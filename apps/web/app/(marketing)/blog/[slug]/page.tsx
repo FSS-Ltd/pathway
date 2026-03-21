@@ -152,7 +152,7 @@ export default async function BlogPostPage({ params }: Props) {
       />
       <article>
         <section className="bg-shell">
-          <div className="mx-auto max-w-7xl px-4 py-12 md:py-16">
+          <div className="mx-auto max-w-7xl px-4 py-8 md:py-16">
             <Link
               href="/blog"
               className="inline-flex items-center gap-2 text-sm font-medium text-text-muted transition hover:text-text-primary"
@@ -160,7 +160,7 @@ export default async function BlogPostPage({ params }: Props) {
               ← Back to Resources
             </Link>
 
-            <div className="mt-8 grid items-center gap-8 lg:grid-cols-2">
+            <div className="mt-6 grid items-center gap-6 md:gap-8 lg:grid-cols-2">
               <div>
                 <div className="mb-4 flex flex-wrap gap-2">
                   {post.tags.map((tag) => (
@@ -172,11 +172,11 @@ export default async function BlogPostPage({ params }: Props) {
                     </span>
                   ))}
                 </div>
-                <h1 className="text-4xl font-bold text-text-primary md:text-5xl">
+                <h1 className="text-3xl font-bold text-text-primary sm:text-4xl md:text-5xl">
                   {post.title}
                 </h1>
                 {post.excerpt && (
-                  <p className="mt-4 text-lg text-text-muted">{post.excerpt}</p>
+                  <p className="mt-4 text-base text-text-muted sm:text-lg">{post.excerpt}</p>
                 )}
                 <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-text-muted">
                   <span>{formatDate(post.publishedAt)}</span>
@@ -187,7 +187,7 @@ export default async function BlogPostPage({ params }: Props) {
                 </div>
               </div>
 
-              <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
+              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-muted sm:aspect-video">
                 {(post.headerImageId ?? post.thumbnailImageId) ? (
                   <Image
                     src={`/media/${post.headerImageId ?? post.thumbnailImageId}`}
@@ -206,15 +206,15 @@ export default async function BlogPostPage({ params }: Props) {
         </section>
 
         <section className="bg-white">
-          <div className="mx-auto max-w-7xl px-4 py-12 md:py-16">
-            <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="mx-auto max-w-7xl px-4 py-10 md:py-16">
+            <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div
-                className="prose prose-lg max-w-none prose-headings:text-text-primary prose-h2:scroll-mt-28 prose-h3:scroll-mt-28 prose-p:text-text-primary prose-p:leading-relaxed prose-a:text-accent-strong prose-a:no-underline hover:prose-a:underline prose-blockquote:border-l-accent-secondary prose-blockquote:bg-accent-subtle/30 prose-blockquote:py-2 prose-blockquote:pl-6 prose-img:my-8 prose-img:rounded-xl"
+                className="prose prose-base max-w-none prose-headings:text-text-primary prose-h2:scroll-mt-28 prose-h3:scroll-mt-28 prose-p:text-text-primary prose-p:leading-relaxed prose-a:text-accent-strong prose-a:no-underline hover:prose-a:underline prose-blockquote:border-l-accent-secondary prose-blockquote:bg-accent-subtle/30 prose-blockquote:py-2 prose-blockquote:pl-6 prose-img:my-8 prose-img:rounded-xl md:prose-lg"
                 dangerouslySetInnerHTML={{ __html: postHtmlWithIds }}
               />
 
               {toc.length > 0 && (
-                <aside className="lg:sticky lg:top-24 lg:self-start">
+                <aside className="hidden xl:sticky xl:top-24 xl:block xl:self-start">
                   <div className="rounded-xl border border-border-subtle bg-surface p-6">
                     <h2 className="mb-4 text-xl font-bold text-text-primary">
                       Table of Contents
