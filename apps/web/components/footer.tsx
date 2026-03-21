@@ -14,28 +14,32 @@ const footerSections: FooterSection[] = [
   {
     title: "Nexsteps",
     description:
-      "School management platform for attendance, rotas, safeguarding, and communication.",
+      "Connected operations platform for attendance, scheduling, family communication, safeguarding, and reporting.",
   },
   {
-    title: "Product",
+    title: "Features",
     links: [
-      { label: "Overview", href: "/" },
+      { label: "Attendance", href: "/features/attendance" },
+      { label: "Teams & Scheduling", href: "/features/teams-scheduling" },
+      { label: "Family Communication", href: "/features/family-communication" },
+      { label: "Safeguarding", href: "/features/safeguarding" },
+      { label: "Reporting", href: "/features/reporting" },
       { label: "Pricing", href: "/pricing" },
     ],
   },
   {
-    title: "Sectors",
+    title: "Who It's For",
     links: [
-      { label: "For Schools", href: "/schools" },
-      { label: "For Clubs", href: "/clubs" },
-      { label: "For Churches", href: "/churches" },
-      { label: "For Charities", href: "/charities" },
+      { label: "Schools", href: "/schools" },
+      { label: "Clubs", href: "/clubs" },
+      { label: "Churches", href: "/churches" },
+      { label: "Charities", href: "/charities" },
     ],
   },
   {
     title: "Resources",
     links: [
-      { label: "Resources", href: "/blog" },
+      { label: "Blog", href: "/blog" },
       { label: "Security", href: "/security" },
       { label: "Book a demo", href: "/demo" },
       { label: "Join trial waitlist", href: "/trial" },

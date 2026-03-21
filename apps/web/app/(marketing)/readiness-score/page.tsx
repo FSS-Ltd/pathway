@@ -29,7 +29,7 @@ export default function ReadinessScoreStartPage() {
           transition={{ duration: 0.6 }}
         >
           <h1 className="text-3xl font-bold text-text-primary sm:text-4xl md:text-5xl">
-            Safeguarding & Ops Readiness Score
+            Operations & Safeguarding Readiness Score
           </h1>
           <p className="text-lg text-text-muted sm:text-xl">
             A 3-minute assessment to highlight risk areas and next steps.

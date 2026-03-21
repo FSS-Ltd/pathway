@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Attendance + Safeguarding Toolkit | Nexsteps",
+  title: "Operations Toolkit | Nexsteps",
   description:
-    "Download blank templates for attendance registers, incident forms, parent consent, volunteer onboarding, and weekly safeguarding checks. No child details required.",
+    "Download blank operational templates for attendance, incident and concern records, parent consent, volunteer onboarding, and weekly safeguarding checks.",
 };
 
 export default function ToolkitLayout({

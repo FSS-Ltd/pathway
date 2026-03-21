@@ -3,9 +3,9 @@ import Link from "next/link";
 import { securityContent } from "../../../content/security-content";
 
 export const metadata: Metadata = {
-  title: "Security & Safeguarding | Nexsteps",
+  title: "Security, Safeguarding & Compliance | Nexsteps",
   description:
-    "Learn about Nexsteps' security practices, GDPR compliance, data handling, and safeguarding measures. Built for schools, clubs, churches, and charities.",
+    "Learn how Nexsteps protects data with secure architecture, GDPR-aligned controls, role-based access, and safeguarding workflows.",
 };
 
 export default function SecurityPage() {

@@ -1,5 +1,0 @@
----
-alwaysApply: true
----
-
-Treat the instructions defined in `pathway-rules.mdc` (in this folder) as the primary project rules for PathWay. Obey them with high priority for all tasks in this workspace.
