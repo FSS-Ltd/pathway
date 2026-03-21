@@ -1,25 +1,23 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Filter, ExternalLink } from "lucide-react";
+import { Search, ExternalLink } from "lucide-react";
 import type { BlogPostSummary } from "../../../lib/blog-client";
 
 type Props = {
   posts: BlogPostSummary[];
-  nextCursor?: string;
   allTags: string[];
 };
 
 export default function BlogIndexClient({
   posts,
-  nextCursor,
   allTags,
 }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [filterOpen, setFilterOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -40,6 +38,12 @@ export default function BlogIndexClient({
 
   const filteredFeatured = filteredPosts[0];
   const filteredGrid = filteredPosts.slice(1);
+  const visibleGridPosts = filteredGrid.slice(0, visibleCount);
+  const hasMoreVisiblePosts = visibleGridPosts.length < filteredGrid.length;
+
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [searchQuery, selectedCategory]);
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row lg:gap-12">
@@ -59,35 +63,6 @@ export default function BlogIndexClient({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full rounded-xl border border-border-subtle bg-surface py-2.5 pl-10 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:border-accent-primary focus:outline-none focus:ring-1 focus:ring-accent-primary"
               />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-text-primary">
-              Filter
-            </label>
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-              <button
-                type="button"
-                onClick={() => setFilterOpen(!filterOpen)}
-                className="flex w-full items-center justify-between rounded-xl border border-border-subtle bg-surface py-2.5 pl-10 pr-4 text-sm text-text-primary"
-              >
-                <span className="text-text-muted">Filter article...</span>
-                <svg
-                  className={`h-4 w-4 text-text-muted transition ${filterOpen ? "rotate-180" : ""}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 9l-7 7-7-7"
-                  />
-                </svg>
-              </button>
             </div>
           </div>
 
@@ -201,7 +176,7 @@ export default function BlogIndexClient({
 
             {/* Grid of Posts */}
             <div className="grid gap-6 sm:grid-cols-2">
-              {filteredGrid.map((post) => (
+              {visibleGridPosts.map((post) => (
                 <Link
                   key={post.id}
                   href={`/blog/${post.slug}`}
@@ -266,14 +241,15 @@ export default function BlogIndexClient({
           </div>
         )}
 
-        {nextCursor && filteredPosts.length > 0 && (
+        {hasMoreVisiblePosts && filteredPosts.length > 0 && (
           <div className="mt-8 text-center">
-            <Link
-              href={`/blog?cursor=${nextCursor}`}
+            <button
+              type="button"
+              onClick={() => setVisibleCount((count) => count + 10)}
               className="inline-flex items-center gap-2 rounded-lg bg-accent-subtle px-6 py-3 text-sm font-medium text-accent-strong transition hover:bg-accent-primary hover:text-white"
             >
-              Load more
-            </Link>
+              Show more
+            </button>
           </div>
         )}
       </main>

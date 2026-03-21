@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export const revalidate = 60;
 
 export default async function BlogIndexPage() {
-  const { posts, nextCursor } = await fetchBlogPosts(undefined, 20);
+  const { posts } = await fetchBlogPosts(undefined, 110);
 
   // All unique tags for categories
   const allTags = Array.from(
@@ -52,7 +52,6 @@ export default async function BlogIndexPage() {
 
       <BlogIndexClient
         posts={posts}
-        nextCursor={nextCursor}
         allTags={allTags}
       />
     </div>

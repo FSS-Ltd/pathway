@@ -76,15 +76,19 @@ export async function fetchBlogPosts(
 }
 
 export async function fetchBlogPostBySlug(slug: string): Promise<BlogPostDetail | null> {
-  const res = await fetch(`${API_BASE_URL}/public/blog/posts/${encodeURIComponent(slug)}`, {
-    next: { revalidate: 60 },
-    ...getFetchOptions(),
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`Failed to fetch blog post: ${res.status}`);
+  try {
+    const res = await fetch(`${API_BASE_URL}/public/blog/posts/${encodeURIComponent(slug)}`, {
+      next: { revalidate: 60 },
+      ...getFetchOptions(),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      return null;
+    }
+    return res.json();
+  } catch {
+    return null;
   }
-  return res.json();
 }
 
 export async function fetchRelatedPosts(
