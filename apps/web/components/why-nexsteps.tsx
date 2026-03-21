@@ -26,24 +26,24 @@ const itemVariants = {
 
 const features = [
   {
-    title: "Built for busy schools",
+    title: "Spreadsheets hide what is really happening",
     description:
-      "Fast flows for attendance, rotas, safeguarding, and announcements. Minimise clicks, maximise efficiency.",
+      "Critical attendance, scheduling, and care details end up split across tabs and versions.",
   },
   {
-    title: "Multi-tenant and secure",
+    title: "Group chats are fast, but not operationally reliable",
     description:
-      "Tenant isolation with Row-Level Security and GDPR-first data handling. Your data stays private.",
+      "Important updates get buried, duplicated, or lost when teams coordinate only in chat threads.",
   },
   {
-    title: "Offline-first mobile app",
+    title: "Separate parent apps and admin tools create extra friction",
     description:
-      "Staff can capture attendance and notes offline, then sync when connected. Perfect for busy classrooms.",
+      "Staff and families see different versions of reality, which creates unnecessary follow-up work.",
   },
   {
-    title: "Parent communication",
+    title: "Disconnected logs make decisions slower",
     description:
-      "Send announcements, share attendance history, and keep families informed-all from one platform.",
+      "When evidence lives in multiple places, leaders spend more time collecting context than acting on it.",
   },
 ];
 
@@ -64,7 +64,7 @@ export default function WhyNexsteps() {
           viewport={{ once: true }}
           transition={{ delay: 0.2 }}
         >
-          Why Nexsteps?
+          Why organisations switch
         </motion.h2>
         <motion.div
           className="grid gap-8 md:grid-cols-2"

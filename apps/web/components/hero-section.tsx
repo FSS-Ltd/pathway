@@ -52,28 +52,27 @@ export default function HeroSection() {
           className="mb-4 text-4xl font-bold text-text-primary md:text-5xl lg:text-6xl"
           variants={itemVariants}
         >
-          All-in-one platform: Manage attendance, rotas & safeguarding
+          Run attendance, teams, family communication, and safeguarding in one place.
         </motion.h1>
         <motion.p
           className="mb-6 text-lg leading-relaxed text-text-muted md:text-xl"
           variants={itemVariants}
         >
-          Streamline your school operations with attendance tracking, rota
-          management, safeguarding notes, and parent communication-all from one
-          secure dashboard.
+          Nexsteps helps schools, clubs, and churches stay organised, connected,
+          and in sync.
         </motion.p>
         <motion.div
           className="flex flex-wrap justify-center gap-4 md:justify-start"
           variants={itemVariants}
         >
           <CtaButton href="/demo" location="home_hero" variant="primary">
-            Get Started
+            Book a demo
           </CtaButton>
           <Link
-            href="/trial"
+            href="/features/attendance"
             className="rounded-md border border-border-subtle bg-surface px-6 py-3 text-base font-medium text-text-primary transition hover:bg-muted"
           >
-            Join waitlist
+            See how Nexsteps works
           </Link>
         </motion.div>
       </motion.div>

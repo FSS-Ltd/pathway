@@ -229,10 +229,12 @@ export default function PricingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
-          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">Pricing</h1>
+          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">
+            Pricing for connected operations
+          </h1>
           <p className="text-lg text-pw-text-muted md:text-xl">
-            Choose the level of structure your organisation actually needs.
-            All plans include secure, GDPR-compliant data handling.
+            Choose the level of structure your organisation needs to run attendance,
+            scheduling, family communication, safeguarding, and reporting in one place.
           </p>
         </motion.div>
 

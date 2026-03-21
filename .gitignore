@@ -39,6 +39,8 @@ packages/db/prisma/.env
 .vscode/
 .idea/
 .cursor/
+.codex/
+AGENTS.md
 # OS
 .DS_Store
 Thumbs.db

@@ -41,10 +41,10 @@ export default function SectorGrid({ sectors }: SectorGridProps) {
         transition={{ duration: 0.6 }}
       >
         <h2 className="mb-4 text-3xl font-bold text-text-primary md:text-4xl">
-          Choose Your Sector
+          Built for your context
         </h2>
         <p className="mx-auto max-w-2xl text-lg text-text-muted">
-          Nexsteps is designed for schools, clubs, churches, and charities
+          See how connected operations adapt to schools, clubs, churches, and charities
         </p>
       </motion.div>
 
@@ -66,7 +66,7 @@ export default function SectorGrid({ sectors }: SectorGridProps) {
               className="flex h-full flex-col rounded-xl border border-border-subtle bg-surface p-6 shadow-soft transition hover:border-accent-primary/60 hover:shadow-card"
             >
               <h3 className="mb-2 text-lg font-semibold text-text-primary">
-                For {sector.name}
+                {sector.name}
               </h3>
               <p className="flex-1 text-sm text-text-muted">{sector.heroSubtitle}</p>
             </Link>

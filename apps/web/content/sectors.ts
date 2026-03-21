@@ -6,6 +6,9 @@ export interface SectorDefinition {
   slug: string;
   heroTitle: string;
   heroSubtitle: string;
+  fragmentedToolsCopy: string;
+  examplesSectionTitle: string;
+  examples: string[];
   primaryCtaLabel: string;
   secondaryCtaLabel: string;
   primaryCtaHref: string;
@@ -19,9 +22,17 @@ export const sectors: SectorDefinition[] = [
     id: "schools",
     name: "Schools",
     slug: "schools",
-    heroTitle: "Nexsteps for Schools",
+    heroTitle: "Connected operations for schools",
     heroSubtitle:
-      "A comprehensive school management platform designed for busy school staff. Manage attendance, rotas, safeguarding workflows, and parent communication-all in one secure, GDPR-compliant system.",
+      "Run attendance, teams, family communication, and safeguarding from one connected system built for school operations.",
+    fragmentedToolsCopy:
+      "Replace disconnected spreadsheets, group chats, parent apps, and stand-alone logs with one workflow for school operations.",
+    examplesSectionTitle: "School examples",
+    examples: [
+      "Coordinate classroom cover and session changes without losing attendance context.",
+      "Keep parent communications aligned with what staff are seeing in real time.",
+      "Support pastoral and safeguarding follow-through with structured records.",
+    ],
     primaryCtaLabel: "Book a demo",
     secondaryCtaLabel: "View pricing",
     primaryCtaHref: "/demo?sector=schools",
@@ -34,15 +45,23 @@ export const sectors: SectorDefinition[] = [
       "Multi-site support for academies and MATs",
       "GDPR-compliant data handling",
     ],
-    benefitsSectionTitle: "Key Features",
+    benefitsSectionTitle: "Operational outcomes for schools",
   },
   {
     id: "clubs",
     name: "Clubs",
     slug: "clubs",
-    heroTitle: "Nexsteps for Clubs",
+    heroTitle: "Connected operations for clubs",
     heroSubtitle:
-      "Perfect for youth clubs, sports clubs, and after-school programmes. Manage multiple groups, track attendance, coordinate volunteers, and keep parents informed-all from one platform.",
+      "Coordinate attendance, teams, family communication, and safeguarding in one connected operating system for clubs and programmes.",
+    fragmentedToolsCopy:
+      "Replace rota spreadsheets, coach group chats, separate parent messaging tools, and isolated logs with one connected system.",
+    examplesSectionTitle: "Club examples",
+    examples: [
+      "Run multi-group sessions with clearer staffing and attendance visibility.",
+      "Keep volunteers, staff, and families aligned on session updates.",
+      "Capture concerns and follow-up actions in structured records.",
+    ],
     primaryCtaLabel: "Book a demo",
     secondaryCtaLabel: "View pricing",
     primaryCtaHref: "/demo?sector=clubs",
@@ -55,15 +74,23 @@ export const sectors: SectorDefinition[] = [
       "Offline-first mobile app for on-the-go capture",
       "Secure, GDPR-compliant data handling",
     ],
-    benefitsSectionTitle: "Perfect for Clubs",
+    benefitsSectionTitle: "Operational outcomes for clubs",
   },
   {
     id: "churches",
     name: "Churches",
     slug: "churches",
-    heroTitle: "Nexsteps for Churches",
+    heroTitle: "Connected operations for churches",
     heroSubtitle:
-      "Support faith-based groups and churches with secure, GDPR-compliant management tools for children and youth programmes. Manage attendance, volunteers, and parent communication with confidence.",
+      "Keep attendance, teams, family communication, and safeguarding connected across church children and youth activities.",
+    fragmentedToolsCopy:
+      "Replace disconnected attendance sheets, leader chats, separate family updates, and manual logs with one operational flow.",
+    examplesSectionTitle: "Church examples",
+    examples: [
+      "Coordinate volunteers and group leaders across multiple age bands.",
+      "Keep families updated as plans change across services and activities.",
+      "Maintain structured records for care and safeguarding follow-up.",
+    ],
     primaryCtaLabel: "Book a demo",
     secondaryCtaLabel: "View pricing",
     primaryCtaHref: "/demo?sector=churches",
@@ -76,15 +103,23 @@ export const sectors: SectorDefinition[] = [
       "GDPR-compliant data handling",
       "Parent communication and announcements",
     ],
-    benefitsSectionTitle: "Built for Faith-Based Groups",
+    benefitsSectionTitle: "Operational outcomes for churches",
   },
   {
     id: "charities",
     name: "Charities",
     slug: "charities",
-    heroTitle: "Nexsteps for Charities",
+    heroTitle: "Connected operations for charities",
     heroSubtitle:
-      "Support charities and non-profit organisations with secure, GDPR-compliant management tools for children and youth programmes. Manage attendance, volunteers, and parent communication efficiently.",
+      "Bring attendance, teams, family communication, and safeguarding together in one connected system for programme delivery.",
+    fragmentedToolsCopy:
+      "Replace siloed spreadsheets, volunteer chats, separate communication tools, and fragmented records with one connected platform.",
+    examplesSectionTitle: "Charity examples",
+    examples: [
+      "Coordinate delivery teams across sites and programme sessions.",
+      "Keep families and stakeholders aligned with clearer communication flows.",
+      "Record sensitive concerns in a consistent, structured way.",
+    ],
     primaryCtaLabel: "Book a demo",
     secondaryCtaLabel: "View pricing",
     primaryCtaHref: "/demo?sector=charities",
@@ -97,7 +132,7 @@ export const sectors: SectorDefinition[] = [
       "GDPR-compliant data handling",
       "Parent and guardian communication",
     ],
-    benefitsSectionTitle: "Perfect for Charities",
+    benefitsSectionTitle: "Operational outcomes for charities",
   },
 ];
 
@@ -108,4 +143,3 @@ export function getSectorById(id: SectorId): SectorDefinition | undefined {
 export function getSectorBySlug(slug: string): SectorDefinition | undefined {
   return sectors.find((s) => s.slug === slug);
 }
-

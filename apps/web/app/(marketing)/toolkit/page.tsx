@@ -81,10 +81,10 @@ export default function ToolkitPage() {
           transition={{ duration: 0.6 }}
         >
           <h1 className="text-4xl font-bold text-text-primary">
-            Attendance + Safeguarding Toolkit
+            Operations Toolkit
           </h1>
           <p className="text-lg text-text-muted">
-            Blank templates to help you run attendance, record concerns, and stay compliant.
+            Blank templates to help you run attendance, capture incident and concern records, and stay compliant.
           </p>
 
           <ul className="space-y-2 text-text-muted">

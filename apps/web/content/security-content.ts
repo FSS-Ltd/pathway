@@ -55,11 +55,11 @@ export interface SecurityContent {
 
 export const securityContent: SecurityContent = {
   hero: {
-    title: "Security & Safeguarding at Nexsteps",
+    title: "Security, Safeguarding & Compliance at Nexsteps",
     description:
-      "Nexsteps is built with security and compliance at its core. We protect children's data, support safeguarding workflows, and ensure your organisation's information is handled with the highest standards of care and accountability.",
+      "Nexsteps is a connected operations system with security and compliance built in. We protect children's data, support safeguarding workflows, and help organisations operate with stronger accountability.",
     primaryCta: {
-      label: "Book a security & safeguarding walkthrough",
+      label: "Book a security walkthrough",
       href: "/demo?topic=security",
     },
     secondaryCta: {
@@ -186,4 +186,3 @@ export const securityContent: SecurityContent = {
   },
   lastUpdated: "December 2024",
 };
-

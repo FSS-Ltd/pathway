@@ -7,11 +7,11 @@ const baseUrl = "https://nexsteps.dev";
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: {
-    default: "Nexsteps - School Management Platform",
+    default: "Nexsteps - Connected Operations Platform",
     template: "%s | Nexsteps",
   },
   description:
-    "Nexsteps helps schools, clubs, churches, and charities manage attendance, rotas, safeguarding, and parent communication.",
+    "Nexsteps helps schools, clubs, churches, and charities run attendance, teams, family communication, safeguarding, and reporting from one connected system.",
   alternates: {
     canonical: baseUrl,
   },

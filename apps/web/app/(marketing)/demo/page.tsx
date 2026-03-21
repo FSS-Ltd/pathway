@@ -103,8 +103,9 @@ export default function DemoPage() {
         >
           <h1 className="text-4xl font-bold text-pw-text">Book a Demo</h1>
           <p className="text-lg text-pw-text-muted">
-            See how Nexsteps can help your organisation manage attendance, rotas, safeguarding,
-            and parent communication. Schedule a demo with our team.
+            See how Nexsteps can help your organisation run attendance, teams,
+            family communication, safeguarding, and reporting in one connected system.
+            Schedule a demo with our team.
           </p>
         </motion.div>
 
