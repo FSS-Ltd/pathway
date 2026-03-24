@@ -1,0 +1,210 @@
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import Svg, { Path } from "react-native-svg";
+
+import { BrandLogo } from "@/components/primitives/brand-logo";
+import { mobileTokens } from "@/design/tokens";
+import { useAppReady } from "@/hooks/use-app-ready";
+import { ApiError } from "@/lib/api/client";
+
+export default function SignInScreen() {
+  const { signIn, bootstrapState } = useAppReady();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (bootstrapState.status === "ready" || bootstrapState.status === "needs-site-selection") {
+      router.replace("/(auth)/site-select");
+    }
+  }, [bootstrapState]);
+
+  async function handleSignIn() {
+    if (isSigningIn) return;
+
+    setIsSigningIn(true);
+    setErrorMessage(null);
+
+    try {
+      await signIn();
+    } catch (error) {
+      if (error instanceof Error) {
+        if ((error as { name?: string }).name === "WebAuthCancelled") {
+          setErrorMessage("Sign-in was cancelled.");
+        } else if ((error as { name?: string }).name === "Auth0NativeModuleUnavailable") {
+          setErrorMessage("Use a custom dev build (not Expo Go) to sign in with Auth0.");
+        } else if (error instanceof ApiError) {
+          setErrorMessage("Signed in, but workspace bootstrap failed.");
+        } else {
+          setErrorMessage(error.message);
+        }
+      } else {
+        setErrorMessage("Unable to sign in right now.");
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.logoWrap}>
+          <BrandLogo width={140} height={50} />
+        </View>
+
+        <View style={styles.headingBlock}>
+          <Text style={styles.heading}>Welcome back</Text>
+          <Text style={styles.subheading}>Log in to continue your journey</Text>
+        </View>
+
+        <View style={styles.motifWrap}>
+          <Svg width={220} height={34} viewBox="0 0 220 34" fill="none">
+            <Path
+              d="M14 14C64 4 156 4 206 14"
+              stroke="#D8F2EC"
+              strokeWidth={4}
+              strokeLinecap="round"
+            />
+            <Path
+              d="M32 26C74 18 146 18 188 26"
+              stroke="#F7EDD1"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+          </Svg>
+        </View>
+
+        <View style={styles.formBlock}>
+          <Text style={styles.helperText}>
+            Continue with your invited account to access Nexsteps securely through Auth0.
+          </Text>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continue to Auth0"
+            hitSlop={6}
+            onPress={handleSignIn}
+            disabled={isSigningIn}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              isSigningIn ? styles.primaryDisabled : undefined,
+              pressed && !isSigningIn ? styles.primaryPressed : undefined,
+            ]}
+          >
+            {isSigningIn ? (
+              <ActivityIndicator color={mobileTokens.colors.text.primary} />
+            ) : (
+              <Text style={styles.primaryButtonText}>Continue to Auth0</Text>
+            )}
+          </Pressable>
+
+          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        </View>
+
+        <Text style={styles.inviteOnlyText}>
+          Access is invite-only. Your organisation will send your sign-up link by email.
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: mobileTokens.colors.bg.auth,
+  },
+  container: {
+    paddingHorizontal: 28,
+    paddingTop: 12,
+    paddingBottom: 36,
+  },
+  logoWrap: {
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  headingBlock: {
+    alignItems: "center",
+    marginBottom: 22,
+    gap: 8,
+  },
+  heading: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 36,
+    lineHeight: 44,
+    color: mobileTokens.colors.text.primary,
+    letterSpacing: -0.3,
+  },
+  subheading: {
+    fontFamily: "Quicksand_400Regular",
+    fontSize: 16,
+    lineHeight: 24,
+    color: mobileTokens.colors.text.muted,
+  },
+  motifWrap: {
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  formBlock: {
+    gap: 16,
+  },
+  helperText: {
+    textAlign: "center",
+    fontFamily: "Quicksand_400Regular",
+    fontSize: 16,
+    lineHeight: 24,
+    color: mobileTokens.colors.text.muted,
+    paddingHorizontal: 8,
+  },
+  primaryButton: {
+    minHeight: 62,
+    borderRadius: 18,
+    backgroundColor: mobileTokens.colors.accent.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
+    marginTop: 4,
+  },
+  primaryPressed: {
+    opacity: 0.92,
+  },
+  primaryDisabled: {
+    opacity: 0.86,
+  },
+  primaryButtonText: {
+    fontFamily: "Nunito_700Bold",
+    fontSize: 18,
+    lineHeight: 24,
+    color: mobileTokens.colors.text.primary,
+  },
+  inviteOnlyText: {
+    marginTop: 26,
+    textAlign: "center",
+    fontFamily: "Quicksand_500Medium",
+    fontSize: 14,
+    lineHeight: 24,
+    color: mobileTokens.colors.text.muted,
+  },
+  error: {
+    marginTop: 2,
+    textAlign: "center",
+    fontFamily: "Quicksand_500Medium",
+    fontSize: mobileTokens.typography.body.xs.size,
+    lineHeight: mobileTokens.typography.body.xs.lineHeight,
+    color: mobileTokens.colors.status.danger,
+  },
+});

@@ -1,12 +1,39 @@
 {
   "name": "@pathway/mobile",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
+  "main": "expo-router/entry",
   "scripts": {
-    "dev": "echo mobile-dev",
-    "build": "echo mobile-build",
-    "lint": "eslint \"src/**/*.{ts,tsx,js}\" --no-error-on-unmatched-pattern",
-    "typecheck": "tsc -v",
-    "test": "echo mobile-test"
+    "dev": "expo start --clear",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "doctor": "npx expo-doctor",
+    "lint": "eslint \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" --no-error-on-unmatched-pattern",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo-google-fonts/nunito": "^0.4.2",
+    "@expo-google-fonts/quicksand": "^0.4.1",
+    "@expo/metro-runtime": "~6.1.2",
+    "@expo/vector-icons": "^15.0.2",
+    "@pathway/mobile-core": "workspace:*",
+    "expo": "~54.0.0",
+    "expo-constants": "^55.0.9",
+    "expo-font": "^55.0.4",
+    "expo-router": "~6.0.0",
+    "expo-secure-store": "^55.0.9",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-auth0": "^5.4.0",
+    "react-native-safe-area-context": "5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.13.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "react-native-svg-transformer": "^1.5.0",
+    "typescript": "~5.9.2"
   }
 }

@@ -233,7 +233,12 @@ export class ActiveSiteController {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { superUser: true },
+      select: {
+        superUser: true,
+        hasFamilyAccess: true,
+        hasServeAccess: true,
+        lastActiveTenantId: true,
+      },
     });
 
     // Get user's org memberships to determine org roles
@@ -284,6 +289,32 @@ export class ActiveSiteController {
       }
     });
 
+    const cookieSiteId = req.cookies?.[ACTIVE_SITE_COOKIE];
+    const activeSiteId =
+      cookieSiteId ??
+      user?.lastActiveTenantId ??
+      siteMemberships[0]?.tenantId ??
+      userTenantRoles[0]?.tenantId ??
+      null;
+
+    const linkedChildrenCount = await prisma.child.count({
+      where: {
+        ...(activeSiteId ? { tenantId: activeSiteId } : {}),
+        guardians: { some: { id: userId } },
+      },
+    });
+
+    const siteRoleValues = Array.from(siteRoles.values());
+    const hasFamilyRole = siteRoleValues.includes(SiteRole.VIEWER);
+    const hasServeRole = siteRoleValues.some(
+      (role) => role === SiteRole.STAFF || role === SiteRole.SITE_ADMIN,
+    );
+
+    const computedHasFamilyAccess =
+      Boolean(user?.hasFamilyAccess) || hasFamilyRole || linkedChildrenCount > 0;
+    const computedHasServeAccess =
+      Boolean(user?.hasServeAccess) || hasServeRole;
+
     const cookieOrgId = req.cookies?.pw_active_org_id;
     const firstOrgFromMemberships = orgMemberships[0]?.org ?? userOrgRoles[0]?.org;
     const currentOrgId = cookieOrgId ?? firstOrgFromMemberships?.id ?? null;
@@ -318,6 +349,8 @@ export class ActiveSiteController {
         orgId: m.tenant.orgId,
         role: m.role,
       })),
+      hasFamilyAccess: computedHasFamilyAccess,
+      hasServeAccess: computedHasServeAccess,
     };
   }
 
@@ -355,5 +388,3 @@ export class ActiveSiteController {
     res.cookie(ACTIVE_ORG_COOKIE, payload.orgId ?? "", options);
   }
 }
-
-
