@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  Inject,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -42,7 +43,10 @@ const userInclude = {
  */
 @Injectable()
 export class AuthUserGuard implements CanActivate {
-  constructor(private readonly authIdentityService: AuthIdentityService) {}
+  constructor(
+    @Inject(AuthIdentityService)
+    private readonly authIdentityService: AuthIdentityService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -78,7 +82,14 @@ export class AuthUserGuard implements CanActivate {
         });
       } catch (err) {
         console.warn("[AuthUserGuard] JIT upsert failed:", err);
-        throw new UnauthorizedException("User not found for this Auth0 identity");
+        const detail =
+          err instanceof Error ? err.message : "Unknown JIT upsert failure";
+        if (process.env.NODE_ENV === "production") {
+          throw new UnauthorizedException("User not found for this Auth0 identity");
+        }
+        throw new UnauthorizedException(
+          `User not found for this Auth0 identity (JIT upsert failed: ${detail})`,
+        );
       }
       identity = await prisma.userIdentity.findUnique({
         where: {
@@ -266,5 +277,3 @@ export class AuthUserGuard implements CanActivate {
     return true;
   }
 }
-
-

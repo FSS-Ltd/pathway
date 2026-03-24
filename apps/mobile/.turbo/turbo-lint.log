@@ -1,4 +1,15 @@
 
-> @pathway/mobile@0.0.0 lint /Users/JeanFidele/Projects/pathway/apps/mobile
-> eslint "src/**/*.{ts,tsx,js}" --no-error-on-unmatched-pattern
+> @pathway/mobile@0.1.0 lint /Users/JeanFidele/Projects/pathway/apps/mobile
+> eslint "app/**/*.{ts,tsx}" "src/**/*.{ts,tsx}" --no-error-on-unmatched-pattern
 
+
+/Users/JeanFidele/Projects/pathway/apps/mobile/src/lib/api/client.ts
+  37:5  error  Unnecessary try/catch wrapper  no-useless-catch
+
+/Users/JeanFidele/Projects/pathway/apps/mobile/src/lib/auth/auth0-client.ts
+  43:12  error  'error' is defined but never used  @typescript-eslint/no-unused-vars
+  63:12  error  'error' is defined but never used  @typescript-eslint/no-unused-vars
+
+✖ 3 problems (3 errors, 0 warnings)
+
+ ELIFECYCLE  Command failed with exit code 1.
