@@ -1,21 +1,36 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+import type { ActiveSite, ActiveSiteState } from "@pathway/mobile-core";
 
 import { BrandLogo } from "@/components/primitives/brand-logo";
 import { mobileTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks/use-app-ready";
-import { apiClient } from "@/lib/api/client";
-import { updateSessionSnapshot } from "@/lib/auth/session-store";
+
+function getActiveSiteStateFromBootstrap(
+  state: ReturnType<typeof useAppReady>["bootstrapState"],
+): ActiveSiteState | null {
+  if (state.status === "ready" || state.status === "needs-site-selection") {
+    return state.activeSiteState;
+  }
+  return null;
+}
 
 export default function SiteSelectScreen() {
-  const { bootstrapState, refreshBootstrap, signOut } = useAppReady();
+  const { bootstrapState, signOut, switchActiveSite, switchSpace } = useAppReady();
+  const [pendingSiteId, setPendingSiteId] = useState<string | null>(null);
+  const [pendingSpace, setPendingSpace] = useState<"family" | "serve" | null>(null);
 
-  const isPreparingSite = bootstrapState.status === "loading";
+  const isPreparing = bootstrapState.status === "loading";
   const needsSiteSelection = bootstrapState.status === "needs-site-selection";
   const isReady = bootstrapState.status === "ready";
+  const activeSiteState = getActiveSiteStateFromBootstrap(bootstrapState);
+  const availableSites = activeSiteState?.sites ?? [];
+  const activeSiteId = activeSiteState?.activeSiteId ?? null;
+  const hasMultipleSites = availableSites.length > 1;
 
   const hasFamilyAccess = isReady ? bootstrapState.hasFamilyAccess : false;
   const hasServeAccess = isReady ? bootstrapState.hasServeAccess : false;
@@ -23,35 +38,93 @@ export default function SiteSelectScreen() {
   useEffect(() => {
     if (bootstrapState.status === "unauthenticated" || bootstrapState.status === "error") {
       router.replace("/(auth)/sign-in");
+      return;
+    }
+
+    if (bootstrapState.status === "ready" || bootstrapState.status === "needs-site-selection") {
+      setPendingSiteId(null);
+      setPendingSpace(null);
     }
   }, [bootstrapState]);
 
-  async function handleSelectSite(siteId: string) {
-    if (!needsSiteSelection) return;
-    const token = bootstrapState.session.accessToken;
-    await apiClient.setActiveSite(siteId, token);
-    await updateSessionSnapshot({ activeSiteId: siteId });
-    await refreshBootstrap();
+  async function handleSelectSite(site: ActiveSite) {
+    if (!activeSiteState) return;
+    if (pendingSiteId) return;
+    if (site.id === activeSiteId && bootstrapState.status === "ready") return;
+
+    setPendingSiteId(site.id);
+    try {
+      await switchActiveSite(site.id);
+    } finally {
+      setPendingSiteId(null);
+    }
   }
 
-  async function enterSpace(space: "family" | "serve") {
+  async function handleEnterSpace(space: "family" | "serve") {
     if (!isReady) return;
-    await updateSessionSnapshot({ preferredSpace: space });
-    router.replace(space === "family" ? "/(family)/(tabs)/home" : "/(serve)/(tabs)/attendance");
+    const isAllowed = space === "family" ? hasFamilyAccess : hasServeAccess;
+    if (!isAllowed) return;
+
+    setPendingSpace(space);
+    try {
+      await switchSpace(space);
+      router.replace(space === "family" ? "/(family)/(tabs)/home" : "/(serve)/(tabs)/attendance");
+    } finally {
+      setPendingSpace(null);
+    }
   }
 
-  function handleFamilyAction() {
+  function handleFamilyPrimaryAction() {
     if (!isReady) return;
     if (hasFamilyAccess) {
-      void enterSpace("family");
+      void handleEnterSpace("family");
       return;
     }
     router.push("/(auth)/register-child");
   }
 
-  function handleServeAction() {
-    if (!isReady || !hasServeAccess) return;
-    void enterSpace("serve");
+  function renderSiteSelectionCard() {
+    if (!activeSiteState) return null;
+    if (!hasMultipleSites && !needsSiteSelection) return null;
+
+    return (
+      <View style={styles.siteSelectionCard}>
+        <Text style={styles.siteSelectionTitle}>
+          {needsSiteSelection ? "Select your site" : "Switch active site"}
+        </Text>
+        <View style={styles.siteList}>
+          {availableSites.map((site) => {
+            const isActive = site.id === activeSiteId;
+            const isPending = pendingSiteId === site.id;
+            return (
+              <Pressable
+                key={site.id}
+                onPress={() => {
+                  void handleSelectSite(site);
+                }}
+                disabled={Boolean(pendingSiteId)}
+                style={({ pressed }) => [
+                  styles.siteButton,
+                  isActive ? styles.siteButtonActive : undefined,
+                  isPending ? styles.siteButtonPending : undefined,
+                  pressed && !pendingSiteId ? styles.pressed : undefined,
+                ]}
+              >
+                <View style={styles.siteButtonTextWrap}>
+                  <Text style={styles.siteButtonTitle}>{site.name}</Text>
+                  <Text style={styles.siteButtonMeta}>{site.orgName ?? "Organisation site"}</Text>
+                </View>
+                {isPending ? (
+                  <ActivityIndicator size="small" color={mobileTokens.colors.accent.serve} />
+                ) : isActive ? (
+                  <Text style={styles.siteBadge}>Active</Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -79,108 +152,115 @@ export default function SiteSelectScreen() {
         <Text style={styles.title}>Welcome to Nexsteps</Text>
         <Text style={styles.subtitle}>
           {needsSiteSelection
-            ? "Select your site first, then choose your space"
-            : "Choose your space to get started"}
+            ? "Select your site to continue"
+            : hasMultipleSites
+              ? "Choose your space or switch active site"
+              : "Choose your space to get started"}
         </Text>
 
+        {renderSiteSelectionCard()}
+
         {needsSiteSelection ? (
-          <View style={styles.siteSelectionCard}>
-            <Text style={styles.siteSelectionTitle}>Select site</Text>
-            <View style={styles.siteList}>
-              {bootstrapState.activeSiteState.sites.map((site) => (
-                <Pressable
-                  key={site.id}
-                  onPress={() => {
-                    void handleSelectSite(site.id);
-                  }}
-                  style={({ pressed }) => [styles.siteButton, pressed ? styles.pressed : undefined]}
-                >
-                  <Text style={styles.siteButtonTitle}>{site.name}</Text>
-                  <Text style={styles.siteButtonMeta}>{site.orgName ?? "Organisation site"}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={styles.loadingRow}>
-              <ActivityIndicator color={mobileTokens.colors.accent.primary} />
-              <Text style={styles.loadingText}>Preparing your workspace...</Text>
-            </View>
+          <View style={styles.waitingCard}>
+            <ActivityIndicator color={mobileTokens.colors.accent.primary} />
+            <Text style={styles.waitingText}>
+              We&apos;ll unlock your available spaces once your site is selected.
+            </Text>
           </View>
         ) : null}
 
-        <View style={[styles.spaceCard, !isReady ? styles.disabledCard : undefined]}>
-          <View style={styles.spaceTopRow}>
-            <View style={styles.iconTile}>
-              <Ionicons
-                name="people-outline"
-                size={34}
-                color={hasFamilyAccess ? mobileTokens.colors.text.primary : mobileTokens.colors.text.subtle}
-              />
-            </View>
-            <View style={styles.cardCopyWrap}>
-              <Text style={[styles.spaceTitle, !hasFamilyAccess ? styles.disabledText : undefined]}>
-                Family Space
-              </Text>
-              <Text style={[styles.spaceDescription, !hasFamilyAccess ? styles.disabledText : undefined]}>
-                Connect with your child&apos;s journey
-              </Text>
-              {!hasFamilyAccess ? <Text style={styles.hintText}>Add a child to get started</Text> : null}
-            </View>
-          </View>
+        {!needsSiteSelection ? (
+          <>
+            <View style={styles.spaceCard}>
+              <View style={styles.spaceTopRow}>
+                <View style={styles.iconTile}>
+                  <Ionicons
+                    name="people-outline"
+                    size={34}
+                    color={hasFamilyAccess ? mobileTokens.colors.text.primary : mobileTokens.colors.text.subtle}
+                  />
+                </View>
+                <View style={styles.cardCopyWrap}>
+                  <Text style={[styles.spaceTitle, !hasFamilyAccess ? styles.disabledText : undefined]}>
+                    Family Space
+                  </Text>
+                  <Text style={[styles.spaceDescription, !hasFamilyAccess ? styles.disabledText : undefined]}>
+                    Connect with your child&apos;s journey
+                  </Text>
+                  {!hasFamilyAccess ? <Text style={styles.hintText}>Add a child to get started</Text> : null}
+                </View>
+              </View>
 
-          <Pressable
-            disabled={isPreparingSite || needsSiteSelection}
-            onPress={handleFamilyAction}
-            style={({ pressed }) => [
-              styles.familyButton,
-              !hasFamilyAccess ? styles.familyRegisterButton : undefined,
-              pressed ? styles.pressed : undefined,
-              isPreparingSite || needsSiteSelection ? styles.disabledButton : undefined,
-            ]}
-          >
-            {!hasFamilyAccess ? (
-              <Ionicons name="person-add-outline" size={20} color={mobileTokens.colors.text.primary} />
-            ) : null}
-            <Text style={styles.familyButtonText}>
-              {hasFamilyAccess ? "Enter Family Space" : "Register Child"}
-            </Text>
-          </Pressable>
-        </View>
-
-        <View style={[styles.spaceCard, !hasServeAccess ? styles.disabledCard : undefined]}>
-          <View style={styles.spaceTopRow}>
-            <View style={styles.iconTile}>
-              <Ionicons
-                name="heart-outline"
-                size={34}
-                color={hasServeAccess ? mobileTokens.colors.text.primary : mobileTokens.colors.text.subtle}
-              />
+              <Pressable
+                disabled={isPreparing || pendingSpace !== null}
+                onPress={handleFamilyPrimaryAction}
+                style={({ pressed }) => [
+                  styles.familyButton,
+                  !hasFamilyAccess ? styles.familyRegisterButton : undefined,
+                  isPreparing || pendingSpace !== null ? styles.disabledButton : undefined,
+                  pressed ? styles.pressed : undefined,
+                ]}
+              >
+                {!hasFamilyAccess ? (
+                  <Ionicons name="person-add-outline" size={20} color={mobileTokens.colors.text.primary} />
+                ) : null}
+                {pendingSpace === "family" ? (
+                  <ActivityIndicator color={mobileTokens.colors.text.primary} />
+                ) : (
+                  <Text style={styles.familyButtonText}>
+                    {hasFamilyAccess ? "Enter Family Space" : "Register Child"}
+                  </Text>
+                )}
+              </Pressable>
             </View>
-            <View style={styles.cardCopyWrap}>
-              <Text style={[styles.spaceTitle, !hasServeAccess ? styles.disabledText : undefined]}>
-                Serve Space
-              </Text>
-              <Text style={[styles.spaceDescription, !hasServeAccess ? styles.disabledText : undefined]}>
-                Make a difference in your community
-              </Text>
-              {!hasServeAccess ? (
-                <Text style={styles.serveHintLink}>Do you want to volunteer?</Text>
+
+            <View style={[styles.spaceCard, !hasServeAccess ? styles.disabledCard : undefined]}>
+              <View style={styles.spaceTopRow}>
+                <View style={styles.iconTile}>
+                  <Ionicons
+                    name="heart-outline"
+                    size={34}
+                    color={hasServeAccess ? mobileTokens.colors.text.primary : mobileTokens.colors.text.subtle}
+                  />
+                </View>
+                <View style={styles.cardCopyWrap}>
+                  <Text style={[styles.spaceTitle, !hasServeAccess ? styles.disabledText : undefined]}>
+                    Serve Space
+                  </Text>
+                  <Text style={[styles.spaceDescription, !hasServeAccess ? styles.disabledText : undefined]}>
+                    Make a difference in your community
+                  </Text>
+                  {!hasServeAccess ? (
+                    <Text style={styles.serveHintLink}>Unavailable for this site</Text>
+                  ) : null}
+                </View>
+              </View>
+
+              {hasServeAccess ? (
+                <Pressable
+                  disabled={pendingSpace !== null}
+                  onPress={() => {
+                    void handleEnterSpace("serve");
+                  }}
+                  style={({ pressed }) => [
+                    styles.serveButton,
+                    pendingSpace !== null ? styles.disabledButton : undefined,
+                    pressed ? styles.pressed : undefined,
+                  ]}
+                >
+                  {pendingSpace === "serve" ? (
+                    <ActivityIndicator color={mobileTokens.colors.text.inverse} />
+                  ) : (
+                    <Text style={styles.serveButtonText}>Enter Serve Space</Text>
+                  )}
+                </Pressable>
               ) : null}
             </View>
-          </View>
-
-          {hasServeAccess ? (
-            <Pressable
-              disabled={!isReady}
-              onPress={handleServeAction}
-              style={({ pressed }) => [styles.serveButton, pressed ? styles.pressed : undefined]}
-            >
-              <Text style={styles.serveButtonText}>Enter Serve Space</Text>
-            </Pressable>
-          ) : null}
-        </View>
+          </>
+        ) : null}
 
         <Text style={styles.footerText}>
-          You can switch between spaces anytime from your profile settings
+          You can switch sites and spaces anytime from your profile settings
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -234,7 +314,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     marginTop: 12,
-    marginBottom: 28,
+    marginBottom: 20,
     fontFamily: mobileTokens.typography.fontFamily.body,
     fontSize: 18,
     lineHeight: 28,
@@ -247,7 +327,8 @@ const styles = StyleSheet.create({
     backgroundColor: mobileTokens.colors.bg.surface,
     borderWidth: 1,
     borderColor: "rgba(51, 51, 51, 0.07)",
-    padding: 18,
+    padding: 16,
+    gap: 10,
   },
   siteSelectionTitle: {
     fontFamily: mobileTokens.typography.fontFamily.heading,
@@ -255,10 +336,9 @@ const styles = StyleSheet.create({
     lineHeight: 30,
     fontWeight: mobileTokens.typography.weight.bold,
     color: mobileTokens.colors.text.primary,
-    marginBottom: 12,
   },
   siteList: {
-    gap: 10,
+    gap: 8,
   },
   siteButton: {
     borderRadius: 14,
@@ -267,6 +347,19 @@ const styles = StyleSheet.create({
     backgroundColor: mobileTokens.colors.bg.muted,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  siteButtonActive: {
+    borderColor: "rgba(20, 37, 63, 0.28)",
+    backgroundColor: "rgba(111, 205, 189, 0.20)",
+  },
+  siteButtonPending: {
+    opacity: 0.74,
+  },
+  siteButtonTextWrap: {
+    flex: 1,
   },
   siteButtonTitle: {
     fontFamily: mobileTokens.typography.fontFamily.heading,
@@ -282,17 +375,33 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: mobileTokens.colors.text.muted,
   },
-  loadingRow: {
-    marginTop: 12,
-    flexDirection: "row",
+  siteBadge: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: mobileTokens.typography.weight.semibold,
+    color: mobileTokens.colors.text.primary,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  waitingCard: {
+    marginBottom: 16,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: "rgba(51, 51, 51, 0.08)",
+    backgroundColor: mobileTokens.colors.bg.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
   },
-  loadingText: {
+  waitingText: {
+    textAlign: "center",
     fontFamily: mobileTokens.typography.fontFamily.body,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 21,
     color: mobileTokens.colors.text.muted,
   },
   spaceCard: {
@@ -351,7 +460,7 @@ const styles = StyleSheet.create({
     fontFamily: mobileTokens.typography.fontFamily.body,
     fontSize: 15,
     lineHeight: 22,
-    color: mobileTokens.colors.accent.serve,
+    color: mobileTokens.colors.text.subtle,
     fontWeight: mobileTokens.typography.weight.semibold,
   },
   familyButton: {

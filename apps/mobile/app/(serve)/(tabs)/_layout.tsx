@@ -74,6 +74,15 @@ export default function ServeTabsLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="account"
+        options={{
+          title: "Account",
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? "settings" : "settings-outline"} color={color} size={size} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }
