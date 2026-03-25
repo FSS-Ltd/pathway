@@ -30,10 +30,10 @@ const config: ExpoConfig = {
   scheme: "nexsteps",
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./pathwayLogo.png",
+  icon: "./assets/Nexsteps.png",
   userInterfaceStyle: "light",
   splash: {
-    image: "./pathwayLogo.png",
+    image: "./assets/Nexsteps.png",
     resizeMode: "contain",
     backgroundColor: "#f4f6f8",
   },
@@ -63,7 +63,7 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./pathwayLogo.png",
+      foregroundImage: "./assets/Nexsteps.png",
       backgroundColor: "#ffffff",
     },
     package: "com.nexsteps.mobile",

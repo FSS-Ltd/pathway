@@ -15,13 +15,14 @@ export default function RegisterChildScreen() {
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.root}>
         <View style={styles.backgroundLayer} />
+        <View style={styles.dimmer} />
         <View style={[styles.glowBlob, styles.glowMint]} />
         <View style={[styles.glowBlob, styles.glowGold]} />
         <View style={[styles.glowBlob, styles.glowBlue]} />
 
         <View style={styles.headerRow}>
           <View style={styles.logoRow}>
-            <BrandLogo width={120} height={42} />
+            <BrandLogo width={136} height={48} />
           </View>
           <Pressable
             onPress={() => router.back()}
@@ -38,6 +39,7 @@ export default function RegisterChildScreen() {
             <View style={[styles.frameCorner, styles.bottomLeft]} />
             <View style={[styles.frameCorner, styles.bottomRight]} />
           </View>
+          <Text style={styles.frameHint}>Position QR code within the frame</Text>
         </View>
 
         <View style={styles.overlayCard}>
@@ -69,19 +71,23 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 22,
+    paddingTop: 10,
+    paddingBottom: 20,
   },
   backgroundLayer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(21, 24, 30, 0.9)",
+    backgroundColor: "#151921",
+  },
+  dimmer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
   glowBlob: {
     position: "absolute",
     width: 230,
     height: 230,
     borderRadius: 230,
-    opacity: 0.18,
+    opacity: 0.24,
   },
   glowMint: {
     backgroundColor: mobileTokens.colors.accent.primary,
@@ -100,7 +106,7 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     zIndex: 1,
-    minHeight: 54,
+    minHeight: 58,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -110,10 +116,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   closeButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: "rgba(255,255,255,0.2)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.26)",
     alignItems: "center",
@@ -123,105 +129,120 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 8,
-    marginBottom: 8,
+    marginTop: 2,
+    marginBottom: 2,
   },
   scanFrame: {
-    width: "86%",
-    maxWidth: 340,
+    width: "84%",
+    maxWidth: 326,
     aspectRatio: 1,
-    borderRadius: 24,
-    borderWidth: 3,
+    borderRadius: 22,
+    borderWidth: 4,
     borderColor: "#80E6D3",
+  },
+  frameHint: {
+    marginTop: 14,
+    textAlign: "center",
+    color: "rgba(255,255,255,0.92)",
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: mobileTokens.typography.weight.semibold,
   },
   frameCorner: {
     position: "absolute",
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     borderColor: "#80E6D3",
   },
   topLeft: {
-    top: -4,
-    left: -4,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 8,
+    top: -5,
+    left: -5,
+    borderTopWidth: 5,
+    borderLeftWidth: 5,
+    borderTopLeftRadius: 10,
   },
   topRight: {
-    top: -4,
-    right: -4,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 8,
+    top: -5,
+    right: -5,
+    borderTopWidth: 5,
+    borderRightWidth: 5,
+    borderTopRightRadius: 10,
   },
   bottomLeft: {
-    bottom: -4,
-    left: -4,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 8,
+    bottom: -5,
+    left: -5,
+    borderBottomWidth: 5,
+    borderLeftWidth: 5,
+    borderBottomLeftRadius: 10,
   },
   bottomRight: {
-    bottom: -4,
-    right: -4,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 8,
+    bottom: -5,
+    right: -5,
+    borderBottomWidth: 5,
+    borderRightWidth: 5,
+    borderBottomRightRadius: 10,
   },
   overlayCard: {
     zIndex: 1,
-    borderRadius: 28,
+    borderRadius: 30,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.24)",
-    backgroundColor: "rgba(41, 44, 50, 0.82)",
-    paddingHorizontal: 22,
-    paddingTop: 20,
+    borderColor: "rgba(255, 255, 255, 0.28)",
+    backgroundColor: "rgba(46, 49, 54, 0.76)",
+    paddingHorizontal: 24,
+    paddingTop: 22,
     paddingBottom: 18,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.22,
+    shadowOffset: { width: 0, height: 12 },
+    shadowRadius: 18,
+    elevation: 8,
   },
   badge: {
-    width: 78,
-    height: 78,
-    borderRadius: 39,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: mobileTokens.colors.accent.primary,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 14,
+    marginBottom: 12,
   },
   title: {
     textAlign: "center",
     color: mobileTokens.colors.text.inverse,
     fontFamily: mobileTokens.typography.fontFamily.heading,
     fontWeight: mobileTokens.typography.weight.bold,
-    fontSize: 47,
-    lineHeight: 55,
-    marginBottom: 10,
+    fontSize: 48,
+    lineHeight: 56,
+    marginBottom: 12,
   },
   description: {
     textAlign: "center",
     color: "rgba(255,255,255,0.87)",
     fontFamily: mobileTokens.typography.fontFamily.body,
-    fontSize: 17,
-    lineHeight: 26,
-    marginBottom: 16,
+    fontSize: 16,
+    lineHeight: 25,
+    marginBottom: 18,
   },
   demoButton: {
-    minHeight: 62,
-    alignSelf: "stretch",
+    minHeight: 60,
+    minWidth: 220,
+    paddingHorizontal: 20,
     borderRadius: 18,
     borderWidth: 2,
     borderColor: mobileTokens.colors.accent.primary,
     backgroundColor: "rgba(255,255,255,0.95)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   demoButtonText: {
     color: mobileTokens.colors.text.primary,
     fontFamily: mobileTokens.typography.fontFamily.heading,
     fontWeight: mobileTokens.typography.weight.bold,
-    fontSize: 21,
-    lineHeight: 28,
+    fontSize: 19,
+    lineHeight: 26,
   },
   helper: {
     textAlign: "center",
