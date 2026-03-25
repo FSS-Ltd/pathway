@@ -58,24 +58,31 @@ export default function SignInScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.logoWrap}>
-          <BrandLogo width={140} height={50} />
+          <BrandLogo width={184} height={66} />
         </View>
 
         <View style={styles.headingBlock}>
-          <Text style={styles.heading}>Welcome back</Text>
+          <Text
+            style={styles.heading}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.78}
+          >
+            Welcome back
+          </Text>
           <Text style={styles.subheading}>Log in to continue your journey</Text>
         </View>
 
         <View style={styles.motifWrap}>
-          <Svg width={220} height={34} viewBox="0 0 220 34" fill="none">
+          <Svg width={248} height={42} viewBox="0 0 248 42" fill="none">
             <Path
-              d="M14 14C64 4 156 4 206 14"
+              d="M18 16C76 4 172 4 230 16"
               stroke="#D8F2EC"
               strokeWidth={4}
               strokeLinecap="round"
             />
             <Path
-              d="M32 26C74 18 146 18 188 26"
+              d="M36 30C84 22 164 22 212 30"
               stroke="#F7EDD1"
               strokeWidth={2}
               strokeLinecap="round"
@@ -83,31 +90,33 @@ export default function SignInScreen() {
           </Svg>
         </View>
 
-        <View style={styles.formBlock}>
-          <Text style={styles.helperText}>
-            Continue with your invited account to access Nexsteps securely through Auth0.
-          </Text>
+        <View style={styles.formCard}>
+          <View style={styles.formBlock}>
+            <Text style={styles.helperText}>
+              Continue with your invited account to access Nexsteps securely through Auth0.
+            </Text>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Continue to Auth0"
-            hitSlop={6}
-            onPress={handleSignIn}
-            disabled={isSigningIn}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              isSigningIn ? styles.primaryDisabled : undefined,
-              pressed && !isSigningIn ? styles.primaryPressed : undefined,
-            ]}
-          >
-            {isSigningIn ? (
-              <ActivityIndicator color={mobileTokens.colors.text.primary} />
-            ) : (
-              <Text style={styles.primaryButtonText}>Continue to Auth0</Text>
-            )}
-          </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continue to Auth0"
+              hitSlop={6}
+              onPress={handleSignIn}
+              disabled={isSigningIn}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                isSigningIn ? styles.primaryDisabled : undefined,
+                pressed && !isSigningIn ? styles.primaryPressed : undefined,
+              ]}
+            >
+              {isSigningIn ? (
+                <ActivityIndicator color={mobileTokens.colors.text.primary} />
+              ) : (
+                <Text style={styles.primaryButtonText}>Continue to Auth0</Text>
+              )}
+            </Pressable>
 
-          {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+            {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+          </View>
         </View>
 
         <Text style={styles.inviteOnlyText}>
@@ -125,49 +134,64 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: 28,
-    paddingTop: 12,
-    paddingBottom: 36,
+    paddingTop: 22,
+    paddingBottom: 44,
   },
   logoWrap: {
     alignItems: "center",
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 26,
   },
   headingBlock: {
     alignItems: "center",
-    marginBottom: 22,
+    marginBottom: 24,
     gap: 8,
   },
   heading: {
     fontFamily: "Nunito_700Bold",
-    fontSize: 36,
-    lineHeight: 44,
+    fontSize: 52,
+    lineHeight: 58,
     color: mobileTokens.colors.text.primary,
-    letterSpacing: -0.3,
+    letterSpacing: -0.8,
+    textAlign: "center",
+    width: "100%",
   },
   subheading: {
     fontFamily: "Quicksand_400Regular",
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: 17,
+    lineHeight: 26,
     color: mobileTokens.colors.text.muted,
   },
   motifWrap: {
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 26,
+  },
+  formCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: "rgba(51, 51, 51, 0.08)",
+    backgroundColor: mobileTokens.colors.bg.surface,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+    paddingHorizontal: 18,
+    paddingVertical: 18,
   },
   formBlock: {
-    gap: 16,
+    gap: 14,
   },
   helperText: {
     textAlign: "center",
     fontFamily: "Quicksand_400Regular",
     fontSize: 16,
-    lineHeight: 24,
+    lineHeight: 25,
     color: mobileTokens.colors.text.muted,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
   },
   primaryButton: {
-    minHeight: 62,
+    minHeight: 60,
     borderRadius: 18,
     backgroundColor: mobileTokens.colors.accent.primary,
     justifyContent: "center",
@@ -177,7 +201,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
-    marginTop: 4,
+    marginTop: 2,
   },
   primaryPressed: {
     opacity: 0.92,
@@ -187,24 +211,25 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontFamily: "Nunito_700Bold",
-    fontSize: 18,
-    lineHeight: 24,
+    fontSize: 24,
+    lineHeight: 30,
     color: mobileTokens.colors.text.primary,
   },
   inviteOnlyText: {
-    marginTop: 26,
+    marginTop: 24,
     textAlign: "center",
     fontFamily: "Quicksand_500Medium",
-    fontSize: 14,
-    lineHeight: 24,
-    color: mobileTokens.colors.text.muted,
+    fontSize: 15,
+    lineHeight: 23,
+    color: mobileTokens.colors.text.subtle,
+    paddingHorizontal: 6,
   },
   error: {
-    marginTop: 2,
+    marginTop: 4,
     textAlign: "center",
     fontFamily: "Quicksand_500Medium",
-    fontSize: mobileTokens.typography.body.xs.size,
-    lineHeight: mobileTokens.typography.body.xs.lineHeight,
+    fontSize: 13,
+    lineHeight: 19,
     color: mobileTokens.colors.status.danger,
   },
 });

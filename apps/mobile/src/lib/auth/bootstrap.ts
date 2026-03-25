@@ -93,16 +93,6 @@ export async function bootstrapAuthState(): Promise<BootstrapState> {
     const spaceResolution = resolveSpaceFromRoles(roles, session.preferredSpace);
     const nextSpace = spaceResolution.primarySpace;
 
-    if (__DEV__) {
-      console.log("ROLES_PAYLOAD", JSON.stringify(roles, null, 2));
-      console.log("SPACE_FLAGS", {
-        hasFamilyAccess: spaceResolution.hasFamilyAccess,
-        hasServeAccess: spaceResolution.hasServeAccess,
-        availableSpaces: spaceResolution.availableSpaces,
-        primarySpace: spaceResolution.primarySpace,
-      });
-    }
-
     const updatedSession = await updateSessionSnapshot({
       userId: me.userId,
       activeSiteId: activeSiteState.activeSiteId ?? session.activeSiteId,
