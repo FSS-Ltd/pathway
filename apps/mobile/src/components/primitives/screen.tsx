@@ -28,10 +28,20 @@ export function Screen({
 }: ScreenProps) {
   const { signOut } = useAppReady();
   const showSpaceActions = tone === "family" || tone === "serve";
+  const safeAreaEdges = showSpaceActions ? ["top", "left", "right"] as const : undefined;
+  const scrollPaddingBottom = showSpaceActions
+    ? mobileTokens.spacing.xs
+    : mobileTokens.spacing.xxl;
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: getSpaceBackgroundColor(tone) }]}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+    <SafeAreaView
+      edges={safeAreaEdges}
+      style={[styles.safeArea, { backgroundColor: getSpaceBackgroundColor(tone) }]}
+    >
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: scrollPaddingBottom }]}
+        showsVerticalScrollIndicator={false}
+      >
         {showSpaceActions ? (
           <View style={styles.spaceActionsRow}>
             <Pressable
@@ -111,7 +121,6 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: mobileTokens.layout.screenHorizontalPadding,
     paddingTop: mobileTokens.layout.screenTopPadding,
-    paddingBottom: mobileTokens.spacing.xxl,
     gap: mobileTokens.spacing.md,
   },
   spaceActionsRow: {
