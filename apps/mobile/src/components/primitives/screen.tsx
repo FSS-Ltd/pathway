@@ -35,10 +35,10 @@ export function Screen({
         {showSpaceActions ? (
           <View style={styles.spaceActionsRow}>
             <Pressable
-              onPress={() => router.replace("/(auth)/site-select")}
+              onPress={() => router.push("/(auth)/site-select")}
               style={({ pressed }) => [styles.spaceActionButton, pressed ? styles.pressed : undefined]}
             >
-              <Text style={styles.spaceActionText}>Exit Space</Text>
+              <Text style={styles.spaceActionText}>Switch Site/Space</Text>
             </Pressable>
             <Pressable
               onPress={() => {

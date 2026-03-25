@@ -2,78 +2,68 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Screen } from "@/components/primitives/screen";
-import { BrandedCard, BrandedButton, Chip, ListRow, SectionTitle } from "@/components/primitives/ui";
+import { BrandedButton, BrandedCard, Chip, ListRow, SectionTitle } from "@/components/primitives/ui";
 import { mobileTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks/use-app-ready";
 
-export default function FamilyAccountScreen() {
+export default function ServeAccountScreen() {
   const { bootstrapState, switchSpace, signOut } = useAppReady();
   const isReady = bootstrapState.status === "ready";
   const activeSite = isReady
     ? bootstrapState.activeSiteState.sites.find((site) => site.id === bootstrapState.activeSiteState.activeSiteId)
     : null;
 
-  const hasServeAccess = isReady ? bootstrapState.hasServeAccess : false;
+  const hasFamilyAccess = isReady ? bootstrapState.hasFamilyAccess : false;
   const isDualSpaceUser = isReady ? bootstrapState.isDualSpaceUser : false;
 
   return (
-    <Screen tone="family" badge="Family Space" title="Family settings" subtitle="Manage privacy, notices, and account preferences.">
+    <Screen
+      tone="serve"
+      badge="Serve Space"
+      title="Serve settings"
+      subtitle="Manage your site context, roles, and workspace preferences."
+    >
       <BrandedCard style={styles.workspaceCard}>
         <SectionTitle title="Workspace" subtitle={activeSite ? activeSite.name : "No active site selected"} />
         <View style={styles.inlineRow}>
           <Chip
             label={activeSite?.orgName ? `Org: ${activeSite.orgName}` : "Organisation unavailable"}
-            tone="family"
+            tone="serve"
           />
-          <Chip label={isDualSpaceUser ? "Dual space access" : "Family only access"} tone="serve" />
+          <Chip label={isDualSpaceUser ? "Dual space access" : "Serve only access"} tone="serve" />
         </View>
 
         <View style={styles.workspaceActions}>
           <BrandedButton
             label="Switch site"
-            tone="family"
-            variant="secondary"
+            tone="serve"
+            variant="ghost"
             onPress={() => router.push("/(auth)/site-select")}
           />
-          {hasServeAccess ? (
+          {hasFamilyAccess ? (
             <BrandedButton
-              label="Switch to Serve Space"
-              tone="serve"
-              variant="primary"
+              label="Switch to Family Space"
+              tone="family"
+              variant="secondary"
               onPress={() => {
                 void (async () => {
-                  await switchSpace("serve");
-                  router.replace("/(serve)/(tabs)/attendance");
+                  await switchSpace("family");
+                  router.replace("/(family)/(tabs)/home");
                 })();
               }}
             />
           ) : (
             <Text style={styles.workspaceHint}>
-              Serve Space is unavailable for this site. Switch site to check other access.
+              Family Space is unavailable for this site. Switch site to check other access.
             </Text>
           )}
         </View>
       </BrandedCard>
 
       <BrandedCard>
-        <SectionTitle title="Profile" />
-        <ListRow title="Primary contact" subtitle="jane.parent@email.com" right="Edit" />
-        <ListRow title="Emergency contact" subtitle="+44 7123 456 789" right="Edit" />
-      </BrandedCard>
-
-      <BrandedCard>
-        <SectionTitle title="Consent and privacy" subtitle="Family-safe controls" />
-        <View style={styles.inlineRow}>
-          <Chip label="Photo consent: Enabled" tone="family" />
-          <Chip label="Data export available" tone="serve" />
-        </View>
-        <Text style={styles.blockText}>Safeguarding records and internal notes are not shown in Family Space.</Text>
-      </BrandedCard>
-
-      <BrandedCard>
-        <SectionTitle title="Notifications" />
-        <ListRow title="Push notifications" subtitle="Attendance, notices, reminders" right="On" />
-        <ListRow title="Email summaries" subtitle="Weekly digest" right="On" />
+        <SectionTitle title="Role context" subtitle="Current operational permissions" />
+        <ListRow title="Role scope" subtitle="Site-level operational access" right="Active" />
+        <ListRow title="Safeguarding visibility" subtitle="Restricted to authorized roles" right="Enabled" />
       </BrandedCard>
 
       <BrandedCard>
@@ -94,7 +84,7 @@ export default function FamilyAccountScreen() {
 
 const styles = StyleSheet.create({
   workspaceCard: {
-    backgroundColor: mobileTokens.colors.accent.familySoft,
+    backgroundColor: mobileTokens.colors.accent.serveSoft,
   },
   inlineRow: {
     flexDirection: "row",
@@ -109,12 +99,6 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.body.sm.size,
     lineHeight: mobileTokens.typography.body.sm.lineHeight,
     color: mobileTokens.colors.text.subtle,
-  },
-  blockText: {
-    fontFamily: mobileTokens.typography.fontFamily.body,
-    fontSize: mobileTokens.typography.body.sm.size,
-    lineHeight: mobileTokens.typography.body.sm.lineHeight,
-    color: mobileTokens.colors.text.muted,
   },
   signOutButton: {
     minHeight: 48,

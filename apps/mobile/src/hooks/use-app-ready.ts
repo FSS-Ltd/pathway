@@ -15,5 +15,7 @@ export function useAppReady() {
     refreshBootstrap: context.refreshBootstrap,
     signIn: context.signIn,
     signOut: context.signOut,
+    switchSpace: context.switchSpace,
+    switchActiveSite: context.switchActiveSite,
   };
 }
