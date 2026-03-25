@@ -1,5 +1,5 @@
-import type { PropsWithChildren } from "react";
-import { Pressable, StyleSheet, Text, type ViewStyle, View } from "react-native";
+import type { PropsWithChildren, ReactNode } from "react";
+import { Pressable, StyleSheet, Text, type TextStyle, type ViewStyle, View } from "react-native";
 
 import { getSpaceAccentColor, mobileTokens, type MobileSpaceTone } from "@/design/tokens";
 
@@ -58,18 +58,77 @@ export function BrandedButton({
   tone?: MobileSpaceTone;
   variant?: "primary" | "secondary" | "ghost";
 }) {
-  const base =
-    variant === "primary"
-      ? { backgroundColor: tone === "serve" ? mobileTokens.colors.accent.serve : mobileTokens.colors.accent.primary }
-      : variant === "secondary"
-        ? { backgroundColor: mobileTokens.colors.accent.family }
-        : { backgroundColor: mobileTokens.colors.bg.surface, borderWidth: 1, borderColor: mobileTokens.colors.border.strong };
+  return (
+    <StandardButton
+      label={label}
+      onPress={onPress}
+      tone={tone}
+      variant={variant === "ghost" ? "white" : variant}
+      size="medium"
+    />
+  );
+}
 
-  const textColor = variant === "ghost" ? mobileTokens.colors.text.primary : mobileTokens.colors.text.onAccent;
+export function StandardButton({
+  label,
+  onPress,
+  tone = "serve",
+  variant = "primary",
+  size = "medium",
+  disabled = false,
+  iconLeft,
+  style,
+  textStyle,
+}: {
+  label?: string;
+  onPress?: () => void;
+  tone?: MobileSpaceTone;
+  variant?: "primary" | "secondary" | "white" | "disabled";
+  size?: "small" | "medium" | "large";
+  disabled?: boolean;
+  iconLeft?: ReactNode;
+  style?: ViewStyle | ViewStyle[];
+  textStyle?: TextStyle;
+}) {
+  const accentColor = getSpaceAccentColor(tone);
+  const effectiveVariant = disabled ? "disabled" : variant;
+  const base =
+    effectiveVariant === "primary"
+      ? { backgroundColor: mobileTokens.colors.accent.primary, borderColor: mobileTokens.colors.accent.primary, borderWidth: 0 }
+      : effectiveVariant === "secondary"
+        ? { backgroundColor: mobileTokens.colors.accent.secondary, borderColor: mobileTokens.colors.accent.secondary, borderWidth: 0 }
+        : effectiveVariant === "white"
+          ? { backgroundColor: mobileTokens.colors.bg.surface, borderColor: accentColor, borderWidth: 2 }
+          : { backgroundColor: "#F1F2F3", borderColor: "#F1F2F3", borderWidth: 0 };
+
+  const textColor = effectiveVariant === "disabled" ? "#B7B9BB" : mobileTokens.colors.text.primary;
+  const heightStyle =
+    size === "small"
+      ? styles.standardButtonSmall
+      : size === "large"
+        ? styles.standardButtonLarge
+        : styles.standardButtonMedium;
 
   return (
-    <Pressable style={[styles.button, base]} onPress={onPress}>
-      <Text style={[styles.buttonText, { color: textColor }]}>{label}</Text>
+    <Pressable
+      style={({ pressed }) => [
+        styles.standardButtonBase,
+        heightStyle,
+        base,
+        style,
+        pressed ? styles.buttonPressed : undefined,
+      ]}
+      onPress={onPress}
+      disabled={disabled || effectiveVariant === "disabled"}
+    >
+      {iconLeft ? (
+        <View style={[styles.buttonIconWrap, !label ? styles.buttonIconOnly : undefined]}>{iconLeft}</View>
+      ) : null}
+      {label ? (
+        <Text numberOfLines={1} style={[styles.standardButtonText, { color: textColor }, textStyle]}>
+          {label}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -141,18 +200,38 @@ const styles = StyleSheet.create({
   chipTextSolid: {
     color: mobileTokens.colors.text.onAccent,
   },
-  button: {
-    minHeight: 52,
+  standardButtonBase: {
     borderRadius: mobileTokens.radius.lg,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: mobileTokens.spacing.md,
   },
-  buttonText: {
+  standardButtonSmall: {
+    minHeight: 44,
+  },
+  standardButtonMedium: {
+    minHeight: 52,
+  },
+  standardButtonLarge: {
+    minHeight: 60,
+  },
+  standardButtonText: {
     fontFamily: mobileTokens.typography.fontFamily.heading,
     fontWeight: mobileTokens.typography.weight.bold,
     fontSize: mobileTokens.typography.body.md.size,
     lineHeight: mobileTokens.typography.body.md.lineHeight,
+  },
+  buttonPressed: {
+    opacity: 0.9,
+  },
+  buttonIconWrap: {
+    marginRight: mobileTokens.spacing.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonIconOnly: {
+    marginRight: 0,
   },
   row: {
     flexDirection: "row",

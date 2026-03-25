@@ -173,7 +173,7 @@ export default function SiteSelectScreen() {
           <>
             <View style={styles.spaceCard}>
               <View style={styles.spaceTopRow}>
-                <View style={styles.iconTile}>
+                <View style={[styles.iconTile, hasFamilyAccess ? styles.familyIconTile : styles.disabledIconTile]}>
                   <Ionicons
                     name="people-outline"
                     size={34}
@@ -216,11 +216,11 @@ export default function SiteSelectScreen() {
 
             <View style={[styles.spaceCard, !hasServeAccess ? styles.disabledCard : undefined]}>
               <View style={styles.spaceTopRow}>
-                <View style={styles.iconTile}>
+                <View style={[styles.iconTile, hasServeAccess ? styles.serveIconTile : styles.disabledIconTile]}>
                   <Ionicons
                     name="heart-outline"
                     size={34}
-                    color={hasServeAccess ? mobileTokens.colors.text.primary : mobileTokens.colors.text.subtle}
+                    color={hasServeAccess ? mobileTokens.colors.text.inverse : mobileTokens.colors.text.subtle}
                   />
                 </View>
                 <View style={styles.cardCopyWrap}>
@@ -249,7 +249,7 @@ export default function SiteSelectScreen() {
                   ]}
                 >
                   {pendingSpace === "serve" ? (
-                    <ActivityIndicator color={mobileTokens.colors.text.inverse} />
+                    <ActivityIndicator color={mobileTokens.colors.text.primary} />
                   ) : (
                     <Text style={styles.serveButtonText}>Enter Serve Space</Text>
                   )}
@@ -431,6 +431,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  familyIconTile: {
+    backgroundColor: mobileTokens.colors.accent.secondary,
+  },
+  serveIconTile: {
+    backgroundColor: mobileTokens.colors.accent.serve,
+  },
+  disabledIconTile: {
+    backgroundColor: "#E6E6E6",
+  },
   cardCopyWrap: {
     flex: 1,
   },
@@ -491,7 +500,7 @@ const styles = StyleSheet.create({
     marginLeft: 88,
     minHeight: 58,
     borderRadius: 20,
-    backgroundColor: mobileTokens.colors.accent.serve,
+    backgroundColor: mobileTokens.colors.accent.primary,
     alignItems: "center",
     justifyContent: "center",
     alignSelf: "stretch",
@@ -501,7 +510,7 @@ const styles = StyleSheet.create({
     fontSize: 21,
     lineHeight: 28,
     fontWeight: mobileTokens.typography.weight.bold,
-    color: mobileTokens.colors.text.inverse,
+    color: mobileTokens.colors.text.primary,
   },
   disabledCard: {
     opacity: 0.72,
