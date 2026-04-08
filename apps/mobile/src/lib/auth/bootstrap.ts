@@ -119,6 +119,16 @@ export async function bootstrapAuthState(): Promise<BootstrapState> {
     if (error instanceof ApiError && [401, 403].includes(error.status)) {
       await clearSessionSnapshot();
       apiClient.setAccessToken(null);
+      if (__DEV__) {
+        const bodySnippet = error.body?.trim()
+          ? ` — ${error.body.trim().slice(0, 180)}`
+          : "";
+        return {
+          status: "error",
+          route: "/(auth)/sign-in",
+          message: `Bootstrap auth failed (${error.status}) on ${error.message}${bodySnippet}`,
+        };
+      }
       return { status: "unauthenticated", route: "/(auth)/sign-in" };
     }
 

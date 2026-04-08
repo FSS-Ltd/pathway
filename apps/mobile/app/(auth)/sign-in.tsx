@@ -14,12 +14,15 @@ import Svg, { Path } from "react-native-svg";
 import { BrandLogo } from "@/components/primitives/brand-logo";
 import { mobileTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks/use-app-ready";
-import { ApiError } from "@/lib/api/client";
+import { apiClient, ApiError } from "@/lib/api/client";
 
 export default function SignInScreen() {
   const { signIn, bootstrapState } = useAppReady();
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isTestingApi, setIsTestingApi] = useState(false);
+  const [attemptedSignIn, setAttemptedSignIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [apiDebugMessage, setApiDebugMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (bootstrapState.status === "ready" || bootstrapState.status === "needs-site-selection") {
@@ -27,9 +30,16 @@ export default function SignInScreen() {
     }
   }, [bootstrapState]);
 
+  useEffect(() => {
+    if (bootstrapState.status === "error" && attemptedSignIn) {
+      setErrorMessage(bootstrapState.message);
+    }
+  }, [bootstrapState, attemptedSignIn]);
+
   async function handleSignIn() {
     if (isSigningIn) return;
 
+    setAttemptedSignIn(true);
     setIsSigningIn(true);
     setErrorMessage(null);
 
@@ -51,6 +61,24 @@ export default function SignInScreen() {
       }
     } finally {
       setIsSigningIn(false);
+    }
+  }
+
+  async function handleApiProbe() {
+    if (isTestingApi) return;
+
+    setIsTestingApi(true);
+    setApiDebugMessage(null);
+
+    try {
+      const health = await apiClient.getHealth();
+      setApiDebugMessage(`API reachable: /health status=${health.status}`);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "API probe failed for unknown reason.";
+      setApiDebugMessage(message);
+    } finally {
+      setIsTestingApi(false);
     }
   }
 
@@ -115,6 +143,27 @@ export default function SignInScreen() {
               )}
             </Pressable>
 
+            {__DEV__ ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Test API connection"
+                onPress={handleApiProbe}
+                disabled={isTestingApi}
+                style={({ pressed }) => [
+                  styles.debugButton,
+                  isTestingApi ? styles.primaryDisabled : undefined,
+                  pressed && !isTestingApi ? styles.primaryPressed : undefined,
+                ]}
+              >
+                {isTestingApi ? (
+                  <ActivityIndicator color={mobileTokens.colors.text.primary} />
+                ) : (
+                  <Text style={styles.debugButtonText}>Test API connection</Text>
+                )}
+              </Pressable>
+            ) : null}
+
+            {apiDebugMessage ? <Text style={styles.debugText}>{apiDebugMessage}</Text> : null}
             {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
           </View>
         </View>
@@ -214,6 +263,28 @@ const styles = StyleSheet.create({
     fontSize: 24,
     lineHeight: 30,
     color: mobileTokens.colors.text.primary,
+  },
+  debugButton: {
+    minHeight: 46,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.border.strong,
+    backgroundColor: mobileTokens.colors.bg.surface,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  debugButtonText: {
+    fontFamily: "Quicksand_600SemiBold",
+    fontSize: 16,
+    lineHeight: 22,
+    color: mobileTokens.colors.text.primary,
+  },
+  debugText: {
+    textAlign: "center",
+    fontFamily: "Quicksand_500Medium",
+    fontSize: 13,
+    lineHeight: 19,
+    color: mobileTokens.colors.text.subtle,
   },
   inviteOnlyText: {
     marginTop: 24,

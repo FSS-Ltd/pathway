@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { useCallback, useMemo, useState, type ComponentProps } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Screen } from "@/components/primitives/screen";
@@ -14,7 +14,6 @@ type UiAttendanceStatus = "present" | "late" | "absent" | "unmarked";
 
 export default function ServeAttendanceSessionScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const [attendanceDetail, setAttendanceDetail] = useState<AttendanceSessionDetail | null>(null);
   const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(null);
@@ -23,9 +22,6 @@ export default function ServeAttendanceSessionScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isNotFound, setIsNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isCompactPhone = width < 390;
-  const isWideTablet = width >= 900;
-
   const loadSession = useCallback(async () => {
     if (!sessionId) {
       setError("Missing session id.");
@@ -95,6 +91,21 @@ export default function ServeAttendanceSessionScreen() {
     [registerRows, initialStatusByChild, draftStatusByChild],
   );
 
+  const markAllPresent = useCallback(() => {
+    if (registerRows.length === 0) return;
+    setDraftStatusByChild((prev) => {
+      const next = { ...prev };
+      registerRows.forEach((row) => {
+        next[row.childId] = "present";
+      });
+      return next;
+    });
+  }, [registerRows]);
+
+  const resetToServer = useCallback(() => {
+    setDraftStatusByChild(initialStatusByChild);
+  }, [initialStatusByChild]);
+
   return (
     <Screen tone="serve">
       <View style={styles.headerRow}>
@@ -125,22 +136,6 @@ export default function ServeAttendanceSessionScreen() {
         </View>
       </View>
 
-      <View style={styles.syncRow}>
-        <View style={styles.unsyncedWrap}>
-          <View style={[styles.syncDot, hasUnsyncedChanges ? styles.syncDotUnsynced : styles.syncDotSynced]} />
-          <Text style={styles.unsyncedText}>{hasUnsyncedChanges ? "Unsynced" : "Synced"}</Text>
-        </View>
-        <StandardButton
-          label="Sync Data"
-          tone="serve"
-          variant="primary"
-          size="large"
-          iconLeft={<Ionicons name="cloud-upload-outline" size={20} color={mobileTokens.colors.text.primary} />}
-          onPress={() => void loadSession()}
-          style={styles.syncButton}
-        />
-      </View>
-
       {isLoading ? (
         <BrandedCard>
           <Text style={styles.stateText}>Loading session detail...</Text>
@@ -169,12 +164,12 @@ export default function ServeAttendanceSessionScreen() {
             <SectionTitle title="Attendance Overview" />
             <View style={styles.overviewGrid}>
               <View style={styles.overviewRow}>
-                <OverviewTile label="Present" value={summary.present} tone="present" compact={isCompactPhone} />
-                <OverviewTile label="Late" value={summary.late} tone="late" compact={isCompactPhone} />
+                <OverviewTile label="Present" value={summary.present} tone="present" />
+                <OverviewTile label="Late" value={summary.late} tone="late" />
               </View>
               <View style={styles.overviewRow}>
-                <OverviewTile label="Absent" value={summary.absent} tone="absent" compact={isCompactPhone} />
-                <OverviewTile label="Not Marked" value={summary.unmarked} tone="unmarked" compact={isCompactPhone} />
+                <OverviewTile label="Absent" value={summary.absent} tone="absent" />
+                <OverviewTile label="Not Marked" value={summary.unmarked} tone="unmarked" />
               </View>
             </View>
           </BrandedCard>
@@ -215,10 +210,10 @@ export default function ServeAttendanceSessionScreen() {
                       return (
                         <StandardButton
                           key={option}
-                          label={isWideTablet ? registerStatusLabel(option) : undefined}
+                          label={registerStatusLabel(option)}
                           tone="serve"
                           variant="white"
-                          size={isWideTablet ? "small" : "medium"}
+                          size="small"
                           iconLeft={
                             <Ionicons
                               name={statusIcon(option)}
@@ -227,7 +222,7 @@ export default function ServeAttendanceSessionScreen() {
                             />
                           }
                           style={selected ? [styles.actionButton, styles.actionButtonSelected] : styles.actionButton}
-                          textStyle={isWideTablet ? styles.actionButtonTextTablet : styles.actionButtonText}
+                          textStyle={styles.actionButtonText}
                           onPress={() =>
                             setDraftStatusByChild((prev) => ({
                               ...prev,
@@ -237,10 +232,65 @@ export default function ServeAttendanceSessionScreen() {
                         />
                       );
                     })}
+                    <StandardButton
+                      label="Unmark"
+                      tone="serve"
+                      variant="white"
+                      size="small"
+                      iconLeft={<Ionicons name="close-circle-outline" size={18} color={mobileTokens.colors.text.primary} />}
+                      style={(draftStatusByChild[row.childId] ?? "unmarked") === "unmarked"
+                        ? [styles.actionButton, styles.actionButtonSelected]
+                        : styles.actionButton}
+                      textStyle={styles.actionButtonText}
+                      onPress={() =>
+                        setDraftStatusByChild((prev) => ({
+                          ...prev,
+                          [row.childId]: "unmarked",
+                        }))
+                      }
+                    />
                   </View>
                 </View>
               ))
             )}
+          </BrandedCard>
+
+          <BrandedCard>
+            <SectionTitle
+              title="Register actions"
+              subtitle="Prepared for mark-all, per-child updates, and offline queue in the next branch."
+            />
+            <View style={styles.unsyncedWrap}>
+              <View style={[styles.syncDot, hasUnsyncedChanges ? styles.syncDotUnsynced : styles.syncDotSynced]} />
+              <Text style={styles.unsyncedText}>
+                {hasUnsyncedChanges ? "Unsynced register changes" : "No pending register changes"}
+              </Text>
+            </View>
+            <View style={styles.registerActionRow}>
+              <StandardButton
+                label="Mark all present"
+                tone="serve"
+                variant="primary"
+                size="medium"
+                onPress={markAllPresent}
+                style={styles.registerActionButton}
+              />
+              <StandardButton
+                label="Reset"
+                tone="serve"
+                variant="white"
+                size="medium"
+                onPress={resetToServer}
+                style={styles.registerActionButton}
+              />
+            </View>
+            <StandardButton
+              label="Save register (coming soon)"
+              tone="serve"
+              variant="disabled"
+              size="medium"
+              disabled
+            />
           </BrandedCard>
         </>
       ) : (
@@ -291,7 +341,7 @@ function registerStatusLabel(status: UiAttendanceStatus): string {
   return "Not Marked";
 }
 
-function statusIcon(status: UiAttendanceStatus): React.ComponentProps<typeof Ionicons>["name"] {
+function statusIcon(status: UiAttendanceStatus): ComponentProps<typeof Ionicons>["name"] {
   if (status === "present") return "checkmark-circle-outline";
   if (status === "late") return "time-outline";
   if (status === "absent") return "close-outline";
@@ -309,12 +359,10 @@ function OverviewTile({
   label,
   value,
   tone,
-  compact = false,
 }: {
   label: string;
   value: number;
   tone: "present" | "late" | "absent" | "unmarked";
-  compact?: boolean;
 }) {
   const backgroundMap = {
     present: "#eaf6f3",
@@ -333,14 +381,13 @@ function OverviewTile({
     <View
       style={[
         styles.overviewTile,
-        compact ? styles.overviewTileCompact : styles.overviewTileRegular,
         { backgroundColor: backgroundMap[tone] },
       ]}
     >
-      <Text style={[styles.overviewValue, compact ? styles.overviewValueCompact : undefined, { color: valueColorMap[tone] }]}>
+      <Text style={[styles.overviewValue, { color: valueColorMap[tone] }]}>
         {value}
       </Text>
-      <Text style={[styles.overviewLabel, compact ? styles.overviewLabelCompact : undefined]}>{label}</Text>
+      <Text style={styles.overviewLabel}>{label}</Text>
     </View>
   );
 }
@@ -376,17 +423,11 @@ const styles = StyleSheet.create({
     color: mobileTokens.colors.text.muted,
     fontSize: mobileTokens.typography.body.lg.size,
   },
-  syncRow: {
-    marginTop: mobileTokens.spacing.md,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: mobileTokens.spacing.sm,
-  },
   unsyncedWrap: {
     flexDirection: "row",
     alignItems: "center",
     gap: mobileTokens.spacing.xs,
+    marginTop: mobileTokens.spacing.xxs,
   },
   syncDot: {
     width: 10,
@@ -404,9 +445,6 @@ const styles = StyleSheet.create({
     fontWeight: mobileTokens.typography.weight.semibold,
     fontSize: mobileTokens.typography.body.lg.size,
     color: mobileTokens.colors.text.primary,
-  },
-  syncButton: {
-    minWidth: 166,
   },
   overviewCard: {
     marginTop: mobileTokens.spacing.sm,
@@ -429,13 +467,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: mobileTokens.spacing.xs,
-  },
-  overviewTileRegular: {
-    minHeight: 156,
-    paddingVertical: mobileTokens.spacing.lg,
-  },
-  overviewTileCompact: {
-    minHeight: 136,
+    minHeight: 120,
     paddingVertical: mobileTokens.spacing.md,
   },
   overviewValue: {
@@ -443,19 +475,11 @@ const styles = StyleSheet.create({
     fontWeight: mobileTokens.typography.weight.bold,
     fontSize: mobileTokens.typography.heading.md.size,
   },
-  overviewValueCompact: {
-    fontSize: mobileTokens.typography.heading.sm.size,
-    lineHeight: mobileTokens.typography.heading.sm.lineHeight,
-  },
   overviewLabel: {
     fontFamily: mobileTokens.typography.fontFamily.body,
     fontSize: mobileTokens.typography.body.lg.size,
     color: mobileTokens.colors.text.muted,
     fontWeight: mobileTokens.typography.weight.semibold,
-  },
-  overviewLabelCompact: {
-    fontSize: mobileTokens.typography.body.md.size,
-    lineHeight: mobileTokens.typography.body.md.lineHeight,
   },
   childCard: {
     borderWidth: 1,
@@ -510,12 +534,15 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: "row",
+    justifyContent: "space-between",
     gap: mobileTokens.spacing.xs,
+    flexWrap: "wrap",
   },
   actionButton: {
-    flex: 1,
+    width: "48%",
+    flexGrow: 0,
+    flexShrink: 0,
     borderColor: mobileTokens.colors.accent.primary,
-    minWidth: 0,
   },
   actionButtonSelected: {
     backgroundColor: mobileTokens.colors.accent.subtle,
@@ -530,14 +557,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     flexShrink: 1,
   },
-  actionButtonTextTablet: {
-    fontFamily: mobileTokens.typography.fontFamily.body,
-    fontSize: mobileTokens.typography.body.lg.size,
-    lineHeight: mobileTokens.typography.body.lg.lineHeight,
-    color: mobileTokens.colors.text.primary,
-    fontWeight: mobileTokens.typography.weight.semibold,
-    textAlign: "center",
-    flexShrink: 1,
+  registerActionRow: {
+    flexDirection: "row",
+    gap: mobileTokens.spacing.xs,
+    marginTop: mobileTokens.spacing.xs,
+  },
+  registerActionButton: {
+    flex: 1,
   },
   stateText: {
     fontFamily: mobileTokens.typography.fontFamily.body,
