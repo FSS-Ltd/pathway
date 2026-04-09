@@ -103,10 +103,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
 async function getBlogPostUrls(): Promise<MetadataRoute.Sitemap> {
   try {
-    const { posts } = await fetchBlogPosts(undefined, 500);
+    const posts: Awaited<ReturnType<typeof fetchBlogPosts>>["posts"] = [];
+    let cursor: string | undefined;
+
+    // Pull all published posts page-by-page so sitemap stays complete.
+    for (let i = 0; i < 50; i += 1) {
+      const page = await fetchBlogPosts(cursor, 100);
+      posts.push(...page.posts);
+      if (!page.nextCursor) break;
+      cursor = page.nextCursor;
+    }
+
     return posts.map((post) => ({
       url: `${baseUrl}/blog/${post.slug}`,
-      lastModified: new Date(post.updatedAt),
+      lastModified: new Date(post.publishedAt ?? post.updatedAt),
       changeFrequency: "weekly" as const,
       priority: 0.6,
     }));
@@ -114,4 +124,3 @@ async function getBlogPostUrls(): Promise<MetadataRoute.Sitemap> {
     return [];
   }
 }
-
