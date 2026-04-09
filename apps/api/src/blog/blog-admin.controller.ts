@@ -20,6 +20,8 @@ import { AuthUserGuard } from "../auth/auth-user.guard";
 import { BlogService } from "./blog.service";
 import { createBlogPostDto } from "./dto/create-blog-post.dto";
 import { updateBlogPostDto } from "./dto/update-blog-post.dto";
+import { BlogAutomationTokenService } from "./blog-automation-token.service";
+import { createAutomationTokenDto } from "./dto/create-automation-token.dto";
 interface AuthRequest extends Request {
   authUserId?: string;
   __pathwayContext?: {
@@ -33,7 +35,11 @@ interface AuthRequest extends Request {
 @Controller("admin/blog")
 @UseGuards(AuthUserGuard)
 export class BlogAdminController {
-  constructor(@Inject(BlogService) private readonly blogService: BlogService) {}
+  constructor(
+    @Inject(BlogService) private readonly blogService: BlogService,
+    @Inject(BlogAutomationTokenService)
+    private readonly automationTokenService: BlogAutomationTokenService,
+  ) {}
 
   private async assertBlogAdmin(req: AuthRequest) {
     const userId = req.authUserId;
@@ -154,5 +160,21 @@ export class BlogAdminController {
       parsed.data.width,
       parsed.data.height,
     );
+  }
+
+  @Post("automation/tokens")
+  async createAutomationToken(@Body() dto: unknown, @Req() req: AuthRequest) {
+    await this.assertBlogAdmin(req);
+    const parsed = createAutomationTokenDto.safeParse(dto);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.errors);
+    }
+    return this.automationTokenService.createToken(parsed.data);
+  }
+
+  @Delete("automation/tokens/:id")
+  async revokeAutomationToken(@Param("id") id: string, @Req() req: AuthRequest) {
+    await this.assertBlogAdmin(req);
+    return this.automationTokenService.revokeToken(id);
   }
 }

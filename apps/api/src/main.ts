@@ -13,6 +13,7 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { ValidationPipe } from "@nestjs/common";
 import { json, urlencoded } from "express";
+import type { NextFunction, Request, Response } from "express";
 import cookieParser from "cookie-parser";
 import fs from "node:fs";
 import type { HttpsOptions } from "@nestjs/common/interfaces/external/https-options.interface";
@@ -63,6 +64,31 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: bodyLimit }));
 
   app.use(cookieParser());
+
+  // Dev tracing for login/bootstrap diagnostics.
+  const traceRequests =
+    process.env.API_DEBUG_REQUESTS === "true" || process.env.NODE_ENV !== "production";
+  if (traceRequests) {
+    app.use((req: Request, res: Response, next: NextFunction) => {
+      const path = req.path ?? req.url ?? "";
+      const shouldTrace =
+        path.startsWith("/health") ||
+        path.startsWith("/auth") ||
+        path.startsWith("/attendance") ||
+        path.startsWith("/sessions");
+
+      if (!shouldTrace) return next();
+
+      const startedAt = Date.now();
+      console.log(`[api-debug] -> ${req.method} ${path}`);
+      res.on("finish", () => {
+        console.log(
+          `[api-debug] <- ${req.method} ${path} ${res.statusCode} (${Date.now() - startedAt}ms)`,
+        );
+      });
+      next();
+    });
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({

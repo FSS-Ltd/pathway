@@ -13,6 +13,11 @@ export class ApiError extends Error {
   }
 }
 
+export type HealthResponse = {
+  status: string;
+  dbTime?: string | null;
+};
+
 type RequestOptions = Omit<RequestInit, "headers"> & {
   token?: string;
   headers?: Record<string, string>;
@@ -33,15 +38,22 @@ class MobileApiClient {
     const { token, headers, ...rest } = options;
     const bearerToken = token ?? this.accessToken;
     const url = `${env.apiUrl}${path}`;
-    const response = await fetch(url, {
-      ...rest,
-      headers: {
-        Accept: "application/json",
-        ...(rest.body ? { "Content-Type": "application/json" } : {}),
-        ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
-        ...headers,
-      },
-    });
+    let response: Response;
+    try {
+      response = await this.fetchWithDevFallback(url, {
+        ...rest,
+        headers: {
+          Accept: "application/json",
+          ...(rest.body ? { "Content-Type": "application/json" } : {}),
+          ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+          ...headers,
+        },
+      });
+    } catch (error) {
+      const reason =
+        error instanceof Error && error.message ? error.message : "Unknown network error";
+      throw new Error(`Network request failed for ${url}: ${reason}`);
+    }
 
     if (!response.ok) {
       const body = await response.text().catch(() => "");
@@ -57,6 +69,23 @@ class MobileApiClient {
     }
 
     return (await response.json()) as T;
+  }
+
+  private async fetchWithDevFallback(url: string, init: RequestInit): Promise<Response> {
+    try {
+      return await fetch(url, init);
+    } catch (firstError) {
+      if (!__DEV__) throw firstError;
+      if (!url.includes("://api.localhost")) throw firstError;
+
+      const localhostUrl = url.replace("://api.localhost", "://localhost");
+      try {
+        return await fetch(localhostUrl, init);
+      } catch {
+        const loopbackUrl = url.replace("://api.localhost", "://127.0.0.1");
+        return fetch(loopbackUrl, init);
+      }
+    }
   }
 
   getAuthMe(token?: string) {
@@ -83,6 +112,10 @@ class MobileApiClient {
       token,
       body: JSON.stringify({ siteId }),
     });
+  }
+
+  getHealth() {
+    return this.request<HealthResponse>("/health", { method: "GET" });
   }
 }
 
