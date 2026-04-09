@@ -421,7 +421,7 @@ export default function EditStaffPage() {
         >
           {!canEditAvailability ? (
             <p className="text-sm text-text-muted">
-              Upgrade to Starter or above to manage date exceptions.
+              Date exceptions are unavailable on this plan.
             </p>
           ) : (
             <div className="space-y-4">
@@ -474,7 +474,7 @@ export default function EditStaffPage() {
         >
           {!canEditAvailability ? (
             <p className="text-sm text-text-muted">
-              Upgrade to Starter or above to set age group preferences.
+              Age group preferences are unavailable on this plan.
             </p>
           ) : groups.length === 0 ? (
             <p className="text-sm text-text-muted">

@@ -9,6 +9,7 @@ import { prisma, runTransaction, SiteRole } from "@pathway/db";
 import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
 import { InvitesService } from "../invites/invites.service";
+import { getPlanDefinition } from "../billing/billing-plans";
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -105,9 +106,21 @@ export class ChildrenService {
     // 1) Ensure tenant exists
     const tenant = await prisma.tenant.findUnique({
       where: { id: resolvedTenantId },
-      select: { id: true },
+      select: { id: true, orgId: true },
     });
     if (!tenant) throw new BadRequestException("tenant not found");
+
+    const maxChildrenCap = await this.resolveMaxChildrenCap(tenant.orgId);
+    if (maxChildrenCap !== null) {
+      const currentChildrenCount = await prisma.child.count({
+        where: { tenant: { orgId: tenant.orgId } },
+      });
+      if (currentChildrenCount >= maxChildrenCap) {
+        throw new BadRequestException(
+          `children cap reached (${maxChildrenCap}) for current plan`,
+        );
+      }
+    }
 
     // 2) If group provided, ensure it belongs to the same tenant
     if (input.groupId) {
@@ -192,6 +205,28 @@ export class ChildrenService {
       },
       select: childSelect,
     });
+  }
+
+  private async resolveMaxChildrenCap(orgId: string): Promise<number | null> {
+    const [latestSnapshot, latestSubscription] = await Promise.all([
+      prisma.orgEntitlementSnapshot.findFirst({
+        where: { orgId },
+        orderBy: [{ createdAt: "desc" }],
+        select: { flagsJson: true },
+      }),
+      prisma.subscription.findFirst({
+        where: { orgId },
+        orderBy: [{ periodEnd: "desc" }],
+        select: { planCode: true },
+      }),
+    ]);
+
+    const flags = toRecord(latestSnapshot?.flagsJson);
+    const capFromSnapshot = numberOrNull(flags?.maxChildrenIncluded);
+    if (capFromSnapshot !== null) return capFromSnapshot;
+
+    const planDefinition = getPlanDefinition(latestSubscription?.planCode);
+    return planDefinition?.maxChildrenIncluded ?? null;
   }
 
   private decodeAndValidatePhoto(
@@ -577,3 +612,11 @@ export class ChildrenService {
     });
   }
 }
+
+const toRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+};
+
+const numberOrNull = (value: unknown): number | null =>
+  typeof value === "number" ? value : null;

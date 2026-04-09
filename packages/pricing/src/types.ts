@@ -27,6 +27,7 @@ export interface PlanDefinition {
   currency: "GBP";
   selfServe: boolean;
   av30Included: number | null; // Active People (AV30) included
+  maxChildrenIncluded: number | null; // Maximum children included
   maxSitesIncluded: number | null; // Number of sites included
   features: string[];
   doesNotInclude?: string[]; // For Core plan - features not included
@@ -43,4 +44,3 @@ export interface PricingFaq {
   question: string;
   answer: string;
 }
-

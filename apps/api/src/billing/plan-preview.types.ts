@@ -15,6 +15,7 @@ export type PlanPreviewRequest = {
 
 export type PlanPreviewCaps = {
   av30Cap: number | null;
+  maxChildren: number | null;
   storageGbCap: number | null;
   smsMessagesCap: number | null;
   leaderSeatsIncluded: number | null;
@@ -38,4 +39,3 @@ export type PlanPreviewResponse = {
     warnings: string[];
   };
 };
-

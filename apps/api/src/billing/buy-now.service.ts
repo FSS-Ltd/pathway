@@ -68,13 +68,15 @@ export class BuyNowService {
     };
 
     const planDefinition = getPlanDefinition(sanitisedPlan.planCode);
+    const { selection: gatedPlan, warnings: gatingWarnings } =
+      this.enforcePlanAddonPolicy(sanitisedPlan, planDefinition?.tier ?? null);
 
     const previewAddons: PlanPreviewAddons = {
-      extraAv30Blocks: sanitisedPlan.av30AddonBlocks,
-      extraSites: sanitisedPlan.extraSites,
-      extraStorageGb: sanitisedPlan.extraStorageGb,
-      extraSmsMessages: sanitisedPlan.extraSmsMessages,
-      extraLeaderSeats: sanitisedPlan.extraLeaderSeats,
+      extraAv30Blocks: gatedPlan.av30AddonBlocks,
+      extraSites: gatedPlan.extraSites,
+      extraStorageGb: gatedPlan.extraStorageGb,
+      extraSmsMessages: gatedPlan.extraSmsMessages,
+      extraLeaderSeats: gatedPlan.extraLeaderSeats,
     };
 
     const previewResult = this.planPreviewService.preview({
@@ -92,6 +94,7 @@ export class BuyNowService {
       planTier: previewResult.planTier,
       billingPeriod: billingPeriodNormalized,
       av30Cap: previewResult.effectiveCaps.av30Cap,
+      maxChildren: previewResult.effectiveCaps.maxChildren,
       maxSites: previewResult.effectiveCaps.maxSites,
       storageGbCap: previewResult.effectiveCaps.storageGbCap,
       smsMessagesCap: previewResult.effectiveCaps.smsMessagesCap,
@@ -133,7 +136,7 @@ export class BuyNowService {
       data: {
         tenantId: tenantId ?? undefined,
         orgId: orgId ?? undefined,
-        planCode: sanitisedPlan.planCode,
+        planCode: gatedPlan.planCode,
         av30Cap: previewResult.effectiveCaps.av30Cap ?? undefined,
         storageGbCap: previewResult.effectiveCaps.storageGbCap ?? undefined,
         smsMessagesCap: previewResult.effectiveCaps.smsMessagesCap ?? undefined,
@@ -152,7 +155,7 @@ export class BuyNowService {
     });
 
     const providerParams: BuyNowCheckoutParams = {
-      plan: sanitisedPlan,
+      plan: gatedPlan,
       org: request.org,
       preview,
       successUrl: request.successUrl,
@@ -176,7 +179,7 @@ export class BuyNowService {
       data: { providerCheckoutId: session.sessionId },
     });
 
-    const warnings = ["price_not_included"];
+    const warnings = ["price_not_included", ...gatingWarnings];
     if (!planDefinition) warnings.push("unknown_plan_code");
 
     return {
@@ -296,9 +299,38 @@ export class BuyNowService {
       extraSmsMessages: this.toNonNegativeInt(request.extraSmsMessages),
       extraLeaderSeats: this.toNonNegativeInt(request.extraLeaderSeats),
     };
+    const { selection: gatedAddons, warnings: gatingWarnings } =
+      this.enforcePlanAddonPolicy(
+        {
+          planCode: normalizedPlanCode,
+          av30AddonBlocks: previewAddons.extraAv30Blocks,
+          extraSites: previewAddons.extraSites,
+          extraStorageGb: previewAddons.extraStorageGb,
+          extraSmsMessages: previewAddons.extraSmsMessages,
+          extraLeaderSeats: previewAddons.extraLeaderSeats,
+        },
+        planDefinition.tier,
+      );
+    const hasAllowedAddons =
+      (gatedAddons.av30AddonBlocks ?? 0) > 0 ||
+      (gatedAddons.extraStorageGb ?? 0) > 0 ||
+      (gatedAddons.extraSmsMessages ?? 0) > 0 ||
+      (gatedAddons.extraSites ?? 0) > 0 ||
+      (gatedAddons.extraLeaderSeats ?? 0) > 0;
+    if (addonsOnly && !hasAllowedAddons) {
+      throw new BadRequestException(
+        "You're already on this plan. Add add-ons above to checkout, or choose a different plan.",
+      );
+    }
     const previewResult = this.planPreviewService.preview({
       planCode: normalizedPlanCode,
-      addons: previewAddons,
+      addons: {
+        extraAv30Blocks: gatedAddons.av30AddonBlocks,
+        extraSites: gatedAddons.extraSites,
+        extraStorageGb: gatedAddons.extraStorageGb,
+        extraSmsMessages: gatedAddons.extraSmsMessages,
+        extraLeaderSeats: gatedAddons.extraLeaderSeats,
+      },
     });
 
     const billingPeriodNormalized =
@@ -311,6 +343,7 @@ export class BuyNowService {
       planTier: previewResult.planTier,
       billingPeriod: billingPeriodNormalized,
       av30Cap: previewResult.effectiveCaps.av30Cap,
+      maxChildren: previewResult.effectiveCaps.maxChildren,
       maxSites: previewResult.effectiveCaps.maxSites,
       storageGbCap: previewResult.effectiveCaps.storageGbCap,
       smsMessagesCap: previewResult.effectiveCaps.smsMessagesCap,
@@ -358,11 +391,11 @@ export class BuyNowService {
     const providerParams: BuyNowCheckoutParams = {
       plan: {
         planCode: normalizedPlanCode,
-        av30AddonBlocks: previewAddons.extraAv30Blocks,
-        extraSites: previewAddons.extraSites,
-        extraStorageGb: previewAddons.extraStorageGb,
-        extraSmsMessages: previewAddons.extraSmsMessages,
-        extraLeaderSeats: previewAddons.extraLeaderSeats,
+        av30AddonBlocks: gatedAddons.av30AddonBlocks,
+        extraSites: gatedAddons.extraSites,
+        extraStorageGb: gatedAddons.extraStorageGb,
+        extraSmsMessages: gatedAddons.extraSmsMessages,
+        extraLeaderSeats: gatedAddons.extraLeaderSeats,
       },
       org: {
         orgName: org.name,
@@ -400,7 +433,7 @@ export class BuyNowService {
       provider: session.provider,
       sessionId: session.sessionId,
       sessionUrl: session.sessionUrl,
-      warnings: [],
+      warnings: gatingWarnings,
     };
   }
 
@@ -494,5 +527,45 @@ export class BuyNowService {
     if (planCode === "CORE_YEARLY") return "MINIMUM_YEARLY";
     return planCode;
   }
-}
 
+  private enforcePlanAddonPolicy(
+    selection: {
+      planCode: string;
+      av30AddonBlocks?: number;
+      extraSites?: number;
+      extraStorageGb?: number;
+      extraSmsMessages?: number;
+      extraLeaderSeats?: number;
+    },
+    planTier: PlanTier | null,
+  ): {
+    selection: {
+      planCode: string;
+      av30AddonBlocks?: number;
+      extraSites?: number;
+      extraStorageGb?: number;
+      extraSmsMessages?: number;
+      extraLeaderSeats?: number;
+    };
+    warnings: string[];
+  } {
+    if (planTier !== "core") {
+      return { selection, warnings: [] };
+    }
+
+    const warnings: string[] = [];
+    const av30AddonBlocks = selection.av30AddonBlocks ?? 0;
+    const extraSites = selection.extraSites ?? 0;
+    if (av30AddonBlocks > 0) warnings.push("core_capacity_addon_blocked_av30");
+    if (extraSites > 0) warnings.push("core_capacity_addon_blocked_sites");
+
+    return {
+      selection: {
+        ...selection,
+        av30AddonBlocks: 0,
+        extraSites: 0,
+      },
+      warnings,
+    };
+  }
+}

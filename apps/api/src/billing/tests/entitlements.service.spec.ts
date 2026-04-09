@@ -37,6 +37,7 @@ describe("EntitlementsService", () => {
     expect(result.subscriptionStatus).toBe("NONE");
     expect(result.subscription).toBeUndefined();
     expect(result.av30Cap).toBeNull();
+    expect(result.maxChildren).toBeNull();
     expect(result.maxSites).toBeNull();
     expect(result.source).toBe("master_org");
     expect(prismaMock.subscription.findFirst).not.toHaveBeenCalled();
@@ -93,6 +94,7 @@ describe("EntitlementsService", () => {
       }),
     );
     expect(result.av30Cap).toBe(75);
+    expect(result.maxChildren).toBeNull();
     expect(result.leaderSeatsIncluded).toBe(10);
     expect(result.storageGbCap).toBe(120);
     expect(result.smsMessagesCap).toBe(900);
@@ -125,6 +127,7 @@ describe("EntitlementsService", () => {
     expect(result.isMasterOrg).toBe(false);
     expect(result.subscriptionStatus).toBe(SubscriptionStatus.CANCELED);
     expect(result.av30Cap).toBe(200);
+    expect(result.maxChildren).toBeNull();
     expect(result.maxSites).toBe(3);
     expect(result.storageGbCap).toBeNull();
     expect(result.smsMessagesCap).toBeNull();
@@ -160,6 +163,7 @@ describe("EntitlementsService", () => {
     expect(result.subscriptionStatus).toBe(SubscriptionStatus.ACTIVE);
     expect(result.subscription?.planCode).toBe("LEGACY_PLAN_CODE");
     expect(result.av30Cap).toBeNull();
+    expect(result.maxChildren).toBeNull();
     expect(result.smsMessagesCap).toBeNull();
     expect(result.source).toBe("fallback");
   });
@@ -175,9 +179,39 @@ describe("EntitlementsService", () => {
     expect(result.subscriptionStatus).toBe("NONE");
     expect(result.subscription).toBeUndefined();
     expect(result.av30Cap).toBeNull();
+    expect(result.maxChildren).toBeNull();
     expect(result.currentAv30).toBeNull();
     expect(result.smsMessagesCap).toBeNull();
     expect(result.source).toBe("fallback");
   });
-});
 
+  it("resolves maxChildren from snapshot flags before plan fallback", async () => {
+    prismaMock.subscription.findFirst.mockResolvedValue({
+      id: "sub_core",
+      orgId,
+      provider: BillingProvider.STRIPE,
+      planCode: "CORE_MONTHLY",
+      status: SubscriptionStatus.ACTIVE,
+      periodStart: new Date("2024-01-01T00:00:00Z"),
+      periodEnd: new Date("2024-02-01T00:00:00Z"),
+      cancelAtPeriodEnd: false,
+      createdAt: new Date("2023-12-15T00:00:00Z"),
+      updatedAt: new Date("2024-01-15T00:00:00Z"),
+    });
+    prismaMock.orgEntitlementSnapshot.findFirst.mockResolvedValue({
+      id: "snap_core",
+      orgId,
+      maxSites: 1,
+      av30Included: 15,
+      leaderSeatsIncluded: 0,
+      storageGbIncluded: 0,
+      flagsJson: { maxChildrenIncluded: 50 },
+      source: "snapshot",
+      createdAt: new Date("2024-01-01T00:00:00Z"),
+    });
+    prismaMock.usageCounters.findFirst.mockResolvedValue(null);
+
+    const result = await service.resolve(orgId);
+    expect(result.maxChildren).toBe(50);
+  });
+});

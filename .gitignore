@@ -52,3 +52,4 @@ pgdata/
 # Turborepo
 .turbo/
 **/.turbo/
+**/.turbo/turbo-lint.log

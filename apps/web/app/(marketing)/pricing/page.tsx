@@ -257,7 +257,9 @@ export default function PricingPage() {
           </div>
 
           <div className="mb-4">
-            <p className="text-sm text-pw-text-muted">Replace paper and spreadsheets. Nothing more.</p>
+            <p className="text-sm text-pw-text-muted">
+              Starter workflows with tighter limits for smaller teams.
+            </p>
           </div>
 
           {/* Pricing - Monthly and Yearly */}

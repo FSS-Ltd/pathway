@@ -21,6 +21,7 @@ export type ResolvedEntitlements = {
       }
     | undefined;
   av30Cap: number | null;
+  maxChildren: number | null;
   storageGbCap: number | null;
   smsMessagesCap: number | null;
   leaderSeatsIncluded: number | null;
@@ -62,6 +63,7 @@ export class EntitlementsService {
         subscriptionStatus: "NONE",
         subscription: undefined,
         av30Cap: null,
+        maxChildren: null,
         storageGbCap: null,
         smsMessagesCap: null,
         leaderSeatsIncluded: null,
@@ -97,9 +99,15 @@ export class EntitlementsService {
     const smsMessagesCapFromSnapshot = numberOrNull(
       flagsFromSnapshot?.smsMessagesCap,
     );
+    const maxChildrenFromSnapshot = numberOrNull(
+      flagsFromSnapshot?.maxChildrenIncluded,
+    );
 
     const av30Cap =
       snapshot?.av30Included ?? planDefinition?.av30Included ?? null;
+    const maxChildren =
+      maxChildrenFromSnapshot ??
+      (snapshot ? null : planDefinition?.maxChildrenIncluded ?? null);
     const storageGbCap =
       snapshot?.storageGbIncluded ?? planDefinition?.storageGbIncluded ?? null;
     const smsMessagesCap =
@@ -143,6 +151,7 @@ export class EntitlementsService {
           }
         : undefined,
       av30Cap,
+      maxChildren,
       storageGbCap,
       smsMessagesCap,
       leaderSeatsIncluded,
@@ -173,4 +182,3 @@ const toRecord = (
 
 const numberOrNull = (value: unknown): number | null =>
   typeof value === "number" ? value : null;
-

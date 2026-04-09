@@ -113,6 +113,7 @@ export class StripeBuyNowProvider extends BuyNowProvider {
       billing_interval: billingInterval,
       planCode: params.plan.planCode,
       av30Cap: String(params.preview.av30Cap ?? ""),
+      maxChildren: String(params.preview.maxChildren ?? ""),
       maxSites: String(params.preview.maxSites ?? ""),
     };
 
@@ -173,4 +174,3 @@ export class StripeBuyNowProvider extends BuyNowProvider {
     };
   }
 }
-

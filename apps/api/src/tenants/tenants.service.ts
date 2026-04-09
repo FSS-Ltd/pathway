@@ -7,6 +7,7 @@ import { createHash, randomBytes } from "crypto";
 import { prisma } from "@pathway/db";
 import { createTenantDto, type CreateTenantDto } from "./dto/create-tenant.dto";
 import type { UpdateTenantDto } from "./dto/update-tenant.dto";
+import { getPlanDefinition } from "../billing/billing-plans";
 
 const PUBLIC_SIGNUP_PATH = "/signup";
 const TOKEN_BYTES = 32;
@@ -117,6 +118,18 @@ export class TenantsService {
     });
     if (!org) {
       throw new BadRequestException("org not found");
+    }
+
+    const maxSitesCap = await this.resolveMaxSitesCap(parsed.orgId);
+    if (maxSitesCap !== null) {
+      const currentSiteCount = await prisma.tenant.count({
+        where: { orgId: parsed.orgId },
+      });
+      if (currentSiteCount >= maxSitesCap) {
+        throw new BadRequestException(
+          `sites cap reached (${maxSitesCap}) for current plan`,
+        );
+      }
     }
 
     // Pre-check for unique slug to provide a clean error (still race-safe with unique index)
@@ -253,5 +266,27 @@ export class TenantsService {
       data: { revokedAt: now },
     });
     return this.getOrCreatePublicSignupLink(tenantId, orgId, createdByUserId);
+  }
+
+  private async resolveMaxSitesCap(orgId: string): Promise<number | null> {
+    const [latestSnapshot, latestSubscription] = await Promise.all([
+      prisma.orgEntitlementSnapshot.findFirst({
+        where: { orgId },
+        orderBy: [{ createdAt: "desc" }],
+        select: { maxSites: true },
+      }),
+      prisma.subscription.findFirst({
+        where: { orgId },
+        orderBy: [{ periodEnd: "desc" }],
+        select: { planCode: true },
+      }),
+    ]);
+
+    if (typeof latestSnapshot?.maxSites === "number") {
+      return latestSnapshot.maxSites;
+    }
+
+    const planDefinition = getPlanDefinition(latestSubscription?.planCode);
+    return planDefinition?.maxSitesIncluded ?? null;
   }
 }

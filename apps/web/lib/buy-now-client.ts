@@ -13,12 +13,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
 export type PlanPreviewResponse = {
   planCode: string;
-  planTier: "starter" | "growth" | "enterprise" | null;
+  planTier: "core" | "starter" | "growth" | "enterprise" | null;
   displayName: string | null;
   billingPeriod: "monthly" | "yearly" | "none" | null;
   selfServe: boolean | null;
   base: {
     av30Cap: number | null;
+    maxChildren: number | null;
     storageGbCap: number | null;
     smsMessagesCap: number | null;
     leaderSeatsIncluded: number | null;

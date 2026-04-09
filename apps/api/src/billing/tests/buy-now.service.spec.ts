@@ -102,6 +102,7 @@ describe("BuyNowService", () => {
       }),
     );
     expect(result.preview.av30Cap).toBe(100); // 50 base + 2*25
+    expect(result.preview.maxChildren).toBeNull();
     expect(result.preview.maxSites).toBe(1);
     expect(result.warnings).toContain("price_not_included");
     expect(result.warnings).not.toContain("unknown_plan_code");
@@ -124,6 +125,7 @@ describe("BuyNowService", () => {
     expect(providerMock.createCheckoutSession).toHaveBeenCalledTimes(1);
     expect(result.preview.planTier).toBeNull();
     expect(result.preview.av30Cap).toBe(50); // 2*25 from add-ons only
+    expect(result.preview.maxChildren).toBeNull();
     expect(result.warnings).toEqual(
       expect.arrayContaining(["price_not_included", "unknown_plan_code"]),
     );
@@ -146,5 +148,35 @@ describe("BuyNowService", () => {
     expect(result.preview.av30Cap).toBe(50); // base only, add-ons clamped
     expect(providerMock.createCheckoutSession).toHaveBeenCalledTimes(1);
   });
-});
 
+  it("blocks core capacity add-ons but keeps non-capacity add-ons", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    const result = await service.checkout({
+      ...baseRequest,
+      plan: {
+        planCode: "CORE_MONTHLY",
+        av30AddonBlocks: 2,
+        extraSites: 1,
+        extraStorageGb: 100,
+        extraSmsMessages: 1000,
+      },
+    });
+
+    expect(result.preview.av30Cap).toBe(15);
+    expect(result.preview.maxChildren).toBe(50);
+    expect(result.preview.maxSites).toBe(1);
+    expect(result.warnings).toEqual(
+      expect.arrayContaining([
+        "core_capacity_addon_blocked_av30",
+        "core_capacity_addon_blocked_sites",
+      ]),
+    );
+  });
+});

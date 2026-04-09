@@ -3,17 +3,22 @@ const findMany = jest.fn();
 const findFirst = jest.fn();
 const create = jest.fn();
 const update = jest.fn();
+const count = jest.fn();
 
 const tFindUnique = jest.fn(); // tenant
 const gFindUnique = jest.fn(); // group
 const uFindMany = jest.fn(); // users (guardians)
+const snapshotFindFirst = jest.fn();
+const subscriptionFindFirst = jest.fn();
 
 jest.mock("@pathway/db", () => ({
   prisma: {
-    child: { findMany, findFirst, create, update },
+    child: { findMany, findFirst, create, update, count },
     tenant: { findUnique: tFindUnique },
     group: { findUnique: gFindUnique },
     user: { findMany: uFindMany },
+    orgEntitlementSnapshot: { findFirst: snapshotFindFirst },
+    subscription: { findFirst: subscriptionFindFirst },
     $disconnect: jest.fn(),
   },
   runTransaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
@@ -45,6 +50,9 @@ describe("ChildrenService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     svc = new ChildrenService(mockInvitesService as unknown as InvitesService);
+    snapshotFindFirst.mockResolvedValue(null);
+    subscriptionFindFirst.mockResolvedValue({ planCode: "STARTER_MONTHLY" });
+    count.mockResolvedValue(10);
   });
 
   describe("list", () => {
@@ -126,7 +134,7 @@ describe("ChildrenService", () => {
     } as any;
 
     it("creates after validations", async () => {
-      tFindUnique.mockResolvedValueOnce({ id: tenantId });
+      tFindUnique.mockResolvedValueOnce({ id: tenantId, orgId: "org_1" });
       gFindUnique.mockResolvedValueOnce({ id: "g1", tenantId });
       uFindMany.mockResolvedValueOnce([]);
       create.mockResolvedValueOnce({ id: "c1", tenantId });
@@ -140,6 +148,19 @@ describe("ChildrenService", () => {
       await expect(
         svc.create({ ...baseDto }, undefined as any),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("blocks create when children cap is reached", async () => {
+      tFindUnique.mockResolvedValueOnce({ id: tenantId, orgId: "org_1" });
+      snapshotFindFirst.mockResolvedValueOnce({
+        flagsJson: { maxChildrenIncluded: 50 },
+      });
+      count.mockResolvedValueOnce(50);
+
+      await expect(svc.create({ ...baseDto }, tenantId)).rejects.toThrow(
+        /children cap reached/i,
+      );
+      expect(create).not.toHaveBeenCalled();
     });
   });
 

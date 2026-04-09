@@ -23,6 +23,7 @@ import {
   BillingWebhookProvider,
   ParsedBillingWebhookEvent,
 } from "./billing-webhook.provider";
+import { getPlanDefinition } from "./billing-plans";
 import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
 import { LoggingService, StructuredLogger } from "../common/logging/logging.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
@@ -463,6 +464,10 @@ export class BillingWebhookController {
     pendingOrder: PendingOrderRecord,
   ): Prisma.InputJsonValue | undefined {
     const flags: Record<string, unknown> = {};
+    const planDefinition = getPlanDefinition(pendingOrder.planCode);
+    if (planDefinition?.maxChildrenIncluded !== null) {
+      flags.maxChildrenIncluded = planDefinition?.maxChildrenIncluded;
+    }
     if (pendingOrder.smsMessagesCap !== null && pendingOrder.smsMessagesCap !== undefined) {
       flags.smsMessagesCap = pendingOrder.smsMessagesCap;
     }
@@ -769,4 +774,3 @@ export class BillingWebhookController {
     });
   }
 }
-

@@ -26,6 +26,7 @@ export type ParsedBillingWebhookEvent = {
   entitlements?: {
     maxSites?: number | null;
     av30Included?: number | null;
+    maxChildrenIncluded?: number | null;
     leaderSeatsIncluded?: number | null;
     storageGbIncluded?: number | null;
     flagsJson?: Record<string, unknown> | null;
@@ -143,4 +144,3 @@ const mapStatus = (
   }
   return null;
 };
-

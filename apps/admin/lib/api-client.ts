@@ -337,6 +337,7 @@ export type AdminBillingOverview = {
   periodEnd?: string | null;
   cancelAtPeriodEnd?: boolean | null;
   av30Cap?: number | null;
+  maxChildren?: number | null;
   currentAv30?: number | null;
   av30Enforcement?: {
     status: "OK" | "SOFT_CAP" | "GRACE" | "HARD_CAP";
@@ -377,7 +378,7 @@ export type AdminBillingPrices = {
 
 export type AdminPlanPreview = {
   planCode: string | null;
-  planTier: "starter" | "growth" | "enterprise" | null;
+  planTier: "core" | "starter" | "growth" | "enterprise" | null;
   baseAv30Included: number | null;
   effectiveAv30Cap: number | null;
   baseSitesIncluded: number | null;
@@ -3615,6 +3616,7 @@ type ApiEntitlements = {
     cancelAtPeriodEnd?: boolean | null;
   } | null;
   av30Cap?: number | null;
+  maxChildren?: number | null;
   currentAv30?: number | null;
   av30Enforcement?: {
     status: "OK" | "SOFT_CAP" | "GRACE" | "HARD_CAP";
@@ -3641,6 +3643,7 @@ const mapApiEntitlementsToAdmin = (
   periodEnd: api.subscription?.periodEnd ?? null,
   cancelAtPeriodEnd: api.subscription?.cancelAtPeriodEnd ?? null,
   av30Cap: api.av30Cap ?? null,
+  maxChildren: api.maxChildren ?? null,
   currentAv30: api.currentAv30 ?? null,
   av30Enforcement: api.av30Enforcement,
   storageGbCap: api.storageGbCap ?? null,
@@ -3676,7 +3679,7 @@ export async function fetchBillingOverview(): Promise<AdminBillingOverview> {
 
 const mapPreviewToAdmin = (api: {
   planCode: string | null;
-  planTier: "starter" | "growth" | "enterprise" | null;
+  planTier: "core" | "starter" | "growth" | "enterprise" | null;
   base?: {
     av30Cap: number | null;
     maxSites: number | null;
@@ -3721,6 +3724,8 @@ export async function previewPlanSelection(
         tier: AdminPlanPreview["planTier"];
       }
     > = {
+      CORE_MONTHLY: { av30: 15, sites: 1, tier: "core" },
+      CORE_YEARLY: { av30: 15, sites: 1, tier: "core" },
       STARTER_MONTHLY: { av30: 50, sites: 1, tier: "starter" },
       STARTER_YEARLY: { av30: 50, sites: 1, tier: "starter" },
       GROWTH_MONTHLY: { av30: 200, sites: 3, tier: "growth" },
@@ -3789,7 +3794,7 @@ export async function previewPlanSelection(
 
   const json = (await res.json()) as {
     planCode: string | null;
-    planTier: "starter" | "growth" | "enterprise" | null;
+    planTier: "core" | "starter" | "growth" | "enterprise" | null;
     billingPeriod: string | null;
     base: {
       av30Cap: number | null;
@@ -3905,9 +3910,10 @@ export async function createBuyNowCheckout(
     warnings?: string[];
     preview?: {
       planCode: string | null;
-      planTier: "starter" | "growth" | "enterprise" | null;
+      planTier: "core" | "starter" | "growth" | "enterprise" | null;
       billingPeriod: string | null;
       av30Cap: number | null;
+      maxChildren: number | null;
       maxSites: number | null;
       storageGbCap: number | null;
       smsMessagesCap: number | null;
@@ -3997,9 +4003,10 @@ export async function createBuyNowPurchase(
     warnings?: string[];
     preview?: {
       planCode: string | null;
-      planTier: "starter" | "growth" | "enterprise" | null;
+      planTier: "core" | "starter" | "growth" | "enterprise" | null;
       billingPeriod: string | null;
       av30Cap: number | null;
+      maxChildren: number | null;
       maxSites: number | null;
       storageGbCap: number | null;
       smsMessagesCap: number | null;
