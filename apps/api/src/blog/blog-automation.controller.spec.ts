@@ -10,6 +10,7 @@ const mockBlogService = () => ({
   createDraft: jest.fn(),
   publish: jest.fn(),
   getAdminById: jest.fn(),
+  uploadAsset: jest.fn(),
 });
 
 const mockTokenService = () => ({
@@ -91,6 +92,46 @@ describe("BlogAutomationController", () => {
         },
         {} as unknown as AutomationRequest,
       ),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it("uploads assets via automation endpoint", async () => {
+    blogService.uploadAsset.mockResolvedValue({
+      id: "asset_1",
+      url: "https://nexsteps.dev/media/asset_1",
+      width: 1200,
+      height: 630,
+    });
+
+    const result = await controller.uploadAsset({
+      fileBase64: Buffer.from("image-bytes").toString("base64"),
+      mimeType: "image/png",
+      type: "HEADER",
+      width: 1200,
+      height: 630,
+    });
+
+    expect(blogService.uploadAsset).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "image/png",
+      "HEADER",
+      1200,
+      630,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "asset_1",
+        url: "https://nexsteps.dev/media/asset_1",
+      }),
+    );
+  });
+
+  it("rejects malformed asset payloads", async () => {
+    await expect(
+      controller.uploadAsset({
+        fileBase64: "",
+        mimeType: "image/gif",
+      }),
     ).rejects.toThrow(BadRequestException);
   });
 });

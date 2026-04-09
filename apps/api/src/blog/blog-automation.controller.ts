@@ -11,6 +11,7 @@ import { BlogService } from "./blog.service";
 import { BlogAutomationTokenGuard, type AutomationRequest } from "./blog-automation-token.guard";
 import { createAutomationBlogPostDto } from "./dto/create-automation-blog-post.dto";
 import { BlogAutomationTokenService } from "./blog-automation-token.service";
+import { uploadAssetDto } from "./dto/upload-asset.dto";
 
 @Controller("automation/blog")
 @UseGuards(BlogAutomationTokenGuard)
@@ -52,6 +53,23 @@ export class BlogAutomationController {
       publishedAt: published.publishedAt,
       url: `${baseUrl.replace(/\/$/, "")}/blog/${published.slug}`,
     };
+  }
+
+  @Post("assets")
+  async uploadAsset(@Body() dto: unknown) {
+    const parsed = uploadAssetDto.safeParse(dto);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.errors);
+    }
+
+    const buffer = Buffer.from(parsed.data.fileBase64, "base64");
+    return this.blogService.uploadAsset(
+      buffer,
+      parsed.data.mimeType,
+      parsed.data.type,
+      parsed.data.width,
+      parsed.data.height,
+    );
   }
 
   private async triggerRevalidation(webBaseUrl: string, slug: string) {
