@@ -260,6 +260,9 @@ export default function PricingPage() {
             <p className="text-sm text-pw-text-muted">
               Starter workflows with tighter limits for smaller teams.
             </p>
+            <p className="mt-1 text-sm text-pw-text-muted">
+              Includes 15 Active People (AV30), 50 children, and 1 site.
+            </p>
           </div>
 
           {/* Pricing - Monthly and Yearly */}

@@ -7,6 +7,9 @@ node_modules
 certificates/
 *.pem
 
+#docs
+docs/BLOG_AUTOMATION_COWORKER.md
+
 # builds
 dist
 .next
