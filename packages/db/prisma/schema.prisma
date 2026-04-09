@@ -160,6 +160,36 @@ model BlogPost {
   @@index([slug])
 }
 
+model AutomationApiToken {
+  id        String   @id @default(uuid())
+  name      String
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+  revokedAt DateTime?
+  lastUsedAt DateTime?
+
+  publishAudits AutomationBlogPublishAudit[]
+
+  @@index([revokedAt, expiresAt])
+  @@index([createdAt])
+}
+
+model AutomationBlogPublishAudit {
+  id          String   @id @default(uuid())
+  tokenId     String
+  tokenName   String
+  blogPostId  String
+  blogSlug    String
+  publishedAt DateTime
+  createdAt   DateTime @default(now())
+
+  token AutomationApiToken @relation(fields: [tokenId], references: [id])
+
+  @@index([tokenId, createdAt])
+  @@index([blogPostId])
+}
+
 enum StaffAttendanceStatus {
   PRESENT
   ABSENT

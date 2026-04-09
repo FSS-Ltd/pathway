@@ -5,11 +5,19 @@ import { BlogService } from "./blog.service";
 import { BlogAdminController } from "./blog-admin.controller";
 import { BlogPublicController } from "./blog-public.controller";
 import { BlogMediaController } from "./blog-media.controller";
+import { BlogAutomationController } from "./blog-automation.controller";
+import { BlogAutomationTokenService } from "./blog-automation-token.service";
+import { BlogAutomationTokenGuard } from "./blog-automation-token.guard";
 
 @Module({
   imports: [CommonModule, AuthModule],
-  controllers: [BlogAdminController, BlogPublicController, BlogMediaController],
-  providers: [BlogService],
-  exports: [BlogService],
+  controllers: [
+    BlogAdminController,
+    BlogPublicController,
+    BlogMediaController,
+    BlogAutomationController,
+  ],
+  providers: [BlogService, BlogAutomationTokenService, BlogAutomationTokenGuard],
+  exports: [BlogService, BlogAutomationTokenService],
 })
 export class BlogModule {}
