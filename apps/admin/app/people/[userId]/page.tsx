@@ -595,7 +595,7 @@ export default function StaffDetailPage() {
           >
             {!staff.canEditAvailability ? (
               <p className="text-sm text-text-muted">
-                Upgrade to Starter or above to set class preferences.
+                Class preferences are unavailable on this plan.
               </p>
             ) : groups.length === 0 ? (
               <p className="text-sm text-text-muted">

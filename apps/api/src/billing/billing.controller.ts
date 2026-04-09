@@ -74,6 +74,7 @@ export class BillingController {
         cancelAtPeriodEnd: resolved.subscription.cancelAtPeriodEnd,
       } : null,
       av30Cap: resolved.av30Cap,
+      maxChildren: resolved.maxChildren,
       currentAv30: resolved.currentAv30,
       av30Enforcement: {
         status: av30Status.status,

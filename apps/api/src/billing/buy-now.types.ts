@@ -40,6 +40,7 @@ export type BuyNowCheckoutPreview = {
   planTier: PlanTier | null;
   billingPeriod: "monthly" | "yearly" | null;
   av30Cap: number | null;
+  maxChildren: number | null;
   maxSites: number | null;
   storageGbCap: number | null;
   smsMessagesCap: number | null;
@@ -54,4 +55,3 @@ export type BuyNowCheckoutResponse = {
   sessionUrl: string;
   warnings?: string[];
 };
-

@@ -7,6 +7,7 @@ jest.mock("@pathway/db", () => ({
     tenant: {
       findMany: jest.fn(),
       findUnique: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
     },
     org: {
@@ -18,6 +19,12 @@ jest.mock("@pathway/db", () => ({
       update: jest.fn(),
       create: jest.fn(),
     },
+    orgEntitlementSnapshot: {
+      findFirst: jest.fn(),
+    },
+    subscription: {
+      findFirst: jest.fn(),
+    },
   },
 }));
 
@@ -26,11 +33,14 @@ import { prisma } from "@pathway/db";
 const findMany = prisma.tenant.findMany as unknown as jest.Mock;
 const findUnique = prisma.tenant.findUnique as unknown as jest.Mock;
 const create = prisma.tenant.create as unknown as jest.Mock;
+const count = prisma.tenant.count as unknown as jest.Mock;
 const orgFindUnique = prisma.org.findUnique as unknown as jest.Mock;
 const linkFindFirst = prisma.publicSignupLink.findFirst as unknown as jest.Mock;
 const linkUpdateMany = prisma.publicSignupLink.updateMany as unknown as jest.Mock;
 const linkUpdate = prisma.publicSignupLink.update as unknown as jest.Mock;
 const linkCreate = prisma.publicSignupLink.create as unknown as jest.Mock;
+const snapshotFindFirst = prisma.orgEntitlementSnapshot.findFirst as unknown as jest.Mock;
+const subscriptionFindFirst = prisma.subscription.findFirst as unknown as jest.Mock;
 
 describe("TenantsService", () => {
   let svc: TenantsService;
@@ -48,6 +58,9 @@ describe("TenantsService", () => {
     jest.clearAllMocks();
     svc = new TenantsService();
     orgFindUnique.mockResolvedValue({ id: ORG_ID });
+    count.mockResolvedValue(0);
+    snapshotFindFirst.mockResolvedValue(null);
+    subscriptionFindFirst.mockResolvedValue({ planCode: "STARTER_MONTHLY" });
   });
 
   describe("list", () => {
@@ -207,6 +220,17 @@ describe("TenantsService", () => {
       await expect(
         svc.create({ name: "Race", slug: "race-church", orgId: ORG_ID }),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it("blocks create when site cap is reached", async () => {
+      findUnique.mockResolvedValue(null);
+      snapshotFindFirst.mockResolvedValue({ maxSites: 1 });
+      count.mockResolvedValue(1);
+
+      await expect(
+        svc.create({ name: "Second Site", slug: "second-site", orgId: ORG_ID }),
+      ).rejects.toThrow(/sites cap reached/i);
+      expect(create).not.toHaveBeenCalled();
     });
   });
 

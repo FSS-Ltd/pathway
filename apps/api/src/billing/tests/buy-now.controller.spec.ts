@@ -52,6 +52,7 @@ describe("BuyNowController", () => {
         planTier: "starter",
         billingPeriod: "monthly",
         av30Cap: 75,
+        maxChildren: null,
         maxSites: 1,
         storageGbCap: null,
         smsMessagesCap: null,
@@ -88,4 +89,3 @@ describe("BuyNowController", () => {
     expect(serviceMock.checkout).not.toHaveBeenCalled();
   });
 });
-

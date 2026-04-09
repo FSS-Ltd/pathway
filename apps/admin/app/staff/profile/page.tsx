@@ -597,7 +597,7 @@ export default function StaffProfilePage() {
         </p>
         {!canEditAvailability ? (
           <p className="mt-4 text-sm text-text-muted">
-            Upgrade to Starter or above to set class preferences.
+            Class preferences are unavailable on this plan.
           </p>
         ) : groups.length === 0 ? (
           <p className="mt-4 text-sm text-text-muted">

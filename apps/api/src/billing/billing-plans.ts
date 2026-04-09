@@ -20,11 +20,12 @@ export type PlanDefinition = {
   billingPeriod: "monthly" | "yearly" | "none";
   selfServe: boolean;
   av30Included: number | null;
+  maxChildrenIncluded: number | null;
   storageGbIncluded: number | null;
   smsMessagesIncluded: number | null;
   leaderSeatsIncluded: number | null;
   maxSitesIncluded: number | null;
-  /** Max active classes/groups per site. Core=4, Starter+=null (no limit). */
+  /** Max active classes/groups per site. Null means no explicit cap. */
   maxActiveClasses: number | null;
   flags?: { canExceedAv30WithOverage?: boolean; enterpriseOnly?: boolean };
 };
@@ -37,11 +38,12 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "monthly",
     selfServe: true,
     av30Included: 15,
+    maxChildrenIncluded: 50,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
     maxSitesIncluded: 1,
-    maxActiveClasses: 4,
+    maxActiveClasses: null,
   },
   CORE_YEARLY: {
     code: "CORE_YEARLY",
@@ -50,11 +52,12 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "yearly",
     selfServe: true,
     av30Included: 15,
+    maxChildrenIncluded: 50,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
     maxSitesIncluded: 1,
-    maxActiveClasses: 4,
+    maxActiveClasses: null,
   },
   MINIMUM_MONTHLY: {
     code: "MINIMUM_MONTHLY",
@@ -63,11 +66,12 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "monthly",
     selfServe: true,
     av30Included: 15,
+    maxChildrenIncluded: 50,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
     maxSitesIncluded: 1,
-    maxActiveClasses: 4,
+    maxActiveClasses: null,
   },
   MINIMUM_YEARLY: {
     code: "MINIMUM_YEARLY",
@@ -76,11 +80,12 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "yearly",
     selfServe: true,
     av30Included: 15,
+    maxChildrenIncluded: 50,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
     maxSitesIncluded: 1,
-    maxActiveClasses: 4,
+    maxActiveClasses: null,
   },
   STARTER_MONTHLY: {
     code: "STARTER_MONTHLY",
@@ -89,6 +94,7 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "monthly",
     selfServe: true,
     av30Included: 50,
+    maxChildrenIncluded: null,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
@@ -102,6 +108,7 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "yearly",
     selfServe: true,
     av30Included: 50,
+    maxChildrenIncluded: null,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
@@ -115,6 +122,7 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "monthly",
     selfServe: true,
     av30Included: 200,
+    maxChildrenIncluded: null,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
@@ -128,6 +136,7 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "yearly",
     selfServe: true,
     av30Included: 200,
+    maxChildrenIncluded: null,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
@@ -141,6 +150,7 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     billingPeriod: "none",
     selfServe: false,
     av30Included: null,
+    maxChildrenIncluded: null,
     storageGbIncluded: null,
     smsMessagesIncluded: null,
     leaderSeatsIncluded: null,
@@ -159,4 +169,3 @@ export function getPlanDefinition(
   }
   return null;
 }
-

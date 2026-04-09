@@ -6,7 +6,6 @@ import {
 import { prisma, Weekday, OrgRole } from "@pathway/db";
 import type { UpdateStaffDto } from "./dto/update-staff.dto";
 import type { UpdateProfileDto } from "./dto/update-profile.dto";
-import { getPlanDefinition } from "../billing/billing-plans";
 
 const WEEKDAY_ORDER: Weekday[] = [
   Weekday.SUN,
@@ -652,15 +651,7 @@ export class StaffService {
       select: { isMasterOrg: true },
     });
     if (org?.isMasterOrg) return true;
-
-    const subscription = await prisma.subscription.findFirst({
-      where: { orgId },
-      orderBy: { periodEnd: "desc" },
-    });
-    const planCode = subscription?.planCode ?? null;
-    const def = getPlanDefinition(planCode);
-    const tier = def?.tier ?? "core";
-    return tier !== "core";
+    return true;
   }
 
   async update(

@@ -116,13 +116,13 @@ export default function BuyNowPage() {
         planCode,
         frequency,
         av30AddonBlocks25:
-          planTier === "core" ? 0 : planTier === "starter" ? av30Blocks : 0,
+          planTier === "starter" ? av30Blocks : 0,
         av30AddonBlocks50:
-          planTier === "core" ? 0 : planTier === "growth" ? av30Blocks : 0,
-        storageAddon100Gb: planTier === "core" ? 0 : storageChoice === "100" ? 1 : 0,
-        storageAddon200Gb: planTier === "core" ? 0 : storageChoice === "200" ? 1 : 0,
-        storageAddon1Tb: planTier === "core" ? 0 : storageChoice === "1000" ? 1 : 0,
-        smsBundles1000: planTier === "core" ? 0 : smsBundles,
+          planTier === "growth" ? av30Blocks : 0,
+        storageAddon100Gb: storageChoice === "100" ? 1 : 0,
+        storageAddon200Gb: storageChoice === "200" ? 1 : 0,
+        storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
+        smsBundles1000: smsBundles,
       }
     : null;
 
@@ -153,22 +153,20 @@ export default function BuyNowPage() {
     const handle = setTimeout(async () => {
       try {
         const extraAv30Blocks =
-          planTier === "core"
-            ? 0
-            : planTier === "growth"
+          planTier === "growth"
               ? Math.max(0, av30Blocks) * 2 // +50 blocks -> backend 25-size
-              : Math.max(0, av30Blocks);
+              : planTier === "starter"
+                ? Math.max(0, av30Blocks)
+                : 0;
         const extraStorageGb =
-          planTier === "core"
-            ? 0
-            : storageChoice === "100"
-              ? 100
-              : storageChoice === "200"
-                ? 200
-                : storageChoice === "1000"
-                  ? 1000
-                  : 0;
-        const extraSmsMessages = planTier === "core" ? 0 : Math.max(0, smsBundles * 1000);
+          storageChoice === "100"
+            ? 100
+            : storageChoice === "200"
+              ? 200
+              : storageChoice === "1000"
+                ? 1000
+                : 0;
+        const extraSmsMessages = Math.max(0, smsBundles * 1000);
 
         const result = await previewPlanSelection(
           {
@@ -342,15 +340,15 @@ export default function BuyNowPage() {
           <div className="rounded-xl border border-pw-border bg-white p-4 shadow-sm">
             <h2 className="text-lg font-semibold">Plan</h2>
             <p className="text-sm text-pw-text-muted">
-              Starter and Growth are self-serve. Enterprise is contact-only.
+              Core, Starter, and Growth are self-serve. Enterprise is contact-only.
             </p>
             <div className="mt-4 grid gap-3 md:grid-cols-4">
               {[
                 {
                   tier: "core" as PlanTier,
                   title: "Core",
-                  desc: "Attendance only.",
-                  included: "Up to 15 staff/volunteers, 4 groups, 1 site",
+                  desc: "Starter essentials for smaller teams.",
+                  included: "15 Active People, 50 children, 1 site",
                 },
                 {
                   tier: "starter" as PlanTier,
@@ -451,23 +449,34 @@ export default function BuyNowPage() {
             </div>
           </div>
 
-          {planTier !== "core" && (
+          {planTier !== "enterprise" && (
             <div className="rounded-xl border border-pw-border bg-white p-4 shadow-sm">
               <h2 className="text-lg font-semibold">Add-ons</h2>
               <p className="text-sm text-pw-text-muted">
-                Adjust capacity now or leave at zero-you can add more later.
+                {planTier === "core"
+                  ? "Core supports storage and SMS add-ons. Capacity expansion is unavailable on Core."
+                  : "Adjust capacity now or leave at zero-you can add more later."}
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <AddonInput
-                  label={`Extra ${planTier === "growth" ? "+50" : "+25"} Active People`}
-                  helper={
-                    planTier === "growth"
-                      ? "£59/mo or £590/yr"
-                      : "£39/mo or £390/yr"
-                  }
-                  value={av30Blocks}
-                  onChange={(v) => setAv30Blocks(clampQty(v))}
-                />
+                {planTier !== "core" ? (
+                  <AddonInput
+                    label={`Extra ${planTier === "growth" ? "+50" : "+25"} Active People`}
+                    helper={
+                      planTier === "growth"
+                        ? "£59/mo or £590/yr"
+                        : "£39/mo or £390/yr"
+                    }
+                    value={av30Blocks}
+                    onChange={(v) => setAv30Blocks(clampQty(v))}
+                  />
+                ) : (
+                  <div className="rounded-lg border border-pw-border p-3">
+                    <p className="text-sm font-medium">Capacity add-ons</p>
+                    <p className="text-xs text-pw-text-muted">
+                      Core does not support Active People or additional site add-ons.
+                    </p>
+                  </div>
+                )}
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">
                     Storage (billed {frequency})
@@ -624,6 +633,10 @@ export default function BuyNowPage() {
                   value={preview.effectiveCaps.av30Cap ?? "-"}
                 />
                 <PreviewRow
+                  label="Children cap"
+                  value={preview.effectiveCaps.maxChildren ?? "-"}
+                />
+                <PreviewRow
                   label="Sites cap"
                   value={preview.effectiveCaps.maxSites ?? "-"}
                 />
@@ -729,4 +742,3 @@ function PreviewRow({ label, value }: { label: string; value: string | number })
     </>
   );
 }
-

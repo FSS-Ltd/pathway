@@ -34,6 +34,7 @@ describe("PlanPreviewController", () => {
       selfServe: true,
       base: {
         av30Cap: 50,
+        maxChildren: null,
         storageGbCap: null,
         smsMessagesCap: null,
         leaderSeatsIncluded: null,
@@ -41,6 +42,7 @@ describe("PlanPreviewController", () => {
       },
       addons: {
         av30Cap: null,
+        maxChildren: null,
         storageGbCap: null,
         smsMessagesCap: null,
         leaderSeatsIncluded: null,
@@ -49,6 +51,7 @@ describe("PlanPreviewController", () => {
       },
       effectiveCaps: {
         av30Cap: 50,
+        maxChildren: null,
         storageGbCap: null,
         smsMessagesCap: null,
         leaderSeatsIncluded: null,
@@ -86,4 +89,3 @@ describe("PlanPreviewController", () => {
     ).toThrow(BadRequestException);
   });
 });
-

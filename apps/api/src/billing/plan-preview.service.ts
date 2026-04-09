@@ -21,13 +21,19 @@ export class PlanPreviewService {
     
     const planDefinition = getPlanDefinition(trimmedPlanCode);
     const addons = input.addons ?? {};
+    const addonPolicyResult = this.applyAddonPolicy(planDefinition, addons);
 
     const base = this.computeBaseCaps(planDefinition);
-    const addonResult = this.computeAddonCaps(addons);
+    const addonResult = this.computeAddonCaps(addonPolicyResult.sanitisedAddons);
     const effectiveCaps = this.combineCaps(base, addonResult.caps);
-    const notes = this.buildNotes(planDefinition, addons, addonResult);
+    const notes = this.buildNotes(
+      planDefinition,
+      addonPolicyResult.rawAddons,
+      addonResult,
+      addonPolicyResult.warnings,
+    );
 
-    const hasRawAddons = Object.values(addons).some(
+    const hasRawAddons = Object.values(addonPolicyResult.rawAddons).some(
       (value) => value !== undefined,
     );
 
@@ -40,7 +46,7 @@ export class PlanPreviewService {
       base,
       addons: {
         ...addonResult.caps,
-        ...(hasRawAddons ? { rawAddons: addons } : {}),
+        ...(hasRawAddons ? { rawAddons: addonPolicyResult.rawAddons } : {}),
         extraAv30Blocks: addonResult.blocks,
       },
       effectiveCaps,
@@ -51,6 +57,7 @@ export class PlanPreviewService {
   private computeBaseCaps(plan: PlanDefinition | null): PlanPreviewCaps {
     return {
       av30Cap: plan?.av30Included ?? null,
+      maxChildren: plan?.maxChildrenIncluded ?? null,
       storageGbCap: plan?.storageGbIncluded ?? null,
       smsMessagesCap: plan?.smsMessagesIncluded ?? null,
       leaderSeatsIncluded: plan?.leaderSeatsIncluded ?? null,
@@ -77,6 +84,7 @@ export class PlanPreviewService {
     const caps: PlanPreviewCaps = {
       av30Cap:
         av30Blocks.value > 0 ? av30Blocks.value * this.av30BlockSize : null,
+      maxChildren: null,
       storageGbCap: storage.value > 0 ? storage.value : null,
       smsMessagesCap: sms.value > 0 ? sms.value : null,
       leaderSeatsIncluded: seats.value > 0 ? seats.value : null,
@@ -106,6 +114,7 @@ export class PlanPreviewService {
 
     return {
       av30Cap: sum(base.av30Cap, addons.av30Cap),
+      maxChildren: base.maxChildren,
       storageGbCap: sum(base.storageGbCap, addons.storageGbCap),
       smsMessagesCap: sum(base.smsMessagesCap, addons.smsMessagesCap),
       leaderSeatsIncluded: sum(
@@ -120,8 +129,9 @@ export class PlanPreviewService {
     plan: PlanDefinition | null,
     addons: PlanPreviewAddons,
     addonResult: { caps: PlanPreviewCaps; blocks: number | null; hadNegative: boolean },
+    policyWarnings: string[],
   ): PlanPreviewResponse["notes"] {
-    const warnings = ["price_not_included"];
+    const warnings = ["price_not_included", ...policyWarnings];
     let source: PlanPreviewResponse["notes"]["source"] = "plan_catalogue";
 
     if (!plan) {
@@ -143,5 +153,41 @@ export class PlanPreviewService {
 
     return { source, warnings };
   }
-}
 
+  private applyAddonPolicy(
+    plan: PlanDefinition | null,
+    addons: PlanPreviewAddons,
+  ): {
+    rawAddons: PlanPreviewAddons;
+    sanitisedAddons: PlanPreviewAddons;
+    warnings: string[];
+  } {
+    const rawAddons = { ...addons };
+    const warnings: string[] = [];
+
+    if (plan?.tier === "core") {
+      if ((rawAddons.extraAv30Blocks ?? 0) > 0) {
+        warnings.push("core_capacity_addon_blocked_av30");
+      }
+      if ((rawAddons.extraSites ?? 0) > 0) {
+        warnings.push("core_capacity_addon_blocked_sites");
+      }
+
+      return {
+        rawAddons,
+        sanitisedAddons: {
+          ...rawAddons,
+          extraAv30Blocks: 0,
+          extraSites: 0,
+        },
+        warnings,
+      };
+    }
+
+    return {
+      rawAddons,
+      sanitisedAddons: rawAddons,
+      warnings,
+    };
+  }
+}
