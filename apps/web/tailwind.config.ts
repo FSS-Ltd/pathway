@@ -47,24 +47,8 @@ const config: Config = {
         "pw-danger": "rgb(var(--pw-status-danger) / <alpha-value>)",
       },
       fontFamily: {
-        heading: [
-          "var(--font-heading)",
-          "Nunito",
-          "Inter",
-          "Segoe UI",
-          "system-ui",
-          "-apple-system",
-          "sans-serif",
-        ],
-        body: [
-          "var(--font-body)",
-          "Quicksand",
-          "Inter",
-          "Segoe UI",
-          "system-ui",
-          "-apple-system",
-          "sans-serif",
-        ],
+        heading: ["var(--font-heading)", "Segoe UI", "system-ui", "-apple-system", "sans-serif"],
+        body: ["var(--font-body)", "Segoe UI", "system-ui", "-apple-system", "sans-serif"],
       },
       borderRadius: {
         sm: "6px",

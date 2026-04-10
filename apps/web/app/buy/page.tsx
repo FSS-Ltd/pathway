@@ -313,8 +313,8 @@ export default function BuyNowPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Image 
-              src="/NSLogo.svg" 
-              alt="Nexsteps" 
+              src="/favicon.svg" 
+              alt="" 
               width={32} 
               height={32}
               className="h-8 w-8"

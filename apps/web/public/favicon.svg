@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Nexsteps">
+  <rect width="64" height="64" rx="14" fill="#17b89e" />
+  <path
+    d="M18 45V19h6.8l14.2 17.6V19H46v26h-6.7L25 27.4V45z"
+    fill="#0f172a"
+  />
+</svg>
