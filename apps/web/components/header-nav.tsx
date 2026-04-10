@@ -1,6 +1,5 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/analytics";
@@ -117,7 +116,6 @@ export default function HeaderNav() {
 
   return (
     <>
-      {/* Desktop Navigation */}
       <nav className="hidden items-center gap-6 min-[1021px]:flex">
         {navLinks.map((link) =>
           link.children ? (
@@ -135,9 +133,7 @@ export default function HeaderNav() {
                 onFocus={() => openDropdown(link.label)}
                 onBlur={scheduleCloseDropdown}
                 onClick={() =>
-                  setOpenDesktopDropdown((current) =>
-                    current === link.label ? null : link.label,
-                  )
+                  setOpenDesktopDropdown((current) => (current === link.label ? null : link.label))
                 }
               >
                 {link.label}
@@ -172,16 +168,16 @@ export default function HeaderNav() {
                       : "translate-y-1 opacity-0"
                   }`}
                 >
-                {link.children.map((child) => (
-                  <Link
-                    key={child.href}
-                    href={child.href}
-                    onClick={() => setOpenDesktopDropdown(null)}
-                    className="block rounded-md px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-muted hover:text-accent-primary"
-                  >
-                    {child.label}
-                  </Link>
-                ))}
+                  {link.children.map((child) => (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      onClick={() => setOpenDesktopDropdown(null)}
+                      className="block rounded-md px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-muted hover:text-accent-primary"
+                    >
+                      {child.label}
+                    </Link>
+                  ))}
                 </div>
               </div>
             </div>
@@ -196,7 +192,6 @@ export default function HeaderNav() {
           ),
         )}
 
-        {/* Action Buttons */}
         <div className="ml-4 flex items-center gap-3">
           <Link
             href="https://app.nexsteps.dev"
@@ -208,63 +203,43 @@ export default function HeaderNav() {
           <Link
             href="/demo"
             onClick={handleDemoClick}
-            className="rounded-md bg-accent-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-accent-strong"
+            className="rounded-md bg-accent-primary px-4 py-2 text-sm font-medium text-text-primary shadow-sm transition hover:bg-accent-strong"
           >
             Request a Demo
           </Link>
         </div>
       </nav>
 
-      {/* Mobile Menu Button */}
       <button
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        onClick={() => setIsMobileMenuOpen((open) => !open)}
         className="flex flex-col gap-1.5 min-[1021px]:hidden"
+        aria-expanded={isMobileMenuOpen}
         aria-label="Toggle menu"
       >
-        <motion.span
-          className="h-0.5 w-6 bg-text-primary"
-          animate={{
-            rotate: isMobileMenuOpen ? 45 : 0,
-            y: isMobileMenuOpen ? 6 : 0,
-          }}
-          transition={{ duration: 0.2 }}
+        <span
+          className={`h-0.5 w-6 bg-text-primary transition duration-200 ${
+            isMobileMenuOpen ? "translate-y-2 rotate-45" : ""
+          }`}
         />
-        <motion.span
-          className="h-0.5 w-6 bg-text-primary"
-          animate={{ opacity: isMobileMenuOpen ? 0 : 1 }}
-          transition={{ duration: 0.2 }}
+        <span
+          className={`h-0.5 w-6 bg-text-primary transition duration-200 ${
+            isMobileMenuOpen ? "opacity-0" : ""
+          }`}
         />
-        <motion.span
-          className="h-0.5 w-6 bg-text-primary"
-          animate={{
-            rotate: isMobileMenuOpen ? -45 : 0,
-            y: isMobileMenuOpen ? -6 : 0,
-          }}
-          transition={{ duration: 0.2 }}
+        <span
+          className={`h-0.5 w-6 bg-text-primary transition duration-200 ${
+            isMobileMenuOpen ? "-translate-y-2 -rotate-45" : ""
+          }`}
         />
       </button>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-40 bg-black/20 min-[1021px]:hidden"
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-            {/* Menu */}
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2 }}
-              className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-subtle bg-surface p-4 shadow-lg min-[1021px]:hidden"
-            >
+      {isMobileMenuOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/20 min-[1021px]:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-subtle bg-surface p-4 shadow-lg min-[1021px]:hidden">
             <nav className="flex flex-col gap-4">
               {navLinks.map((link) =>
                 link.children ? (
@@ -327,16 +302,15 @@ export default function HeaderNav() {
                     setIsMobileMenuOpen(false);
                     handleDemoClick();
                   }}
-                  className="rounded-md bg-accent-primary px-4 py-2 text-center text-sm font-medium text-white shadow-sm transition hover:bg-accent-strong"
+                  className="rounded-md bg-accent-primary px-4 py-2 text-center text-sm font-medium text-text-primary shadow-sm transition hover:bg-accent-strong"
                 >
                   Request a Demo
                 </Link>
               </div>
             </nav>
-          </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          </div>
+        </>
+      )}
     </>
   );
 }

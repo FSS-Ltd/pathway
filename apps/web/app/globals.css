@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Quicksand:wght@500;600&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -23,8 +21,8 @@
   --pw-status-warn: 245 158 11;
   --pw-status-danger: 239 68 68;
   --pw-status-info: 59 130 246;
-  --font-heading: "Nunito", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-body: "Quicksand", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-heading: var(--font-nunito), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-body: var(--font-nunito), "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 * {

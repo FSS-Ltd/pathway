@@ -1,7 +1,3 @@
-"use client";
-
-import { motion } from "framer-motion";
-
 interface FeatureCard {
   title: string;
   description: string;
@@ -48,26 +44,10 @@ const roles = [
   },
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.15,
-    },
-  },
-};
-
 export default function FeatureCards() {
   return (
     <section id="features" className="mx-auto max-w-7xl px-4 py-16 md:py-24">
-      <motion.div
-        className="rounded-xl border border-border-subtle bg-surface p-8 shadow-soft md:p-12"
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: "-100px" }}
-      >
+      <div className="rounded-xl border border-border-subtle bg-surface p-8 shadow-soft md:p-12">
         <h3 className="mb-8 text-center text-3xl font-bold text-text-primary md:text-4xl">
           Core capabilities
         </h3>
@@ -80,12 +60,8 @@ export default function FeatureCards() {
               key={feature.title}
               className="rounded-xl border border-border-subtle bg-surface p-6 text-center shadow-soft transition hover:border-accent-primary/60 hover:shadow-card md:text-left"
             >
-              <h3 className="mb-2 text-xl font-semibold text-text-primary">
-                {feature.title}
-              </h3>
-              <p className="text-sm leading-relaxed text-text-muted">
-                {feature.description}
-              </p>
+              <h3 className="mb-2 text-xl font-semibold text-text-primary">{feature.title}</h3>
+              <p className="text-sm leading-relaxed text-text-muted">{feature.description}</p>
             </div>
           ))}
         </div>
@@ -97,16 +73,13 @@ export default function FeatureCards() {
         </h3>
         <div className="grid gap-8 md:grid-cols-3">
           {roles.map((role) => (
-            <div
-              key={role.title}
-              className="text-center md:text-left"
-            >
+            <div key={role.title} className="text-center md:text-left">
               <h4 className="mb-2 text-xl font-semibold text-text-primary">{role.title}</h4>
               <p className="text-sm leading-relaxed text-text-muted">{role.description}</p>
             </div>
           ))}
         </div>
-      </motion.div>
+      </div>
     </section>
   );
 }

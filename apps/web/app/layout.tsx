@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
+import { Nunito } from "next/font/google";
 import GoogleAnalytics from "../components/google-analytics";
 import "./globals.css";
 
 const baseUrl = "https://nexsteps.dev";
+const nunito = Nunito({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  display: "swap",
+  variable: "--font-nunito",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
@@ -16,8 +23,9 @@ export const metadata: Metadata = {
     canonical: baseUrl,
   },
   icons: {
-    icon: "/NSLogo.svg",
-    shortcut: "/NSLogo.svg",
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: ["/favicon.svg"],
+    apple: [{ url: "/favicon.svg" }],
   },
 };
 
@@ -28,8 +36,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="bg-shell text-text-primary">
-        {children} 
+      <body className={`${nunito.variable} bg-shell text-text-primary`}>
+        {children}
         <GoogleAnalytics />
       </body>
     </html>
