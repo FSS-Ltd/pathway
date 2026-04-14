@@ -57,6 +57,16 @@ export class BlogAutomationController {
 
   @Post("assets")
   async uploadAsset(@Body() dto: unknown) {
+    return this.parseAndUploadAsset(dto);
+  }
+
+  // Backward compatibility for older automation clients.
+  @Post("media")
+  async uploadAssetLegacy(@Body() dto: unknown) {
+    return this.parseAndUploadAsset(dto);
+  }
+
+  private parseAndUploadAsset(dto: unknown) {
     const parsed = uploadAssetDto.safeParse(dto);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.errors);

@@ -23,9 +23,9 @@ export const metadata: Metadata = {
     canonical: baseUrl,
   },
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
-    shortcut: ["/favicon.svg"],
-    apple: [{ url: "/favicon.svg" }],
+    icon: [{ url: "/NSLogo.svg", type: "image/svg+xml" }],
+    shortcut: ["/NSLogo.svg"],
+    apple: [{ url: "/NSLogo.svg" }],
   },
 };
 

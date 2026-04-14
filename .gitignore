@@ -41,6 +41,7 @@ packages/db/prisma/.env
 .cursor/
 .codex/
 AGENTS.md
+CLAUDE.md
 # OS
 .DS_Store
 Thumbs.db

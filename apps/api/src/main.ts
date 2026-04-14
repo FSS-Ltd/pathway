@@ -19,6 +19,11 @@ import fs from "node:fs";
 import type { HttpsOptions } from "@nestjs/common/interfaces/external/https-options.interface";
 
 function readHttpsOptionsFromEnv(): HttpsOptions | undefined {
+  // Keep local API on HTTP by default. Enable HTTPS explicitly when needed.
+  if (process.env.API_ENABLE_HTTPS !== "true") {
+    return undefined;
+  }
+
   const keyPath = process.env.API_DEV_SSL_KEY ?? process.env.NEXT_DEV_SSL_KEY;
   const certPath =
     process.env.API_DEV_SSL_CERT ?? process.env.NEXT_DEV_SSL_CERT;

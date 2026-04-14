@@ -139,7 +139,7 @@ export default async function BlogPostPage({ params }: Props) {
     publisher: {
       "@type": "Organization",
       name: "Nexsteps",
-      logo: { "@type": "ImageObject", url: `${baseUrl}/favicon.svg` },
+      logo: { "@type": "ImageObject", url: `${baseUrl}/NSLogo.svg` },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": `${baseUrl}/blog/${slug}` },
   };

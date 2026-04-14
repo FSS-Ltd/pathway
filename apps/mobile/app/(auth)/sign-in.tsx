@@ -15,6 +15,7 @@ import { BrandLogo } from "@/components/primitives/brand-logo";
 import { mobileTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks/use-app-ready";
 import { apiClient, ApiError } from "@/lib/api/client";
+import { env } from "@/config/env";
 
 export default function SignInScreen() {
   const { signIn, bootstrapState } = useAppReady();
@@ -75,7 +76,11 @@ export default function SignInScreen() {
       setApiDebugMessage(`API reachable: /health status=${health.status}`);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "API probe failed for unknown reason.";
+        error instanceof ApiError
+          ? `${error.message}${error.body ? ` — ${error.body.slice(0, 220)}` : ""}`
+          : error instanceof Error
+            ? error.message
+            : "API probe failed for unknown reason.";
       setApiDebugMessage(message);
     } finally {
       setIsTestingApi(false);
@@ -164,6 +169,7 @@ export default function SignInScreen() {
             ) : null}
 
             {apiDebugMessage ? <Text style={styles.debugText}>{apiDebugMessage}</Text> : null}
+            {__DEV__ ? <Text style={styles.debugText}>apiUrl: {env.apiUrl}</Text> : null}
             {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
           </View>
         </View>

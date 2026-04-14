@@ -159,7 +159,15 @@ export default function BlogIndexClient({
                             />
                           </div>
                         ) : (
-                          <div className="h-8 w-8 shrink-0 rounded-full bg-muted" />
+                          <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted p-1">
+                            <Image
+                              src="/NSLogo.svg"
+                              alt="Nexsteps logo"
+                              fill
+                              className="object-contain p-0.5"
+                              sizes="32px"
+                            />
+                          </div>
                         )}
                         <span className="font-medium text-text-primary">
                           {filteredFeatured.authorName ?? "Nexsteps"}
@@ -222,7 +230,15 @@ export default function BlogIndexClient({
                               />
                             </div>
                           ) : (
-                            <div className="h-6 w-6 shrink-0 rounded-full bg-muted" />
+                            <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted p-0.5">
+                              <Image
+                                src="/NSLogo.svg"
+                                alt="Nexsteps logo"
+                                fill
+                                className="object-contain p-0.5"
+                                sizes="24px"
+                              />
+                            </div>
                           )}
                           <span className="font-medium text-text-primary">
                             {post.authorName ?? "Nexsteps"}
