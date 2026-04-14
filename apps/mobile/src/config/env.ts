@@ -26,6 +26,18 @@ function normalizeAuth0Domain(raw?: string): string {
   return clean(raw).replace(/^https?:\/\//, "");
 }
 
+function getApiHostname(rawUrl: string): string | null {
+  try {
+    return new URL(rawUrl).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isUnsupportedLocalApiHost(hostname: string): boolean {
+  return hostname === "api.127.0.0.1" || hostname.endsWith(".127.0.0.1");
+}
+
 export const env = {
   apiUrl: clean(
     process.env.EXPO_PUBLIC_API_URL ??
@@ -71,6 +83,13 @@ export const env = {
 export function assertEnv() {
   if (!env.apiUrl) {
     throw new Error("EXPO_PUBLIC_API_URL is required for mobile API calls.");
+  }
+
+  const apiHostname = getApiHostname(env.apiUrl);
+  if (apiHostname && isUnsupportedLocalApiHost(apiHostname)) {
+    throw new Error(
+      `EXPO_PUBLIC_API_URL host "${apiHostname}" is not supported for local mobile dev. Use "https://api.localhost:3003" for iOS simulator.`,
+    );
   }
 
   if (!env.auth0.domain) {

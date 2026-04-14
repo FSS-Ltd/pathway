@@ -134,4 +134,35 @@ describe("BlogAutomationController", () => {
       }),
     ).rejects.toThrow(BadRequestException);
   });
+
+  it("supports legacy media upload route for backward compatibility", async () => {
+    blogService.uploadAsset.mockResolvedValue({
+      id: "asset_legacy",
+      url: "https://nexsteps.dev/media/asset_legacy",
+      width: 800,
+      height: 450,
+    });
+
+    const result = await controller.uploadAssetLegacy({
+      fileBase64: Buffer.from("legacy-image").toString("base64"),
+      mimeType: "image/webp",
+      type: "THUMBNAIL",
+      width: 800,
+      height: 450,
+    });
+
+    expect(blogService.uploadAsset).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      "image/webp",
+      "THUMBNAIL",
+      800,
+      450,
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: "asset_legacy",
+        url: "https://nexsteps.dev/media/asset_legacy",
+      }),
+    );
+  });
 });

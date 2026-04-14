@@ -112,6 +112,46 @@ Success response:
 }
 ```
 
+### Optional: upload images for blog posts
+
+Endpoint (preferred):
+
+- `POST /automation/blog/assets`
+
+Legacy alias (still supported for older clients):
+
+- `POST /automation/blog/media`
+
+Auth header:
+
+- `Authorization: Bearer <automation_token>`
+
+Payload:
+
+- `fileBase64` (required, base64 file bytes)
+- `mimeType` (required, one of `image/png`, `image/jpeg`, `image/webp`)
+- `type` (optional, one of `THUMBNAIL`, `HEADER`, `INLINE`; defaults to `INLINE`)
+- `width` (optional positive integer)
+- `height` (optional positive integer)
+
+`curl` example:
+
+```bash
+curl -X POST "$API_BASE_URL/automation/blog/assets" \
+  -H "Authorization: Bearer $PATHWAY_BLOG_AUTOMATION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fileBase64": "'"$(base64 < ./header-image.png | tr -d '\n')"'" ,
+    "mimeType": "image/png",
+    "type": "HEADER",
+    "width": 1200,
+    "height": 630
+  }'
+```
+
+Success response includes `id` and canonical `url` like `https://.../media/<assetId>`.
+Use the returned `id` as `thumbnailImageId` or `headerImageId` in `POST /automation/blog/posts`.
+
 ## 6) Revoke a token (if leaked or rotated)
 
 Endpoint:
@@ -139,4 +179,3 @@ curl -X DELETE "$API_BASE_URL/admin/blog/automation/tokens/$TOKEN_ID" \
 - `400 Bad Request`: Invalid payload (often bad slug format or malformed `contentJson`).
 - `429 Too Many Requests`: Token exceeded per-minute rate limit.
 - Slug conflict: Returned when `slug` is already in use.
-

@@ -19,7 +19,7 @@ export default function MarketingLayout({
             className="flex items-center gap-2 transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:ring-offset-2 focus-visible:ring-status-info"
           >
             <Image
-              src="/favicon.svg"
+              src="/NSLogo.svg"
               alt=""
               width={32}
               height={32}
