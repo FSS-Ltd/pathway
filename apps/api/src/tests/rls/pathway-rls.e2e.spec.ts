@@ -8,6 +8,35 @@ import {
 const TENANT_A = process.env.E2E_TENANT_ID as string;
 const TENANT_B = process.env.E2E_TENANT2_ID as string;
 
+const SUPABASE_RLS_HARDENED_TABLES = [
+  "_GroupToSession",
+  "_ParentChildren",
+  "_prisma_migrations",
+  "AutomationApiToken",
+  "AutomationBlogPublishAudit",
+  "BillingEvent",
+  "BlogAsset",
+  "BlogPost",
+  "DownloadToken",
+  "EmergencyContact",
+  "HandoverLog",
+  "HandoverLogVersion",
+  "Invite",
+  "Lead",
+  "OrgEntitlementSnapshot",
+  "OrgMembership",
+  "OrgRetentionPolicy",
+  "ParentSignupConsent",
+  "PublicSignupLink",
+  "SessionStaffAttendance",
+  "SiteMembership",
+  "StaffPreferredGroup",
+  "StaffUnavailableDate",
+  "Subscription",
+  "UsageCounters",
+  "UserIdentity",
+] as const;
+
 interface TenantFixtures {
   childId: string;
   noteId: string;
@@ -224,6 +253,59 @@ describe("Postgres RLS policies", () => {
         `,
     );
     expect(policies.length).toBeGreaterThan(0);
+  });
+
+  it("verifies newly hardened Supabase public tables have RLS enabled", async () => {
+    if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
+    const rows = await withTenantRlsContext(
+      TENANT_A,
+      fixtures[TENANT_A].orgId,
+      async (tx) =>
+        tx.$queryRaw<
+          Array<{
+            relname: string;
+            relrowsecurity: boolean;
+          }>
+        >`
+          SELECT c.relname, c.relrowsecurity
+          FROM pg_class c
+          JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = current_schema()
+            AND c.relkind IN ('r', 'p')
+            AND c.relname IN (${Prisma.join(SUPABASE_RLS_HARDENED_TABLES)})
+          ORDER BY c.relname
+        `,
+    );
+
+    expect(rows.map((row) => row.relname).sort()).toEqual(
+      [...SUPABASE_RLS_HARDENED_TABLES].sort(),
+    );
+    expect(rows.filter((row) => !row.relrowsecurity)).toEqual([]);
+  });
+
+  it("verifies anon and authenticated have no direct grants on hardened public tables", async () => {
+    if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
+    const grants = await withTenantRlsContext(
+      TENANT_A,
+      fixtures[TENANT_A].orgId,
+      async (tx) =>
+        tx.$queryRaw<
+          Array<{
+            table_name: string;
+            grantee: string;
+            privilege_type: string;
+          }>
+        >`
+          SELECT tp.table_name, tp.grantee, tp.privilege_type
+          FROM information_schema.table_privileges tp
+          WHERE tp.table_schema = current_schema()
+            AND tp.grantee IN ('anon', 'authenticated')
+            AND tp.table_name IN (${Prisma.join(SUPABASE_RLS_HARDENED_TABLES)})
+          ORDER BY tp.table_name, tp.grantee, tp.privilege_type
+        `,
+    );
+
+    expect(grants).toEqual([]);
   });
 
   it("returns only in-tenant children and notes", async () => {

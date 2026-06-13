@@ -29,7 +29,8 @@
     "cert:api": "mkdir -p .cert && mkcert -cert-file .cert/api.localhost.pem -key-file .cert/api.localhost-key.pem localhost 127.0.0.1 ::1 api.localhost",
     "reset": "git restore apps/**/.turbo/*.log packages/**/.turbo/*.log",
     "clean:cache": "git clean -fdX .turbo",
-    "clean:all": "rm -rf node_modules .turbo && pnpm install"
+    "clean:all": "rm -rf node_modules .turbo && pnpm install",
+    "supabase:rls:check": "node scripts/check-supabase-rls.mjs"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
