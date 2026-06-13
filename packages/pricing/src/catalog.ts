@@ -39,10 +39,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
         description: "Add SMS messaging bundles (1,000 messages per bundle)",
       },
     ],
-    doesNotInclude: [
-      "Extra Active People add-ons",
-      "Additional sites add-ons",
-    ],
+    doesNotInclude: ["Capacity add-ons (extra Active People and extra sites)"],
     upgradeWhen:
       "You need higher staff capacity, more children capacity, or multi-site support.",
     bestFor: "Organisations that need Starter workflows at a smaller operating size.",
@@ -81,10 +78,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
         description: "Add SMS messaging bundles (1,000 messages per bundle)",
       },
     ],
-    doesNotInclude: [
-      "Extra Active People add-ons",
-      "Additional sites add-ons",
-    ],
+    doesNotInclude: ["Capacity add-ons (extra Active People and extra sites)"],
     upgradeWhen:
       "You need higher staff capacity, more children capacity, or multi-site support.",
     bestFor: "Organisations that need Starter workflows at a smaller operating size.",
