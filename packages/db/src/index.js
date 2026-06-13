@@ -1,4 +1,3 @@
-/* eslint-env node */
 // Canonical Prisma bootstrap (ESM/CJS/Jest-safe)
 import { PrismaClient, Prisma } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -18,7 +17,6 @@ const prismaProxy = new Proxy(basePrismaClient, {
     },
 });
 export const prisma = prismaProxy;
-// eslint-disable-next-line no-undef
 if (process.env.NODE_ENV !== "production") {
     globalForPrisma.__prisma = basePrismaClient;
 }
@@ -60,6 +58,9 @@ export async function resetDatabase() {
         "UserTenantRole",
         "UserOrgRole",
         "User",
+        "EmergencyContact",
+        "ParentSignupConsent",
+        "PublicSignupLink",
         "Tenant",
         "Org"
       RESTART IDENTITY CASCADE
@@ -91,19 +92,29 @@ export async function resetDatabase() {
         "UserTenantRole",
         "UserOrgRole",
         "User",
+        "EmergencyContact",
+        "ParentSignupConsent",
+        "PublicSignupLink",
         "Tenant",
         "Org"
       RESTART IDENTITY CASCADE
     `);
     }
 }
-export { AssignmentStatus, Role, Weekday, SwapStatus, SubscriptionStatus, BillingProvider, PendingOrderStatus, OrgRole, SiteRole, } from "@prisma/client";
+export { AssignmentStatus, Role, Weekday, SwapStatus, SubscriptionStatus, BillingProvider, PendingOrderStatus, OrgRole, SiteRole, StaffAttendanceStatus, } from "@prisma/client";
 export { Prisma };
 async function applyTenantContext(tx, tenantId, orgId) {
     await tx.$executeRawUnsafe(`SELECT set_config('app.tenant_id', $1, true)`, tenantId);
     const orgValue = orgId ?? "";
     await tx.$executeRawUnsafe(`SELECT set_config('app.org_id', $1, true)`, orgValue);
     await tx.$executeRawUnsafe(`SET LOCAL row_security = on`);
+}
+/**
+ * Run an interactive transaction using the base Prisma client.
+ * Use this when prisma.$transaction fails (e.g. with the Proxy in some environments).
+ */
+export async function runTransaction(fn) {
+    return basePrismaClient.$transaction(fn);
 }
 export async function withTenantRlsContext(tenantId, orgId, callback) {
     if (!tenantId) {

@@ -5,7 +5,7 @@
   "scripts": {
     "build": "echo ui-build",
     "lint": "eslint \"src/**/*.{ts,tsx,js}\" --no-error-on-unmatched-pattern",
-    "typecheck": "tsc -v",
+    "typecheck": "tsc -p tsconfig.json --noEmit --incremental false",
     "test": "echo ui-test"
   },
   "dependencies": {

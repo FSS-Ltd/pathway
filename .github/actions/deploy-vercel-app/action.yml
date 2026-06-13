@@ -1,0 +1,131 @@
+name: Deploy Vercel app
+description: Build and deploy one PathWay app to Vercel using cached pnpm and prebuilt artifacts.
+
+inputs:
+  app:
+    required: true
+    description: Short app name used in cache keys.
+  package:
+    required: true
+    description: pnpm workspace package name.
+  cwd:
+    required: true
+    description: Vercel project path inside the monorepo.
+  vercel-project-id:
+    required: true
+    description: Vercel project ID for this app.
+  vercel-org-id:
+    required: true
+    description: Vercel org or team ID.
+  vercel-token:
+    required: true
+    description: Vercel access token.
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "20"
+
+    - name: Enable corepack
+      shell: bash
+      run: corepack enable
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9.7.0
+        run_install: false
+
+    - name: Get pnpm store directory
+      shell: bash
+      run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+    - name: Restore pnpm store cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
+    - name: Restore build caches
+      uses: actions/cache@v4
+      with:
+        path: |
+          .turbo
+          ${{ inputs.cwd }}/.next/cache
+          ${{ inputs.cwd }}/.vercel/cache
+        key: ${{ runner.os }}-vercel-${{ inputs.app }}-${{ hashFiles('pnpm-lock.yaml', 'turbo.json', 'apps/**/package.json', 'apps/**/vercel.json', 'packages/**/package.json') }}-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-vercel-${{ inputs.app }}-
+          ${{ runner.os }}-vercel-
+
+    - name: Verify required Vercel secrets
+      shell: bash
+      env:
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
+      run: |
+        test -n "$VERCEL_TOKEN" || {
+          echo "VERCEL_TOKEN secret is required." >&2
+          exit 1
+        }
+        test -n "$VERCEL_ORG_ID" || {
+          echo "VERCEL_ORG_ID secret is required." >&2
+          exit 1
+        }
+        test -n "$VERCEL_PROJECT_ID" || {
+          echo "Vercel project ID is required for ${{ inputs.app }}." >&2
+          exit 1
+        }
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile --prefer-offline
+
+    - name: Lint
+      shell: bash
+      run: pnpm --filter ${{ inputs.package }} lint
+
+    - name: Typecheck
+      shell: bash
+      run: pnpm --filter ${{ inputs.package }} typecheck
+
+    - name: Unit tests
+      shell: bash
+      run: pnpm --filter ${{ inputs.package }} test
+
+    - name: Pull Vercel production environment
+      shell: bash
+      env:
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
+      run: >-
+        pnpm dlx vercel@54.13.0 pull --cwd "${{ inputs.cwd }}" --yes
+        --environment=production --project="$VERCEL_PROJECT_ID"
+        --token="$VERCEL_TOKEN"
+
+    - name: Build Vercel artifact
+      shell: bash
+      env:
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
+      run: >-
+        pnpm dlx vercel@54.13.0 build --cwd "${{ inputs.cwd }}" --prod
+        --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN"
+
+    - name: Deploy prebuilt artifact
+      shell: bash
+      env:
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
+      run: |
+        url="$(pnpm dlx vercel@54.13.0 deploy --cwd "${{ inputs.cwd }}" --prebuilt --prod --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
+        echo "Deployed ${{ inputs.app }} to $url"

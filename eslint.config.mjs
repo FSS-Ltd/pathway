@@ -46,11 +46,23 @@ export default tseslint.config(
       // add repo-wide rules here later
     },
   },
-  // Workers: Node + Jest globals so process/console and describe/expect etc. are defined
+  // Server-side packages and launch scripts run in Node.
+  {
+    files: [
+      "apps/api/**/*.{ts,tsx,js}",
+      "apps/workers/**/*.{ts,tsx,js}",
+      "packages/db/**/*.{ts,tsx,js}",
+      "scripts/**/*.{js,mjs,cjs,ts}",
+    ],
+    languageOptions: {
+      globals: nodeGlobals,
+    },
+  },
+  // Workers: Jest globals so describe/expect etc. are defined in worker tests.
   {
     files: ["apps/workers/**/*.{ts,tsx,js}"],
     languageOptions: {
-      globals: { ...nodeGlobals, ...jestGlobals },
+      globals: jestGlobals,
     },
   },
 );

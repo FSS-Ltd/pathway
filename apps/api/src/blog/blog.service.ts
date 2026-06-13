@@ -2,16 +2,25 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
 import { tiptapJsonToHtml } from "./tiptap-to-html";
 import type { CreateBlogPostDto } from "./dto/create-blog-post.dto";
 import type { UpdateBlogPostDto } from "./dto/update-blog-post.dto";
+import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { blogAssetKey } from "../common/storage/storage-key.util";
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"] as const;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB
 
 @Injectable()
 export class BlogService {
+  constructor(@Optional() storage?: SupabaseStorageService) {
+    this.storage = storage ?? new SupabaseStorageService();
+  }
+
+  private readonly storage: SupabaseStorageService;
+
   async createDraft(dto: CreateBlogPostDto) {
     const existing = await prisma.blogPost.findUnique({
       where: { slug: dto.slug },
@@ -194,15 +203,24 @@ export class BlogService {
     const sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
     const existing = await prisma.blogAsset.findUnique({ where: { sha256 } });
     if (existing) return { id: existing.id };
+    const stored = await this.storage.uploadObject({
+      bucket: "public",
+      key: blogAssetKey(sha256, mimeType),
+      body: buffer,
+      contentType: mimeType,
+    });
     const asset = await prisma.blogAsset.create({
       data: {
         type: "INLINE",
+        storage: stored ? "SUPABASE" : "POSTGRES",
         mimeType,
         byteSize: buffer.length,
         sha256,
         width: null,
         height: null,
-        bytes: buffer,
+        bytes: stored ? null : buffer,
+        storageBucket: stored?.bucket ?? null,
+        storageKey: stored?.key ?? null,
       },
     });
     return { id: asset.id };
@@ -271,9 +289,22 @@ export class BlogService {
   ): Promise<{ bytes: Buffer; mimeType: string } | null> {
     const asset = await prisma.blogAsset.findUnique({
       where: { id },
-      select: { bytes: true, mimeType: true },
+      select: {
+        bytes: true,
+        mimeType: true,
+        storageBucket: true,
+        storageKey: true,
+      },
     });
     if (!asset) return null;
+    if (asset.storageBucket && asset.storageKey) {
+      const bytes = await this.storage.downloadObject(
+        asset.storageBucket,
+        asset.storageKey,
+      );
+      if (bytes) return { bytes, mimeType: asset.mimeType };
+    }
+    if (!asset.bytes) return null;
     return {
       bytes: Buffer.from(asset.bytes),
       mimeType: asset.mimeType,
@@ -310,15 +341,24 @@ export class BlogService {
         height: existing.height ?? undefined,
       };
     }
+    const stored = await this.storage.uploadObject({
+      bucket: "public",
+      key: blogAssetKey(sha256, mimeType),
+      body: buffer,
+      contentType: mimeType,
+    });
     const asset = await prisma.blogAsset.create({
       data: {
         type,
+        storage: stored ? "SUPABASE" : "POSTGRES",
         mimeType,
         byteSize: buffer.length,
         sha256,
         width: width ?? null,
         height: height ?? null,
-        bytes: buffer,
+        bytes: stored ? null : buffer,
+        storageBucket: stored?.bucket ?? null,
+        storageKey: stored?.key ?? null,
       },
     });
     const baseUrl = process.env.PUBLIC_BLOG_BASE_URL ?? "https://nexsteps.dev";

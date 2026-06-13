@@ -1,0 +1,70 @@
+name: Scheduled workers
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Nightly at 02:30 UTC. Keep this as GitHub Actions cron to avoid Render cron charges.
+    - cron: "30 2 * * *"
+
+jobs:
+  run:
+    name: AV30 and retention
+    runs-on: ubuntu-22.04
+    environment: production
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      AV30_TENANT_IDS: ${{ secrets.AV30_TENANT_IDS }}
+      RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Verify required secrets
+        shell: bash
+        run: |
+          test -n "$DATABASE_URL" || {
+            echo "DATABASE_URL secret is required for worker jobs." >&2
+            exit 1
+          }
+          test "$RETENTION_ENABLED" = "true" || {
+            echo "RETENTION_ENABLED must be set to true for scheduled retention." >&2
+            exit 1
+          }
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Compute AV30
+        run: pnpm --filter @pathway/workers compute:av30
+
+      - name: Run retention
+        run: pnpm --filter @pathway/workers retention:run

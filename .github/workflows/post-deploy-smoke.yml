@@ -1,0 +1,51 @@
+name: Post-deploy smoke tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: API base URL, for example https://api.nexsteps.dev
+        required: true
+        type: string
+      web_url:
+        description: Marketing site URL, for example https://nexsteps.dev
+        required: true
+        type: string
+      admin_url:
+        description: Admin app URL, for example https://app.nexsteps.dev
+        required: true
+        type: string
+
+jobs:
+  smoke:
+    name: Smoke test deployed apps
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check API health
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="${{ inputs.api_url }}/health"
+          response="$(curl --fail --silent --show-error --location --max-time 20 "$url")"
+          echo "$response"
+          echo "$response" | grep -E '"status"[[:space:]]*:[[:space:]]*"ok"'
+
+      - name: Check marketing site
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 20 \
+            --output /tmp/nexsteps-web.html \
+            "${{ inputs.web_url }}"
+          test -s /tmp/nexsteps-web.html
+
+      - name: Check admin app responds
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 20 \
+            --output /tmp/nexsteps-admin.html \
+            "${{ inputs.admin_url }}"
+          test -s /tmp/nexsteps-admin.html

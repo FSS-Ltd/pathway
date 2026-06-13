@@ -2,10 +2,13 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from "@nestjs/common";
 import { prisma, Weekday, OrgRole } from "@pathway/db";
 import type { UpdateStaffDto } from "./dto/update-staff.dto";
 import type { UpdateProfileDto } from "./dto/update-profile.dto";
+import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { staffAvatarKey } from "../common/storage/storage-key.util";
 
 const WEEKDAY_ORDER: Weekday[] = [
   Weekday.SUN,
@@ -55,6 +58,12 @@ async function assertStaffInTenant(
 
 @Injectable()
 export class StaffService {
+  constructor(@Optional() storage?: SupabaseStorageService) {
+    this.storage = storage ?? new SupabaseStorageService();
+  }
+
+  private readonly storage: SupabaseStorageService;
+
   /**
    * Returns staff who can be assigned to a session, with eligibility flags.
    * Eligibility is informational only; admins may override.
@@ -137,8 +146,7 @@ export class StaffService {
     const preferredSet = new Set(preferredGroups.map((p) => p.userId));
     const availableByUser = new Map<string, boolean>();
     for (const p of preferences) {
-      const overlaps =
-        startMin < p.endMinute && endMin > p.startMinute;
+      const overlaps = startMin < p.endMinute && endMin > p.startMinute;
       if (overlaps) {
         availableByUser.set(p.userId, true);
       }
@@ -172,8 +180,8 @@ export class StaffService {
       does_not_prefer_group: 3,
     };
     rows.sort((a, b) => {
-      const aE = a.eligible ? 0 : order[a.reason!] ?? 4;
-      const bE = b.eligible ? 0 : order[b.reason!] ?? 4;
+      const aE = a.eligible ? 0 : (order[a.reason!] ?? 4);
+      const bE = b.eligible ? 0 : (order[b.reason!] ?? 4);
       if (aE !== bE) return aE - bE;
       return a.fullName.localeCompare(b.fullName);
     });
@@ -201,57 +209,70 @@ export class StaffService {
     preferredGroups: { id: string; name: string }[];
     canEditAvailability: boolean;
     hasServeAccess: boolean;
-    children: { id: string; firstName: string; lastName: string; preferredName: string | null; group: { name: string } | null }[];
+    children: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      preferredName: string | null;
+      group: { name: string } | null;
+    }[];
   }> {
     await assertStaffInTenant(userId, tenantId);
 
-    const [user, preferences, unavailableDates, preferredGroups, entitlements, userWithChildren] =
-      await Promise.all([
-        prisma.user.findUniqueOrThrow({
-          where: { id: userId },
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            name: true,
-            displayName: true,
-            email: true,
-            dateOfBirth: true,
-            avatarUrl: true,
-            avatarBytes: true,
-            avatarContentType: true,
-            isActive: true,
-            hasServeAccess: true,
-          },
-        }),
-        prisma.volunteerPreference.findMany({
-          where: { userId, tenantId },
-          orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
-        }),
-        prisma.staffUnavailableDate.findMany({
-          where: { userId, tenantId },
-          orderBy: { date: "asc" },
-        }),
-        prisma.staffPreferredGroup.findMany({
-          where: { userId, tenantId },
-          include: { group: { select: { id: true, name: true } } },
-        }),
-        this.resolvePlanTier(orgId),
-        prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            children: {
-              select: {
-                id: true,
-                firstName: true,
-                lastName: true,
-                preferredName: true,
-                group: { select: { name: true } },
-              },
+    const [
+      user,
+      preferences,
+      unavailableDates,
+      preferredGroups,
+      entitlements,
+      userWithChildren,
+    ] = await Promise.all([
+      prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          name: true,
+          displayName: true,
+          email: true,
+          dateOfBirth: true,
+          avatarUrl: true,
+          avatarKey: true,
+          avatarBytes: true,
+          avatarContentType: true,
+          isActive: true,
+          hasServeAccess: true,
+        },
+      }),
+      prisma.volunteerPreference.findMany({
+        where: { userId, tenantId },
+        orderBy: [{ weekday: "asc" }, { startMinute: "asc" }],
+      }),
+      prisma.staffUnavailableDate.findMany({
+        where: { userId, tenantId },
+        orderBy: { date: "asc" },
+      }),
+      prisma.staffPreferredGroup.findMany({
+        where: { userId, tenantId },
+        include: { group: { select: { id: true, name: true } } },
+      }),
+      this.resolvePlanTier(orgId),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          children: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              preferredName: true,
+              group: { select: { name: true } },
             },
           },
-        }),
-      ]);
+        },
+      }),
+    ]);
 
     const fullName =
       [user.firstName, user.lastName].filter(Boolean).join(" ") ||
@@ -283,7 +304,8 @@ export class StaffService {
         : null,
       avatarUrl: user.avatarUrl,
       hasAvatar: Boolean(
-        user.avatarBytes && (user.avatarBytes as Buffer).length > 0,
+        user.avatarKey ||
+        (user.avatarBytes && (user.avatarBytes as Buffer).length > 0),
       ),
       role,
       isActive: user.isActive,
@@ -332,7 +354,13 @@ export class StaffService {
           attendanceTotal: number;
         };
       }[];
-      children: { id: string; firstName: string; lastName: string; preferredName: string | null; group: { name: string } | null }[];
+      children: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        preferredName: string | null;
+        group: { name: string } | null;
+      }[];
     }
   > {
     const base = await this.getById(currentUserId, tenantId, orgId);
@@ -395,10 +423,10 @@ export class StaffService {
               }),
             ),
           ])
-        : [[], []] as [
+        : ([[], []] as [
             { sessionId: string; _count: { id: number } }[],
             number[],
-          ];
+          ]);
 
     const markedBySession = new Map(
       attendanceCounts.map((c) => [c.sessionId, c._count.id]),
@@ -474,10 +502,18 @@ export class StaffService {
       );
     }
 
+    const stored = await this.storage.uploadObject({
+      bucket: "private",
+      key: staffAvatarKey(tenantId, currentUserId, type),
+      body: buffer,
+      contentType: type,
+    });
+
     await prisma.user.update({
       where: { id: currentUserId },
       data: {
-        avatarBytes: buffer,
+        avatarKey: stored?.key ?? null,
+        avatarBytes: stored ? null : buffer,
         avatarContentType: type,
         avatarUrl: null, // Clear external URL when using bytes
       },
@@ -492,8 +528,20 @@ export class StaffService {
   ): Promise<{ buffer: Buffer; contentType: string } | null> {
     const user = await prisma.user.findUnique({
       where: { id: currentUserId },
-      select: { avatarBytes: true, avatarContentType: true },
+      select: { avatarKey: true, avatarBytes: true, avatarContentType: true },
     });
+    if (user?.avatarKey) {
+      const buffer = await this.storage.downloadObject(
+        process.env.SUPABASE_STORAGE_PRIVATE_BUCKET ?? "",
+        user.avatarKey,
+      );
+      if (buffer) {
+        return {
+          buffer,
+          contentType: user.avatarContentType ?? "image/jpeg",
+        };
+      }
+    }
     if (!user?.avatarBytes || (user.avatarBytes as Buffer).length === 0) {
       return null;
     }
@@ -537,7 +585,10 @@ export class StaffService {
 
     if (canEditAvailability) {
       if (dto.weeklyAvailability !== undefined) {
-        const rangesByDay = new Map<Weekday, { start: number; end: number }[]>();
+        const rangesByDay = new Map<
+          Weekday,
+          { start: number; end: number }[]
+        >();
         for (const item of dto.weeklyAvailability) {
           const start = minuteFromTime(item.startTime);
           const end = minuteFromTime(item.endTime);
@@ -547,9 +598,7 @@ export class StaffService {
             );
           }
           const existing = rangesByDay.get(item.day) ?? [];
-          const overlaps = existing.some(
-            (r) => start < r.end && end > r.start,
-          );
+          const overlaps = existing.some((r) => start < r.end && end > r.start);
           if (overlaps) {
             throw new BadRequestException(
               `Overlapping time ranges for ${item.day}`,
@@ -618,7 +667,11 @@ export class StaffService {
         }
       }
     } else {
-      const blocked = ["weeklyAvailability", "unavailableDates", "preferredGroupIds"] as const;
+      const blocked = [
+        "weeklyAvailability",
+        "unavailableDates",
+        "preferredGroupIds",
+      ] as const;
       for (const f of blocked) {
         if (dto[f] !== undefined) {
           throw new BadRequestException(
@@ -717,9 +770,7 @@ export class StaffService {
           );
         }
         const existing = rangesByDay.get(item.day) ?? [];
-        const overlaps = existing.some(
-          (r) => start < r.end && end > r.start,
-        );
+        const overlaps = existing.some((r) => start < r.end && end > r.start);
         if (overlaps) {
           throw new BadRequestException(
             `Overlapping time ranges for ${item.day}`,
@@ -735,7 +786,13 @@ export class StaffService {
       for (const [day, ranges] of rangesByDay) {
         for (const { start, end } of ranges) {
           await prisma.volunteerPreference.create({
-            data: { userId, tenantId, weekday: day, startMinute: start, endMinute: end },
+            data: {
+              userId,
+              tenantId,
+              weekday: day,
+              startMinute: start,
+              endMinute: end,
+            },
           });
         }
       }

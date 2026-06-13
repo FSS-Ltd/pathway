@@ -13,10 +13,7 @@ function parseTenantIds(): string[] {
 async function main() {
   const tenantIds = parseTenantIds();
   if (!tenantIds.length) {
-    console.error(
-      "Set AV30_TENANT_IDS (comma-separated) to run the AV30 computation job.",
-    );
-    process.exitCode = 1;
+    console.log("[av30] No AV30_TENANT_IDS configured; skipping computation.");
     return;
   }
 
@@ -39,4 +36,3 @@ main()
   .finally(async () => {
     await closePrisma().catch(() => undefined);
   });
-
