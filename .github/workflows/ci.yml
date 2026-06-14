@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [master, develop]
   pull_request:
@@ -18,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Enable corepack
         run: corepack enable
@@ -42,8 +43,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Setup Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-ci-${{ hashFiles('pnpm-lock.yaml', 'turbo.json', 'apps/**/package.json', 'packages/**/package.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-ci-
+            ${{ runner.os }}-turbo-
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Typecheck
         run: pnpm -r typecheck
@@ -86,7 +96,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Enable corepack
         run: corepack enable
@@ -110,8 +120,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
+      - name: Setup Turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-integration-${{ hashFiles('pnpm-lock.yaml', 'turbo.json', 'apps/**/package.json', 'packages/**/package.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-integration-
+            ${{ runner.os }}-turbo-
+
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Generate Prisma Client
         run: pnpm db:generate
@@ -139,4 +158,3 @@ jobs:
           E2E_ALLOW_RESET: "true"
         run: pnpm test:integration
         continue-on-error: false
-

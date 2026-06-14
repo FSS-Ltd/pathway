@@ -1,460 +1,95 @@
-name: Deploy to ECS
+name: Deploy to Vercel
 
 on:
-  push:
-    branches: [master]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: App to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - web
+          - admin
+          - api
 
-env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'eu-west-2' }}
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+concurrency:
+  group: vercel-production-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  deploy-web:
+    name: Deploy web
+    runs-on: ubuntu-22.04
     environment: production
-    name: Build and Deploy to ECS
-    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        inputs.target == 'all' ||
+        inputs.target == 'web'
+      }}
     permissions:
-      id-token: write
       contents: read
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Debug GitHub OIDC claims (sub/aud/iss)
-        shell: bash
-        run: |
-          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
-          echo "GITHUB_REF=$GITHUB_REF"
-          echo "GITHUB_SHA=$GITHUB_SHA"
-
-          # Request an OIDC token (no secrets in payload; do not print the raw token)
-          RESPONSE=$(curl -sS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
-
-          TOKEN=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin)['value'])")
-
-          # Decode JWT payload (second segment)
-          export TOKEN
-          PAYLOAD=$(python3 -c "import base64,json,os,sys; token=os.environ['TOKEN']; payload=token.split('.')[1]; payload += '=' * (-len(payload) % 4); print(base64.urlsafe_b64decode(payload.encode()).decode())")
-
-          export PAYLOAD
-
-          python3 -c "import json,os; p=json.loads(os.environ['PAYLOAD']); print('iss:', p.get('iss')); print('aud:', p.get('aud')); print('sub:', p.get('sub')); print('repository:', p.get('repository')); print('ref:', p.get('ref')); print('job_workflow_ref:', p.get('job_workflow_ref'))"
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Deploy web
+        uses: ./.github/actions/deploy-vercel-app
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Validate AWS identity
-        run: aws sts get-caller-identity
+          app: web
+          package: "@pathway/web"
+          cwd: apps/web
+          vercel-project-id: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+  deploy-admin:
+    name: Deploy admin
+    runs-on: ubuntu-22.04
+    environment: production
+    if: >-
+      ${{
+        inputs.target == 'all' ||
+        inputs.target == 'admin'
+      }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Deploy admin
+        uses: ./.github/actions/deploy-vercel-app
+        with:
+          app: admin
+          package: "@pathway/admin"
+          cwd: apps/admin
+          vercel-project-id: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
 
-      - name: Build and push web image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPO_WEB || 'nexsteps-web' }}
-          IMAGE_TAG: ${{ github.sha }}
-          # Pass NEXT_PUBLIC_API_URL as build arg so Next.js embeds it at build time
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file apps/web/Dockerfile \
-            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:sha-$IMAGE_TAG \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            --push \
-            .
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-22.04
+    environment: production
+    if: >-
+      ${{
+        inputs.target == 'all' ||
+        inputs.target == 'api'
+      }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build and push admin image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPO_ADMIN || 'nexsteps-admin' }}
-          IMAGE_TAG: ${{ github.sha }}
-          # Pass NEXT_PUBLIC_API_URL as build arg so Next.js embeds it at build time
-          # This prevents the app from using mock API mode in production
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file apps/admin/Dockerfile \
-            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:sha-$IMAGE_TAG \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            --push \
-            .
-
-      - name: Build and push api image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPO_API || 'nexsteps-api' }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker buildx build \
-            --platform linux/amd64 \
-            --file apps/api/Dockerfile \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:sha-$IMAGE_TAG \
-            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
-            --push \
-            .
-
-      - name: Render and deploy web task definition
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPO_WEB || 'nexsteps-web' }}
-          IMAGE_TAG: ${{ github.sha }}
-          EXECUTION_ROLE_ARN: ${{ vars.ECS_EXECUTION_ROLE_ARN }}
-          TASK_ROLE_ARN: ${{ vars.ECS_TASK_ROLE_ARN }}
-          NODE_ENV: ${{ secrets.NODE_ENV }}
-          PORT: ${{ secrets.PORT }}
-          HOSTNAME: ${{ secrets.HOSTNAME }}
-          INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-          AUTH0_ISSUER: ${{ secrets.AUTH0_ISSUER }}
-          AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_BASE_URL: ${{ secrets.STRIPE_BASE_URL }}
-          STRIPE_CANCEL_URL: ${{ secrets.STRIPE_CANCEL_URL }}
-          STRIPE_PRICE_MAP: ${{ secrets.STRIPE_PRICE_MAP }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_SNAPSHOT_URL: ${{ secrets.STRIPE_SNAPSHOT_URL }}
-          STRIPE_SUCCESS_URL: ${{ secrets.STRIPE_SUCCESS_URL }}
-          STRIPE_THIN_URL: ${{ secrets.STRIPE_THIN_URL }}
-          STRIPE_WEBHOOK_SECRET_SNAPSHOT: ${{ secrets.STRIPE_WEBHOOK_SECRET_SNAPSHOT }}
-          STRIPE_WEBHOOK_SECRET_THIN: ${{ secrets.STRIPE_WEBHOOK_SECRET_THIN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM: ${{ secrets.RESEND_FROM }}
-          RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
-          BILLING_PROVIDER: ${{ secrets.BILLING_PROVIDER }}
-        run: |
-          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:sha-$IMAGE_TAG"
-          jq --arg image "$IMAGE_URI" \
-             --arg execRole "$EXECUTION_ROLE_ARN" \
-             --arg taskRole "$TASK_ROLE_ARN" \
-             --arg nodeEnv "$NODE_ENV" \
-             --arg port "$PORT" \
-             --arg hostname "$HOSTNAME" \
-             --arg internalAuthSecret "$INTERNAL_AUTH_SECRET" \
-             --arg apiUrl "$NEXT_PUBLIC_API_URL" \
-             --arg nextauthUrl "$NEXTAUTH_URL" \
-             --arg nextauthSecret "$NEXTAUTH_SECRET" \
-             --arg auth0ClientId "$AUTH0_CLIENT_ID" \
-             --arg auth0ClientSecret "$AUTH0_CLIENT_SECRET" \
-             --arg auth0Issuer "$AUTH0_ISSUER" \
-             --arg auth0Audience "$AUTH0_AUDIENCE" \
-             --arg stripeSecretKey "$STRIPE_SECRET_KEY" \
-             --arg stripeBaseUrl "$STRIPE_BASE_URL" \
-             --arg stripeCancelUrl "$STRIPE_CANCEL_URL" \
-             --arg stripePriceMap "$STRIPE_PRICE_MAP" \
-             --arg stripePublishableKey "$STRIPE_PUBLISHABLE_KEY" \
-             --arg stripeSnapshotUrl "$STRIPE_SNAPSHOT_URL" \
-             --arg stripeSuccessUrl "$STRIPE_SUCCESS_URL" \
-             --arg stripeThinUrl "$STRIPE_THIN_URL" \
-             --arg stripeWebhookSecretSnapshot "$STRIPE_WEBHOOK_SECRET_SNAPSHOT" \
-             --arg stripeWebhookSecretThin "$STRIPE_WEBHOOK_SECRET_THIN" \
-             --arg resendApiKey "$RESEND_API_KEY" \
-             --arg resendFrom "$RESEND_FROM" \
-             --arg retentionEnabled "$RETENTION_ENABLED" \
-             --arg billingProvider "$BILLING_PROVIDER" \
-             '.executionRoleArn = $execRole |
-              .taskRoleArn = $taskRole |
-              .containerDefinitions[0].image = $image |
-              .containerDefinitions[0].environment += [
-               {"name": "NODE_ENV", "value": $nodeEnv},
-               {"name": "PORT", "value": $port},
-               {"name": "HOSTNAME", "value": $hostname},
-               {"name": "INTERNAL_AUTH_SECRET", "value": $internalAuthSecret},
-               {"name": "NEXT_PUBLIC_API_URL", "value": $apiUrl},
-               {"name": "NEXTAUTH_URL", "value": $nextauthUrl},
-               {"name": "NEXTAUTH_SECRET", "value": $nextauthSecret},
-               {"name": "AUTH0_CLIENT_ID", "value": $auth0ClientId},
-               {"name": "AUTH0_CLIENT_SECRET", "value": $auth0ClientSecret},
-               {"name": "AUTH0_ISSUER", "value": $auth0Issuer},
-               {"name": "AUTH0_AUDIENCE", "value": $auth0Audience},
-               {"name": "STRIPE_SECRET_KEY", "value": $stripeSecretKey},
-               {"name": "STRIPE_BASE_URL", "value": $stripeBaseUrl},
-               {"name": "STRIPE_CANCEL_URL", "value": $stripeCancelUrl},
-               {"name": "STRIPE_PRICE_MAP", "value": $stripePriceMap},
-               {"name": "STRIPE_PUBLISHABLE_KEY", "value": $stripePublishableKey},
-               {"name": "STRIPE_SNAPSHOT_URL", "value": $stripeSnapshotUrl},
-               {"name": "STRIPE_SUCCESS_URL", "value": $stripeSuccessUrl},
-               {"name": "STRIPE_THIN_URL", "value": $stripeThinUrl},
-               {"name": "STRIPE_WEBHOOK_SECRET_SNAPSHOT", "value": $stripeWebhookSecretSnapshot},
-               {"name": "STRIPE_WEBHOOK_SECRET_THIN", "value": $stripeWebhookSecretThin},
-               {"name": "RESEND_API_KEY", "value": $resendApiKey},
-               {"name": "RESEND_FROM", "value": $resendFrom},
-               {"name": "RETENTION_ENABLED", "value": $retentionEnabled},
-               {"name": "BILLING_PROVIDER", "value": $billingProvider}
-              ]' \
-             infra/ecs/web.taskdef.json > /tmp/web-taskdef.json
-
-          aws ecs register-task-definition \
-            --cli-input-json file:///tmp/web-taskdef.json \
-            --region ${{ env.AWS_REGION }}
-
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition ${{ vars.ECS_TASKDEF_WEB || 'nexsteps-web' }} \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskDefinition.revision' \
-            --output text)
-
-          aws ecs update-service \
-            --cluster ${{ vars.ECS_CLUSTER || 'nexsteps-prod' }} \
-            --service ${{ vars.ECS_SERVICE_WEB || 'nexsteps-web' }} \
-            --task-definition ${{ vars.ECS_TASKDEF_WEB || 'nexsteps-web' }}:$TASK_DEF \
-            --region ${{ env.AWS_REGION }} \
-            --force-new-deployment
-
-      - name: Render and deploy admin task definition
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPO_ADMIN || 'nexsteps-admin' }}
-          IMAGE_TAG: ${{ github.sha }}
-          EXECUTION_ROLE_ARN: ${{ vars.ECS_EXECUTION_ROLE_ARN }}
-          TASK_ROLE_ARN: ${{ vars.ECS_TASK_ROLE_ARN }}
-          NODE_ENV: ${{ secrets.NODE_ENV }}
-          PORT: ${{ secrets.PORT }}
-          HOSTNAME: ${{ secrets.HOSTNAME }}
-          INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
-          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-          AUTH0_ISSUER: ${{ secrets.AUTH0_ISSUER }}
-          AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_BASE_URL: ${{ secrets.STRIPE_BASE_URL }}
-          STRIPE_CANCEL_URL: ${{ secrets.STRIPE_CANCEL_URL }}
-          STRIPE_PRICE_MAP: ${{ secrets.STRIPE_PRICE_MAP }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_SNAPSHOT_URL: ${{ secrets.STRIPE_SNAPSHOT_URL }}
-          STRIPE_SUCCESS_URL: ${{ secrets.STRIPE_SUCCESS_URL }}
-          STRIPE_THIN_URL: ${{ secrets.STRIPE_THIN_URL }}
-          STRIPE_WEBHOOK_SECRET_SNAPSHOT: ${{ secrets.STRIPE_WEBHOOK_SECRET_SNAPSHOT }}
-          STRIPE_WEBHOOK_SECRET_THIN: ${{ secrets.STRIPE_WEBHOOK_SECRET_THIN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM: ${{ secrets.RESEND_FROM }}
-          RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
-          BILLING_PROVIDER: ${{ secrets.BILLING_PROVIDER }}
-        run: |
-          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:sha-$IMAGE_TAG"
-          jq --arg image "$IMAGE_URI" \
-             --arg execRole "$EXECUTION_ROLE_ARN" \
-             --arg taskRole "$TASK_ROLE_ARN" \
-             --arg nodeEnv "$NODE_ENV" \
-             --arg port "$PORT" \
-             --arg hostname "$HOSTNAME" \
-             --arg internalAuthSecret "$INTERNAL_AUTH_SECRET" \
-             --arg apiUrl "$NEXT_PUBLIC_API_URL" \
-             --arg nextauthUrl "$NEXTAUTH_URL" \
-             --arg nextauthSecret "$NEXTAUTH_SECRET" \
-             --arg auth0ClientId "$AUTH0_CLIENT_ID" \
-             --arg auth0ClientSecret "$AUTH0_CLIENT_SECRET" \
-             --arg auth0Issuer "$AUTH0_ISSUER" \
-             --arg auth0Audience "$AUTH0_AUDIENCE" \
-             --arg stripeSecretKey "$STRIPE_SECRET_KEY" \
-             --arg stripeBaseUrl "$STRIPE_BASE_URL" \
-             --arg stripeCancelUrl "$STRIPE_CANCEL_URL" \
-             --arg stripePriceMap "$STRIPE_PRICE_MAP" \
-             --arg stripePublishableKey "$STRIPE_PUBLISHABLE_KEY" \
-             --arg stripeSnapshotUrl "$STRIPE_SNAPSHOT_URL" \
-             --arg stripeSuccessUrl "$STRIPE_SUCCESS_URL" \
-             --arg stripeThinUrl "$STRIPE_THIN_URL" \
-             --arg stripeWebhookSecretSnapshot "$STRIPE_WEBHOOK_SECRET_SNAPSHOT" \
-             --arg stripeWebhookSecretThin "$STRIPE_WEBHOOK_SECRET_THIN" \
-             --arg resendApiKey "$RESEND_API_KEY" \
-             --arg resendFrom "$RESEND_FROM" \
-             --arg retentionEnabled "$RETENTION_ENABLED" \
-             --arg billingProvider "$BILLING_PROVIDER" \
-             '.executionRoleArn = $execRole |
-              .taskRoleArn = $taskRole |
-              .containerDefinitions[0].image = $image |
-              .containerDefinitions[0].environment += [
-               {"name": "NODE_ENV", "value": $nodeEnv},
-               {"name": "PORT", "value": $port},
-               {"name": "HOSTNAME", "value": $hostname},
-               {"name": "INTERNAL_AUTH_SECRET", "value": $internalAuthSecret},
-               {"name": "NEXT_PUBLIC_API_URL", "value": $apiUrl},
-               {"name": "NEXTAUTH_URL", "value": $nextauthUrl},
-               {"name": "NEXTAUTH_SECRET", "value": $nextauthSecret},
-               {"name": "AUTH0_CLIENT_ID", "value": $auth0ClientId},
-               {"name": "AUTH0_CLIENT_SECRET", "value": $auth0ClientSecret},
-               {"name": "AUTH0_ISSUER", "value": $auth0Issuer},
-               {"name": "AUTH0_AUDIENCE", "value": $auth0Audience},
-               {"name": "STRIPE_SECRET_KEY", "value": $stripeSecretKey},
-               {"name": "STRIPE_BASE_URL", "value": $stripeBaseUrl},
-               {"name": "STRIPE_CANCEL_URL", "value": $stripeCancelUrl},
-               {"name": "STRIPE_PRICE_MAP", "value": $stripePriceMap},
-               {"name": "STRIPE_PUBLISHABLE_KEY", "value": $stripePublishableKey},
-               {"name": "STRIPE_SNAPSHOT_URL", "value": $stripeSnapshotUrl},
-               {"name": "STRIPE_SUCCESS_URL", "value": $stripeSuccessUrl},
-               {"name": "STRIPE_THIN_URL", "value": $stripeThinUrl},
-               {"name": "STRIPE_WEBHOOK_SECRET_SNAPSHOT", "value": $stripeWebhookSecretSnapshot},
-               {"name": "STRIPE_WEBHOOK_SECRET_THIN", "value": $stripeWebhookSecretThin},
-               {"name": "RESEND_API_KEY", "value": $resendApiKey},
-               {"name": "RESEND_FROM", "value": $resendFrom},
-               {"name": "RETENTION_ENABLED", "value": $retentionEnabled},
-               {"name": "BILLING_PROVIDER", "value": $billingProvider}
-              ]' \
-             infra/ecs/admin.taskdef.json > /tmp/admin-taskdef.json
-
-          aws ecs register-task-definition \
-            --cli-input-json file:///tmp/admin-taskdef.json \
-            --region ${{ env.AWS_REGION }}
-
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition ${{ vars.ECS_TASKDEF_ADMIN || 'nexsteps-admin' }} \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskDefinition.revision' \
-            --output text)
-
-          aws ecs update-service \
-            --cluster ${{ vars.ECS_CLUSTER || 'nexsteps-prod' }} \
-            --service ${{ vars.ECS_SERVICE_ADMIN || 'nexsteps-admin' }} \
-            --task-definition ${{ vars.ECS_TASKDEF_ADMIN || 'nexsteps-admin' }}:$TASK_DEF \
-            --region ${{ env.AWS_REGION }} \
-            --force-new-deployment
-
-      - name: Render and deploy api task definition
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ vars.ECR_REPO_API || 'nexsteps-api' }}
-          IMAGE_TAG: ${{ github.sha }}
-          EXECUTION_ROLE_ARN: ${{ vars.ECS_EXECUTION_ROLE_ARN }}
-          TASK_ROLE_ARN: ${{ vars.ECS_TASK_ROLE_ARN }}
-          NODE_ENV: ${{ secrets.NODE_ENV }}
-          PORT: ${{ secrets.PORT }}
-          HOSTNAME: ${{ secrets.HOSTNAME }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-          AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
-          AUTH0_ISSUER: ${{ secrets.AUTH0_ISSUER }}
-          AUTH0_AUDIENCE: ${{ secrets.AUTH0_AUDIENCE }}
-          INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_BASE_URL: ${{ secrets.STRIPE_BASE_URL }}
-          STRIPE_CANCEL_URL: ${{ secrets.STRIPE_CANCEL_URL }}
-          STRIPE_PRICE_MAP: ${{ secrets.STRIPE_PRICE_MAP }}
-          STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
-          STRIPE_SNAPSHOT_URL: ${{ secrets.STRIPE_SNAPSHOT_URL }}
-          STRIPE_SUCCESS_URL: ${{ secrets.STRIPE_SUCCESS_URL }}
-          STRIPE_THIN_URL: ${{ secrets.STRIPE_THIN_URL }}
-          STRIPE_WEBHOOK_SECRET_SNAPSHOT: ${{ secrets.STRIPE_WEBHOOK_SECRET_SNAPSHOT }}
-          STRIPE_WEBHOOK_SECRET_THIN: ${{ secrets.STRIPE_WEBHOOK_SECRET_THIN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          RESEND_FROM: ${{ secrets.RESEND_FROM }}
-          RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
-          BILLING_PROVIDER: ${{ secrets.BILLING_PROVIDER }}
-        run: |
-          IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY:sha-$IMAGE_TAG"
-          # Default NODE_ENV so billing provider and other env checks work when secret is unset
-          export NODE_ENV="${NODE_ENV:-production}"
-          jq --arg image "$IMAGE_URI" \
-             --arg execRole "$EXECUTION_ROLE_ARN" \
-             --arg taskRole "$TASK_ROLE_ARN" \
-             --arg nodeEnv "$NODE_ENV" \
-             --arg port "$PORT" \
-             --arg hostname "$HOSTNAME" \
-             --arg databaseUrl "$DATABASE_URL" \
-             --arg auth0ClientId "$AUTH0_CLIENT_ID" \
-             --arg auth0ClientSecret "$AUTH0_CLIENT_SECRET" \
-             --arg auth0Issuer "$AUTH0_ISSUER" \
-             --arg auth0Audience "$AUTH0_AUDIENCE" \
-             --arg internalAuthSecret "$INTERNAL_AUTH_SECRET" \
-             --arg stripeSecretKey "$STRIPE_SECRET_KEY" \
-             --arg stripeBaseUrl "$STRIPE_BASE_URL" \
-             --arg stripeCancelUrl "$STRIPE_CANCEL_URL" \
-             --arg stripePriceMap "$STRIPE_PRICE_MAP" \
-             --arg stripePublishableKey "$STRIPE_PUBLISHABLE_KEY" \
-             --arg stripeSnapshotUrl "$STRIPE_SNAPSHOT_URL" \
-             --arg stripeSuccessUrl "$STRIPE_SUCCESS_URL" \
-             --arg stripeThinUrl "$STRIPE_THIN_URL" \
-             --arg stripeWebhookSecretSnapshot "$STRIPE_WEBHOOK_SECRET_SNAPSHOT" \
-             --arg stripeWebhookSecretThin "$STRIPE_WEBHOOK_SECRET_THIN" \
-             --arg resendApiKey "$RESEND_API_KEY" \
-             --arg resendFrom "$RESEND_FROM" \
-             --arg retentionEnabled "$RETENTION_ENABLED" \
-             --arg billingProvider "$BILLING_PROVIDER" \
-             '.executionRoleArn = $execRole |
-              .taskRoleArn = $taskRole |
-              .containerDefinitions[0].image = $image |
-              .containerDefinitions[0].environment += [
-               {"name": "NODE_ENV", "value": $nodeEnv},
-               {"name": "PORT", "value": $port},
-               {"name": "HOSTNAME", "value": $hostname},
-               {"name": "DATABASE_URL", "value": $databaseUrl},
-               {"name": "AUTH0_CLIENT_ID", "value": $auth0ClientId},
-               {"name": "AUTH0_CLIENT_SECRET", "value": $auth0ClientSecret},
-               {"name": "AUTH0_ISSUER", "value": $auth0Issuer},
-               {"name": "AUTH0_AUDIENCE", "value": $auth0Audience},
-               {"name": "INTERNAL_AUTH_SECRET", "value": $internalAuthSecret},
-               {"name": "STRIPE_SECRET_KEY", "value": $stripeSecretKey},
-               {"name": "STRIPE_BASE_URL", "value": $stripeBaseUrl},
-               {"name": "STRIPE_CANCEL_URL", "value": $stripeCancelUrl},
-               {"name": "STRIPE_PRICE_MAP", "value": $stripePriceMap},
-               {"name": "STRIPE_PUBLISHABLE_KEY", "value": $stripePublishableKey},
-               {"name": "STRIPE_SNAPSHOT_URL", "value": $stripeSnapshotUrl},
-               {"name": "STRIPE_SUCCESS_URL", "value": $stripeSuccessUrl},
-               {"name": "STRIPE_THIN_URL", "value": $stripeThinUrl},
-               {"name": "STRIPE_WEBHOOK_SECRET_SNAPSHOT", "value": $stripeWebhookSecretSnapshot},
-               {"name": "STRIPE_WEBHOOK_SECRET_THIN", "value": $stripeWebhookSecretThin},
-               {"name": "RESEND_API_KEY", "value": $resendApiKey},
-               {"name": "RESEND_FROM", "value": $resendFrom},
-               {"name": "RETENTION_ENABLED", "value": $retentionEnabled},
-               {"name": "BILLING_PROVIDER", "value": $billingProvider}
-              ]' \
-             infra/ecs/api.taskdef.json > /tmp/api-taskdef.json
-
-          aws ecs register-task-definition \
-            --cli-input-json file:///tmp/api-taskdef.json \
-            --region ${{ env.AWS_REGION }}
-
-          TASK_DEF=$(aws ecs describe-task-definition \
-            --task-definition ${{ vars.ECS_TASKDEF_API || 'nexsteps-api' }} \
-            --region ${{ env.AWS_REGION }} \
-            --query 'taskDefinition.revision' \
-            --output text)
-
-          aws ecs update-service \
-            --cluster ${{ vars.ECS_CLUSTER || 'nexsteps-prod' }} \
-            --service ${{ vars.ECS_SERVICE_API || 'nexsteps-api' }} \
-            --task-definition ${{ vars.ECS_TASKDEF_API || 'nexsteps-api' }}:$TASK_DEF \
-            --region ${{ env.AWS_REGION }} \
-            --force-new-deployment
-
-      - name: Wait for web service to stabilize
-        run: |
-          aws ecs wait services-stable \
-            --cluster ${{ vars.ECS_CLUSTER || 'nexsteps-prod' }} \
-            --services ${{ vars.ECS_SERVICE_WEB || 'nexsteps-web' }} \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Wait for admin service to stabilize
-        run: |
-          aws ecs wait services-stable \
-            --cluster ${{ vars.ECS_CLUSTER || 'nexsteps-prod' }} \
-            --services ${{ vars.ECS_SERVICE_ADMIN || 'nexsteps-admin' }} \
-            --region ${{ env.AWS_REGION }}
-
-      - name: Wait for api service to stabilize
-        run: |
-          aws ecs wait services-stable \
-            --cluster ${{ vars.ECS_CLUSTER || 'nexsteps-prod' }} \
-            --services ${{ vars.ECS_SERVICE_API || 'nexsteps-api' }} \
-            --region ${{ env.AWS_REGION }}
+      - name: Deploy API
+        uses: ./.github/actions/deploy-vercel-app
+        with:
+          app: api
+          package: "@pathway/api"
+          cwd: apps/api
+          vercel-project-id: ${{ secrets.VERCEL_API_PROJECT_ID }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}

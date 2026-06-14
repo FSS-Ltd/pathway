@@ -18,7 +18,9 @@
     }
   },
   "include": [
+    "api",
     "src",
+    "scripts",
     "../../packages/auth/src",
     "../../packages/db/src",
     "../../packages/types/src",

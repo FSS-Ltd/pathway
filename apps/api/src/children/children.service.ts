@@ -4,12 +4,15 @@ import {
   ForbiddenException,
   NotFoundException,
   Inject,
+  Optional,
 } from "@nestjs/common";
 import { prisma, runTransaction, SiteRole } from "@pathway/db";
 import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
 import { InvitesService } from "../invites/invites.service";
 import { getPlanDefinition } from "../billing/billing-plans";
+import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { childPhotoKey } from "../common/storage/storage-key.util";
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -41,7 +44,14 @@ const childSelect = {
 export class ChildrenService {
   constructor(
     @Inject(InvitesService) private readonly invitesService: InvitesService,
-  ) {}
+    @Optional()
+    @Inject(SupabaseStorageService)
+    storage?: SupabaseStorageService,
+  ) {
+    this.storage = storage ?? new SupabaseStorageService();
+  }
+
+  private readonly storage: SupabaseStorageService;
 
   async list(tenantId: string) {
     return prisma.child.findMany({
@@ -78,13 +88,26 @@ export class ChildrenService {
       },
     });
     if (!child || !child.photoConsent) return null;
+    if (child.photoKey) {
+      const buffer = await this.storage.downloadObject(
+        process.env.SUPABASE_STORAGE_PRIVATE_BUCKET ?? "",
+        child.photoKey,
+      );
+      if (buffer) {
+        return {
+          buffer,
+          contentType: child.photoContentType ?? "image/jpeg",
+        };
+      }
+    }
     if (child.photoBytes && child.photoBytes.length > 0) {
-      const buffer = child.photoBytes instanceof Buffer ? child.photoBytes : Buffer.from(child.photoBytes);
+      const buffer =
+        child.photoBytes instanceof Buffer
+          ? child.photoBytes
+          : Buffer.from(child.photoBytes);
       const contentType = child.photoContentType ?? "image/jpeg";
       return { buffer, contentType };
     }
-    // TODO: when S3/photoKey is used, fetch and return signed URL or stream
-    if (child.photoKey) return null;
     return null;
   }
 
@@ -163,18 +186,18 @@ export class ChildrenService {
 
     // 5) Date of birth
     const dateOfBirth =
-      input.dateOfBirth?.trim() && /^\d{4}-\d{2}-\d{2}$/.test(input.dateOfBirth.trim())
+      input.dateOfBirth?.trim() &&
+      /^\d{4}-\d{2}-\d{2}$/.test(input.dateOfBirth.trim())
         ? new Date(input.dateOfBirth.trim())
         : null;
 
     // 6) Pickup permissions -> notes when provided
-    const notes =
-      input.pickupPermissions?.trim()
-        ? `Authorised collectors: ${input.pickupPermissions.trim()}`
-        : undefined;
+    const notes = input.pickupPermissions?.trim()
+      ? `Authorised collectors: ${input.pickupPermissions.trim()}`
+      : undefined;
 
-    // 7) Create
-    return prisma.child.create({
+    // 7) Create with DB-byte fallback, then move to Supabase Storage when configured.
+    const child = await prisma.child.create({
       data: {
         firstName,
         lastName,
@@ -205,6 +228,32 @@ export class ChildrenService {
       },
       select: childSelect,
     });
+
+    if (photoBytes && this.storage.isConfigured()) {
+      const stored = await this.storage.uploadObject({
+        bucket: "private",
+        key: childPhotoKey(
+          resolvedTenantId,
+          child.id,
+          photoContentType ?? "image/jpeg",
+        ),
+        body: photoBytes,
+        contentType: photoContentType ?? "image/jpeg",
+      });
+      if (stored) {
+        return prisma.child.update({
+          where: { id: child.id },
+          data: {
+            photoKey: stored.key,
+            photoBytes: null,
+            photoContentType: photoContentType ?? "image/jpeg",
+          },
+          select: childSelect,
+        });
+      }
+    }
+
+    return child;
   }
 
   private async resolveMaxChildrenCap(orgId: string): Promise<number | null> {
@@ -307,37 +356,23 @@ export class ChildrenService {
       );
     }
 
-    let data = photoBase64;
-    let detectedType = contentType;
-    if (data.startsWith("data:")) {
-      const match = data.match(/^data:([^;]+);base64,/);
-      if (match) {
-        detectedType = match[1].trim().toLowerCase();
-        data = data.replace(/^data:[^;]+;base64,/, "");
-      }
-    }
-    const buffer = Buffer.from(data, "base64");
-    if (buffer.length > MAX_PHOTO_BYTES) {
-      throw new BadRequestException(
-        `Photo must be at most ${MAX_PHOTO_BYTES / 1024 / 1024}MB`,
-      );
-    }
-    if (buffer.length === 0) {
-      throw new BadRequestException("Photo data is empty");
-    }
-    const type = detectedType || "image/jpeg";
-    if (!ALLOWED_PHOTO_TYPES.includes(type)) {
-      throw new BadRequestException(
-        `Photo must be one of: ${ALLOWED_PHOTO_TYPES.join(", ")}`,
-      );
-    }
+    const { buffer, contentType: type } = this.decodeAndValidatePhoto(
+      photoBase64,
+      contentType,
+    );
+    const stored = await this.storage.uploadObject({
+      bucket: "private",
+      key: childPhotoKey(tenantId, childId, type),
+      body: buffer,
+      contentType: type,
+    });
 
     await prisma.child.update({
       where: { id: childId },
       data: {
-        photoBytes: buffer,
+        photoBytes: stored ? null : buffer,
         photoContentType: type,
-        photoKey: null,
+        photoKey: stored?.key ?? null,
       },
     });
   }
@@ -381,7 +416,12 @@ export class ChildrenService {
     | { invited: true; parentId: string }
     | { userNotFound: true }
   > {
-    await this.assertCanInviteParent(childId, tenantId, callerUserId, isOrgAdmin);
+    await this.assertCanInviteParent(
+      childId,
+      tenantId,
+      callerUserId,
+      isOrgAdmin,
+    );
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
@@ -406,7 +446,9 @@ export class ChildrenService {
     });
 
     if (existingUser) {
-      const alreadyLinked = child.guardians.some((g) => g.id === existingUser.id);
+      const alreadyLinked = child.guardians.some(
+        (g) => g.id === existingUser.id,
+      );
       if (alreadyLinked) {
         return { linked: true, parentId: existingUser.id };
       }
@@ -490,10 +532,7 @@ export class ChildrenService {
       where: {
         email: { equals: normalizedEmail, mode: "insensitive" },
         hasFamilyAccess: true,
-        OR: [
-          { tenantId },
-          { siteMemberships: { some: { tenantId } } },
-        ],
+        OR: [{ tenantId }, { siteMemberships: { some: { tenantId } } }],
       },
       select: { id: true },
     });

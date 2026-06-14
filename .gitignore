@@ -1,6 +1,8 @@
 # node
 node_modules
 .pnpm-store
+package-lock.json
+npm-shrinkwrap.json
 
 # local certificates
 .cert/
@@ -24,11 +26,16 @@ packages/*/src/**/*.js.map
 
 # env
 .env
+env.production
 .env.local
 .env.*.local
 .env.prod
 .env.production
 .env.staging
+
+# Vercel local project metadata
+.vercel/
+apps/*/.vercel/
 
 # logs
 npm-debug.log*

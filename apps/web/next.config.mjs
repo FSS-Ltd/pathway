@@ -15,7 +15,10 @@ const cspReportOnly = [
 
 const nextConfig = {
   reactStrictMode: true,
-  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+  output: process.env.NEXT_STANDALONE === "true" ? "standalone" : undefined,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   async headers() {
     return [
       {
@@ -51,8 +54,12 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      { source: '/resources', destination: '/blog', permanent: true },
-      { source: '/resources/:slug', destination: '/blog/:slug', permanent: true },
+      { source: "/resources", destination: "/blog", permanent: true },
+      {
+        source: "/resources/:slug",
+        destination: "/blog/:slug",
+        permanent: true,
+      },
     ];
   },
 };

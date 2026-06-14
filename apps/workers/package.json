@@ -8,7 +8,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx,js}\" --no-error-on-unmatched-pattern",
     "test": "jest -c jest.config.ts",
-    "compute:av30": "ts-node --esm src/av30/compute-av30.cli.ts"
+    "compute:av30": "tsx src/av30/compute-av30.cli.ts",
+    "retention:run": "tsx src/retention/run-retention.cli.ts"
   },
   "dependencies": {
     "@pathway/db": "workspace:*",
@@ -26,4 +27,3 @@
     "typescript": "^5.6.2"
   }
 }
-

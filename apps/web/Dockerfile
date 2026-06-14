@@ -40,6 +40,7 @@ RUN pnpm install --frozen-lockfile --prefer-offline
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_STANDALONE=true
 ENV NODE_ENV=production
 RUN pnpm --filter @pathway/web build
 

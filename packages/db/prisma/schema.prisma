@@ -118,6 +118,7 @@ enum BlogAssetType {
 
 enum BlogAssetStorage {
   POSTGRES
+  SUPABASE
 }
 
 model BlogAsset {
@@ -129,10 +130,13 @@ model BlogAsset {
   sha256    String           @unique
   width     Int?
   height    Int?
-  bytes     Bytes
+  bytes     Bytes?
+  storageBucket String?
+  storageKey    String?
   createdAt DateTime         @default(now())
 
   @@index([sha256])
+  @@index([storageBucket, storageKey])
 }
 
 model BlogPost {
@@ -304,7 +308,8 @@ model User {
   lastName    String?
   dateOfBirth        DateTime? @db.Date
   avatarUrl          String?   // External URL fallback (e.g. Auth0)
-  avatarBytes        Bytes?    // Inline storage until S3
+  avatarKey          String?   // Supabase Storage key for uploaded avatar
+  avatarBytes        Bytes?    // Inline fallback until storage backfill
   avatarContentType  String?   // e.g. image/jpeg
   isActive           Boolean   @default(true)
   superUser          Boolean   @default(false) // Nexsteps staff only (e.g. blog admin)
@@ -511,7 +516,7 @@ model Child {
   specialNeedsOther   String?     // Free text when specialNeedsType is "other"
   photoConsent        Boolean      @default(false)
   photoKey            String?
-  photoBytes          Bytes?       // Inline storage until S3; serve via signed URL later
+  photoBytes          Bytes?       // Inline fallback until storage backfill
   photoContentType    String?      // e.g. image/jpeg
   notes               String?
   tenantId            String
@@ -751,8 +756,8 @@ model Lesson {
   session            Session?  @relation(fields: [sessionId], references: [id])
   title              String
   description        String?
-  fileKey            String?   // storage key / label for resource (S3 key when integrated)
-  resourceFileBytes  Bytes?    // temporary: uploaded file content until S3
+  fileKey            String?   // Supabase Storage key / label for resource
+  resourceFileBytes  Bytes?    // Inline fallback until storage backfill
   resourceFileName   String?   // original filename for download
   weekOf             DateTime  // e.g., Monday of the week (kept for backward compatibility)
   createdAt          DateTime  @default(now())

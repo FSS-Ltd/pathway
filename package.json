@@ -24,13 +24,21 @@
     "db:generate": "pnpm --filter @pathway/db run prisma:generate",
     "db:migrate": "pnpm --filter @pathway/db run prisma:migrate:dev",
     "db:deploy": "pnpm --filter @pathway/db run prisma:migrate:deploy",
+    "db:status:production": "node scripts/prisma-production.mjs status",
+    "db:deploy:production": "node scripts/prisma-production.mjs deploy",
     "db:reset": "pnpm --filter @pathway/db run prisma:migrate:reset",
     "db:seed": "pnpm --filter @pathway/db run seed",
+    "env:production:prepare": "node scripts/prepare-production-env.mjs",
+    "launch:preflight": "node scripts/launch-preflight.mjs",
+    "supabase:rls:check": "node scripts/check-supabase-rls.mjs",
+    "vercel:projects:setup": "node scripts/setup-vercel-projects.mjs",
+    "vercel:env:sync": "node scripts/sync-vercel-env.mjs",
+    "vercel:deploy:production": "node scripts/deploy-vercel-production.mjs",
+    "github:secrets:setup": "node scripts/setup-github-actions-secrets.mjs",
     "cert:api": "mkdir -p .cert && mkcert -cert-file .cert/api.localhost.pem -key-file .cert/api.localhost-key.pem localhost 127.0.0.1 ::1 api.localhost",
     "reset": "git restore apps/**/.turbo/*.log packages/**/.turbo/*.log",
     "clean:cache": "git clean -fdX .turbo",
-    "clean:all": "rm -rf node_modules .turbo && pnpm install",
-    "supabase:rls:check": "node scripts/check-supabase-rls.mjs"
+    "clean:all": "rm -rf node_modules .turbo && pnpm install"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",

@@ -2,17 +2,22 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
 import type { Prisma } from "@pathway/db";
-import {
-  CreateLessonDto,
-  UpdateLessonDto,
-  decodeResourceFile,
-} from "./dto";
+import { CreateLessonDto, UpdateLessonDto, decodeResourceFile } from "./dto";
+import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { lessonResourceKey } from "../common/storage/storage-key.util";
 
 @Injectable()
 export class LessonsService {
+  constructor(@Optional() storage?: SupabaseStorageService) {
+    this.storage = storage ?? new SupabaseStorageService();
+  }
+
+  private readonly storage: SupabaseStorageService;
+
   /** Create a lesson. Validates tenant and (optional) group ownership. */
   async create(dto: CreateLessonDto, tenantId: string) {
     if (dto.tenantId !== tenantId) {
@@ -42,9 +47,7 @@ export class LessonsService {
       });
       if (!session) throw new NotFoundException("Session not found");
       if (session.tenantId !== tenantId) {
-        throw new BadRequestException(
-          "Session must belong to the same tenant",
-        );
+        throw new BadRequestException("Session must belong to the same tenant");
       }
     }
 
@@ -66,7 +69,7 @@ export class LessonsService {
     }
 
     try {
-      return await prisma.lesson.create({
+      const lesson = await prisma.lesson.create({
         data: {
           tenantId,
           groupId: dto.groupId ?? null,
@@ -79,6 +82,31 @@ export class LessonsService {
           resourceFileName,
         },
       });
+
+      if (
+        resourceFileBytes &&
+        resourceFileName &&
+        this.storage.isConfigured()
+      ) {
+        const stored = await this.storage.uploadObject({
+          bucket: "private",
+          key: lessonResourceKey(tenantId, lesson.id, resourceFileName),
+          body: resourceFileBytes,
+          contentType: "application/octet-stream",
+        });
+        if (stored) {
+          return await prisma.lesson.update({
+            where: { id: lesson.id },
+            data: {
+              fileKey: stored.key,
+              resourceFileBytes: null,
+              resourceFileName,
+            },
+          });
+        }
+      }
+
+      return lesson;
     } catch (e: unknown) {
       this.handlePrismaError(e, "create");
     }
@@ -158,9 +186,26 @@ export class LessonsService {
   ): Promise<{ buffer: Buffer; fileName: string } | null> {
     const lesson = await prisma.lesson.findFirst({
       where: { id, tenantId },
-      select: { resourceFileBytes: true, resourceFileName: true },
+      select: {
+        fileKey: true,
+        resourceFileBytes: true,
+        resourceFileName: true,
+      },
     });
-    if (!lesson?.resourceFileBytes) return null;
+    if (!lesson) return null;
+    if (lesson.fileKey) {
+      const buffer = await this.storage.downloadObject(
+        process.env.SUPABASE_STORAGE_PRIVATE_BUCKET ?? "",
+        lesson.fileKey,
+      );
+      if (buffer) {
+        return {
+          buffer,
+          fileName: lesson.resourceFileName ?? "resource",
+        };
+      }
+    }
+    if (!lesson.resourceFileBytes) return null;
     return {
       buffer: Buffer.from(lesson.resourceFileBytes),
       fileName: lesson.resourceFileName ?? "resource",
@@ -203,6 +248,8 @@ export class LessonsService {
 
     let resourceFileBytes: Buffer | null | undefined = undefined;
     let resourceFileName: string | null | undefined = undefined;
+    let fileKey: string | null | undefined =
+      dto.fileKey === undefined ? undefined : dto.fileKey;
     if (dto.resourceFileBase64 !== undefined) {
       if (dto.resourceFileBase64 && dto.resourceFileBase64.trim()) {
         try {
@@ -213,6 +260,16 @@ export class LessonsService {
           if (decoded) {
             resourceFileBytes = decoded.buffer;
             resourceFileName = decoded.fileName;
+            const stored = await this.storage.uploadObject({
+              bucket: "private",
+              key: lessonResourceKey(existing.tenantId, id, decoded.fileName),
+              body: decoded.buffer,
+              contentType: "application/octet-stream",
+            });
+            if (stored) {
+              fileKey = stored.key;
+              resourceFileBytes = null;
+            }
           }
         } catch (e) {
           throw new BadRequestException(
@@ -222,6 +279,7 @@ export class LessonsService {
       } else {
         resourceFileBytes = null;
         resourceFileName = null;
+        fileKey = null;
       }
     }
 
@@ -234,7 +292,7 @@ export class LessonsService {
           title: dto.title ?? undefined,
           description:
             dto.description === undefined ? undefined : dto.description,
-          fileKey: dto.fileKey === undefined ? undefined : dto.fileKey,
+          fileKey,
           weekOf: dto.weekOf ?? undefined,
           ...(resourceFileBytes !== undefined ? { resourceFileBytes } : {}),
           ...(resourceFileName !== undefined ? { resourceFileName } : {}),

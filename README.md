@@ -180,32 +180,36 @@ Each app and package can have its own `.env` files. Make sure to create and conf
 Refer to the `.env.example` files in each directory for required variables.
 
 ### Local HTTPS for API (dev)
+
 To run the Nest API over HTTPS on `https://api.localhost:3001` without browser certificate errors:
 
-1) Add to your `/etc/hosts`:
+1. Add to your `/etc/hosts`:
    ```
    127.0.0.1 api.localhost
    ```
-2) Generate local certs (requires [mkcert](https://github.com/FiloSottile/mkcert)):
+2. Generate local certs (requires [mkcert](https://github.com/FiloSottile/mkcert)):
    ```
    pnpm cert:api
    ```
    This writes:
    - `.cert/api.localhost.pem`
    - `.cert/api.localhost-key.pem`
-3) In your `.env.local` (or `.env.example` for sharing defaults), set:
+3. In your `.env.local` (or `.env.example` for sharing defaults), set:
    ```
    API_DEV_SSL_CERT=.cert/api.localhost.pem
    API_DEV_SSL_KEY=.cert/api.localhost-key.pem
    API_HOST=api.localhost
    ```
-4) Start the API; browse at `https://api.localhost:3001`.
+4. Start the API; browse at `https://api.localhost:3001`.
 
 ## Docker Setup
 
-### Production Docker Images
+### Legacy Docker Images
 
-Each app has a production-ready Dockerfile optimized for AWS ECS Fargate deployments:
+The Dockerfiles are retained for local container smoke tests and as a fallback
+reference. The active production deployment path is Vercel and Supabase; do not
+use these Docker images for the current production launch unless the deployment
+strategy changes again.
 
 - `apps/web/Dockerfile` - Next.js SSR marketing site
 - `apps/admin/Dockerfile` - Next.js SSR admin dashboard
@@ -245,9 +249,9 @@ docker run -p 3002:3000 pathway-admin:latest
 docker run -p 3003:3001 pathway-api:latest
 ```
 
-#### Docker Compose (Production Smoke Test)
+#### Docker Compose (Local Smoke Test)
 
-Use the production docker-compose file for local testing:
+Use the production-shaped docker-compose file for local testing:
 
 ```bash
 # Build and start all services
@@ -264,11 +268,12 @@ docker-compose -f docker-compose.prod.yml down
 ```
 
 Services will be available on:
+
 - Web: http://localhost:3001
 - Admin: http://localhost:3002
 - API: http://localhost:3003
 
-**Note:** The services run on an internal network but expose ports for local testing. For production deployments (e.g., AWS ECS), configure networking, environment variables, and service discovery according to your infrastructure requirements.
+**Note:** The services run on an internal network but expose ports for local testing. Production deploys are handled by Vercel and GitHub Actions as described below.
 
 ## CI/CD
 
@@ -290,6 +295,7 @@ pnpm test:unit
 ```
 
 All checks must pass before code can be merged. The workflow:
+
 - Uses pnpm with frozen lockfile for reproducible installs
 - Caches the pnpm store for faster builds
 - Fails fast on the first error (typecheck → lint → test:unit)
@@ -299,6 +305,7 @@ All checks must pass before code can be merged. The workflow:
 ### Integration Tests in CI
 
 Integration tests run in a separate, optional job that:
+
 - Runs on `master`/`main` branch pushes, PRs, or manual trigger
 - Uses a Postgres service container (ephemeral, isolated per run)
 - Sets up test databases and runs migrations automatically
@@ -326,94 +333,18 @@ pnpm test:integration
 
 ## Deployment
 
-This repository includes automated deployment to AWS ECS Fargate via GitHub Actions. The deployment workflow runs automatically on pushes to the `master` branch.
+The active non-AWS deployment path is:
 
-### Required GitHub Variables
+- Marketing and purchase web: Vercel, configured by `apps/web/vercel.json`.
+- Admin app: Vercel, configured by `apps/admin/vercel.json`.
+- API: Vercel Node function, configured by `apps/api/vercel.json` and `apps/api/api/[...path].ts`.
+- Database: Supabase Postgres, deployed with Prisma migrations.
+- File storage: Supabase Storage, accessed only by the backend API.
+- Scheduled jobs: GitHub Actions cron in `.github/workflows/workers-scheduled.yml`.
 
-The following variables must be configured in your GitHub repository settings (Settings → Secrets and variables → Actions → Variables):
+Production deploys run through `.github/workflows/deploy.yml` using cached Vercel prebuilt artifacts. Production values should live in ignored `env.production`; run `pnpm env:production:prepare` if the current values are still in `.env.production` or `.env.prod`. Use `pnpm vercel:projects:setup` to dry-run the Vercel project setup before creating projects with `--apply`, then use `pnpm github:secrets:setup` to dry-run GitHub Actions production secrets. See `docs/TEMPORARY_FREE_EU_DEPLOYMENT.md` for the full production runbook, required secrets, DNS, provider callbacks, and smoke tests.
 
-#### AWS Configuration
-- `AWS_REGION` - AWS region (defaults to `eu-west-2` if not set)
-- `AWS_ACCOUNT_ID` - Your AWS account ID
-- `AWS_ROLE_TO_ASSUME` - ARN of the IAM role to assume via OIDC (e.g., `arn:aws:iam::123456789012:role/github-actions-role`)
-
-#### ECS Configuration
-- `ECS_CLUSTER` - ECS cluster name (defaults to `nexsteps-prod` if not set)
-- `ECS_EXECUTION_ROLE_ARN` - ARN of the ECS task execution role (for pulling images from ECR and writing logs)
-- `ECS_TASK_ROLE_ARN` - ARN of the ECS task role (for application permissions)
-
-#### ECS Service Names
-- `ECS_SERVICE_WEB` - ECS service name for web app (defaults to `nexsteps-web`)
-- `ECS_SERVICE_ADMIN` - ECS service name for admin app (defaults to `nexsteps-admin`)
-- `ECS_SERVICE_API` - ECS service name for API (defaults to `nexsteps-api`)
-
-#### ECS Task Definition Names
-- `ECS_TASKDEF_WEB` - Task definition family name for web (defaults to `nexsteps-web`)
-- `ECS_TASKDEF_ADMIN` - Task definition family name for admin (defaults to `nexsteps-admin`)
-- `ECS_TASKDEF_API` - Task definition family name for API (defaults to `nexsteps-api`)
-
-#### ECR Repository Names
-- `ECR_REPO_WEB` - ECR repository name for web (defaults to `nexsteps-web`)
-- `ECR_REPO_ADMIN` - ECR repository name for admin (defaults to `nexsteps-admin`)
-- `ECR_REPO_API` - ECR repository name for API (defaults to `nexsteps-api`)
-
-### AWS IAM Setup
-
-The deployment workflow uses OIDC to authenticate with AWS. You need to:
-
-1. **Create an IAM Role** for GitHub Actions with trust policy allowing the GitHub OIDC provider:
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Principal": {
-           "Federated": "arn:aws:iam::ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com"
-         },
-         "Action": "sts:AssumeRoleWithWebIdentity",
-         "Condition": {
-           "StringEquals": {
-             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-           },
-           "StringLike": {
-             "token.actions.githubusercontent.com:sub": "repo:OWNER/REPO:*"
-           }
-         }
-       }
-     ]
-   }
-   ```
-
-2. **Attach policies** to the role with permissions for:
-   - ECR: `ecr:GetAuthorizationToken`, `ecr:BatchCheckLayerAvailability`, `ecr:GetDownloadUrlForLayer`, `ecr:BatchGetImage`, `ecr:PutImage`, `ecr:InitiateLayerUpload`, `ecr:UploadLayerPart`, `ecr:CompleteLayerUpload`
-   - ECS: `ecs:RegisterTaskDefinition`, `ecs:DescribeTaskDefinition`, `ecs:UpdateService`, `ecs:DescribeServices`
-   - CloudWatch Logs: `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
-
-3. **Set the role ARN** as the `AWS_ROLE_TO_ASSUME` variable in GitHub.
-
-### Deployment Process
-
-When code is pushed to `master`:
-
-1. The workflow builds Docker images for all three apps (web, admin, api)
-2. Images are tagged with both `:sha-<commit-sha>` and `:latest`
-3. Images are pushed to their respective ECR repositories
-4. Task definitions are rendered with the new image URIs
-5. New task definition revisions are registered with ECS
-6. Each ECS service is updated to use the new task definition
-7. The workflow waits for all services to reach a stable state
-
-### Task Definitions
-
-Task definitions are stored in `infra/ecs/` and include:
-- Fargate compatibility
-- CPU/Memory allocation (512 CPU, 1024 MB memory by default)
-- Container port mappings (3000 for all services)
-- CloudWatch Logs configuration
-- Environment variables for production
-
-You can modify these task definitions as needed, but ensure they match your ECS service configurations.
+The old AWS/ECS task definition files under `infra/ecs/` are retained for reference only. They are not part of the active deployment path.
 
 ## Next Steps
 
