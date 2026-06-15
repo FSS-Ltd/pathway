@@ -2,6 +2,12 @@ name: Deploy database migrations
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to deploy migrations from.
+        required: false
+        type: string
 
 jobs:
   deploy:
@@ -16,6 +22,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

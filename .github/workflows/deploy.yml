@@ -1,6 +1,9 @@
 name: Deploy to Vercel
 
 on:
+  pull_request:
+    branches: [master]
+    types: [closed]
   workflow_dispatch:
     inputs:
       target:
@@ -15,24 +18,43 @@ on:
           - api
 
 concurrency:
-  group: vercel-production-${{ github.ref }}
+  group: vercel-production-${{ github.event.pull_request.base.ref || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
+  deploy-db:
+    name: Deploy database migrations
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        github.event.pull_request.merged == true
+      }}
+    uses: ./.github/workflows/db-deploy.yml
+    with:
+      ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+    secrets: inherit
+
   deploy-web:
     name: Deploy web
     runs-on: ubuntu-22.04
     environment: production
+    needs: deploy-db
     if: >-
       ${{
-        inputs.target == 'all' ||
-        inputs.target == 'web'
+        needs.deploy-db.result == 'success' &&
+        (
+          github.event_name == 'pull_request' ||
+          inputs.target == 'all' ||
+          inputs.target == 'web'
+        )
       }}
     permissions:
       contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
       - name: Deploy web
         uses: ./.github/actions/deploy-vercel-app
@@ -48,16 +70,23 @@ jobs:
     name: Deploy admin
     runs-on: ubuntu-22.04
     environment: production
+    needs: deploy-db
     if: >-
       ${{
-        inputs.target == 'all' ||
-        inputs.target == 'admin'
+        needs.deploy-db.result == 'success' &&
+        (
+          github.event_name == 'pull_request' ||
+          inputs.target == 'all' ||
+          inputs.target == 'admin'
+        )
       }}
     permissions:
       contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
       - name: Deploy admin
         uses: ./.github/actions/deploy-vercel-app
@@ -73,16 +102,23 @@ jobs:
     name: Deploy API
     runs-on: ubuntu-22.04
     environment: production
+    needs: deploy-db
     if: >-
       ${{
-        inputs.target == 'all' ||
-        inputs.target == 'api'
+        needs.deploy-db.result == 'success' &&
+        (
+          github.event_name == 'pull_request' ||
+          inputs.target == 'all' ||
+          inputs.target == 'api'
+        )
       }}
     permissions:
       contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
 
       - name: Deploy API
         uses: ./.github/actions/deploy-vercel-app
