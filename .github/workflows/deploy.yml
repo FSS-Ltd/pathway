@@ -1,9 +1,8 @@
 name: Deploy to Vercel
 
 on:
-  pull_request:
+  push:
     branches: [master]
-    types: [closed]
   workflow_dispatch:
     inputs:
       target:
@@ -18,7 +17,7 @@ on:
           - api
 
 concurrency:
-  group: vercel-production-${{ github.event.pull_request.base.ref || github.ref_name }}
+  group: vercel-production-${{ github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -27,11 +26,11 @@ jobs:
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
-        github.event.pull_request.merged == true
+        github.event_name == 'push'
       }}
     uses: ./.github/workflows/db-deploy.yml
     with:
-      ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+      ref: ${{ github.ref_name }}
     secrets: inherit
 
   deploy-web:
@@ -43,7 +42,7 @@ jobs:
       ${{
         needs.deploy-db.result == 'success' &&
         (
-          github.event_name == 'pull_request' ||
+          github.event_name == 'push' ||
           inputs.target == 'all' ||
           inputs.target == 'web'
         )
@@ -54,7 +53,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          ref: ${{ github.ref_name }}
 
       - name: Deploy web
         uses: ./.github/actions/deploy-vercel-app
@@ -75,7 +74,7 @@ jobs:
       ${{
         needs.deploy-db.result == 'success' &&
         (
-          github.event_name == 'pull_request' ||
+          github.event_name == 'push' ||
           inputs.target == 'all' ||
           inputs.target == 'admin'
         )
@@ -86,7 +85,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          ref: ${{ github.ref_name }}
 
       - name: Deploy admin
         uses: ./.github/actions/deploy-vercel-app
@@ -107,7 +106,7 @@ jobs:
       ${{
         needs.deploy-db.result == 'success' &&
         (
-          github.event_name == 'pull_request' ||
+          github.event_name == 'push' ||
           inputs.target == 'all' ||
           inputs.target == 'api'
         )
@@ -118,7 +117,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          ref: ${{ github.ref_name }}
 
       - name: Deploy API
         uses: ./.github/actions/deploy-vercel-app

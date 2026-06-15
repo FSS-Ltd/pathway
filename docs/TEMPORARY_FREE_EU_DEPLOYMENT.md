@@ -260,8 +260,8 @@ so missing values are reported before any remote writes happen.
 Active workflows:
 
 - `CI`: typecheck, lint, unit tests, optional integration tests
-- `Deploy to Vercel`: production deploys for web, admin, and API on merged PRs
-  to `master`, plus manual dispatch
+- `Deploy to Vercel`: production deploys for web, admin, and API on pushes to
+  `master`, plus manual dispatch
 - `Deploy database migrations`: reusable Prisma migration deploy against
   Supabase, plus manual dispatch
 - `Scheduled workers`: nightly AV30 and retention jobs
@@ -276,14 +276,14 @@ The Vercel deploy workflow uses:
 - pinned Vercel CLI `54.13.0`
 - `vercel build` plus `vercel deploy --prebuilt`
 
-The production Vercel workflow runs automatically when a pull request is merged
-to `master`. It first calls `Deploy database migrations`, then deploys the web,
-admin, and API Vercel projects from the base branch. Manual dispatch remains
-available for targeted production deploys, and it uses the same migration-first
-sequence. The local `db:*:production` helpers load ignored `env.production` and
-pass `DIRECT_URL` to Prisma as `DATABASE_URL`, because Prisma migrations should
-use a direct/session connection while runtime API traffic uses the transaction
-pooler.
+The production Vercel workflow runs automatically from the `push` event that
+GitHub emits after a pull request is merged to `master`. It first calls `Deploy
+database migrations`, then deploys the web, admin, and API Vercel projects from
+`master`. Manual dispatch remains available for targeted production deploys, and
+it uses the same migration-first sequence. The local `db:*:production` helpers
+load ignored `env.production` and pass `DIRECT_URL` to Prisma as `DATABASE_URL`,
+because Prisma migrations should use a direct/session connection while runtime
+API traffic uses the transaction pooler.
 
 Required GitHub Actions secrets for database/workers:
 
