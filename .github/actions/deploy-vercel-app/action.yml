@@ -39,6 +39,23 @@ runs:
         version: 9.7.0
         run_install: false
 
+    - name: Configure Vercel CLI shell environment
+      shell: bash
+      run: |
+        {
+          echo "/usr/local/sbin"
+          echo "/usr/local/bin"
+          echo "/usr/sbin"
+          echo "/usr/bin"
+          echo "/sbin"
+          echo "/bin"
+        } >> "$GITHUB_PATH"
+        echo "SHELL=/bin/sh" >> "$GITHUB_ENV"
+        test -x /bin/sh || {
+          echo "/bin/sh is required for Vercel build commands." >&2
+          exit 1
+        }
+
     - name: Get pnpm store directory
       shell: bash
       run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
