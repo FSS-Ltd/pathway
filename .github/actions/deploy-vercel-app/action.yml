@@ -42,6 +42,7 @@ runs:
     - name: Configure Vercel CLI shell environment
       shell: bash
       run: |
+        vercel_cli_system_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
         {
           echo "/usr/local/sbin"
           echo "/usr/local/bin"
@@ -50,6 +51,7 @@ runs:
           echo "/sbin"
           echo "/bin"
         } >> "$GITHUB_PATH"
+        echo "VERCEL_CLI_SYSTEM_PATH=$vercel_cli_system_path" >> "$GITHUB_ENV"
         echo "SHELL=/bin/sh" >> "$GITHUB_ENV"
         test -x /bin/sh || {
           echo "/bin/sh is required for Vercel build commands." >&2
@@ -122,9 +124,11 @@ runs:
         VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
         VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
         VERCEL_TOKEN: ${{ inputs.vercel-token }}
-      run: >-
-        pnpm dlx vercel@54.13.0 pull --cwd "${{ inputs.cwd }}" --yes
-        --environment=production --project="$VERCEL_PROJECT_ID"
+      run: |
+        export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
+        command -v sh >/dev/null
+        pnpm dlx vercel@54.13.0 pull --cwd "${{ inputs.cwd }}" --yes \
+        --environment=production --project="$VERCEL_PROJECT_ID" \
         --token="$VERCEL_TOKEN"
 
     - name: Build Vercel artifact
@@ -133,8 +137,10 @@ runs:
         VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
         VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
         VERCEL_TOKEN: ${{ inputs.vercel-token }}
-      run: >-
-        pnpm dlx vercel@54.13.0 build --cwd "${{ inputs.cwd }}" --prod
+      run: |
+        export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
+        command -v sh >/dev/null
+        pnpm dlx vercel@54.13.0 build --cwd "${{ inputs.cwd }}" --prod \
         --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN"
 
     - name: Deploy prebuilt artifact
@@ -144,5 +150,7 @@ runs:
         VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
         VERCEL_TOKEN: ${{ inputs.vercel-token }}
       run: |
+        export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
+        command -v sh >/dev/null
         url="$(pnpm dlx vercel@54.13.0 deploy --cwd "${{ inputs.cwd }}" --prebuilt --prod --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
         echo "Deployed ${{ inputs.app }} to $url"

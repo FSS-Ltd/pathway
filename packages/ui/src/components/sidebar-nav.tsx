@@ -59,6 +59,13 @@ const iconComponents: LucideIcon[] = [
   Settings,
 ];
 
+// Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.
+const renderSidebarIcon = (Icon: LucideIcon, className: string) =>
+  React.createElement(Icon as React.ElementType, {
+    "aria-hidden": true,
+    className,
+  });
+
 // Base items without icons - icons will be added in the component to avoid SSR hydration issues.
 // iconIndex is stable so when admin filters by access, each item keeps the correct icon.
 export const defaultSidebarItems: SidebarNavItem[] = [
@@ -114,7 +121,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
       const IconComponent = iconComponents[iconIndex];
       return {
         ...item,
-        icon: IconComponent ? <IconComponent className="h-4 w-4" /> : null,
+        icon: IconComponent ? renderSidebarIcon(IconComponent, "h-4 w-4") : null,
       };
     });
   }, [items, isMounted]);
@@ -148,10 +155,10 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
             )}
           >
             {isCollapsed ? (
-              <ChevronRight className="h-5 w-5 text-text-primary" />
+              renderSidebarIcon(ChevronRight, "h-5 w-5 text-text-primary")
             ) : (
               <>
-                <ChevronLeft className="h-4 w-4 text-text-muted" />
+                {renderSidebarIcon(ChevronLeft, "h-4 w-4 text-text-muted")}
                 <span className="text-xs text-text-muted">Collapse</span>
               </>
             )}
