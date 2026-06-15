@@ -28,18 +28,17 @@ export type AdminRoleInfo = {
 export function getAdminRoleInfoFromApiResponse(
   rolesResponse: UserRolesResponse | null | undefined,
 ): AdminRoleInfo {
-  // Default: assume staff-level access only (safest fallback)
-  const defaultRole: AdminRoleInfo = {
+  const noAccessRole: AdminRoleInfo = {
     isOrgAdmin: false,
     isOrgOwner: false,
     isSiteAdmin: false,
-    isStaff: true,
+    isStaff: false,
     isSafeguardingStaff: false,
     isSuperUser: false,
   };
 
   if (!rolesResponse) {
-    return defaultRole;
+    return noAccessRole;
   }
 
   // Check org roles from both sources
@@ -168,4 +167,3 @@ export function meetsAccessRequirement(
       return true;
   }
 }
-

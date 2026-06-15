@@ -49,9 +49,26 @@ export function useAdminAccess(): UseAdminAccessResult {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const sessionRoles = (session as { roles?: UserRolesResponse } | null)?.roles ?? null;
+    const accessToken =
+      (session as { accessToken?: string } | null)?.accessToken ?? null;
+
     // Only fetch roles when session is authenticated
     if (sessionStatus !== "authenticated" || !session) {
+      setRolesResponse(null);
+      setError(null);
       setIsLoadingRoles(false);
+      return;
+    }
+
+    if (!accessToken) {
+      setRolesResponse(null);
+      setIsLoadingRoles(false);
+      if (!sessionRoles) {
+        setError("Missing API access token for role lookup.");
+      } else {
+        setError(null);
+      }
       return;
     }
 
@@ -61,7 +78,7 @@ export function useAdminAccess(): UseAdminAccessResult {
       try {
         setIsLoadingRoles(true);
         setError(null);
-        const response = await fetchUserRoles();
+        const response = await fetchUserRoles(accessToken);
         if (!cancelled) {
           setRolesResponse(response);
         }
@@ -110,4 +127,3 @@ export function useAdminAccess(): UseAdminAccessResult {
     error,
   };
 }
-
