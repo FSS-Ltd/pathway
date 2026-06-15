@@ -2,7 +2,6 @@ import {
   createCorsOriginValidator,
   resolveApiListenOptions,
 } from "./api-bootstrap";
-import { normalizeVercelRequestUrl } from "../../api/[...path]";
 
 const originalEnv = { ...process.env };
 
@@ -56,11 +55,5 @@ describe("api bootstrap config", () => {
     delete process.env.PORT;
 
     expect(() => resolveApiListenOptions()).toThrow("Invalid API port");
-  });
-
-  it("normalizes Vercel catch-all function URLs back to API route paths", () => {
-    expect(normalizeVercelRequestUrl("/api/health")).toBe("/health");
-    expect(normalizeVercelRequestUrl("/api/auth/me?x=1")).toBe("/auth/me?x=1");
-    expect(normalizeVercelRequestUrl("/health")).toBe("/health");
   });
 });

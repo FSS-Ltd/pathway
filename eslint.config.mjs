@@ -49,13 +49,23 @@ export default tseslint.config(
   // Server-side packages and launch scripts run in Node.
   {
     files: [
-      "apps/api/**/*.{ts,tsx,js}",
-      "apps/workers/**/*.{ts,tsx,js}",
-      "packages/db/**/*.{ts,tsx,js}",
+      "apps/api/**/*.{ts,tsx,js,cjs}",
+      "apps/workers/**/*.{ts,tsx,js,cjs}",
+      "packages/db/**/*.{ts,tsx,js,cjs}",
       "scripts/**/*.{js,mjs,cjs,ts}",
     ],
     languageOptions: {
       globals: nodeGlobals,
+    },
+  },
+  {
+    files: ["**/*.cjs", "apps/api/api/**/*.js"],
+    languageOptions: {
+      sourceType: "commonjs",
+      globals: nodeGlobals,
+    },
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
   // Workers: Jest globals so describe/expect etc. are defined in worker tests.

@@ -10,8 +10,20 @@ const DEFAULT_ENV_CANDIDATES = [
 
 export function getArgValue(name) {
   const prefix = `${name}=`;
-  const arg = process.argv.slice(2).find((item) => item.startsWith(prefix));
-  return arg ? arg.slice(prefix.length) : undefined;
+  const args = process.argv.slice(2).filter((item) => item !== "--");
+
+  for (let index = 0; index < args.length; index += 1) {
+    const item = args[index];
+    if (item.startsWith(prefix)) {
+      return item.slice(prefix.length);
+    }
+    if (item === name) {
+      const value = args[index + 1];
+      return value && !value.startsWith("--") ? value : undefined;
+    }
+  }
+
+  return undefined;
 }
 
 export function isPresent(value) {
