@@ -10,7 +10,7 @@ import {
 } from "./lib/env-file.mjs";
 
 const VERCEL_CLI_VERSION = "54.13.0";
-const args = new Set(process.argv.slice(2));
+const args = new Set(process.argv.slice(2).filter((item) => item !== "--"));
 const selectedTarget = getArgValue("--target");
 const skipBuild = args.has("--skip-build");
 const remoteBuild = args.has("--remote-build");
@@ -67,17 +67,15 @@ async function main() {
 
     console.log(`[vercel-deploy] ${name}: pull production env`);
     runVercel(
-      remoteBuild
-        ? ["pull", "--yes", "--environment=production", "--project", projectId]
-        : [
-            "pull",
-            "--cwd",
-            project.cwd,
-            "--yes",
-            "--environment=production",
-            "--project",
-            projectId,
-          ],
+      [
+        "pull",
+        "--cwd",
+        project.cwd,
+        "--yes",
+        "--environment=production",
+        "--project",
+        projectId,
+      ],
     );
 
     if (!skipBuild && !remoteBuild) {

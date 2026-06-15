@@ -202,6 +202,9 @@ importers:
       stripe:
         specifier: ^14.0.0
         version: 14.25.0
+      tsx:
+        specifier: ^4.20.0
+        version: 4.21.0
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -251,9 +254,6 @@ importers:
       ts-node-dev:
         specifier: ^2.0.0
         version: 2.0.0(@types/node@20.19.33)(typescript@5.9.3)
-      tsx:
-        specifier: ^4.20.0
-        version: 4.21.0
       typescript:
         specifier: ^5.6.2
         version: 5.9.3
