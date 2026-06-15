@@ -131,6 +131,26 @@ runs:
         --environment=production --project="$VERCEL_PROJECT_ID" \
         --token="$VERCEL_TOKEN"
 
+    - name: Skip Vercel local install
+      shell: bash
+      env:
+        VERCEL_PROJECT_SETTINGS_PATH: ${{ inputs.cwd }}/.vercel/project.json
+      run: |
+        node <<'NODE'
+        const fs = require("node:fs");
+
+        const settingsPath = process.env.VERCEL_PROJECT_SETTINGS_PATH;
+        if (!settingsPath || !fs.existsSync(settingsPath)) {
+          console.error(`Vercel project settings not found at ${settingsPath || "(unset)"}.`);
+          process.exit(1);
+        }
+
+        const project = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+        project.settings = project.settings || {};
+        project.settings.installCommand = "";
+        fs.writeFileSync(settingsPath, `${JSON.stringify(project, null, 2)}\n`);
+        NODE
+
     - name: Build Vercel artifact
       shell: bash
       env:
