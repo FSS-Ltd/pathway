@@ -11,6 +11,13 @@ const apiBaseUrl =
 
 const INTERNAL_AUTH_SECRET = process.env.INTERNAL_AUTH_SECRET;
 
+type IdentityUpsertResponse = {
+  userId?: string;
+  email?: string | null;
+  displayName?: string | null;
+  roles?: UserRolesFromApi;
+};
+
 // For local dev: Node's fetch rejects self-signed certs (api.localhost). Use an agent
 // that skips TLS verification when calling localhost HTTPS.
 const isLocalhostHttps =
@@ -35,7 +42,7 @@ async function upsertIdentityToApi(payload: {
   subject: string;
   email?: string | null;
   name?: string | null;
-}): Promise<{ userId?: string; email?: string | null; displayName?: string | null }> {
+}): Promise<IdentityUpsertResponse> {
   console.log("[🔐 AUTH] Starting identity upsert to API:");
   console.log({
     provider: payload.provider,
@@ -56,11 +63,7 @@ async function upsertIdentityToApi(payload: {
     const body = JSON.stringify(payload);
     console.log(`[🔐 AUTH] Calling ${url.toString()}...`);
 
-    const result = await new Promise<{
-      userId?: string;
-      email?: string | null;
-      displayName?: string | null;
-    }>((resolve, reject) => {
+    const result = await new Promise<IdentityUpsertResponse>((resolve, reject) => {
       const isHttps = url.protocol === "https:";
       const protocol = isHttps ? https : http;
       const req = protocol.request(
@@ -88,11 +91,7 @@ async function upsertIdentityToApi(payload: {
               return;
             }
             try {
-              const parsed = JSON.parse(text) as {
-                userId?: string;
-                email?: string | null;
-                displayName?: string | null;
-              };
+              const parsed = JSON.parse(text) as IdentityUpsertResponse;
               resolve(parsed);
             } catch {
               resolve({});
@@ -136,6 +135,7 @@ async function upsertIdentityToApi(payload: {
 
 export type UserRolesFromApi = {
   userId: string;
+  superUser?: boolean;
   currentOrgIsMasterOrg?: boolean;
   orgRoles: Array<{ orgId: string; role: string }>;
   siteRoles: Array<{ tenantId: string; role: string }>;
@@ -146,55 +146,9 @@ export type UserRolesFromApi = {
     orgId: string;
     role: string;
   }>;
+  hasFamilyAccess?: boolean;
+  hasServeAccess?: boolean;
 };
-
-async function fetchRolesFromApi(accessToken: string): Promise<UserRolesFromApi | null> {
-  try {
-    const url = new URL(`${apiBaseUrl}/auth/active-site/roles`);
-
-    const result = await new Promise<UserRolesFromApi | null>((resolve, reject) => {
-      const isHttps = url.protocol === "https:";
-      const protocol = isHttps ? https : http;
-      const req = protocol.request(
-        url,
-        {
-          method: "GET",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          ...(isHttps && insecureAgent ? { agent: insecureAgent } : {}),
-        },
-        (res) => {
-          const chunks: Buffer[] = [];
-          res.on("data", (chunk) => chunks.push(chunk));
-          res.on("end", () => {
-            const text = Buffer.concat(chunks).toString();
-            if (res.statusCode && res.statusCode >= 400) {
-              console.warn(
-                `[🔐 AUTH] Roles fetch failed: ${res.statusCode} - ${text.slice(0, 200)}`,
-              );
-              resolve(null);
-              return;
-            }
-            try {
-              resolve(JSON.parse(text) as UserRolesFromApi);
-            } catch {
-              resolve(null);
-            }
-          });
-        },
-      );
-      req.on("error", (err) => {
-        console.warn("[🔐 AUTH] Roles fetch error:", err);
-        resolve(null);
-      });
-      req.end();
-    });
-
-    return result ?? null;
-  } catch (err) {
-    console.warn("[🔐 AUTH] Roles fetch exception:", err);
-    return null;
-  }
-}
 
 // Admin-only NextAuth configuration.
 // We treat the access token as the bearer token expected by the Nest API.
@@ -271,20 +225,15 @@ export const authOptions: NextAuthOptions = {
           if (identity.displayName) {
             (token as any).displayName = identity.displayName;
           }
-
-          // Fetch roles from API and store in token for session
-          const accessToken = account?.access_token;
-          if (accessToken) {
-            const roles = await fetchRolesFromApi(accessToken);
-            if (roles) {
-              (token as any).roles = roles;
-              console.log("[🔐 AUTH] Roles fetched:", {
-                orgRoles: roles.orgRoles.length,
-                siteRoles: roles.siteRoles.length,
-                orgMemberships: roles.orgMemberships.length,
-                siteMemberships: roles.siteMemberships.length,
-              });
-            }
+          if (identity.roles) {
+            (token as any).roles = identity.roles;
+            console.log("[🔐 AUTH] Roles stored from identity upsert:", {
+              orgRoles: identity.roles.orgRoles.length,
+              siteRoles: identity.roles.siteRoles.length,
+              orgMemberships: identity.roles.orgMemberships.length,
+              siteMemberships: identity.roles.siteMemberships.length,
+              superUser: identity.roles.superUser === true,
+            });
           }
         }
 
@@ -320,4 +269,3 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
 };
-

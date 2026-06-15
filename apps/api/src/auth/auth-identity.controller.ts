@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { AuthIdentityService } from "./auth-identity.service";
 import { UpsertIdentityDto } from "./dto/upsert-identity.dto";
+import { UserRolesService } from "./user-roles.service";
 
 const INTERNAL_SECRET_HEADER = "x-pathway-internal-secret";
 
@@ -16,6 +17,8 @@ export class AuthIdentityController {
   constructor(
     @Inject(AuthIdentityService)
     private readonly authIdentityService: AuthIdentityService,
+    @Inject(UserRolesService)
+    private readonly userRolesService: UserRolesService,
   ) {}
 
   @Post("upsert")
@@ -29,8 +32,8 @@ export class AuthIdentityController {
     }
 
     const result = await this.authIdentityService.upsertFromAuth0(body);
-    return result;
+    const roles = await this.userRolesService.getUserRoles(result.userId);
+    return { ...result, roles };
   }
 }
-
 

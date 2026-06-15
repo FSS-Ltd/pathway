@@ -501,13 +501,14 @@ export function setApiClientToken(token?: string | null) {
   accessTokenOverride = token ?? null;
 }
 
-function buildAuthHeaders(): HeadersInit {
+function buildAuthHeaders(accessToken?: string | null): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
 
-  if (accessTokenOverride) {
-    headers["Authorization"] = `Bearer ${accessTokenOverride}`;
+  const resolvedAccessToken = accessToken ?? accessTokenOverride;
+  if (resolvedAccessToken) {
+    headers["Authorization"] = `Bearer ${resolvedAccessToken}`;
     return headers;
   }
 
@@ -582,15 +583,19 @@ export type UserRolesResponse = {
     orgId: string;
     role: string;
   }>;
+  hasFamilyAccess?: boolean;
+  hasServeAccess?: boolean;
 };
 
 /**
  * Fetch user roles from the API
  * This queries UserOrgRole, UserTenantRole, OrgMembership, and SiteMembership tables
  */
-export async function fetchUserRoles(): Promise<UserRolesResponse> {
+export async function fetchUserRoles(
+  accessToken?: string | null,
+): Promise<UserRolesResponse> {
   if (isUsingMockApi()) {
-    // In mock mode, return empty roles (will fall back to dev mode admin access)
+    // In mock mode, return an explicit empty role payload.
     return {
       userId: "mock-user",
       superUser: false,
@@ -603,7 +608,7 @@ export async function fetchUserRoles(): Promise<UserRolesResponse> {
   }
   const response = await fetch(`${API_BASE_URL}/auth/active-site/roles`, {
     method: "GET",
-    headers: buildAuthHeaders(),
+    headers: buildAuthHeaders(accessToken),
     credentials: "include",
   });
   if (!response.ok) {

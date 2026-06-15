@@ -107,7 +107,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   const showMissingTokenBanner = isDevelopment && !isMockApi && !hasDevToken && !session;
 
   // Get role information for access control
-  const { role, currentOrgIsMasterOrg } = useAdminAccess();
+  const { role, currentOrgIsMasterOrg, error: accessError } = useAdminAccess();
 
   // Collapsible sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
@@ -225,6 +225,11 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               {showMissingTokenBanner && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
                   No dev auth token configured - some API calls may fail.
+                </div>
+              )}
+              {accessError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900">
+                  Role lookup failed: {accessError}
                 </div>
               )}
               {children}

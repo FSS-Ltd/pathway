@@ -7,6 +7,7 @@ import { AuthIdentityService } from "./auth-identity.service";
 import { AuthMeController } from "./auth-me.controller";
 import { AuthUserGuard } from "./auth-user.guard";
 import { Auth0ManagementService } from "./auth0-management.service";
+import { UserRolesService } from "./user-roles.service";
 import { InvitesModule } from "../invites/invites.module";
 
 @Module({
@@ -16,6 +17,7 @@ import { InvitesModule } from "../invites/invites.module";
     ActiveSiteService,
     AuthUserGuard,
     Auth0ManagementService,
+    UserRolesService,
   ],
   controllers: [AuthIdentityController, ActiveSiteController, AuthMeController],
   exports: [
@@ -23,8 +25,8 @@ import { InvitesModule } from "../invites/invites.module";
     ActiveSiteService,
     AuthUserGuard,
     Auth0ManagementService,
+    UserRolesService,
   ],
 })
 export class AuthModule {}
-
 
