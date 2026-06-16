@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import {
@@ -79,6 +80,7 @@ async function main() {
     );
 
     if (!skipBuild && !remoteBuild) {
+      skipVercelLocalInstall(project.cwd);
       console.log(`[vercel-deploy] ${name}: build production artifact`);
       runVercel([
         "build",
@@ -108,7 +110,20 @@ async function main() {
   }
 }
 
+function skipVercelLocalInstall(projectCwd) {
+  const settingsPath = path.join(projectCwd, ".vercel", "project.json");
+  if (!fs.existsSync(settingsPath)) {
+    throw new Error(`Vercel project settings not found at ${settingsPath}.`);
+  }
+
+  const project = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+  project.settings = project.settings || {};
+  project.settings.installCommand = "";
+  fs.writeFileSync(settingsPath, `${JSON.stringify(project, null, 2)}\n`);
+}
+
 function runVercel(vercelArgs) {
+  const systemPath = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
   const result = spawnSync(
     "npx",
     [
@@ -120,7 +135,14 @@ function runVercel(vercelArgs) {
     ],
     {
       encoding: "utf8",
-      env: process.env,
+      env: {
+        ...process.env,
+        PATH: process.env.PATH
+          ? `${systemPath}:${process.env.PATH}`
+          : systemPath,
+        SHELL: process.env.SHELL || "/bin/sh",
+        VERCEL_CLI_SYSTEM_PATH: systemPath,
+      },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
