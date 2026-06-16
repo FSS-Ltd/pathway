@@ -1,16 +1,22 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, BadRequestException } from "@nestjs/common";
 import {
   BillingWebhookProvider,
   type ParsedBillingWebhookEvent,
 } from "../billing-webhook.provider";
-import type { BillingProviderConfig } from "../billing-provider.config";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+} from "../billing-provider.config";
 import { BillingProvider } from "@pathway/db";
 
 @Injectable()
 export class GoCardlessBillingWebhookProvider
   implements BillingWebhookProvider
 {
-  constructor(private readonly config: BillingProviderConfig) {}
+  constructor(
+    @Inject(BILLING_PROVIDER_CONFIG)
+    private readonly config: BillingProviderConfig,
+  ) {}
 
   async verifyAndParse(
     body: unknown,
@@ -44,4 +50,3 @@ const safeParse = (raw: string) => {
     return {};
   }
 };
-

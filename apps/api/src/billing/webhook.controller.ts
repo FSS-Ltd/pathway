@@ -5,6 +5,7 @@ import {
   HttpCode,
   Inject,
   Logger,
+  Optional,
   Post,
   Req,
 } from "@nestjs/common";
@@ -50,9 +51,12 @@ export class BillingWebhookController {
   constructor(
     @Inject(BILLING_WEBHOOK_PROVIDER)
     private readonly provider: BillingWebhookProvider,
+    @Inject(EntitlementsService)
     private readonly entitlements: EntitlementsService,
     @Inject(ModuleRef) private readonly moduleRef: ModuleRef,
     @Inject(BILLING_PROVIDER_CONFIG) private readonly billingConfig: BillingProviderConfig,
+    @Optional()
+    @Inject(LoggingService)
     logging?: LoggingService,
   ) {
     this.logger = logging

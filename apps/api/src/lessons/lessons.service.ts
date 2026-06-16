@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
   Optional,
@@ -12,7 +13,11 @@ import { lessonResourceKey } from "../common/storage/storage-key.util";
 
 @Injectable()
 export class LessonsService {
-  constructor(@Optional() storage?: SupabaseStorageService) {
+  constructor(
+    @Optional()
+    @Inject(SupabaseStorageService)
+    storage?: SupabaseStorageService,
+  ) {
     this.storage = storage ?? new SupabaseStorageService();
   }
 

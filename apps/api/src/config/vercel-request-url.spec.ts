@@ -1,4 +1,7 @@
-import { normalizeVercelRequestUrl } from "./vercel-request-url";
+import {
+  normalizeVercelRequestUrl,
+  stripVercelRoutingQueryParam,
+} from "./vercel-request-url";
 
 describe("normalizeVercelRequestUrl", () => {
   it("normalizes Vercel catch-all function URLs back to API route paths", () => {
@@ -21,5 +24,16 @@ describe("normalizeVercelRequestUrl", () => {
     expect(
       normalizeVercelRequestUrl("/api/[...path].js?__vercel_path="),
     ).toBe("/");
+  });
+
+  it("strips Vercel routing metadata from parsed query objects", () => {
+    const query = {
+      __vercel_path: "announcements",
+      audience: "ALL",
+    };
+
+    stripVercelRoutingQueryParam(query);
+
+    expect(query).toEqual({ audience: "ALL" });
   });
 });

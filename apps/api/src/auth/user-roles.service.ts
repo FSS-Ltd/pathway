@@ -1,15 +1,20 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { OrgRole, Role, SiteRole, prisma } from "@pathway/db";
+import {
+  safeErrorDiagnostic,
+  safeErrorStack,
+} from "../common/logging/safe-diagnostics";
 
 type RoleLookupOptions = {
   activeOrgId?: string | null;
   activeSiteId?: string | null;
+  route?: string;
 };
 
 type RoleLookupLogContext = {
-  userId: string;
-  activeOrgId?: string | null;
-  activeSiteId?: string | null;
+  route?: string;
+  hasActiveOrgId: boolean;
+  hasActiveSiteId: boolean;
 };
 
 export type UserRolesResponse = {
@@ -38,9 +43,9 @@ export class UserRolesService {
     options: RoleLookupOptions = {},
   ): Promise<UserRolesResponse> {
     const logContext = {
-      userId,
-      activeOrgId: options.activeOrgId,
-      activeSiteId: options.activeSiteId,
+      route: options.route,
+      hasActiveOrgId: Boolean(options.activeOrgId),
+      hasActiveSiteId: Boolean(options.activeSiteId),
     };
 
     const user = await this.runRequiredRoleLookup(
@@ -244,25 +249,17 @@ export class UserRolesService {
     context: RoleLookupLogContext,
     error: unknown,
   ): void {
-    const errorMeta =
-      error instanceof Error
-        ? { errorName: error.name, errorMessage: error.message }
-        : { errorMessage: String(error) };
-
     const payload = {
       message: "User role lookup database operation failed",
+      route: context.route,
       operation,
-      userId: context.userId,
-      activeOrgId: context.activeOrgId ?? null,
-      activeSiteId: context.activeSiteId ?? null,
-      ...errorMeta,
+      hasActiveOrgId: context.hasActiveOrgId,
+      hasActiveSiteId: context.hasActiveSiteId,
+      ...safeErrorDiagnostic(error),
     };
 
     if (level === "error") {
-      this.logger.error(
-        payload,
-        error instanceof Error ? error.stack : undefined,
-      );
+      this.logger.error(payload, safeErrorStack(error));
       return;
     }
 

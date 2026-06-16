@@ -1,7 +1,9 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
+  Logger,
   NotFoundException,
   NotImplementedException,
 } from "@nestjs/common";
@@ -12,7 +14,6 @@ import {
   LoggingService,
   StructuredLogger,
 } from "../common/logging/logging.service";
-import { Logger } from "@nestjs/common";
 import type { LogContext } from "../common/logging/logging.service";
 
 type RegisterOrgResult = {
@@ -45,7 +46,9 @@ type RegisterOrgResult = {
 export class OrgsService {
   private readonly logger: StructuredLogger;
   constructor(
+    @Inject(BillingService)
     private readonly billing: BillingService,
+    @Inject(LoggingService)
     logging: LoggingService,
   ) {
     // Fallback to Nest Logger if DI fails in dev; avoids crash during bootstrap.

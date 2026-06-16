@@ -47,7 +47,9 @@ export class BuyNowService {
     private readonly provider: BuyNowProvider,
     @Inject(Auth0ManagementService)
     private readonly auth0Management: Auth0ManagementService,
-    @Optional() private readonly requestContext?: PathwayRequestContext,
+    @Optional()
+    @Inject(PathwayRequestContext)
+    private readonly requestContext?: PathwayRequestContext,
     @Inject(BILLING_PROVIDER_CONFIG)
     private readonly providerConfig?: BillingProviderConfig,
   ) {}

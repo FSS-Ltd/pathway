@@ -3,12 +3,14 @@ import {
   ExecutionContext,
   Inject,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from "@nestjs/common";
 import { parseAuthTokenFromRequest } from "./auth-token.util";
 import { prisma } from "@pathway/db";
 import type { Request, Response } from "express";
 import { AuthIdentityService } from "./auth-identity.service";
+import { safeErrorDiagnostic } from "../common/logging/safe-diagnostics";
 
 interface AuthenticatedRequest extends Request {
   authUserId?: string;
@@ -34,6 +36,9 @@ const userInclude = {
   },
 } as const;
 
+const ACTIVE_SITE_COOKIE = "pw_active_site_id";
+const ACTIVE_ORG_COOKIE = "pw_active_org_id";
+
 /**
  * Guard that:
  * 1. Authenticates user via Auth0 JWT (looks up UserIdentity)
@@ -43,6 +48,8 @@ const userInclude = {
  */
 @Injectable()
 export class AuthUserGuard implements CanActivate {
+  private readonly logger = new Logger(AuthUserGuard.name);
+
   constructor(
     @Inject(AuthIdentityService)
     private readonly authIdentityService: AuthIdentityService,
@@ -81,11 +88,20 @@ export class AuthUserGuard implements CanActivate {
           name: claims.name ?? claims.given_name ?? undefined,
         });
       } catch (err) {
-        console.warn("[AuthUserGuard] JIT upsert failed:", err);
+        this.logger.warn({
+          message: "Auth user guard JIT upsert failed",
+          route: this.describeRoute(req),
+          operation: "authIdentity.upsertFromAuth0",
+          hasActiveSiteCookie: Boolean(req.cookies?.[ACTIVE_SITE_COOKIE]),
+          hasActiveOrgCookie: Boolean(req.cookies?.[ACTIVE_ORG_COOKIE]),
+          ...safeErrorDiagnostic(err),
+        });
         const detail =
           err instanceof Error ? err.message : "Unknown JIT upsert failure";
         if (process.env.NODE_ENV === "production") {
-          throw new UnauthorizedException("User not found for this Auth0 identity");
+          throw new UnauthorizedException(
+            "User not found for this Auth0 identity",
+          );
         }
         throw new UnauthorizedException(
           `User not found for this Auth0 identity (JIT upsert failed: ${detail})`,
@@ -275,5 +291,15 @@ export class AuthUserGuard implements CanActivate {
     (req as Record<string, unknown>).__pathwayContext = pathwayContext;
 
     return true;
+  }
+
+  private describeRoute(req: AuthenticatedRequest): string {
+    const method = req.method ?? "UNKNOWN";
+    const path =
+      typeof req.path === "string"
+        ? req.path
+        : (req.url?.split("?")[0] ?? "unknown");
+
+    return `${method} ${path}`;
   }
 }

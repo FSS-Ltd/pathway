@@ -1,4 +1,4 @@
-const VERCEL_PATH_QUERY_PARAM = "__vercel_path";
+export const VERCEL_PATH_QUERY_PARAM = "__vercel_path";
 
 export function normalizeVercelRequestUrl(url: string | undefined): string {
   if (!url) return "/";
@@ -26,4 +26,13 @@ function normalizeRouteDestUrl(url: string): string | null {
   const pathname = path ? `/${path}` : "/";
   const query = parsed.searchParams.toString();
   return query ? `${pathname}?${query}` : pathname;
+}
+
+export function stripVercelRoutingQueryParam(query: unknown): void {
+  if (!isRecord(query)) return;
+  delete query[VERCEL_PATH_QUERY_PARAM];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
