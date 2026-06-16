@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { UserRolesService } from "../user-roles.service";
 
 jest.mock("@pathway/db", () => ({
@@ -50,11 +51,24 @@ const childCount = prisma.child.count as unknown as jest.Mock;
 
 describe("UserRolesService", () => {
   let service: UserRolesService;
+  let loggerWarn: jest.SpyInstance;
+  let loggerError: jest.SpyInstance;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    loggerWarn = jest
+      .spyOn(Logger.prototype, "warn")
+      .mockImplementation(() => undefined);
+    loggerError = jest
+      .spyOn(Logger.prototype, "error")
+      .mockImplementation(() => undefined);
     service = new UserRolesService();
     childCount.mockResolvedValue(0);
+  });
+
+  afterEach(() => {
+    loggerWarn.mockRestore();
+    loggerError.mockRestore();
   });
 
   it("builds the superuser role response from current memberships", async () => {
@@ -162,5 +176,43 @@ describe("UserRolesService", () => {
       hasFamilyAccess: false,
       hasServeAccess: true,
     });
+  });
+
+  it("returns roles when linked-child access derivation fails", async () => {
+    userFindUnique.mockResolvedValue({
+      superUser: false,
+      hasFamilyAccess: false,
+      hasServeAccess: false,
+      lastActiveTenantId: "tenant-1",
+    });
+    orgMembershipFindMany.mockResolvedValue([]);
+    siteMembershipFindMany.mockResolvedValue([
+      {
+        tenantId: "tenant-1",
+        role: "STAFF",
+        tenant: { id: "tenant-1", name: "Victorious Kids", orgId: "org-1" },
+      },
+    ]);
+    userOrgRoleFindMany.mockResolvedValue([]);
+    userTenantRoleFindMany.mockResolvedValue([]);
+    childCount.mockRejectedValueOnce(new Error("relation lookup failed"));
+
+    await expect(
+      service.getUserRoles("user-staff", { activeSiteId: "tenant-1" }),
+    ).resolves.toMatchObject({
+      userId: "user-staff",
+      siteRoles: [{ tenantId: "tenant-1", role: "STAFF" }],
+      hasFamilyAccess: false,
+      hasServeAccess: true,
+    });
+
+    expect(loggerWarn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: "child.countLinkedGuardians",
+        userId: "user-staff",
+        activeSiteId: "tenant-1",
+        errorMessage: "relation lookup failed",
+      }),
+    );
   });
 });

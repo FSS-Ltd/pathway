@@ -1,7 +1,13 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { OrgRole, Role, SiteRole, prisma } from "@pathway/db";
 
 type RoleLookupOptions = {
+  activeOrgId?: string | null;
+  activeSiteId?: string | null;
+};
+
+type RoleLookupLogContext = {
+  userId: string;
   activeOrgId?: string | null;
   activeSiteId?: string | null;
 };
@@ -25,39 +31,80 @@ export type UserRolesResponse = {
 
 @Injectable()
 export class UserRolesService {
+  private readonly logger = new Logger(UserRolesService.name);
+
   async getUserRoles(
     userId: string,
     options: RoleLookupOptions = {},
   ): Promise<UserRolesResponse> {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        superUser: true,
-        hasFamilyAccess: true,
-        hasServeAccess: true,
-        lastActiveTenantId: true,
-      },
-    });
+    const logContext = {
+      userId,
+      activeOrgId: options.activeOrgId,
+      activeSiteId: options.activeSiteId,
+    };
 
-    const orgMemberships = await prisma.orgMembership.findMany({
-      where: { userId },
-      include: { org: { select: { id: true, name: true, isMasterOrg: true } } },
-    });
+    const user = await this.runRequiredRoleLookup(
+      "user.findUnique",
+      logContext,
+      () =>
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            superUser: true,
+            hasFamilyAccess: true,
+            hasServeAccess: true,
+            lastActiveTenantId: true,
+          },
+        }),
+    );
 
-    const siteMemberships = await prisma.siteMembership.findMany({
-      where: { userId },
-      include: { tenant: { select: { id: true, name: true, orgId: true } } },
-    });
+    const orgMemberships = await this.runRequiredRoleLookup(
+      "orgMembership.findMany",
+      logContext,
+      () =>
+        prisma.orgMembership.findMany({
+          where: { userId },
+          include: {
+            org: { select: { id: true, name: true, isMasterOrg: true } },
+          },
+        }),
+    );
 
-    const userOrgRoles = await prisma.userOrgRole.findMany({
-      where: { userId },
-      include: { org: { select: { id: true, name: true, isMasterOrg: true } } },
-    });
+    const siteMemberships = await this.runRequiredRoleLookup(
+      "siteMembership.findMany",
+      logContext,
+      () =>
+        prisma.siteMembership.findMany({
+          where: { userId },
+          include: {
+            tenant: { select: { id: true, name: true, orgId: true } },
+          },
+        }),
+    );
 
-    const userTenantRoles = await prisma.userTenantRole.findMany({
-      where: { userId },
-      include: { tenant: { select: { id: true, name: true, orgId: true } } },
-    });
+    const userOrgRoles = await this.runRequiredRoleLookup(
+      "userOrgRole.findMany",
+      logContext,
+      () =>
+        prisma.userOrgRole.findMany({
+          where: { userId },
+          include: {
+            org: { select: { id: true, name: true, isMasterOrg: true } },
+          },
+        }),
+    );
+
+    const userTenantRoles = await this.runRequiredRoleLookup(
+      "userTenantRole.findMany",
+      logContext,
+      () =>
+        prisma.userTenantRole.findMany({
+          where: { userId },
+          include: {
+            tenant: { select: { id: true, name: true, orgId: true } },
+          },
+        }),
+    );
 
     const orgRoles = new Map<string, OrgRole>();
     orgMemberships.forEach((membership) => {
@@ -87,12 +134,18 @@ export class UserRolesService {
       userTenantRoles[0]?.tenantId ??
       null;
 
-    const linkedChildrenCount = await prisma.child.count({
-      where: {
-        ...(activeSiteId ? { tenantId: activeSiteId } : {}),
-        guardians: { some: { id: userId } },
-      },
-    });
+    const linkedChildrenCount = await this.runOptionalRoleLookup(
+      "child.countLinkedGuardians",
+      logContext,
+      () =>
+        prisma.child.count({
+          where: {
+            ...(activeSiteId ? { tenantId: activeSiteId } : {}),
+            guardians: { some: { id: userId } },
+          },
+        }),
+      0,
+    );
 
     const siteRoleValues = Array.from(siteRoles.values());
     const hasFamilyRole = siteRoleValues.includes(SiteRole.VIEWER);
@@ -107,7 +160,8 @@ export class UserRolesService {
 
     const firstOrgFromMemberships =
       orgMemberships[0]?.org ?? userOrgRoles[0]?.org;
-    const currentOrgId = options.activeOrgId ?? firstOrgFromMemberships?.id ?? null;
+    const currentOrgId =
+      options.activeOrgId ?? firstOrgFromMemberships?.id ?? null;
     const currentOrg = currentOrgId
       ? orgMemberships.find((membership) => membership.orgId === currentOrgId)
           ?.org ??
@@ -155,5 +209,63 @@ export class UserRolesService {
       default:
         return null;
     }
+  }
+
+  private async runRequiredRoleLookup<T>(
+    operation: string,
+    context: RoleLookupLogContext,
+    query: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await query();
+    } catch (error) {
+      this.logRoleLookupFailure("error", operation, context, error);
+      throw error;
+    }
+  }
+
+  private async runOptionalRoleLookup<T>(
+    operation: string,
+    context: RoleLookupLogContext,
+    query: () => Promise<T>,
+    fallback: T,
+  ): Promise<T> {
+    try {
+      return await query();
+    } catch (error) {
+      this.logRoleLookupFailure("warn", operation, context, error);
+      return fallback;
+    }
+  }
+
+  private logRoleLookupFailure(
+    level: "error" | "warn",
+    operation: string,
+    context: RoleLookupLogContext,
+    error: unknown,
+  ): void {
+    const errorMeta =
+      error instanceof Error
+        ? { errorName: error.name, errorMessage: error.message }
+        : { errorMessage: String(error) };
+
+    const payload = {
+      message: "User role lookup database operation failed",
+      operation,
+      userId: context.userId,
+      activeOrgId: context.activeOrgId ?? null,
+      activeSiteId: context.activeSiteId ?? null,
+      ...errorMeta,
+    };
+
+    if (level === "error") {
+      this.logger.error(
+        payload,
+        error instanceof Error ? error.stack : undefined,
+      );
+      return;
+    }
+
+    this.logger.warn(payload);
   }
 }
