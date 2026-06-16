@@ -161,6 +161,34 @@ describe("AnnouncementsController", () => {
       });
       expect(res).toEqual(items);
     });
+
+    it("ignores Vercel routing metadata when parsing list filters", async () => {
+      const query = {
+        __vercel_path: "announcements",
+        audience: "ALL",
+      };
+      const items: Announcement[] = [
+        {
+          id,
+          tenantId,
+          title: "General",
+          body: "hello",
+          audience: "ALL",
+          publishedAt: null,
+        },
+      ];
+      service.findAll.mockResolvedValue(items);
+
+      const res = await controller.findAll(query, tenantId);
+
+      expect(service.findAll).toHaveBeenCalledWith({
+        tenantId,
+        audience: "ALL",
+        publishedOnly: false,
+      });
+      expect(res).toEqual(items);
+    });
+
   });
 
   describe("findOne", () => {

@@ -1,6 +1,7 @@
 import {
   Injectable,
   BadRequestException,
+  Inject,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
@@ -24,7 +25,10 @@ const SELECT = {
 @Injectable()
 export class AttendanceService {
   constructor(
-    @Optional() private readonly av30ActivityService: Av30ActivityService | undefined,
+    @Optional()
+    @Inject(Av30ActivityService)
+    private readonly av30ActivityService: Av30ActivityService | undefined,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

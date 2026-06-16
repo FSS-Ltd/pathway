@@ -198,7 +198,10 @@ describe("UserRolesService", () => {
     childCount.mockRejectedValueOnce(new Error("relation lookup failed"));
 
     await expect(
-      service.getUserRoles("user-staff", { activeSiteId: "tenant-1" }),
+      service.getUserRoles("user-staff", {
+        activeSiteId: "tenant-1",
+        route: "GET /auth/active-site/roles",
+      }),
     ).resolves.toMatchObject({
       userId: "user-staff",
       siteRoles: [{ tenantId: "tenant-1", role: "STAFF" }],
@@ -208,11 +211,14 @@ describe("UserRolesService", () => {
 
     expect(loggerWarn).toHaveBeenCalledWith(
       expect.objectContaining({
+        route: "GET /auth/active-site/roles",
         operation: "child.countLinkedGuardians",
-        userId: "user-staff",
-        activeSiteId: "tenant-1",
+        hasActiveOrgId: false,
+        hasActiveSiteId: true,
         errorMessage: "relation lookup failed",
       }),
     );
+    expect(loggerWarn.mock.calls[0][0]).not.toHaveProperty("userId");
+    expect(loggerWarn.mock.calls[0][0]).not.toHaveProperty("activeSiteId");
   });
 });

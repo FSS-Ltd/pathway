@@ -1,10 +1,13 @@
 import Stripe from "stripe";
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, BadRequestException } from "@nestjs/common";
 import {
   BillingWebhookProvider,
   type ParsedBillingWebhookEvent,
 } from "../billing-webhook.provider";
-import type { BillingProviderConfig } from "../billing-provider.config";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+} from "../billing-provider.config";
 import { BillingProvider, SubscriptionStatus } from "@pathway/db";
 
 // SNAPSHOT webhook handler: this is the only Stripe endpoint that processes
@@ -17,7 +20,10 @@ import { BillingProvider, SubscriptionStatus } from "@pathway/db";
 export class StripeBillingWebhookProvider implements BillingWebhookProvider {
   private readonly stripe: Stripe;
 
-  constructor(private readonly config: BillingProviderConfig) {
+  constructor(
+    @Inject(BILLING_PROVIDER_CONFIG)
+    private readonly config: BillingProviderConfig,
+  ) {
     if (!config.stripe.secretKey) {
       throw new Error("Stripe secret key is required for Stripe webhook provider");
     }
@@ -226,4 +232,3 @@ const mapStripeStatus = (
       return null;
   }
 };
-

@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
   Optional,
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
@@ -15,7 +16,11 @@ const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB
 
 @Injectable()
 export class BlogService {
-  constructor(@Optional() storage?: SupabaseStorageService) {
+  constructor(
+    @Optional()
+    @Inject(SupabaseStorageService)
+    storage?: SupabaseStorageService,
+  ) {
     this.storage = storage ?? new SupabaseStorageService();
   }
 

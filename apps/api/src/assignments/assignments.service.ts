@@ -16,7 +16,9 @@ import { UpdateAssignmentDto } from "./dto/update-assignment.dto";
 @Injectable()
 export class AssignmentsService {
   constructor(
-    @Optional() private readonly av30ActivityService: Av30ActivityService | undefined,
+    @Optional()
+    @Inject(Av30ActivityService)
+    private readonly av30ActivityService: Av30ActivityService | undefined,
     @Inject(MailerService) private readonly mailerService: MailerService,
   ) {}
 

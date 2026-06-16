@@ -17,6 +17,7 @@ import { createAnnouncementDto, updateAnnouncementDto } from "./dto";
 import { CurrentTenant, CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../billing/entitlements-enforcement.service";
+import { stripVercelRoutingQueryParam } from "../config/vercel-request-url";
 
 const listQuery = z
   .object({
@@ -58,6 +59,7 @@ export class AnnouncementsController {
     @Query() query: unknown,
     @CurrentTenant("tenantId") tenantId: string,
   ) {
+    stripVercelRoutingQueryParam(query);
     const q = await listQuery.parseAsync(query);
     return this.service.findAll({
       tenantId,

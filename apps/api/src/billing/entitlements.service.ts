@@ -1,4 +1,4 @@
-import { Injectable, Optional } from "@nestjs/common";
+import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { prisma, SubscriptionStatus, BillingProvider } from "@pathway/db";
 import { getPlanDefinition } from "./billing-plans";
@@ -38,6 +38,7 @@ export type ResolvedEntitlements = {
 export class EntitlementsService {
   constructor(
     @Optional()
+    @Inject(PathwayRequestContext)
     private readonly requestContext?: PathwayRequestContext,
   ) {}
 

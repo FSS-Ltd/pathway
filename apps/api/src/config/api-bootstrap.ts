@@ -14,6 +14,7 @@ import {
 import cookieParser from "cookie-parser";
 import fs from "node:fs";
 import { getAllowedCorsOrigins, validateProductionEnv } from "./runtime-env";
+import { stripVercelRoutingQueryParam } from "./vercel-request-url";
 
 type CorsOriginCallback = (err: Error | null, allow?: boolean) => void;
 
@@ -63,6 +64,10 @@ export function configureApiApplication(app: INestApplication): void {
   );
   app.use(urlencoded({ extended: true, limit: bodyLimit }));
   app.use(cookieParser());
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    stripVercelRoutingQueryParam(req.query);
+    next();
+  });
 
   const traceRequests =
     process.env.API_DEBUG_REQUESTS === "true" ||

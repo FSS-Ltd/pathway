@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
   Optional,
 } from "@nestjs/common";
 import { prisma, Weekday, OrgRole } from "@pathway/db";
@@ -58,7 +59,11 @@ async function assertStaffInTenant(
 
 @Injectable()
 export class StaffService {
-  constructor(@Optional() storage?: SupabaseStorageService) {
+  constructor(
+    @Optional()
+    @Inject(SupabaseStorageService)
+    storage?: SupabaseStorageService,
+  ) {
     this.storage = storage ?? new SupabaseStorageService();
   }
 

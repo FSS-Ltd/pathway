@@ -1,12 +1,16 @@
 import Stripe from "stripe";
-import { Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   BuyNowProvider,
   type BuyNowCheckoutParams,
   type BuyNowCheckoutResult,
   type BuyNowProviderContext,
 } from "../buy-now.provider";
-import type { BillingProviderConfig, StripePriceMap } from "../billing-provider.config";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+  type StripePriceMap,
+} from "../billing-provider.config";
 import type { PlanCode } from "../billing-plans";
 
 @Injectable()
@@ -14,7 +18,10 @@ export class StripeBuyNowProvider extends BuyNowProvider {
   private readonly stripe: Stripe;
   private readonly logger = new Logger(StripeBuyNowProvider.name);
 
-  constructor(private readonly config: BillingProviderConfig) {
+  constructor(
+    @Inject(BILLING_PROVIDER_CONFIG)
+    private readonly config: BillingProviderConfig,
+  ) {
     super();
     if (!config.stripe.secretKey) {
       throw new Error("Stripe secret key is required for Stripe provider");
