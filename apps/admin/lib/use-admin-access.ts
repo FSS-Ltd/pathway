@@ -14,6 +14,7 @@ import {
   getAdminRoleInfoFromApiResponse,
 } from "./access";
 import { fetchUserRoles, type UserRolesResponse } from "./api-client";
+import { getRoleLookupFailureStatus } from "./role-lookup-status";
 
 export type UseAdminAccessResult = {
   role: AdminRoleInfo;
@@ -23,6 +24,7 @@ export type UseAdminAccessResult = {
   currentOrgIsMasterOrg: boolean;
   isLoading: boolean;
   error?: string | null;
+  warning?: string | null;
 };
 
 /**
@@ -47,9 +49,11 @@ export function useAdminAccess(): UseAdminAccessResult {
   const [rolesResponse, setRolesResponse] = useState<UserRolesResponse | null>(null);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    const sessionRoles = (session as { roles?: UserRolesResponse } | null)?.roles ?? null;
+    const sessionRoles =
+      (session as { roles?: UserRolesResponse } | null)?.roles ?? null;
     const accessToken =
       (session as { accessToken?: string } | null)?.accessToken ?? null;
 
@@ -57,6 +61,7 @@ export function useAdminAccess(): UseAdminAccessResult {
     if (sessionStatus !== "authenticated" || !session) {
       setRolesResponse(null);
       setError(null);
+      setWarning(null);
       setIsLoadingRoles(false);
       return;
     }
@@ -66,8 +71,12 @@ export function useAdminAccess(): UseAdminAccessResult {
       setIsLoadingRoles(false);
       if (!sessionRoles) {
         setError("Missing API access token for role lookup.");
+        setWarning(null);
       } else {
         setError(null);
+        setWarning(
+          "Missing API access token for role lookup. Using saved session roles.",
+        );
       }
       return;
     }
@@ -78,15 +87,16 @@ export function useAdminAccess(): UseAdminAccessResult {
       try {
         setIsLoadingRoles(true);
         setError(null);
+        setWarning(null);
         const response = await fetchUserRoles(accessToken);
         if (!cancelled) {
           setRolesResponse(response);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof Error ? err.message : "Failed to load user roles",
-          );
+          const status = getRoleLookupFailureStatus(err, Boolean(sessionRoles));
+          setError(status.error);
+          setWarning(status.warning);
           setRolesResponse(null);
         }
       } finally {
@@ -104,7 +114,8 @@ export function useAdminAccess(): UseAdminAccessResult {
   }, [sessionStatus, session]);
 
   // Use API response when available; fall back to roles from session (set at login)
-  const rolesSource = rolesResponse ?? (session as { roles?: UserRolesResponse })?.roles;
+  const rolesSource =
+    rolesResponse ?? (session as { roles?: UserRolesResponse })?.roles;
 
   const role = useMemo(
     () => getAdminRoleInfoFromApiResponse(rolesSource),
@@ -125,5 +136,6 @@ export function useAdminAccess(): UseAdminAccessResult {
     currentOrgIsMasterOrg,
     isLoading,
     error,
+    warning,
   };
 }

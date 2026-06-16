@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Post,
   Req,
   Res,
@@ -40,6 +41,8 @@ type SiteSummary = {
 
 @Controller("auth/active-site")
 export class ActiveSiteController {
+  private readonly logger = new Logger(ActiveSiteController.name);
+
   constructor(private readonly userRolesService: UserRolesService) {}
 
   @UseGuards(AuthUserGuard)
@@ -234,10 +237,25 @@ export class ActiveSiteController {
       throw new UnauthorizedException("Missing authenticated user");
     }
 
-    return this.userRolesService.getUserRoles(userId, {
-      activeOrgId: req.cookies?.[ACTIVE_ORG_COOKIE],
-      activeSiteId: req.cookies?.[ACTIVE_SITE_COOKIE],
-    });
+    try {
+      return await this.userRolesService.getUserRoles(userId, {
+        activeOrgId: req.cookies?.[ACTIVE_ORG_COOKIE],
+        activeSiteId: req.cookies?.[ACTIVE_SITE_COOKIE],
+      });
+    } catch (error) {
+      this.logger.error(
+        {
+          message: "Active site role lookup failed",
+          userId,
+          hasActiveOrgCookie: Boolean(req.cookies?.[ACTIVE_ORG_COOKIE]),
+          hasActiveSiteCookie: Boolean(req.cookies?.[ACTIVE_SITE_COOKIE]),
+          errorName: error instanceof Error ? error.name : undefined,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   private setActiveSiteCookies(
