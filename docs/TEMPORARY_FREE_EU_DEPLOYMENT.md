@@ -275,7 +275,7 @@ The Vercel deploy workflow uses:
 - Next/Vercel build cache paths
 - pinned Vercel CLI `54.13.0`
 - local lint, typecheck, and unit tests before deployment
-- `vercel deploy --prod --archive=tgz` so Vercel performs the production build remotely
+- `vercel build --cwd <app> --prod` followed by `vercel deploy --cwd <app> --prebuilt --prod` so CI deploys the verified artifact
 
 The production Vercel workflow runs automatically from the `push` event that
 GitHub emits after a pull request is merged to `master`. It first calls `Deploy

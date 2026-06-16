@@ -9,14 +9,14 @@
       "includeFiles": "{api/package.json,tsconfig.json,src/**,../../packages/{auth,db,types,util}/src/**,../../packages/{auth,db,types,util}/package.json,../../packages/config/{package.json,tsconfig/**},../../packages/db/prisma/**}"
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
+      "src": "/api/(?<path>.*)",
+      "dest": "/api/[...path].js?__vercel_path=$path"
     },
     {
-      "source": "/:path*",
-      "destination": "/api/:path*"
+      "src": "/(?<path>.*)",
+      "dest": "/api/[...path].js?__vercel_path=$path"
     }
   ]
 }

@@ -118,7 +118,7 @@ runs:
       shell: bash
       run: pnpm --filter ${{ inputs.package }} test
 
-    - name: Deploy with Vercel remote build
+    - name: Pull Vercel production environment
       shell: bash
       env:
         VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
@@ -127,5 +127,50 @@ runs:
       run: |
         export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
         command -v sh >/dev/null
-        url="$(pnpm dlx vercel@54.13.0 deploy --prod --archive=tgz --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
+        pnpm dlx vercel@54.13.0 pull --cwd "${{ inputs.cwd }}" --yes \
+        --environment=production --project="$VERCEL_PROJECT_ID" \
+        --token="$VERCEL_TOKEN"
+
+    - name: Skip Vercel local install
+      shell: bash
+      env:
+        VERCEL_PROJECT_SETTINGS_PATH: ${{ inputs.cwd }}/.vercel/project.json
+      run: |
+        node <<'NODE'
+        const fs = require("node:fs");
+
+        const settingsPath = process.env.VERCEL_PROJECT_SETTINGS_PATH;
+        if (!settingsPath || !fs.existsSync(settingsPath)) {
+          console.error(`Vercel project settings not found at ${settingsPath || "(unset)"}.`);
+          process.exit(1);
+        }
+
+        const project = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+        project.settings = project.settings || {};
+        project.settings.installCommand = "";
+        fs.writeFileSync(settingsPath, `${JSON.stringify(project, null, 2)}\n`);
+        NODE
+
+    - name: Build Vercel artifact
+      shell: bash
+      env:
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
+      run: |
+        export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
+        command -v sh >/dev/null
+        pnpm dlx vercel@54.13.0 build --cwd "${{ inputs.cwd }}" --prod \
+        --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN"
+
+    - name: Deploy prebuilt artifact
+      shell: bash
+      env:
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
+      run: |
+        export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
+        command -v sh >/dev/null
+        url="$(pnpm dlx vercel@54.13.0 deploy --cwd "${{ inputs.cwd }}" --prebuilt --prod --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
         echo "Deployed ${{ inputs.app }} to $url"

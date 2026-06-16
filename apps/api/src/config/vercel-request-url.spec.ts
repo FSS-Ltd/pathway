@@ -6,4 +6,20 @@ describe("normalizeVercelRequestUrl", () => {
     expect(normalizeVercelRequestUrl("/api/auth/me?x=1")).toBe("/auth/me?x=1");
     expect(normalizeVercelRequestUrl("/health")).toBe("/health");
   });
+
+  it("reconstructs nested paths from Vercel route destinations", () => {
+    expect(
+      normalizeVercelRequestUrl(
+        "/api/[...path].js?__vercel_path=auth/active-site/roles",
+      ),
+    ).toBe("/auth/active-site/roles");
+    expect(
+      normalizeVercelRequestUrl(
+        "/api/[...path].js?__vercel_path=auth/active-site/roles&x=1",
+      ),
+    ).toBe("/auth/active-site/roles?x=1");
+    expect(
+      normalizeVercelRequestUrl("/api/[...path].js?__vercel_path="),
+    ).toBe("/");
+  });
 });
