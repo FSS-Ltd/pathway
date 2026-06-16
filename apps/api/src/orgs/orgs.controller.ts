@@ -268,8 +268,6 @@ export class OrgsController {
         }
       }
 
-      const validMembers = Array.from(memberByUserId.values());
-
       // Get site memberships for users in this org
       const orgSites = await prisma.tenant.findMany({
         where: { orgId },
@@ -284,8 +282,25 @@ export class OrgsController {
         select: {
           userId: true,
           tenantId: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+              email: true,
+            },
+          },
         },
       });
+      for (const member of siteMembers) {
+        if (!member.user || memberByUserId.has(member.user.id)) continue;
+        memberByUserId.set(member.user.id, {
+          user: member.user,
+          role: OrgRole.ORG_MEMBER,
+        });
+      }
+
+      const validMembers = Array.from(memberByUserId.values());
 
       // Build map of userId -> siteCount
       const siteCountMap = new Map<string, number>();
