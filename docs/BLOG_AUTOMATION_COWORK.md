@@ -114,6 +114,30 @@ Success response:
 
 ### Optional: upload images for blog posts
 
+Cover images are optional, but generated images must carry honest provenance.
+Accepted automation image sources are:
+
+- `local:gpt-image-2` for the local generation path.
+- `codex:image_gen` for images generated with Codex's built-in image generation tool in the current automation thread.
+
+Do not label a Codex-generated image as `local:gpt-image-2`. Do not use third-party
+remote image URLs, stock imagery, or manually sourced images as automation cover
+images unless a human explicitly approves that source for the post.
+
+Candidate `coverImage` metadata should include:
+
+```json
+{
+  "fileBase64": "...",
+  "mimeType": "image/png",
+  "type": "HEADER",
+  "width": 1200,
+  "height": 630,
+  "altText": "Brief descriptive alt text for the generated cover image.",
+  "generatedBy": "codex:image_gen"
+}
+```
+
 Endpoint (preferred):
 
 - `POST /automation/blog/assets`
