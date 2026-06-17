@@ -188,7 +188,8 @@ describe("OrgsController", () => {
         id: "org-1",
         name: "New Org Name",
         slug: "acme",
-      });
+        parentPortalEnabled: true,
+      } as unknown as Awaited<ReturnType<OrgsService["updateCurrentOrg"]>>);
       const result = await controller.updateCurrent(
         "org-1",
         req,
@@ -201,7 +202,46 @@ describe("OrgsController", () => {
         id: "org-1",
         name: "New Org Name",
         slug: "acme",
+        parentPortalEnabled: true,
       });
+    });
+
+    it("should allow an admin to update the parent portal setting", async () => {
+      const req = { authUserId: "user-1" } as unknown as Parameters<
+        OrgsController["updateCurrent"]
+      >[1];
+      updateCurrentOrgMock.mockResolvedValue({
+        id: "org-1",
+        name: "Org Name",
+        slug: "acme",
+        parentPortalEnabled: false,
+      } as unknown as Awaited<ReturnType<OrgsService["updateCurrentOrg"]>>);
+
+      const result = await controller.updateCurrent("org-1", req, {
+        parentPortalEnabled: false,
+      });
+
+      expect(updateCurrentOrgMock).toHaveBeenCalledWith("org-1", {
+        parentPortalEnabled: false,
+      });
+      expect(result).toEqual({
+        id: "org-1",
+        name: "Org Name",
+        slug: "acme",
+        parentPortalEnabled: false,
+      });
+    });
+
+    it("should reject an empty org update payload", async () => {
+      const req = { authUserId: "user-1" } as unknown as Parameters<
+        OrgsController["updateCurrent"]
+      >[1];
+
+      await expect(controller.updateCurrent("org-1", req, {})).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(updateCurrentOrgMock).not.toHaveBeenCalled();
     });
 
     it("should throw BadRequestException for invalid name (too short)", async () => {
