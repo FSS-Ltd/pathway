@@ -169,12 +169,12 @@ export class ChildSignupDto {
   @IsBoolean()
   photoConsent!: boolean;
 
-  /** Base64-encoded image (only accepted when photoConsent is true). Stored as bytes in DB until S3. */
+  /** Base64-encoded internal profile picture for attendance identification. */
   @IsOptional()
   @IsString()
   photoBase64?: string;
 
-  /** Content type of photoBase64, e.g. image/jpeg. Required if photoBase64 is set. */
+  /** Content type of photoBase64, e.g. image/jpeg. */
   @IsOptional()
   @IsString()
   @MaxLength(100)

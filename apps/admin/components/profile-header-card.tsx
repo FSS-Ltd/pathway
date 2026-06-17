@@ -24,6 +24,8 @@ export type ProfileHeaderCardProps = {
   fileInputRef?: React.RefObject<HTMLInputElement>;
   /** Handler for file selection when using upload */
   onFileChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Optional explanatory text shown below the upload control */
+  uploadHelpText?: React.ReactNode;
 };
 
 /**
@@ -40,9 +42,14 @@ export function ProfileHeaderCard({
   isUploading = false,
   fileInputRef,
   onFileChange,
+  uploadHelpText,
 }: ProfileHeaderCardProps) {
   const [avatarError, setAvatarError] = React.useState(false);
   const showImage = avatarSrc && !avatarError;
+
+  React.useEffect(() => {
+    setAvatarError(false);
+  }, [avatarSrc]);
 
   return (
     <Card className="p-4">
@@ -104,6 +111,11 @@ export function ProfileHeaderCard({
                 {isUploading ? "Uploading…" : "Upload / Change photo"}
               </Button>
             </>
+          ) : null}
+          {uploadHelpText ? (
+            <p className="max-w-sm text-center text-xs text-text-muted">
+              {uploadHelpText}
+            </p>
           ) : null}
         </div>
       </div>

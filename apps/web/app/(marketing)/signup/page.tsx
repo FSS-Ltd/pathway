@@ -27,7 +27,7 @@ type ChildEntry = {
   specialNeedsType: string; // none | sen_support | ehcp | other
   specialNeedsOther: string;
   photoConsent: boolean;
-  /** Base64-encoded photo (when photoConsent); stored as bytes in DB. */
+  /** Internal profile picture used for attendance identification. */
   photoBase64: string;
   photoContentType: string;
   pickupPermissions: string;
@@ -182,15 +182,6 @@ function SignupContent() {
       return;
     }
 
-    const anyPhotoWithoutConsent = children.some(
-      (c) => c.photoBase64 && !c.photoConsent,
-    );
-    if (anyPhotoWithoutConsent) {
-      setSubmitStatus("error");
-      setSubmitError("Photo can only be added when photo consent is given for that child.");
-      return;
-    }
-
     const invalidGpPhone = childrenValid.find(
       (c) => c.gpPhone.trim() && !GP_PHONE_REGEX.test(c.gpPhone.trim()),
     );
@@ -282,8 +273,8 @@ function SignupContent() {
               ? c.specialNeedsOther.trim()
               : undefined,
           photoConsent: c.photoConsent,
-          photoBase64: c.photoConsent && c.photoBase64 ? c.photoBase64 : undefined,
-          photoContentType: c.photoConsent && c.photoContentType ? c.photoContentType : undefined,
+          photoBase64: c.photoBase64 || undefined,
+          photoContentType: c.photoContentType || undefined,
           pickupPermissions: c.pickupPermissions.trim() || undefined,
         })),
         consents: {
@@ -675,53 +666,53 @@ function SignupContent() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="flex items-center gap-2">
+                  <label className="block text-sm font-medium text-pw-text">
+                    Child profile picture (optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="mt-1 block w-full text-sm text-pw-text-muted file:mr-4 file:rounded file:border-0 file:bg-pw-accent-subtle file:px-4 file:py-2 file:text-pw-text"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) {
+                        updateChild(child.id, { photoBase64: "", photoContentType: "" });
+                        return;
+                      }
+                      if (file.size > 5 * 1024 * 1024) {
+                        setSubmitError("Photo must be 5MB or smaller.");
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const data = reader.result as string;
+                        if (data.startsWith("data:")) {
+                          updateChild(child.id, {
+                            photoBase64: data,
+                            photoContentType: file.type || "image/jpeg",
+                          });
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                  <p className="mt-1 text-xs text-pw-text-muted">
+                    This helps volunteers identify children and mark attendance accurately. It is optional, so guests who may not return can be added without one. If this child attends regularly, please add a clear photo. JPEG, PNG or WebP. Max 5MB.
+                  </p>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="flex items-start gap-2">
                     <input
                       type="checkbox"
                       checked={child.photoConsent}
                       onChange={(e) => updateChild(child.id, { photoConsent: e.target.checked })}
-                      className="rounded border-pw-border"
+                      className="mt-0.5 rounded border-pw-border"
                     />
                     <span className="text-sm font-medium text-pw-text">
-                      I consent to photos of this child being used by the organisation *
+                      Organisation photo/video consent: I consent to photos or videos of this child being used by the organisation outside the internal attendance profile.
                     </span>
                   </label>
                 </div>
-                {child.photoConsent && (
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-pw-text">Photo (optional)</label>
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp"
-                      className="mt-1 block w-full text-sm text-pw-text-muted file:mr-4 file:rounded file:border-0 file:bg-pw-accent-subtle file:px-4 file:py-2 file:text-pw-text"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) {
-                          updateChild(child.id, { photoBase64: "", photoContentType: "" });
-                          return;
-                        }
-                        if (file.size > 5 * 1024 * 1024) {
-                          setSubmitError("Photo must be 5MB or smaller.");
-                          return;
-                        }
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const data = reader.result as string;
-                          if (data.startsWith("data:")) {
-                            updateChild(child.id, {
-                              photoBase64: data,
-                              photoContentType: file.type || "image/jpeg",
-                            });
-                          }
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                    <p className="mt-1 text-xs text-pw-text-muted">
-                      JPEG, PNG or WebP. Max 5MB. Stored securely by the organisation.
-                    </p>
-                  </div>
-                )}
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-pw-text">
                     Who can collect this child (optional)

@@ -24,7 +24,6 @@ const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const FORM_VERSION = "1.0";
 const REQUIRED_CONSENTS = [
   "data_processing",
-  "photo_per_child",
   "emergency_contact",
 ];
 
@@ -159,6 +158,8 @@ export class PublicSignupService {
       dateOfBirth?: string;
       allergies?: string;
       photoConsent?: boolean;
+      photoBase64?: string;
+      photoContentType?: string;
     }>,
   ): Promise<{ success: true; linkedCount: number }> {
     const link = await this.resolveLink(inviteToken);
@@ -174,6 +175,16 @@ export class PublicSignupService {
           /^\d{4}-\d{2}-\d{2}$/.test(c.dateOfBirth.trim())
             ? new Date(c.dateOfBirth.trim())
             : null;
+        let photoBytes: Buffer | null = null;
+        let photoContentType: string | null = null;
+        if (c.photoBase64?.trim()) {
+          const decoded = this.decodeAndValidatePhoto(
+            c.photoBase64.trim(),
+            c.photoContentType?.trim(),
+          );
+          photoBytes = decoded.buffer;
+          photoContentType = decoded.contentType;
+        }
         const child = await prisma.child.create({
           data: {
             tenantId: link.tenantId,
@@ -183,10 +194,19 @@ export class PublicSignupService {
             dateOfBirth,
             allergies: (c.allergies ?? "").trim() || "none",
             photoConsent: c.photoConsent ?? false,
+            photoKey: null,
+            photoBytes: photoBytes ?? undefined,
+            photoContentType: photoContentType ?? undefined,
             guardians: { connect: { id: userId } },
           },
           select: { id: true },
         });
+        await this.moveChildPhotoToStorage(
+          child.id,
+          link.tenantId,
+          photoBytes,
+          photoContentType,
+        );
         idsToLink.push(child.id);
       }
     }
@@ -262,17 +282,6 @@ export class PublicSignupService {
       throw new BadRequestException("At least one child is required");
     }
 
-    for (const child of dto.children) {
-      if (
-        (child.photoBase64 || child.photoContentType) &&
-        !child.photoConsent
-      ) {
-        throw new BadRequestException(
-          "Photo can only be set when photo consent is granted for that child",
-        );
-      }
-    }
-
     const email = dto.parent.email.trim().toLowerCase();
     const auth0Sub = await this.auth0Management?.verifyPassword(
       email,
@@ -330,7 +339,7 @@ export class PublicSignupService {
       const allergies = (c.allergies ?? "").trim() || "none";
       let photoBytes: Buffer | null = null;
       let photoContentType: string | null = null;
-      if (c.photoConsent && c.photoBase64?.trim()) {
+      if (c.photoBase64?.trim()) {
         const decoded = this.decodeAndValidatePhoto(
           c.photoBase64.trim(),
           c.photoContentType?.trim(),
@@ -443,17 +452,6 @@ export class PublicSignupService {
       throw new BadRequestException("At least one child is required");
     }
 
-    for (const child of dto.children) {
-      if (
-        (child.photoBase64 || child.photoContentType) &&
-        !child.photoConsent
-      ) {
-        throw new BadRequestException(
-          "Photo can only be set when photo consent is granted for that child",
-        );
-      }
-    }
-
     const email = dto.parent.email.trim().toLowerCase();
     const fullName = dto.parent.fullName.trim();
     const safeName = fullName && !fullName.includes("@") ? fullName : null;
@@ -523,7 +521,7 @@ export class PublicSignupService {
       const allergies = (c.allergies ?? "").trim() || "none";
       let photoBytes: Buffer | null = null;
       let photoContentType: string | null = null;
-      if (c.photoConsent && c.photoBase64?.trim()) {
+      if (c.photoBase64?.trim()) {
         const decoded = this.decodeAndValidatePhoto(
           c.photoBase64.trim(),
           c.photoContentType?.trim(),

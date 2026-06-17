@@ -71,8 +71,9 @@ export class ChildrenService {
   }
 
   /**
-   * Returns photo bytes when child has photoConsent and (photoBytes or photoKey).
-   * Returns null when no photo available (no consent, or no bytes/key).
+   * Returns the internal child profile photo used for attendance identification.
+   * Organisation photo/video consent is tracked separately and does not gate this
+   * private profile image.
    */
   async getPhoto(
     id: string,
@@ -81,13 +82,12 @@ export class ChildrenService {
     const child = await prisma.child.findFirst({
       where: { id, tenantId },
       select: {
-        photoConsent: true,
         photoBytes: true,
         photoContentType: true,
         photoKey: true,
       },
     });
-    if (!child || !child.photoConsent) return null;
+    if (!child) return null;
     if (child.photoKey) {
       const buffer = await this.storage.downloadObject(
         process.env.SUPABASE_STORAGE_PRIVATE_BUCKET ?? "",
@@ -172,10 +172,10 @@ export class ChildrenService {
       guardiansConnect = guardians.map((g) => ({ id: g.id }));
     }
 
-    // 4) Photo decode (when photoConsent + photoBase64)
+    // 4) Profile photo decode (when a profile photo is supplied)
     let photoBytes: Buffer | undefined;
     let photoContentType: string | null = null;
-    if (input.photoConsent && input.photoBase64?.trim()) {
+    if (input.photoBase64?.trim()) {
       const decoded = this.decodeAndValidatePhoto(
         input.photoBase64.trim(),
         input.photoContentType?.trim(),
@@ -333,7 +333,7 @@ export class ChildrenService {
   }
 
   /**
-   * Upload photo for child. Requires photoConsent; only admin or linked parent can upload.
+   * Upload internal profile photo for child. Only admin or linked parent can upload.
    */
   async uploadPhoto(
     childId: string,
@@ -347,14 +347,9 @@ export class ChildrenService {
 
     const child = await prisma.child.findFirst({
       where: { id: childId, tenantId },
-      select: { photoConsent: true },
+      select: { id: true },
     });
     if (!child) throw new NotFoundException("Child not found");
-    if (!child.photoConsent) {
-      throw new BadRequestException(
-        "Photo consent must be granted before uploading a photo",
-      );
-    }
 
     const { buffer, contentType: type } = this.decodeAndValidatePhoto(
       photoBase64,

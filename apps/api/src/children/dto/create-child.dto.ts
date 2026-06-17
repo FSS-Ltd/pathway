@@ -35,6 +35,7 @@ export const createChildSchema = z.object({
   gpPhone: z.string().trim().max(25).optional(),
   specialNeedsType: specialNeedsType.optional(),
   specialNeedsOther: z.string().trim().max(500).optional(),
+  // Organisation photo/video consent. Internal profile pictures are handled separately.
   photoConsent: z.boolean().default(false),
   photoBase64: z.string().optional(),
   photoContentType: z.string().trim().max(100).optional(),

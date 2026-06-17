@@ -16,6 +16,8 @@ type ChildEntry = {
   dateOfBirth: string;
   allergies: string;
   photoConsent: boolean;
+  photoBase64: string;
+  photoContentType: string;
 };
 
 const defaultChild = (): ChildEntry => ({
@@ -26,6 +28,8 @@ const defaultChild = (): ChildEntry => ({
   dateOfBirth: "",
   allergies: "",
   photoConsent: false,
+  photoBase64: "",
+  photoContentType: "",
 });
 
 function SignupCompleteContent() {
@@ -77,6 +81,8 @@ function SignupCompleteContent() {
           dateOfBirth: c.dateOfBirth.trim() || undefined,
           allergies: c.allergies.trim() || undefined,
           photoConsent: c.photoConsent,
+          photoBase64: c.photoBase64 || undefined,
+          photoContentType: c.photoContentType || undefined,
         })),
       );
       setSuccess(true);
@@ -211,13 +217,58 @@ function SignupCompleteContent() {
                   placeholder="e.g. none, peanuts"
                 />
               </div>
-              <div className="flex items-center gap-2">
+              <div>
+                <Label htmlFor={`${child.id}-profilePhoto`}>
+                  Child profile picture (optional)
+                </Label>
+                <Input
+                  id={`${child.id}-profilePhoto`}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="mt-1 file:mr-4 file:rounded file:border-0 file:bg-accent-subtle file:px-4 file:py-2 file:text-text-primary"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) {
+                      updateChild(child.id, {
+                        photoBase64: "",
+                        photoContentType: "",
+                      });
+                      return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                      setError("Photo must be 5MB or smaller.");
+                      return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const data = reader.result as string;
+                      if (data.startsWith("data:")) {
+                        updateChild(child.id, {
+                          photoBase64: data,
+                          photoContentType: file.type || "image/jpeg",
+                        });
+                      }
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+                <p className="mt-1 text-xs text-text-muted">
+                  This helps volunteers identify children and mark attendance accurately. It is optional, so guests who may not return can be added without one. If this child attends regularly, please add a clear photo.
+                </p>
+              </div>
+              <div className="flex items-start gap-2">
                 <Checkbox
                   id={`${child.id}-photoConsent`}
                   checked={child.photoConsent}
                   onChange={(e) => updateChild(child.id, { photoConsent: e.target.checked })}
+                  className="mt-0.5"
                 />
-                <Label htmlFor={`${child.id}-photoConsent`}>Photo consent</Label>
+                <Label htmlFor={`${child.id}-photoConsent`}>
+                  Organisation photo/video consent
+                  <span className="mt-1 block text-xs font-normal text-text-muted">
+                    Consent for photos or videos of this child to be used outside the internal attendance profile.
+                  </span>
+                </Label>
               </div>
               {children.length > 1 ? (
                 <Button

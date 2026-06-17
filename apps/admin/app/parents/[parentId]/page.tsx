@@ -594,7 +594,46 @@ export default function ParentDetailPage() {
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <label className="flex cursor-pointer items-center gap-2">
+                      <Label htmlFor="child-photo">
+                        Child profile picture (optional)
+                      </Label>
+                      <Input
+                        id="child-photo"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="mt-1 file:mr-4 file:rounded file:border-0 file:bg-accent-subtle file:px-4 file:py-2 file:text-text-primary"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) {
+                            updateChildForm({
+                              photoBase64: "",
+                              photoContentType: "",
+                            });
+                            return;
+                          }
+                          if (file.size > 5 * 1024 * 1024) {
+                            setError("Photo must be 5MB or smaller.");
+                            return;
+                          }
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const data = reader.result as string;
+                            if (data.startsWith("data:")) {
+                              updateChildForm({
+                                photoBase64: data,
+                                photoContentType: file.type || "image/jpeg",
+                              });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      <p className="mt-1 text-xs text-text-muted">
+                        This helps volunteers identify children and mark attendance accurately. It is optional, so guests who may not return can be added without one. If this child attends regularly, please add a clear photo.
+                      </p>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="flex cursor-pointer items-start gap-2">
                         <Checkbox
                           checked={childForm.photoConsent}
                           onChange={(e) =>
@@ -602,52 +641,13 @@ export default function ParentDetailPage() {
                               photoConsent: e.target.checked,
                             })
                           }
+                          className="mt-0.5"
                         />
                         <span className="text-sm font-medium text-text-primary">
-                          I consent to photos of this child being used by the
-                          organisation *
+                          Organisation photo/video consent: I consent to photos or videos of this child being used by the organisation outside the internal attendance profile.
                         </span>
                       </label>
                     </div>
-                    {childForm.photoConsent && (
-                      <div className="sm:col-span-2">
-                        <Label htmlFor="child-photo">Photo (optional)</Label>
-                        <Input
-                          id="child-photo"
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          className="mt-1 file:mr-4 file:rounded file:border-0 file:bg-accent-subtle file:px-4 file:py-2 file:text-text-primary"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) {
-                              updateChildForm({
-                                photoBase64: "",
-                                photoContentType: "",
-                              });
-                              return;
-                            }
-                            if (file.size > 5 * 1024 * 1024) {
-                              setError("Photo must be 5MB or smaller.");
-                              return;
-                            }
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              const data = reader.result as string;
-                              if (data.startsWith("data:")) {
-                                updateChildForm({
-                                  photoBase64: data,
-                                  photoContentType: file.type || "image/jpeg",
-                                });
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }}
-                        />
-                        <p className="mt-1 text-xs text-text-muted">
-                          JPEG, PNG or WebP. Max 5MB.
-                        </p>
-                      </div>
-                    )}
                     <div className="sm:col-span-2">
                       <Label htmlFor="child-pickup">
                         Who can collect this child (optional)
