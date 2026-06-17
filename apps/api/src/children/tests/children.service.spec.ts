@@ -35,12 +35,19 @@ const mockInvitesService = {
   createInvite: jest.fn(),
 };
 
+const mockStorage = {
+  downloadObject: jest.fn(),
+  isConfigured: jest.fn(),
+  uploadObject: jest.fn(),
+};
+
 jest.mock("../../invites/invites.service", () => ({
   InvitesService: jest.fn().mockImplementation(() => mockInvitesService),
 }));
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { ChildrenService } from "../../children/children.service";
+import { SupabaseStorageService } from "../../common/storage/supabase-storage.service";
 import { InvitesService } from "../../invites/invites.service";
 
 describe("ChildrenService", () => {
@@ -49,7 +56,12 @@ describe("ChildrenService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    svc = new ChildrenService(mockInvitesService as unknown as InvitesService);
+    mockStorage.isConfigured.mockReturnValue(false);
+    mockStorage.uploadObject.mockResolvedValue(null);
+    svc = new ChildrenService(
+      mockInvitesService as unknown as InvitesService,
+      mockStorage as unknown as SupabaseStorageService,
+    );
     snapshotFindFirst.mockResolvedValue(null);
     subscriptionFindFirst.mockResolvedValue({ planCode: "STARTER_MONTHLY" });
     count.mockResolvedValue(10);
@@ -103,15 +115,18 @@ describe("ChildrenService", () => {
       expect(res?.contentType).toBe("image/jpeg");
     });
 
-    it("returns null when no consent", async () => {
+    it("returns internal profile photo when organisation photo consent is false", async () => {
+      const buf = Buffer.from("fake-image-data");
       findFirst.mockResolvedValueOnce({
         photoConsent: false,
-        photoBytes: Buffer.from("x"),
+        photoBytes: buf,
         photoContentType: "image/jpeg",
         photoKey: null,
       });
       const res = await svc.getPhoto("c1", tenantId);
-      expect(res).toBeNull();
+      expect(res).not.toBeNull();
+      expect(res?.buffer).toEqual(buf);
+      expect(res?.contentType).toBe("image/jpeg");
     });
 
     it("returns null when no photo bytes", async () => {
@@ -142,6 +157,32 @@ describe("ChildrenService", () => {
       const res = await svc.create({ ...baseDto }, tenantId);
       expect(res).toHaveProperty("id", "c1");
       expect(create).toHaveBeenCalled();
+    });
+
+    it("stores an internal profile photo without organisation photo consent", async () => {
+      tFindUnique.mockResolvedValueOnce({ id: tenantId, orgId: "org_1" });
+      create.mockResolvedValueOnce({ id: "c1", tenantId });
+
+      const photoBase64 = Buffer.from("fake-image-data").toString("base64");
+      await svc.create(
+        {
+          ...baseDto,
+          photoConsent: false,
+          photoBase64,
+          photoContentType: "image/jpeg",
+        },
+        tenantId,
+      );
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            photoConsent: false,
+            photoBytes: expect.any(Buffer),
+            photoContentType: "image/jpeg",
+          }),
+        }),
+      );
     });
 
     it("errors when tenant missing", async () => {
@@ -180,6 +221,33 @@ describe("ChildrenService", () => {
       await expect(svc.update("missing", {}, tenantId)).rejects.toBeInstanceOf(
         NotFoundException,
       );
+    });
+  });
+
+  describe("uploadPhoto", () => {
+    it("uploads an internal profile photo without organisation photo consent", async () => {
+      findFirst.mockResolvedValueOnce({ id: "c1" });
+      update.mockResolvedValueOnce({ id: "c1" });
+
+      await expect(
+        svc.uploadPhoto(
+          "c1",
+          tenantId,
+          "u1",
+          true,
+          Buffer.from("fake-image-data").toString("base64"),
+          "image/jpeg",
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(update).toHaveBeenCalledWith({
+        where: { id: "c1" },
+        data: {
+          photoBytes: expect.any(Buffer),
+          photoContentType: "image/jpeg",
+          photoKey: null,
+        },
+      });
     });
   });
 });

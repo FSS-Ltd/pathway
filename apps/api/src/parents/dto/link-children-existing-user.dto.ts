@@ -46,6 +46,15 @@ export class ChildToCreateDto {
   @IsBoolean()
   @IsOptional()
   photoConsent?: boolean;
+
+  @IsOptional()
+  @IsString()
+  photoBase64?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  photoContentType?: string;
 }
 
 export class LinkChildrenExistingUserDto {

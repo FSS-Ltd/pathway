@@ -48,7 +48,7 @@ export type PublicSignupSubmitPayload = {
     specialNeedsType?: string;
     specialNeedsOther?: string;
     photoConsent: boolean;
-    /** Base64-encoded image; stored as bytes in DB until S3. */
+    /** Base64-encoded internal profile picture for attendance identification. */
     photoBase64?: string;
     photoContentType?: string;
     pickupPermissions?: string;

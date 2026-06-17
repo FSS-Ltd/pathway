@@ -64,7 +64,7 @@ export default function FamilyAccountScreen() {
       <BrandedCard>
         <SectionTitle title="Consent and privacy" subtitle="Family-safe controls" />
         <View style={styles.inlineRow}>
-          <Chip label="Photo consent: Enabled" tone="family" />
+          <Chip label="Org photo/video consent: Enabled" tone="family" />
           <Chip label="Data export available" tone="serve" />
         </View>
         <Text style={styles.blockText}>Safeguarding records and internal notes are not shown in Family Space.</Text>

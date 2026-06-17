@@ -181,7 +181,7 @@ export default function ChildDetailPage() {
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !child || !isLinkedParent) return;
+    if (!file || !child || !canEdit) return;
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
@@ -356,20 +356,19 @@ export default function ChildDetailPage() {
                 undefined
               }
               avatarSrc={
-                childDetail.hasPhotoConsent
-                  ? `/api/children/${child.id}/photo?v=${photoVersion}`
-                  : null
+                `/api/children/${child.id}/photo?v=${photoVersion}`
               }
               badges={
                 <Badge variant={statusTone[childDetail.status]}>
                   {childDetail.status === "active" ? "Active" : "Inactive"}
                 </Badge>
               }
-              showUploadButton={isLinkedParent && childDetail.hasPhotoConsent}
+              showUploadButton={canEdit}
               onUploadClick={() => fileInputRef.current?.click()}
               isUploading={isUploadingPhoto}
               fileInputRef={fileInputRef}
               onFileChange={handlePhotoUpload}
+              uploadHelpText="This helps volunteers identify children and mark attendance accurately. It is optional, so guests who may not return can be added without one. If this child attends regularly, please add a clear photo."
             />
             <Card className="p-6">
               <h2 className="text-lg font-bold text-text-primary">
@@ -437,7 +436,9 @@ export default function ChildDetailPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="child-photoConsent">Photo consent</Label>
+                  <Label htmlFor="child-photoConsent">
+                    Organisation photo/video consent
+                  </Label>
                   <Select
                     id="child-photoConsent"
                     value={photoConsent ? "yes" : "no"}
@@ -450,6 +451,9 @@ export default function ChildDetailPage() {
                     <option value="yes">Yes</option>
                     <option value="no">No</option>
                   </Select>
+                  <p className="mt-1 text-xs text-text-muted">
+                    This controls photos or videos used outside the internal attendance profile.
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="child-groupId">Primary group / class</Label>
@@ -539,10 +543,14 @@ export default function ChildDetailPage() {
                 "Additional needs",
                 "accent",
               )}
-              {renderFlag(childDetail.hasPhotoConsent, "Photo consent", "success")}
+              {renderFlag(
+                childDetail.hasPhotoConsent,
+                "Organisation photo/video consent",
+                "success",
+              )}
             </div>
             <p className="mt-3 text-sm text-text-muted">
-              Avatars are shown only when photo consent is given.
+              Profile pictures are internal attendance aids and do not depend on organisation photo/video consent.
             </p>
           </Card>
 

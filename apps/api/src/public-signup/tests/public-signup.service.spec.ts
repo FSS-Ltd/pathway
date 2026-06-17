@@ -168,6 +168,44 @@ describe("PublicSignupService", () => {
         connect: [{ id: "child-1" }],
       });
     });
+
+    it("creates children with internal profile pictures without organisation photo consent", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.child.create as jest.Mock).mockResolvedValue({ id: "child-1" });
+      (prisma.child.findMany as jest.Mock).mockResolvedValue([{ id: "child-1" }]);
+      (prisma.user.update as jest.Mock).mockResolvedValue({});
+      (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.userTenantRole.create as jest.Mock).mockResolvedValue({});
+      (prisma.$transaction as jest.Mock).mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
+        fn(prisma),
+      );
+
+      const result = await service.linkChildrenExistingUser(
+        "user-1",
+        "a".repeat(32),
+        [],
+        [
+          {
+            firstName: "Child",
+            lastName: "One",
+            photoConsent: false,
+            photoBase64: Buffer.from("fake-image-data").toString("base64"),
+            photoContentType: "image/jpeg",
+          },
+        ],
+      );
+
+      expect(result).toEqual({ success: true, linkedCount: 1 });
+      expect(prisma.child.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            photoConsent: false,
+            photoBytes: expect.any(Buffer),
+            photoContentType: "image/jpeg",
+          }),
+        }),
+      );
+    });
   });
 
   describe("resolveLink / getConfig", () => {
@@ -278,6 +316,48 @@ describe("PublicSignupService", () => {
       expect(prisma.child.create).toHaveBeenCalled();
       expect(prisma.emergencyContact.createMany).toHaveBeenCalled();
       expect(prisma.parentSignupConsent.create).toHaveBeenCalled();
+    });
+
+    it("accepts an internal child profile picture without organisation photo consent", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.user.create as jest.Mock).mockResolvedValue({
+        id: "user-1",
+        email: "jane@example.com",
+        name: "Jane Doe",
+      });
+      (prisma.userIdentity.create as jest.Mock).mockResolvedValue({});
+      (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.userTenantRole.create as jest.Mock).mockResolvedValue({});
+      (prisma.child.create as jest.Mock).mockResolvedValue({ id: "child-1" });
+      (prisma.emergencyContact.createMany as jest.Mock).mockResolvedValue({});
+      (prisma.parentSignupConsent.create as jest.Mock).mockResolvedValue({});
+      (prisma.publicSignupLink.update as jest.Mock).mockResolvedValue({});
+
+      const result = await service.submit({
+        ...validDto,
+        children: [
+          {
+            ...validDto.children[0],
+            photoConsent: false,
+            photoBase64: Buffer.from("fake-image-data").toString("base64"),
+            photoContentType: "image/jpeg",
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      expect(prisma.child.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            photoConsent: false,
+            photoBytes: expect.any(Buffer),
+            photoContentType: "image/jpeg",
+          }),
+        }),
+      );
     });
   });
 });

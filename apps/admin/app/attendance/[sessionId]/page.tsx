@@ -13,8 +13,14 @@ import {
   setApiClientToken,
   type SaveAttendanceRow,
 } from "../../../lib/api-client";
+import { getInitials } from "../../../lib/names";
 
 type ChildStatus = "present" | "absent" | "late" | "unknown";
+type AttendanceDisplayRow = {
+  childId: string;
+  childName: string;
+  status: ChildStatus;
+};
 
 const statusCopy: Record<AdminAttendanceDetail["status"], string> = {
   not_started: "Not started",
@@ -42,6 +48,45 @@ const childStatusTone: Record<
 };
 
 const STATUS_OPTIONS: ChildStatus[] = ["present", "absent", "late", "unknown"];
+
+function AttendanceChildCell({
+  childId,
+  childName,
+}: {
+  childId: string;
+  childName: string;
+}) {
+  const [imageError, setImageError] = React.useState(false);
+  const showImage = !imageError;
+
+  React.useEffect(() => {
+    setImageError(false);
+  }, [childId]);
+
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-subtle text-xs font-semibold text-accent-strong">
+        {showImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/children/${childId}/photo`}
+            alt=""
+            width={40}
+            height={40}
+            className="h-full w-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : null}
+        <span className={showImage ? "hidden" : ""} aria-hidden>
+          {getInitials(childName)}
+        </span>
+      </div>
+      <span className="min-w-0 text-sm font-semibold text-text-primary">
+        {childName}
+      </span>
+    </div>
+  );
+}
 
 export default function AttendanceDetailPage() {
   const params = useParams<{ sessionId: string }>();
@@ -176,17 +221,16 @@ export default function AttendanceDetailPage() {
     }));
   }, [detail, editRows]);
 
-  const columns = React.useMemo<
-    ColumnDef<{ childId: string; childName: string; status: ChildStatus }>[]
-  >(
+  const columns = React.useMemo<ColumnDef<AttendanceDisplayRow>[]>(
     () => [
       {
         id: "child",
         header: "Child",
         cell: (row) => (
-          <span className="text-sm font-semibold text-text-primary">
-            {row.childName}
-          </span>
+          <AttendanceChildCell
+            childId={row.childId}
+            childName={row.childName}
+          />
         ),
       },
       {

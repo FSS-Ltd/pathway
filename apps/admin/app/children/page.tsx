@@ -113,7 +113,7 @@ export default function ChildrenPage() {
               <Badge variant="accent">Additional needs</Badge>
             ) : null}
             <Badge variant={row.hasPhotoConsent ? "success" : "default"}>
-              {row.hasPhotoConsent ? "Photo consent" : "No photo consent"}
+              {row.hasPhotoConsent ? "Org photo/video consent" : "No org photo/video consent"}
             </Badge>
           </div>
         ),
@@ -141,7 +141,7 @@ export default function ChildrenPage() {
             Children
           </h1>
           <p className="text-sm text-text-muted">
-            Child records for this organisation (photo consent and needs awareness).
+            Child records for this organisation, including needs awareness and organisation photo/video consent.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -153,7 +153,7 @@ export default function ChildrenPage() {
       </div>
       <Card
         title="Children Roster"
-        description="Mock data for now. Will respect tenant scoping and photo consent rules."
+        description="Mock data for now. Will respect tenant scoping and organisation consent rules."
       >
         {error ? (
           <div className="flex flex-col gap-2 rounded-md bg-status-danger/5 p-4 text-sm text-status-danger">

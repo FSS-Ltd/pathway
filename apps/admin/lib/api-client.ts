@@ -2341,7 +2341,7 @@ export async function inviteParentToChild(
   >;
 }
 
-/** Upload child photo. Requires photoConsent; only admin or linked parent can upload. */
+/** Upload internal child profile photo. Only admin or linked parent can upload. */
 export async function uploadChildPhoto(
   childId: string,
   photoBase64: string,
@@ -2542,6 +2542,8 @@ export async function linkChildrenExistingUser(
     dateOfBirth?: string;
     allergies?: string;
     photoConsent?: boolean;
+    photoBase64?: string;
+    photoContentType?: string;
   }>,
 ): Promise<{ success: true; linkedCount: number }> {
   if (isUsingMockApi()) {
