@@ -5,7 +5,14 @@ import { LoggingService } from "../../common/logging/logging.service";
 
 // ---- Local helper types to avoid `any` -------------------------------------
 // Minimal shapes used in this spec; they mirror just what we need.
-type OrgRecord = { id: string; name: string; slug: string };
+type OrgRecord = {
+  id: string;
+  name: string;
+  slug: string;
+  planCode?: string;
+  isSuite?: boolean;
+  parentPortalEnabled?: boolean;
+};
 
 type RegisterOrgInput = {
   org: { name: string; slug: string };
@@ -26,6 +33,8 @@ interface PrismaSubset {
     findUnique: (args: {
       where: { slug?: string; id?: string };
     }) => Promise<OrgRecord | null>;
+    findMany: (args: unknown) => Promise<OrgRecord[]>;
+    update: (args: unknown) => Promise<OrgRecord>;
   };
   tenant: { create: (args: unknown) => Promise<unknown> };
   user: { create: (args: unknown) => Promise<unknown> };
@@ -38,6 +47,8 @@ const prismaMock: PrismaSubset = {
   org: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    findMany: jest.fn(),
+    update: jest.fn(),
   },
   tenant: {
     create: jest.fn(),
@@ -123,6 +134,73 @@ describe("OrgsService", () => {
       );
       // also ensure billing was not returned when omitted
       expect((result as Record<string, unknown>).billing).toBeUndefined();
+    });
+  });
+
+  describe("list", () => {
+    it("returns the parent portal setting for the current org", async () => {
+      (prismaMock.org.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "org_1",
+          name: "Acme Church",
+          slug: "acme-church",
+          planCode: "STARTER",
+          isSuite: false,
+          parentPortalEnabled: false,
+        },
+      ]);
+
+      const result = await service.list("org_1");
+
+      expect(result).toEqual([
+        expect.objectContaining({
+          id: "org_1",
+          parentPortalEnabled: false,
+        }),
+      ]);
+      expect(prismaMock.org.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            parentPortalEnabled: true,
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("updateCurrentOrg", () => {
+    it("updates the parent portal setting without requiring a name change", async () => {
+      (prismaMock.org.findUnique as jest.Mock).mockResolvedValue({
+        id: "org_1",
+        name: "Acme Church",
+        slug: "acme-church",
+      });
+      (prismaMock.org.update as jest.Mock).mockResolvedValue({
+        id: "org_1",
+        name: "Acme Church",
+        slug: "acme-church",
+        parentPortalEnabled: false,
+      });
+
+      const result = await service.updateCurrentOrg("org_1", {
+        parentPortalEnabled: false,
+      } as unknown as Parameters<OrgsService["updateCurrentOrg"]>[1]);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "org_1",
+          parentPortalEnabled: false,
+        }),
+      );
+      expect(prismaMock.org.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "org_1" },
+          data: { parentPortalEnabled: false },
+          select: expect.objectContaining({
+            parentPortalEnabled: true,
+          }),
+        }),
+      );
     });
   });
 });

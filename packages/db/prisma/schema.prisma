@@ -101,6 +101,11 @@ enum LeadKind {
   READINESS
 }
 
+enum ChildGuardianContactType {
+  PRIMARY_GUARDIAN
+  EMERGENCY_CONTACT
+}
+
 // --- Blog (platform-wide, not tenant-scoped) ---
 
 enum BlogPostStatus {
@@ -216,6 +221,7 @@ model Org {
   planCode         String // e.g., trial|starter|standard|pro|suite_*
   isSuite          Boolean                  @default(false)
   isMasterOrg      Boolean                  @default(false) // Internal/platform org: no Stripe, unlimited, non-billable
+  parentPortalEnabled Boolean                  @default(true)
   stripeCustomerId String?                  @unique
   tenants          Tenant[]
   subscriptions    Subscription[]
@@ -266,6 +272,7 @@ model Tenant {
   publicSignupLinks      PublicSignupLink[]
   emergencyContacts      EmergencyContact[]
   parentSignupConsents   ParentSignupConsent[]
+  childGuardianContacts  ChildGuardianContact[]
   handoverLogs           HandoverLog[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -499,6 +506,28 @@ model ParentSignupConsent {
   @@index([tenantId])
 }
 
+model ChildGuardianContact {
+  id                         String                   @id @default(uuid())
+  childId                    String
+  tenantId                   String
+  fullName                   String
+  email                      String?
+  phone                      String?
+  relationshipToChild        String?
+  contactType                ChildGuardianContactType @default(PRIMARY_GUARDIAN)
+  dataProcessingConsentAt    DateTime?
+  firstAidConsentAt          DateTime?
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+
+  child  Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([tenantId])
+  @@index([tenantId, contactType])
+}
+
 model Child {
   id                  String       @id @default(uuid())
   firstName           String
@@ -522,6 +551,7 @@ model Child {
   tenantId            String
   tenant              Tenant       @relation(fields: [tenantId], references: [id])
   guardians           User[]       @relation("ParentChildren")
+  guardianContacts    ChildGuardianContact[]
   groupId             String?
   group               Group?       @relation(fields: [groupId], references: [id])
   disabilities        String[]     @default([])

@@ -10,6 +10,7 @@ import {
 import { PublicSignupService } from "./public-signup.service";
 import { PublicSignupConfigDto } from "./dto/public-signup-config.dto";
 import {
+  PublicSignupContactOnlySubmitDto,
   PublicSignupSubmitDto,
   SubmitExistingUserDto,
 } from "./dto/public-signup-submit.dto";
@@ -51,6 +52,13 @@ export class PublicSignupController {
   @Post("signup/submit")
   async submit(@Body() body: PublicSignupSubmitDto): Promise<{ success: true; message: string }> {
     return this.publicSignupService.submit(body);
+  }
+
+  @Post("signup/submit-contact-only")
+  async submitContactOnly(
+    @Body() body: PublicSignupContactOnlySubmitDto,
+  ): Promise<{ success: true; message: string }> {
+    return this.publicSignupService.submitContactOnly(body);
   }
 
   @Post("signup/submit-existing-user")

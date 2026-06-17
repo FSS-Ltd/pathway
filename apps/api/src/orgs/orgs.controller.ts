@@ -48,11 +48,22 @@ const updateCurrentOrgBody = z
   .object({
     name: z
       .string()
-      .min(1, "name is required")
       .transform((s) => s.trim())
-      .pipe(z.string().min(2, "name must be at least 2 characters").max(120, "name must be at most 120 characters")),
+      .pipe(
+        z
+          .string()
+          .min(2, "name must be at least 2 characters")
+          .max(120, "name must be at most 120 characters"),
+      )
+      .optional(),
+    parentPortalEnabled: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (value) =>
+      value.name !== undefined || value.parentPortalEnabled !== undefined,
+    { message: "At least one field is required" },
+  );
 
 @Controller("orgs")
 export class OrgsController {
@@ -122,7 +133,7 @@ export class OrgsController {
       updateCurrentOrgBody,
       body,
     );
-    return this.service.updateCurrentOrg(orgId, { name: dto.name });
+    return this.service.updateCurrentOrg(orgId, dto);
   }
 
   /**

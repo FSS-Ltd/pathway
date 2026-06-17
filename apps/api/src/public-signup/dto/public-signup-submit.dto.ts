@@ -74,6 +74,26 @@ export class ParentGuardianExistingUserDto {
   relationshipToChild?: string;
 }
 
+export class ParentGuardianContactOnlyDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  fullName!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  relationshipToChild?: string;
+}
+
 export class EmergencyContactDto {
   @IsString()
   @IsNotEmpty()
@@ -232,6 +252,32 @@ export class SubmitExistingUserDto {
   @ValidateNested()
   @Type(() => ParentGuardianExistingUserDto)
   parent!: ParentGuardianExistingUserDto;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EmergencyContactDto)
+  emergencyContacts!: EmergencyContactDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ChildSignupDto)
+  children!: ChildSignupDto[];
+
+  @ValidateNested()
+  @Type(() => ConsentsDto)
+  consents!: ConsentsDto;
+}
+
+export class PublicSignupContactOnlySubmitDto {
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(32)
+  @MaxLength(128)
+  token!: string;
+
+  @ValidateNested()
+  @Type(() => ParentGuardianContactOnlyDto)
+  parent!: ParentGuardianContactOnlyDto;
 
   @IsArray()
   @ValidateNested({ each: true })

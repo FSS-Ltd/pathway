@@ -17,6 +17,7 @@ import {
   inviteParentToChild,
   updateChild,
   uploadChildPhoto,
+  type AdminChildGuardianContact,
   type ChildEditFormData,
   type UpdateChildPayload,
 } from "../../../lib/api-client";
@@ -41,6 +42,7 @@ export default function ChildDetailPage() {
     status: "active" | "inactive";
     hasAllergies: boolean;
     hasAdditionalNeeds: boolean;
+    guardianContacts: AdminChildGuardianContact[];
   } | null>(null);
   const [groups, setGroups] = React.useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -120,6 +122,7 @@ export default function ChildDetailPage() {
               status: detailRes.status,
               hasAllergies: detailRes.hasAllergies,
               hasAdditionalNeeds: detailRes.hasAdditionalNeeds,
+              guardianContacts: detailRes.guardianContacts,
             }
           : null,
       );
@@ -534,6 +537,34 @@ export default function ChildDetailPage() {
               )}
             </Card>
           )}
+
+          {childDetail.guardianContacts.length > 0 ? (
+            <Card title="Parent / guardian contacts">
+              <div className="grid gap-3 md:grid-cols-2">
+                {childDetail.guardianContacts.map((contact) => (
+                  <div
+                    key={contact.id}
+                    className="rounded-md border border-border-subtle bg-surface-alt p-4"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-text-primary">
+                        {contact.fullName}
+                      </p>
+                      <Badge variant="default">Record only</Badge>
+                    </div>
+                    <div className="mt-3 space-y-1 text-sm text-text-muted">
+                      <p>
+                        Relationship:{" "}
+                        {contact.relationshipToChild ?? "Not provided"}
+                      </p>
+                      <p>Email: {contact.email ?? "Not provided"}</p>
+                      <p>Phone: {contact.phone ?? "Not provided"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
 
           <Card title="Flags">
             <div className="flex flex-wrap gap-2 text-sm">

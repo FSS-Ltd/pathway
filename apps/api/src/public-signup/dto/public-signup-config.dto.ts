@@ -9,4 +9,5 @@ export class PublicSignupConfigDto {
   /** e.g. ["photo", "emergency_contact", "data_processing"] */
   requiredConsents!: string[];
   formVersion!: string;
+  parentPortalEnabled!: boolean;
 }

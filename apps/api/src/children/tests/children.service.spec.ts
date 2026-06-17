@@ -92,6 +92,34 @@ describe("ChildrenService", () => {
       });
     });
 
+    it("includes contact-only guardian records for child detail views", async () => {
+      const child = {
+        id: "c1",
+        tenantId,
+        guardianContacts: [
+          {
+            id: "contact-1",
+            fullName: "Jane Doe",
+            email: "jane@example.com",
+            phone: "07700900111",
+            relationshipToChild: "Parent",
+            contactType: "PRIMARY_GUARDIAN",
+          },
+        ],
+      };
+      findFirst.mockResolvedValueOnce(child);
+
+      const res = await svc.getById("c1", tenantId);
+
+      expect(res).toBe(child);
+      expect(findFirst).toHaveBeenCalledWith({
+        where: { id: "c1", tenantId },
+        select: expect.objectContaining({
+          guardianContacts: expect.any(Object),
+        }),
+      });
+    });
+
     it("404 when missing", async () => {
       findFirst.mockResolvedValueOnce(null);
       await expect(svc.getById("missing", tenantId)).rejects.toBeInstanceOf(

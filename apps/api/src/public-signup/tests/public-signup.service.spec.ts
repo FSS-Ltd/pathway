@@ -6,8 +6,9 @@ import { MailerService } from "../../mailer/mailer.service";
 import { Auth0ManagementService } from "../../auth/auth0-management.service";
 
 jest.mock("@pathway/db", () => {
-  const { Role } = jest.requireActual("@prisma/client");
+  const { ChildGuardianContactType, Role } = jest.requireActual("@prisma/client");
   return {
+    ChildGuardianContactType,
     Role,
     prisma: {
       publicSignupLink: {
@@ -29,6 +30,9 @@ jest.mock("@pathway/db", () => {
       child: {
         create: jest.fn(),
         findMany: jest.fn(),
+      },
+      childGuardianContact: {
+        createMany: jest.fn(),
       },
       emergencyContact: {
         createMany: jest.fn(),
@@ -53,8 +57,12 @@ describe("PublicSignupService", () => {
     id: "link-1",
     tenantId: "tenant-1",
     orgId: "org-1",
-    org: { name: "Test Org" },
+    org: { name: "Test Org", parentPortalEnabled: true },
     tenant: { name: "Test Site", timezone: "Europe/London" },
+  };
+  const portalDisabledLink = {
+    ...validLink,
+    org: { ...validLink.org, parentPortalEnabled: false },
   };
 
   beforeEach(async () => {
@@ -111,6 +119,18 @@ describe("PublicSignupService", () => {
       await expect(
         service.signupPreflight("invalid", "any@example.com"),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it("does not expose existing-user status when parent portal is disabled", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        portalDisabledLink,
+      );
+
+      await expect(
+        service.signupPreflight("a".repeat(32), "existing@example.com"),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
     });
   });
 
@@ -228,9 +248,24 @@ describe("PublicSignupService", () => {
         orgName: "Test Org",
         siteName: "Test Site",
         siteTimezone: "Europe/London",
+        parentPortalEnabled: true,
         formVersion: "1.0",
       });
       expect(config.requiredConsents).toContain("data_processing");
+    });
+
+    it("returns disabled parent portal config when org has disabled it", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        portalDisabledLink,
+      );
+
+      const config = await service.getConfig("any-token");
+
+      expect(config).toMatchObject({
+        orgName: "Test Org",
+        siteName: "Test Site",
+        parentPortalEnabled: false,
+      });
     });
   });
 
@@ -358,6 +393,93 @@ describe("PublicSignupService", () => {
           }),
         }),
       );
+    });
+
+    it("rejects portal account submission when parent portal is disabled", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        portalDisabledLink,
+      );
+
+      await expect(service.submit(validDto)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(auth0Mock.createUser).not.toHaveBeenCalled();
+    });
+
+    it("rejects contact-only submission while parent portal is enabled", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
+
+      await expect(service.submitContactOnly(validDto)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("stores contact-only child guardian records without creating portal access", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        portalDisabledLink,
+      );
+      (prisma.child.create as jest.Mock).mockResolvedValue({ id: "child-1" });
+      (
+        (prisma as unknown as {
+          childGuardianContact: { createMany: jest.Mock };
+        }).childGuardianContact.createMany
+      ).mockResolvedValue({ count: 2 });
+      (prisma.publicSignupLink.update as jest.Mock).mockResolvedValue({});
+
+      const result = await service.submitContactOnly({
+        ...validDto,
+        parent: {
+          fullName: "Jane Doe",
+          email: "jane@example.com",
+          phone: "07700900111",
+          relationshipToChild: "Parent",
+        },
+        emergencyContacts: [
+          {
+            name: "Emergency Contact",
+            phone: "07700900123",
+            relationship: "Aunt",
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      expect(prisma.user.findFirst).not.toHaveBeenCalled();
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(prisma.userTenantRole.create).not.toHaveBeenCalled();
+      expect(auth0Mock.createUser).not.toHaveBeenCalled();
+      expect(mailerMock.sendParentSignupCompleteEmail).not.toHaveBeenCalled();
+      expect(
+        (prisma as unknown as {
+          childGuardianContact: { createMany: jest.Mock };
+        }).childGuardianContact.createMany,
+      ).toHaveBeenCalledWith({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            childId: "child-1",
+            tenantId: "tenant-1",
+            fullName: "Jane Doe",
+            email: "jane@example.com",
+            phone: "07700900111",
+            relationshipToChild: "Parent",
+            contactType: "PRIMARY_GUARDIAN",
+            dataProcessingConsentAt: expect.any(Date),
+          }),
+          expect.objectContaining({
+            childId: "child-1",
+            tenantId: "tenant-1",
+            fullName: "Emergency Contact",
+            email: null,
+            phone: "07700900123",
+            relationshipToChild: "Aunt",
+            contactType: "EMERGENCY_CONTACT",
+          }),
+        ]),
+      });
     });
   });
 });

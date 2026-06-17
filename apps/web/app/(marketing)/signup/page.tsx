@@ -5,10 +5,12 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   fetchPublicSignupConfig,
+  submitContactOnlySignup,
   submitPublicSignup,
   submitExistingUserSignup,
   signupPreflight,
   type PublicSignupConfig,
+  type PublicSignupContactOnlyPayload,
   type PublicSignupSubmitPayload,
 } from "../../../lib/public-signup-client";
 
@@ -134,6 +136,7 @@ function SignupContent() {
   };
 
   const runPreflight = async () => {
+    if (config?.parentPortalEnabled === false) return;
     const email = parentEmail.trim().toLowerCase();
     if (!email || !email.includes("@") || !token.trim()) return;
     setPreflightMode("checking");
@@ -197,60 +200,62 @@ function SignupContent() {
       return;
     }
 
-    if (preflightMode === "idle" || preflightMode === "checking") {
-      setPreflightMode("checking");
-      try {
-        const result = await signupPreflight(token, parentEmail.trim().toLowerCase());
-        setPreflightMode(result.mode);
-        if (result.mode === "EXISTING_USER") {
+    const parentPortalEnabled = config?.parentPortalEnabled ?? true;
+
+    if (parentPortalEnabled) {
+      if (preflightMode === "idle" || preflightMode === "checking") {
+        setPreflightMode("checking");
+        try {
+          const result = await signupPreflight(
+            token,
+            parentEmail.trim().toLowerCase(),
+          );
+          setPreflightMode(result.mode);
+          if (result.mode === "EXISTING_USER") {
+            setSubmitStatus("error");
+            setSubmitError("");
+            return;
+          }
+        } catch {
+          setPreflightMode("idle");
           setSubmitStatus("error");
-          setSubmitError("");
+          setSubmitError("Could not verify email. Please try again.");
           return;
         }
-      } catch {
-        setPreflightMode("idle");
-        setSubmitStatus("error");
-        setSubmitError("Could not verify email. Please try again.");
-        return;
       }
-    }
 
-    const isExistingUser = preflightMode === "EXISTING_USER";
+      const isExistingUser = preflightMode === "EXISTING_USER";
 
-    // New users: enforce password rules. Existing users: only verify non-empty (they already have a password).
-    if (!isExistingUser) {
-      if (parentPassword.length < 8) {
+      // New users: enforce password rules. Existing users: only verify non-empty (they already have a password).
+      if (!isExistingUser) {
+        if (parentPassword.length < 8) {
+          setSubmitStatus("error");
+          setSubmitError("Password must be at least 8 characters.");
+          return;
+        }
+        if (!PASSWORD_REGEX.test(parentPassword)) {
+          setSubmitStatus("error");
+          setSubmitError(
+            "Password must include at least one letter and one number.",
+          );
+          return;
+        }
+      } else if (!parentPassword.trim()) {
         setSubmitStatus("error");
-        setSubmitError("Password must be at least 8 characters.");
+        setSubmitError("Please enter your password.");
         return;
       }
-      if (!PASSWORD_REGEX.test(parentPassword)) {
+      if (!isExistingUser && parentPassword !== parentPasswordConfirm) {
         setSubmitStatus("error");
-        setSubmitError("Password must include at least one letter and one number.");
+        setSubmitError("Passwords do not match.");
         return;
       }
-    } else if (!parentPassword.trim()) {
-      setSubmitStatus("error");
-      setSubmitError("Please enter your password.");
-      return;
-    }
-    if (!isExistingUser && parentPassword !== parentPasswordConfirm) {
-      setSubmitStatus("error");
-      setSubmitError("Passwords do not match.");
-      return;
     }
 
     setIsSubmitting(true);
     try {
-      const payload: PublicSignupSubmitPayload = {
+      const commonPayload = {
         token,
-        parent: {
-          fullName: parentName.trim(),
-          email: parentEmail.trim().toLowerCase(),
-          password: parentPassword,
-          phone: parentPhone.trim() || undefined,
-          relationshipToChild: parentRelationship.trim() || undefined,
-        },
         emergencyContacts: ecValid.map((e) => ({
           name: e.name.trim(),
           phone: e.phone.trim(),
@@ -282,10 +287,34 @@ function SignupContent() {
           firstAidConsent: firstAidConsent || undefined,
         },
       };
-      if (isExistingUser) {
-        await submitExistingUserSignup(payload);
+
+      if (parentPortalEnabled) {
+        const payload: PublicSignupSubmitPayload = {
+          ...commonPayload,
+          parent: {
+            fullName: parentName.trim(),
+            email: parentEmail.trim().toLowerCase(),
+            password: parentPassword,
+            phone: parentPhone.trim() || undefined,
+            relationshipToChild: parentRelationship.trim() || undefined,
+          },
+        };
+        if (preflightMode === "EXISTING_USER") {
+          await submitExistingUserSignup(payload);
+        } else {
+          await submitPublicSignup(payload);
+        }
       } else {
-        await submitPublicSignup(payload);
+        const payload: PublicSignupContactOnlyPayload = {
+          ...commonPayload,
+          parent: {
+            fullName: parentName.trim(),
+            email: parentEmail.trim().toLowerCase(),
+            phone: parentPhone.trim() || undefined,
+            relationshipToChild: parentRelationship.trim() || undefined,
+          },
+        };
+        await submitContactOnlySignup(payload);
       }
       setSubmitStatus("success");
     } catch (err) {
@@ -324,18 +353,23 @@ function SignupContent() {
     );
   }
 
+  const parentPortalEnabled = config.parentPortalEnabled;
+
   if (submitStatus === "success") {
     return (
       <div className="mx-auto max-w-2xl px-4 py-16">
         <div className="rounded-xl border border-pw-border bg-white p-8 text-center">
           <h1 className="text-2xl font-semibold text-pw-text">Registration complete</h1>
           <p className="mt-4 text-pw-text-muted">
-            Thank you for registering with {config.siteName}. You can now sign in with your email
-            and password to access your account.
+            {parentPortalEnabled
+              ? `Thank you for registering with ${config.siteName}. You can now sign in with your email and password to access your account.`
+              : `Thank you for registering with ${config.siteName}. Your details have been recorded for the organisation.`}
           </p>
-          <p className="mt-2 text-sm text-pw-text-muted">
-            We&apos;ve also sent a confirmation email. Check your spam folder if you don&apos;t see it.
-          </p>
+          {parentPortalEnabled ? (
+            <p className="mt-2 text-sm text-pw-text-muted">
+              We&apos;ve also sent a confirmation email. Check your spam folder if you don&apos;t see it.
+            </p>
+          ) : null}
         </div>
       </div>
     );
@@ -344,7 +378,9 @@ function SignupContent() {
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-pw-text">Family registration</h1>
+        <h1 className="text-3xl font-bold text-pw-text">
+          {parentPortalEnabled ? "Family registration" : "Child registration"}
+        </h1>
         <p className="mt-2 text-pw-text-muted">
           {config.orgName} · {config.siteName}
         </p>
@@ -383,40 +419,42 @@ function SignupContent() {
                   setParentEmail(e.target.value);
                   setPreflightMode("idle");
                 }}
-                onBlur={runPreflight}
+                onBlur={parentPortalEnabled ? runPreflight : undefined}
                 className="mt-1 w-full rounded-md border border-pw-border bg-white px-3 py-2 text-pw-text"
               />
-              {preflightMode === "checking" ? (
+              {parentPortalEnabled && preflightMode === "checking" ? (
                 <p className="mt-1 text-xs text-pw-text-muted">Checking…</p>
               ) : null}
             </div>
-            <div>
-              <label className="block text-sm font-medium text-pw-text">
-                {preflightMode === "EXISTING_USER" ? "Your password *" : "Password *"}
-              </label>
-              <input
-                type="password"
-                required
-                value={parentPassword}
-                onChange={(e) => setParentPassword(e.target.value)}
-                placeholder={
-                  preflightMode === "EXISTING_USER"
-                    ? "Enter your password to link your children"
-                    : "At least 8 characters with a letter and number"
-                }
-                className="mt-1 w-full rounded-md border border-pw-border bg-white px-3 py-2 text-pw-text"
-              />
-              {preflightMode === "EXISTING_USER" ? (
-                <p className="mt-1 text-xs text-pw-text-muted">
-                  This email is already registered. Enter your password to continue.
-                </p>
-              ) : (
-                <p className="mt-1 text-xs text-pw-text-muted">
-                  You&apos;ll use this to sign in after registration.
-                </p>
-              )}
-            </div>
-            {preflightMode !== "EXISTING_USER" ? (
+            {parentPortalEnabled ? (
+              <div>
+                <label className="block text-sm font-medium text-pw-text">
+                  {preflightMode === "EXISTING_USER" ? "Your password *" : "Password *"}
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={parentPassword}
+                  onChange={(e) => setParentPassword(e.target.value)}
+                  placeholder={
+                    preflightMode === "EXISTING_USER"
+                      ? "Enter your password to link your children"
+                      : "At least 8 characters with a letter and number"
+                  }
+                  className="mt-1 w-full rounded-md border border-pw-border bg-white px-3 py-2 text-pw-text"
+                />
+                {preflightMode === "EXISTING_USER" ? (
+                  <p className="mt-1 text-xs text-pw-text-muted">
+                    This email is already registered. Enter your password to continue.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-pw-text-muted">
+                    You&apos;ll use this to sign in after registration.
+                  </p>
+                )}
+              </div>
+            ) : null}
+            {parentPortalEnabled && preflightMode !== "EXISTING_USER" ? (
               <div>
                 <label className="block text-sm font-medium text-pw-text">Confirm password *</label>
                 <input
