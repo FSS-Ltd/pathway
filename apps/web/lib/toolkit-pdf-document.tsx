@@ -7,14 +7,8 @@
 import React from "react";
 import path from "node:path";
 import fs from "node:fs";
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  Image,
-  StyleSheet,
-} from "@react-pdf/renderer";
+import { StyleSheet } from "@react-pdf/renderer";
+import { Document, Image, Page, Text, View } from "./react-pdf-jsx";
 import { TOOLKIT_TOKENS as T } from "./toolkit-pdf-tokens";
 
 const DISCLAIMER =
