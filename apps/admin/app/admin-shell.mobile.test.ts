@@ -15,8 +15,23 @@ assert.match(
 );
 assert.match(
   source,
-  /md:hidden/,
-  "mobile navigation is scoped to small viewports",
+  /lg:hidden/,
+  "mobile navigation is scoped below the desktop sidebar breakpoint",
+);
+assert.match(
+  source,
+  /hidden lg:flex/,
+  "desktop sidebar is hidden until the large viewport breakpoint",
+);
+assert.match(
+  source,
+  /fixed inset-0 z-50 lg:hidden/,
+  "mobile navigation opens as a fixed overlay below the large breakpoint",
+);
+assert.match(
+  source,
+  /!h-full !w-full/,
+  "mobile drawer navigation fills the overlay panel",
 );
 assert.match(
   source,
