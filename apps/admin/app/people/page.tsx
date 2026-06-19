@@ -15,10 +15,13 @@ import {
 import {
   fetchActiveSiteState,
   fetchPeopleForOrg,
+  fetchDeletedPeopleForOrg,
   fetchInvitesForOrg,
+  deletePersonFromOrg,
   resendInvite,
   revokeInvite,
   type PersonRow,
+  type DeletedPersonRow,
   type InviteRow,
 } from "../../lib/api-client";
 import { getSafeDisplayName } from "../../lib/names";
@@ -34,13 +37,19 @@ export default function PeoplePage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const { role, userId: apiUserId, isLoading: isLoadingAccess } = useAdminAccess();
+  const canDeletePeople = role.isOrgAdmin;
   const [people, setPeople] = React.useState<PersonRow[]>([]);
+  const [deletedPeople, setDeletedPeople] = React.useState<DeletedPersonRow[]>([]);
   const [invites, setInvites] = React.useState<InviteRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [deletingUserId, setDeletingUserId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [orgId, setOrgId] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [activeTab, setActiveTab] = React.useState<"people" | "invites">("people");
+  const [activeTab, setActiveTab] = React.useState<
+    "people" | "invites" | "deleted"
+  >("people");
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -49,18 +58,20 @@ export default function PeoplePage() {
       if (!orgId) {
         throw new Error("Active organisation not found.");
       }
-      const [peopleData, invitesData] = await Promise.all([
+      const [peopleData, deletedPeopleData, invitesData] = await Promise.all([
         fetchPeopleForOrg(orgId),
+        canDeletePeople ? fetchDeletedPeopleForOrg(orgId) : Promise.resolve([]),
         fetchInvitesForOrg(orgId, "pending"),
       ]);
       setPeople(peopleData);
+      setDeletedPeople(deletedPeopleData);
       setInvites(invitesData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setIsLoading(false);
     }
-  }, [orgId]);
+  }, [canDeletePeople, orgId]);
 
   React.useEffect(() => {
     // Only load data when session is authenticated
@@ -107,6 +118,34 @@ export default function PeoplePage() {
     }
   }, [orgId, load]);
 
+  const handleDeletePerson = React.useCallback(async (person: PersonRow) => {
+    const displayName = getSafeDisplayName({
+      displayName: person.displayName,
+      name: person.name,
+      email: person.email,
+    });
+    const confirmed = confirm(
+      `Remove ${displayName} from this organisation? They will lose org and site access, but historical records will be kept.`,
+    );
+    if (!confirmed) return;
+    setDeletingUserId(person.id);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      if (!orgId) {
+        throw new Error("Active organisation not found.");
+      }
+      await deletePersonFromOrg(orgId, person.id);
+      await load();
+      setSuccessMessage(`${displayName} has been moved to deleted users.`);
+      setActiveTab("deleted");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete person");
+    } finally {
+      setDeletingUserId(null);
+    }
+  }, [orgId, load]);
+
   const filteredPeople = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return people;
@@ -126,6 +165,22 @@ export default function PeoplePage() {
     if (!query) return invites;
     return invites.filter((inv) => inv.email.toLowerCase().includes(query));
   }, [invites, searchQuery]);
+
+  const filteredDeletedPeople = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return deletedPeople;
+    return deletedPeople.filter((person) => {
+      const displayName = getSafeDisplayName({
+        displayName: person.displayName,
+        name: person.name,
+        email: person.email ?? "",
+      });
+      return (
+        displayName.toLowerCase().includes(query) ||
+        (person.email ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [deletedPeople, searchQuery]);
 
   const canEditPeople = canPerform("people:edit", role);
   const sessionUserId = (session?.user as { id?: string })?.id ?? null;
@@ -176,17 +231,31 @@ export default function PeoplePage() {
               !!currentUserId && currentUserId === row.id;
             const href = isCurrentUser ? "/staff/profile" : `/people/${row.id}`;
             return (
-              <Button asChild variant="secondary" size="sm">
-                <Link href={href}>Profile</Link>
-              </Button>
+              <div className="flex items-center justify-end gap-2">
+                <Button asChild variant="secondary" size="sm">
+                  <Link href={href}>Profile</Link>
+                </Button>
+                {canDeletePeople && !isCurrentUser && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={deletingUserId === row.id}
+                    onClick={() => handleDeletePerson(row)}
+                    className="border-status-danger/30 text-status-danger hover:bg-status-danger/5"
+                  >
+                    {deletingUserId === row.id ? "Deleting..." : "Delete"}
+                  </Button>
+                )}
+              </div>
             );
           },
-          width: "100px",
+          width: canDeletePeople ? "180px" : "100px",
         });
       }
       return cols;
     },
-    [canEditPeople, currentUserId],
+    [canDeletePeople, canEditPeople, currentUserId, deletingUserId, handleDeletePerson],
   );
 
   const inviteColumns = React.useMemo<ColumnDef<InviteRow>[]>(
@@ -255,6 +324,58 @@ export default function PeoplePage() {
     [handleResendInvite, handleRevokeInvite],
   );
 
+  const deletedPeopleColumns = React.useMemo<ColumnDef<DeletedPersonRow>[]>(
+    () => [
+      {
+        id: "name",
+        header: "Name",
+        cell: (row) => (
+          <div className="flex flex-col">
+            <span className="font-semibold text-text-primary">
+              {getSafeDisplayName({
+                displayName: row.displayName,
+                name: row.name,
+                email: row.email ?? "",
+              })}
+            </span>
+            {row.email && (
+              <span className="text-sm text-text-muted">{row.email}</span>
+            )}
+          </div>
+        ),
+      },
+      {
+        id: "priorOrgRole",
+        header: "Previous role",
+        cell: (row) => (
+          <Badge variant="default">{row.priorOrgRole ?? "ORG_MEMBER"}</Badge>
+        ),
+        width: "150px",
+      },
+      {
+        id: "priorSiteCount",
+        header: "Site access",
+        cell: (row) => (
+          <span className="text-sm text-text-secondary">
+            {row.priorSiteCount} site(s)
+          </span>
+        ),
+        width: "140px",
+      },
+      {
+        id: "deletedAt",
+        header: "Deleted",
+        cell: (row) => (
+          <span className="text-sm text-text-secondary">
+            {new Date(row.deletedAt).toLocaleDateString()}
+          </span>
+        ),
+        width: "130px",
+      },
+    ],
+    [],
+  );
+
   if (isLoadingAccess) {
     return (
       <div className="flex flex-col gap-4">
@@ -296,6 +417,11 @@ export default function PeoplePage() {
           {error}
         </div>
       )}
+      {successMessage && (
+        <div className="rounded-md border border-status-success/30 bg-status-success/10 px-3 py-2 text-sm text-status-success">
+          {successMessage}
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-4 border-b border-border pb-0">
@@ -319,15 +445,35 @@ export default function PeoplePage() {
         >
           Pending invites ({invites.length})
         </button>
+        {canDeletePeople ? (
+          <button
+            onClick={() => setActiveTab("deleted")}
+            className={`pb-2 px-1 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "deleted"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-primary"
+            }`}
+          >
+            Deleted users ({deletedPeople.length})
+          </button>
+        ) : null}
       </div>
 
       {/* Data Card */}
       <Card
-        title={activeTab === "people" ? "Organisation members" : "Pending invitations"}
+        title={
+          activeTab === "people"
+            ? "Organisation members"
+            : activeTab === "invites"
+              ? "Pending invitations"
+              : "Deleted users"
+        }
         description={
           activeTab === "people"
             ? "Users with access to this organisation and its sites"
-            : "Invitations sent but not yet accepted"
+            : activeTab === "invites"
+              ? "Invitations sent but not yet accepted"
+              : "People removed from this organisation"
         }
         actions={
           <Input
@@ -348,11 +494,17 @@ export default function PeoplePage() {
             data={filteredPeople}
             emptyMessage="No people found. Invite someone to get started."
           />
-        ) : (
+        ) : activeTab === "invites" ? (
           <DataTable
             columns={inviteColumns}
             data={filteredInvites}
             emptyMessage="No pending invites."
+          />
+        ) : (
+          <DataTable
+            columns={deletedPeopleColumns}
+            data={filteredDeletedPeople}
+            emptyMessage="No deleted users."
           />
         )}
       </Card>

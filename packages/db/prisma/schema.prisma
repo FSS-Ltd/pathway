@@ -236,6 +236,7 @@ model Org {
   pendingOrders     PendingOrder[]
   invites           Invite[]
   publicSignupLinks PublicSignupLink[]
+  deletedUsers      OrgDeletedUser[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
@@ -350,6 +351,8 @@ model User {
   identities           UserIdentity[]
   invitesCreated          Invite[]                  @relation("InviteCreatedBy")
   publicSignupLinksCreated PublicSignupLink[]       @relation("PublicSignupLinkCreatedBy")
+  orgDeletionRecords    OrgDeletedUser[]          @relation("OrgDeletedUserTarget")
+  deletedOrgUsers       OrgDeletedUser[]          @relation("OrgDeletedUserActor")
   staffUnavailableDates   StaffUnavailableDate[]
   staffPreferredGroups    StaffPreferredGroup[]
   emergencyContacts       EmergencyContact[]
@@ -443,6 +446,27 @@ model Invite {
   @@index([orgId, email])
   @@index([tokenHash])
   @@index([email])
+}
+
+model OrgDeletedUser {
+  id              String   @id @default(uuid())
+  orgId           String
+  userId          String
+  deletedByUserId String
+  name            String
+  displayName     String?
+  email           String?
+  priorOrgRole    OrgRole?
+  priorSiteCount  Int      @default(0)
+  deletedAt       DateTime @default(now())
+
+  org       Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user      User @relation("OrgDeletedUserTarget", fields: [userId], references: [id])
+  deletedBy User @relation("OrgDeletedUserActor", fields: [deletedByUserId], references: [id])
+
+  @@index([orgId, deletedAt])
+  @@index([userId])
+  @@index([deletedByUserId])
 }
 
 // Invite-only public parent signup link (site-specific; token in QR link).

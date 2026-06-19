@@ -5265,6 +5265,18 @@ export type PersonRow = {
   };
 };
 
+export type DeletedPersonRow = {
+  id: string;
+  userId: string;
+  name: string;
+  displayName?: string | null;
+  email?: string | null;
+  priorOrgRole?: string | null;
+  priorSiteCount: number;
+  deletedAt: string;
+  deletedByUserId: string;
+};
+
 export type InviteRow = {
   id: string;
   email: string;
@@ -5312,6 +5324,46 @@ export async function fetchPeopleForOrg(orgId: string): Promise<PersonRow[]> {
   }
 
   return (await res.json()) as PersonRow[];
+}
+
+/**
+ * Fetch people removed from an org
+ */
+export async function fetchDeletedPeopleForOrg(
+  orgId: string,
+): Promise<DeletedPersonRow[]> {
+  const res = await fetch(`${API_BASE_URL}/orgs/${orgId}/people/deleted`, {
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch deleted people: ${res.status} ${body}`);
+  }
+
+  return (await res.json()) as DeletedPersonRow[];
+}
+
+/**
+ * Remove a person's access from an org
+ */
+export async function deletePersonFromOrg(
+  orgId: string,
+  userId: string,
+): Promise<DeletedPersonRow> {
+  const res = await fetch(`${API_BASE_URL}/orgs/${orgId}/people/${userId}`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to delete person: ${res.status} ${body}`);
+  }
+
+  return (await res.json()) as DeletedPersonRow;
 }
 
 /**

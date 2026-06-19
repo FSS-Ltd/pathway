@@ -4,11 +4,12 @@ import { BillingModule } from "../billing/billing.module";
 import { AuthModule } from "../auth/auth.module";
 import { OrgsController } from "./orgs.controller";
 import { OrgsService } from "./orgs.service";
+import { OrgPeopleService } from "./org-people.service";
 
 @Module({
   imports: [CommonModule, BillingModule, AuthModule],
   controllers: [OrgsController],
-  providers: [OrgsService],
-  exports: [OrgsService],
+  providers: [OrgsService, OrgPeopleService],
+  exports: [OrgsService, OrgPeopleService],
 })
 export class OrgsModule {}
