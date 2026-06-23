@@ -19,10 +19,6 @@ const ORG_ADMIN_ROLES = [OrgRole.ORG_ADMIN, OrgRole.ORG_BILLING];
 
 @Injectable()
 export class ActiveSiteService {
-  constructor() {
-    console.log("[ActiveSiteService] Constructor called - service initialized");
-  }
-
   async getActiveSiteState(userId: string): Promise<ActiveSiteState> {
     const sites = await this.listSitesForUser(userId);
     const user = await prisma.user.findUnique({
@@ -124,5 +120,4 @@ export class ActiveSiteService {
     );
   }
 }
-
 
