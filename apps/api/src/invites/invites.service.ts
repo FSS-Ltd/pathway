@@ -134,7 +134,6 @@ export class InvitesService {
       email: normalizedEmail,
       orgName: invite.org.name,
       invitedBy: invitedByName,
-      inviteUrl,
     });
 
     try {
@@ -318,7 +317,6 @@ export class InvitesService {
       email: updated.email,
       orgName: updated.org.name,
       invitedBy: invitedByName,
-      inviteUrl,
     });
 
     try {
@@ -853,4 +851,3 @@ export class InvitesService {
     };
   }
 }
-
