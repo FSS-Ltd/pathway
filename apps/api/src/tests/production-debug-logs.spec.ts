@@ -16,4 +16,15 @@ describe("production debug logging", () => {
       expect(source).not.toContain("console.log");
     },
   );
+
+  it("does not write raw invite acceptance URLs to diagnostics", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "src/invites/invites.service.ts"),
+      "utf8",
+    );
+    const consolePayloads =
+      source.match(/console\.log\(\{[\s\S]*?\n\s*\}\);/g) ?? [];
+
+    expect(consolePayloads.join("\n")).not.toContain("inviteUrl");
+  });
 });
