@@ -43,16 +43,6 @@ async function upsertIdentityToApi(payload: {
   email?: string | null;
   name?: string | null;
 }): Promise<IdentityUpsertResponse> {
-  console.log("[🔐 AUTH] Starting identity upsert to API:");
-  console.log({
-    provider: payload.provider,
-    subject: payload.subject,
-    email: payload.email,
-    name: payload.name,
-    apiBaseUrl,
-    hasSecret: !!INTERNAL_AUTH_SECRET,
-  });
-
   if (!INTERNAL_AUTH_SECRET) {
     console.error("❌ [AUTH] INTERNAL_AUTH_SECRET not set! Cannot create user in DB!");
     return {};
@@ -61,7 +51,6 @@ async function upsertIdentityToApi(payload: {
   try {
     const url = new URL(`${apiBaseUrl}/internal/auth/identity/upsert`);
     const body = JSON.stringify(payload);
-    console.log(`[🔐 AUTH] Calling ${url.toString()}...`);
 
     const result = await new Promise<IdentityUpsertResponse>((resolve, reject) => {
       const isHttps = url.protocol === "https:";
@@ -78,7 +67,6 @@ async function upsertIdentityToApi(payload: {
           ...(isHttps && insecureAgent ? { agent: insecureAgent } : {}),
         },
         (res) => {
-          console.log(`[🔐 AUTH] API response status: ${res.statusCode}`);
           const chunks: Buffer[] = [];
           res.on("data", (chunk) => chunks.push(chunk));
           res.on("end", () => {
@@ -103,15 +91,6 @@ async function upsertIdentityToApi(payload: {
       req.write(body);
       req.end();
     });
-
-    if (result.userId || result.email || result.displayName) {
-      console.log("✅ [AUTH] Identity upsert SUCCESS:");
-      console.log({
-        userId: result.userId,
-        email: result.email,
-        displayName: result.displayName,
-      });
-    }
 
     return result;
   } catch (error) {
@@ -173,22 +152,6 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, account, profile }) {
       try {
-        console.log("[🔐 AUTH] JWT callback triggered");
-        console.log("[🔐 AUTH] Profile:", {
-          sub: token.sub,
-          email: (profile as any)?.email ?? (token as any).email,
-          name: (profile as any)?.name,
-          hasAccount: !!account,
-          userId: (token as any).userId,
-          displayName: (token as any).displayName,
-          rolesInToken: (token as any).roles
-            ? {
-                orgRoles: (token as any).roles.orgRoles?.length ?? 0,
-                siteRoles: (token as any).roles.siteRoles?.length ?? 0,
-              }
-            : undefined,
-        });
-
         // On first login, persist tokens into the JWT
         if (account?.access_token) {
           (token as any).accessToken = account.access_token;
@@ -200,7 +163,6 @@ export const authOptions: NextAuthOptions = {
         // Upsert identity in DB whenever we have a new Auth0 session
         // Auth0 handles email verification - if user is here, they're verified
         if (account?.provider === "auth0" && token.sub) {
-          console.log("[🔐 AUTH] Upserting user identity to DB...");
           const profileEmail = (profile as any)?.email ?? (token as any).email;
           const profileName =
             (profile as any)?.name ??
@@ -227,13 +189,6 @@ export const authOptions: NextAuthOptions = {
           }
           if (identity.roles) {
             (token as any).roles = identity.roles;
-            console.log("[🔐 AUTH] Roles stored from identity upsert:", {
-              orgRoles: identity.roles.orgRoles.length,
-              siteRoles: identity.roles.siteRoles.length,
-              orgMemberships: identity.roles.orgMemberships.length,
-              siteMemberships: identity.roles.siteMemberships.length,
-              superUser: identity.roles.superUser === true,
-            });
           }
         }
 
