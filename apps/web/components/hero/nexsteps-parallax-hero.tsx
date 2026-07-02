@@ -209,12 +209,18 @@ export default function NexStepsParallaxHero() {
     let frame: number;
     const tick = () => {
       const video = videoRef.current;
-      if (video && video.readyState >= 2 && video.duration) {
+      // Skip while a seek is in flight — stacking seeks on a high-res
+      // stream makes the decoder thrash and the scrub stutter.
+      if (video && video.readyState >= 2 && video.duration && !video.seeking) {
         // Leave a small tail so we never seek past the last frame.
         const target = scrubTarget.current * (video.duration - 0.05);
         const delta = target - video.currentTime;
-        if (Math.abs(delta) > 0.01) {
-          video.currentTime += delta * 0.14;
+        if (Math.abs(delta) > 0.25) {
+          video.currentTime += delta * 0.2;
+        } else if (Math.abs(delta) > 1 / 60) {
+          // Close to target: snap instead of chasing sub-frame deltas,
+          // so each scroll step costs exactly one seek.
+          video.currentTime = target;
         }
       }
       frame = requestAnimationFrame(tick);
