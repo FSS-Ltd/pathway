@@ -6,14 +6,16 @@ import {
   Optional,
 } from "@nestjs/common";
 import { createHash } from "crypto";
-import { prisma, Role } from "@pathway/db";
+import { ChildGuardianContactType, prisma, Role } from "@pathway/db";
 import { MailerService } from "../mailer/mailer.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { childPhotoKey } from "../common/storage/storage-key.util";
 import type { PublicSignupConfigDto } from "./dto/public-signup-config.dto";
 import type {
+  ChildSignupDto,
   PublicSignupSubmitDto,
+  PublicSignupContactOnlySubmitDto,
   SubmitExistingUserDto,
   EmergencyContactDto,
 } from "./dto/public-signup-submit.dto";
@@ -34,6 +36,13 @@ type ResolvedLink = {
   orgName: string;
   siteName: string;
   siteTimezone: string | null;
+  parentPortalEnabled: boolean;
+};
+
+type CommonSignupPayload = {
+  consents: { dataProcessingConsent: boolean; firstAidConsent?: boolean };
+  emergencyContacts: EmergencyContactDto[];
+  children: ChildSignupDto[];
 };
 
 @Injectable()
@@ -69,7 +78,7 @@ export class PublicSignupService {
       },
       include: {
         tenant: { select: { name: true, timezone: true } },
-        org: { select: { name: true } },
+        org: { select: { name: true, parentPortalEnabled: true } },
       },
     });
 
@@ -84,6 +93,7 @@ export class PublicSignupService {
       orgName: link.org.name,
       siteName: link.tenant.name,
       siteTimezone: link.tenant.timezone ?? null,
+      parentPortalEnabled: link.org.parentPortalEnabled,
     };
   }
 
@@ -93,6 +103,7 @@ export class PublicSignupService {
       orgName: link.orgName,
       siteName: link.siteName,
       siteTimezone: link.siteTimezone,
+      parentPortalEnabled: link.parentPortalEnabled,
       requiredConsents: REQUIRED_CONSENTS,
       formVersion: FORM_VERSION,
     };
@@ -113,7 +124,8 @@ export class PublicSignupService {
     mode: "EXISTING_USER" | "NEW_USER";
     displayName?: string;
   }> {
-    await this.resolveLink(inviteToken);
+    const link = await this.resolveLink(inviteToken);
+    this.assertParentPortalEnabled(link);
     const normalized = email.trim().toLowerCase();
     const user = await prisma.user.findFirst({
       where: { email: { equals: normalized, mode: "insensitive" } },
@@ -163,6 +175,7 @@ export class PublicSignupService {
     }>,
   ): Promise<{ success: true; linkedCount: number }> {
     const link = await this.resolveLink(inviteToken);
+    this.assertParentPortalEnabled(link);
     const idsToLink = [...childIds];
 
     if (childrenToCreate && childrenToCreate.length > 0) {
@@ -269,18 +282,9 @@ export class PublicSignupService {
     dto: SubmitExistingUserDto,
   ): Promise<{ success: true; message: string }> {
     const link = await this.resolveLink(dto.token);
+    this.assertParentPortalEnabled(link);
 
-    if (!dto.consents.dataProcessingConsent) {
-      throw new BadRequestException("Data processing consent is required");
-    }
-    if (!dto.emergencyContacts?.length) {
-      throw new BadRequestException(
-        "At least one emergency contact is required",
-      );
-    }
-    if (!dto.children?.length) {
-      throw new BadRequestException("At least one child is required");
-    }
+    this.assertCommonSignupRequirements(dto);
 
     const email = dto.parent.email.trim().toLowerCase();
     const auth0Sub = await this.auth0Management?.verifyPassword(
@@ -336,56 +340,7 @@ export class PublicSignupService {
     const now = new Date();
 
     for (const c of dto.children) {
-      const allergies = (c.allergies ?? "").trim() || "none";
-      let photoBytes: Buffer | null = null;
-      let photoContentType: string | null = null;
-      if (c.photoBase64?.trim()) {
-        const decoded = this.decodeAndValidatePhoto(
-          c.photoBase64.trim(),
-          c.photoContentType?.trim(),
-        );
-        photoBytes = decoded.buffer;
-        photoContentType = decoded.contentType;
-      }
-
-      const dateOfBirth =
-        c.dateOfBirth?.trim() &&
-        /^\d{4}-\d{2}-\d{2}$/.test(c.dateOfBirth.trim())
-          ? new Date(c.dateOfBirth.trim())
-          : null;
-
-      const child = await prisma.child.create({
-        data: {
-          tenantId: link.tenantId,
-          firstName: c.firstName.trim(),
-          lastName: c.lastName.trim(),
-          preferredName: c.preferredName?.trim() || null,
-          dateOfBirth,
-          allergies,
-          additionalNeedsNotes: c.additionalNeedsNotes?.trim() || null,
-          schoolName: c.schoolName?.trim() || null,
-          yearGroup: c.yearGroup?.trim() || null,
-          gpName: c.gpName?.trim() || null,
-          gpPhone: c.gpPhone?.trim() || null,
-          specialNeedsType: c.specialNeedsType?.trim() || null,
-          specialNeedsOther:
-            c.specialNeedsType === "other" && c.specialNeedsOther?.trim()
-              ? c.specialNeedsOther.trim()
-              : null,
-          photoConsent: c.photoConsent,
-          photoKey: null,
-          photoBytes: photoBytes ?? undefined,
-          photoContentType: photoContentType ?? undefined,
-          groupId: c.groupId || null,
-          guardians: { connect: { id: user.id } },
-        },
-      });
-      await this.moveChildPhotoToStorage(
-        child.id,
-        link.tenantId,
-        photoBytes,
-        photoContentType,
-      );
+      await this.createSignupChild(link, c, user.id);
     }
 
     await prisma.emergencyContact.createMany({
@@ -439,18 +394,9 @@ export class PublicSignupService {
     dto: PublicSignupSubmitDto,
   ): Promise<{ success: true; message: string }> {
     const link = await this.resolveLink(dto.token);
+    this.assertParentPortalEnabled(link);
 
-    if (!dto.consents.dataProcessingConsent) {
-      throw new BadRequestException("Data processing consent is required");
-    }
-    if (!dto.emergencyContacts?.length) {
-      throw new BadRequestException(
-        "At least one emergency contact is required",
-      );
-    }
-    if (!dto.children?.length) {
-      throw new BadRequestException("At least one child is required");
-    }
+    this.assertCommonSignupRequirements(dto);
 
     const email = dto.parent.email.trim().toLowerCase();
     const fullName = dto.parent.fullName.trim();
@@ -518,57 +464,7 @@ export class PublicSignupService {
     const childIds: string[] = [];
 
     for (const c of dto.children) {
-      const allergies = (c.allergies ?? "").trim() || "none";
-      let photoBytes: Buffer | null = null;
-      let photoContentType: string | null = null;
-      if (c.photoBase64?.trim()) {
-        const decoded = this.decodeAndValidatePhoto(
-          c.photoBase64.trim(),
-          c.photoContentType?.trim(),
-        );
-        photoBytes = decoded.buffer;
-        photoContentType = decoded.contentType;
-      }
-
-      const dateOfBirth =
-        c.dateOfBirth?.trim() &&
-        /^\d{4}-\d{2}-\d{2}$/.test(c.dateOfBirth.trim())
-          ? new Date(c.dateOfBirth.trim())
-          : null;
-
-      const child = await prisma.child.create({
-        data: {
-          tenantId: link.tenantId,
-          firstName: c.firstName.trim(),
-          lastName: c.lastName.trim(),
-          preferredName: c.preferredName?.trim() || null,
-          dateOfBirth,
-          allergies,
-          additionalNeedsNotes: c.additionalNeedsNotes?.trim() || null,
-          schoolName: c.schoolName?.trim() || null,
-          yearGroup: c.yearGroup?.trim() || null,
-          gpName: c.gpName?.trim() || null,
-          gpPhone: c.gpPhone?.trim() || null,
-          specialNeedsType: c.specialNeedsType?.trim() || null,
-          specialNeedsOther:
-            c.specialNeedsType === "other" && c.specialNeedsOther?.trim()
-              ? c.specialNeedsOther.trim()
-              : null,
-          photoConsent: c.photoConsent,
-          photoKey: null,
-          photoBytes: photoBytes ?? undefined,
-          photoContentType: photoContentType ?? undefined,
-          groupId: c.groupId || null,
-          guardians: { connect: { id: user.id } },
-        },
-      });
-      await this.moveChildPhotoToStorage(
-        child.id,
-        link.tenantId,
-        photoBytes,
-        photoContentType,
-      );
-      childIds.push(child.id);
+      childIds.push(await this.createSignupChild(link, c, user.id));
     }
 
     await prisma.emergencyContact.createMany({
@@ -615,6 +511,150 @@ export class PublicSignupService {
       success: true,
       message: "Registration complete. Check your email to sign in.",
     };
+  }
+
+  async submitContactOnly(
+    dto: PublicSignupContactOnlySubmitDto,
+  ): Promise<{ success: true; message: string }> {
+    const link = await this.resolveLink(dto.token);
+    if (link.parentPortalEnabled) {
+      throw new BadRequestException(
+        "Parent portal is enabled for this organisation",
+      );
+    }
+
+    this.assertCommonSignupRequirements(dto);
+
+    const now = new Date();
+    const childIds: string[] = [];
+    for (const child of dto.children) {
+      childIds.push(await this.createSignupChild(link, child));
+    }
+
+    const primaryContact = {
+      fullName: dto.parent.fullName.trim(),
+      email: dto.parent.email.trim().toLowerCase(),
+      phone: dto.parent.phone?.trim() || null,
+      relationshipToChild: dto.parent.relationshipToChild?.trim() || null,
+      contactType: ChildGuardianContactType.PRIMARY_GUARDIAN,
+      dataProcessingConsentAt: now,
+      firstAidConsentAt: dto.consents.firstAidConsent ? now : null,
+    };
+
+    const contactRows = childIds.flatMap((childId) => [
+      {
+        childId,
+        tenantId: link.tenantId,
+        ...primaryContact,
+      },
+      ...dto.emergencyContacts.map((ec) => ({
+        childId,
+        tenantId: link.tenantId,
+        fullName: ec.name.trim(),
+        email: null,
+        phone: ec.phone.trim(),
+        relationshipToChild: ec.relationship?.trim() || null,
+        contactType: ChildGuardianContactType.EMERGENCY_CONTACT,
+        dataProcessingConsentAt: null,
+        firstAidConsentAt: null,
+      })),
+    ]);
+
+    await prisma.childGuardianContact.createMany({
+      data: contactRows,
+    });
+
+    await prisma.publicSignupLink.update({
+      where: { id: link.id },
+      data: { lastUsedAt: now },
+    });
+
+    return {
+      success: true,
+      message: "Registration complete. Your details have been recorded.",
+    };
+  }
+
+  private assertParentPortalEnabled(link: ResolvedLink): void {
+    if (!link.parentPortalEnabled) {
+      throw new BadRequestException(
+        "Parent portal is disabled for this organisation",
+      );
+    }
+  }
+
+  private assertCommonSignupRequirements(dto: CommonSignupPayload): void {
+    if (!dto.consents.dataProcessingConsent) {
+      throw new BadRequestException("Data processing consent is required");
+    }
+    if (!dto.emergencyContacts?.length) {
+      throw new BadRequestException(
+        "At least one emergency contact is required",
+      );
+    }
+    if (!dto.children?.length) {
+      throw new BadRequestException("At least one child is required");
+    }
+  }
+
+  private async createSignupChild(
+    link: ResolvedLink,
+    c: ChildSignupDto,
+    guardianUserId?: string,
+  ): Promise<string> {
+    const allergies = (c.allergies ?? "").trim() || "none";
+    let photoBytes: Buffer | null = null;
+    let photoContentType: string | null = null;
+    if (c.photoBase64?.trim()) {
+      const decoded = this.decodeAndValidatePhoto(
+        c.photoBase64.trim(),
+        c.photoContentType?.trim(),
+      );
+      photoBytes = decoded.buffer;
+      photoContentType = decoded.contentType;
+    }
+
+    const dateOfBirth =
+      c.dateOfBirth?.trim() && /^\d{4}-\d{2}-\d{2}$/.test(c.dateOfBirth.trim())
+        ? new Date(c.dateOfBirth.trim())
+        : null;
+
+    const child = await prisma.child.create({
+      data: {
+        tenantId: link.tenantId,
+        firstName: c.firstName.trim(),
+        lastName: c.lastName.trim(),
+        preferredName: c.preferredName?.trim() || null,
+        dateOfBirth,
+        allergies,
+        additionalNeedsNotes: c.additionalNeedsNotes?.trim() || null,
+        schoolName: c.schoolName?.trim() || null,
+        yearGroup: c.yearGroup?.trim() || null,
+        gpName: c.gpName?.trim() || null,
+        gpPhone: c.gpPhone?.trim() || null,
+        specialNeedsType: c.specialNeedsType?.trim() || null,
+        specialNeedsOther:
+          c.specialNeedsType === "other" && c.specialNeedsOther?.trim()
+            ? c.specialNeedsOther.trim()
+            : null,
+        photoConsent: c.photoConsent,
+        photoKey: null,
+        photoBytes: photoBytes ?? undefined,
+        photoContentType: photoContentType ?? undefined,
+        groupId: c.groupId || null,
+        ...(guardianUserId
+          ? { guardians: { connect: { id: guardianUserId } } }
+          : {}),
+      },
+      select: { id: true },
+    });
+    await this.moveChildPhotoToStorage(
+      child.id,
+      link.tenantId,
+      photoBytes,
+      photoContentType,
+    );
+    return child.id;
   }
 
   /**

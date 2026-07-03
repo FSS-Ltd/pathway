@@ -23,6 +23,7 @@ type RegisterOrgResult = {
     slug: string;
     planCode: string;
     isSuite: boolean;
+    parentPortalEnabled: boolean;
   };
   initialTenant?: {
     id: string;
@@ -83,6 +84,7 @@ export class OrgsService {
             slug: true,
             planCode: true,
             isSuite: true,
+            parentPortalEnabled: true,
           },
         });
 
@@ -204,6 +206,7 @@ export class OrgsService {
         slug: true,
         planCode: true,
         isSuite: true,
+        parentPortalEnabled: true,
       },
     });
     if (!org) throw new NotFoundException("Org not found");
@@ -211,21 +214,36 @@ export class OrgsService {
   }
 
   /**
-   * Update current org profile (name). Used by admin Settings.
+   * Update current org profile. Used by admin Settings.
    */
   async updateCurrentOrg(
     orgId: string,
-    data: { name: string },
-  ): Promise<{ id: string; name: string; slug: string }> {
+    data: { name?: string; parentPortalEnabled?: boolean },
+  ): Promise<{
+    id: string;
+    name: string;
+    slug: string;
+    parentPortalEnabled: boolean;
+  }> {
     const org = await prisma.org.findUnique({
       where: { id: orgId },
       select: { id: true, name: true, slug: true },
     });
     if (!org) throw new NotFoundException("Organisation not found");
+    const updateData: { name?: string; parentPortalEnabled?: boolean } = {};
+    if (data.name !== undefined) {
+      updateData.name = data.name.trim();
+    }
+    if (data.parentPortalEnabled !== undefined) {
+      updateData.parentPortalEnabled = data.parentPortalEnabled;
+    }
+    if (Object.keys(updateData).length === 0) {
+      throw new BadRequestException("At least one field is required");
+    }
     const updated = await prisma.org.update({
       where: { id: orgId },
-      data: { name: data.name.trim() },
-      select: { id: true, name: true, slug: true },
+      data: updateData,
+      select: { id: true, name: true, slug: true, parentPortalEnabled: true },
     });
     return updated;
   }
@@ -270,6 +288,7 @@ export class OrgsService {
         slug: true,
         planCode: true,
         isSuite: true,
+        parentPortalEnabled: true,
       },
     });
   }

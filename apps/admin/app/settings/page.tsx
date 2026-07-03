@@ -26,6 +26,7 @@ import { canPerform } from "../../lib/permissions";
 import { NoAccessCard } from "../../components/no-access-card";
 import { QrCodeCard } from "../../components/qr/QrCodeCard";
 import { getSafeDisplayName } from "../../lib/names";
+import { ParentPortalSettingsCard } from "./parent-portal-settings-card";
 
 function getRoleLabel(role: AdminRoleInfo): string {
   if (role.isOrgAdmin || role.isOrgOwner) return "Organisation admin";
@@ -49,6 +50,10 @@ export default function SettingsPage() {
   const [editOrgName, setEditOrgName] = React.useState("");
   const [orgSaveError, setOrgSaveError] = React.useState<string | null>(null);
   const [savingOrg, setSavingOrg] = React.useState(false);
+  const [parentPortalSaveError, setParentPortalSaveError] = React.useState<
+    string | null
+  >(null);
+  const [savingParentPortal, setSavingParentPortal] = React.useState(false);
 
   const [editingSite, setEditingSite] = React.useState(false);
   const [editSiteName, setEditSiteName] = React.useState("");
@@ -131,6 +136,24 @@ export default function SettingsPage() {
       setOrgSaveError(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSavingOrg(false);
+    }
+  };
+
+  const handleToggleParentPortal = async (enabled: boolean) => {
+    if (!org || enabled === org.parentPortalEnabled) return;
+    setParentPortalSaveError(null);
+    setSavingParentPortal(true);
+    try {
+      const updated = await updateOrgProfile({
+        parentPortalEnabled: enabled,
+      });
+      setOrg(updated);
+    } catch (e) {
+      setParentPortalSaveError(
+        e instanceof Error ? e.message : "Failed to save setting",
+      );
+    } finally {
+      setSavingParentPortal(false);
     }
   };
 
@@ -321,6 +344,15 @@ export default function SettingsPage() {
             <p className="text-sm text-text-muted">Organisation information is not available.</p>
           )}
         </Card>
+
+        <ParentPortalSettingsCard
+          enabled={org?.parentPortalEnabled ?? true}
+          canEdit={canEditOrg}
+          isLoading={isLoading}
+          isSaving={savingParentPortal}
+          error={parentPortalSaveError}
+          onToggle={handleToggleParentPortal}
+        />
 
         {/* A) Active Site */}
         <Card

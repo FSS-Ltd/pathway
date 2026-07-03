@@ -15,6 +15,7 @@ export type PublicSignupConfig = {
   orgName: string;
   siteName: string;
   siteTimezone?: string | null;
+  parentPortalEnabled: boolean;
   requiredConsents: string[];
   formVersion: string;
 };
@@ -56,6 +57,18 @@ export type PublicSignupSubmitPayload = {
   consents: {
     dataProcessingConsent: boolean;
     firstAidConsent?: boolean;
+  };
+};
+
+export type PublicSignupContactOnlyPayload = Omit<
+  PublicSignupSubmitPayload,
+  "parent"
+> & {
+  parent: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    relationshipToChild?: string;
   };
 };
 
@@ -135,6 +148,22 @@ export async function submitExistingUserSignup(
   payload: PublicSignupSubmitPayload,
 ): Promise<{ success: true; message: string }> {
   const res = await fetch(`${API_BASE_URL}/public/signup/submit-existing-user`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "Registration failed. Please try again.");
+  }
+  return res.json() as Promise<{ success: true; message: string }>;
+}
+
+export async function submitContactOnlySignup(
+  payload: PublicSignupContactOnlyPayload,
+): Promise<{ success: true; message: string }> {
+  const res = await fetch(`${API_BASE_URL}/public/signup/submit-contact-only`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),

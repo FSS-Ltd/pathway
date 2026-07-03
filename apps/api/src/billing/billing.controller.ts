@@ -35,12 +35,7 @@ export class BillingController {
     @Inject(BillingService) private readonly service: BillingService,
     @Inject(forwardRef(() => EntitlementsService)) private readonly entitlements: EntitlementsService,
     @Inject(forwardRef(() => EntitlementsEnforcementService)) private readonly enforcement: EntitlementsEnforcementService,
-  ) {
-    console.log("[BillingController] Constructor called - TIMESTAMP:", Date.now());
-    console.log("[BillingController] service:", !!this.service, this.service?.constructor?.name);
-    console.log("[BillingController] entitlements:", !!this.entitlements, this.entitlements?.constructor?.name);
-    console.log("[BillingController] enforcement:", !!this.enforcement, this.enforcement?.constructor?.name);
-  }
+  ) {}
 
   @Post("checkout")
   async checkout(@Body() body: unknown) {
@@ -54,14 +49,9 @@ export class BillingController {
   @Get("entitlements")
   @UseGuards(AuthUserGuard)
   async getEntitlements(@CurrentOrg("orgId") orgId: string) {
-    console.log("[getEntitlements] Starting...");
-    console.log("[getEntitlements] orgId:", orgId);
-    console.log("[getEntitlements] this.entitlements:", !!this.entitlements, typeof this.entitlements);
-    console.log("[getEntitlements] this.enforcement:", !!this.enforcement, typeof this.enforcement);
-    
     const resolved = await this.entitlements.resolve(orgId);
     const av30Status = await this.enforcement.checkAv30ForOrg(orgId);
-    
+
     return {
       orgId: resolved.orgId,
       isMasterOrg: resolved.isMasterOrg,

@@ -38,6 +38,17 @@ const childSelect = {
   guardians: {
     select: { id: true },
   },
+  guardianContacts: {
+    select: {
+      id: true,
+      fullName: true,
+      email: true,
+      phone: true,
+      relationshipToChild: true,
+      contactType: true,
+    },
+    orderBy: { createdAt: "asc" },
+  },
 } as const;
 
 @Injectable()

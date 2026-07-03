@@ -51,6 +51,78 @@ function groupSitesByOrg(sites: SiteOption[]) {
   return Array.from(groups.values());
 }
 
+type SiteMenuContentProps = {
+  siteState: SiteState;
+  savingSiteId: string | null;
+  error: string | null;
+  onSelectSite: (siteId: string) => void;
+};
+
+function SiteMenuContent({
+  siteState,
+  savingSiteId,
+  error,
+  onSelectSite,
+}: SiteMenuContentProps) {
+  return (
+    <>
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+        <Building2 className="h-4 w-4" />
+        <span>Site</span>
+      </div>
+      <ul className="max-h-80 overflow-y-auto px-1 pb-2">
+        {siteState.sites.length === 0 && (
+          <li className="px-3 py-2 text-sm text-text-muted">
+            No sites available for your account yet.
+          </li>
+        )}
+        {groupSitesByOrg(siteState.sites).map((group) => (
+          <li key={group.orgId ?? group.orgName}>
+            <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase text-text-muted">
+              {group.orgName}
+            </div>
+            <ul className="space-y-1 px-1 pb-2">
+              {group.sites.map((site) => {
+                const isActive = site.id === siteState.activeSiteId;
+                return (
+                  <li key={site.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectSite(site.id)}
+                      className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm text-text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:ring-accent-primary"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">{site.name}</span>
+                        {site.role && (
+                          <span className="text-xs text-text-muted">
+                            {site.role.toLowerCase()}
+                          </span>
+                        )}
+                      </div>
+                      {savingSiteId === site.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-accent-strong" />
+                      ) : (
+                        isActive && (
+                          <Check className="h-4 w-4 text-accent-strong" />
+                        )
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </li>
+        ))}
+      </ul>
+      {error && (
+        <div className="border-t border-border-subtle px-3 py-2 text-xs text-status-danger">
+          {error}
+        </div>
+      )}
+    </>
+  );
+}
+
 export function TopBarActions() {
   const { data: session, status } = useSession();
   const { role } = useAdminAccess();
@@ -167,6 +239,7 @@ export function TopBarActions() {
       const result = await setActiveSite(siteId);
       setSiteState(result);
       setSiteOpen(false);
+      setUserOpen(false);
     } catch (err) {
       console.error(err);
       setError("Unable to switch site");
@@ -195,7 +268,7 @@ export function TopBarActions() {
   return (
     <div className="flex items-center gap-3">
       {/* Site selector */}
-      <div className="relative" ref={siteMenuRef}>
+      <div className="relative hidden md:block" ref={siteMenuRef}>
         <button
           type="button"
           onClick={() => {
@@ -220,59 +293,12 @@ export function TopBarActions() {
             className="absolute right-0 z-30 mt-2 w-80 rounded-xl border border-border-subtle bg-surface shadow-lg"
             role="menu"
           >
-            <div className="flex items-center gap-2 px-3 pt-3 pb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
-              <Building2 className="h-4 w-4" />
-              <span>Site</span>
-            </div>
-            <ul className="max-h-80 overflow-y-auto px-1 pb-2">
-              {siteState.sites.length === 0 && (
-                <li className="px-3 py-2 text-sm text-text-muted">
-                  No sites available for your account yet.
-                </li>
-              )}
-              {groupSitesByOrg(siteState.sites).map((group) => (
-                <li key={group.orgId ?? group.orgName}>
-                  <div className="px-3 pt-2 pb-1 text-xs font-semibold uppercase text-text-muted">
-                    {group.orgName}
-                  </div>
-                  <ul className="space-y-1 px-1 pb-2">
-                    {group.sites.map((site) => {
-                      const isActive = site.id === siteState.activeSiteId;
-                      return (
-                        <li key={site.id}>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectSite(site.id)}
-                            className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm text-text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:ring-accent-primary"
-                          >
-                            <div className="flex flex-col">
-                              <span className="font-medium">{site.name}</span>
-                              {site.role && (
-                                <span className="text-xs text-text-muted">
-                                  {site.role.toLowerCase()}
-                                </span>
-                              )}
-                            </div>
-                            {savingSiteId === site.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin text-accent-strong" />
-                            ) : (
-                              isActive && (
-                                <Check className="h-4 w-4 text-accent-strong" />
-                              )
-                            )}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-            {error && (
-              <div className="border-t border-border-subtle px-3 py-2 text-xs text-status-danger">
-                {error}
-              </div>
-            )}
+            <SiteMenuContent
+              siteState={siteState}
+              savingSiteId={savingSiteId}
+              error={error}
+              onSelectSite={handleSelectSite}
+            />
           </div>
         )}
       </div>
@@ -286,7 +312,7 @@ export function TopBarActions() {
             setSiteOpen(false);
           }}
           aria-label="Open user menu"
-          className="flex min-w-0 max-w-[240px] items-center gap-3 rounded-full border border-border-subtle bg-surface px-3.5 py-2 shadow-sm transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:ring-accent-primary"
+          className="flex min-w-0 max-w-[11rem] items-center gap-3 rounded-full border border-border-subtle bg-surface px-3.5 py-2 shadow-sm transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:ring-accent-primary sm:max-w-[240px]"
         >
           <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-subtle text-xs font-semibold text-accent-strong">
             {avatarSrc ? (
@@ -344,6 +370,15 @@ export function TopBarActions() {
                   <div className="truncate text-xs text-text-muted">{userEmail}</div>
                 )}
               </div>
+            </div>
+
+            <div className="border-t border-border-subtle md:hidden">
+              <SiteMenuContent
+                siteState={siteState}
+                savingSiteId={savingSiteId}
+                error={error}
+                onSelectSite={handleSelectSite}
+              />
             </div>
 
             <div className="border-t border-border-subtle py-1 text-sm">

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { OrgsController } from "../orgs.controller";
 import { OrgsService } from "../orgs.service";
+import { OrgPeopleService } from "../org-people.service";
 import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { BadRequestException } from "@nestjs/common";
@@ -74,6 +75,15 @@ describe("OrgsController", () => {
   const getRetentionOverviewMock = jest.fn() as jest.MockedFunction<
     OrgsService["getRetentionOverview"]
   >;
+  const listPeopleMock = jest.fn() as jest.MockedFunction<
+    OrgPeopleService["listPeople"]
+  >;
+  const listDeletedPeopleMock = jest.fn() as jest.MockedFunction<
+    OrgPeopleService["listDeletedPeople"]
+  >;
+  const removePersonMock = jest.fn() as jest.MockedFunction<
+    OrgPeopleService["removePerson"]
+  >;
   const mockOrgsService: Pick<
     OrgsService,
     "register" | "updateCurrentOrg" | "getRetentionOverview"
@@ -82,11 +92,22 @@ describe("OrgsController", () => {
     updateCurrentOrg: updateCurrentOrgMock,
     getRetentionOverview: getRetentionOverviewMock,
   };
+  const mockOrgPeopleService: Pick<
+    OrgPeopleService,
+    "listPeople" | "listDeletedPeople" | "removePerson"
+  > = {
+    listPeople: listPeopleMock,
+    listDeletedPeople: listDeletedPeopleMock,
+    removePerson: removePersonMock,
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OrgsController],
-      providers: [{ provide: OrgsService, useValue: mockOrgsService }],
+      providers: [
+        { provide: OrgsService, useValue: mockOrgsService },
+        { provide: OrgPeopleService, useValue: mockOrgPeopleService },
+      ],
     })
       .overrideGuard(PathwayAuthGuard)
       .useValue({ canActivate: () => true })
@@ -98,6 +119,9 @@ describe("OrgsController", () => {
     registerMock.mockReset();
     updateCurrentOrgMock.mockReset();
     getRetentionOverviewMock.mockReset();
+    listPeopleMock.mockReset();
+    listDeletedPeopleMock.mockReset();
+    removePersonMock.mockReset();
     mockPrisma.orgMembership.findFirst.mockResolvedValue({
       role: "ORG_ADMIN",
     });
@@ -188,7 +212,8 @@ describe("OrgsController", () => {
         id: "org-1",
         name: "New Org Name",
         slug: "acme",
-      });
+        parentPortalEnabled: true,
+      } as unknown as Awaited<ReturnType<OrgsService["updateCurrentOrg"]>>);
       const result = await controller.updateCurrent(
         "org-1",
         req,
@@ -201,7 +226,46 @@ describe("OrgsController", () => {
         id: "org-1",
         name: "New Org Name",
         slug: "acme",
+        parentPortalEnabled: true,
       });
+    });
+
+    it("should allow an admin to update the parent portal setting", async () => {
+      const req = { authUserId: "user-1" } as unknown as Parameters<
+        OrgsController["updateCurrent"]
+      >[1];
+      updateCurrentOrgMock.mockResolvedValue({
+        id: "org-1",
+        name: "Org Name",
+        slug: "acme",
+        parentPortalEnabled: false,
+      } as unknown as Awaited<ReturnType<OrgsService["updateCurrentOrg"]>>);
+
+      const result = await controller.updateCurrent("org-1", req, {
+        parentPortalEnabled: false,
+      });
+
+      expect(updateCurrentOrgMock).toHaveBeenCalledWith("org-1", {
+        parentPortalEnabled: false,
+      });
+      expect(result).toEqual({
+        id: "org-1",
+        name: "Org Name",
+        slug: "acme",
+        parentPortalEnabled: false,
+      });
+    });
+
+    it("should reject an empty org update payload", async () => {
+      const req = { authUserId: "user-1" } as unknown as Parameters<
+        OrgsController["updateCurrent"]
+      >[1];
+
+      await expect(controller.updateCurrent("org-1", req, {})).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(updateCurrentOrgMock).not.toHaveBeenCalled();
     });
 
     it("should throw BadRequestException for invalid name (too short)", async () => {
@@ -245,60 +309,24 @@ describe("OrgsController", () => {
   });
 
   describe("listPeople", () => {
-    it("includes users who only have site membership in the org", async () => {
+    it("delegates active people listing to OrgPeopleService", async () => {
       const req = { authUserId: "admin-user" } as unknown as Parameters<
         OrgsController["listPeople"]
       >[1];
-
-      mockPrisma.orgMembership.findMany.mockResolvedValue([
+      listPeopleMock.mockResolvedValue([
         {
-          user: {
-            id: "admin-user",
-            name: "Admin User",
-            displayName: "Admin User",
-            email: "admin@example.test",
-          },
-          role: "ORG_ADMIN",
-        },
-      ]);
-      mockPrisma.tenant.findMany.mockResolvedValue([{ id: "site-1" }]);
-      mockPrisma.siteMembership.findMany.mockResolvedValue([
-        {
-          userId: "admin-user",
-          tenantId: "site-1",
-          user: {
-            id: "admin-user",
-            name: "Admin User",
-            displayName: "Admin User",
-            email: "admin@example.test",
-          },
-        },
-        {
-          userId: "staff-user",
-          tenantId: "site-1",
-          user: {
-            id: "staff-user",
-            name: "Staff User",
-            displayName: "Staff User",
-            email: "staff@example.test",
-          },
+          id: "staff-user",
+          name: "Staff User",
+          displayName: "Staff User",
+          email: "staff@example.test",
+          orgRole: "ORG_MEMBER",
+          siteAccessSummary: { allSites: false, siteCount: 1 },
         },
       ]);
 
       const result = await controller.listPeople("org-1", req);
 
       expect(result).toEqual([
-        {
-          id: "admin-user",
-          name: "Admin User",
-          displayName: "Admin User",
-          email: "admin@example.test",
-          orgRole: "ORG_ADMIN",
-          siteAccessSummary: {
-            allSites: true,
-            siteCount: 1,
-          },
-        },
         {
           id: "staff-user",
           name: "Staff User",
@@ -311,23 +339,83 @@ describe("OrgsController", () => {
           },
         },
       ]);
-      expect(mockPrisma.siteMembership.findMany).toHaveBeenCalledWith({
-        where: {
-          tenantId: { in: ["site-1"] },
+      expect(listPeopleMock).toHaveBeenCalledWith("org-1", "admin-user");
+    });
+  });
+
+  describe("listDeletedPeople", () => {
+    it("delegates deleted people listing to OrgPeopleService", async () => {
+      const req = { authUserId: "admin-user" } as unknown as Parameters<
+        OrgsController["listDeletedPeople"]
+      >[1];
+      const deletedAt = new Date("2026-06-19T09:00:00.000Z");
+      listDeletedPeopleMock.mockResolvedValue([
+        {
+          id: "deleted-1",
+          userId: "staff-user",
+          name: "Staff User",
+          displayName: "Staff User",
+          email: "staff@example.test",
+          priorOrgRole: "ORG_MEMBER",
+          priorSiteCount: 1,
+          deletedAt,
+          deletedByUserId: "admin-user",
         },
-        select: {
-          userId: true,
-          tenantId: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              displayName: true,
-              email: true,
-            },
-          },
+      ]);
+
+      const result = await controller.listDeletedPeople("org-1", req);
+
+      expect(result).toEqual([
+        {
+          id: "deleted-1",
+          userId: "staff-user",
+          name: "Staff User",
+          displayName: "Staff User",
+          email: "staff@example.test",
+          priorOrgRole: "ORG_MEMBER",
+          priorSiteCount: 1,
+          deletedAt,
+          deletedByUserId: "admin-user",
         },
+      ]);
+      expect(listDeletedPeopleMock).toHaveBeenCalledWith(
+        "org-1",
+        "admin-user",
+      );
+    });
+  });
+
+  describe("removePerson", () => {
+    it("delegates person removal to OrgPeopleService", async () => {
+      const req = { authUserId: "admin-user" } as unknown as Parameters<
+        OrgsController["removePerson"]
+      >[2];
+      const deletedAt = new Date("2026-06-19T09:00:00.000Z");
+      removePersonMock.mockResolvedValue({
+        id: "deleted-1",
+        userId: "staff-user",
+        name: "Staff User",
+        displayName: "Staff User",
+        email: "staff@example.test",
+        priorOrgRole: "ORG_MEMBER",
+        priorSiteCount: 1,
+        deletedAt,
+        deletedByUserId: "admin-user",
       });
+
+      const result = await controller.removePerson("org-1", "staff-user", req);
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: "deleted-1",
+          userId: "staff-user",
+        }),
+      );
+      expect(removePersonMock).toHaveBeenCalledWith(
+        "org-1",
+        "staff-user",
+        "admin-user",
+      );
     });
   });
 });

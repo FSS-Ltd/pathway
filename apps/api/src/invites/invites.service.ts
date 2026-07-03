@@ -128,15 +128,6 @@ export class InvitesService {
     const invitedByName =
       invite.createdBy.displayName || invite.createdBy.name || "A team member";
 
-    console.log("[INVITE] 📧 Preparing to send invite email:");
-    console.log({
-      inviteId: invite.id,
-      email: normalizedEmail,
-      orgName: invite.org.name,
-      invitedBy: invitedByName,
-      inviteUrl,
-    });
-
     try {
       await this.mailerService.sendInviteEmail({
         to: normalizedEmail,
@@ -144,7 +135,6 @@ export class InvitesService {
         orgName: invite.org.name,
         invitedByName,
       });
-      console.log(`[INVITE] ✅ Email sent successfully to ${normalizedEmail}`);
     } catch (error) {
       console.error(`[INVITE] ❌ Failed to send email to ${normalizedEmail}:`, error);
       // Don't fail the invite creation if email fails
@@ -180,9 +170,6 @@ export class InvitesService {
 
         if (existingIdentity) {
           // User already has Auth0 account, nothing to do
-          console.log(
-            `[INVITE] User ${email} already exists in DB and Auth0`,
-          );
           return;
         }
 
@@ -207,9 +194,6 @@ export class InvitesService {
               displayName: safeName,
             },
           });
-          console.log(
-            `[INVITE] ✅ Created Auth0 account for existing user ${email}`,
-          );
         }
         return;
       }
@@ -244,9 +228,6 @@ export class InvitesService {
             displayName: safeName,
           },
         });
-        console.log(
-          `[INVITE] ✅ Created user ${email} in DB and Auth0`,
-        );
       } else {
         console.warn(
           `[INVITE] ⚠️ Created user ${email} in DB but failed to create Auth0 account. User will need to sign up manually.`,
@@ -312,15 +293,6 @@ export class InvitesService {
     const invitedByName =
       updated.createdBy.displayName || updated.createdBy.name || "A team member";
 
-    console.log("[INVITE] 🔄 Resending invite email:");
-    console.log({
-      inviteId: updated.id,
-      email: updated.email,
-      orgName: updated.org.name,
-      invitedBy: invitedByName,
-      inviteUrl,
-    });
-
     try {
       await this.mailerService.sendInviteEmail({
         to: updated.email,
@@ -328,7 +300,6 @@ export class InvitesService {
         orgName: updated.org.name,
         invitedByName,
       });
-      console.log(`[INVITE] ✅ Email resent successfully to ${updated.email}`);
     } catch (error) {
       console.error(`[INVITE] ❌ Failed to resend email to ${updated.email}:`, error);
       // Don't fail the resend if email fails
@@ -447,12 +418,6 @@ export class InvitesService {
 
     if (pendingInvites.length === 0) return;
 
-    console.log("[INVITE] Auto-accepting pending invites on login:", {
-      email: normalizedEmail,
-      userId,
-      count: pendingInvites.length,
-    });
-
     for (const invite of pendingInvites) {
       try {
         await this.applyInviteMemberships(
@@ -462,7 +427,6 @@ export class InvitesService {
           userId,
           normalizedEmail,
         );
-        console.log("[INVITE] ✅ Auto-accepted invite:", invite.id);
       } catch (err) {
         console.error("[INVITE] Failed to auto-accept invite:", invite.id, err);
         // Continue with other invites
@@ -556,20 +520,11 @@ export class InvitesService {
       }
     }
 
-    console.log("[INVITE-ACCEPT] Applying memberships for invite:", {
-      inviteId: invite.id,
-      userId,
-      orgRole,
-      siteRole,
-      hasSiteIdsJson: !!siteIdsJson,
-    });
-
     // 1. Org membership
     // Always create at least ORG_MEMBER if no role specified
     const effectiveOrgRole = orgRole || OrgRole.ORG_MEMBER;
-    
-    console.log("[INVITE-ACCEPT] Creating OrgMembership with role:", effectiveOrgRole);
-    const orgMembership = await prisma.orgMembership.upsert({
+
+    await prisma.orgMembership.upsert({
       where: {
         orgId_userId: { orgId, userId },
       },
@@ -583,7 +538,6 @@ export class InvitesService {
         role: effectiveOrgRole,
       },
     });
-    console.log("[INVITE-ACCEPT] ✅ OrgMembership created:", orgMembership);
 
     // 1b. Create UserOrgRole record (for backward compatibility with older role checks)
     // Map OrgRole enum directly (they use the same enum values)
@@ -606,13 +560,6 @@ export class InvitesService {
               role: effectiveOrgRole,
             },
           });
-          console.log("[INVITE-ACCEPT] ✅ UserOrgRole created:", {
-            userId,
-            orgId,
-            role: effectiveOrgRole,
-          });
-        } else {
-          console.log("[INVITE-ACCEPT] UserOrgRole already exists, skipping");
         }
       } catch (err) {
         // Ignore duplicate errors (P2002)
@@ -646,7 +593,6 @@ export class InvitesService {
       }
     } else {
       // No site access specified - give access to all sites with STAFF role by default
-      console.log("[INVITE-ACCEPT] No site access specified, granting access to all sites");
       const allSites = await prisma.tenant.findMany({
         where: { orgId },
         select: { id: true },
@@ -656,16 +602,10 @@ export class InvitesService {
 
     // Always create site memberships - default to STAFF if no role specified
     const effectiveSiteRole = siteRole || SiteRole.STAFF;
-    
-    console.log("[INVITE-ACCEPT] Creating SiteMemberships:", {
-      siteCount: siteIds.length,
-      role: effectiveSiteRole,
-      siteIds,
-    });
 
     if (siteIds.length > 0) {
       for (const siteId of siteIds) {
-        const siteMembership = await prisma.siteMembership.upsert({
+        await prisma.siteMembership.upsert({
           where: {
             tenantId_userId: { tenantId: siteId, userId },
           },
@@ -678,10 +618,6 @@ export class InvitesService {
             // Optionally update role
             role: effectiveSiteRole,
           },
-        });
-        console.log("[INVITE-ACCEPT] ✅ SiteMembership created:", {
-          siteId,
-          role: siteMembership.role,
         });
 
         // 2b. Create UserTenantRole record (for backward compatibility with older role checks)
@@ -706,13 +642,6 @@ export class InvitesService {
                   role: tenantRole,
                 },
               });
-              console.log("[INVITE-ACCEPT] ✅ UserTenantRole created:", {
-                userId,
-                tenantId: siteId,
-                role: tenantRole,
-              });
-            } else {
-              console.log("[INVITE-ACCEPT] UserTenantRole already exists, skipping");
             }
           } catch (err) {
             // Ignore duplicate errors (P2002)
@@ -731,12 +660,10 @@ export class InvitesService {
     }
 
     // Mark invite as used
-    console.log("[INVITE-ACCEPT] Marking invite as used:", invite.id);
     await prisma.invite.update({
       where: { id: invite.id },
       data: { usedAt: new Date() },
     });
-    console.log("[INVITE-ACCEPT] ✅ Invite marked as used");
 
     // Determine accessible sites
     const accessibleSites = await prisma.tenant.findMany({
@@ -763,27 +690,17 @@ export class InvitesService {
     let activeSiteId: string | null = null;
     if (sites.length === 1) {
       activeSiteId = sites[0]!.id;
-      console.log("[INVITE-ACCEPT] Auto-selecting single site:", activeSiteId);
       await prisma.user.update({
         where: { id: userId },
         data: { lastActiveTenantId: activeSiteId },
       });
     }
 
-    const result = {
+    return {
       activeSiteId,
       orgId,
       sites,
     };
-
-    console.log("[INVITE-ACCEPT] 🎉 Invite acceptance complete:", {
-      userId,
-      orgId,
-      activeSiteId: activeSiteId || "(user will choose)",
-      sitesCount: sites.length,
-    });
-
-    return result;
   }
 
   /**
@@ -853,4 +770,3 @@ export class InvitesService {
     };
   }
 }
-

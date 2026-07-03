@@ -9,6 +9,8 @@ describe("PublicSignupController", () => {
     getConfig: jest.fn(),
     signupPreflight: jest.fn(),
     submit: jest.fn(),
+    submitExistingUser: jest.fn(),
+    submitContactOnly: jest.fn(),
   };
 
   async function createApp() {
@@ -27,6 +29,8 @@ describe("PublicSignupController", () => {
     serviceMock.getConfig.mockReset();
     serviceMock.signupPreflight.mockReset();
     serviceMock.submit.mockReset();
+    serviceMock.submitExistingUser.mockReset();
+    serviceMock.submitContactOnly.mockReset();
   });
 
   afterEach(async () => {
@@ -141,6 +145,42 @@ describe("PublicSignupController", () => {
         .post("/public/signup/submit")
         .send(body)
         .expect(400);
+    });
+  });
+
+  describe("POST /public/signup/submit-contact-only", () => {
+    const validBody = {
+      token: "a".repeat(32),
+      parent: {
+        fullName: "Jane Doe",
+        email: "jane@example.com",
+        phone: "07700900111",
+        relationshipToChild: "Parent",
+      },
+      emergencyContacts: [{ name: "Emergency Contact", phone: "07700900123" }],
+      children: [
+        {
+          firstName: "Child",
+          lastName: "One",
+          photoConsent: false,
+        },
+      ],
+      consents: { dataProcessingConsent: true },
+    };
+
+    it("delegates to contact-only signup service", async () => {
+      serviceMock.submitContactOnly.mockResolvedValue({
+        success: true,
+        message: "Registration complete",
+      });
+
+      const res = await request(app.getHttpServer())
+        .post("/public/signup/submit-contact-only")
+        .send(validBody)
+        .expect(201);
+
+      expect(serviceMock.submitContactOnly).toHaveBeenCalledWith(validBody);
+      expect(res.body.success).toBe(true);
     });
   });
 });

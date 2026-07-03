@@ -101,6 +101,11 @@ enum LeadKind {
   READINESS
 }
 
+enum ChildGuardianContactType {
+  PRIMARY_GUARDIAN
+  EMERGENCY_CONTACT
+}
+
 // --- Blog (platform-wide, not tenant-scoped) ---
 
 enum BlogPostStatus {
@@ -216,6 +221,7 @@ model Org {
   planCode         String // e.g., trial|starter|standard|pro|suite_*
   isSuite          Boolean                  @default(false)
   isMasterOrg      Boolean                  @default(false) // Internal/platform org: no Stripe, unlimited, non-billable
+  parentPortalEnabled Boolean                  @default(true)
   stripeCustomerId String?                  @unique
   tenants          Tenant[]
   subscriptions    Subscription[]
@@ -230,6 +236,7 @@ model Org {
   pendingOrders     PendingOrder[]
   invites           Invite[]
   publicSignupLinks PublicSignupLink[]
+  deletedUsers      OrgDeletedUser[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
@@ -266,6 +273,7 @@ model Tenant {
   publicSignupLinks      PublicSignupLink[]
   emergencyContacts      EmergencyContact[]
   parentSignupConsents   ParentSignupConsent[]
+  childGuardianContacts  ChildGuardianContact[]
   handoverLogs           HandoverLog[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
@@ -343,6 +351,8 @@ model User {
   identities           UserIdentity[]
   invitesCreated          Invite[]                  @relation("InviteCreatedBy")
   publicSignupLinksCreated PublicSignupLink[]       @relation("PublicSignupLinkCreatedBy")
+  orgDeletionRecords    OrgDeletedUser[]          @relation("OrgDeletedUserTarget")
+  deletedOrgUsers       OrgDeletedUser[]          @relation("OrgDeletedUserActor")
   staffUnavailableDates   StaffUnavailableDate[]
   staffPreferredGroups    StaffPreferredGroup[]
   emergencyContacts       EmergencyContact[]
@@ -438,6 +448,27 @@ model Invite {
   @@index([email])
 }
 
+model OrgDeletedUser {
+  id              String   @id @default(uuid())
+  orgId           String
+  userId          String
+  deletedByUserId String
+  name            String
+  displayName     String?
+  email           String?
+  priorOrgRole    OrgRole?
+  priorSiteCount  Int      @default(0)
+  deletedAt       DateTime @default(now())
+
+  org       Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user      User @relation("OrgDeletedUserTarget", fields: [userId], references: [id])
+  deletedBy User @relation("OrgDeletedUserActor", fields: [deletedByUserId], references: [id])
+
+  @@index([orgId, deletedAt])
+  @@index([userId])
+  @@index([deletedByUserId])
+}
+
 // Invite-only public parent signup link (site-specific; token in QR link).
 // tokenForDisplay: stored only for admin re-display of the same QR; never logged; verification uses tokenHash only.
 model PublicSignupLink {
@@ -499,6 +530,28 @@ model ParentSignupConsent {
   @@index([tenantId])
 }
 
+model ChildGuardianContact {
+  id                         String                   @id @default(uuid())
+  childId                    String
+  tenantId                   String
+  fullName                   String
+  email                      String?
+  phone                      String?
+  relationshipToChild        String?
+  contactType                ChildGuardianContactType @default(PRIMARY_GUARDIAN)
+  dataProcessingConsentAt    DateTime?
+  firstAidConsentAt          DateTime?
+  createdAt                  DateTime                 @default(now())
+  updatedAt                  DateTime                 @updatedAt
+
+  child  Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([tenantId])
+  @@index([tenantId, contactType])
+}
+
 model Child {
   id                  String       @id @default(uuid())
   firstName           String
@@ -522,6 +575,7 @@ model Child {
   tenantId            String
   tenant              Tenant       @relation(fields: [tenantId], references: [id])
   guardians           User[]       @relation("ParentChildren")
+  guardianContacts    ChildGuardianContact[]
   groupId             String?
   group               Group?       @relation(fields: [groupId], references: [id])
   disabilities        String[]     @default([])

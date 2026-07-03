@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { Menu, X } from "lucide-react";
 import { TopBarActions } from "@/components/topbar-actions";
 import {
   SidebarNav,
@@ -87,6 +88,42 @@ const resolveTitle = (path: string): string => {
   return titleMap[topSegment] ?? "Admin";
 };
 
+type AdminBrandLinkProps = {
+  isCollapsed?: boolean;
+  onClick?: () => void;
+};
+
+const AdminBrandLink = ({
+  isCollapsed = false,
+  onClick,
+}: AdminBrandLinkProps) => (
+  <Link
+    href="/"
+    onClick={onClick}
+    className={cn(
+      "group flex items-center gap-3 transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:ring-offset-2 focus-visible:ring-status-info",
+      isCollapsed && "justify-center",
+    )}
+  >
+    <Image
+      src="/NSLogo.svg"
+      alt={isCollapsed ? "Nexsteps" : "Nexsteps Admin"}
+      width={32}
+      height={32}
+      className="rounded-md shadow-sm"
+      priority
+    />
+    {!isCollapsed && (
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold tracking-tight text-text-primary">
+          Nexsteps
+        </span>
+        <span className="text-xs text-text-muted">Admin</span>
+      </div>
+    )}
+  </Link>
+);
+
 export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -116,6 +153,10 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
 
   // Collapsible sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = React.useState(false);
+  const mobileMenuButtonRef = React.useRef<HTMLButtonElement | null>(null);
+  const mobileNavTitleId = "admin-mobile-navigation-title";
+  const mobileNavPanelId = "admin-mobile-navigation";
 
   // Check if user needs onboarding (first login)
   // Show onboarding if user just logged in (firstLoginAt is recent, within last 5 minutes)
@@ -137,6 +178,24 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
       setShowOnboarding(true);
     }
   }, [session, isAuthRoute]);
+
+  React.useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
+
+  const closeMobileNav = React.useCallback(() => {
+    setIsMobileNavOpen(false);
+    mobileMenuButtonRef.current?.focus();
+  }, []);
+
+  const handleMobileNavKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMobileNav();
+    }
+  };
 
   // Filter nav items based on user's role (hide billing for master orgs)
   const visibleNavItems = React.useMemo(
@@ -166,56 +225,34 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
       )}
       <div className="flex h-screen overflow-hidden bg-shell text-text-primary">
         <SidebarNav
+          className="hidden lg:flex"
           items={visibleNavItems}
           currentPath={pathname}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          header={
-            <Link
-              href="/"
-              className={cn(
-                "group flex items-center gap-3 transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:ring-offset-2 focus-visible:ring-status-info",
-                isSidebarCollapsed && "justify-center",
-              )}
-            >
-              {isSidebarCollapsed ? (
-                <Image
-                  src="/NSLogo.svg"
-                  alt="Nexsteps"
-                  width={32}
-                  height={32}
-                  className="rounded-md shadow-sm"
-                  priority
-                />
-              ) : (
-                <>
-                  <Image
-                    src="/NSLogo.svg"
-                    alt="Nexsteps Admin"
-                    width={32}
-                    height={32}
-                    className="rounded-md shadow-sm"
-                    priority
-                  />
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-sm font-semibold tracking-tight text-text-primary">
-                      Nexsteps
-                    </span>
-                    <span className="text-xs text-text-muted">Admin</span>
-                  </div>
-                </>
-              )}
-            </Link>
-          }
+          header={<AdminBrandLink isCollapsed={isSidebarCollapsed} />}
         />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-shell">
           <TopBar
             title={title}
-            rightSlot={
-                <TopBarActions />
+            className="px-3 sm:px-4 md:px-6"
+            breadcrumbs={
+              <button
+                ref={mobileMenuButtonRef}
+                type="button"
+                aria-label="Open admin navigation"
+                aria-haspopup="dialog"
+                aria-expanded={isMobileNavOpen}
+                aria-controls={mobileNavPanelId}
+                onClick={() => setIsMobileNavOpen(true)}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border-subtle bg-surface text-text-primary shadow-sm transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2 lg:hidden"
+              >
+                <Menu className="h-5 w-5" aria-hidden="true" />
+              </button>
             }
+            rightSlot={<TopBarActions />}
           />
-          <main className="flex-1 overflow-y-auto px-8 py-6">
+          <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
             <div
               className={cn(
                 "mx-auto w-full space-y-4",
@@ -247,6 +284,44 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           </main>
         </div>
       </div>
+      {isMobileNavOpen && (
+        <div
+          className="fixed inset-0 z-50 lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={mobileNavTitleId}
+          id={mobileNavPanelId}
+          onKeyDown={handleMobileNavKeyDown}
+        >
+          <button
+            type="button"
+            aria-label="Close admin navigation"
+            className="absolute inset-0 h-full w-full bg-slate-950/40"
+            onClick={closeMobileNav}
+          />
+          <div className="relative flex h-full w-[min(20rem,calc(100vw-2rem))] flex-col bg-surface shadow-2xl">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-accent-secondary/30 px-3">
+              <div id={mobileNavTitleId}>
+                <AdminBrandLink onClick={closeMobileNav} />
+              </div>
+              <button
+                type="button"
+                aria-label="Close admin navigation"
+                onClick={closeMobileNav}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-border-subtle bg-surface text-text-primary transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+            <SidebarNav
+              className="!h-full !w-full border-r-0 shadow-none"
+              items={visibleNavItems}
+              currentPath={pathname}
+              header={null}
+            />
+          </div>
+        </div>
+      )}
     </>
   );
 };

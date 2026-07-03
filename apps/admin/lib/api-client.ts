@@ -137,6 +137,16 @@ export type AdminChildDetail = {
   hasAllergies: boolean;
   hasAdditionalNeeds: boolean;
   status: "active" | "inactive";
+  guardianContacts: AdminChildGuardianContact[];
+};
+
+export type AdminChildGuardianContact = {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  relationshipToChild: string | null;
+  contactType: "PRIMARY_GUARDIAN" | "EMERGENCY_CONTACT" | string;
 };
 
 export type AdminParentRow = {
@@ -433,6 +443,7 @@ export type AdminOrgOverview = {
   name: string;
   slug: string | null;
   isMultiSite: boolean;
+  parentPortalEnabled: boolean;
   planTier?: string | null;
   siteCount?: number | null;
 };
@@ -2008,6 +2019,14 @@ type ApiChild = {
   hasPhotoConsent?: boolean | null;
   photoConsent?: boolean | null;
   status?: string | null;
+  guardianContacts?: Array<{
+    id: string;
+    fullName: string;
+    email?: string | null;
+    phone?: string | null;
+    relationshipToChild?: string | null;
+    contactType?: string | null;
+  }> | null;
 };
 
 type ApiChildDetail = ApiChild & {};
@@ -2049,6 +2068,14 @@ const mapApiChildDetailToAdmin = (c: ApiChildDetail): AdminChildDetail => ({
     (Array.isArray(c.disabilities) && c.disabilities.length > 0) ||
     (Array.isArray(c.additionalNeeds) && c.additionalNeeds.length > 0),
   status: c.status === "inactive" ? "inactive" : "active",
+  guardianContacts: (c.guardianContacts ?? []).map((contact) => ({
+    id: contact.id,
+    fullName: contact.fullName,
+    email: contact.email ?? null,
+    phone: contact.phone ?? null,
+    relationshipToChild: contact.relationshipToChild ?? null,
+    contactType: contact.contactType ?? "PRIMARY_GUARDIAN",
+  })),
 });
 
 export async function fetchChildById(
@@ -2069,6 +2096,7 @@ export async function fetchChildById(
           hasAllergies: match.hasAllergies,
           hasAdditionalNeeds: match.hasAdditionalNeeds,
           status: match.status,
+          guardianContacts: [],
         }
       : null;
   }
@@ -4056,6 +4084,7 @@ type ApiOrg = {
   slug?: string | null;
   planCode?: string | null;
   isSuite?: boolean | null;
+  parentPortalEnabled?: boolean | null;
   // TODO: map site counts when available
 };
 
@@ -4064,6 +4093,7 @@ const mapApiOrgToAdmin = (org: ApiOrg): AdminOrgOverview => ({
   name: org.name,
   slug: org.slug ?? null,
   isMultiSite: Boolean(org.isSuite), // TODO: confirm multi-site flag mapping
+  parentPortalEnabled: org.parentPortalEnabled ?? true,
   planTier: org.planCode ?? null,
   siteCount: null,
 });
@@ -4078,6 +4108,7 @@ export async function fetchOrgOverview(): Promise<AdminOrgOverview> {
       name: "Mock Organisation",
       slug: "mock-org",
       isMultiSite: false,
+      parentPortalEnabled: true,
       planTier: null,
       siteCount: null,
     };
@@ -4101,6 +4132,7 @@ export async function fetchOrgOverview(): Promise<AdminOrgOverview> {
       name: "Organisation",
       slug: null,
       isMultiSite: false,
+      parentPortalEnabled: true,
       planTier: null,
       siteCount: null,
     };
@@ -4109,25 +4141,33 @@ export async function fetchOrgOverview(): Promise<AdminOrgOverview> {
   return mapApiOrgToAdmin(firstOrg);
 }
 
-/** Update current organisation profile (name). ORG_ADMIN only. */
+/** Update current organisation profile. ORG_ADMIN only. */
 export async function updateOrgProfile(input: {
-  name: string;
+  name?: string;
+  parentPortalEnabled?: boolean;
 }): Promise<AdminOrgOverview> {
   if (isUsingMockApi()) {
     throw new Error("Organisation updates are not available in mock mode.");
+  }
+  const body: { name?: string; parentPortalEnabled?: boolean } = {};
+  if (input.name !== undefined) {
+    body.name = input.name.trim();
+  }
+  if (input.parentPortalEnabled !== undefined) {
+    body.parentPortalEnabled = input.parentPortalEnabled;
   }
   const res = await fetch(`${API_BASE_URL}/orgs/current`, {
     method: "PATCH",
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",
-    body: JSON.stringify({ name: input.name.trim() }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to update org: ${res.status} ${body}`);
   }
-  const json = (await res.json()) as { id: string; name: string; slug: string };
+  const json = (await res.json()) as ApiOrg;
   return mapApiOrgToAdmin(json);
 }
 
@@ -5225,6 +5265,18 @@ export type PersonRow = {
   };
 };
 
+export type DeletedPersonRow = {
+  id: string;
+  userId: string;
+  name: string;
+  displayName?: string | null;
+  email?: string | null;
+  priorOrgRole?: string | null;
+  priorSiteCount: number;
+  deletedAt: string;
+  deletedByUserId: string;
+};
+
 export type InviteRow = {
   id: string;
   email: string;
@@ -5272,6 +5324,46 @@ export async function fetchPeopleForOrg(orgId: string): Promise<PersonRow[]> {
   }
 
   return (await res.json()) as PersonRow[];
+}
+
+/**
+ * Fetch people removed from an org
+ */
+export async function fetchDeletedPeopleForOrg(
+  orgId: string,
+): Promise<DeletedPersonRow[]> {
+  const res = await fetch(`${API_BASE_URL}/orgs/${orgId}/people/deleted`, {
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch deleted people: ${res.status} ${body}`);
+  }
+
+  return (await res.json()) as DeletedPersonRow[];
+}
+
+/**
+ * Remove a person's access from an org
+ */
+export async function deletePersonFromOrg(
+  orgId: string,
+  userId: string,
+): Promise<DeletedPersonRow> {
+  const res = await fetch(`${API_BASE_URL}/orgs/${orgId}/people/${userId}`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to delete person: ${res.status} ${body}`);
+  }
+
+  return (await res.json()) as DeletedPersonRow;
 }
 
 /**

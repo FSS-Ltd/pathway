@@ -38,9 +38,7 @@ export class EntitlementsEnforcementService {
   constructor(
     @Inject(forwardRef(() => EntitlementsService))
     private readonly entitlements: EntitlementsService,
-  ) {
-    console.log("[EntitlementsEnforcementService] Constructor called, entitlements:", !!this.entitlements);
-  }
+  ) {}
 
   async checkAv30ForOrg(orgId: string): Promise<Av30EnforcementResult> {
     const resolved = await this.entitlements.resolve(orgId);
@@ -116,4 +114,3 @@ export class EntitlementsEnforcementService {
     return grace;
   }
 }
-

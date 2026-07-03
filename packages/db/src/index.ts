@@ -58,6 +58,7 @@ export async function resetDatabase() {
         "Session",
         "ChildNote",
         "Concern",
+        "ChildGuardianContact",
         "Child",
         "Group",
         "SiteMembership",
@@ -91,6 +92,7 @@ export async function resetDatabase() {
         "Session",
         "ChildNote",
         "Concern",
+        "ChildGuardianContact",
         "Child",
         "Group",
         "SiteMembership",
@@ -122,6 +124,7 @@ export {
   OrgRole,
   SiteRole,
   StaffAttendanceStatus,
+  ChildGuardianContactType,
 } from "@prisma/client";
 export { Prisma };
 
