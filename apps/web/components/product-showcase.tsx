@@ -82,7 +82,9 @@ export default function ProductShowcase() {
             <BrowserFrame src={ADMIN_SRC} alt="NexSteps admin dashboard overview" />
           </ScrollReveal>
 
-          <div className="pointer-events-none absolute inset-x-0 -bottom-24 flex justify-center gap-6 px-4 md:-bottom-32 md:gap-10">
+          {/* Mobile: phones sit in normal flow below the browser frame.
+              md+: they overlap it from an absolute strip along the bottom. */}
+          <div className="mt-10 flex justify-center gap-6 px-4 md:pointer-events-none md:absolute md:inset-x-0 md:-bottom-32 md:mt-0 md:gap-10">
             <motion.div
               className="pointer-events-auto hidden md:block"
               initial={{ opacity: 0, y: 40, rotate: -6 }}
@@ -99,7 +101,7 @@ export default function ProductShowcase() {
             </motion.div>
 
             <motion.div
-              className="pointer-events-auto -translate-y-6 md:translate-y-6"
+              className="pointer-events-auto md:translate-y-6"
               initial={{ opacity: 0, y: 40, rotate: 6 }}
               whileInView={{ opacity: 1, y: 0, rotate: 6 }}
               viewport={{ once: true, margin: "-80px" }}
@@ -115,8 +117,8 @@ export default function ProductShowcase() {
           </div>
         </div>
 
-        {/* Reserve room for the phones that overhang the browser frame below. */}
-        <div className="h-24 md:h-40" aria-hidden />
+        {/* Reserve room for the phones that overhang the browser frame on md+. */}
+        <div className="hidden md:block md:h-40" aria-hidden />
       </div>
     </section>
   );

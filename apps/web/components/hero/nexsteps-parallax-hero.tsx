@@ -13,8 +13,18 @@ import {
 import { useEffect, useRef, useState } from "react";
 import CtaButton from "../cta-button";
 
-const VIDEO_WEBM = "/hero/nexsteps-hero-scroll.webm";
-const VIDEO_MP4 = "/hero/nexsteps-hero-scroll.mp4";
+// 4K for desktop; 1080p for small screens where 4K decode and download
+// cost make the scrub stutter or never start (the old "static image" bug).
+const VIDEO_SOURCES = {
+  desktop: {
+    webm: "/hero/nexsteps-hero-scroll.webm",
+    mp4: "/hero/nexsteps-hero-scroll.mp4",
+  },
+  mobile: {
+    webm: "/hero/nexsteps-hero-scroll-1080.webm",
+    mp4: "/hero/nexsteps-hero-scroll-1080.mp4",
+  },
+};
 const POSTER = "/hero/nexsteps-hero-poster.webp";
 
 // Portion of scroll progress that scrubs the video; the rest holds the final
@@ -191,6 +201,19 @@ export default function NexStepsParallaxHero() {
   const outerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
+  // Resolved on mount so the client picks the right rendition; the poster
+  // covers the first paint either way.
+  const [sources, setSources] = useState<
+    (typeof VIDEO_SOURCES)[keyof typeof VIDEO_SOURCES] | null
+  >(null);
+
+  useEffect(() => {
+    setSources(
+      window.matchMedia("(max-width: 767px)").matches
+        ? VIDEO_SOURCES.mobile
+        : VIDEO_SOURCES.desktop,
+    );
+  }, []);
 
   const { scrollYProgress } = useScroll({
     target: outerRef,
@@ -209,12 +232,18 @@ export default function NexStepsParallaxHero() {
     let frame: number;
     const tick = () => {
       const video = videoRef.current;
-      if (video && video.readyState >= 2 && video.duration) {
+      // Skip while a seek is in flight — stacking seeks on a high-res
+      // stream makes the decoder thrash and the scrub stutter.
+      if (video && video.readyState >= 2 && video.duration && !video.seeking) {
         // Leave a small tail so we never seek past the last frame.
         const target = scrubTarget.current * (video.duration - 0.05);
         const delta = target - video.currentTime;
-        if (Math.abs(delta) > 0.01) {
-          video.currentTime += delta * 0.14;
+        if (Math.abs(delta) > 0.25) {
+          video.currentTime += delta * 0.2;
+        } else if (Math.abs(delta) > 1 / 60) {
+          // Close to target: snap instead of chasing sub-frame deltas,
+          // so each scroll step costs exactly one seek.
+          video.currentTime = target;
         }
       }
       frame = requestAnimationFrame(tick);
@@ -244,7 +273,7 @@ export default function NexStepsParallaxHero() {
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${POSTER})` }}
         />
-        {!videoFailed ? (
+        {!videoFailed && sources ? (
           <video
             ref={videoRef}
             className="absolute inset-0 h-full w-full object-cover"
@@ -253,14 +282,24 @@ export default function NexStepsParallaxHero() {
             preload="auto"
             poster={POSTER}
             aria-hidden
+            onLoadedMetadata={(e) => {
+              // iOS refuses to buffer video until playback starts, leaving
+              // the hero stuck on the poster; a muted play/pause kicks the
+              // pipeline into loading so scrubbing works.
+              const video = e.currentTarget;
+              video
+                .play()
+                .then(() => video.pause())
+                .catch(() => {});
+            }}
             onError={(e) => {
               // React surfaces <source> fallback errors here too; only bail
               // when the media element itself has given up.
               if (e.currentTarget.error) setVideoFailed(true);
             }}
           >
-            <source src={VIDEO_WEBM} type="video/webm" />
-            <source src={VIDEO_MP4} type="video/mp4" />
+            <source src={sources.webm} type="video/webm" />
+            <source src={sources.mp4} type="video/mp4" />
           </video>
         ) : null}
 
