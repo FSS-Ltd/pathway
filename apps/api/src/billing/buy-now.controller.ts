@@ -10,6 +10,7 @@ import {
 import type { Request } from "express";
 import {
   IsEmail,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -19,6 +20,7 @@ import {
   IsUrl,
 } from "class-validator";
 import { Type, Transform } from "class-transformer";
+import { SECTOR_LABELS, type Sector } from "@pathway/types";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { BuyNowService } from "./buy-now.service";
 import type {
@@ -74,6 +76,9 @@ class BuyNowOrgDetailsDto implements BuyNowOrgDetails {
   @IsString()
   @IsNotEmpty()
   password!: string;
+
+  @IsIn(Object.keys(SECTOR_LABELS))
+  sector!: Sector;
 
   @IsOptional()
   @IsString()

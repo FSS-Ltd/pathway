@@ -15,7 +15,7 @@ type OrgRecord = {
 };
 
 type RegisterOrgInput = {
-  org: { name: string; slug: string };
+  org: { name: string; slug: string; sector: string };
   admin?: { email?: string; fullName?: string; userId?: string };
   initialTenant: {
     create: true;
@@ -118,7 +118,7 @@ describe("OrgsService", () => {
       (prismaMock.org.create as jest.Mock).mockResolvedValue(baseOrg);
 
       const dto: RegisterOrgInput = {
-        org: { name: baseOrg.name, slug: baseOrg.slug },
+        org: { name: baseOrg.name, slug: baseOrg.slug, sector: "CHURCH" },
         admin: { email: "admin@acme.test", fullName: "Admin User" },
         initialTenant: { create: true, name: "Kids", slug: "kids" },
       };

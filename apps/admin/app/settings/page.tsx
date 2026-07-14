@@ -16,6 +16,7 @@ import {
   requestExportOrganisationData,
   updateOrgProfile,
   updateSiteProfile,
+  ORG_SECTOR_LABELS,
   type ActiveSiteState,
   type SiteOption,
 } from "../../lib/api-client";
@@ -317,6 +318,11 @@ export default function SettingsPage() {
                 />
               </div>
               <p className="text-sm text-text-muted">Slug: {org?.slug ?? "—"} (read-only)</p>
+              {org?.sector && (
+                <p className="text-sm text-text-muted">
+                  Sector: {ORG_SECTOR_LABELS[org.sector]} (read-only)
+                </p>
+              )}
               {orgSaveError && (
                 <p className="text-sm text-status-danger">{orgSaveError}</p>
               )}
@@ -336,6 +342,11 @@ export default function SettingsPage() {
               <p className="text-sm text-text-muted">
                 {org.isMultiSite ? "Multi-site organisation" : "Single-site organisation"}
               </p>
+              {org.sector && (
+                <p className="text-sm text-text-muted">
+                  Sector: {ORG_SECTOR_LABELS[org.sector]}
+                </p>
+              )}
               {planTier && (
                 <p className="text-sm text-text-muted">Plan: {planTier}</p>
               )}

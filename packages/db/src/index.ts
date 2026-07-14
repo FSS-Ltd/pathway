@@ -130,6 +130,7 @@ export {
   SiteRole,
   StaffAttendanceStatus,
   ChildGuardianContactType,
+  OrgSector,
 } from "@prisma/client";
 export { Prisma };
 

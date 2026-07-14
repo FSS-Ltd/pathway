@@ -122,6 +122,7 @@ export class BuyNowService {
         contactName: request.org.contactName,
         contactEmail: normalizedEmail,
         password: request.org.password,
+        sector: request.org.sector ?? "",
         planCode: sanitisedPlan.planCode,
       };
       

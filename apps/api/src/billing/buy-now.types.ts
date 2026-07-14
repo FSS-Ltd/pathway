@@ -1,3 +1,4 @@
+import type { Sector } from "@pathway/types";
 import type { PlanCode, PlanTier } from "./billing-plans";
 
 export type BuyNowPlanSelection = {
@@ -14,6 +15,9 @@ export type BuyNowOrgDetails = {
   contactName: string;
   contactEmail: string;
   password: string;
+  // Required for new-org public checkout (enforced by BuyNowOrgDetailsDto); omitted
+  // when this shape is reused as provider metadata for an existing org's purchase.
+  sector?: Sector;
   source?: string;
 };
 

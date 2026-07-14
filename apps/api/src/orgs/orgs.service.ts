@@ -7,7 +7,7 @@ import {
   NotFoundException,
   NotImplementedException,
 } from "@nestjs/common";
-import { prisma } from "@pathway/db";
+import { prisma, type OrgSector } from "@pathway/db";
 import { registerOrgDto } from "./dto/register-org.dto";
 import { BillingService } from "../billing/billing.service";
 import {
@@ -24,6 +24,7 @@ type RegisterOrgResult = {
     planCode: string;
     isSuite: boolean;
     parentPortalEnabled: boolean;
+    sector: OrgSector | null;
   };
   initialTenant?: {
     id: string;
@@ -77,6 +78,7 @@ export class OrgsService {
             slug: dto.org.slug,
             planCode: dto.org.planCode,
             isSuite: dto.org.isSuite ?? true,
+            sector: dto.org.sector as OrgSector,
           },
           select: {
             id: true,
@@ -85,6 +87,7 @@ export class OrgsService {
             planCode: true,
             isSuite: true,
             parentPortalEnabled: true,
+            sector: true,
           },
         });
 
@@ -207,6 +210,7 @@ export class OrgsService {
         planCode: true,
         isSuite: true,
         parentPortalEnabled: true,
+        sector: true,
       },
     });
     if (!org) throw new NotFoundException("Org not found");
@@ -289,6 +293,7 @@ export class OrgsService {
         planCode: true,
         isSuite: true,
         parentPortalEnabled: true,
+        sector: true,
       },
     });
   }

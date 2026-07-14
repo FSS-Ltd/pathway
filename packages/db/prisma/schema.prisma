@@ -106,6 +106,15 @@ enum ChildGuardianContactType {
   EMERGENCY_CONTACT
 }
 
+// Selected once at initial plan purchase; drives which features are visible to the org.
+// Keep in sync with SectorId in apps/web/content/sectors.ts and Sector in packages/types.
+enum OrgSector {
+  CHURCH
+  CLUB
+  SCHOOL
+  CHARITY
+}
+
 // --- Blog (platform-wide, not tenant-scoped) ---
 
 enum BlogPostStatus {
@@ -222,6 +231,9 @@ model Org {
   isSuite          Boolean                  @default(false)
   isMasterOrg      Boolean                  @default(false) // Internal/platform org: no Stripe, unlimited, non-billable
   parentPortalEnabled Boolean                  @default(true)
+  // Selected once at initial plan purchase. Nullable so orgs created before this field
+  // existed remain valid; new orgs should always set it at purchase time.
+  sector           OrgSector?
   stripeCustomerId String?                  @unique
   tenants          Tenant[]
   subscriptions    Subscription[]

@@ -19,6 +19,8 @@ import {
   previewPlanSelection,
   type PlanPreviewResponse,
   fetchPublicBillingPrices,
+  SECTOR_OPTIONS,
+  type Sector,
 } from "../../lib/buy-now-client";
 
 type PlanTier = "core" | "starter" | "growth" | "enterprise";
@@ -75,6 +77,7 @@ export default function BuyNowPage() {
   const [contactName, setContactName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [sector, setSector] = useState<Sector | "">("");
 
   const [preview, setPreview] = useState<PlanPreviewResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -215,8 +218,8 @@ export default function BuyNowPage() {
       setCheckoutError("Please choose Starter or Growth to continue.");
       return;
     }
-    if (!orgName || !contactName || !contactEmail || !password) {
-      setCheckoutError("Please complete all organisation and contact details including password.");
+    if (!orgName || !contactName || !contactEmail || !password || !sector) {
+      setCheckoutError("Please complete all organisation and contact details, including sector and password.");
       return;
     }
     if (password.length < 8) {
@@ -251,6 +254,7 @@ export default function BuyNowPage() {
         contactName,
         contactEmail,
         password,
+        sector: sector as Sector,
         successUrl,
         cancelUrl,
       });
@@ -520,6 +524,26 @@ export default function BuyNowPage() {
                 value={orgName}
                 onChange={setOrgName}
               />
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">
+                  Sector <span className="text-pw-primary">*</span>
+                </span>
+                <select
+                  required
+                  value={sector}
+                  onChange={(e) => setSector(e.target.value as Sector)}
+                  className="rounded-md border border-pw-border px-3 py-2 text-sm text-pw-text focus:border-pw-primary focus:outline-none"
+                >
+                  <option value="" disabled>
+                    Select a sector
+                  </option>
+                  {SECTOR_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <Field
                 label="Your name"
                 required
