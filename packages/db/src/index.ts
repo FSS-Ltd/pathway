@@ -1,13 +1,18 @@
 // Canonical Prisma bootstrap (ESM/CJS/Jest-safe)
 import { PrismaClient, Prisma } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { withPiiEncryption } from "./pii-encryption";
 
 // Keep a single PrismaClient instance across hot-reloads in dev/test
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient };
 const prismaContext = new AsyncLocalStorage<Prisma.TransactionClient>();
 
-const basePrismaClient: PrismaClient =
+const rawPrismaClient: PrismaClient =
   globalForPrisma.__prisma ?? new PrismaClient();
+
+// Transparent field-level encryption for sensitive PII columns (see pii-encryption.ts).
+// Applied to the base client so it also covers $transaction/withTenantRlsContext.
+const basePrismaClient: PrismaClient = withPiiEncryption(rawPrismaClient);
 
 const prismaProxy = new Proxy(basePrismaClient, {
   get(target, prop, receiver) {
@@ -24,7 +29,7 @@ const prismaProxy = new Proxy(basePrismaClient, {
 export const prisma = prismaProxy as PrismaClient;
 
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.__prisma = basePrismaClient;
+  globalForPrisma.__prisma = rawPrismaClient;
 }
 
 // Small helper so test teardown (or scripts) can cleanly disconnect

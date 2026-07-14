@@ -494,6 +494,7 @@ model PublicSignupLink {
 }
 
 // Emergency contact for a parent (guardian) in a tenant.
+// name/phone/relationship are encrypted at rest — see packages/db/src/pii-encryption.ts.
 model EmergencyContact {
   id          String   @id @default(uuid())
   userId      String
@@ -512,6 +513,7 @@ model EmergencyContact {
 }
 
 // Consent record for parent signup (timestamps + consenting adult identity).
+// consentingAdultName/consentingAdultRelationship are encrypted at rest — see packages/db/src/pii-encryption.ts.
 model ParentSignupConsent {
   id                        String    @id @default(uuid())
   userId                    String
@@ -530,6 +532,7 @@ model ParentSignupConsent {
   @@index([tenantId])
 }
 
+// fullName/phone/relationshipToChild are encrypted at rest — see packages/db/src/pii-encryption.ts.
 model ChildGuardianContact {
   id                         String                   @id @default(uuid())
   childId                    String
@@ -552,6 +555,9 @@ model ChildGuardianContact {
   @@index([tenantId, contactType])
 }
 
+// allergies/additionalNeedsNotes/gpName/gpPhone/specialNeedsOther/notes are encrypted
+// at rest — see packages/db/src/pii-encryption.ts. dateOfBirth is NOT yet encrypted
+// (would require a DateTime -> String column change; tracked as a follow-up).
 model Child {
   id                  String       @id @default(uuid())
   firstName           String
@@ -667,6 +673,7 @@ model Attendance {
   @@index([groupId])
 }
 
+// summary/details are encrypted at rest — see packages/db/src/pii-encryption.ts.
 model Concern {
   id        String    @id @default(uuid())
   childId   String
@@ -839,6 +846,7 @@ model Announcement {
   @@index([tenantId, audience, publishedAt])
 }
 
+// text is encrypted at rest — see packages/db/src/pii-encryption.ts.
 model ChildNote {
   id               String    @id @default(uuid())
   childId          String
@@ -961,8 +969,10 @@ model PendingOrder {
   completedAt            DateTime?
   updatedAt              DateTime           @updatedAt
   
-  // For public checkout: store org/user details until payment confirmed
-  pendingOrgDetails      Json?              // { orgName, slug, contactName, contactEmail, password }
+  // For public checkout: store org/user details until payment confirmed.
+  // Encrypted as a whole (may carry a plaintext password transiently) — see
+  // packages/db/src/pii-encryption.ts. { orgName, slug, contactName, contactEmail, password }
+  pendingOrgDetails      Json?
 
   @@index([tenantId, orgId, provider, providerCheckoutId])
   @@index([provider, providerSubscriptionId])

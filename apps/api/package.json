@@ -15,6 +15,7 @@
     "test:integration": "jest -c jest.projects.config.ts --selectProjects e2e",
     "test:e2e": "pnpm test:integration",
     "storage:backfill": "tsx scripts/backfill-supabase-storage.ts",
+    "pii:backfill": "tsx scripts/backfill-pii-encryption.ts",
     "db:generate": "pnpm --filter @pathway/db run prisma:generate",
     "db:migrate": "pnpm --filter @pathway/db run prisma:migrate:dev",
     "db:deploy": "pnpm --filter @pathway/db run prisma:migrate:deploy",
