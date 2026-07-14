@@ -73,10 +73,20 @@ describe("ChildrenService", () => {
       const res = await svc.list(tenantId);
       expect(res).toEqual([]);
       expect(findMany).toHaveBeenCalledWith({
-        where: { tenantId },
+        where: { tenantId, OR: expect.any(Array) },
         select: expect.any(Object),
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       });
+    });
+
+    it("excludes children whose guest pass has expired", async () => {
+      findMany.mockResolvedValueOnce([]);
+      await svc.list(tenantId);
+      const where = findMany.mock.calls[0][0].where;
+      expect(where.OR).toEqual([
+        { isGuest: false },
+        { guestExpiresAt: { gt: expect.any(Date) } },
+      ]);
     });
   });
 
@@ -87,7 +97,7 @@ describe("ChildrenService", () => {
       const res = await svc.getById("c1", tenantId);
       expect(res).toBe(child);
       expect(findFirst).toHaveBeenCalledWith({
-        where: { id: "c1", tenantId },
+        where: { id: "c1", tenantId, OR: expect.any(Array) },
         select: expect.any(Object),
       });
     });
@@ -113,7 +123,7 @@ describe("ChildrenService", () => {
 
       expect(res).toBe(child);
       expect(findFirst).toHaveBeenCalledWith({
-        where: { id: "c1", tenantId },
+        where: { id: "c1", tenantId, OR: expect.any(Array) },
         select: expect.objectContaining({
           guardianContacts: expect.any(Object),
         }),

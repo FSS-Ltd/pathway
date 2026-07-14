@@ -49,6 +49,10 @@ const formatTimeRange = (startsAt?: string, endsAt?: string) => {
   return { date, range: `${startTime} - ${endTime}`, sameDay };
 };
 
+/** Guest pass reuses the site's signup token; only the path differs. */
+const toGuestSignupUrl = (signupUrl: string): string =>
+  signupUrl.replace("/signup?", "/signup/guest?");
+
 const isTodayLocal = (dateString?: string) => {
   if (!dateString) return false;
   const date = new Date(dateString);
@@ -431,6 +435,28 @@ export default function DashboardPage() {
                   </Button>
                 </div>
               </div>
+            )}
+          </div>
+        </Card>
+
+        <Card title="Guest pass link">
+          <div className="mb-3 flex flex-col gap-3">
+            <p className="text-sm text-text-muted">
+              Same link as the parent signup QR, but for a visiting child. Their
+              details are deleted 24 hours after submission.
+            </p>
+            {signupLink ? (
+              <QrCodeCard
+                title="Guest pass"
+                value={toGuestSignupUrl(signupLink.signupUrl)}
+                size={192}
+                embedded
+              />
+            ) : (
+              <p className="text-sm text-text-muted">
+                Generate the parent signup QR above first — the guest pass link reuses
+                the same site token.
+              </p>
             )}
           </div>
         </Card>

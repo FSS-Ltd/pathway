@@ -51,6 +51,12 @@ const childSelect = {
   },
 } as const;
 
+// Guest children vanish from listings at guestExpiresAt, even before the workers
+// guest-pass-cleanup sweep hard-deletes the row. See docs/design/guest-pass-24h.md.
+const notExpiredGuestFilter = () => ({
+  OR: [{ isGuest: false }, { guestExpiresAt: { gt: new Date() } }],
+});
+
 @Injectable()
 export class ChildrenService {
   constructor(
@@ -66,7 +72,7 @@ export class ChildrenService {
 
   async list(tenantId: string) {
     return prisma.child.findMany({
-      where: { tenantId },
+      where: { tenantId, ...notExpiredGuestFilter() },
       select: childSelect,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
@@ -74,7 +80,7 @@ export class ChildrenService {
 
   async getById(id: string, tenantId: string) {
     const child = await prisma.child.findFirst({
-      where: { id, tenantId },
+      where: { id, tenantId, ...notExpiredGuestFilter() },
       select: childSelect,
     });
     if (!child) throw new NotFoundException("Child not found");

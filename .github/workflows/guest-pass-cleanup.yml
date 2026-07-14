@@ -1,0 +1,67 @@
+name: Guest pass cleanup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Hourly. Nightly-only would allow up to ~48h of guest PII to persist physically
+    # even though the read-time filter already hides it after 24h.
+    - cron: "0 * * * *"
+
+jobs:
+  run:
+    name: Guest pass cleanup
+    runs-on: ubuntu-22.04
+    environment: production
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      GUEST_CLEANUP_ENABLED: ${{ secrets.GUEST_CLEANUP_ENABLED }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Verify required secrets
+        shell: bash
+        run: |
+          test -n "$DATABASE_URL" || {
+            echo "DATABASE_URL secret is required for worker jobs." >&2
+            exit 1
+          }
+          test "$GUEST_CLEANUP_ENABLED" = "true" || {
+            echo "GUEST_CLEANUP_ENABLED must be set to true for scheduled guest pass cleanup." >&2
+            exit 1
+          }
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Run guest pass cleanup
+        run: pnpm --filter @pathway/workers guests:cleanup
