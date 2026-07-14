@@ -78,6 +78,18 @@ export class SupabaseStorageService {
     return Buffer.from(await response.arrayBuffer());
   }
 
+  /**
+   * Builds a public, unauthenticated URL for an object in the public bucket
+   * (e.g. an org logo rendered directly in an <img> tag). Does not verify the
+   * object exists — callers should have already uploaded it.
+   */
+  getPublicUrl(key: string): string {
+    const bucket = this.resolveBucket("public");
+    const baseUrl = process.env.SUPABASE_URL?.trim().replace(/\/$/, "");
+    if (!baseUrl) throw new Error("Missing SUPABASE_URL");
+    return `${baseUrl}/storage/v1/object/public/${encodePath(bucket)}/${encodeStorageKey(key)}`;
+  }
+
   private resolveBucket(kind: StorageUploadInput["bucket"]): string {
     const bucket =
       kind === "private"

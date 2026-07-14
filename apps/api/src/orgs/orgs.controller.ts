@@ -16,6 +16,7 @@ import { z } from "zod";
 import { OrgsService } from "./orgs.service";
 import { OrgPeopleService } from "./org-people.service";
 import { registerOrgDto } from "./dto/register-org.dto";
+import { uploadLogoDto } from "./dto/upload-logo.dto";
 import { CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { OrgRole, prisma } from "@pathway/db";
@@ -138,6 +139,37 @@ export class OrgsController {
       body,
     );
     return this.service.updateCurrentOrg(orgId, dto);
+  }
+
+  /**
+   * Upload/replace the current org's white-label logo. ORG_ADMIN only.
+   */
+  @Post("current/logo")
+  @UseGuards(AuthUserGuard)
+  async uploadCurrentLogo(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+    @Body() body: unknown,
+  ) {
+    await this.ensureOrgAdmin(req, orgId);
+    const dto = await parseOrBadRequest<z.infer<typeof uploadLogoDto>>(
+      uploadLogoDto,
+      body,
+    );
+    return this.service.uploadLogo(orgId, dto.logoBase64, dto.logoContentType);
+  }
+
+  /**
+   * Revert the current org's logo to the default NexSteps mark. ORG_ADMIN only.
+   */
+  @Delete("current/logo")
+  @UseGuards(AuthUserGuard)
+  async deleteCurrentLogo(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    await this.ensureOrgAdmin(req, orgId);
+    return this.service.deleteLogo(orgId);
   }
 
   /**

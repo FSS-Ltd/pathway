@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { OrgsService } from "../orgs.service";
 import { BillingService } from "../../billing/billing.service";
 import { LoggingService } from "../../common/logging/logging.service";
+import { SupabaseStorageService } from "../../common/storage/supabase-storage.service";
 
 // ---- Local helper types to avoid `any` -------------------------------------
 // Minimal shapes used in this spec; they mirror just what we need.
@@ -12,6 +13,7 @@ type OrgRecord = {
   planCode?: string;
   isSuite?: boolean;
   parentPortalEnabled?: boolean;
+  logoStorageKey?: string | null;
 };
 
 type RegisterOrgInput = {
@@ -33,6 +35,7 @@ interface PrismaSubset {
     findUnique: (args: {
       where: { slug?: string; id?: string };
     }) => Promise<OrgRecord | null>;
+    findFirst: (args: unknown) => Promise<OrgRecord | null>;
     findMany: (args: unknown) => Promise<OrgRecord[]>;
     update: (args: unknown) => Promise<OrgRecord>;
   };
@@ -47,6 +50,7 @@ const prismaMock: PrismaSubset = {
   org: {
     create: jest.fn(),
     findUnique: jest.fn(),
+    findFirst: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
   },
@@ -89,6 +93,20 @@ describe("OrgsService", () => {
     })),
   };
 
+  const mockStorage: Pick<
+    SupabaseStorageService,
+    "isConfigured" | "uploadObject" | "getPublicUrl"
+  > = {
+    isConfigured: jest.fn(() => true),
+    uploadObject: jest.fn(async (input) => ({
+      bucket: input.bucket,
+      key: input.key,
+    })),
+    getPublicUrl: jest.fn(
+      (key: string) => `https://supabase.test/storage/v1/object/public/public-bucket/${key}`,
+    ),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -97,6 +115,7 @@ describe("OrgsService", () => {
         OrgsService,
         { provide: BillingService, useValue: mockBilling },
         LoggingService,
+        { provide: SupabaseStorageService, useValue: mockStorage },
       ],
     }).compile();
 
@@ -201,6 +220,131 @@ describe("OrgsService", () => {
           }),
         }),
       );
+    });
+  });
+
+  describe("list / getBySlug logoUrl", () => {
+    it("maps a null logoStorageKey to a null logoUrl", async () => {
+      (prismaMock.org.findMany as jest.Mock).mockResolvedValue([
+        { id: "org_1", name: "Acme Church", slug: "acme-church", logoStorageKey: null },
+      ]);
+
+      const [org] = await service.list("org_1");
+
+      expect(org.logoUrl).toBeNull();
+      expect(mockStorage.getPublicUrl).not.toHaveBeenCalled();
+    });
+
+    it("builds a public URL when a logoStorageKey is set", async () => {
+      (prismaMock.org.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: "org_1",
+          name: "Acme Church",
+          slug: "acme-church",
+          logoStorageKey: "orgs/org_1/logo.png",
+        },
+      ]);
+
+      const [org] = await service.list("org_1");
+
+      expect(mockStorage.getPublicUrl).toHaveBeenCalledWith("orgs/org_1/logo.png");
+      expect(org.logoUrl).toBe(
+        "https://supabase.test/storage/v1/object/public/public-bucket/orgs/org_1/logo.png",
+      );
+    });
+
+    it("getBySlug surfaces logoUrl and throws when not found", async () => {
+      (prismaMock.org.findFirst as jest.Mock).mockResolvedValue({
+        id: "org_1",
+        name: "Acme Church",
+        slug: "acme-church",
+        logoStorageKey: "orgs/org_1/logo.png",
+      });
+
+      const org = await service.getBySlug("acme-church", "org_1");
+      expect(org.logoUrl).toContain("orgs/org_1/logo.png");
+
+      (prismaMock.org.findFirst as jest.Mock).mockResolvedValue(null);
+      await expect(service.getBySlug("missing", "org_1")).rejects.toThrow();
+    });
+  });
+
+  describe("uploadLogo", () => {
+    const validBase64 = Buffer.from("fake-logo-bytes").toString("base64");
+
+    it("rejects empty logo data", async () => {
+      await expect(
+        service.uploadLogo("org_1", "", "image/png"),
+      ).rejects.toThrow("Logo data is empty");
+      expect(prismaMock.org.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects disallowed content types", async () => {
+      await expect(
+        service.uploadLogo("org_1", validBase64, "application/pdf"),
+      ).rejects.toThrow("Logo must be one of");
+    });
+
+    it("rejects uploads over the size cap", async () => {
+      const big = Buffer.alloc(6 * 1024 * 1024).toString("base64");
+      await expect(
+        service.uploadLogo("org_1", big, "image/png"),
+      ).rejects.toThrow("Logo must be at most");
+    });
+
+    it("throws when storage is not configured", async () => {
+      (mockStorage.isConfigured as jest.Mock).mockReturnValueOnce(false);
+      await expect(
+        service.uploadLogo("org_1", validBase64, "image/png"),
+      ).rejects.toThrow("storage is not configured");
+      expect(prismaMock.org.update).not.toHaveBeenCalled();
+    });
+
+    it("uploads to the public bucket and persists the storage key", async () => {
+      const result = await service.uploadLogo("org_1", validBase64, "image/png");
+
+      expect(mockStorage.uploadObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bucket: "public",
+          key: "orgs/org_1/logo.png",
+          contentType: "image/png",
+        }),
+      );
+      expect(prismaMock.org.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "org_1" },
+          data: { logoStorageKey: "orgs/org_1/logo.png", logoContentType: "image/png" },
+        }),
+      );
+      expect(result.logoUrl).toContain("orgs/org_1/logo.png");
+    });
+
+    it("accepts a data: URL prefix and infers content type from it", async () => {
+      const dataUrl = `data:image/webp;base64,${validBase64}`;
+      await service.uploadLogo("org_1", dataUrl);
+
+      expect(mockStorage.uploadObject).toHaveBeenCalledWith(
+        expect.objectContaining({ key: "orgs/org_1/logo.webp", contentType: "image/webp" }),
+      );
+    });
+  });
+
+  describe("deleteLogo", () => {
+    it("clears the logo fields and returns a null logoUrl", async () => {
+      (prismaMock.org.update as jest.Mock).mockResolvedValue({
+        id: "org_1",
+        name: "Acme Church",
+        slug: "acme-church",
+        logoStorageKey: null,
+      });
+
+      const result = await service.deleteLogo("org_1");
+
+      expect(prismaMock.org.update).toHaveBeenCalledWith({
+        where: { id: "org_1" },
+        data: { logoStorageKey: null, logoContentType: null },
+      });
+      expect(result).toEqual({ logoUrl: null });
     });
   });
 });

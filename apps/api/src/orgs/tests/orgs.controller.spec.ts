@@ -75,6 +75,12 @@ describe("OrgsController", () => {
   const getRetentionOverviewMock = jest.fn() as jest.MockedFunction<
     OrgsService["getRetentionOverview"]
   >;
+  const uploadLogoMock = jest.fn() as jest.MockedFunction<
+    OrgsService["uploadLogo"]
+  >;
+  const deleteLogoMock = jest.fn() as jest.MockedFunction<
+    OrgsService["deleteLogo"]
+  >;
   const listPeopleMock = jest.fn() as jest.MockedFunction<
     OrgPeopleService["listPeople"]
   >;
@@ -86,11 +92,17 @@ describe("OrgsController", () => {
   >;
   const mockOrgsService: Pick<
     OrgsService,
-    "register" | "updateCurrentOrg" | "getRetentionOverview"
+    | "register"
+    | "updateCurrentOrg"
+    | "getRetentionOverview"
+    | "uploadLogo"
+    | "deleteLogo"
   > = {
     register: registerMock,
     updateCurrentOrg: updateCurrentOrgMock,
     getRetentionOverview: getRetentionOverviewMock,
+    uploadLogo: uploadLogoMock,
+    deleteLogo: deleteLogoMock,
   };
   const mockOrgPeopleService: Pick<
     OrgPeopleService,
@@ -119,6 +131,8 @@ describe("OrgsController", () => {
     registerMock.mockReset();
     updateCurrentOrgMock.mockReset();
     getRetentionOverviewMock.mockReset();
+    uploadLogoMock.mockReset();
+    deleteLogoMock.mockReset();
     listPeopleMock.mockReset();
     listDeletedPeopleMock.mockReset();
     removePersonMock.mockReset();
@@ -307,6 +321,67 @@ describe("OrgsController", () => {
       expect(result.attendanceRetentionYears).toBeNull();
       expect(result.safeguardingRetentionYears).toBeNull();
       expect(result.notesRetentionYears).toBeNull();
+    });
+  });
+
+  describe("uploadCurrentLogo", () => {
+    it("delegates to OrgsService.uploadLogo for an ORG_ADMIN", async () => {
+      const req = { authUserId: "admin-user" } as unknown as Parameters<
+        OrgsController["uploadCurrentLogo"]
+      >[1];
+      uploadLogoMock.mockResolvedValue({ logoUrl: "https://cdn.test/logo.png" });
+
+      const result = await controller.uploadCurrentLogo("org-1", req, {
+        logoBase64: "ZmFrZQ==",
+        logoContentType: "image/png",
+      });
+
+      expect(uploadLogoMock).toHaveBeenCalledWith(
+        "org-1",
+        "ZmFrZQ==",
+        "image/png",
+      );
+      expect(result).toEqual({ logoUrl: "https://cdn.test/logo.png" });
+    });
+
+    it("rejects a caller who is not an ORG_ADMIN", async () => {
+      mockPrisma.orgMembership.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.userOrgRole.findFirst.mockResolvedValueOnce(null);
+      const req = { authUserId: "not-admin" } as unknown as Parameters<
+        OrgsController["uploadCurrentLogo"]
+      >[1];
+
+      await expect(
+        controller.uploadCurrentLogo("org-1", req, {
+          logoBase64: "ZmFrZQ==",
+        }),
+      ).rejects.toThrow();
+      expect(uploadLogoMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects an empty body", async () => {
+      const req = { authUserId: "admin-user" } as unknown as Parameters<
+        OrgsController["uploadCurrentLogo"]
+      >[1];
+
+      await expect(
+        controller.uploadCurrentLogo("org-1", req, {}),
+      ).rejects.toThrow();
+      expect(uploadLogoMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("deleteCurrentLogo", () => {
+    it("delegates to OrgsService.deleteLogo for an ORG_ADMIN", async () => {
+      const req = { authUserId: "admin-user" } as unknown as Parameters<
+        OrgsController["deleteCurrentLogo"]
+      >[1];
+      deleteLogoMock.mockResolvedValue({ logoUrl: null });
+
+      const result = await controller.deleteCurrentLogo("org-1", req);
+
+      expect(deleteLogoMock).toHaveBeenCalledWith("org-1");
+      expect(result).toEqual({ logoUrl: null });
     });
   });
 
