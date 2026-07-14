@@ -456,6 +456,8 @@ export type AdminOrgOverview = {
   planTier?: string | null;
   siteCount?: number | null;
   sector?: AdminOrgSector | null;
+  /** Org's white-label logo; null/absent falls back to the NexSteps mark. */
+  logoUrl?: string | null;
 };
 
 export type AdminRetentionOverview = {
@@ -4144,6 +4146,7 @@ type ApiOrg = {
   isSuite?: boolean | null;
   parentPortalEnabled?: boolean | null;
   sector?: AdminOrgSector | null;
+  logoUrl?: string | null;
   // TODO: map site counts when available
 };
 
@@ -4156,6 +4159,7 @@ const mapApiOrgToAdmin = (org: ApiOrg): AdminOrgOverview => ({
   planTier: org.planCode ?? null,
   siteCount: null,
   sector: org.sector ?? null,
+  logoUrl: org.logoUrl ?? null,
 });
 
 // SETTINGS: org overview is metadata-only; do not surface secrets or API keys here.
@@ -4229,6 +4233,46 @@ export async function updateOrgProfile(input: {
   }
   const json = (await res.json()) as ApiOrg;
   return mapApiOrgToAdmin(json);
+}
+
+/** Upload/replace the current org's white-label logo. ORG_ADMIN only. */
+export async function uploadOrgLogo(
+  logoBase64: string,
+  logoContentType?: string,
+): Promise<{ logoUrl: string | null }> {
+  if (isUsingMockApi()) {
+    throw new Error("Logo upload is not available in mock mode.");
+  }
+  const res = await fetch(`${API_BASE_URL}/orgs/current/logo`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({ logoBase64, logoContentType }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to upload logo: ${res.status} ${body}`);
+  }
+  return (await res.json()) as { logoUrl: string | null };
+}
+
+/** Revert the current org's logo to the default NexSteps mark. ORG_ADMIN only. */
+export async function deleteOrgLogo(): Promise<{ logoUrl: null }> {
+  if (isUsingMockApi()) {
+    throw new Error("Logo removal is not available in mock mode.");
+  }
+  const res = await fetch(`${API_BASE_URL}/orgs/current/logo`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to remove logo: ${res.status} ${body}`);
+  }
+  return (await res.json()) as { logoUrl: null };
 }
 
 export type AdminSiteProfile = {

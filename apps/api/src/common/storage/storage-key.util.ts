@@ -26,6 +26,10 @@ export function staffAvatarKey(
   return `tenants/${tenantId}/staff/${userId}/avatar.${storageExtension(mimeType)}`;
 }
 
+export function orgLogoKey(orgId: string, mimeType: string): string {
+  return `orgs/${orgId}/logo.${storageExtension(mimeType)}`;
+}
+
 export function lessonResourceKey(
   tenantId: string,
   lessonId: string,

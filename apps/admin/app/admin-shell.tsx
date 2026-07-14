@@ -16,6 +16,7 @@ import {
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { meetsAccessRequirement, type AccessRequirement } from "@/lib/access";
 import { OnboardingModal } from "@/components/onboarding-modal";
+import { fetchOrgOverview } from "@/lib/api-client";
 import { cn } from "@pathway/ui";
 
 const getDevRuntimeState = () => {
@@ -93,11 +94,45 @@ const resolveTitle = (path: string): string => {
 type AdminBrandLinkProps = {
   isCollapsed?: boolean;
   onClick?: () => void;
+  /** Org's white-label logo. Falls back to the Nexsteps mark when absent or broken. */
+  logoUrl?: string | null;
+};
+
+// Plain <img> (not next/image): logoUrl is a per-org Supabase URL not known at build
+// time, and the admin app has no images.remotePatterns configured for it.
+const BrandMark = ({ logoUrl, alt }: { logoUrl?: string | null; alt: string }) => {
+  const [broken, setBroken] = React.useState(false);
+  React.useEffect(() => setBroken(false), [logoUrl]);
+
+  if (logoUrl && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={logoUrl}
+        alt={alt}
+        width={32}
+        height={32}
+        className="h-8 w-8 rounded-md object-contain shadow-sm"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <Image
+      src="/NSLogo.svg"
+      alt={alt}
+      width={32}
+      height={32}
+      className="rounded-md shadow-sm"
+      priority
+    />
+  );
 };
 
 const AdminBrandLink = ({
   isCollapsed = false,
   onClick,
+  logoUrl,
 }: AdminBrandLinkProps) => (
   <Link
     href="/"
@@ -107,13 +142,9 @@ const AdminBrandLink = ({
       isCollapsed && "justify-center",
     )}
   >
-    <Image
-      src="/NSLogo.svg"
+    <BrandMark
+      logoUrl={logoUrl}
       alt={isCollapsed ? "Nexsteps" : "Nexsteps Admin"}
-      width={32}
-      height={32}
-      className="rounded-md shadow-sm"
-      priority
     />
     {!isCollapsed && (
       <div className="flex flex-col leading-tight">
@@ -152,6 +183,19 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
     error: accessError,
     warning: accessWarning,
   } = useAdminAccess();
+
+  // Org's white-label logo for the day-to-day brand swap. Stays null pre-auth
+  // (login/accept-invite before sign-in), so those screens keep the Nexsteps mark.
+  const [orgLogoUrl, setOrgLogoUrl] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (!session) {
+      setOrgLogoUrl(null);
+      return;
+    }
+    fetchOrgOverview()
+      .then((org) => setOrgLogoUrl(org.logoUrl ?? null))
+      .catch(() => setOrgLogoUrl(null));
+  }, [session]);
 
   // Collapsible sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
@@ -232,7 +276,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           currentPath={pathname}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          header={<AdminBrandLink isCollapsed={isSidebarCollapsed} />}
+          header={<AdminBrandLink isCollapsed={isSidebarCollapsed} logoUrl={orgLogoUrl} />}
         />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-shell">
           <TopBar
@@ -304,7 +348,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           <div className="relative flex h-full w-[min(20rem,calc(100vw-2rem))] flex-col bg-surface shadow-2xl">
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-accent-secondary/30 px-3">
               <div id={mobileNavTitleId}>
-                <AdminBrandLink onClick={closeMobileNav} />
+                <AdminBrandLink onClick={closeMobileNav} logoUrl={orgLogoUrl} />
               </div>
               <button
                 type="button"

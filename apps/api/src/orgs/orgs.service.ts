@@ -10,11 +10,16 @@ import {
 import { prisma, type OrgSector } from "@pathway/db";
 import { registerOrgDto } from "./dto/register-org.dto";
 import { BillingService } from "../billing/billing.service";
+import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { orgLogoKey } from "../common/storage/storage-key.util";
 import {
   LoggingService,
   StructuredLogger,
 } from "../common/logging/logging.service";
 import type { LogContext } from "../common/logging/logging.service";
+
+const MAX_LOGO_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 type RegisterOrgResult = {
   org: {
@@ -52,6 +57,8 @@ export class OrgsService {
     private readonly billing: BillingService,
     @Inject(LoggingService)
     logging: LoggingService,
+    @Inject(SupabaseStorageService)
+    private readonly storage: SupabaseStorageService,
   ) {
     // Fallback to Nest Logger if DI fails in dev; avoids crash during bootstrap.
     this.logger = logging
@@ -211,10 +218,80 @@ export class OrgsService {
         isSuite: true,
         parentPortalEnabled: true,
         sector: true,
+        logoStorageKey: true,
       },
     });
     if (!org) throw new NotFoundException("Org not found");
-    return org;
+    const { logoStorageKey, ...rest } = org;
+    return { ...rest, logoUrl: this.toLogoUrl(logoStorageKey) };
+  }
+
+  /**
+   * Upload/replace the org's white-label logo. Stored in the public Supabase bucket
+   * so it can render in a plain <img> tag with no auth. See docs/design/per-org-logo.md.
+   */
+  async uploadLogo(
+    orgId: string,
+    logoBase64: string,
+    contentType?: string | null,
+  ): Promise<{ logoUrl: string | null }> {
+    let data = logoBase64;
+    let detectedType = contentType;
+    if (data.startsWith("data:")) {
+      const match = data.match(/^data:([^;]+);base64,/);
+      if (match) {
+        detectedType = match[1].trim().toLowerCase();
+        data = data.replace(/^data:[^;]+;base64,/, "");
+      }
+    }
+    const buffer = Buffer.from(data, "base64");
+    if (buffer.length > MAX_LOGO_BYTES) {
+      throw new BadRequestException(
+        `Logo must be at most ${MAX_LOGO_BYTES / 1024 / 1024}MB`,
+      );
+    }
+    if (buffer.length === 0) {
+      throw new BadRequestException("Logo data is empty");
+    }
+    const type = detectedType || "image/png";
+    if (!ALLOWED_LOGO_TYPES.includes(type)) {
+      throw new BadRequestException(
+        `Logo must be one of: ${ALLOWED_LOGO_TYPES.join(", ")}`,
+      );
+    }
+    if (!this.storage.isConfigured()) {
+      throw new BadRequestException(
+        "Logo upload is not available: storage is not configured",
+      );
+    }
+
+    const stored = await this.storage.uploadObject({
+      bucket: "public",
+      key: orgLogoKey(orgId, type),
+      body: buffer,
+      contentType: type,
+    });
+
+    await prisma.org.update({
+      where: { id: orgId },
+      data: { logoStorageKey: stored?.key ?? null, logoContentType: type },
+    });
+
+    return { logoUrl: this.toLogoUrl(stored?.key ?? null) };
+  }
+
+  /** Reverts the org to the default NexSteps mark. */
+  async deleteLogo(orgId: string): Promise<{ logoUrl: null }> {
+    await prisma.org.update({
+      where: { id: orgId },
+      data: { logoStorageKey: null, logoContentType: null },
+    });
+    return { logoUrl: null };
+  }
+
+  private toLogoUrl(logoStorageKey: string | null): string | null {
+    if (!logoStorageKey) return null;
+    return this.storage.getPublicUrl(logoStorageKey);
   }
 
   /**
@@ -283,7 +360,7 @@ export class OrgsService {
   }
 
   async list(orgId: string) {
-    return prisma.org.findMany({
+    const orgs = await prisma.org.findMany({
       where: { id: orgId },
       orderBy: { createdAt: "desc" },
       select: {
@@ -294,8 +371,13 @@ export class OrgsService {
         isSuite: true,
         parentPortalEnabled: true,
         sector: true,
+        logoStorageKey: true,
       },
     });
+    return orgs.map(({ logoStorageKey, ...org }) => ({
+      ...org,
+      logoUrl: this.toLogoUrl(logoStorageKey),
+    }));
   }
 
   /**

@@ -234,6 +234,10 @@ model Org {
   // Selected once at initial plan purchase. Nullable so orgs created before this field
   // existed remain valid; new orgs should always set it at purchase time.
   sector           OrgSector?
+  // Org-level white-label logo, stored in the public Supabase bucket. Nullable — falls
+  // back to the NexSteps mark. See docs/design/per-org-logo.md.
+  logoStorageKey   String?
+  logoContentType  String?
   stripeCustomerId String?                  @unique
   tenants          Tenant[]
   subscriptions    Subscription[]

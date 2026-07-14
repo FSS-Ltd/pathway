@@ -9,6 +9,7 @@ import {
   AdminOrgOverview,
   AdminRetentionOverview,
   deactivateOrganisation,
+  deleteOrgLogo,
   fetchActiveSiteState,
   fetchBillingOverview,
   fetchOrgOverview,
@@ -16,6 +17,7 @@ import {
   requestExportOrganisationData,
   updateOrgProfile,
   updateSiteProfile,
+  uploadOrgLogo,
   ORG_SECTOR_LABELS,
   type ActiveSiteState,
   type SiteOption,
@@ -55,6 +57,10 @@ export default function SettingsPage() {
     string | null
   >(null);
   const [savingParentPortal, setSavingParentPortal] = React.useState(false);
+
+  const [logoError, setLogoError] = React.useState<string | null>(null);
+  const [savingLogo, setSavingLogo] = React.useState(false);
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
 
   const [editingSite, setEditingSite] = React.useState(false);
   const [editSiteName, setEditSiteName] = React.useState("");
@@ -137,6 +143,42 @@ export default function SettingsPage() {
       setOrgSaveError(e instanceof Error ? e.message : "Failed to save");
     } finally {
       setSavingOrg(false);
+    }
+  };
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] ?? "" : "";
+      if (!base64) return;
+      setLogoError(null);
+      setSavingLogo(true);
+      try {
+        const { logoUrl } = await uploadOrgLogo(base64, file.type);
+        setOrg((prev) => (prev ? { ...prev, logoUrl } : prev));
+      } catch (err) {
+        setLogoError(err instanceof Error ? err.message : "Failed to upload logo");
+      } finally {
+        setSavingLogo(false);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const handleRemoveLogo = async () => {
+    setLogoError(null);
+    setSavingLogo(true);
+    try {
+      const { logoUrl } = await deleteOrgLogo();
+      setOrg((prev) => (prev ? { ...prev, logoUrl } : prev));
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : "Failed to remove logo");
+    } finally {
+      setSavingLogo(false);
     }
   };
 
@@ -353,6 +395,67 @@ export default function SettingsPage() {
             </div>
           ) : (
             <p className="text-sm text-text-muted">Organisation information is not available.</p>
+          )}
+        </Card>
+
+        {/* Logo: white-label branding shown in the admin shell day-to-day. */}
+        <Card
+          title="Logo"
+          description="Shown in place of the Nexsteps mark across the admin app. Login and invite screens always show Nexsteps."
+        >
+          {isLoading ? (
+            loadingBlock
+          ) : (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-md border border-border-subtle bg-surface">
+                  {org?.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={org.logoUrl}
+                      alt="Organisation logo"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <span className="text-xs text-text-muted">No logo</span>
+                  )}
+                </div>
+                {canEditOrg && (
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleLogoFileChange}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={savingLogo}
+                        onClick={() => logoInputRef.current?.click()}
+                      >
+                        {savingLogo ? "Saving…" : org?.logoUrl ? "Replace logo" : "Upload logo"}
+                      </Button>
+                      {org?.logoUrl && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={savingLogo}
+                          onClick={handleRemoveLogo}
+                        >
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {logoError && (
+                <p className="text-sm text-status-danger">{logoError}</p>
+              )}
+            </div>
           )}
         </Card>
 
