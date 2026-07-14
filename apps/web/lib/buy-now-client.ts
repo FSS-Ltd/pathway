@@ -11,6 +11,15 @@
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
+export type Sector = "CHURCH" | "CLUB" | "SCHOOL" | "CHARITY";
+
+export const SECTOR_OPTIONS: { value: Sector; label: string }[] = [
+  { value: "CHURCH", label: "Church" },
+  { value: "CLUB", label: "Club" },
+  { value: "SCHOOL", label: "School" },
+  { value: "CHARITY", label: "Charity" },
+];
+
 export type PlanPreviewResponse = {
   planCode: string;
   planTier: "core" | "starter" | "growth" | "enterprise" | null;
@@ -52,6 +61,7 @@ export type BuyNowCheckoutPayload = {
   contactName: string;
   contactEmail: string;
   password: string;
+  sector: Sector;
   successUrl?: string;
   cancelUrl?: string;
 };
@@ -129,6 +139,7 @@ export async function createCheckoutSession(
       contactName: payload.contactName,
       contactEmail: payload.contactEmail,
       password: payload.password,
+      sector: payload.sector,
     },
     successUrl: payload.successUrl,
     cancelUrl: payload.cancelUrl,

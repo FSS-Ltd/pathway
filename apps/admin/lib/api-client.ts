@@ -438,6 +438,15 @@ export type AdminBuyNowPurchaseRequest = {
   cancelUrl?: string | null;
 };
 
+export type AdminOrgSector = "CHURCH" | "CLUB" | "SCHOOL" | "CHARITY";
+
+export const ORG_SECTOR_LABELS: Record<AdminOrgSector, string> = {
+  CHURCH: "Church",
+  CLUB: "Club",
+  SCHOOL: "School",
+  CHARITY: "Charity",
+};
+
 export type AdminOrgOverview = {
   id: string;
   name: string;
@@ -446,6 +455,7 @@ export type AdminOrgOverview = {
   parentPortalEnabled: boolean;
   planTier?: string | null;
   siteCount?: number | null;
+  sector?: AdminOrgSector | null;
 };
 
 export type AdminRetentionOverview = {
@@ -4085,6 +4095,7 @@ type ApiOrg = {
   planCode?: string | null;
   isSuite?: boolean | null;
   parentPortalEnabled?: boolean | null;
+  sector?: AdminOrgSector | null;
   // TODO: map site counts when available
 };
 
@@ -4096,6 +4107,7 @@ const mapApiOrgToAdmin = (org: ApiOrg): AdminOrgOverview => ({
   parentPortalEnabled: org.parentPortalEnabled ?? true,
   planTier: org.planCode ?? null,
   siteCount: null,
+  sector: org.sector ?? null,
 });
 
 // SETTINGS: org overview is metadata-only; do not surface secrets or API keys here.

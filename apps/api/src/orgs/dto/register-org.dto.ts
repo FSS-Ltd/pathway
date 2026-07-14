@@ -1,10 +1,16 @@
 import { z } from "zod";
+import { SECTOR_LABELS } from "@pathway/types";
 
 // Business plan code - keep union to allow forward-compatible custom codes
 export const planCode = z.union([
   z.enum(["trial", "starter", "pro", "enterprise"]).catch("trial"),
   z.string().min(1),
 ]);
+
+// Selected once at org creation; drives which features are visible to the org.
+export const sectorSchema = z.enum(
+  Object.keys(SECTOR_LABELS) as [string, ...string[]],
+);
 
 export const slugSchema = z
   .string()
@@ -96,6 +102,7 @@ export const registerOrgDto = z
         slug: slugSchema,
         planCode,
         isSuite: z.boolean().default(true),
+        sector: sectorSchema,
         billingEmail: z.string().email().optional(),
         billingAddress: billingAddressDto.optional(),
       })

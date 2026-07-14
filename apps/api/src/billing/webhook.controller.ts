@@ -17,6 +17,7 @@ import {
   PendingOrderStatus,
   Role,
   OrgRole,
+  OrgSector,
 } from "@pathway/db";
 import { EntitlementsService } from "./entitlements.service";
 import {
@@ -38,6 +39,10 @@ type WebhookResult =
 type PendingOrderRecord = Prisma.PendingOrderGetPayload<
   Record<string, never>
 >;
+
+export function isOrgSector(value: string | undefined): value is OrgSector {
+  return !!value && (Object.values(OrgSector) as string[]).includes(value);
+}
 
 // Core billing webhook controller. For Stripe, this endpoint is the SNAPSHOT
 // webhook: it handles checkout.session.completed, customer.subscription.* and
@@ -494,6 +499,7 @@ export class BillingWebhookController {
     const contactEmail = details.contactEmail;
     const password = details.password;
     const planCode = details.planCode;
+    const sector = isOrgSector(details.sector) ? details.sector : undefined;
 
     if (!orgName || !slug || !contactEmail) {
       throw new Error("Missing required org details");
@@ -513,6 +519,7 @@ export class BillingWebhookController {
           slug,
           planCode,
           isSuite: false,
+          sector,
         },
       });
 
