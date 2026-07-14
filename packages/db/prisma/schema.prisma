@@ -600,10 +600,15 @@ model Child {
   concerns            Concern[]
   attendance          Attendance[]
   childNotes          ChildNote[]
+  // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
+  // ~1h after guestExpiresAt. See docs/design/guest-pass-24h.md.
+  isGuest             Boolean      @default(false)
+  guestExpiresAt      DateTime?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
   @@index([tenantId])
+  @@index([isGuest, guestExpiresAt])
 }
 
 model Group {

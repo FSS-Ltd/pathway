@@ -175,3 +175,42 @@ export async function submitContactOnlySignup(
   }
   return res.json() as Promise<{ success: true; message: string }>;
 }
+
+export type GuestSignupPayload = {
+  token: string;
+  child: {
+    firstName: string;
+    lastName: string;
+    dateOfBirth?: string;
+    allergies?: string;
+    additionalNeedsNotes?: string;
+  };
+  guardian: {
+    fullName: string;
+    phone: string;
+    relationshipToChild?: string;
+  };
+  dataProcessingConsent: boolean;
+};
+
+export type GuestSignupResult = {
+  childId: string;
+  guestExpiresAt: string;
+};
+
+/** Self-serve guest pass: details are hard-deleted ~1h after guestExpiresAt. */
+export async function submitGuestSignup(
+  payload: GuestSignupPayload,
+): Promise<GuestSignupResult> {
+  const res = await fetch(`${API_BASE_URL}/public/signup/submit-guest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || "Registration failed. Please try again.");
+  }
+  return res.json() as Promise<GuestSignupResult>;
+}

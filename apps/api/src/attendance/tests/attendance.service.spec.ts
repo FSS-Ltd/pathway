@@ -71,6 +71,8 @@ describe("AttendanceService", () => {
     notes: null,
     tenantId,
     disabilities: [],
+    isGuest: false,
+    guestExpiresAt: null,
     createdAt: new Date(),
     updatedAt: new Date(),
   });

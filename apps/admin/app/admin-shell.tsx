@@ -45,6 +45,7 @@ const navItemsWithAccess: (SidebarNavItem & { access?: AccessRequirement })[] = 
   { ...defaultSidebarItems[7], access: "staff-or-admin" }, // My schedule
   { ...defaultSidebarItems[8], access: "staff-or-admin" }, // Attendance
   { ...defaultSidebarItems[9], access: "site-admin-or-higher" }, // Notices & Announcements (admins only)
+  { label: "Guest pass", href: "/guest-pass", iconIndex: 8, access: "staff-or-admin" },
   { label: "Handover", href: "/handover", iconIndex: 8, access: "staff-or-admin" },
   { label: "Handover logs", href: "/admin/handover", iconIndex: 8, access: "site-admin-or-higher" },
   { label: "Create concern", href: "/safeguarding/concerns/new", iconIndex: 10, access: "staff-or-admin" }, // All staff can create
@@ -68,6 +69,7 @@ const titleMap: Record<string, string> = {
   "/sessions": "Sessions & Rota",
   "/my-schedule": "My schedule",
   "/attendance": "Attendance",
+  "/guest-pass": "Guest pass",
   "/handover": "Next session handover",
   "/admin/handover": "Handover logs",
   "/notices": "Notices & Announcements",

@@ -9,7 +9,8 @@
     "lint": "eslint \"src/**/*.{ts,tsx,js}\" --no-error-on-unmatched-pattern",
     "test": "jest -c jest.config.ts",
     "compute:av30": "tsx src/av30/compute-av30.cli.ts",
-    "retention:run": "tsx src/retention/run-retention.cli.ts"
+    "retention:run": "tsx src/retention/run-retention.cli.ts",
+    "guests:cleanup": "tsx src/guest-pass/run-guest-pass-cleanup.cli.ts"
   },
   "dependencies": {
     "@pathway/db": "workspace:*",

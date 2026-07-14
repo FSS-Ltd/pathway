@@ -33,6 +33,7 @@ import { PublicSignupModule } from "./public-signup/public-signup.module";
 import { ExportsModule } from "./exports/exports.module";
 import { BlogModule } from "./blog/blog.module";
 import { HandoverModule } from "./handover/handover.module";
+import { GuestPassModule } from "./guest-pass/guest-pass.module";
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { HandoverModule } from "./handover/handover.module";
     ExportsModule,
     BlogModule,
     HandoverModule,
+    GuestPassModule,
   ],
 })
 export class AppModule {}

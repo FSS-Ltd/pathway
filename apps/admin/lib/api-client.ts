@@ -744,6 +744,54 @@ export async function rotatePublicSignupLinkForCurrentSite(): Promise<AdminPubli
   return (await res.json()) as AdminPublicSignupLink;
 }
 
+export type GuestPassChildInput = {
+  firstName: string;
+  lastName: string;
+  dateOfBirth?: string;
+  allergies?: string;
+  additionalNeedsNotes?: string;
+};
+
+export type GuestPassGuardianInput = {
+  fullName: string;
+  phone: string;
+  relationshipToChild?: string;
+};
+
+export type GuestPassResult = {
+  childId: string;
+  guestExpiresAt: string;
+};
+
+/**
+ * Staff/kiosk quick-add: registers a day-pass guest child for the current site.
+ * Auto-deleted ~24h later by the workers guest-pass-cleanup sweep.
+ */
+export async function createGuestPassForCurrentSite(input: {
+  child: GuestPassChildInput;
+  guardian: GuestPassGuardianInput;
+  consentConfirmed: boolean;
+}): Promise<GuestPassResult> {
+  if (isUsingMockApi()) {
+    throw new Error("Guest pass requires the real API; disable mock API to use this feature.");
+  }
+  const res = await fetch(`${API_BASE_URL}/guest-pass/current`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      res.status === 400
+        ? "Active site context required. Select a site first."
+        : `Failed to create guest pass: ${res.status}${body ? ` ${body}` : ""}`,
+    );
+  }
+  return (await res.json()) as GuestPassResult;
+}
+
 const getDefaultTenantId = () =>
   process.env.NEXT_PUBLIC_DEV_TENANT_ID ||
   process.env.NEXT_PUBLIC_TENANT_ID ||
