@@ -34,27 +34,30 @@ const getDevRuntimeState = () => {
 // Staff (no admin): Profile, Children, Parents, Lessons, Sessions, My schedule, Attendance, Create concern.
 // Site/Org admin: People, Classes, Announcements, Safeguarding (view), Reports, Settings.
 // Org admin only: Billing.
+//
+// `group` clusters related items into a collapsible accordion section in the sidebar;
+// items without a `group` (Dashboard) render as top-level links above the sections.
 const navItemsWithAccess: (SidebarNavItem & { access?: AccessRequirement })[] = [
   { ...defaultSidebarItems[0], access: "staff-or-admin" }, // Dashboard
-  { label: "Profile", href: "/staff/profile", iconIndex: 1, access: "staff-only" }, // Staff only (replaces People)
-  { ...defaultSidebarItems[1], access: "site-admin-or-higher" }, // People (admins only)
-  { ...defaultSidebarItems[2], access: "staff-or-admin" }, // Children
-  { ...defaultSidebarItems[3], access: "staff-or-admin" }, // Parents & Guardians
-  { ...defaultSidebarItems[4], access: "staff-or-admin" }, // Lessons
-  { ...defaultSidebarItems[5], access: "site-admin-or-higher" }, // Classes (admins only)
-  { ...defaultSidebarItems[6], access: "staff-or-admin" }, // Sessions & Rota
-  { ...defaultSidebarItems[7], access: "staff-or-admin" }, // My schedule
-  { ...defaultSidebarItems[8], access: "staff-or-admin" }, // Attendance
-  { ...defaultSidebarItems[9], access: "site-admin-or-higher" }, // Notices & Announcements (admins only)
-  { label: "Guest pass", href: "/guest-pass", iconIndex: 8, access: "staff-or-admin" },
-  { label: "Handover", href: "/handover", iconIndex: 8, access: "staff-or-admin" },
-  { label: "Handover logs", href: "/admin/handover", iconIndex: 8, access: "site-admin-or-higher" },
-  { label: "Create concern", href: "/safeguarding/concerns/new", iconIndex: 10, access: "staff-or-admin" }, // All staff can create
-  { ...defaultSidebarItems[10], access: "safeguarding-admin" }, // Safeguarding (view dashboard)
-  { ...defaultSidebarItems[11], access: "billing" }, // Billing (org admin only)
-  { label: "Blog", href: "/admin/blog", iconIndex: 4, access: "super-user" },
-  { ...defaultSidebarItems[12], access: "admin-only" }, // Reports
-  { ...defaultSidebarItems[13], access: "admin-only" }, // Settings
+  { label: "Profile", href: "/staff/profile", iconIndex: 14, access: "staff-only", group: "People" }, // Staff only (replaces People)
+  { ...defaultSidebarItems[1], access: "site-admin-or-higher", group: "People" }, // People (admins only)
+  { ...defaultSidebarItems[2], access: "staff-or-admin", group: "People" }, // Children
+  { ...defaultSidebarItems[3], access: "staff-or-admin", group: "People" }, // Parents & Guardians
+  { ...defaultSidebarItems[4], access: "staff-or-admin", group: "Teaching" }, // Lessons
+  { ...defaultSidebarItems[5], access: "site-admin-or-higher", group: "Teaching" }, // Classes (admins only)
+  { ...defaultSidebarItems[6], access: "staff-or-admin", group: "Schedule" }, // Sessions & Rota
+  { ...defaultSidebarItems[7], access: "staff-or-admin", group: "Schedule" }, // My schedule
+  { ...defaultSidebarItems[8], access: "staff-or-admin", group: "Schedule" }, // Attendance
+  { ...defaultSidebarItems[9], access: "site-admin-or-higher", group: "Communication" }, // Notices & Announcements (admins only)
+  { label: "Guest pass", href: "/guest-pass", iconIndex: 15, access: "staff-or-admin", group: "Guest & Handover" },
+  { label: "Handover", href: "/handover", iconIndex: 16, access: "staff-or-admin", group: "Guest & Handover" },
+  { label: "Handover logs", href: "/admin/handover", iconIndex: 17, access: "site-admin-or-higher", group: "Guest & Handover" },
+  { label: "Create concern", href: "/safeguarding/concerns/new", iconIndex: 18, access: "staff-or-admin", group: "Safeguarding" }, // All staff can create
+  { ...defaultSidebarItems[10], access: "safeguarding-admin", group: "Safeguarding" }, // Safeguarding (view dashboard)
+  { ...defaultSidebarItems[11], access: "billing", group: "Admin" }, // Billing (org admin only)
+  { label: "Blog", href: "/admin/blog", iconIndex: 19, access: "super-user", group: "Communication" },
+  { ...defaultSidebarItems[12], access: "admin-only", group: "Admin" }, // Reports
+  { ...defaultSidebarItems[13], access: "admin-only", group: "Admin" }, // Settings
 ];
 
 const titleMap: Record<string, string> = {
