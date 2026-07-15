@@ -15,6 +15,7 @@ import {
   CreditCard,
   BarChart3,
   Settings,
+  LifeBuoy,
   ChevronLeft,
   ChevronRight,
   type LucideIcon,
@@ -57,6 +58,8 @@ const iconComponents: LucideIcon[] = [
   CreditCard,
   BarChart3,
   Settings,
+  // index 13: Feedback — rendered via AdminShell's footer slot, not the flat nav list.
+  LifeBuoy,
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.

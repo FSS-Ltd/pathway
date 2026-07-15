@@ -3607,6 +3607,41 @@ export async function createConcern(payload: {
   return { id: json.id };
 }
 
+/** Submit admin feedback / a feature request. Emails support directly, no stored record. */
+export async function submitFeedback(payload: {
+  category: "bug" | "feature-request" | "other";
+  subject: string;
+  description: string;
+  screenshotBase64?: string;
+  screenshotContentType?: string;
+  screenshotFilename?: string;
+}): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_BASE_URL}/feedback`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+    body: JSON.stringify({
+      category: payload.category,
+      subject: payload.subject.trim(),
+      description: payload.description.trim(),
+      ...(payload.screenshotBase64
+        ? {
+            screenshotBase64: payload.screenshotBase64,
+            screenshotContentType: payload.screenshotContentType,
+            screenshotFilename: payload.screenshotFilename,
+          }
+        : {}),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to submit feedback (${res.status}): ${body || res.statusText}`,
+    );
+  }
+  return res.json();
+}
+
 /** Fetch a single concern by id for detail view. Returns null if not found. */
 export async function fetchConcernById(
   id: string,

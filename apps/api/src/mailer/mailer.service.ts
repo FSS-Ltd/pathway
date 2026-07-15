@@ -4,6 +4,8 @@ import { Resend } from "resend";
 /** Resend requires: `email@example.com` or `Name <email@example.com>` */
 const DEFAULT_FROM = "Nexsteps <noreply@mail.nexsteps.dev>";
 
+const FEEDBACK_RECIPIENT = "support@faithfulsoftware.dev";
+
 function parseAndValidateFromAddress(
   raw: string | undefined,
 ): { from: string; usedFallback: boolean } {
@@ -53,6 +55,25 @@ export type SendParentSignupCompleteParams = {
   siteName: string;
   orgName: string;
   loginUrl: string;
+};
+
+/** Params for admin feedback / feature-request submissions, sent to the support inbox. */
+export type SendFeedbackEmailParams = {
+  category: "bug" | "feature-request" | "other";
+  subject: string;
+  description: string;
+  reporterEmail?: string;
+  reporterName?: string;
+  tenantId?: string;
+  orgId?: string;
+  orgSlug?: string;
+  attachment?: { buffer: Buffer; filename: string; contentType: string };
+};
+
+const FEEDBACK_CATEGORY_LABELS: Record<SendFeedbackEmailParams["category"], string> = {
+  bug: "Bug",
+  "feature-request": "Feature request",
+  other: "Other",
 };
 
 @Injectable()
@@ -656,6 +677,140 @@ You've completed registration for ${siteName}. Sign in here:
 ${loginUrl}
 
 If you didn't register with ${orgName}, you can safely ignore this email.
+    `.trim();
+  }
+
+  /**
+   * Send an admin feedback / feature-request submission to the support inbox.
+   * Optional screenshot travels as an email attachment (no storage involved).
+   */
+  async sendFeedbackEmail(params: SendFeedbackEmailParams): Promise<void> {
+    const categoryLabel = FEEDBACK_CATEGORY_LABELS[params.category];
+    const subject = `[Feedback: ${categoryLabel}] ${params.subject}`;
+    const html = this.buildFeedbackEmailHtml(params, categoryLabel);
+    const text = this.buildFeedbackEmailText(params, categoryLabel);
+
+    if (!this.isEnabled || !this.resend) {
+      this.logger.log(
+        `[📧 MAILER] MOCK MODE - Would send feedback email\nSubject: ${subject}\nReporter: ${params.reporterEmail ?? "unknown"}\nScreenshot: ${params.attachment ? `attached (${params.attachment.buffer.length} bytes)` : "none"}`,
+      );
+      return;
+    }
+
+    try {
+      const result = await this.resend.emails.send({
+        from: this.fromAddress,
+        to: FEEDBACK_RECIPIENT,
+        subject,
+        html,
+        text,
+        replyTo: params.reporterEmail,
+        attachments: params.attachment
+          ? [
+              {
+                filename: params.attachment.filename,
+                content: params.attachment.buffer,
+                contentType: params.attachment.contentType,
+              },
+            ]
+          : undefined,
+      });
+
+      if (result.error) {
+        this.logger.error(`[📧 MAILER] Feedback email error:`, result.error);
+        throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+      }
+
+      this.logger.log(`[📧 MAILER] Feedback email sent to ${FEEDBACK_RECIPIENT}`);
+    } catch (error) {
+      this.logger.error(`[📧 MAILER] Exception sending feedback email:`, error);
+      throw new Error(`Failed to send feedback email: ${String(error)}`);
+    }
+  }
+
+  private buildFeedbackEmailHtml(
+    params: SendFeedbackEmailParams,
+    categoryLabel: string,
+  ): string {
+    const escapeHtml = (value: string): string =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const { reporterEmail, reporterName, tenantId, orgId, orgSlug, attachment } = params;
+    const subject = escapeHtml(params.subject);
+    const description = escapeHtml(params.description);
+    const reporter = escapeHtml(
+      reporterName
+        ? `${reporterName}${reporterEmail ? ` (${reporterEmail})` : ""}`
+        : reporterEmail ?? "Unknown",
+    );
+    const org = escapeHtml(orgSlug || orgId || "Not set");
+    const tenant = escapeHtml(tenantId || "Not set");
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feedback: ${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e5e5e5;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1a1a1a;">Nexsteps Admin Feedback</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <p style="margin: 0 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #737373;">${categoryLabel}</p>
+              <h2 style="margin: 0 0 16px; font-size: 20px; font-weight: 600; color: #1a1a1a;">${subject}</h2>
+              <p style="margin: 0 0 24px; font-size: 16px; line-height: 1.6; color: #525252; white-space: pre-wrap;">${description}</p>
+              <table cellpadding="0" cellspacing="0" style="width: 100%; border-top: 1px solid #e5e5e5; padding-top: 16px;">
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Reported by</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${reporter}</td></tr>
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Organisation</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${org}</td></tr>
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Tenant / site</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${tenant}</td></tr>
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Screenshot</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${attachment ? "Attached" : "None"}</td></tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  private buildFeedbackEmailText(
+    params: SendFeedbackEmailParams,
+    categoryLabel: string,
+  ): string {
+    const { subject, description, reporterEmail, reporterName, tenantId, orgId, orgSlug, attachment } = params;
+    const reporter = reporterName
+      ? `${reporterName}${reporterEmail ? ` (${reporterEmail})` : ""}`
+      : reporterEmail ?? "Unknown";
+
+    return `
+Nexsteps Admin Feedback
+
+[${categoryLabel}] ${subject}
+
+${description}
+
+Reported by: ${reporter}
+Organisation: ${orgSlug || orgId || "Not set"}
+Tenant / site: ${tenantId || "Not set"}
+Screenshot: ${attachment ? "Attached" : "None"}
     `.trim();
   }
 }
