@@ -23,6 +23,7 @@ import { ParentsModule } from "./parents/parents.module";
 import { AnnouncementsModule } from "./announcements/announcements.module";
 import { NotesModule } from "./notes/notes.module";
 import { ConcernsModule } from "./concerns/concerns.module";
+import { FeedbackModule } from "./feedback/feedback.module";
 import { DsarModule } from "./dsar/dsar.module";
 import { AuthModule } from "./auth/auth.module";
 import { InvitesModule } from "./invites/invites.module";
@@ -56,6 +57,7 @@ import { GuestPassModule } from "./guest-pass/guest-pass.module";
     AnnouncementsModule,
     NotesModule,
     ConcernsModule,
+    FeedbackModule,
     DsarModule,
     OrgsModule,
     BillingModule,

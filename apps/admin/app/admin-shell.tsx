@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LifeBuoy } from "lucide-react";
 import { TopBarActions } from "@/components/topbar-actions";
 import {
   SidebarNav,
@@ -83,6 +83,7 @@ const titleMap: Record<string, string> = {
   "/admin/blog": "Blog",
   "/reports": "Reports & Insights",
   "/settings": "Settings & Organisation",
+  "/feedback": "Feedback",
 };
 
 const resolveTitle = (path: string): string => {
@@ -128,6 +129,30 @@ const BrandMark = ({ logoUrl, alt }: { logoUrl?: string | null; alt: string }) =
     />
   );
 };
+
+type FeedbackNavLinkProps = {
+  isCollapsed?: boolean;
+  isActive: boolean;
+};
+
+// Filled colored badge (vs. every other sidebar item's bare outline glyph) so this
+// support/feedback entry point reads as visually distinct at a glance.
+const FeedbackNavLink = ({ isCollapsed = false, isActive }: FeedbackNavLinkProps) => (
+  <Link
+    href="/feedback"
+    title={isCollapsed ? "Feedback" : undefined}
+    className={cn(
+      "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2",
+      isCollapsed && "justify-center",
+      isActive ? "text-accent-strong" : "text-text-primary",
+    )}
+  >
+    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-status-info text-text-inverse">
+      <LifeBuoy className="h-4 w-4" aria-hidden="true" />
+    </span>
+    {!isCollapsed && <span className="truncate">Feedback</span>}
+  </Link>
+);
 
 const AdminBrandLink = ({
   isCollapsed = false,
@@ -243,6 +268,9 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const isFeedbackActive =
+    pathname === "/feedback" || pathname.startsWith("/feedback/");
+
   // Filter nav items based on user's role (hide billing for master orgs)
   const visibleNavItems = React.useMemo(
     () =>
@@ -277,6 +305,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           header={<AdminBrandLink isCollapsed={isSidebarCollapsed} logoUrl={orgLogoUrl} />}
+          footer={<FeedbackNavLink isCollapsed={isSidebarCollapsed} isActive={isFeedbackActive} />}
         />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-shell">
           <TopBar
@@ -364,6 +393,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               items={visibleNavItems}
               currentPath={pathname}
               header={null}
+              footer={<FeedbackNavLink isActive={isFeedbackActive} />}
             />
           </div>
         </div>
