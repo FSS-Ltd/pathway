@@ -3,9 +3,8 @@ name: Guest pass cleanup
 on:
   workflow_dispatch:
   schedule:
-    # Hourly. Nightly-only would allow up to ~48h of guest PII to persist physically
-    # even though the read-time filter already hides it after 24h.
-    - cron: "0 * * * *"
+    # Nightly at midnight UTC.
+    - cron: "0 0 * * *"
 
 jobs:
   run:
