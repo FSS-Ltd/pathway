@@ -193,6 +193,11 @@ export class ConcernsService {
     context: SafeguardingContextIds,
     callback: (tx: Prisma.TransactionClient) => Promise<T>,
   ) {
+    if (!context.tenantId) {
+      throw new BadRequestException(
+        "No active site selected. Choose a site to view safeguarding concerns.",
+      );
+    }
     return withTenantRlsContext(context.tenantId, context.orgId, async (tx) => {
       await tx.$executeRawUnsafe(
         `SELECT set_config('app.user_id', $1, true)`,

@@ -122,6 +122,24 @@ describe("ConcernsService", () => {
     });
   });
 
+  describe("withContext tenant guard", () => {
+    const noTenantContext = { tenantId: "", orgId, actorUserId };
+
+    it("rejects findAll with BadRequest when tenantId is missing, without touching the db", async () => {
+      await expect(
+        service.findAll({}, noTenantContext),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(concernFindMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects create with BadRequest when tenantId is missing, without touching the db", async () => {
+      await expect(
+        service.create({ childId, summary: "x" }, noTenantContext),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(childFindFirst).not.toHaveBeenCalled();
+    });
+  });
+
   describe("findAll", () => {
     it("passes filters to prisma and returns list", async () => {
       const items: Concern[] = [
