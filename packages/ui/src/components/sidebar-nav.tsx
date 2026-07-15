@@ -10,14 +10,21 @@ import {
   Layers,
   CalendarClock,
   CheckSquare,
+  ClipboardCheck,
   Megaphone,
   ShieldCheck,
   CreditCard,
   BarChart3,
   Settings,
-  LifeBuoy,
+  UserCircle,
+  Ticket,
+  ArrowLeftRight,
+  History,
+  AlertTriangle,
+  Newspaper,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -27,10 +34,12 @@ export type SidebarNavItem = {
   href: string;
   badge?: React.ReactNode;
   icon?: React.ReactNode;
-  /** Stable icon index (0–12) so filtered lists still get correct icons. */
+  /** Stable icon index so filtered lists still get correct icons. */
   iconIndex?: number;
   /** Optional access requirement - if not met, item will be filtered out */
   access?: string;
+  /** Items sharing a group render inside a collapsible accordion section; ungrouped items render as top-level links. */
+  group?: string;
 };
 
 export type SidebarNavProps = {
@@ -43,23 +52,30 @@ export type SidebarNavProps = {
   onToggleCollapse?: () => void;
 };
 
-// Icon components array - don't render here, render in component to avoid hydration issues
+// Icon components array - don't render here, render in component to avoid hydration issues.
+// Every entry must be unique; iconIndex is a stable pointer into this array so filtered
+// lists (e.g. by access) keep the correct icon per destination.
 const iconComponents: LucideIcon[] = [
-  LayoutDashboard,
-  Users,
-  GraduationCap,
-  UserRound,
-  BookOpen,
-  Layers,
-  CalendarClock,
-  CheckSquare,
-  Megaphone,
-  ShieldCheck,
-  CreditCard,
-  BarChart3,
-  Settings,
-  // index 13: Feedback — rendered via AdminShell's footer slot, not the flat nav list.
-  LifeBuoy,
+  LayoutDashboard, // 0 Dashboard
+  Users, // 1 People
+  GraduationCap, // 2 Children
+  UserRound, // 3 Parents & Guardians
+  BookOpen, // 4 Lessons
+  Layers, // 5 Classes
+  CalendarClock, // 6 Sessions & Rota
+  CheckSquare, // 7 My schedule
+  ClipboardCheck, // 8 Attendance
+  Megaphone, // 9 Notices & Announcements
+  ShieldCheck, // 10 Safeguarding
+  CreditCard, // 11 Billing
+  BarChart3, // 12 Reports
+  Settings, // 13 Settings
+  UserCircle, // 14 Profile
+  Ticket, // 15 Guest pass
+  ArrowLeftRight, // 16 Handover
+  History, // 17 Handover logs
+  AlertTriangle, // 18 Create concern
+  Newspaper, // 19 Blog
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.
@@ -129,6 +145,74 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
     });
   }, [items, isMounted]);
 
+  // Bucket items by their `group`, preserving first-seen group order. Ungrouped
+  // items (e.g. Dashboard) render as top-level links above the accordion sections.
+  const { ungroupedItems, groups } = React.useMemo(() => {
+    const ungroupedItems: typeof itemsWithIcons = [];
+    const order: string[] = [];
+    const byGroup = new Map<string, typeof itemsWithIcons>();
+    for (const item of itemsWithIcons) {
+      if (!item.group) {
+        ungroupedItems.push(item);
+        continue;
+      }
+      if (!byGroup.has(item.group)) {
+        byGroup.set(item.group, []);
+        order.push(item.group);
+      }
+      byGroup.get(item.group)!.push(item);
+    }
+    return {
+      ungroupedItems,
+      groups: order.map((label) => ({ label, items: byGroup.get(label)! })),
+    };
+  }, [itemsWithIcons]);
+
+  // Open the section containing the current page by default; the rest start collapsed.
+  const [openGroups, setOpenGroups] = React.useState<Set<string>>(() => {
+    const activeGroup = groups.find((group) =>
+      group.items.some((item) => isActive(currentPath, item.href)),
+    );
+    return new Set(activeGroup ? [activeGroup.label] : []);
+  });
+
+  const toggleGroup = (label: string) => {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  };
+
+  const renderNavItem = (item: (typeof itemsWithIcons)[number]) => {
+    const active = isActive(currentPath, item.href);
+    return (
+      <li key={item.href}>
+        <a
+          href={item.href}
+          className={cn(
+            "flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-primary transition-all duration-150 ease-out hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2 motion-safe:hover:translate-x-0.5",
+            isCollapsed && "justify-center",
+            active
+              ? "bg-accent-subtle text-accent-strong"
+              : "hover:text-text-primary",
+          )}
+          title={isCollapsed ? item.label : undefined}
+        >
+          <span className="flex items-center gap-2">
+            {item.icon}
+            {!isCollapsed && <span className="truncate">{item.label}</span>}
+          </span>
+          {!isCollapsed && (item.badge ?? null)}
+        </a>
+      </li>
+    );
+  };
+
   return (
     <nav
       aria-label="Admin navigation"
@@ -169,34 +253,42 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
         </div>
       ) : null}
       <div className="flex-1 overflow-y-auto px-3 py-6">
-        <ul className="flex flex-col gap-1">
-          {itemsWithIcons.map((item) => {
-            const active = isActive(currentPath, item.href);
-            return (
-              <li key={item.href}>
-                <a
-                  href={item.href}
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium text-text-primary transition-all duration-150 ease-out hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2 motion-safe:hover:translate-x-0.5",
-                    isCollapsed && "justify-center",
-                    active
-                      ? "bg-accent-subtle text-accent-strong"
-                      : "hover:text-text-primary",
-                  )}
-                  title={isCollapsed ? item.label : undefined}
-                >
-                  <span className="flex items-center gap-2">
-                    {item.icon}
-                    {!isCollapsed && (
-                      <span className="truncate">{item.label}</span>
+        {isCollapsed ? (
+          // Collapsed rail has no room for group labels - show every item flat.
+          <ul className="flex flex-col gap-1">{itemsWithIcons.map(renderNavItem)}</ul>
+        ) : (
+          <>
+            {ungroupedItems.length > 0 && (
+              <ul className="flex flex-col gap-1">{ungroupedItems.map(renderNavItem)}</ul>
+            )}
+            {groups.map((group) => {
+              const isOpen = openGroups.has(group.label);
+              const panelId = `sidebar-group-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+              return (
+                <div key={group.label} className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.label)}
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    className="flex w-full items-center justify-between rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-wide text-text-muted transition-colors hover:bg-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2"
+                  >
+                    <span>{group.label}</span>
+                    {renderSidebarIcon(
+                      ChevronDown,
+                      cn("h-4 w-4 transition-transform duration-150", isOpen && "rotate-180"),
                     )}
-                  </span>
-                  {!isCollapsed && (item.badge ?? null)}
-                </a>
-              </li>
-            );
-          })}
-        </ul>
+                  </button>
+                  {isOpen && (
+                    <ul id={panelId} className="mt-1 flex flex-col gap-1">
+                      {group.items.map(renderNavItem)}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
       {footer ? (
         <div className="border-t border-border-subtle pt-3 px-2">
