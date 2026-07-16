@@ -3,6 +3,7 @@
 // - Explicit mock mode: NEXT_PUBLIC_USE_MOCK_API === "true" -> local-only mock data for development.
 // Production environments MUST set NEXT_PUBLIC_API_URL (e.g., https://api.nexsteps.dev) and MUST NOT
 // rely on implicit mock fallbacks.
+import { toLocalDateKey } from "./date";
 const useMockApiExplicit =
   typeof process.env.NEXT_PUBLIC_USE_MOCK_API === "string" &&
   process.env.NEXT_PUBLIC_USE_MOCK_API === "true";
@@ -299,6 +300,7 @@ export type AdminStaffRow = {
 export type StaffEligibilityRow = {
   id: string;
   fullName: string;
+  email: string | null;
   eligible: boolean;
   reason?: "unavailable_at_time" | "does_not_prefer_group" | "blocked_on_date";
 };
@@ -944,7 +946,7 @@ export const mapApiAssignmentsToRotaDays = (
       if (!assignment.startsAt) return "unknown";
       const parsed = new Date(assignment.startsAt);
       if (Number.isNaN(parsed.getTime())) return "unknown";
-      return parsed.toISOString().slice(0, 10);
+      return toLocalDateKey(parsed);
     })();
 
     const existing = grouped.get(dateKey) ?? [];

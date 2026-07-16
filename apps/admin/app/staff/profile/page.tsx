@@ -16,6 +16,7 @@ import {
   type StaffProfileDetail,
   type StaffProfileUpdatePayload,
 } from "@/lib/api-client";
+import { toLocalDateKey } from "@/lib/date";
 import { ProfileHeaderCard } from "@/components/profile-header-card";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -87,12 +88,12 @@ export default function StaffProfilePage() {
     null,
   );
   const [activityDateFrom, setActivityDateFrom] = React.useState(() => {
-    return new Date().toISOString().slice(0, 10);
+    return toLocalDateKey(new Date());
   });
   const [activityDateTo, setActivityDateTo] = React.useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 3);
-    return d.toISOString().slice(0, 10);
+    return toLocalDateKey(d);
   });
 
   const ACTIVITY_PAGE_SIZE = 5;
@@ -659,9 +660,9 @@ export default function StaffProfilePage() {
             size="sm"
             onClick={() => {
               const d = new Date();
-              const from = d.toISOString().slice(0, 10);
+              const from = toLocalDateKey(d);
               d.setMonth(d.getMonth() + 3);
-              const to = d.toISOString().slice(0, 10);
+              const to = toLocalDateKey(d);
               setActivityDateFrom(from);
               setActivityDateTo(to);
               setActivityPage(1);

@@ -21,6 +21,7 @@ import {
   acceptSwapRequest,
   declineSwapRequest,
 } from "../../lib/api-client";
+import { toLocalDateKey } from "../../lib/date";
 
 const assignmentStatusCopy: Record<
   AdminAssignmentRow["status"],
@@ -109,8 +110,8 @@ export default function MySchedulePage() {
   const userId =
     sessionUserId ??
     (typeof resolvedUserId === "string" ? resolvedUserId : undefined);
-  const dateFrom = weekStart.toISOString().slice(0, 10);
-  const dateTo = addDays(weekStart, 6).toISOString().slice(0, 10);
+  const dateFrom = toLocalDateKey(weekStart);
+  const dateTo = toLocalDateKey(addDays(weekStart, 6));
 
   React.useEffect(() => {
     if (sessionStatus !== "authenticated" || sessionUserId) return;

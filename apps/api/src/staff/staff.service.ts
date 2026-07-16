@@ -35,6 +35,7 @@ function timeFromMinute(min: number): string {
 export type StaffForAssignmentRow = {
   id: string;
   fullName: string;
+  email: string | null;
   eligible: boolean;
   reason?: "unavailable_at_time" | "does_not_prefer_group" | "blocked_on_date";
 };
@@ -117,6 +118,7 @@ export class StaffService {
             lastName: true,
             name: true,
             displayName: true,
+            email: true,
           },
         }),
         prisma.staffUnavailableDate.findMany({
@@ -174,6 +176,7 @@ export class StaffService {
       return {
         id: u.id,
         fullName,
+        email: u.email,
         eligible: !reason,
         reason,
       };

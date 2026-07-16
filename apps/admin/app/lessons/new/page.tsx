@@ -23,6 +23,7 @@ import {
   setApiClientToken,
 } from "../../../lib/api-client";
 import type { GroupOption } from "../../../lib/api-client";
+import { toLocalDateKey } from "../../../lib/date";
 
 const MAX_RESOURCE_FILE_BYTES = 10 * 1024 * 1024; // 10MB, must match API
 
@@ -38,7 +39,7 @@ const startOfWeekIso = () => {
   const diff = day === 0 ? -6 : 1 - day; // move to Monday
   d.setDate(d.getDate() + diff);
   d.setHours(0, 0, 0, 0);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateKey(d);
 };
 
 export default function NewLessonPage() {
