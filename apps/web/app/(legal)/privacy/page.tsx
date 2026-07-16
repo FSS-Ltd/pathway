@@ -178,8 +178,8 @@ export default function PrivacyPage() {
             <li>Log data (for example, IP address, browser type, device identifiers)</li>
             <li>Usage information about how the platform is accessed and used</li>
             <li>
-              Diagnostic and analytics information (for example, using a privacy-conscious analytics provider
-              such as PostHog configured for EU/UK processing)
+              Diagnostic and analytics information — on our marketing site, via Google Analytics, only after you
+              accept analytics cookies on our cookie banner
             </li>
           </LegalList>
 
@@ -344,9 +344,9 @@ export default function PrivacyPage() {
               transactional and service-related emails.
             </li>
             <li>
-              <strong>Analytics provider</strong> – a privacy-conscious analytics platform such as PostHog,
-              configured to respect UK/EU data protection requirements and, where possible, minimising the use
-              of directly identifiable personal data.
+              <strong>Analytics provider</strong> – Google Analytics, used on our marketing site only, and only
+              after you accept analytics cookies on our cookie banner. We do not enable Google&apos;s advertising
+              or profile-building features.
             </li>
           </LegalList>
           <p>

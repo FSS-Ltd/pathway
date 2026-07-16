@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Cookie, Settings2, SlidersHorizontal } from "lucide-react";
+import CookiePreferencesButton from "../../../components/cookie-preferences-button";
 
 export const metadata: Metadata = {
   title: "Cookie Policy",
@@ -44,7 +45,7 @@ export default function CookiesPage() {
           </div>
           <LegalList>
             <li>Essential session and security cookies for login and navigation.</li>
-            <li>Analytics cookies from a privacy-conscious provider (for example, PostHog).</li>
+            <li>Analytics cookies, including Google Analytics, only set after you accept our cookie banner.</li>
             <li>Stripe cookies used to support secure payments and billing.</li>
           </LegalList>
         </article>
@@ -59,8 +60,9 @@ export default function CookiesPage() {
           <p className="mt-2 text-sm text-pw-text-muted">
             Your browser lets you view, delete and block cookies if you wish. Blocking essential cookies may stop
             parts of Nexsteps from working correctly (for example, you may not be able to log in or stay logged
-            in).
+            in). You can also change the choice you made on our cookie banner at any time:
           </p>
+          <CookiePreferencesButton />
         </article>
       </section>
 
@@ -113,8 +115,8 @@ export default function CookiesPage() {
 
           <h3>3.2 Analytics cookies</h3>
           <p>
-            We use privacy-conscious analytics tools (such as PostHog or an equivalent EU/UK-hosted provider) to
-            help us understand how the Service is used, for example:
+            On our public marketing site (nexsteps.dev), we use Google Analytics to help us understand how the
+            site is used, for example:
           </p>
           <LegalList>
             <li>Which pages are visited and how often</li>
@@ -122,9 +124,13 @@ export default function CookiesPage() {
             <li>General performance and error information</li>
           </LegalList>
           <p>
-            Where possible, we configure analytics to minimise the use of directly identifiable personal data, and
-            to focus on aggregated or pseudonymised usage information. We do not use analytics cookies to build
-            marketing profiles about individual children, parents or staff.
+            Google Analytics cookies are only set after you accept analytics cookies on our cookie banner; if you
+            decline, no Google Analytics cookies are set and no data is sent to Google. Google Analytics is
+            provided by Google LLC and may process data outside the UK/EEA — see &quot;9. International data
+            transfers&quot; in our Privacy Policy for the safeguards that apply. We do not use Google Analytics
+            advertising or profile-building features, and we do not use analytics cookies to build marketing
+            profiles about individual children, parents or staff. The Nexsteps application itself (as opposed to
+            this marketing site) does not use Google Analytics.
           </p>
 
           <h3>3.3 Stripe and payment-related cookies</h3>
