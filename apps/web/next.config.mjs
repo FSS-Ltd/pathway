@@ -11,7 +11,6 @@ const cspReportOnly = [
   "font-src 'self' data:",
   `connect-src 'self' ${apiOrigin} https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com`,
   "form-action 'self'",
-  "upgrade-insecure-requests",
 ].join("; ");
 
 const nextConfig = {
@@ -48,6 +47,12 @@ const nextConfig = {
           {
             key: "Content-Security-Policy-Report-Only",
             value: cspReportOnly,
+          },
+          {
+            // upgrade-insecure-requests is a no-op in Report-Only, so it must
+            // ship as its own enforced header rather than in cspReportOnly.
+            key: "Content-Security-Policy",
+            value: "upgrade-insecure-requests",
           },
         ],
       },
