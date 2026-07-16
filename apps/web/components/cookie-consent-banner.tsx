@@ -26,8 +26,9 @@ export default function CookieConsentBanner() {
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-border-subtle bg-surface px-4 py-4 shadow-card md:px-8">
           <div className="mx-auto flex max-w-5xl flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <p className="text-sm text-text-muted">
-              We use analytics cookies, including Google Analytics, to understand how Nexsteps is used.
-              See our <a href="/cookies" className="underline">Cookie Policy</a> for details.
+              We use analytics cookies, including Google Analytics, solely to measure traffic on this website —
+              never sold, and never applied to data held in the Nexsteps portal. See our{" "}
+              <a href="/cookies" className="underline">Cookie Policy</a> for details.
             </p>
             <div className="flex shrink-0 gap-3">
               <button

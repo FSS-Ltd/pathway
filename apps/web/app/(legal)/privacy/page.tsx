@@ -31,7 +31,9 @@ export default function PrivacyPage() {
           <p className="mt-2 text-sm text-pw-text-muted">
             Nexsteps is a UK-based SaaS platform used by schools, churches, clubs and charities to
             manage programmes for children, young people, staff and volunteers. We are committed to
-            protecting personal data in line with UK GDPR and the Data Protection Act 2018.
+            protecting personal data in line with UK GDPR and the Data Protection Act 2018. Data held
+            inside the Nexsteps portal is never tracked with analytics cookies and is never sold.
+            Analytics on our public marketing website measures traffic only.
           </p>
         </article>
 
@@ -257,6 +259,13 @@ export default function PrivacyPage() {
               law enforcement where required.
             </li>
           </LegalList>
+          <p>
+            We do not sell personal data processed within the Nexsteps portal, and we do not use it for
+            advertising. Analytics on our public marketing website (nexsteps.dev) — separate from the
+            Nexsteps portal used by your organisation — is used solely to measure site traffic and improve
+            the website; this data is never sold or shared with third parties for their own marketing
+            purposes.
+          </p>
 
           <h2 className="mt-8 text-lg font-semibold text-pw-text first:mt-0 text-center">
             6. Data retention

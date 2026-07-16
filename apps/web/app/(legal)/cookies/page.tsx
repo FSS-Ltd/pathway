@@ -32,7 +32,8 @@ export default function CookiesPage() {
           <p className="mt-2 text-sm text-pw-text-muted">
             We use cookies and similar technologies to keep you signed in securely, remember your preferences
             and understand how Nexsteps is used so we can improve it. We do not use cookies for third-party
-            advertising.
+            advertising. Data held inside the Nexsteps portal is never tracked with these cookies or sold —
+            analytics cookies apply only to our public marketing website and measure traffic there.
           </p>
         </article>
 
@@ -129,8 +130,10 @@ export default function CookiesPage() {
             provided by Google LLC and may process data outside the UK/EEA — see &quot;9. International data
             transfers&quot; in our Privacy Policy for the safeguards that apply. We do not use Google Analytics
             advertising or profile-building features, and we do not use analytics cookies to build marketing
-            profiles about individual children, parents or staff. The Nexsteps application itself (as opposed to
-            this marketing site) does not use Google Analytics.
+            profiles about individual children, parents or staff. This data is used solely for internal traffic
+            measurement on our public website — we do not sell it or share it with third parties for their own
+            marketing purposes. The Nexsteps portal itself (as opposed to this marketing site) does not use
+            Google Analytics, and data held inside the portal is never tracked by it.
           </p>
 
           <h3>3.3 Stripe and payment-related cookies</h3>
@@ -153,8 +156,11 @@ export default function CookiesPage() {
           </h2>
           <p>
             Nexsteps does <strong>not</strong> use third-party advertising cookies or ad-tech trackers to deliver
-            targeted advertising. We do not sell or share children&apos;s data with advertisers, and we do not use
-            social media tracking pixels for advertising purposes on our core application.
+            targeted advertising. We do not sell or share data with advertisers — this applies to everyone using
+            Nexsteps, not only children — and we do not use social media tracking pixels for advertising purposes
+            on our core application. Records held inside the Nexsteps portal (attendance, safeguarding notes,
+            family communication and the like) are never tracked or sold; the analytics cookies described above
+            apply only to our public marketing website and exist solely to measure its traffic.
           </p>
 
           <h2 className="mt-8 text-lg font-semibold text-pw-text first:mt-0 text-center">
