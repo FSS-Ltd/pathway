@@ -12,6 +12,7 @@ import {
   fetchAttendanceSessionSummaries,
   setApiClientToken,
 } from "../../lib/api-client";
+import { toLocalDateKey } from "../../lib/date";
 import { useAdminAccess } from "../../lib/use-admin-access";
 import { canAccessAdminSection } from "../../lib/access";
 
@@ -54,8 +55,8 @@ function defaultExportRange(): { from: string; to: string } {
   const from = new Date();
   from.setDate(from.getDate() - 30);
   return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
+    from: toLocalDateKey(from),
+    to: toLocalDateKey(to),
   };
 }
 

@@ -21,6 +21,7 @@ import {
   type ChildEditFormData,
   type UpdateChildPayload,
 } from "../../../lib/api-client";
+import { toLocalDateKey } from "../../../lib/date";
 import { toast } from "sonner";
 
 const statusTone: Record<string, "success" | "default"> = {
@@ -76,10 +77,10 @@ export default function ChildDetailPage() {
   const [exportFrom, setExportFrom] = React.useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
+    return toLocalDateKey(d);
   });
   const [exportTo, setExportTo] = React.useState(() =>
-    new Date().toISOString().slice(0, 10),
+    toLocalDateKey(new Date()),
   );
   const { data: session } = useSession();
   const { role, isLoading: isLoadingAccess } = useAdminAccess();

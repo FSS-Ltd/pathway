@@ -17,6 +17,7 @@ import {
   type StaffEditDetail,
   type StaffEditUpdatePayload,
 } from "../../../lib/api-client";
+import { toLocalDateKey } from "../../../lib/date";
 import { toast } from "sonner";
 
 const WEEKDAYS: { value: string; label: string }[] = [
@@ -58,10 +59,10 @@ export default function StaffDetailPage() {
   const [exportFrom, setExportFrom] = React.useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
-    return d.toISOString().slice(0, 10);
+    return toLocalDateKey(d);
   });
   const [exportTo, setExportTo] = React.useState(() =>
-    new Date().toISOString().slice(0, 10),
+    toLocalDateKey(new Date()),
   );
 
   const [firstName, setFirstName] = React.useState("");

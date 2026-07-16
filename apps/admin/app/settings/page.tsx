@@ -22,6 +22,7 @@ import {
   type ActiveSiteState,
   type SiteOption,
 } from "../../lib/api-client";
+import { toLocalDateKey } from "../../lib/date";
 import { useAdminAccess } from "../../lib/use-admin-access";
 import { canAccessAdminSection, canAccessBilling, canAccessSafeguardingAdmin } from "../../lib/access";
 import type { AdminRoleInfo } from "../../lib/access";
@@ -254,7 +255,7 @@ export default function SettingsPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `organisation-export-${data.slug ?? "data"}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `organisation-export-${data.slug ?? "data"}-${toLocalDateKey(new Date())}.json`;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {

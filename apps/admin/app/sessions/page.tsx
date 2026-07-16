@@ -20,6 +20,7 @@ import {
   fetchSessions,
   mapApiAssignmentsToRotaDays,
 } from "../../lib/api-client";
+import { toLocalDateKey } from "../../lib/date";
 
 const statusCopy: Record<AdminSessionRow["status"], string> = {
   not_started: "Not started",
@@ -163,8 +164,8 @@ export default function SessionsPage() {
     async (start: Date) => {
       setRotaLoading(true);
       setRotaError(null);
-      const dateFrom = start.toISOString().slice(0, 10);
-      const dateTo = addDays(start, 6).toISOString().slice(0, 10);
+      const dateFrom = toLocalDateKey(start);
+      const dateTo = toLocalDateKey(addDays(start, 6));
       try {
         const assignments = await fetchAssignmentsForOrg({
           dateFrom,
@@ -533,7 +534,7 @@ export default function SessionsPage() {
                       Staff
                     </th>
                     {weekDates.map((date) => {
-                      const dateKey = date.toISOString().slice(0, 10);
+                      const dateKey = toLocalDateKey(date);
                       const count = rotaMap.get(dateKey)?.length ?? 0;
                       const dayLabel = date.toLocaleDateString(undefined, {
                         weekday: "short",
@@ -576,7 +577,7 @@ export default function SessionsPage() {
                           </span>
                         </td>
                         {weekDates.map((date) => {
-                          const dateKey = date.toISOString().slice(0, 10);
+                          const dateKey = toLocalDateKey(date);
                           const cellAssignments =
                             rotaGrid.get(staff.staffId)?.get(dateKey) ?? [];
                           return (

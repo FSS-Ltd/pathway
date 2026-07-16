@@ -14,6 +14,7 @@ import {
   fetchChildren,
   type AdminChildRow,
 } from "@/lib/api-client";
+import { toLocalDateKey } from "@/lib/date";
 import { toast } from "sonner";
 
 type HandoverFormState = {
@@ -38,7 +39,7 @@ export default function WriteHandoverPage() {
   const searchParams = useSearchParams();
   const prefilledGroupId = searchParams.get("groupId") ?? "";
   const prefilledDate =
-    searchParams.get("handoverDate") ?? new Date().toISOString().slice(0, 10);
+    searchParams.get("handoverDate") ?? toLocalDateKey(new Date());
   const isSessionScoped = Boolean(searchParams.get("sessionId"));
   const handoverIdParam = searchParams.get("handoverId");
   const [groups, setGroups] = React.useState<GroupOption[]>([]);

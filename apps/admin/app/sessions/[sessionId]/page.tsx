@@ -27,6 +27,7 @@ import {
   type StaffAttendanceRosterItem,
   type StaffEligibilityRow,
 } from "../../../lib/api-client";
+import { toLocalDateKey } from "../../../lib/date";
 import { useAdminAccess } from "../../../lib/use-admin-access";
 import { canAccessAdminSection, canAccessSafeguardingAdmin } from "../../../lib/access";
 
@@ -96,7 +97,7 @@ function buildHandoverHref(
     session.groupIds?.[0] ?? session.groupId ?? null;
   if (!primaryGroupId) return "/handover/write";
   const start = new Date(session.startsAt);
-  const handoverDate = start.toISOString().slice(0, 10);
+  const handoverDate = toLocalDateKey(start);
   const params = new URLSearchParams();
   params.set("sessionId", session.id);
   params.set("groupId", primaryGroupId);
@@ -754,8 +755,10 @@ export default function SessionDetailPage() {
                         }
                       >
                         {s.eligible
-                          ? s.fullName
-                          : `${s.fullName} — ${s.reason ? eligibilityReasonLabel[s.reason] : "Unavailable"}`}
+                          ? s.email
+                            ? `${s.fullName} (${s.email})`
+                            : s.fullName
+                          : `${s.fullName}${s.email ? ` (${s.email})` : ""} — ${s.reason ? eligibilityReasonLabel[s.reason] : "Unavailable"}`}
                       </option>
                     ))}
                   </Select>
