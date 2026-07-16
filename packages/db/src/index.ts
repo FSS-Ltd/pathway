@@ -7,8 +7,13 @@ import { withPiiEncryption } from "./pii-encryption";
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient };
 const prismaContext = new AsyncLocalStorage<Prisma.TransactionClient>();
 
+export const transactionOptions = {
+  maxWait: 10_000,
+  timeout: 15_000,
+} as const;
+
 const rawPrismaClient: PrismaClient =
-  globalForPrisma.__prisma ?? new PrismaClient();
+  globalForPrisma.__prisma ?? new PrismaClient({ transactionOptions });
 
 // Transparent field-level encryption for sensitive PII columns (see pii-encryption.ts).
 // Applied to the base client so it also covers $transaction/withTenantRlsContext.
