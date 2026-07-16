@@ -5,6 +5,7 @@ import { Resend } from "resend";
 const DEFAULT_FROM = "Nexsteps <noreply@mail.nexsteps.dev>";
 
 const FEEDBACK_RECIPIENT = "support@faithfulsoftware.dev";
+const DEMO_REQUEST_RECIPIENT = "sales@faithfulsoftware.dev";
 
 function parseAndValidateFromAddress(
   raw: string | undefined,
@@ -74,6 +75,16 @@ const FEEDBACK_CATEGORY_LABELS: Record<SendFeedbackEmailParams["category"], stri
   bug: "Bug",
   "feature-request": "Feature request",
   other: "Other",
+};
+
+/** Params for demo request notifications, sent to the sales inbox. */
+export type SendDemoRequestEmailParams = {
+  name: string;
+  email: string;
+  organisation?: string;
+  role?: string;
+  sector?: string;
+  message?: string;
 };
 
 @Injectable()
@@ -811,6 +822,108 @@ Reported by: ${reporter}
 Organisation: ${orgSlug || orgId || "Not set"}
 Tenant / site: ${tenantId || "Not set"}
 Screenshot: ${attachment ? "Attached" : "None"}
+    `.trim();
+  }
+
+  /**
+   * Notify the sales inbox of a new demo request, with the submitted form contents.
+   */
+  async sendDemoRequestEmail(params: SendDemoRequestEmailParams): Promise<void> {
+    const subject = `New demo request: ${params.name}${params.organisation ? ` (${params.organisation})` : ""}`;
+    const html = this.buildDemoRequestEmailHtml(params);
+    const text = this.buildDemoRequestEmailText(params);
+
+    if (!this.isEnabled || !this.resend) {
+      this.logger.log(
+        `[📧 MAILER] MOCK MODE - Would send demo request email\nSubject: ${subject}\nFrom: ${params.name} <${params.email}>`,
+      );
+      return;
+    }
+
+    try {
+      const result = await this.resend.emails.send({
+        from: this.fromAddress,
+        to: DEMO_REQUEST_RECIPIENT,
+        subject,
+        html,
+        text,
+        replyTo: params.email,
+      });
+
+      if (result.error) {
+        this.logger.error(`[📧 MAILER] Demo request email error:`, result.error);
+        throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+      }
+
+      this.logger.log(`[📧 MAILER] Demo request email sent to ${DEMO_REQUEST_RECIPIENT}`);
+    } catch (error) {
+      this.logger.error(`[📧 MAILER] Exception sending demo request email:`, error);
+      throw new Error(`Failed to send demo request email: ${String(error)}`);
+    }
+  }
+
+  private buildDemoRequestEmailHtml(params: SendDemoRequestEmailParams): string {
+    const escapeHtml = (value: string): string =>
+      value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
+    const { name, email, organisation, role, sector, message } = params;
+
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New demo request</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f5f5; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="padding: 40px 40px 20px; text-align: center; border-bottom: 1px solid #e5e5e5;">
+              <h1 style="margin: 0; font-size: 24px; font-weight: 600; color: #1a1a1a;">New demo request</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px;">
+              <table cellpadding="0" cellspacing="0" style="width: 100%;">
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Name</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${escapeHtml(name)}</td></tr>
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Email</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${escapeHtml(email)}</td></tr>
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Organisation</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${escapeHtml(organisation || "Not set")}</td></tr>
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Role</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${escapeHtml(role || "Not set")}</td></tr>
+                <tr><td style="padding: 4px 0; font-size: 14px; color: #737373;">Sector</td><td style="padding: 4px 0; font-size: 14px; color: #1a1a1a; text-align: right;">${escapeHtml(sector || "Not set")}</td></tr>
+              </table>
+              ${message ? `<p style="margin: 24px 0 0; font-size: 14px; line-height: 1.6; color: #525252; white-space: pre-wrap; border-top: 1px solid #e5e5e5; padding-top: 16px;">${escapeHtml(message)}</p>` : ""}
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `.trim();
+  }
+
+  private buildDemoRequestEmailText(params: SendDemoRequestEmailParams): string {
+    const { name, email, organisation, role, sector, message } = params;
+
+    return `
+New demo request
+
+Name: ${name}
+Email: ${email}
+Organisation: ${organisation || "Not set"}
+Role: ${role || "Not set"}
+Sector: ${sector || "Not set"}
+${message ? `\n${message}` : ""}
     `.trim();
   }
 }

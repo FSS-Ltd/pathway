@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? "https://api.nexsteps.dev";
 const cspReportOnly = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -8,7 +9,7 @@ const cspReportOnly = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "connect-src 'self' https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com",
+  `connect-src 'self' ${apiOrigin} https://www.google-analytics.com https://*.google-analytics.com https://www.googletagmanager.com`,
   "form-action 'self'",
   "upgrade-insecure-requests",
 ].join("; ");

@@ -27,6 +27,7 @@ jest.mock("@pathway/db", () => {
 
 const mailerServiceMock = {
   sendToolkitLink: jest.fn().mockResolvedValue(undefined),
+  sendDemoRequestEmail: jest.fn().mockResolvedValue(undefined),
 };
 
 describe("LeadsService", () => {
@@ -36,6 +37,35 @@ describe("LeadsService", () => {
     jest.clearAllMocks();
     service = new LeadsService(mailerServiceMock as never);
     process.env.SITE_URL = "https://example.com";
+  });
+
+  describe("createDemoLead", () => {
+    it("notifies sales with the submitted form contents", async () => {
+      prismaMock.lead.findFirst.mockResolvedValue(null);
+      prismaMock.lead.create.mockResolvedValue({
+        id: "lead_1",
+        kind: LeadKind.DEMO,
+        createdAt: new Date(),
+      });
+
+      await service.createDemoLead({
+        name: "Alice",
+        email: "Alice@Example.com",
+        organisation: "Test Org",
+        role: "Head",
+        sector: "Education",
+        message: "Interested in a demo",
+      });
+
+      expect(mailerServiceMock.sendDemoRequestEmail).toHaveBeenCalledWith({
+        name: "Alice",
+        email: "alice@example.com",
+        organisation: "Test Org",
+        role: "Head",
+        sector: "Education",
+        message: "Interested in a demo",
+      });
+    });
   });
 
   describe("createToolkitLead - validation", () => {
