@@ -58,40 +58,48 @@ export class LeadsService {
 
     const existing = await this.findRecentLead(normalizedEmail, LeadKind.DEMO);
 
-    if (existing) {
-      // Update existing lead
-      return prisma.lead.update({
-        where: { id: existing.id },
-        data: {
-          name: dto.name.trim(),
-          organisation: dto.organisation?.trim() || null,
-          role: dto.role?.trim() || null,
-          sector: dto.sector?.trim() || null,
-          message: dto.message?.trim() || null,
-          utmSource: dto.utm?.source?.trim() || null,
-          utmMedium: dto.utm?.medium?.trim() || null,
-          utmCampaign: dto.utm?.campaign?.trim() || null,
-          updatedAt: new Date(),
-        },
-        select: { id: true, kind: true, createdAt: true },
-      });
-    }
+    const lead = existing
+      ? await prisma.lead.update({
+          where: { id: existing.id },
+          data: {
+            name: dto.name.trim(),
+            organisation: dto.organisation?.trim() || null,
+            role: dto.role?.trim() || null,
+            sector: dto.sector?.trim() || null,
+            message: dto.message?.trim() || null,
+            utmSource: dto.utm?.source?.trim() || null,
+            utmMedium: dto.utm?.medium?.trim() || null,
+            utmCampaign: dto.utm?.campaign?.trim() || null,
+            updatedAt: new Date(),
+          },
+          select: { id: true, kind: true, createdAt: true },
+        })
+      : await prisma.lead.create({
+          data: {
+            kind: LeadKind.DEMO,
+            email: normalizedEmail,
+            name: dto.name.trim(),
+            organisation: dto.organisation?.trim() || null,
+            role: dto.role?.trim() || null,
+            sector: dto.sector?.trim() || null,
+            message: dto.message?.trim() || null,
+            utmSource: dto.utm?.source?.trim() || null,
+            utmMedium: dto.utm?.medium?.trim() || null,
+            utmCampaign: dto.utm?.campaign?.trim() || null,
+          },
+          select: { id: true, kind: true, createdAt: true },
+        });
 
-    return prisma.lead.create({
-      data: {
-        kind: LeadKind.DEMO,
-        email: normalizedEmail,
-        name: dto.name.trim(),
-        organisation: dto.organisation?.trim() || null,
-        role: dto.role?.trim() || null,
-        sector: dto.sector?.trim() || null,
-        message: dto.message?.trim() || null,
-        utmSource: dto.utm?.source?.trim() || null,
-        utmMedium: dto.utm?.medium?.trim() || null,
-        utmCampaign: dto.utm?.campaign?.trim() || null,
-      },
-      select: { id: true, kind: true, createdAt: true },
+    await this.mailerService.sendDemoRequestEmail({
+      name: dto.name.trim(),
+      email: normalizedEmail,
+      organisation: dto.organisation?.trim() || undefined,
+      role: dto.role?.trim() || undefined,
+      sector: dto.sector?.trim() || undefined,
+      message: dto.message?.trim() || undefined,
     });
+
+    return lead;
   }
 
   async createToolkitLead(dto: CreateToolkitLeadDto) {
