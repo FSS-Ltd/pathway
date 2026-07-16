@@ -31,7 +31,9 @@ export default function PrivacyPage() {
           <p className="mt-2 text-sm text-pw-text-muted">
             Nexsteps is a UK-based SaaS platform used by schools, churches, clubs and charities to
             manage programmes for children, young people, staff and volunteers. We are committed to
-            protecting personal data in line with UK GDPR and the Data Protection Act 2018.
+            protecting personal data in line with UK GDPR and the Data Protection Act 2018. Data held
+            inside the Nexsteps portal is never tracked with analytics cookies and is never sold.
+            Analytics on our public marketing website measures traffic only.
           </p>
         </article>
 
@@ -178,8 +180,8 @@ export default function PrivacyPage() {
             <li>Log data (for example, IP address, browser type, device identifiers)</li>
             <li>Usage information about how the platform is accessed and used</li>
             <li>
-              Diagnostic and analytics information (for example, using a privacy-conscious analytics provider
-              such as PostHog configured for EU/UK processing)
+              Diagnostic and analytics information — on our marketing site, via Google Analytics, only after you
+              accept analytics cookies on our cookie banner
             </li>
           </LegalList>
 
@@ -257,6 +259,13 @@ export default function PrivacyPage() {
               law enforcement where required.
             </li>
           </LegalList>
+          <p>
+            We do not sell personal data processed within the Nexsteps portal, and we do not use it for
+            advertising. Analytics on our public marketing website (nexsteps.dev) — separate from the
+            Nexsteps portal used by your organisation — is used solely to measure site traffic and improve
+            the website; this data is never sold or shared with third parties for their own marketing
+            purposes.
+          </p>
 
           <h2 className="mt-8 text-lg font-semibold text-pw-text first:mt-0 text-center">
             6. Data retention
@@ -344,9 +353,9 @@ export default function PrivacyPage() {
               transactional and service-related emails.
             </li>
             <li>
-              <strong>Analytics provider</strong> – a privacy-conscious analytics platform such as PostHog,
-              configured to respect UK/EU data protection requirements and, where possible, minimising the use
-              of directly identifiable personal data.
+              <strong>Analytics provider</strong> – Google Analytics, used on our marketing site only, and only
+              after you accept analytics cookies on our cookie banner. We do not enable Google&apos;s advertising
+              or profile-building features.
             </li>
           </LegalList>
           <p>

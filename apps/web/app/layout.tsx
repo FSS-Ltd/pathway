@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Nunito } from "next/font/google";
-import GoogleAnalytics from "../components/google-analytics";
+import CookieConsentBanner from "../components/cookie-consent-banner";
 import "./globals.css";
 
 const baseUrl = "https://nexsteps.dev";
@@ -38,7 +38,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${nunito.variable} bg-shell text-text-primary`}>
         {children}
-        <GoogleAnalytics />
+        <CookieConsentBanner />
       </body>
     </html>
   );
