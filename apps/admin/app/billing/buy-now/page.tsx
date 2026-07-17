@@ -35,7 +35,7 @@ const planOptions = [
     code: "STARTER",
     label: "Starter",
     description: "For single-site organisations getting started.",
-    baseAv30: 50,
+    baseAv30: 250,
     baseSites: 1,
     tier: "starter",
   },
@@ -43,9 +43,17 @@ const planOptions = [
     code: "GROWTH",
     label: "Growth",
     description: "For growing orgs with multiple groups/sites.",
-    baseAv30: 200,
-    baseSites: 3,
+    baseAv30: 750,
+    baseSites: 2,
     tier: "growth",
+  },
+  {
+    code: "PROFESSIONAL",
+    label: "Professional",
+    description: "For established, multi-site organisations.",
+    baseAv30: 2000,
+    baseSites: 5,
+    tier: "professional",
   },
   {
     code: "ENTERPRISE_CONTACT",
@@ -103,8 +111,9 @@ export default function BuyNowPage() {
 
   const planCode: PlanCode | null = React.useMemo(() => {
     if (planTier === "ENTERPRISE_CONTACT") return "ENTERPRISE_CONTACT";
-    if (planTier === "STARTER") return billingPeriod === "monthly" ? "STARTER_MONTHLY" : "STARTER_YEARLY";
-    if (planTier === "GROWTH") return billingPeriod === "monthly" ? "GROWTH_MONTHLY" : "GROWTH_YEARLY";
+    if (planTier === "STARTER") return billingPeriod === "monthly" ? "STARTER_49_MONTHLY" : "STARTER_49_YEARLY";
+    if (planTier === "GROWTH") return billingPeriod === "monthly" ? "GROWTH_99_MONTHLY" : "GROWTH_99_YEARLY";
+    if (planTier === "PROFESSIONAL") return billingPeriod === "monthly" ? "PROFESSIONAL_149_MONTHLY" : "PROFESSIONAL_149_YEARLY";
     return null;
   }, [planTier, billingPeriod]);
 
@@ -444,16 +453,21 @@ export default function BuyNowPage() {
             <div className="grid gap-3">
               {planOptions.map((plan) => {
                 const isActive = planTier === plan.code;
-                const cardPlanCode =
+                const cardPlanCode = (
                   plan.code === "ENTERPRISE_CONTACT"
                     ? "ENTERPRISE_CONTACT"
-                    : (plan.code === "STARTER"
+                    : plan.code === "STARTER"
+                      ? billingPeriod === "monthly"
+                        ? "STARTER_49_MONTHLY"
+                        : "STARTER_49_YEARLY"
+                      : plan.code === "GROWTH"
                         ? billingPeriod === "monthly"
-                          ? "STARTER_MONTHLY"
-                          : "STARTER_YEARLY"
+                          ? "GROWTH_99_MONTHLY"
+                          : "GROWTH_99_YEARLY"
                         : billingPeriod === "monthly"
-                          ? "GROWTH_MONTHLY"
-                          : "GROWTH_YEARLY") as PlanCode;
+                          ? "PROFESSIONAL_149_MONTHLY"
+                          : "PROFESSIONAL_149_YEARLY"
+                ) as PlanCode;
                 const cardPrice = cardPlanCode !== "ENTERPRISE_CONTACT"
                   ? PLAN_PRICES[cardPlanCode]
                   : null;

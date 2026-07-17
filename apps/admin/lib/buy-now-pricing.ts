@@ -1,8 +1,10 @@
 export type PlanCode =
-  | "STARTER_MONTHLY"
-  | "STARTER_YEARLY"
-  | "GROWTH_MONTHLY"
-  | "GROWTH_YEARLY"
+  | "STARTER_49_MONTHLY"
+  | "STARTER_49_YEARLY"
+  | "GROWTH_99_MONTHLY"
+  | "GROWTH_99_YEARLY"
+  | "PROFESSIONAL_149_MONTHLY"
+  | "PROFESSIONAL_149_YEARLY"
   | "ENTERPRISE_CONTACT";
 
 export type StripePriceMeta = {
@@ -14,33 +16,47 @@ export type StripePriceMeta = {
 };
 
 export const PLAN_PRICES: Record<Exclude<PlanCode, "ENTERPRISE_CONTACT">, StripePriceMeta> = {
-  STARTER_MONTHLY: {
-    stripePriceId: "price_starter_monthly",
+  STARTER_49_MONTHLY: {
+    stripePriceId: "price_starter49_monthly",
+    amountMajor: 49,
+    currency: "gbp",
+    interval: "month",
+    label: "£49 / month",
+  },
+  STARTER_49_YEARLY: {
+    stripePriceId: "price_starter49_annual",
+    amountMajor: 490,
+    currency: "gbp",
+    interval: "year",
+    label: "£490 / year",
+  },
+  GROWTH_99_MONTHLY: {
+    stripePriceId: "price_growth99_monthly",
+    amountMajor: 99,
+    currency: "gbp",
+    interval: "month",
+    label: "£99 / month",
+  },
+  GROWTH_99_YEARLY: {
+    stripePriceId: "price_growth99_annual",
+    amountMajor: 990,
+    currency: "gbp",
+    interval: "year",
+    label: "£990 / year",
+  },
+  PROFESSIONAL_149_MONTHLY: {
+    stripePriceId: "price_professional149_monthly",
     amountMajor: 149,
     currency: "gbp",
     interval: "month",
     label: "£149 / month",
   },
-  STARTER_YEARLY: {
-    stripePriceId: "price_starter_annual",
+  PROFESSIONAL_149_YEARLY: {
+    stripePriceId: "price_professional149_annual",
     amountMajor: 1490,
     currency: "gbp",
     interval: "year",
     label: "£1,490 / year",
-  },
-  GROWTH_MONTHLY: {
-    stripePriceId: "price_growth_monthly",
-    amountMajor: 399,
-    currency: "gbp",
-    interval: "month",
-    label: "£399 / month",
-  },
-  GROWTH_YEARLY: {
-    stripePriceId: "price_growth_annual",
-    amountMajor: 3990,
-    currency: "gbp",
-    interval: "year",
-    label: "£3,990 / year",
   },
 };
 
@@ -156,10 +172,12 @@ export function mergeBillingPrices(
     const interval = p.interval ?? "month";
 
     if (
-      p.code === "STARTER_MONTHLY" ||
-      p.code === "STARTER_YEARLY" ||
-      p.code === "GROWTH_MONTHLY" ||
-      p.code === "GROWTH_YEARLY"
+      p.code === "STARTER_49_MONTHLY" ||
+      p.code === "STARTER_49_YEARLY" ||
+      p.code === "GROWTH_99_MONTHLY" ||
+      p.code === "GROWTH_99_YEARLY" ||
+      p.code === "PROFESSIONAL_149_MONTHLY" ||
+      p.code === "PROFESSIONAL_149_YEARLY"
     ) {
       planPrices[p.code] = {
         stripePriceId: "",
