@@ -25,9 +25,7 @@ export type AddonCode =
   | "STORAGE_200GB_MONTHLY"
   | "STORAGE_200GB_YEARLY"
   | "STORAGE_1TB_MONTHLY"
-  | "STORAGE_1TB_YEARLY"
-  | "SMS_1000_MONTHLY"
-  | "SMS_1000_YEARLY";
+  | "STORAGE_1TB_YEARLY";
 
 export type StripePriceMeta = {
   stripePriceId: string;
@@ -153,20 +151,6 @@ export const ADDON_PRICES: Record<AddonCode, StripePriceMeta> = {
     interval: "year",
     label: "+1TB storage - £1,500 / year",
   },
-  SMS_1000_MONTHLY: {
-    stripePriceId: "price_sms_1000_monthly",
-    amountMajor: 15,
-    currency: "gbp",
-    interval: "month",
-    label: "1,000 SMS - £15 / month",
-  },
-  SMS_1000_YEARLY: {
-    stripePriceId: "price_sms_1000_annual",
-    amountMajor: 150,
-    currency: "gbp",
-    interval: "year",
-    label: "1,000 SMS - £150 / year",
-  },
 };
 
 export type BuyNowSelection = {
@@ -177,7 +161,6 @@ export type BuyNowSelection = {
   storageAddon100Gb?: number;
   storageAddon200Gb?: number;
   storageAddon1Tb?: number;
-  smsBundles1000?: number;
 };
 
 export type CartTotals = {
@@ -246,11 +229,6 @@ export function calculateCartTotals(
     `+1TB storage${intervalLabel}`,
     addonPrices[`STORAGE_1TB_${intervalKey}` as AddonCode],
     selection.storageAddon1Tb,
-  );
-  addLine(
-    "1,000 SMS",
-    addonPrices[`SMS_1000_${intervalKey}` as AddonCode],
-    selection.smsBundles1000,
   );
 
   const subtotalMajor = lines.reduce((sum, line) => sum + line.amountMajor, 0);

@@ -48,7 +48,6 @@ type AddonDescriptions = {
   starterExtraPeople?: string;
   growthExtraPeople?: string;
   storage?: string;
-  sms?: string;
 };
 
 const formatMoney = (amount?: number | null) => {
@@ -76,9 +75,6 @@ const buildAddonDescriptions = (prices: PublicBillingPrices["prices"]): AddonDes
   const storage200 = getMajor("STORAGE_200GB_YEARLY");
   const storage1tb = getMajor("STORAGE_1TB_YEARLY");
 
-  const smsMonthly = getMajor("SMS_1000_MONTHLY");
-  const smsYearly = getMajor("SMS_1000_YEARLY");
-
   const starterExtraPeople =
     starterMonthly && starterYearly
       ? `Add +25 Active People blocks for £${formatMoney(starterMonthly)}/month or £${formatMoney(
@@ -102,18 +98,10 @@ const buildAddonDescriptions = (prices: PublicBillingPrices["prices"]): AddonDes
         )}/year)`
       : undefined;
 
-  const sms =
-    smsMonthly && smsYearly
-      ? `Add SMS messaging bundles (1,000 messages) for £${formatMoney(
-          smsMonthly,
-        )}/month or £${formatMoney(smsYearly)}/year`
-      : undefined;
-
   return {
     starterExtraPeople,
     growthExtraPeople,
     storage,
-    sms,
   };
 };
 
@@ -202,9 +190,6 @@ export default function PricingPage() {
     if (addon.label === "Storage" && addonDescriptions.storage) {
       return { ...addon, description: addonDescriptions.storage };
     }
-    if (addon.label === "SMS bundles" && addonDescriptions.sms) {
-      return { ...addon, description: addonDescriptions.sms };
-    }
     return addon;
   });
   const growthAddons = growthMonthly.addons?.map((addon) => {
@@ -213,9 +198,6 @@ export default function PricingPage() {
     }
     if (addon.label === "Storage" && addonDescriptions.storage) {
       return { ...addon, description: addonDescriptions.storage };
-    }
-    if (addon.label === "SMS bundles" && addonDescriptions.sms) {
-      return { ...addon, description: addonDescriptions.sms };
     }
     return addon;
   });

@@ -54,7 +54,6 @@ export default function BuyNowPage() {
 
   const [av30Blocks, setAv30Blocks] = useState(0);
   const [storageChoice, setStorageChoice] = useState<"none" | "100" | "200" | "1000">("none");
-  const [smsBundles, setSmsBundles] = useState(0);
   const [planPriceOverrides, setPlanPriceOverrides] = useState<Partial<Record<PlanCode, typeof PLAN_PRICES[PlanCode]>>>({});
   const [addonPriceOverrides, setAddonPriceOverrides] = useState<
     Partial<
@@ -65,9 +64,7 @@ export default function BuyNowPage() {
         | "AV30_BLOCK_50_YEARLY"
         | "STORAGE_100GB_YEARLY"
         | "STORAGE_200GB_YEARLY"
-        | "STORAGE_1TB_YEARLY"
-        | "SMS_1000_MONTHLY"
-        | "SMS_1000_YEARLY",
+        | "STORAGE_1TB_YEARLY",
         { amountMajor: number; label: string }
       >
     >
@@ -125,7 +122,6 @@ export default function BuyNowPage() {
         storageAddon100Gb: storageChoice === "100" ? 1 : 0,
         storageAddon200Gb: storageChoice === "200" ? 1 : 0,
         storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
-        smsBundles1000: smsBundles,
       }
     : null;
 
@@ -169,7 +165,6 @@ export default function BuyNowPage() {
               : storageChoice === "1000"
                 ? 1000
                 : 0;
-        const extraSmsMessages = Math.max(0, smsBundles * 1000);
 
         const result = await previewPlanSelection(
           {
@@ -177,7 +172,6 @@ export default function BuyNowPage() {
             addons: {
               extraAv30Blocks,
               extraStorageGb,
-              extraSmsMessages,
             },
           },
           { signal: controller.signal },
@@ -206,7 +200,6 @@ export default function BuyNowPage() {
     frequency,
     av30Blocks,
     storageChoice,
-    smsBundles,
   ]);
 
   const clampQty = (value: number) =>
@@ -249,7 +242,6 @@ export default function BuyNowPage() {
         storageAddon100Gb: storageChoice === "100" ? 1 : 0,
         storageAddon200Gb: storageChoice === "200" ? 1 : 0,
         storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
-        smsBundles1000: smsBundles,
         orgName,
         contactName,
         contactEmail,
@@ -269,17 +261,6 @@ export default function BuyNowPage() {
       setIsCheckoutLoading(false);
     }
   };
-
-  const smsAddon =
-    frequency === "yearly"
-      ? mergedAddonPrices["SMS_1000_YEARLY"]
-      : mergedAddonPrices["SMS_1000_MONTHLY"];
-  const smsHelper =
-    smsAddon?.amountMajor !== undefined
-      ? `${formatAmount(smsAddon.amountMajor)} per 1k SMS (${frequency}).`
-      : frequency === "monthly"
-        ? "£15/mo"
-        : "£150/yr";
 
   const storageKey = frequency === "yearly" ? "YEARLY" : "MONTHLY";
   const storageUnit = frequency === "yearly" ? "year" : "month";
@@ -458,7 +439,7 @@ export default function BuyNowPage() {
               <h2 className="text-lg font-semibold">Add-ons</h2>
               <p className="text-sm text-pw-text-muted">
                 {planTier === "core"
-                  ? "Core supports storage and SMS add-ons. Capacity expansion is unavailable on Core."
+                  ? "Core supports storage add-ons. Capacity expansion is unavailable on Core."
                   : "Adjust capacity now or leave at zero-you can add more later."}
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -500,12 +481,6 @@ export default function BuyNowPage() {
                     Storage add-ons are charged as {frequency} line items at checkout.
                   </span>
                 </div>
-                <AddonInput
-                  label="SMS bundles (1,000 per bundle)"
-                  helper={smsHelper}
-                  value={smsBundles}
-                  onChange={(v) => setSmsBundles(clampQty(v))}
-                />
               </div>
               {frequency === "monthly" && (
                 <p className="mt-3 text-xs text-pw-text-muted">

@@ -94,16 +94,7 @@ export class StripeBuyNowProvider extends BuyNowProvider {
       }
     }
 
-    // SMS add-on (per 1,000 messages)
-    const extraSms = Math.max(0, params.plan.extraSmsMessages ?? 0);
-    if (extraSms >= 1000) {
-      const addonCode = (`SMS_1000_${intervalSuffix}` as keyof StripePriceMap);
-      const addonPriceId = priceMap[addonCode];
-      const qty = Math.floor(extraSms / 1000);
-      if (addonPriceId && qty > 0) {
-        lineItems.push({ price: addonPriceId, quantity: qty });
-      }
-    }
+    // Phase 0 PR 0.3: SMS add-on removed from the purchase path entirely.
 
     if (addonsOnly && lineItems.length === 0) {
       this.logger.warn("addonsOnly checkout but no add-on line items; API should validate hasAddons");

@@ -85,21 +85,12 @@ export const ADDON_PRICES = {
     amountMajor: 1500,
     label: "+1TB storage - £1,500 / year",
   },
-  SMS_1000_MONTHLY: {
-    amountMajor: 15,
-    label: "1,000 SMS - £15 / month",
-  },
-  SMS_1000_YEARLY: {
-    amountMajor: 150,
-    label: "1,000 SMS - £150 / year",
-  },
 } as const;
 
 export type AdminSelection = {
   planCode: PlanCode;
   av30BlockCount?: number;
   storageChoice?: "none" | "100" | "200" | "1000";
-  smsBundles1000?: number;
 };
 
 export type CartTotals = {
@@ -175,19 +166,6 @@ export function calculateCartTotals(
         amountMajor: storageLine.amountMajor,
       });
     }
-  }
-
-  const smsBundles = Math.max(0, Math.trunc(selection.smsBundles1000 ?? 0));
-  if (smsBundles && selection.planCode !== "ENTERPRISE_CONTACT") {
-    const isYearly = selection.planCode.endsWith("YEARLY");
-    const addon =
-      addonPrices[`SMS_1000_${isYearly ? "YEARLY" : "MONTHLY"}` as
-        | "SMS_1000_MONTHLY"
-        | "SMS_1000_YEARLY"];
-    lines.push({
-      label: `${addon.label} × ${smsBundles}`,
-      amountMajor: addon.amountMajor * smsBundles,
-    });
   }
 
   const subtotalMajor = lines.reduce((sum, line) => sum + line.amountMajor, 0);
