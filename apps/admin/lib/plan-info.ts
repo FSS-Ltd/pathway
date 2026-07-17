@@ -8,7 +8,7 @@
 
 export type PlanInfo = {
   code: string;
-  tier: "starter" | "growth" | "enterprise";
+  tier: "starter" | "growth" | "professional" | "enterprise";
   interval: "monthly" | "yearly";
   displayName: string;
   priceDisplay: string;
@@ -109,6 +109,61 @@ export const PLAN_CATALOGUE: Record<string, PlanInfo> = {
     priceDisplay: "Contact us for pricing",
     av30Included: null,
     priceInPounds: null,
+  },
+  // Phase 0 PR 0.2: new target-tier plan codes.
+  STARTER_49_MONTHLY: {
+    code: "STARTER_49_MONTHLY",
+    tier: "starter",
+    interval: "monthly",
+    displayName: "Starter (Monthly)",
+    priceDisplay: "£49 per month",
+    av30Included: 250,
+    priceInPounds: 49,
+  },
+  STARTER_49_YEARLY: {
+    code: "STARTER_49_YEARLY",
+    tier: "starter",
+    interval: "yearly",
+    displayName: "Starter (Yearly)",
+    priceDisplay: "£490 per year",
+    av30Included: 250,
+    priceInPounds: 490,
+  },
+  GROWTH_99_MONTHLY: {
+    code: "GROWTH_99_MONTHLY",
+    tier: "growth",
+    interval: "monthly",
+    displayName: "Growth (Monthly)",
+    priceDisplay: "£99 per month",
+    av30Included: 750,
+    priceInPounds: 99,
+  },
+  GROWTH_99_YEARLY: {
+    code: "GROWTH_99_YEARLY",
+    tier: "growth",
+    interval: "yearly",
+    displayName: "Growth (Yearly)",
+    priceDisplay: "£990 per year",
+    av30Included: 750,
+    priceInPounds: 990,
+  },
+  PROFESSIONAL_149_MONTHLY: {
+    code: "PROFESSIONAL_149_MONTHLY",
+    tier: "professional",
+    interval: "monthly",
+    displayName: "Professional (Monthly)",
+    priceDisplay: "£149 per month",
+    av30Included: 2000,
+    priceInPounds: 149,
+  },
+  PROFESSIONAL_149_YEARLY: {
+    code: "PROFESSIONAL_149_YEARLY",
+    tier: "professional",
+    interval: "yearly",
+    displayName: "Professional (Yearly)",
+    priceDisplay: "£1,490 per year",
+    av30Included: 2000,
+    priceInPounds: 1490,
   },
 };
 

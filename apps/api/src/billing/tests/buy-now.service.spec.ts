@@ -1,4 +1,4 @@
-import { BuyNowService } from "../buy-now.service";
+import { BuyNowService, TIER_HIERARCHY } from "../buy-now.service";
 import { PlanPreviewService } from "../plan-preview.service";
 import { BuyNowProvider } from "../buy-now.provider";
 import { BillingProvider } from "@pathway/db";
@@ -178,5 +178,17 @@ describe("BuyNowService", () => {
         "core_capacity_addon_blocked_sites",
       ]),
     );
+  });
+});
+
+describe("TIER_HIERARCHY (Phase 0 PR 0.2)", () => {
+  it("places professional strictly between growth and enterprise", () => {
+    expect(TIER_HIERARCHY.professional).toBeGreaterThan(TIER_HIERARCHY.growth);
+    expect(TIER_HIERARCHY.professional).toBeLessThan(TIER_HIERARCHY.enterprise);
+  });
+
+  it("preserves the existing core < starter < growth ordering", () => {
+    expect(TIER_HIERARCHY.core).toBeLessThan(TIER_HIERARCHY.starter);
+    expect(TIER_HIERARCHY.starter).toBeLessThan(TIER_HIERARCHY.growth);
   });
 });

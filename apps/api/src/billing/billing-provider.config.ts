@@ -72,6 +72,13 @@ const ALLOWED_PRICE_CODES: Set<PriceCode> = new Set([
   "STORAGE_1TB_YEARLY",
   "SMS_1000_MONTHLY",
   "SMS_1000_YEARLY",
+  // Phase 0 PR 0.2: new target-tier plan codes.
+  "STARTER_49_MONTHLY",
+  "STARTER_49_YEARLY",
+  "GROWTH_99_MONTHLY",
+  "GROWTH_99_YEARLY",
+  "PROFESSIONAL_149_MONTHLY",
+  "PROFESSIONAL_149_YEARLY",
 ]);
 
 type ParsePriceMapResult = {

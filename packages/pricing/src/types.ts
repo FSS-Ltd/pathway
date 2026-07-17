@@ -3,7 +3,7 @@
  * Plan codes align with backend billing-plans.ts to prevent drift.
  */
 
-export type PlanTier = "core" | "starter" | "growth" | "enterprise";
+export type PlanTier = "core" | "starter" | "growth" | "professional" | "enterprise";
 
 export type BillingPeriod = "monthly" | "yearly" | "contact";
 
@@ -14,7 +14,15 @@ export type PlanCode =
   | "STARTER_YEARLY"
   | "GROWTH_MONTHLY"
   | "GROWTH_YEARLY"
-  | "ENTERPRISE_CONTACT";
+  | "ENTERPRISE_CONTACT"
+  // Phase 0 PR 0.2: new target-tier codes (price-tagged; existing codes above are
+  // untouched and keep resolving for grandfathered subscribers, see PR 0.6).
+  | "STARTER_49_MONTHLY"
+  | "STARTER_49_YEARLY"
+  | "GROWTH_99_MONTHLY"
+  | "GROWTH_99_YEARLY"
+  | "PROFESSIONAL_149_MONTHLY"
+  | "PROFESSIONAL_149_YEARLY";
 
 export interface PlanDefinition {
   code: PlanCode;

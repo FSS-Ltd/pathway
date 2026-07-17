@@ -36,6 +36,16 @@ import {
 } from "./billing-provider.config";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 
+// Phase 0 PR 0.2: adds "professional" between growth and enterprise. Exported
+// (not a local const) so it's directly testable without instantiating the service.
+export const TIER_HIERARCHY: Record<PlanTier, number> = {
+  core: 1,
+  starter: 2,
+  growth: 3,
+  professional: 4,
+  enterprise: 5,
+};
+
 @Injectable()
 export class BuyNowService {
   private readonly logger = new Logger(BuyNowService.name);
@@ -503,16 +513,8 @@ export class BuyNowService {
       return;
     }
 
-    // Define tier hierarchy
-    const tierHierarchy: Record<PlanTier, number> = {
-      core: 1,
-      starter: 2,
-      growth: 3,
-      enterprise: 4,
-    };
-
-    const currentTierLevel = tierHierarchy[currentPlanDef.tier];
-    const newTierLevel = tierHierarchy[newPlanDef.tier];
+    const currentTierLevel = TIER_HIERARCHY[currentPlanDef.tier];
+    const newTierLevel = TIER_HIERARCHY[newPlanDef.tier];
 
     if (newTierLevel < currentTierLevel) {
       throw new BadRequestException(
