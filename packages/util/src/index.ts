@@ -1,3 +1,2 @@
 export * from "./crypto";
-
-export const APP_VERSION = "2.0.1";
+export * from "./version";
