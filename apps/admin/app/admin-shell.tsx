@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Menu, X, LifeBuoy } from "lucide-react";
-import { APP_VERSION } from "@pathway/util";
+import { APP_VERSION } from "@pathway/util/version";
 import { TopBarActions } from "@/components/topbar-actions";
 import {
   SidebarNav,
