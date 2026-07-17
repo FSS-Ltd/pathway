@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Menu, X, LifeBuoy } from "lucide-react";
+import { APP_VERSION } from "@pathway/util";
 import { TopBarActions } from "@/components/topbar-actions";
 import {
   SidebarNav,
@@ -156,6 +157,11 @@ const FeedbackNavLink = ({ isCollapsed = false, isActive }: FeedbackNavLinkProps
     {!isCollapsed && <span className="truncate">Feedback</span>}
   </Link>
 );
+
+const AppVersionTag = ({ isCollapsed = false }: { isCollapsed?: boolean }) =>
+  isCollapsed ? null : (
+    <span className="block px-3 pt-2 text-xs text-text-muted">v{APP_VERSION}</span>
+  );
 
 const AdminBrandLink = ({
   isCollapsed = false,
@@ -308,7 +314,12 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           header={<AdminBrandLink isCollapsed={isSidebarCollapsed} logoUrl={orgLogoUrl} />}
-          footer={<FeedbackNavLink isCollapsed={isSidebarCollapsed} isActive={isFeedbackActive} />}
+          footer={
+            <>
+              <FeedbackNavLink isCollapsed={isSidebarCollapsed} isActive={isFeedbackActive} />
+              <AppVersionTag isCollapsed={isSidebarCollapsed} />
+            </>
+          }
         />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-shell">
           <TopBar
@@ -396,7 +407,12 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               items={visibleNavItems}
               currentPath={pathname}
               header={null}
-              footer={<FeedbackNavLink isActive={isFeedbackActive} />}
+              footer={
+                <>
+                  <FeedbackNavLink isActive={isFeedbackActive} />
+                  <AppVersionTag />
+                </>
+              }
             />
           </div>
         </div>
