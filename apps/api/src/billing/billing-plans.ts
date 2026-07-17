@@ -1,6 +1,6 @@
 // Plan catalogue derived from Option A spec (`pathway-buy-now-option-a.md`).
 // Keep PlanCode values in sync with Subscription.planCode and Buy Now flow inputs.
-export type PlanTier = "core" | "starter" | "growth" | "enterprise";
+export type PlanTier = "core" | "starter" | "growth" | "professional" | "enterprise";
 
 export type PlanCode =
   | "CORE_MONTHLY"
@@ -11,7 +11,15 @@ export type PlanCode =
   | "STARTER_YEARLY"
   | "GROWTH_MONTHLY"
   | "GROWTH_YEARLY"
-  | "ENTERPRISE_CONTACT";
+  | "ENTERPRISE_CONTACT"
+  // Phase 0 PR 0.2: new target-tier codes (price-tagged; existing codes above are
+  // untouched and keep resolving for grandfathered subscribers, see PR 0.6).
+  | "STARTER_49_MONTHLY"
+  | "STARTER_49_YEARLY"
+  | "GROWTH_99_MONTHLY"
+  | "GROWTH_99_YEARLY"
+  | "PROFESSIONAL_149_MONTHLY"
+  | "PROFESSIONAL_149_YEARLY";
 
 export type PlanDefinition = {
   code: PlanCode;
@@ -157,6 +165,91 @@ export const PLAN_CATALOGUE: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxSitesIncluded: null,
     maxActiveClasses: null,
     flags: { enterpriseOnly: true },
+  },
+  // Phase 0 PR 0.2: new target-tier plan codes (£49/250, £99/750, £149/2,000).
+  STARTER_49_MONTHLY: {
+    code: "STARTER_49_MONTHLY",
+    tier: "starter",
+    displayName: "Starter",
+    billingPeriod: "monthly",
+    selfServe: true,
+    av30Included: 250,
+    maxChildrenIncluded: null,
+    storageGbIncluded: null,
+    smsMessagesIncluded: null,
+    leaderSeatsIncluded: null,
+    maxSitesIncluded: 1,
+    maxActiveClasses: null,
+  },
+  STARTER_49_YEARLY: {
+    code: "STARTER_49_YEARLY",
+    tier: "starter",
+    displayName: "Starter",
+    billingPeriod: "yearly",
+    selfServe: true,
+    av30Included: 250,
+    maxChildrenIncluded: null,
+    storageGbIncluded: null,
+    smsMessagesIncluded: null,
+    leaderSeatsIncluded: null,
+    maxSitesIncluded: 1,
+    maxActiveClasses: null,
+  },
+  GROWTH_99_MONTHLY: {
+    code: "GROWTH_99_MONTHLY",
+    tier: "growth",
+    displayName: "Growth",
+    billingPeriod: "monthly",
+    selfServe: true,
+    av30Included: 750,
+    maxChildrenIncluded: null,
+    storageGbIncluded: null,
+    smsMessagesIncluded: null,
+    leaderSeatsIncluded: null,
+    maxSitesIncluded: 2,
+    maxActiveClasses: null,
+  },
+  GROWTH_99_YEARLY: {
+    code: "GROWTH_99_YEARLY",
+    tier: "growth",
+    displayName: "Growth",
+    billingPeriod: "yearly",
+    selfServe: true,
+    av30Included: 750,
+    maxChildrenIncluded: null,
+    storageGbIncluded: null,
+    smsMessagesIncluded: null,
+    leaderSeatsIncluded: null,
+    maxSitesIncluded: 2,
+    maxActiveClasses: null,
+  },
+  PROFESSIONAL_149_MONTHLY: {
+    code: "PROFESSIONAL_149_MONTHLY",
+    tier: "professional",
+    displayName: "Professional",
+    billingPeriod: "monthly",
+    selfServe: true,
+    av30Included: 2000,
+    maxChildrenIncluded: null,
+    storageGbIncluded: null,
+    smsMessagesIncluded: null,
+    leaderSeatsIncluded: null,
+    maxSitesIncluded: 5,
+    maxActiveClasses: null,
+  },
+  PROFESSIONAL_149_YEARLY: {
+    code: "PROFESSIONAL_149_YEARLY",
+    tier: "professional",
+    displayName: "Professional",
+    billingPeriod: "yearly",
+    selfServe: true,
+    av30Included: 2000,
+    maxChildrenIncluded: null,
+    storageGbIncluded: null,
+    smsMessagesIncluded: null,
+    leaderSeatsIncluded: null,
+    maxSitesIncluded: 5,
+    maxActiveClasses: null,
   },
 };
 

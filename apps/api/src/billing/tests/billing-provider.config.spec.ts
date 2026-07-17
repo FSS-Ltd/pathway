@@ -56,5 +56,20 @@ describe("billing provider config", () => {
     const config = loadBillingProviderConfig();
     expect(config.activeProvider).toBe("FAKE");
   });
+
+  it("Phase 0 PR 0.2: accepts the new target-tier price codes in STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      STARTER_49_MONTHLY: "price_starter49_m",
+      GROWTH_99_MONTHLY: "price_growth99_m",
+      PROFESSIONAL_149_MONTHLY: "price_pro149_m",
+    });
+    const config = loadBillingProviderConfig();
+    expect(config.stripe.priceMap?.STARTER_49_MONTHLY).toBe("price_starter49_m");
+    expect(config.stripe.priceMap?.GROWTH_99_MONTHLY).toBe("price_growth99_m");
+    expect(config.stripe.priceMap?.PROFESSIONAL_149_MONTHLY).toBe("price_pro149_m");
+  });
 });
 
