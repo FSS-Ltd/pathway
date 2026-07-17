@@ -83,7 +83,6 @@ export default function BuyNowPage() {
   const [billingPeriod, setBillingPeriod] = React.useState<"monthly" | "yearly">("monthly");
   const [av30BlockCount, setAv30BlockCount] = React.useState(0);
   const [storageChoice, setStorageChoice] = React.useState<"none" | "100" | "200" | "1000">("none");
-  const [smsBundlesCount, setSmsBundlesCount] = React.useState(0);
   const [planPriceOverrides, setPlanPriceOverrides] = React.useState<
     Partial<Record<PlanCode, (typeof PLAN_PRICES)[Exclude<PlanCode, "ENTERPRISE_CONTACT">]>>
   >({});
@@ -236,13 +235,11 @@ export default function BuyNowPage() {
             : storageChoice === "1000"
               ? 1000
               : 0;
-      const extraSmsMessages = Math.max(0, smsBundlesCount) * 1000;
       const result = await previewPlanSelection({
         planCode,
         extraAv30Blocks,
         extraSites: 0,
         extraStorageGb,
-        extraSmsMessages,
         extraLeaderSeats: 0,
       });
       setPreview(result);
@@ -262,7 +259,6 @@ export default function BuyNowPage() {
     planCode,
     av30BlockCount,
     storageChoice,
-    smsBundlesCount,
     billingPeriod,
   ]);
 
@@ -270,7 +266,7 @@ export default function BuyNowPage() {
   React.useEffect(() => {
     // Only load data when session is authenticated
     if (sessionStatus !== "authenticated" || !session) return;
-    
+
     const handle = setTimeout(() => {
       void loadPreview();
     }, 300);
@@ -282,15 +278,13 @@ export default function BuyNowPage() {
     planCode,
     av30BlockCount,
     storageChoice,
-    smsBundlesCount,
     billingPeriod,
   ]);
 
   const isCurrentPlan = Boolean(planCode && currentPlanCode && planCode === currentPlanCode);
   const hasAddons =
     (av30BlockCount ?? 0) > 0 ||
-    (storageChoice && storageChoice !== "none") ||
-    (smsBundlesCount ?? 0) > 0;
+    (storageChoice && storageChoice !== "none");
 
   const handleCheckout = async () => {
     setCheckoutError(null);
@@ -331,14 +325,12 @@ export default function BuyNowPage() {
             : storageChoice === "1000"
               ? 1000
               : 0;
-      const extraSmsMessages = Math.max(0, smsBundlesCount) * 1000;
       // Authenticated upgrade: use purchase endpoint (no org/password required)
       const response = await createBuyNowPurchase({
         planCode,
         extraAv30Blocks,
         extraSites: 0,
         extraStorageGb,
-        extraSmsMessages,
         extraLeaderSeats: 0,
         successUrl,
         cancelUrl,
@@ -408,7 +400,6 @@ export default function BuyNowPage() {
           planCode,
           av30BlockCount,
           storageChoice,
-          smsBundles1000: smsBundlesCount,
         },
         {
           planPrices: mergedPlanPrices,
@@ -421,16 +412,6 @@ export default function BuyNowPage() {
     planCode && planCode !== "ENTERPRISE_CONTACT"
       ? mergedPlanPrices[planCode]?.label
       : null;
-
-  const smsAddon = mergedAddonPrices[
-    `SMS_1000_${billingPeriod === "yearly" ? "YEARLY" : "MONTHLY"}` as keyof typeof mergedAddonPrices
-  ];
-  const smsHelper =
-    smsAddon?.amountMajor !== undefined
-      ? `£${formatAmount(smsAddon.amountMajor)} per 1k SMS (${billingPeriod}).`
-      : billingPeriod === "monthly"
-        ? "£15 per 1k SMS (monthly)."
-        : "£150 per 1k SMS (yearly).";
 
   return (
     <div className="flex flex-col gap-6">
@@ -558,20 +539,6 @@ export default function BuyNowPage() {
                     ? "Each block adds 50 Active People capacity."
                     : "Each block adds 25 Active People capacity."}
                 </p>
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="smsBundles">SMS bundles (1,000 each)</Label>
-                <Input
-                  id="smsBundles"
-                  type="number"
-                  min={0}
-                  value={smsBundlesCount}
-                  onChange={(e) =>
-                    setSmsBundlesCount(clampNonNegative(Number(e.target.value)))
-                  }
-                />
-                <p className="text-xs text-text-muted">{smsHelper}</p>
               </div>
 
               <div className="space-y-1 md:col-span-2">
@@ -719,7 +686,7 @@ export default function BuyNowPage() {
                           </span>
                         </div>
                         <p className="text-xs text-text-muted">
-                          Final price and tax confirmed on Stripe-hosted checkout. Additional storage/SMS entered here are charged per backend configuration.
+                          Final price and tax confirmed on Stripe-hosted checkout. Additional storage entered here is charged per backend configuration.
                         </p>
                       </>
                     ) : (

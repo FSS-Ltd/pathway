@@ -57,6 +57,21 @@ describe("billing provider config", () => {
     expect(config.activeProvider).toBe("FAKE");
   });
 
+  it("Phase 0 PR 0.3: rejects the removed SMS add-on price code from STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      STARTER_MONTHLY: "price_starter_m",
+      SMS_1000_MONTHLY: "price_sms_should_be_filtered",
+    });
+    const config = loadBillingProviderConfig();
+    expect(config.stripe.priceMap?.STARTER_MONTHLY).toBe("price_starter_m");
+    expect(
+      (config.stripe.priceMap as Record<string, string> | undefined)?.SMS_1000_MONTHLY,
+    ).toBeUndefined();
+  });
+
   it("Phase 0 PR 0.2: accepts the new target-tier price codes in STRIPE_PRICE_MAP", () => {
     process.env.BILLING_PROVIDER = "STRIPE";
     process.env.STRIPE_SECRET_KEY = "sk_test";

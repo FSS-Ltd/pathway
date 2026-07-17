@@ -13,9 +13,7 @@ export type AddonPriceCode =
   | "STORAGE_200GB_MONTHLY"
   | "STORAGE_200GB_YEARLY"
   | "STORAGE_1TB_MONTHLY"
-  | "STORAGE_1TB_YEARLY"
-  | "SMS_1000_MONTHLY"
-  | "SMS_1000_YEARLY";
+  | "STORAGE_1TB_YEARLY";
 
 export type PriceCode = PlanCode | AddonPriceCode;
 
@@ -70,8 +68,6 @@ const ALLOWED_PRICE_CODES: Set<PriceCode> = new Set([
   "STORAGE_200GB_YEARLY",
   "STORAGE_1TB_MONTHLY",
   "STORAGE_1TB_YEARLY",
-  "SMS_1000_MONTHLY",
-  "SMS_1000_YEARLY",
   // Phase 0 PR 0.2: new target-tier plan codes.
   "STARTER_49_MONTHLY",
   "STARTER_49_YEARLY",
@@ -182,8 +178,6 @@ const parsePriceMap = (raw?: string): ParsePriceMapResult => {
       ADDON_STORAGE_200GB_YEAR: "STORAGE_200GB_YEARLY",
       ADDON_STORAGE_1TB_MONTH: "STORAGE_1TB_MONTHLY",
       ADDON_STORAGE_1TB_YEAR: "STORAGE_1TB_YEARLY",
-      ADDON_SMS_1000_MONTH: "SMS_1000_MONTHLY",
-      ADDON_SMS_1000_YEAR: "SMS_1000_YEARLY",
     };
     const mapped = (legacyMap[upper] ?? upper) as PriceCode;
     if (ALLOWED_PRICE_CODES.has(mapped)) {

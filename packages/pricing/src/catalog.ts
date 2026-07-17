@@ -34,10 +34,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
       },
-      {
-        label: "SMS bundles",
-        description: "Add SMS messaging bundles (1,000 messages per bundle)",
-      },
     ],
     doesNotInclude: ["Capacity add-ons (extra Active People and extra sites)"],
     upgradeWhen:
@@ -72,10 +68,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
       {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
-      },
-      {
-        label: "SMS bundles",
-        description: "Add SMS messaging bundles (1,000 messages per bundle)",
       },
     ],
     doesNotInclude: ["Capacity add-ons (extra Active People and extra sites)"],
@@ -114,10 +106,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
       {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
-      },
-      {
-        label: "SMS bundles",
-        description: "Add SMS messaging bundles (1,000 messages per bundle)",
       },
     ],
     notes: [
@@ -159,10 +147,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
       },
-      {
-        label: "SMS bundles",
-        description: "Add SMS messaging bundles (1,000 messages per bundle)",
-      },
     ],
     notes: [
       "No setup fees",
@@ -200,10 +184,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
       {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
-      },
-      {
-        label: "SMS bundles",
-        description: "Add SMS messaging bundles (1,000 messages per bundle)",
       },
       {
         label: "Additional sites",
@@ -246,10 +226,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
       {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
-      },
-      {
-        label: "SMS bundles",
-        description: "Add SMS messaging bundles (1,000 messages per bundle)",
       },
       {
         label: "Additional sites",
@@ -548,7 +524,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     question: "Are there any hidden fees?",
     answer:
-      "No. The price you see is the price you pay. There are no setup fees, no per-user fees beyond your plan's included Active People, and no surprise charges. Add-ons (extra Active People, storage, SMS) are clearly priced and optional.",
+      "No. The price you see is the price you pay. There are no setup fees, no per-user fees beyond your plan's included Active People, and no surprise charges. Add-ons (extra Active People, storage) are clearly priced and optional.",
   },
   {
     question: "Can I cancel my subscription?",
