@@ -508,7 +508,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     question: "Are there any hidden fees?",
     answer:
-      "No. The price you see is the price you pay. There are no setup fees, no per-user fees beyond your plan's included Active People, and no surprise charges. Add-ons (extra Active People, storage) are clearly priced and optional.",
+      "No. The price you see is the price you pay. There are no setup fees, no per-user fees beyond your plan's included Active People, and no surprise charges. Storage is the only add-on, clearly priced and optional.",
   },
   {
     question: "Can I cancel my subscription?",
@@ -538,6 +538,6 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     question: "What's included in each plan?",
     answer:
-      "All plans include secure, GDPR-compliant data handling. Core includes Starter features with hard limits of 15 Active People, 50 children, and 1 site. Starter includes 50 Active People and 1 site with full features. Growth includes 200 Active People and 3 sites. Enterprise is customised to your needs.",
+      "All plans include secure, GDPR-compliant data handling. Starter includes 250 Active People and 1 site. Growth includes 750 Active People and 2 sites. Professional includes 2,000 Active People and up to 5 sites. Enterprise is customised to your needs.",
   },
 ];

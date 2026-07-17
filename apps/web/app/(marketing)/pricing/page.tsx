@@ -101,19 +101,15 @@ export default function PricingPage() {
         const res = await fetchPublicBillingPrices();
         if (res?.prices?.length) {
           const overrides: Record<string, PriceOverride> = {};
-          
+
           res.prices.forEach((p) => {
-            const amountMajor = typeof p.unitAmount === "number" 
-              ? Number((p.unitAmount / 100).toFixed(2)) 
+            const amountMajor = typeof p.unitAmount === "number"
+              ? Number((p.unitAmount / 100).toFixed(2))
               : 0;
-            
+
             if (!amountMajor) return;
-            
-            // Map MINIMUM_* codes from Stripe to CORE_* codes
-            let code = p.code;
-            if (code === "MINIMUM_MONTHLY") code = "CORE_MONTHLY";
-            if (code === "MINIMUM_YEARLY") code = "CORE_YEARLY";
-            
+
+            const code = p.code;
             const interval = p.interval;
             
             if (interval === "month") {
@@ -135,43 +131,41 @@ export default function PricingPage() {
     void loadPrices();
   }, []);
 
-  const coreMonthly = {
-    ...PLANS.CORE_MONTHLY,
-    pricePerMonth: priceOverrides.CORE_MONTHLY?.pricePerMonth ?? PLANS.CORE_MONTHLY.pricePerMonth,
-  };
-  const coreYearly = {
-    ...PLANS.CORE_YEARLY,
-    pricePerYear: priceOverrides.CORE_YEARLY?.pricePerYear ?? PLANS.CORE_YEARLY.pricePerYear,
-  };
   const starterMonthly = {
-    ...PLANS.STARTER_MONTHLY,
-    pricePerMonth: priceOverrides.STARTER_MONTHLY?.pricePerMonth ?? PLANS.STARTER_MONTHLY.pricePerMonth,
+    ...PLANS.STARTER_49_MONTHLY,
+    pricePerMonth: priceOverrides.STARTER_49_MONTHLY?.pricePerMonth ?? PLANS.STARTER_49_MONTHLY.pricePerMonth,
   };
   const starterYearly = {
-    ...PLANS.STARTER_YEARLY,
-    pricePerYear: priceOverrides.STARTER_YEARLY?.pricePerYear ?? PLANS.STARTER_YEARLY.pricePerYear,
+    ...PLANS.STARTER_49_YEARLY,
+    pricePerYear: priceOverrides.STARTER_49_YEARLY?.pricePerYear ?? PLANS.STARTER_49_YEARLY.pricePerYear,
   };
   const growthMonthly = {
-    ...PLANS.GROWTH_MONTHLY,
-    pricePerMonth: priceOverrides.GROWTH_MONTHLY?.pricePerMonth ?? PLANS.GROWTH_MONTHLY.pricePerMonth,
+    ...PLANS.GROWTH_99_MONTHLY,
+    pricePerMonth: priceOverrides.GROWTH_99_MONTHLY?.pricePerMonth ?? PLANS.GROWTH_99_MONTHLY.pricePerMonth,
   };
   const growthYearly = {
-    ...PLANS.GROWTH_YEARLY,
-    pricePerYear: priceOverrides.GROWTH_YEARLY?.pricePerYear ?? PLANS.GROWTH_YEARLY.pricePerYear,
+    ...PLANS.GROWTH_99_YEARLY,
+    pricePerYear: priceOverrides.GROWTH_99_YEARLY?.pricePerYear ?? PLANS.GROWTH_99_YEARLY.pricePerYear,
+  };
+  const professionalMonthly = {
+    ...PLANS.PROFESSIONAL_149_MONTHLY,
+    pricePerMonth: priceOverrides.PROFESSIONAL_149_MONTHLY?.pricePerMonth ?? PLANS.PROFESSIONAL_149_MONTHLY.pricePerMonth,
+  };
+  const professionalYearly = {
+    ...PLANS.PROFESSIONAL_149_YEARLY,
+    pricePerYear: priceOverrides.PROFESSIONAL_149_YEARLY?.pricePerYear ?? PLANS.PROFESSIONAL_149_YEARLY.pricePerYear,
   };
   const enterprisePlan = PLANS.ENTERPRISE_CONTACT;
-  const starterAddons = starterMonthly.addons?.map((addon) => {
-    if (addon.label === "Storage" && addonDescriptions.storage) {
-      return { ...addon, description: addonDescriptions.storage };
-    }
-    return addon;
-  });
-  const growthAddons = growthMonthly.addons?.map((addon) => {
-    if (addon.label === "Storage" && addonDescriptions.storage) {
-      return { ...addon, description: addonDescriptions.storage };
-    }
-    return addon;
-  });
+  const applyStorageDescription = (plan: typeof starterMonthly) =>
+    plan.addons?.map((addon) => {
+      if (addon.label === "Storage" && addonDescriptions.storage) {
+        return { ...addon, description: addonDescriptions.storage };
+      }
+      return addon;
+    });
+  const starterAddons = applyStorageDescription(starterMonthly);
+  const growthAddons = applyStorageDescription(growthMonthly);
+  const professionalAddons = applyStorageDescription(professionalMonthly);
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-16 md:py-24">
@@ -198,88 +192,6 @@ export default function PricingPage() {
         initial="hidden"
         animate="visible"
       >
-        {/* Core Card */}
-        <motion.div
-          className="flex flex-col rounded-xl border border-pw-border bg-white p-6 shadow-sm transition hover:shadow-card"
-          variants={itemVariants}
-          whileHover={{ y: -5, transition: { duration: 0.2 } }}
-        >
-          <div className="mb-4">
-            <h3 className="text-2xl font-bold text-pw-text">{coreMonthly.displayName}</h3>
-            <p className="mt-1 text-sm text-pw-text-muted">{coreMonthly.tagline}</p>
-          </div>
-
-          <div className="mb-4">
-            <p className="text-sm text-pw-text-muted">
-              Starter workflows with tighter limits for smaller teams.
-            </p>
-            <p className="mt-1 text-sm text-pw-text-muted">
-              Includes 15 Active People (AV30), 50 children, and 1 site.
-            </p>
-          </div>
-
-          {/* Pricing - Monthly and Yearly */}
-          <div className="mb-6 space-y-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-pw-text">
-                £{coreMonthly.pricePerMonth?.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-              <span className="text-pw-text-muted">/month</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-pw-text">
-                £{coreYearly.pricePerYear?.toLocaleString("en-GB")}
-              </span>
-              <span className="text-pw-text-muted">/year</span>
-              <span className="ml-2 text-sm text-pw-text-muted">
-                (save £
-                {((coreMonthly.pricePerMonth || 0) * 12 - (coreYearly.pricePerYear || 0)).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                )
-              </span>
-            </div>
-          </div>
-
-          <ul className="mb-6 flex-1 space-y-2 text-sm">
-            {coreMonthly.features.map((feature, idx) => (
-              <li key={idx} className="flex items-start gap-2">
-                <span className="mt-1 text-pw-primary">✓</span>
-                <span className="text-pw-text-muted">{feature}</span>
-              </li>
-            ))}
-          </ul>
-
-          {coreMonthly.doesNotInclude && coreMonthly.doesNotInclude.length > 0 && (
-            <div className="mb-6">
-              <p className="mb-2 text-xs font-semibold text-pw-text-muted">Does not include:</p>
-              <ul className="space-y-1 text-xs text-pw-text-muted">
-                {coreMonthly.doesNotInclude.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="mt-1 text-pw-text-muted/60">✗</span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {coreMonthly.bestFor && (
-            <p className="mb-4 text-xs text-pw-text-muted italic">{coreMonthly.bestFor}</p>
-          )}
-
-          {coreMonthly.upgradeWhen && (
-            <p className="mb-6 text-xs text-pw-text-muted">
-              <strong className="text-pw-text">Upgrade when:</strong> {coreMonthly.upgradeWhen}
-            </p>
-          )}
-
-          <CtaButton
-            href="/buy"
-            location="pricing_core"
-          >
-            Start with Core
-          </CtaButton>
-        </motion.div>
-
         {/* Starter Card */}
         <motion.div
           className="flex flex-col rounded-xl border border-pw-border bg-white p-6 shadow-sm transition hover:shadow-card"
@@ -447,6 +359,91 @@ export default function PricingPage() {
             location="pricing_growth"
           >
             Start with Growth
+          </CtaButton>
+        </motion.div>
+
+        {/* Professional Card */}
+        <motion.div
+          className="flex flex-col rounded-xl border border-pw-border bg-white p-6 shadow-sm transition hover:shadow-card"
+          variants={itemVariants}
+          whileHover={{ y: -5, transition: { duration: 0.2 } }}
+        >
+          <div className="mb-4">
+            <h3 className="text-2xl font-bold text-pw-text">{professionalMonthly.displayName}</h3>
+            <p className="mt-1 text-sm text-pw-text-muted">{professionalMonthly.tagline}</p>
+          </div>
+
+          <div className="mb-4">
+            <p className="text-sm text-pw-text-muted">For established organisations running multiple sites at scale.</p>
+          </div>
+
+          {/* Pricing - Monthly and Yearly */}
+          <div className="mb-6 space-y-3">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-pw-text">
+                £{professionalMonthly.pricePerMonth?.toLocaleString("en-GB")}
+              </span>
+              <span className="text-pw-text-muted">/month</span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold text-pw-text">
+                £{professionalYearly.pricePerYear?.toLocaleString("en-GB")}
+              </span>
+              <span className="text-pw-text-muted">/year</span>
+              <span className="ml-2 text-sm text-pw-text-muted">
+                (save £
+                {((professionalMonthly.pricePerMonth || 0) * 12 - (professionalYearly.pricePerYear || 0)).toLocaleString("en-GB")}
+                )
+              </span>
+            </div>
+          </div>
+
+          <div className="mb-6 space-y-2 text-sm text-pw-text-muted">
+            {professionalMonthly.av30Included && (
+              <p>
+                <strong className="text-pw-text">Up to {professionalMonthly.av30Included} active people</strong>
+              </p>
+            )}
+            {professionalMonthly.maxSitesIncluded && (
+              <p>
+                <strong className="text-pw-text">
+                  {professionalMonthly.maxSitesIncluded === 1
+                    ? "1 site included"
+                    : `${professionalMonthly.maxSitesIncluded} sites included`}
+                </strong>
+              </p>
+            )}
+          </div>
+
+          <ul className="mb-6 flex-1 space-y-2 text-sm">
+            {professionalMonthly.features.map((feature, idx) => (
+              <li key={idx} className="flex items-start gap-2">
+                <span className="mt-1 text-pw-primary">✓</span>
+                <span className="text-pw-text-muted">{feature}</span>
+              </li>
+            ))}
+          </ul>
+
+          {professionalAddons && professionalAddons.length > 0 && (
+            <div className="mb-6">
+              <p className="mb-2 text-xs font-semibold text-pw-text">Add-ons available:</p>
+              <ul className="space-y-1 text-xs text-pw-text-muted">
+                {professionalAddons.map((addon, idx) => (
+                  <li key={idx}>• {addon.label}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {professionalMonthly.bestFor && (
+            <p className="mb-6 text-xs text-pw-text-muted italic">{professionalMonthly.bestFor}</p>
+          )}
+
+          <CtaButton
+            href="/buy"
+            location="pricing_professional"
+          >
+            Start with Professional
           </CtaButton>
         </motion.div>
 

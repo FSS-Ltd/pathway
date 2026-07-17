@@ -8,12 +8,12 @@
 export type BillingInterval = "month" | "year";
 
 export type PlanCode =
-  | "CORE_MONTHLY"
-  | "CORE_YEARLY"
-  | "STARTER_MONTHLY"
-  | "STARTER_YEARLY"
-  | "GROWTH_MONTHLY"
-  | "GROWTH_YEARLY";
+  | "STARTER_49_MONTHLY"
+  | "STARTER_49_YEARLY"
+  | "GROWTH_99_MONTHLY"
+  | "GROWTH_99_YEARLY"
+  | "PROFESSIONAL_149_MONTHLY"
+  | "PROFESSIONAL_149_YEARLY";
 
 export type AddonCode =
   | "STORAGE_100GB_MONTHLY"
@@ -32,47 +32,47 @@ export type StripePriceMeta = {
 };
 
 export const PLAN_PRICES: Record<PlanCode, StripePriceMeta> = {
-  CORE_MONTHLY: {
-    stripePriceId: "price_core_monthly",
-    amountMajor: 49.99,
+  STARTER_49_MONTHLY: {
+    stripePriceId: "price_starter49_monthly",
+    amountMajor: 49,
     currency: "gbp",
     interval: "month",
-    label: "£49.99 / month",
+    label: "£49 / month",
   },
-  CORE_YEARLY: {
-    stripePriceId: "price_core_annual",
-    amountMajor: 499,
+  STARTER_49_YEARLY: {
+    stripePriceId: "price_starter49_annual",
+    amountMajor: 490,
     currency: "gbp",
     interval: "year",
-    label: "£499 / year",
+    label: "£490 / year",
   },
-  STARTER_MONTHLY: {
-    stripePriceId: "price_starter_monthly",
+  GROWTH_99_MONTHLY: {
+    stripePriceId: "price_growth99_monthly",
+    amountMajor: 99,
+    currency: "gbp",
+    interval: "month",
+    label: "£99 / month",
+  },
+  GROWTH_99_YEARLY: {
+    stripePriceId: "price_growth99_annual",
+    amountMajor: 990,
+    currency: "gbp",
+    interval: "year",
+    label: "£990 / year",
+  },
+  PROFESSIONAL_149_MONTHLY: {
+    stripePriceId: "price_professional149_monthly",
     amountMajor: 149,
     currency: "gbp",
     interval: "month",
     label: "£149 / month",
   },
-  STARTER_YEARLY: {
-    stripePriceId: "price_starter_annual",
+  PROFESSIONAL_149_YEARLY: {
+    stripePriceId: "price_professional149_annual",
     amountMajor: 1490,
     currency: "gbp",
     interval: "year",
     label: "£1,490 / year",
-  },
-  GROWTH_MONTHLY: {
-    stripePriceId: "price_growth_monthly",
-    amountMajor: 399,
-    currency: "gbp",
-    interval: "month",
-    label: "£399 / month",
-  },
-  GROWTH_YEARLY: {
-    stripePriceId: "price_growth_annual",
-    amountMajor: 3990,
-    currency: "gbp",
-    interval: "year",
-    label: "£3,990 / year",
   },
 };
 
@@ -214,22 +214,15 @@ export function mergeBillingPrices(
     if (!amountMajor) return;
     const interval = p.interval ?? "month";
 
-    const mappedPlanCode =
-      p.code === "MINIMUM_MONTHLY"
-        ? "CORE_MONTHLY"
-        : p.code === "MINIMUM_YEARLY"
-          ? "CORE_YEARLY"
-          : p.code;
-
     if (
-      mappedPlanCode === "CORE_MONTHLY" ||
-      mappedPlanCode === "CORE_YEARLY" ||
-      mappedPlanCode === "STARTER_MONTHLY" ||
-      mappedPlanCode === "STARTER_YEARLY" ||
-      mappedPlanCode === "GROWTH_MONTHLY" ||
-      mappedPlanCode === "GROWTH_YEARLY"
+      p.code === "STARTER_49_MONTHLY" ||
+      p.code === "STARTER_49_YEARLY" ||
+      p.code === "GROWTH_99_MONTHLY" ||
+      p.code === "GROWTH_99_YEARLY" ||
+      p.code === "PROFESSIONAL_149_MONTHLY" ||
+      p.code === "PROFESSIONAL_149_YEARLY"
     ) {
-      planPrices[mappedPlanCode as PlanCode] = {
+      planPrices[p.code as PlanCode] = {
         stripePriceId: "",
         amountMajor,
         currency: "gbp",

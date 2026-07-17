@@ -23,16 +23,16 @@ import {
   type Sector,
 } from "../../lib/buy-now-client";
 
-type PlanTier = "core" | "starter" | "growth" | "enterprise";
+type PlanTier = "starter" | "growth" | "professional" | "enterprise";
 type BillingFrequency = "monthly" | "yearly";
 
 const tierToPlanCode = (
   tier: PlanTier,
   frequency: BillingFrequency,
 ): PlanCode | null => {
-  if (tier === "core") return frequency === "monthly" ? "CORE_MONTHLY" : "CORE_YEARLY";
-  if (tier === "starter") return frequency === "monthly" ? "STARTER_MONTHLY" : "STARTER_YEARLY";
-  if (tier === "growth") return frequency === "monthly" ? "GROWTH_MONTHLY" : "GROWTH_YEARLY";
+  if (tier === "starter") return frequency === "monthly" ? "STARTER_49_MONTHLY" : "STARTER_49_YEARLY";
+  if (tier === "growth") return frequency === "monthly" ? "GROWTH_99_MONTHLY" : "GROWTH_99_YEARLY";
+  if (tier === "professional") return frequency === "monthly" ? "PROFESSIONAL_149_MONTHLY" : "PROFESSIONAL_149_YEARLY";
   return null;
 };
 
@@ -186,7 +186,7 @@ export default function BuyNowPage() {
   const handleCheckout = async () => {
     setCheckoutError(null);
     if (!planCode || planTier === "enterprise") {
-      setCheckoutError("Please choose Starter or Growth to continue.");
+      setCheckoutError("Please choose Starter, Growth, or Professional to continue.");
       return;
     }
     if (!orgName || !contactName || !contactEmail || !password || !sector) {
@@ -301,27 +301,27 @@ export default function BuyNowPage() {
           <div className="rounded-xl border border-pw-border bg-white p-4 shadow-sm">
             <h2 className="text-lg font-semibold">Plan</h2>
             <p className="text-sm text-pw-text-muted">
-              Core, Starter, and Growth are self-serve. Enterprise is contact-only.
+              Starter, Growth, and Professional are self-serve. Enterprise is contact-only.
             </p>
             <div className="mt-4 grid gap-3 md:grid-cols-4">
               {[
                 {
-                  tier: "core" as PlanTier,
-                  title: "Core",
-                  desc: "Starter essentials for smaller teams.",
-                  included: "15 Active People, 50 children, 1 site",
-                },
-                {
                   tier: "starter" as PlanTier,
                   title: "Starter",
                   desc: "Run your organisation properly.",
-                  included: "Includes 50 Active People and 1 site",
+                  included: "Includes 250 Active People and 1 site",
                 },
                 {
                   tier: "growth" as PlanTier,
                   title: "Growth",
                   desc: "Operate at scale.",
-                  included: "Includes 200 Active People and 3 sites",
+                  included: "Includes 750 Active People and 2 sites",
+                },
+                {
+                  tier: "professional" as PlanTier,
+                  title: "Professional",
+                  desc: "For established, multi-site organisations.",
+                  included: "Includes 2,000 Active People and up to 5 sites",
                 },
                 {
                   tier: "enterprise" as PlanTier,
@@ -414,9 +414,7 @@ export default function BuyNowPage() {
             <div className="rounded-xl border border-pw-border bg-white p-4 shadow-sm">
               <h2 className="text-lg font-semibold">Add-ons</h2>
               <p className="text-sm text-pw-text-muted">
-                {planTier === "core"
-                  ? "Core supports storage add-ons. Capacity expansion is unavailable on Core."
-                  : "Adjust capacity now or leave at zero-you can add more later."}
+                Adjust capacity now or leave at zero-you can add more later.
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-1">
