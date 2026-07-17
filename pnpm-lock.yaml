@@ -78,6 +78,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@pathway/util':
+        specifier: workspace:*
+        version: link:../../packages/util
       '@tiptap/extension-image':
         specifier: ^3.19.0
         version: 3.19.0(@tiptap/core@3.19.0(@tiptap/pm@3.19.0))
@@ -327,6 +330,9 @@ importers:
       '@pathway/pricing':
         specifier: workspace:*
         version: link:../../packages/pricing
+      '@pathway/util':
+        specifier: workspace:*
+        version: link:../../packages/util
       '@react-pdf/renderer':
         specifier: ^4.3.2
         version: 4.3.2(react@18.3.1)

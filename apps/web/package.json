@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@pathway/pricing": "workspace:*",
+    "@pathway/util": "workspace:*",
     "@react-pdf/renderer": "^4.3.2",
     "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",

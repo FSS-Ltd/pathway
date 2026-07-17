@@ -1,5 +1,6 @@
 {
   "name": "pathway",
+  "version": "2.0.1",
   "private": true,
   "packageManager": "pnpm@9.7.0",
   "scripts": {

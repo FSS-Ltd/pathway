@@ -1,5 +1,6 @@
 import { Controller, Get } from "@nestjs/common";
 import { prisma } from "@pathway/db";
+import { APP_VERSION } from "@pathway/util";
 
 /** Env var names we care about for debugging (no values returned). */
 const ENV_KEYS_TO_CHECK = [
@@ -33,7 +34,7 @@ export class HealthController {
     const now = await prisma.$queryRawUnsafe<{ now: string }[]>(
       "SELECT NOW()::text as now",
     );
-    return { status: "ok", dbTime: now[0]?.now ?? null };
+    return { status: "ok", dbTime: now[0]?.now ?? null, version: APP_VERSION };
   }
 
   /**

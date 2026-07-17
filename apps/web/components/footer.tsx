@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { APP_VERSION } from "@pathway/util";
 
 interface FooterSection {
   title: string;
@@ -121,7 +122,10 @@ export default function Footer() {
         </div>
 
         <div className="mt-8 border-t border-border-subtle pt-8 text-center text-sm text-text-muted">
-          <p>&copy; {new Date().getFullYear()} Nexsteps. All rights reserved.</p>
+          <p>
+            &copy; {new Date().getFullYear()} Nexsteps. All rights reserved.{" "}
+            <span className="text-text-muted/70">v{APP_VERSION}</span>
+          </p>
         </div>
       </div>
     </footer>
