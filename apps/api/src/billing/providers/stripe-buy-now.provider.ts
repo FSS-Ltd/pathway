@@ -64,19 +64,8 @@ export class StripeBuyNowProvider extends BuyNowProvider {
       lineItems.push({ price: basePriceId, quantity: 1 });
     }
 
-    // AV30 add-on blocks: Growth uses 50-block price (admin sends blocks*2), Starter uses 25-block
-    const av30Blocks = Math.max(0, params.plan.av30AddonBlocks ?? 0);
-    if (av30Blocks > 0) {
-      const isGrowth = String(planCode).startsWith("GROWTH");
-      const addonCode = isGrowth
-        ? (`AV30_BLOCK_50_${intervalSuffix}` as keyof StripePriceMap)
-        : (`AV30_BLOCK_25_${intervalSuffix}` as keyof StripePriceMap);
-      const addonPriceId = priceMap[addonCode];
-      const qty = isGrowth ? Math.floor(av30Blocks / 2) : av30Blocks;
-      if (addonPriceId && qty > 0) {
-        lineItems.push({ price: addonPriceId, quantity: qty });
-      }
-    }
+    // Phase 0 PR 0.4: AV30 block add-on removed from the purchase path entirely.
+    // The AV30 hard cap itself is unaffected - see entitlements-enforcement.service.ts.
 
     // Storage add-on: use monthly or yearly price to match plan interval
     const extraStorageGb = Math.max(0, params.plan.extraStorageGb ?? 0);

@@ -26,8 +26,6 @@ import {
 type PlanTier = "core" | "starter" | "growth" | "enterprise";
 type BillingFrequency = "monthly" | "yearly";
 
-const MAX_QTY = 20;
-
 const tierToPlanCode = (
   tier: PlanTier,
   frequency: BillingFrequency,
@@ -52,16 +50,11 @@ export default function BuyNowPage() {
   const [planTier, setPlanTier] = useState<PlanTier>("starter");
   const [frequency, setFrequency] = useState<BillingFrequency>("monthly");
 
-  const [av30Blocks, setAv30Blocks] = useState(0);
   const [storageChoice, setStorageChoice] = useState<"none" | "100" | "200" | "1000">("none");
   const [planPriceOverrides, setPlanPriceOverrides] = useState<Partial<Record<PlanCode, typeof PLAN_PRICES[PlanCode]>>>({});
   const [addonPriceOverrides, setAddonPriceOverrides] = useState<
     Partial<
       Record<
-        | "AV30_BLOCK_25_MONTHLY"
-        | "AV30_BLOCK_25_YEARLY"
-        | "AV30_BLOCK_50_MONTHLY"
-        | "AV30_BLOCK_50_YEARLY"
         | "STORAGE_100GB_YEARLY"
         | "STORAGE_200GB_YEARLY"
         | "STORAGE_1TB_YEARLY",
@@ -115,10 +108,6 @@ export default function BuyNowPage() {
     ?       {
         planCode,
         frequency,
-        av30AddonBlocks25:
-          planTier === "starter" ? av30Blocks : 0,
-        av30AddonBlocks50:
-          planTier === "growth" ? av30Blocks : 0,
         storageAddon100Gb: storageChoice === "100" ? 1 : 0,
         storageAddon200Gb: storageChoice === "200" ? 1 : 0,
         storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
@@ -151,12 +140,6 @@ export default function BuyNowPage() {
     setIsPreviewLoading(true);
     const handle = setTimeout(async () => {
       try {
-        const extraAv30Blocks =
-          planTier === "growth"
-              ? Math.max(0, av30Blocks) * 2 // +50 blocks -> backend 25-size
-              : planTier === "starter"
-                ? Math.max(0, av30Blocks)
-                : 0;
         const extraStorageGb =
           storageChoice === "100"
             ? 100
@@ -170,7 +153,6 @@ export default function BuyNowPage() {
           {
             planCode,
             addons: {
-              extraAv30Blocks,
               extraStorageGb,
             },
           },
@@ -198,12 +180,8 @@ export default function BuyNowPage() {
   }, [
     planCode,
     frequency,
-    av30Blocks,
     storageChoice,
   ]);
-
-  const clampQty = (value: number) =>
-    Math.min(MAX_QTY, Math.max(0, Number.isFinite(value) ? Math.trunc(value) : 0));
 
   const handleCheckout = async () => {
     setCheckoutError(null);
@@ -237,8 +215,6 @@ export default function BuyNowPage() {
       const { sessionUrl } = await createCheckoutSession({
         planCode,
         billingPeriod: frequency,
-        av30AddonBlocks25: planTier === "starter" ? av30Blocks : 0,
-        av30AddonBlocks50: planTier === "growth" ? av30Blocks : 0,
         storageAddon100Gb: storageChoice === "100" ? 1 : 0,
         storageAddon200Gb: storageChoice === "200" ? 1 : 0,
         storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
@@ -443,25 +419,6 @@ export default function BuyNowPage() {
                   : "Adjust capacity now or leave at zero-you can add more later."}
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {planTier !== "core" ? (
-                  <AddonInput
-                    label={`Extra ${planTier === "growth" ? "+50" : "+25"} Active People`}
-                    helper={
-                      planTier === "growth"
-                        ? "£59/mo or £590/yr"
-                        : "£39/mo or £390/yr"
-                    }
-                    value={av30Blocks}
-                    onChange={(v) => setAv30Blocks(clampQty(v))}
-                  />
-                ) : (
-                  <div className="rounded-lg border border-pw-border p-3">
-                    <p className="text-sm font-medium">Capacity add-ons</p>
-                    <p className="text-xs text-pw-text-muted">
-                      Core does not support Active People or additional site add-ons.
-                    </p>
-                  </div>
-                )}
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">
                     Storage (billed {frequency})
@@ -660,44 +617,6 @@ export default function BuyNowPage() {
         </aside>
       </div>
     </main>
-  );
-}
-
-function AddonInput({
-  label,
-  helper,
-  value,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  helper?: string;
-  value: number;
-  onChange: (value: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label className="flex flex-col gap-2 rounded-lg border border-pw-border p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{label}</span>
-        <input
-          type="number"
-          min={0}
-          max={MAX_QTY}
-          value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
-          disabled={disabled}
-          className={clsx(
-            "w-24 rounded-md border px-2 py-1 text-sm",
-            disabled ? "bg-pw-surface text-pw-text-muted" : "border-pw-border",
-          )}
-        />
-      </div>
-      <span className="text-xs text-pw-text-muted">
-        {helper}
-        {disabled ? " (not available on monthly)" : ""}
-      </span>
-    </label>
   );
 }
 
