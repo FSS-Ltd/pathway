@@ -57,9 +57,6 @@ const planOptions = [
   },
 ] as const;
 
-const clampNonNegative = (value: number | null | undefined) =>
-  Math.max(0, Number.isFinite(value as number) ? Math.trunc(value as number) : 0);
-
 const warningCopy: Record<string, string> = {
   mock_mode: "Running against mock data; for development only.",
   unknown_plan_code: "Plan code not recognised; caps may be incomplete.",
@@ -81,7 +78,6 @@ export default function BuyNowPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [planTier, setPlanTier] = React.useState<(typeof planOptions)[number]["code"]>("STARTER");
   const [billingPeriod, setBillingPeriod] = React.useState<"monthly" | "yearly">("monthly");
-  const [av30BlockCount, setAv30BlockCount] = React.useState(0);
   const [storageChoice, setStorageChoice] = React.useState<"none" | "100" | "200" | "1000">("none");
   const [planPriceOverrides, setPlanPriceOverrides] = React.useState<
     Partial<Record<PlanCode, (typeof PLAN_PRICES)[Exclude<PlanCode, "ENTERPRISE_CONTACT">]>>
@@ -224,9 +220,6 @@ export default function BuyNowPage() {
         setPreviewWarnings([]);
         return;
       }
-      const extraAv30Blocks = planCode.startsWith("GROWTH")
-        ? Math.max(0, av30BlockCount) * 2 // growth blocks are 50; backend expects blocks of 25
-        : Math.max(0, av30BlockCount);
       const extraStorageGb =
         storageChoice === "100"
           ? 100
@@ -237,7 +230,6 @@ export default function BuyNowPage() {
               : 0;
       const result = await previewPlanSelection({
         planCode,
-        extraAv30Blocks,
         extraSites: 0,
         extraStorageGb,
         extraLeaderSeats: 0,
@@ -257,7 +249,6 @@ export default function BuyNowPage() {
     }
   }, [
     planCode,
-    av30BlockCount,
     storageChoice,
     billingPeriod,
   ]);
@@ -276,15 +267,12 @@ export default function BuyNowPage() {
     session,
     loadPreview,
     planCode,
-    av30BlockCount,
     storageChoice,
     billingPeriod,
   ]);
 
   const isCurrentPlan = Boolean(planCode && currentPlanCode && planCode === currentPlanCode);
-  const hasAddons =
-    (av30BlockCount ?? 0) > 0 ||
-    (storageChoice && storageChoice !== "none");
+  const hasAddons = storageChoice !== "none";
 
   const handleCheckout = async () => {
     setCheckoutError(null);
@@ -314,9 +302,6 @@ export default function BuyNowPage() {
         setIsCheckoutLoading(false);
         return;
       }
-      const extraAv30Blocks = planCode.startsWith("GROWTH")
-        ? Math.max(0, av30BlockCount) * 2
-        : Math.max(0, av30BlockCount);
       const extraStorageGb =
         storageChoice === "100"
           ? 100
@@ -328,7 +313,6 @@ export default function BuyNowPage() {
       // Authenticated upgrade: use purchase endpoint (no org/password required)
       const response = await createBuyNowPurchase({
         planCode,
-        extraAv30Blocks,
         extraSites: 0,
         extraStorageGb,
         extraLeaderSeats: 0,
@@ -398,7 +382,6 @@ export default function BuyNowPage() {
     ? calculateCartTotals(
         {
           planCode,
-          av30BlockCount,
           storageChoice,
         },
         {
@@ -478,12 +461,7 @@ export default function BuyNowPage() {
                   <button
                     key={plan.code}
                     type="button"
-                    onClick={() => {
-                      setPlanTier(plan.code);
-                      if (plan.code === "ENTERPRISE_CONTACT") {
-                        setAv30BlockCount(0);
-                      }
-                    }}
+                    onClick={() => setPlanTier(plan.code)}
                     className={`flex w-full items-start justify-between rounded-lg border px-4 py-3 text-left transition ${
                       isActive
                         ? "border-accent ring-2 ring-accent/40"
@@ -521,26 +499,6 @@ export default function BuyNowPage() {
 
           <Card title="Add-ons">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1">
-                <Label htmlFor="av30Blocks">
-                  Extra AV30 blocks ({planTier === "GROWTH" ? "+50" : "+25"})
-                </Label>
-                <Input
-                  id="av30Blocks"
-                  type="number"
-                  min={0}
-                  value={av30BlockCount}
-                  onChange={(e) =>
-                    setAv30BlockCount(clampNonNegative(Number(e.target.value)))
-                  }
-                />
-                <p className="text-xs text-text-muted">
-                  {planTier === "GROWTH"
-                    ? "Each block adds 50 Active People capacity."
-                    : "Each block adds 25 Active People capacity."}
-                </p>
-              </div>
-
               <div className="space-y-1 md:col-span-2">
                 <Label htmlFor="storageChoice">
                   Storage (billed {billingPeriod})

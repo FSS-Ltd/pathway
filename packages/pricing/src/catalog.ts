@@ -100,10 +100,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     ],
     addons: [
       {
-        label: "Extra Active People",
-        description: "Add +25 Active People blocks for £39/month or £390/year",
-      },
-      {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
       },
@@ -140,10 +136,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     ],
     addons: [
       {
-        label: "Extra Active People",
-        description: "Add +25 Active People blocks for £39/month or £390/year",
-      },
-      {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
       },
@@ -177,10 +169,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
       "Custom onboarding",
     ],
     addons: [
-      {
-        label: "Extra Active People",
-        description: "Add +50 Active People blocks for £59/month or £590/year",
-      },
       {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
@@ -219,10 +207,6 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
       "Custom onboarding",
     ],
     addons: [
-      {
-        label: "Extra Active People",
-        description: "Add +50 Active People blocks for £59/month or £590/year",
-      },
       {
         label: "Storage",
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",

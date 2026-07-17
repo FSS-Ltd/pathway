@@ -45,22 +45,6 @@ export const PLAN_PRICES: Record<Exclude<PlanCode, "ENTERPRISE_CONTACT">, Stripe
 };
 
 export const ADDON_PRICES = {
-  AV30_BLOCK_25_MONTHLY: {
-    amountMajor: 39,
-    label: "+25 Active People - £39 / month",
-  },
-  AV30_BLOCK_25_YEARLY: {
-    amountMajor: 390,
-    label: "+25 Active People - £390 / year",
-  },
-  AV30_BLOCK_50_MONTHLY: {
-    amountMajor: 59,
-    label: "+50 Active People - £59 / month",
-  },
-  AV30_BLOCK_50_YEARLY: {
-    amountMajor: 590,
-    label: "+50 Active People - £590 / year",
-  },
   STORAGE_100GB_MONTHLY: {
     amountMajor: 25,
     label: "+100GB storage - £25 / month",
@@ -89,7 +73,6 @@ export const ADDON_PRICES = {
 
 export type AdminSelection = {
   planCode: PlanCode;
-  av30BlockCount?: number;
   storageChoice?: "none" | "100" | "200" | "1000";
 };
 
@@ -133,22 +116,6 @@ export function calculateCartTotals(
       : undefined;
   if (planMeta && !opts?.excludePlanLine) {
     lines.push({ label: planMeta.label, amountMajor: planMeta.amountMajor });
-  }
-
-  const qty = Math.max(0, Math.trunc(selection.av30BlockCount ?? 0));
-  if (qty > 0 && selection.planCode !== "ENTERPRISE_CONTACT") {
-    const isGrowth = selection.planCode.startsWith("GROWTH");
-    const isYearly = selection.planCode.endsWith("YEARLY");
-    const addon =
-      addonPrices[
-        `${isGrowth ? "AV30_BLOCK_50" : "AV30_BLOCK_25"}_${
-          isYearly ? "YEARLY" : "MONTHLY"
-        }` as keyof typeof ADDON_PRICES
-      ];
-    lines.push({
-      label: `${addon.label} × ${qty}`,
-      amountMajor: addon.amountMajor * qty,
-    });
   }
 
   if (selection.storageChoice && selection.storageChoice !== "none") {

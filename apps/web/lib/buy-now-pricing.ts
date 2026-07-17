@@ -16,10 +16,6 @@ export type PlanCode =
   | "GROWTH_YEARLY";
 
 export type AddonCode =
-  | "AV30_BLOCK_25_MONTHLY"
-  | "AV30_BLOCK_25_YEARLY"
-  | "AV30_BLOCK_50_MONTHLY"
-  | "AV30_BLOCK_50_YEARLY"
   | "STORAGE_100GB_MONTHLY"
   | "STORAGE_100GB_YEARLY"
   | "STORAGE_200GB_MONTHLY"
@@ -81,34 +77,6 @@ export const PLAN_PRICES: Record<PlanCode, StripePriceMeta> = {
 };
 
 export const ADDON_PRICES: Record<AddonCode, StripePriceMeta> = {
-  AV30_BLOCK_25_MONTHLY: {
-    stripePriceId: "price_av30_25_monthly",
-    amountMajor: 39,
-    currency: "gbp",
-    interval: "month",
-    label: "+25 Active People - £39 / month",
-  },
-  AV30_BLOCK_25_YEARLY: {
-    stripePriceId: "price_av30_25_annual",
-    amountMajor: 390,
-    currency: "gbp",
-    interval: "year",
-    label: "+25 Active People - £390 / year",
-  },
-  AV30_BLOCK_50_MONTHLY: {
-    stripePriceId: "price_av30_50_monthly",
-    amountMajor: 59,
-    currency: "gbp",
-    interval: "month",
-    label: "+50 Active People - £59 / month",
-  },
-  AV30_BLOCK_50_YEARLY: {
-    stripePriceId: "price_av30_50_annual",
-    amountMajor: 590,
-    currency: "gbp",
-    interval: "year",
-    label: "+50 Active People - £590 / year",
-  },
   STORAGE_100GB_MONTHLY: {
     stripePriceId: "price_storage_100gb_monthly",
     amountMajor: 25,
@@ -156,8 +124,6 @@ export const ADDON_PRICES: Record<AddonCode, StripePriceMeta> = {
 export type BuyNowSelection = {
   planCode: PlanCode;
   frequency: "monthly" | "yearly";
-  av30AddonBlocks25?: number;
-  av30AddonBlocks50?: number;
   storageAddon100Gb?: number;
   storageAddon200Gb?: number;
   storageAddon1Tb?: number;
@@ -205,16 +171,6 @@ export function calculateCartTotals(
   const addonPrices = { ...ADDON_PRICES, ...(opts?.addonPrices ?? {}) };
   const intervalLabel = selection.frequency === "monthly" ? " (monthly)" : " (yearly)";
 
-  addLine(
-    "+25 Active People",
-    addonPrices[`AV30_BLOCK_25_${intervalKey}` as AddonCode],
-    selection.av30AddonBlocks25,
-  );
-  addLine(
-    "+50 Active People",
-    addonPrices[`AV30_BLOCK_50_${intervalKey}` as AddonCode],
-    selection.av30AddonBlocks50,
-  );
   addLine(
     `+100GB storage${intervalLabel}`,
     addonPrices[`STORAGE_100GB_${intervalKey}` as AddonCode],

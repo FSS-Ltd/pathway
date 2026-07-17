@@ -72,6 +72,22 @@ describe("billing provider config", () => {
     ).toBeUndefined();
   });
 
+  it("Phase 0 PR 0.4: rejects the removed AV30 block price codes from STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      STARTER_MONTHLY: "price_starter_m",
+      AV30_BLOCK_25_MONTHLY: "price_av30_should_be_filtered",
+      AV30_BLOCK_50_YEARLY: "price_av30_should_also_be_filtered",
+    });
+    const config = loadBillingProviderConfig();
+    expect(config.stripe.priceMap?.STARTER_MONTHLY).toBe("price_starter_m");
+    const priceMap = config.stripe.priceMap as Record<string, string> | undefined;
+    expect(priceMap?.AV30_BLOCK_25_MONTHLY).toBeUndefined();
+    expect(priceMap?.AV30_BLOCK_50_YEARLY).toBeUndefined();
+  });
+
   it("Phase 0 PR 0.2: accepts the new target-tier price codes in STRIPE_PRICE_MAP", () => {
     process.env.BILLING_PROVIDER = "STRIPE";
     process.env.STRIPE_SECRET_KEY = "sk_test";

@@ -45,8 +45,6 @@ type PriceOverride = {
 };
 
 type AddonDescriptions = {
-  starterExtraPeople?: string;
-  growthExtraPeople?: string;
   storage?: string;
 };
 
@@ -66,28 +64,9 @@ const buildAddonDescriptions = (prices: PublicBillingPrices["prices"]): AddonDes
     return Number((price.unitAmount / 100).toFixed(2));
   };
 
-  const starterMonthly = getMajor("AV30_BLOCK_25_MONTHLY");
-  const starterYearly = getMajor("AV30_BLOCK_25_YEARLY");
-  const growthMonthly = getMajor("AV30_BLOCK_50_MONTHLY");
-  const growthYearly = getMajor("AV30_BLOCK_50_YEARLY");
-
   const storage100 = getMajor("STORAGE_100GB_YEARLY");
   const storage200 = getMajor("STORAGE_200GB_YEARLY");
   const storage1tb = getMajor("STORAGE_1TB_YEARLY");
-
-  const starterExtraPeople =
-    starterMonthly && starterYearly
-      ? `Add +25 Active People blocks for £${formatMoney(starterMonthly)}/month or £${formatMoney(
-          starterYearly,
-        )}/year`
-      : undefined;
-
-  const growthExtraPeople =
-    growthMonthly && growthYearly
-      ? `Add +50 Active People blocks for £${formatMoney(growthMonthly)}/month or £${formatMoney(
-          growthYearly,
-        )}/year`
-      : undefined;
 
   const storage =
     storage100 && storage200 && storage1tb
@@ -99,8 +78,6 @@ const buildAddonDescriptions = (prices: PublicBillingPrices["prices"]): AddonDes
       : undefined;
 
   return {
-    starterExtraPeople,
-    growthExtraPeople,
     storage,
   };
 };
@@ -184,18 +161,12 @@ export default function PricingPage() {
   };
   const enterprisePlan = PLANS.ENTERPRISE_CONTACT;
   const starterAddons = starterMonthly.addons?.map((addon) => {
-    if (addon.label === "Extra Active People" && addonDescriptions.starterExtraPeople) {
-      return { ...addon, description: addonDescriptions.starterExtraPeople };
-    }
     if (addon.label === "Storage" && addonDescriptions.storage) {
       return { ...addon, description: addonDescriptions.storage };
     }
     return addon;
   });
   const growthAddons = growthMonthly.addons?.map((addon) => {
-    if (addon.label === "Extra Active People" && addonDescriptions.growthExtraPeople) {
-      return { ...addon, description: addonDescriptions.growthExtraPeople };
-    }
     if (addon.label === "Storage" && addonDescriptions.storage) {
       return { ...addon, description: addonDescriptions.storage };
     }
