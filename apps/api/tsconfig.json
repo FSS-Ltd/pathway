@@ -11,6 +11,8 @@
       "@pathway/auth/*": ["../../packages/auth/src/*"],
       "@pathway/db": ["../../packages/db/src/index.ts"],
       "@pathway/db/*": ["../../packages/db/src/*"],
+      "@pathway/platform": ["../../packages/platform/src/index.ts"],
+      "@pathway/platform/*": ["../../packages/platform/src/*"],
       "@pathway/types": ["../../packages/types/src/index.ts"],
       "@pathway/types/*": ["../../packages/types/src/*"],
       "@pathway/util": ["../../packages/util/src/index.ts"],
@@ -23,6 +25,7 @@
     "scripts",
     "../../packages/auth/src",
     "../../packages/db/src",
+    "../../packages/platform/src",
     "../../packages/types/src",
     "../../packages/util/src"
   ],

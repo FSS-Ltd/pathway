@@ -31,6 +31,7 @@
     "@nestjs/platform-express": "^10.4.7",
     "@pathway/auth": "workspace:*",
     "@pathway/db": "workspace:*",
+    "@pathway/platform": "workspace:*",
     "@pathway/types": "workspace:*",
     "@pathway/util": "workspace:*",
     "class-transformer": "^0.5.1",

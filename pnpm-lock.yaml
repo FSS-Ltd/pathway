@@ -175,6 +175,9 @@ importers:
       '@pathway/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@pathway/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
       '@pathway/types':
         specifier: workspace:*
         version: link:../../packages/types
