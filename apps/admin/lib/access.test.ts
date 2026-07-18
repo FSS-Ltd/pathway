@@ -3,7 +3,7 @@
  * Run with: node --import tsx apps/admin/lib/access.test.ts
  */
 
-import { getAdminRoleInfoFromApiResponse } from "./access";
+import { getAdminRoleInfoFromApiResponse, hasCapability } from "./access";
 
 function runTests() {
   let passed = 0;
@@ -48,6 +48,20 @@ function runTests() {
   assert(superUserRole.isSuperUser, "superuser payload grants superuser access");
   assert(superUserRole.isOrgAdmin, "org admin membership grants org admin");
   assert(superUserRole.isSiteAdmin, "site admin membership grants site admin");
+
+  console.log("hasCapability");
+  assert(
+    hasCapability(["finance.invoices"], "finance.invoices"),
+    "required capability is visible when granted",
+  );
+  assert(
+    !hasCapability([], "finance.invoices"),
+    "required capability is hidden when not granted",
+  );
+  assert(
+    hasCapability([], undefined),
+    "items without a capability requirement stay visible",
+  );
 
   console.log("");
   console.log(`Result: ${passed} passed, ${failed} failed`);
