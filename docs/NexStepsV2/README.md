@@ -22,6 +22,7 @@ Every phase doc in this set was grounded against the actual repo, not written fr
 | 00 | `00-foundation-versioning-and-plans.md` | Product version plumbing + four-tier pricing migration + add-on removal |
 | 01 | `01-platform-engine-data-model-and-resolvers.md` | Vertical/Module enums + models, `packages/platform`, capability maps, resolvers, backfill |
 | 02 | `02-wiring-navigation-guards-admin-settings.md` | Capability-driven navigation, sector-check migration, Org Settings vertical/module sections |
+| 02a | `02a-phase2-build-plan.md` | Detailed, no-guesswork Phase 2 execution plan — verbatim guard/endpoint/service code, settings-card contracts, and test bodies per PR |
 | 03 | `03-billing-integration.md` | Stripe products for the 4 plans + 8 modules + storage, hardened webhook, module activation |
 | 04 | `04-learning-module.md` | The Learning module — first real module, reference implementation for the module pattern |
 | 05 | `05-configurator-and-imagery.md` | The Apple-style "select your profile" purchase configurator + per-vertical/module imagery |

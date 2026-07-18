@@ -5,6 +5,7 @@
 **Ships as:** `2.2.0` (tag `v2.2.0`)
 **Depends on:** Phase 1 (`packages/platform` resolvers and the backfilled `OrgVertical`/`OrgModule` data must exist before anything can consume them).
 **Blocks:** Phase 3 (module activation needs the Modules settings screen this phase builds), Phase 5 (configurator needs the capability-preview pattern this phase establishes), Phase 6 (cutover removes whatever this phase adds alongside the old logic).
+**Detailed execution:** see [`02a-phase2-build-plan.md`](02a-phase2-build-plan.md) — verbatim code, endpoint shapes, settings-card contracts, and test bodies, grounded against the current repo.
 
 ---
 
