@@ -1,5 +1,7 @@
 import type { Vertical } from "@prisma/client";
+import { prisma } from "./db";
 
 export async function getOrgVertical(orgId: string): Promise<Vertical | null> {
-  throw new Error(`not implemented: getOrgVertical(${orgId})`);
+  const row = await prisma.orgVertical.findUnique({ where: { orgId } });
+  return row?.vertical ?? null;
 }

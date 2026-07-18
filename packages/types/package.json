@@ -10,7 +10,9 @@
     "./av30": "./src/av30.ts",
     "./src/av30": "./src/av30.ts",
     "./sector": "./src/sector.ts",
-    "./src/sector": "./src/sector.ts"
+    "./src/sector": "./src/sector.ts",
+    "./vertical": "./src/vertical.ts",
+    "./src/vertical": "./src/vertical.ts"
   },
   "scripts": {
     "build": "echo types-build",
