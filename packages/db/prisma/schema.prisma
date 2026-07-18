@@ -145,6 +145,31 @@ enum ModuleStatus {
   CANCELLED
 }
 
+model OrgVertical {
+  id        String   @id @default(uuid())
+  orgId     String   @unique
+  org       Org      @relation(fields: [orgId], references: [id])
+  vertical  Vertical
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrgModule {
+  id          String       @id @default(uuid())
+  orgId       String
+  org         Org          @relation(fields: [orgId], references: [id])
+  module      Module
+  status      ModuleStatus
+  activatedAt DateTime?
+  expiresAt   DateTime?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([orgId, module])
+  @@index([orgId])
+}
+
 // --- Blog (platform-wide, not tenant-scoped) ---
 
 enum BlogPostStatus {
@@ -283,6 +308,8 @@ model Org {
   invites           Invite[]
   publicSignupLinks PublicSignupLink[]
   deletedUsers      OrgDeletedUser[]
+  orgVertical       OrgVertical?
+  orgModules        OrgModule[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
