@@ -81,6 +81,8 @@ export async function resetDatabase() {
         "ParentSignupConsent",
         "PublicSignupLink",
         "Tenant",
+        "OrgVertical",
+        "OrgModule",
         "Org"
       RESTART IDENTITY CASCADE
     `);
@@ -115,6 +117,8 @@ export async function resetDatabase() {
         "ParentSignupConsent",
         "PublicSignupLink",
         "Tenant",
+        "OrgVertical",
+        "OrgModule",
         "Org"
       RESTART IDENTITY CASCADE
     `);
