@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { CommonModule } from "./common/common.module";
 import { OrgsModule } from "./orgs/orgs.module";
+import { PlatformModule } from "./platform/platform.module";
 import { BillingModule } from "./billing/billing.module";
 
 // Core modules
@@ -60,6 +61,7 @@ import { GuestPassModule } from "./guest-pass/guest-pass.module";
     FeedbackModule,
     DsarModule,
     OrgsModule,
+    PlatformModule,
     BillingModule,
     LeadsModule,
     StaffModule,
