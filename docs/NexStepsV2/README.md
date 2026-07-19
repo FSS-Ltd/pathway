@@ -47,12 +47,12 @@ Used in every phase doc's "current state" section to say, for each real file or 
 
 NexSteps 2.0 introduces one product version, distinct from this doc set's absence of per-document version headers (the docs describe PRs; they aren't versioned artifacts themselves, matching this repo's existing `docs/cee-vertical/` convention).
 
-- **Source of truth:** root `package.json`, which today (grounded: checked 2026-07-17) has **no `version` field at all** — only `name`, `private`, `packageManager`, `scripts`, `dependencies`. Phase 0 adds `"version": "2.0.1"`.
+- **Source of truth:** root `package.json`, currently `2.2.1`; each release updates it with `APP_VERSION` below.
 - **Re-exported as `APP_VERSION`** from `packages/util` (`packages/util/src/index.ts`). Not `packages/config` — that package is an unimplemented stub today (no `src/` directory; its `build`/`lint`/`test` scripts literally `echo` a placeholder string). `packages/util` has real source (`crypto.ts`, `index.ts`) and a working Jest setup, so it's the only one of the two that can host a consumed constant right now.
 - **Surfaced in:**
   - `apps/api/src/health/health.controller.ts` — its `ok()` handler currently returns `{ status: "ok", dbTime }` with no version field; Phase 0 adds one.
   - Web and admin footers (new, small components).
-- **Bump rule:** Phase 0 ships as `2.0.1`. Each feature phase (1–8) bumps the minor. The roadmap table below is the source of truth for which phase ships as which version.
+- **Bump rule:** API-only work increments the patch version, regardless of its implementation size. Minor `2.x` increments are reserved for user-facing features. Phase 3 is therefore `2.2.1`; the next user-facing phase starts at `2.3.0`. The roadmap table below is the source of truth for planned releases.
 - **Release mechanics:** annotated git tags (`v2.0.1`, `v2.1.0`, …) with the GitHub release notes body. **No `CHANGELOG.md` file** — the release notes are the changelog.
 - The dev doc's own revision marker ("Version: 1.1" in its header) is a *document* revision, unrelated to the product version above. It is not renumbered by this work.
 
@@ -65,12 +65,12 @@ NexSteps 2.0 introduces one product version, distinct from this doc set's absenc
 | 0 | `00-foundation-versioning-and-plans` | 2.0.1 | `v2.0.1` | Product version plumbing + four-tier plans + remove SMS & Active People add-ons |
 | 1 | `01-platform-engine-data-model-and-resolvers` | 2.1.0 | `v2.1.0` | Vertical/Module/enums + models, `packages/platform`, capability maps, resolvers, backfill |
 | 2 | `02-wiring-navigation-guards-admin-settings` | 2.2.0 | `v2.2.0` | Capability-driven navigation, sector-check migration, Org Settings vertical/module sections |
-| 3 | `03-billing-integration` | 2.3.0 | `v2.3.0` | Stripe products for 4 plans + 8 modules + storage, hardened webhook, module activation |
-| 4 | `04-learning-module` | 2.4.0 | `v2.4.0` | Learning module (Subject/LearningLog/Evidence/ReportBundle) — first real module |
-| 5 | `05-configurator-and-imagery` | 2.5.0 | `v2.5.0` | Apple-style "select your profile" configurator + per-vertical/module imagery |
-| 6 | `06-cutover` | 2.6.0 | `v2.6.0` | Remove legacy sector checks, feature-flag entitlement, old pricing/buy pages |
-| 7 | `07-nexsteps-home` | 2.7.0 | `v2.7.0` | Home-Education vertical + NexSteps Home plan + family surface |
-| 8 | `08-community` | 2.8.0 | `v2.8.0` | Built-in community (opt-in directory, channels/threads, meetups) — last |
+| 3 | `03-billing-integration` | 2.2.1 | `v2.2.1` | API billing integration for modules, hardened webhook, module activation |
+| 4 | `04-learning-module` | 2.3.0 | `v2.3.0` | Learning module (Subject/LearningLog/Evidence/ReportBundle) — first real module |
+| 5 | `05-configurator-and-imagery` | 2.4.0 | `v2.4.0` | Apple-style "select your profile" configurator + per-vertical/module imagery |
+| 6 | `06-cutover` | 2.5.0 | `v2.5.0` | Remove legacy sector checks, feature-flag entitlement, old pricing/buy pages |
+| 7 | `07-nexsteps-home` | 2.6.0 | `v2.6.0` | Home-Education vertical + NexSteps Home plan + family surface |
+| 8 | `08-community` | 2.7.0 | `v2.7.0` | Built-in community (opt-in directory, channels/threads, meetups) — last |
 
 **Dependency spine:** 0 → 1 → 2 → 3 feeds everything downstream. 4 (Learning) must land before 7 (Home reuses it). 5 (configurator) needs 1 (capabilities) and 3 (Stripe products) done. 6 (cutover) waits until 5 has run one full billing cycle in production. 7 before 8.
 
