@@ -39,6 +39,9 @@ interface PrismaSubset {
     findMany: (args: unknown) => Promise<OrgRecord[]>;
     update: (args: unknown) => Promise<OrgRecord>;
   };
+  orgVertical: {
+    upsert: (args: unknown) => Promise<unknown>;
+  };
   tenant: { create: (args: unknown) => Promise<unknown> };
   user: { create: (args: unknown) => Promise<unknown> };
   $transaction: <T>(cb: (tx: PrismaSubset) => Promise<T>) => Promise<T>;
@@ -53,6 +56,9 @@ const prismaMock: PrismaSubset = {
     findFirst: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
+  },
+  orgVertical: {
+    upsert: jest.fn(),
   },
   tenant: {
     create: jest.fn(),
@@ -166,6 +172,7 @@ describe("OrgsService", () => {
           planCode: "STARTER",
           isSuite: false,
           parentPortalEnabled: false,
+          orgVertical: { vertical: "CLUB" },
         },
       ]);
 
@@ -175,6 +182,7 @@ describe("OrgsService", () => {
         expect.objectContaining({
           id: "org_1",
           parentPortalEnabled: false,
+          vertical: "CLUB",
         }),
       ]);
       expect(prismaMock.org.findMany).toHaveBeenCalledWith(
@@ -223,6 +231,39 @@ describe("OrgsService", () => {
     });
   });
 
+  describe("changeVertical", () => {
+    it("upserts the organisation vertical", async () => {
+      (prismaMock.org.findUnique as jest.Mock).mockResolvedValue({
+        id: "org_1",
+      });
+      (prismaMock.orgVertical.upsert as jest.Mock).mockResolvedValue({
+        orgId: "org_1",
+        vertical: "CLUB",
+      });
+
+      await expect(
+        service.changeVertical("org_1", "CLUB"),
+      ).resolves.toEqual({
+        orgId: "org_1",
+        vertical: "CLUB",
+      });
+      expect(prismaMock.orgVertical.upsert).toHaveBeenCalledWith({
+        where: { orgId: "org_1" },
+        create: { orgId: "org_1", vertical: "CLUB" },
+        update: { vertical: "CLUB" },
+      });
+    });
+
+    it("rejects a missing organisation before writing", async () => {
+      (prismaMock.org.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.changeVertical("missing-org", "CHURCH"),
+      ).rejects.toThrow("Organisation not found");
+      expect(prismaMock.orgVertical.upsert).not.toHaveBeenCalled();
+    });
+  });
+
   describe("list / getBySlug logoUrl", () => {
     it("maps a null logoStorageKey to a null logoUrl", async () => {
       (prismaMock.org.findMany as jest.Mock).mockResolvedValue([
@@ -258,11 +299,13 @@ describe("OrgsService", () => {
         id: "org_1",
         name: "Acme Church",
         slug: "acme-church",
+        orgVertical: { vertical: "CHURCH" },
         logoStorageKey: "orgs/org_1/logo.png",
       });
 
       const org = await service.getBySlug("acme-church", "org_1");
       expect(org.logoUrl).toContain("orgs/org_1/logo.png");
+      expect(org.vertical).toBe("CHURCH");
 
       (prismaMock.org.findFirst as jest.Mock).mockResolvedValue(null);
       await expect(service.getBySlug("missing", "org_1")).rejects.toThrow();

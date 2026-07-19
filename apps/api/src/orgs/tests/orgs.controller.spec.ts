@@ -72,6 +72,9 @@ describe("OrgsController", () => {
   const updateCurrentOrgMock = jest.fn() as jest.MockedFunction<
     OrgsService["updateCurrentOrg"]
   >;
+  const changeVerticalMock = jest.fn() as jest.MockedFunction<
+    OrgsService["changeVertical"]
+  >;
   const getRetentionOverviewMock = jest.fn() as jest.MockedFunction<
     OrgsService["getRetentionOverview"]
   >;
@@ -94,12 +97,14 @@ describe("OrgsController", () => {
     OrgsService,
     | "register"
     | "updateCurrentOrg"
+    | "changeVertical"
     | "getRetentionOverview"
     | "uploadLogo"
     | "deleteLogo"
   > = {
     register: registerMock,
     updateCurrentOrg: updateCurrentOrgMock,
+    changeVertical: changeVerticalMock,
     getRetentionOverview: getRetentionOverviewMock,
     uploadLogo: uploadLogoMock,
     deleteLogo: deleteLogoMock,
@@ -130,6 +135,7 @@ describe("OrgsController", () => {
     controller = module.get<OrgsController>(OrgsController);
     registerMock.mockReset();
     updateCurrentOrgMock.mockReset();
+    changeVerticalMock.mockReset();
     getRetentionOverviewMock.mockReset();
     uploadLogoMock.mockReset();
     deleteLogoMock.mockReset();
@@ -292,6 +298,54 @@ describe("OrgsController", () => {
         controller.updateCurrent("org-1", req, { name: "x" }),
       ).rejects.toThrow(BadRequestException);
       expect(updateCurrentOrgMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateCurrentVertical", () => {
+    const request = {
+      authUserId: "user-1",
+    } as unknown as Parameters<OrgsController["updateCurrentVertical"]>[1];
+
+    it("allows an organisation admin to change vertical", async () => {
+      changeVerticalMock.mockResolvedValue({
+        orgId: "org-1",
+        vertical: "CLUB",
+      } as Awaited<ReturnType<OrgsService["changeVertical"]>>);
+
+      await expect(
+        controller.updateCurrentVertical("org-1", request, {
+          vertical: "CLUB",
+        }),
+      ).resolves.toEqual({ orgId: "org-1", vertical: "CLUB" });
+      expect(changeVerticalMock).toHaveBeenCalledWith("org-1", "CLUB");
+    });
+
+    it("rejects an unknown vertical before calling the service", async () => {
+      await expect(
+        controller.updateCurrentVertical("org-1", request, {
+          vertical: "UNKNOWN",
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(changeVerticalMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a null body before calling the service", async () => {
+      await expect(
+        controller.updateCurrentVertical("org-1", request, null),
+      ).rejects.toThrow(BadRequestException);
+      expect(changeVerticalMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a caller who is not an organisation admin", async () => {
+      mockPrisma.orgMembership.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.userOrgRole.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        controller.updateCurrentVertical("org-1", request, {
+          vertical: "CHURCH",
+        }),
+      ).rejects.toThrow();
+      expect(changeVerticalMock).not.toHaveBeenCalled();
     });
   });
 

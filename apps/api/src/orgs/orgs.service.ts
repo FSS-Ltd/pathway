@@ -7,7 +7,7 @@ import {
   NotFoundException,
   NotImplementedException,
 } from "@nestjs/common";
-import { prisma, type OrgSector } from "@pathway/db";
+import { prisma, type OrgSector, type Vertical } from "@pathway/db";
 import { registerOrgDto } from "./dto/register-org.dto";
 import { BillingService } from "../billing/billing.service";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
@@ -218,12 +218,17 @@ export class OrgsService {
         isSuite: true,
         parentPortalEnabled: true,
         sector: true,
+        orgVertical: { select: { vertical: true } },
         logoStorageKey: true,
       },
     });
     if (!org) throw new NotFoundException("Org not found");
-    const { logoStorageKey, ...rest } = org;
-    return { ...rest, logoUrl: this.toLogoUrl(logoStorageKey) };
+    const { logoStorageKey, orgVertical, ...rest } = org;
+    return {
+      ...rest,
+      vertical: orgVertical?.vertical ?? null,
+      logoUrl: this.toLogoUrl(logoStorageKey),
+    };
   }
 
   /**
@@ -329,6 +334,21 @@ export class OrgsService {
     return updated;
   }
 
+  async changeVertical(orgId: string, vertical: Vertical) {
+    const org = await prisma.org.findUnique({
+      where: { id: orgId },
+      select: { id: true },
+    });
+    if (!org) {
+      throw new NotFoundException("Organisation not found");
+    }
+    return prisma.orgVertical.upsert({
+      where: { orgId },
+      create: { orgId, vertical },
+      update: { vertical },
+    });
+  }
+
   /**
    * Get retention policy for current org (read-only). Returns years; nulls when not configured.
    */
@@ -371,13 +391,17 @@ export class OrgsService {
         isSuite: true,
         parentPortalEnabled: true,
         sector: true,
+        orgVertical: { select: { vertical: true } },
         logoStorageKey: true,
       },
     });
-    return orgs.map(({ logoStorageKey, ...org }) => ({
-      ...org,
-      logoUrl: this.toLogoUrl(logoStorageKey),
-    }));
+    return orgs.map(({ logoStorageKey, orgVertical, ...org }) => {
+      return {
+        ...org,
+        vertical: orgVertical?.vertical ?? null,
+        logoUrl: this.toLogoUrl(logoStorageKey),
+      };
+    });
   }
 
   /**
