@@ -9,8 +9,8 @@ const shellSource = readFileSync(
 
 assert.equal(
   APP_VERSION,
-  "2.2.0",
-  "admin footer must surface the Phase 2 product version",
+  "2.2.1",
+  "admin footer must surface the current product version",
 );
 assert.ok(
   shellSource.includes('from "@pathway/util/version"') &&

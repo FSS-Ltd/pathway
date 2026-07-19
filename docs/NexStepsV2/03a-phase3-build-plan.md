@@ -1,8 +1,8 @@
 # Phase 3 — Detailed build plan (billing integration: modules become purchasable)
 
-**Status:** Planned
+**Status:** Implemented (code); Stripe product and price setup remains operational work
 **Owner:** Unassigned
-**Ships as:** `2.3.0` (tag `v2.3.0`)
+**Ships as:** `2.2.1` (tag `v2.2.1`)
 **Depends on:** Phase 0 (new tier plan codes + `STRIPE_PRICE_MAP` mechanism — merged in PRs #168–175), Phase 1 (`Module` enum, `OrgModule` model, `orgHasModule` resolver — merged in PRs #176–183), Phase 2 (`PlatformController` modules endpoints + the `metadata.billingSource` convention this phase populates — merged in PRs #185–190).
 **Blocks:** Phase 5 (the configurator's checkout handoff needs modules to be purchasable), and turns Phase 2's non-production module toggle into a real, billing-driven activation path in production.
 **Companion to:** [`03-billing-integration.md`](03-billing-integration.md) — that doc is the summary; this one pins down the exact type additions, checkout line-item code, webhook write-sites, upsert shapes, and test bodies so a build session can execute PR-by-PR with no invention.
@@ -35,7 +35,7 @@ So "cache refreshed" and "navigation rebuilt" are not implementation steps here 
 1. **Module activation lives in three concrete write-sites, not one vague "inside applyEvent".** Grounded against the real call tree (`applyEvent` → `handleSubscriptionEvent` → `applyPendingOrder`):
    - **Fresh purchase** → inside the existing `$transaction` in `applyPendingOrder()` (`webhook.controller.ts:312-349`), right after `orgEntitlementSnapshot.create` (314-324). This is the only place a brand-new paid entitlement is written, and it already has the `pendingOrder` in hand — which is where the selected modules come from.
    - **Renewal** (`invoice.paid` / `subscription.updated` with an already-`COMPLETED` order or no order) → extend `expiresAt` on the org's active modules.
-   - **Cancellation** (`subscription.canceled`, from Stripe's `customer.subscription.deleted`, mapped at `stripe-billing-webhook.provider.ts:79-80`) → flip active modules to `CANCELLED` (PR 3.5).
+   - **Cancellation** (`subscription.canceled`, from Stripe's `customer.subscription.deleted`, mapped at `stripe-billing-webhook.provider.ts:79-80`) → flip the cancelled subscription's active modules to `CANCELLED` (PR 3.5).
 
 2. **`PendingOrder.selectedModules` is a typed `Module[]` column, not a `Json` bag.** Grounded: `PendingOrder` stores structured, known caps as typed columns (`av30Cap Int?`, `storageGbCap Int?`, `schema.prisma:1034-1038`) and reserves `Json?` (`flags`, `warnings`, `pendingOrgDetails`) for genuinely freeform data. A module selection is a structured, enumerable list, and the value is consumed as a typed `Module[]` to feed `orgModule.upsert` — so a typed enum-array column matches both the existing convention and the consumer. (The `03-…md` summary left this open; it is resolved here. See PR 3.2.)
 
@@ -43,11 +43,11 @@ So "cache refreshed" and "navigation rebuilt" are not implementation steps here 
 
 4. **`activatedAt` is set once, on first activation only.** The upsert's `create` branch sets `activatedAt: now`; the `update` branch never touches it. So a renewal or a redelivered event never resets the original activation timestamp.
 
-5. **Cancellation cancels all of the org's active modules, scoped by `status`, via `updateMany`** (not `upsert`). Grounded: the code enforces a single active subscription per org (`cancelOtherActiveSubscriptionsForOrg`, `webhook.controller.ts:361-397`), so "the subscription was cancelled" means "every module it paid for is gone." `updateMany({ where: { orgId, status: ACTIVE }, data: { status: CANCELLED } })` is correct and, unlike an upsert, never fabricates a `CANCELLED` row for a module that was never active.
+5. **Cancellation only cancels active modules tied to the cancelled subscription, via `updateMany`** (not `upsert`). The webhook stores `metadata.subscriptionId` at activation and matches it on cancellation, so a delayed cancellation cannot disable modules attached to a replacement subscription. Unlike an upsert, `updateMany` never fabricates a `CANCELLED` row for a module that was never active.
 
 6. **No module tier-gating or module-level proration in this phase.** Any *valid* selected module gets a checkout line item and, on payment, an `ACTIVE` row. "Which tiers may buy which modules," bundle discounts, and mid-cycle single-module downgrades (partial removal without full cancellation) are **out of scope** — the current Stripe event parser doesn't even surface per-line-item module deltas (`mapSubscription` ignores `items.data` except for a nickname fallback, `stripe-billing-webhook.provider.ts:136-140`). Flagged as open decisions, not built.
 
-7. **Versioning:** Phase 3 ends with a **bump-to-2.3.0** PR (root `package.json` + `packages/util/src/version.ts` `APP_VERSION`, currently `2.2.0`), mirroring Phase 2's PR 2.5.
+7. **Versioning:** Phase 3 ends with a **bump-to-2.2.1** PR (root `package.json` + `packages/util/src/version.ts` `APP_VERSION`, currently `2.2.0`). API-only work uses patch releases; minor `2.x` increments are reserved for user-facing features.
 
 ---
 
@@ -99,7 +99,7 @@ So "cache refreshed" and "navigation rebuilt" are not implementation steps here 
 | 3.3 — Checkout line items for modules | `feat/phase3-checkout-modules` | thread `selectedModules` through both entry points + provider line items |
 | 3.4 — Webhook: module activation | `feat/phase3-webhook-activation` | activate on purchase, extend on renewal |
 | 3.5 — Webhook: module cancellation | `feat/phase3-webhook-cancellation` | cancel active modules on subscription end |
-| 3.6 — Version bump `2.3.0` | `chore/phase3-version-2.3.0` | roadmap version bump |
+| 3.6 — Version bump `2.2.1` | `chore/phase3-version-2.2.1` | API release and version-policy update |
 
 > Code blocks below are verbatim targets. "Mirror X" means copy an existing file's shape exactly.
 
@@ -215,18 +215,21 @@ import { Module } from "@pathway/db";                // add to imports
 ```ts
 // Module add-ons: one line item per selected module, at the plan's billing interval.
 const selectedModules = params.plan.selectedModules ?? [];
+const missingModules = selectedModules.filter(
+  (module) => !priceMap[`MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap],
+);
+if (missingModules.length > 0) {
+  this.logger.warn(
+    `Stripe price configuration missing for modules: ${missingModules.join(", ")}`,
+  );
+  throw new Error("Missing Stripe price configuration for selected modules.");
+}
 for (const module of selectedModules) {
-  const id = priceMap[`MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap];
-  if (id) {
-    lineItems.push({ price: id, quantity: 1 });
-  } else {
-    this.logger.warn(
-      `No Stripe price for MODULE_${module}_${intervalSuffix}; skipping module line item`,
-    );
-  }
+  const price = priceMap[`MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap];
+  if (price) lineItems.push({ price, quantity: 1 });
 }
 ```
-An unmapped module (no Price ID yet — see PR 3.1's operational half) logs and is skipped, exactly like the storage block silently skips an unmapped tier. It never aborts checkout.
+An unmapped selected module (no Price ID yet — see PR 3.1's operational half) rejects checkout before a pending order is created. This prevents a buyer receiving an unpaid module.
 
 **Failing test first** — extend `buy-now.service.spec.ts` (mirror `:69-109`): a `checkout({ plan: { planCode: "STARTER_49_MONTHLY", selectedModules: [Module.FINANCE, Module.EVENTS] } })` call asserts `pendingOrder.create` was called with `data: expect.objectContaining({ selectedModules: ["FINANCE", "EVENTS"] })`, and that `createCheckoutSession` received `plan.selectedModules` of length 2. Add a matching `purchaseForOrg` case. (Line-item **count** assertions belong in a `StripeBuyNowProvider` spec with a stubbed `priceMap`; if none exists, the service-level `createCheckoutSession` arg assertion is the reviewable contract, since the provider is faked in the service suite.)
 
@@ -372,16 +375,23 @@ The middle test proves the composed idempotency the dev doc asks for (§10): the
 
 ## PR 3.5 — Webhook: module cancellation
 
-**Scope:** when a subscription ends, flip the org's active modules to `CANCELLED` so `orgHasModule()` returns `false` for them immediately (no cache — Locked-decision 6 / the no-cache finding). Additive to PR 3.4.
+**Scope:** when a subscription ends, flip only its active modules to `CANCELLED` so `orgHasModule()` returns `false` for them immediately (no cache — Locked-decision 6 / the no-cache finding). Additive to PR 3.4.
 
 **Key facts (grounded):** Stripe's `customer.subscription.deleted` is already mapped to `kind: "subscription.canceled"` with `status: CANCELED` (`stripe-billing-webhook.provider.ts:79-80,152`), and `applyEvent` already routes it to `handleSubscriptionEvent(event, CANCELED)` (`webhook.controller.ts:230-231`). So the dispatch exists; this PR only adds the module write. There is **no** Stripe event here for *partial* module removal (dropping one module while keeping the subscription) — the parser doesn't surface per-line-item deltas — so this PR handles full-subscription cancellation only (see Open decisions).
 
 **`apps/api/src/billing/webhook.controller.ts`** (E) — one helper + one call-site:
 ```ts
-/** Subscription ended: revoke every module it entitled. */
-private async cancelActiveModules(orgId: string): Promise<void> {
+/** Subscription ended: revoke the modules it entitled. */
+private async cancelActiveModulesForSubscription(
+  orgId: string,
+  subscriptionId: string,
+): Promise<void> {
   await prisma.orgModule.updateMany({
-    where: { orgId, status: ModuleStatus.ACTIVE },
+    where: {
+      orgId,
+      status: ModuleStatus.ACTIVE,
+      metadata: { path: ["subscriptionId"], equals: subscriptionId },
+    },
     data: { status: ModuleStatus.CANCELLED },
   });
 }
@@ -389,10 +399,10 @@ private async cancelActiveModules(orgId: string): Promise<void> {
 In `handleSubscriptionEvent` (`:239-263`), right after the valid-orgId guard (`:244-250`):
 ```ts
 if (status === SubscriptionStatus.CANCELED) {
-  await this.cancelActiveModules(event.orgId);
+  await this.cancelActiveModulesForSubscription(event.orgId, event.subscriptionId);
 }
 ```
-Placed before the pending-order/upsert logic so it runs regardless of which downstream branch a cancel event falls into. `updateMany` scoped by `status: ACTIVE` never fabricates rows and is a no-op for an org with no active modules (Locked-decision 5).
+Placed after the subscription upsert and before downstream branching, it runs regardless of which cancel-event branch applies. `updateMany` scoped by `status: ACTIVE` and `metadata.subscriptionId` never fabricates rows and is a no-op when no modules match (Locked-decision 5).
 
 **Failing test first** — in `billing-webhook.controller.spec.ts`:
 ```ts
@@ -405,7 +415,11 @@ it("cancels active modules when the subscription is canceled", async () => {
   await controller.handleWebhook({ dummy: true }, "test-signature");
 
   expect(prismaMock.orgModule.updateMany).toHaveBeenCalledWith({
-    where: { orgId: baseEvent.orgId, status: "ACTIVE" },
+    where: {
+      orgId: baseEvent.orgId,
+      status: "ACTIVE",
+      metadata: { path: ["subscriptionId"], equals: baseEvent.subscriptionId },
+    },
     data: { status: "CANCELLED" },
   });
 });
@@ -416,17 +430,17 @@ Optionally, a DB-backed assertion (test-DB only) that after a cancel event, `org
 
 ---
 
-## PR 3.6 — Version bump `2.3.0`
+## PR 3.6 — Version bump `2.2.1`
 
-**Scope:** bump the product version to match the roadmap (Phase 3 ships as `2.3.0`).
+**Scope:** bump the product version for the API billing release (Phase 3 ships as `2.2.1`). Minor `2.x` versions remain reserved for user-facing features.
 
 **Key files:**
-- Root `package.json` — `"version": "2.2.0"` → `"2.3.0"`.
-- `packages/util/src/version.ts` — `APP_VERSION = "2.2.0"` → `"2.3.0"`.
+- Root `package.json` — `"version": "2.2.0"` → `"2.2.1"`.
+- `packages/util/src/version.ts` — `APP_VERSION = "2.2.0"` → `"2.2.1"`.
 
 **Failing test first:** update the existing version assertions that pin `2.2.0` — grep `"2.2.0"` / `2\.2\.0` across `apps` + `packages` (the admin footer test and the `/health` version check are the ones Phase 2's PR 2.5 last touched) and update each expectation. `/health` and the web/admin footers read `APP_VERSION`, so bumping the constant flows through; the tests prove the surfaced value changed.
 
-**Release note (human/CI, not a code change):** annotated tag `v2.3.0` + GitHub release; the release body is the changelog (no `CHANGELOG.md`, per D4). Call out in the body that modules are now purchasable and that the **Stripe module Products/Prices must exist and be mapped** in the target environment (PR 3.1's operational half) for the feature to function.
+**Release note (human/CI, not a code change):** annotated tag `v2.2.1` + GitHub release; the release body is the changelog (no `CHANGELOG.md`, per D4). Call out that this is an API billing release and that the **Stripe module Products/Prices must exist and be mapped** in the target environment (PR 3.1's operational half) for the feature to function.
 
 **Rollback:** revert the two constants + test expectations.
 
@@ -436,13 +450,13 @@ Optionally, a DB-backed assertion (test-DB only) that after a cancel event, `org
 
 - [ ] All 16 `MODULE_*_{MONTHLY,YEARLY}` codes are accepted by `ALLOWED_PRICE_CODES` and reachable via `STRIPE_PRICE_MAP` in at least staging; a `STRIPE_TEST`-mode checkout including a module succeeds end-to-end (PR 3.1 + operational half).
 - [ ] `PendingOrder.selectedModules` records the checkout selection; the column defaults to `[]` and needs no backfill (PR 3.2).
-- [ ] A checkout with N selected modules produces exactly plan-line-item + N module-line-items; an unmapped module is skipped with a warning, never an abort (PR 3.3).
+- [ ] A checkout with N selected modules produces exactly plan-line-item + N module-line-items; an unmapped selected module rejects checkout before a pending order is created (PR 3.3).
 - [ ] A completed purchase writes `ACTIVE` `OrgModule` rows with correct `expiresAt` and `metadata.billingSource = "subscription"`, so Org Settings labels them as billing-driven (PR 3.4).
 - [ ] Redelivering a purchase webhook is provably idempotent — dedup stops it first, and the upsert would make it safe regardless: no duplicate rows, no throw (PR 3.4).
 - [ ] A renewal event advances `expiresAt` on existing active modules rather than creating rows (PR 3.4).
-- [ ] A subscription-cancel event flips the org's active modules to `CANCELLED`; `orgHasModule()` returns `false` for them on the very next call, with nothing to invalidate (PR 3.5).
+- [ ] A subscription-cancel event flips only the affected subscription's active modules to `CANCELLED`; `orgHasModule()` returns `false` for them on the very next call, with nothing to invalidate (PR 3.5).
 - [ ] Every new code path lives inside the existing `applyEvent()` tree; signature verification and duplicate-detection still cover 100% of billing events (all PRs).
-- [ ] Product version reads `2.3.0` in `/health` and the admin footer (PR 3.6).
+- [ ] Product version reads `2.2.1` in `/health` and the admin footer (PR 3.6).
 
 ## Open decisions
 

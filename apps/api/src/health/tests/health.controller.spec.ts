@@ -20,7 +20,7 @@ describe("HealthController", () => {
     expect(result).toEqual({
       status: "ok",
       dbTime: "2026-07-17T00:00:00.000Z",
-      version: "2.2.0",
+      version: "2.2.1",
     });
   });
 
@@ -31,6 +31,6 @@ describe("HealthController", () => {
     const result = await controller.ok();
 
     expect(result.dbTime).toBeNull();
-    expect(result.version).toBe("2.2.0");
+    expect(result.version).toBe("2.2.1");
   });
 });

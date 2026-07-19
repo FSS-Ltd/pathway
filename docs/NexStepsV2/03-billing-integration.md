@@ -2,7 +2,7 @@
 
 **Status:** Planned
 **Owner:** Unassigned
-**Ships as:** `2.3.0` (tag `v2.3.0`)
+**Ships as:** `2.2.1` (tag `v2.2.1`)
 **Depends on:** Phase 0 (plan codes, `STRIPE_PRICE_MAP` mechanism), Phase 1 (`OrgModule` model + resolvers).
 **Blocks:** Phase 2 PR 2.4 (Modules settings screen needs a real activation path to point its production toggle at), Phase 5 (configurator's checkout handoff needs modules to be purchasable).
 
@@ -100,7 +100,7 @@ Second finding, a reassuring one: the existing webhook handler's write ordering 
 **Key files:**
 - `apps/api/src/billing/webhook.controller.ts` (E) — extend `applyEvent()`'s handling of subscription-cancellation events (confirm exact event kind(s) already dispatched in `handleSubscriptionEvent` — likely alongside the existing `refundProratedAndCancelSubscription` call at line 383) to set affected `OrgModule.status = CANCELLED`.
 
-**Failing test first:** a subscription-cancelled webhook event transitions the org's active modules to `CANCELLED`; `organisationHasModule()` (Phase 1) returns `false` for them immediately after.
+**Failing test first:** a subscription-cancelled webhook event transitions only the active modules tied to that provider subscription to `CANCELLED`; `organisationHasModule()` (Phase 1) returns `false` for them immediately after.
 
 **Rollback:** revert the handler addition; modules stay `ACTIVE` indefinitely until manually corrected, which is the pre-PR behaviour, not a regression from a revert.
 
@@ -112,7 +112,7 @@ Second finding, a reassuring one: the existing webhook handler's write ordering 
 - [ ] `PendingOrder` records selected modules at checkout time.
 - [ ] A completed checkout with modules results in the correct `OrgModule` rows, `ACTIVE`, with correct `expiresAt`.
 - [ ] Replaying a webhook event (simulated Stripe retry) is provably idempotent — no duplicate rows, no thrown error.
-- [ ] Subscription cancellation transitions the org's modules to `CANCELLED`, reflected immediately by `organisationHasModule()` (no cache to invalidate, per the grounding finding — this should just work).
+- [ ] Subscription cancellation transitions only the affected subscription's modules to `CANCELLED`, reflected immediately by `organisationHasModule()` (no cache to invalidate, per the grounding finding — this should just work).
 - [ ] Every new webhook code path is added to the existing `applyEvent()` function, not a parallel handler — signature verification and duplicate-detection continue to cover 100% of billing events, module-related or not.
 
 ## Open decisions
