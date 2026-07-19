@@ -57,7 +57,7 @@ This phase builds the **data model, capabilities, API, and a staff/admin surface
 
 ### PR 4.2 — Learning capabilities
 
-**Scope:** Add `learning.*` capabilities (e.g. `learning.log.read`, `learning.log.write`, `learning.reports.generate`) to the `Module → Capability` map for `Module.FINANCE`... — no, for the Learning module. **Open decision:** the dev doc's original 8-module catalogue (§4) does not include Learning — it's a net-new module this doc set adds (D1/D2 in the README). Confirm `Module` enum (Phase 1 PR 1.1) gets a 9th value, `LEARNING`, before this PR starts; the phase docs assumed this but it's worth stating explicitly since Phase 1's doc was written against the dev doc's original 8.
+**Scope:** Add `learning.*` capabilities (e.g. `learning.log.read`, `learning.log.write`, `learning.reports.generate`) to the `Module → Capability` map for `Module.LEARNING`. **Open decision:** the dev doc's original 8-module catalogue (§4) does not include Learning — it's a net-new module this doc set adds (D1/D2 in the README). Confirm `Module` enum (Phase 1 PR 1.1) gets a 9th value, `LEARNING`, before this PR starts; the phase docs assumed this but it's worth stating explicitly since Phase 1's doc was written against the dev doc's original 8.
 
 **Key files:**
 
@@ -92,7 +92,7 @@ This phase builds the **data model, capabilities, API, and a staff/admin surface
 **Key files:**
 
 - `apps/workers/src/learning/generate-report-bundle.cli.ts` (N) — reads target IDs (env var or CLI arg, matching `AV30_TENANT_IDS`'s pattern), instantiates a `GenerateReportBundleJob`, `.run()`, logs, closes Prisma.
-- `apps/workers/src/learning/generate-report-bundle.service.ts` (N) — the actual bundle-assembly logic: gather `LearningLog`/`Evidence` for the period, render/store the bundle, write `storageKey`, mint a `DownloadToken` (reusing the existing model, not building new download-security logic), set `ReportBundleStatus = READY` (or `FAILED` on error).
+- `apps/workers/src/learning/generate-report-bundle.service.ts` (N) — the actual bundle-assembly logic: gather `LearningLog`/`Evidence` for the period, render/store the bundle, write `storageKey`, set `ReportBundleStatus = READY` (or `FAILED` on error). **No token is minted** — the bundle is served through an authenticated API route, the same private-file mechanism child photos and lesson resources already use (see the companion plan's Decision A).
 - `apps/workers/package.json` (E) — add a `generate:report-bundle` script entry, matching `compute:av30`'s shape.
 - `apps/workers/src/learning/tests/*.spec.ts` (N) — matching the existing per-domain `tests/` convention in this app.
 
@@ -122,7 +122,7 @@ This phase builds the **data model, capabilities, API, and a staff/admin surface
 - [ ] `Subject`, `LearningLog`, `Evidence`, `ReportBundle` models exist, migrated, tested.
 - [ ] `Module.LEARNING` exists with a correct capability mapping; the Phase 1 completeness test covers it.
 - [ ] API endpoints for logging/reading learning data are capability-guarded and reject requests without `learning.*` grants.
-- [ ] A `ReportBundle` can be generated end-to-end via the new workers CLI script, landing in `READY` with a valid, downloadable `DownloadToken`.
+- [ ] A `ReportBundle` can be generated end-to-end via the new workers CLI script, landing in `READY` with a valid `storageKey` and downloading through the capability-guarded API route.
 - [ ] The admin Learning nav entry is visible only to orgs with the Learning module active — the first real proof that Phase 2's capability-driven nav mechanism works outside its own unit tests.
 - [ ] No `Merit` model, table, or capability exists — confirmed absent, not just unused.
 
