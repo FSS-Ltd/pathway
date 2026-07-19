@@ -4,7 +4,6 @@ jest.mock("@pathway/db", () => ({
   prisma: { $queryRawUnsafe: (...args: unknown[]) => queryRawUnsafe(...args) },
 }));
 
-import { APP_VERSION } from "@pathway/util";
 import { HealthController } from "../health.controller";
 
 describe("HealthController", () => {
@@ -21,7 +20,7 @@ describe("HealthController", () => {
     expect(result).toEqual({
       status: "ok",
       dbTime: "2026-07-17T00:00:00.000Z",
-      version: APP_VERSION,
+      version: "2.2.0",
     });
   });
 
@@ -32,6 +31,6 @@ describe("HealthController", () => {
     const result = await controller.ok();
 
     expect(result.dbTime).toBeNull();
-    expect(result.version).toBe(APP_VERSION);
+    expect(result.version).toBe("2.2.0");
   });
 });
