@@ -18,6 +18,7 @@ import {
   Role,
   OrgRole,
   OrgSector,
+  ModuleStatus,
 } from "@pathway/db";
 import { EntitlementsService } from "./entitlements.service";
 import {
@@ -254,12 +255,76 @@ export class BillingWebhookController {
       await this.upsertSubscription(event, status);
       if (pendingOrder.status !== PendingOrderStatus.COMPLETED) {
         await this.applyPendingOrder(event, status, pendingOrder);
+      } else if (status === SubscriptionStatus.ACTIVE) {
+        await this.extendActiveModulesExpiry(
+          event.orgId,
+          event.subscriptionId,
+          event.periodEnd,
+        );
       }
       return;
     }
 
     await this.upsertSubscription(event, status);
+    if (status === SubscriptionStatus.ACTIVE) {
+      await this.extendActiveModulesExpiry(
+        event.orgId,
+        event.subscriptionId,
+        event.periodEnd,
+      );
+    }
     await this.maybeSnapshotEntitlements(event);
+  }
+
+  private async activateModulesFromPendingOrder(
+    tx: Prisma.TransactionClient,
+    orgId: string,
+    pendingOrder: PendingOrderRecord,
+    event: ParsedBillingWebhookEvent,
+  ): Promise<void> {
+    const selectedModules = pendingOrder.selectedModules ?? [];
+    if (selectedModules.length === 0) return;
+
+    const now = new Date();
+    const metadata = {
+      billingSource: "subscription",
+      subscriptionId: event.subscriptionId,
+    };
+    for (const module of selectedModules) {
+      await tx.orgModule.upsert({
+        where: { orgId_module: { orgId, module } },
+        create: {
+          orgId,
+          module,
+          status: ModuleStatus.ACTIVE,
+          activatedAt: now,
+          expiresAt: event.periodEnd ?? null,
+          metadata,
+        },
+        update: {
+          status: ModuleStatus.ACTIVE,
+          expiresAt: event.periodEnd ?? null,
+          metadata,
+        },
+      });
+    }
+  }
+
+  private async extendActiveModulesExpiry(
+    orgId: string,
+    subscriptionId: string,
+    periodEnd: Date | null | undefined,
+  ): Promise<void> {
+    if (!periodEnd) return;
+
+    await prisma.orgModule.updateMany({
+      where: {
+        orgId,
+        status: ModuleStatus.ACTIVE,
+        metadata: { path: ["subscriptionId"], equals: subscriptionId },
+      },
+      data: { expiresAt: periodEnd },
+    });
   }
 
   private async upsertSubscription(
@@ -322,6 +387,15 @@ export class BillingWebhookController {
           source: "pending_order",
         },
       });
+
+      if (status === SubscriptionStatus.ACTIVE) {
+        await this.activateModulesFromPendingOrder(
+          tx,
+          actualOrgId,
+          pendingOrder,
+          event,
+        );
+      }
       
       // Store Stripe customer ID on org
       if (event.providerCustomerId && actualOrgId) {

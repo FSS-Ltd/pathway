@@ -10,6 +10,8 @@ import { LoggingService } from "../../common/logging/logging.service";
 import type { BillingProviderConfig } from "../billing-provider.config";
 import {
   BillingProvider,
+  Module,
+  ModuleStatus,
   SubscriptionStatus,
   PendingOrderStatus,
 } from "@pathway/db";
@@ -18,6 +20,7 @@ const prismaMock: {
   billingEvent: { findFirst: jest.Mock; create: jest.Mock };
   subscription: { upsert: jest.Mock; findMany: jest.Mock; update: jest.Mock };
   orgEntitlementSnapshot: { create: jest.Mock };
+  orgModule: { upsert: jest.Mock; updateMany: jest.Mock };
   pendingOrder: {
     findUnique: jest.Mock;
     findFirst: jest.Mock;
@@ -32,6 +35,7 @@ const prismaMock: {
     update: jest.fn().mockResolvedValue(undefined),
   },
   orgEntitlementSnapshot: { create: jest.fn() },
+  orgModule: { upsert: jest.fn(), updateMany: jest.fn() },
   pendingOrder: {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
@@ -147,6 +151,7 @@ describe("BillingWebhookController", () => {
 
     expect(result.status).toBe("ignored_duplicate");
     expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
     expect(prismaMock.billingEvent.create).not.toHaveBeenCalled();
     expect(entitlements.resolve).not.toHaveBeenCalled();
   });
@@ -235,5 +240,79 @@ describe("BillingWebhookController", () => {
       }),
     );
   });
-});
 
+  it("activates selected modules when a pending order completes", async () => {
+    const pending = {
+      id: "po_modules",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "pro",
+      av30Cap: 75,
+      storageGbCap: 100,
+      smsMessagesCap: 500,
+      leaderSeatsIncluded: 5,
+      maxSites: 2,
+      selectedModules: [Module.FINANCE, Module.EVENTS],
+      flags: null,
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_1",
+      providerSubscriptionId: null,
+      status: PendingOrderStatus.PENDING,
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      pendingOrderId: pending.id,
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(2);
+    expect(prismaMock.orgModule.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          orgId_module: { orgId: baseEvent.orgId, module: Module.FINANCE },
+        },
+        create: expect.objectContaining({
+          status: ModuleStatus.ACTIVE,
+          expiresAt: baseEvent.periodEnd,
+          metadata: {
+            billingSource: "subscription",
+            subscriptionId: baseEvent.subscriptionId,
+          },
+        }),
+        update: expect.objectContaining({
+          status: ModuleStatus.ACTIVE,
+          expiresAt: baseEvent.periodEnd,
+        }),
+      }),
+    );
+    const firstActivation = prismaMock.orgModule.upsert.mock.calls[0][0];
+    expect(firstActivation.update).not.toHaveProperty("activatedAt");
+  });
+
+  it("extends active module expiry on a renewal without creating modules", async () => {
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      kind: "invoice.paid",
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.orgModule.updateMany).toHaveBeenCalledWith({
+      where: {
+        orgId: baseEvent.orgId,
+        status: ModuleStatus.ACTIVE,
+        metadata: {
+          path: ["subscriptionId"],
+          equals: baseEvent.subscriptionId,
+        },
+      },
+      data: { expiresAt: baseEvent.periodEnd },
+    });
+    expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
+  });
+});
