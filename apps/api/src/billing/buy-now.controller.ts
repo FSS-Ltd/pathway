@@ -12,14 +12,17 @@ import {
   IsEmail,
   IsIn,
   IsInt,
+  IsArray,
   IsNotEmpty,
   IsOptional,
   IsString,
   Min,
   ValidateNested,
   IsUrl,
+  ArrayUnique,
 } from "class-validator";
 import { Type, Transform } from "class-transformer";
+import { Module } from "@pathway/db";
 import { SECTOR_LABELS, type Sector } from "@pathway/types";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { BuyNowService } from "./buy-now.service";
@@ -59,6 +62,12 @@ class BuyNowPlanSelectionDto implements BuyNowPlanSelection {
   @IsInt()
   @Min(0)
   extraLeaderSeats?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(Object.values(Module), { each: true })
+  selectedModules?: Module[];
 }
 
 class BuyNowOrgDetailsDto implements BuyNowOrgDetails {
@@ -144,6 +153,12 @@ class OrgPurchaseRequestDto implements OrgPurchaseRequest {
   @IsInt()
   @Min(0)
   extraLeaderSeats?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(Object.values(Module), { each: true })
+  selectedModules?: Module[];
 }
 
 /**
@@ -189,4 +204,3 @@ export class BuyNowController {
     });
   }
 }
-

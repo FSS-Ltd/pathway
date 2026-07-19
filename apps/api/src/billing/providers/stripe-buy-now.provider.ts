@@ -83,6 +83,27 @@ export class StripeBuyNowProvider extends BuyNowProvider {
       }
     }
 
+    const selectedModules = params.plan.selectedModules ?? [];
+    const missingModules = selectedModules.filter(
+      (module) =>
+        !priceMap[
+          `MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap
+        ],
+    );
+    if (missingModules.length > 0) {
+      this.logger.warn(
+        `Stripe price configuration missing for modules: ${missingModules.join(", ")}`,
+      );
+      throw new Error("Missing Stripe price configuration for selected modules.");
+    }
+    for (const module of selectedModules) {
+      const price =
+        priceMap[`MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap];
+      if (price) {
+        lineItems.push({ price, quantity: 1 });
+      }
+    }
+
     // Phase 0 PR 0.3: SMS add-on removed from the purchase path entirely.
 
     if (addonsOnly && lineItems.length === 0) {

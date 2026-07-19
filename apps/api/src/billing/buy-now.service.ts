@@ -13,6 +13,7 @@ import {
   PendingOrderStatus,
   SubscriptionStatus,
   OrgRole,
+  type Module,
 } from "@pathway/db";
 import { getPlanDefinition } from "./billing-plans";
 import type { PlanTier } from "./billing-plans";
@@ -82,6 +83,13 @@ export class BuyNowService {
     const planDefinition = getPlanDefinition(sanitisedPlan.planCode);
     const { selection: gatedPlan, warnings: gatingWarnings } =
       this.enforcePlanAddonPolicy(sanitisedPlan, planDefinition?.tier ?? null);
+    const selectedModules = this.normalizeSelectedModules(
+      sanitisedPlan.selectedModules,
+    );
+    this.assertSelectedModulesCanBeCharged(
+      selectedModules,
+      sanitisedPlan.planCode,
+    );
 
     const previewAddons: PlanPreviewAddons = {
       extraAv30Blocks: gatedPlan.av30AddonBlocks,
@@ -156,6 +164,7 @@ export class BuyNowService {
         leaderSeatsIncluded:
           previewResult.effectiveCaps.leaderSeatsIncluded ?? undefined,
         maxSites: previewResult.effectiveCaps.maxSites ?? undefined,
+        selectedModules,
         flags:
           previewResult.notes?.source === "plan_catalogue"
             ? undefined
@@ -168,7 +177,7 @@ export class BuyNowService {
     });
 
     const providerParams: BuyNowCheckoutParams = {
-      plan: gatedPlan,
+      plan: { ...gatedPlan, selectedModules },
       org: request.org,
       preview,
       successUrl: request.successUrl,
@@ -207,6 +216,38 @@ export class BuyNowService {
   private toNonNegativeInt(value?: number): number | undefined {
     if (typeof value !== "number" || Number.isNaN(value)) return undefined;
     return value < 0 ? 0 : Math.trunc(value);
+  }
+
+  private normalizeSelectedModules(selectedModules?: Module[]): Module[] {
+    return [...new Set(selectedModules ?? [])];
+  }
+
+  private assertSelectedModulesCanBeCharged(
+    selectedModules: Module[],
+    planCode: string,
+  ): void {
+    if (selectedModules.length === 0) return;
+
+    const provider = this.providerConfig?.activeProvider ?? "FAKE";
+    if (provider === "FAKE") return;
+    if (provider === "GOCARDLESS") {
+      throw new BadRequestException(
+        "Selected modules are not supported by the active billing provider.",
+      );
+    }
+
+    const intervalSuffix = planCode.endsWith("_YEARLY")
+      ? "YEARLY"
+      : "MONTHLY";
+    const priceMap = this.providerConfig?.stripe.priceMap ?? {};
+    const missingModules = selectedModules.filter(
+      (module) => !priceMap[`MODULE_${module}_${intervalSuffix}`],
+    );
+    if (missingModules.length > 0) {
+      throw new BadRequestException(
+        "Missing Stripe price configuration for selected modules.",
+      );
+    }
   }
 
   /**
@@ -257,6 +298,7 @@ export class BuyNowService {
     }
 
     const normalizedPlanCode = this.normalizePlanCode(request.planCode);
+    const selectedModules = this.normalizeSelectedModules(request.selectedModules);
 
     // 2. If org has active subscription and selected plan is the same: allow checkout only for add-ons
     const activeSubscription = await prisma.subscription.findFirst({
@@ -278,7 +320,8 @@ export class BuyNowService {
       (this.toNonNegativeInt(request.extraStorageGb) ?? 0) > 0 ||
       (this.toNonNegativeInt(request.extraSmsMessages) ?? 0) > 0 ||
       (this.toNonNegativeInt(request.extraSites) ?? 0) > 0 ||
-      (this.toNonNegativeInt(request.extraLeaderSeats) ?? 0) > 0;
+      (this.toNonNegativeInt(request.extraLeaderSeats) ?? 0) > 0 ||
+      selectedModules.length > 0;
 
     if (addonsOnly && !hasAddons) {
       throw new BadRequestException(
@@ -329,7 +372,8 @@ export class BuyNowService {
       (gatedAddons.extraStorageGb ?? 0) > 0 ||
       (gatedAddons.extraSmsMessages ?? 0) > 0 ||
       (gatedAddons.extraSites ?? 0) > 0 ||
-      (gatedAddons.extraLeaderSeats ?? 0) > 0;
+      (gatedAddons.extraLeaderSeats ?? 0) > 0 ||
+      selectedModules.length > 0;
     if (addonsOnly && !hasAllowedAddons) {
       throw new BadRequestException(
         "You're already on this plan. Add add-ons above to checkout, or choose a different plan.",
@@ -383,6 +427,7 @@ export class BuyNowService {
     const prismaProvider = activeProviderToPrismaProvider(
       this.providerConfig?.activeProvider ?? "FAKE",
     );
+    this.assertSelectedModulesCanBeCharged(selectedModules, normalizedPlanCode);
 
     const pendingOrder = await prisma.pendingOrder.create({
       data: {
@@ -395,6 +440,7 @@ export class BuyNowService {
         leaderSeatsIncluded:
           previewResult.effectiveCaps.leaderSeatsIncluded ?? undefined,
         maxSites: previewResult.effectiveCaps.maxSites ?? undefined,
+        selectedModules,
         provider: prismaProvider,
         status: PendingOrderStatus.PENDING,
       },
@@ -409,6 +455,7 @@ export class BuyNowService {
         extraStorageGb: gatedAddons.extraStorageGb,
         extraSmsMessages: gatedAddons.extraSmsMessages,
         extraLeaderSeats: gatedAddons.extraLeaderSeats,
+        selectedModules,
       },
       org: {
         orgName: org.name,
