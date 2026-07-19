@@ -138,6 +138,16 @@ export type AccessContext = {
   currentOrgIsMasterOrg?: boolean;
 };
 
+export function hasCapability(
+  capabilities: string[],
+  required: string | undefined,
+): boolean {
+  if (!required) {
+    return true;
+  }
+  return capabilities.includes(required);
+}
+
 /**
  * Check if user meets an access requirement
  */

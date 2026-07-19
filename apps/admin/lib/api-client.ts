@@ -4,6 +4,7 @@
 // Production environments MUST set NEXT_PUBLIC_API_URL (e.g., https://api.nexsteps.dev) and MUST NOT
 // rely on implicit mock fallbacks.
 import { toLocalDateKey } from "./date";
+import { notifyActiveSiteChanged } from "./active-site-events";
 const useMockApiExplicit =
   typeof process.env.NEXT_PUBLIC_USE_MOCK_API === "string" &&
   process.env.NEXT_PUBLIC_USE_MOCK_API === "true";
@@ -642,6 +643,27 @@ export async function fetchUserRoles(
   return (await response.json()) as UserRolesResponse;
 }
 
+export async function fetchOrgCapabilities(
+  accessToken?: string | null,
+): Promise<string[]> {
+  if (isUsingMockApi()) {
+    return [];
+  }
+  const response = await fetch(`${API_BASE_URL}/platform/capabilities`, {
+    headers: buildAuthHeaders(accessToken),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch capabilities: ${response.status} ${body}`,
+    );
+  }
+  const json = (await response.json()) as { capabilities: string[] };
+  return json.capabilities ?? [];
+}
+
 /**
  * Debug endpoint: returns resolved auth context (siteRole, tenantId, cookies, DB memberships).
  * Use when debugging staff attendance 403 or role resolution issues.
@@ -675,7 +697,9 @@ export async function setActiveSite(siteId: string): Promise<ActiveSiteState> {
     throw new Error("siteId is required");
   }
   if (isUsingMockApi()) {
-    return { activeSiteId: siteId, sites: [] };
+    const state = { activeSiteId: siteId, sites: [] };
+    notifyActiveSiteChanged();
+    return state;
   }
   const response = await fetch(`${API_BASE_URL}/auth/active-site`, {
     method: "POST",
@@ -686,7 +710,9 @@ export async function setActiveSite(siteId: string): Promise<ActiveSiteState> {
   if (!response.ok) {
     throw new Error(`Failed to set active site: ${response.status}`);
   }
-  return (await response.json()) as ActiveSiteState;
+  const state = (await response.json()) as ActiveSiteState;
+  notifyActiveSiteChanged();
+  return state;
 }
 
 export type AdminPublicSignupLink = {

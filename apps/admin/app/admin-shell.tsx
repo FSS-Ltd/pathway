@@ -15,7 +15,11 @@ import {
   defaultSidebarItems,
 } from "@pathway/ui";
 import { useAdminAccess } from "@/lib/use-admin-access";
-import { meetsAccessRequirement, type AccessRequirement } from "@/lib/access";
+import {
+  hasCapability,
+  meetsAccessRequirement,
+  type AccessRequirement,
+} from "@/lib/access";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { fetchOrgOverview } from "@/lib/api-client";
 import { cn } from "@pathway/ui";
@@ -38,7 +42,10 @@ const getDevRuntimeState = () => {
 //
 // `group` clusters related items into a collapsible accordion section in the sidebar;
 // items without a `group` (Dashboard) render as top-level links above the sections.
-const navItemsWithAccess: (SidebarNavItem & { access?: AccessRequirement })[] = [
+const navItemsWithAccess: (SidebarNavItem & {
+  access?: AccessRequirement;
+  capability?: string;
+})[] = [
   { ...defaultSidebarItems[0], access: "staff-or-admin" }, // Dashboard
   { label: "Profile", href: "/staff/profile", iconIndex: 14, access: "staff-only", group: "People" }, // Staff only (replaces People)
   { ...defaultSidebarItems[1], access: "site-admin-or-higher", group: "People" }, // People (admins only)
@@ -214,6 +221,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   const {
     role,
     currentOrgIsMasterOrg,
+    capabilities,
     error: accessError,
     warning: accessWarning,
   } = useAdminAccess();
@@ -283,12 +291,13 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   // Filter nav items based on user's role (hide billing for master orgs)
   const visibleNavItems = React.useMemo(
     () =>
-      navItemsWithAccess.filter((item) =>
-        meetsAccessRequirement(role, item.access, {
-          currentOrgIsMasterOrg,
-        }),
+      navItemsWithAccess.filter(
+        (item) =>
+          meetsAccessRequirement(role, item.access, {
+            currentOrgIsMasterOrg,
+          }) && hasCapability(capabilities, item.capability),
       ),
-    [role, currentOrgIsMasterOrg],
+    [role, currentOrgIsMasterOrg, capabilities],
   );
 
   if (isAuthRoute) {

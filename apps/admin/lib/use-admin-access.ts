@@ -13,7 +13,13 @@ import {
   type AdminRoleInfo,
   getAdminRoleInfoFromApiResponse,
 } from "./access";
-import { fetchUserRoles, type UserRolesResponse } from "./api-client";
+import {
+  fetchOrgCapabilities,
+  fetchUserRoles,
+  type UserRolesResponse,
+} from "./api-client";
+import { loadAdminAccessIndependently } from "./admin-access-loader";
+import { subscribeToActiveSiteChanges } from "./active-site-events";
 import { getRoleLookupFailureStatus } from "./role-lookup-status";
 
 export type UseAdminAccessResult = {
@@ -22,6 +28,7 @@ export type UseAdminAccessResult = {
   userId: string | null;
   /** True when current org is a master/internal org (no billing, unlimited). */
   currentOrgIsMasterOrg: boolean;
+  capabilities: string[];
   isLoading: boolean;
   error?: string | null;
   warning?: string | null;
@@ -47,9 +54,19 @@ export type UseAdminAccessResult = {
 export function useAdminAccess(): UseAdminAccessResult {
   const { data: session, status: sessionStatus } = useSession();
   const [rolesResponse, setRolesResponse] = useState<UserRolesResponse | null>(null);
+  const [capabilities, setCapabilities] = useState<string[]>([]);
+  const [activeSiteRevision, setActiveSiteRevision] = useState(0);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+
+  useEffect(
+    () =>
+      subscribeToActiveSiteChanges(() => {
+        setActiveSiteRevision((revision) => revision + 1);
+      }),
+    [],
+  );
 
   useEffect(() => {
     const sessionRoles =
@@ -60,6 +77,7 @@ export function useAdminAccess(): UseAdminAccessResult {
     // Only fetch roles when session is authenticated
     if (sessionStatus !== "authenticated" || !session) {
       setRolesResponse(null);
+      setCapabilities([]);
       setError(null);
       setWarning(null);
       setIsLoadingRoles(false);
@@ -68,6 +86,7 @@ export function useAdminAccess(): UseAdminAccessResult {
 
     if (!accessToken) {
       setRolesResponse(null);
+      setCapabilities([]);
       setIsLoadingRoles(false);
       if (!sessionRoles) {
         setError("Missing API access token for role lookup.");
@@ -88,16 +107,28 @@ export function useAdminAccess(): UseAdminAccessResult {
         setIsLoadingRoles(true);
         setError(null);
         setWarning(null);
-        const response = await fetchUserRoles(accessToken);
-        if (!cancelled) {
-          setRolesResponse(response);
-        }
+        setCapabilities([]);
+        await loadAdminAccessIndependently({
+          loadRoles: () => fetchUserRoles(accessToken),
+          loadCapabilities: () => fetchOrgCapabilities(accessToken),
+          onRolesLoaded: (response) => {
+            if (!cancelled) {
+              setRolesResponse(response);
+            }
+          },
+          onCapabilitiesLoaded: (resolvedCapabilities) => {
+            if (!cancelled) {
+              setCapabilities(resolvedCapabilities);
+            }
+          },
+        });
       } catch (err) {
         if (!cancelled) {
           const status = getRoleLookupFailureStatus(err, Boolean(sessionRoles));
           setError(status.error);
           setWarning(status.warning);
           setRolesResponse(null);
+          setCapabilities([]);
         }
       } finally {
         if (!cancelled) {
@@ -111,7 +142,7 @@ export function useAdminAccess(): UseAdminAccessResult {
     return () => {
       cancelled = true;
     };
-  }, [sessionStatus, session]);
+  }, [sessionStatus, session, activeSiteRevision]);
 
   // Use API response when available; fall back to roles from session (set at login)
   const rolesSource =
@@ -134,6 +165,7 @@ export function useAdminAccess(): UseAdminAccessResult {
     role,
     userId,
     currentOrgIsMasterOrg,
+    capabilities,
     isLoading,
     error,
     warning,
