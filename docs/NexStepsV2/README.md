@@ -24,6 +24,7 @@ Every phase doc in this set was grounded against the actual repo, not written fr
 | 02 | `02-wiring-navigation-guards-admin-settings.md` | Capability-driven navigation, sector-check migration, Org Settings vertical/module sections |
 | 02a | `02a-phase2-build-plan.md` | Detailed, no-guesswork Phase 2 execution plan — verbatim guard/endpoint/service code, settings-card contracts, and test bodies per PR |
 | 03 | `03-billing-integration.md` | Stripe products for the 4 plans + 8 modules + storage, hardened webhook, module activation |
+| 03a | `03a-phase3-build-plan.md` | Detailed, no-guesswork Phase 3 execution plan — module price codes, `selectedModules` column, checkout line items, and the verbatim webhook activation/renewal/cancellation write-sites + test bodies per PR |
 | 04 | `04-learning-module.md` | The Learning module — first real module, reference implementation for the module pattern |
 | 05 | `05-configurator-and-imagery.md` | The Apple-style "select your profile" purchase configurator + per-vertical/module imagery |
 | 06 | `06-cutover.md` | Removing legacy sector checks, feature-flag entitlement, and the old pricing/buy pages |
