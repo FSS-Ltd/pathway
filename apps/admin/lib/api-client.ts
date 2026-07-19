@@ -450,6 +450,25 @@ export const ORG_SECTOR_LABELS: Record<AdminOrgSector, string> = {
   CHARITY: "Charity",
 };
 
+export type AdminVertical =
+  | "CHURCH"
+  | "INDEPENDENT_SCHOOL"
+  | "ACE_SCHOOL"
+  | "STATE_SCHOOL"
+  | "NURSERY"
+  | "CHARITY"
+  | "CLUB";
+
+export const VERTICAL_LABELS: Record<AdminVertical, string> = {
+  CHURCH: "Church",
+  INDEPENDENT_SCHOOL: "Independent School",
+  ACE_SCHOOL: "ACE School",
+  STATE_SCHOOL: "State School",
+  NURSERY: "Nursery",
+  CHARITY: "Charity",
+  CLUB: "Club",
+};
+
 export type AdminOrgOverview = {
   id: string;
   name: string;
@@ -459,6 +478,7 @@ export type AdminOrgOverview = {
   planTier?: string | null;
   siteCount?: number | null;
   sector?: AdminOrgSector | null;
+  vertical?: AdminVertical | null;
   /** Org's white-label logo; null/absent falls back to the NexSteps mark. */
   logoUrl?: string | null;
 };
@@ -4209,6 +4229,7 @@ type ApiOrg = {
   isSuite?: boolean | null;
   parentPortalEnabled?: boolean | null;
   sector?: AdminOrgSector | null;
+  vertical?: AdminVertical | null;
   logoUrl?: string | null;
   // TODO: map site counts when available
 };
@@ -4222,6 +4243,7 @@ const mapApiOrgToAdmin = (org: ApiOrg): AdminOrgOverview => ({
   planTier: org.planCode ?? null,
   siteCount: null,
   sector: org.sector ?? null,
+  vertical: org.vertical ?? null,
   logoUrl: org.logoUrl ?? null,
 });
 
@@ -4238,6 +4260,7 @@ export async function fetchOrgOverview(): Promise<AdminOrgOverview> {
       parentPortalEnabled: true,
       planTier: null,
       siteCount: null,
+      vertical: null,
     };
   }
 
@@ -4262,6 +4285,7 @@ export async function fetchOrgOverview(): Promise<AdminOrgOverview> {
       parentPortalEnabled: true,
       planTier: null,
       siteCount: null,
+      vertical: null,
     };
   }
 
@@ -4294,8 +4318,51 @@ export async function updateOrgProfile(input: {
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to update org: ${res.status} ${body}`);
   }
-  const json = (await res.json()) as ApiOrg;
-  return mapApiOrgToAdmin(json);
+  return fetchOrgOverview();
+}
+
+export async function updateOrgVertical(
+  vertical: AdminVertical,
+): Promise<AdminOrgOverview> {
+  if (isUsingMockApi()) {
+    throw new Error("Vertical updates are not available in mock mode.");
+  }
+  const res = await fetch(`${API_BASE_URL}/orgs/current/vertical`, {
+    method: "PATCH",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({ vertical }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to update vertical: ${res.status} ${body}`);
+  }
+  return fetchOrgOverview();
+}
+
+export async function fetchVerticalCapabilities(
+  vertical: AdminVertical,
+): Promise<string[]> {
+  if (isUsingMockApi()) {
+    return [];
+  }
+  const res = await fetch(
+    `${API_BASE_URL}/platform/verticals/${encodeURIComponent(vertical)}/capabilities`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch vertical capabilities: ${res.status} ${body}`,
+    );
+  }
+  const json = (await res.json()) as { capabilities: string[] };
+  return json.capabilities ?? [];
 }
 
 /** Upload/replace the current org's white-label logo. ORG_ADMIN only. */

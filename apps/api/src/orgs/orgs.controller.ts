@@ -20,6 +20,7 @@ import { uploadLogoDto } from "./dto/upload-logo.dto";
 import { CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { OrgRole, prisma } from "@pathway/db";
+import { isVertical } from "@pathway/types";
 import type { Request } from "express";
 
 interface AuthenticatedRequest extends Request {
@@ -66,6 +67,12 @@ const updateCurrentOrgBody = z
       value.name !== undefined || value.parentPortalEnabled !== undefined,
     { message: "At least one field is required" },
   );
+
+const updateCurrentVerticalBody = z
+  .object({
+    vertical: z.string(),
+  })
+  .strict();
 
 @Controller("orgs")
 export class OrgsController {
@@ -139,6 +146,26 @@ export class OrgsController {
       body,
     );
     return this.service.updateCurrentOrg(orgId, dto);
+  }
+
+  /**
+   * Change the current organisation's platform vertical. ORG_ADMIN only.
+   */
+  @Patch("current/vertical")
+  @UseGuards(AuthUserGuard)
+  async updateCurrentVertical(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+    @Body() body: unknown,
+  ) {
+    await this.ensureOrgAdmin(req, orgId);
+    const { vertical } = await parseOrBadRequest<
+      z.infer<typeof updateCurrentVerticalBody>
+    >(updateCurrentVerticalBody, body);
+    if (!isVertical(vertical)) {
+      throw new BadRequestException("Unknown vertical");
+    }
+    return this.service.changeVertical(orgId, vertical);
   }
 
   /**

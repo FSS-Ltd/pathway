@@ -8,14 +8,17 @@ import {
   AdminBillingOverview,
   AdminOrgOverview,
   AdminRetentionOverview,
+  type AdminVertical,
   deactivateOrganisation,
   deleteOrgLogo,
   fetchActiveSiteState,
   fetchBillingOverview,
   fetchOrgOverview,
   fetchRetentionOverview,
+  fetchVerticalCapabilities,
   requestExportOrganisationData,
   updateOrgProfile,
+  updateOrgVertical,
   updateSiteProfile,
   uploadOrgLogo,
   ORG_SECTOR_LABELS,
@@ -24,13 +27,14 @@ import {
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
 import { useAdminAccess } from "../../lib/use-admin-access";
-import { canAccessAdminSection, canAccessBilling, canAccessSafeguardingAdmin } from "../../lib/access";
+import { canAccessAdminSection, canAccessSafeguardingAdmin } from "../../lib/access";
 import type { AdminRoleInfo } from "../../lib/access";
 import { canPerform } from "../../lib/permissions";
 import { NoAccessCard } from "../../components/no-access-card";
 import { QrCodeCard } from "../../components/qr/QrCodeCard";
 import { getSafeDisplayName } from "../../lib/names";
 import { ParentPortalSettingsCard } from "./parent-portal-settings-card";
+import { VerticalSettingsCard } from "./vertical-settings-card";
 
 function getRoleLabel(role: AdminRoleInfo): string {
   if (role.isOrgAdmin || role.isOrgOwner) return "Organisation admin";
@@ -58,6 +62,14 @@ export default function SettingsPage() {
     string | null
   >(null);
   const [savingParentPortal, setSavingParentPortal] = React.useState(false);
+  const [savingVertical, setSavingVertical] = React.useState(false);
+  const [verticalSaveError, setVerticalSaveError] = React.useState<
+    string | null
+  >(null);
+  const [verticalPreview, setVerticalPreview] = React.useState<string[] | null>(
+    null,
+  );
+  const verticalPreviewRequest = React.useRef(0);
 
   const [logoError, setLogoError] = React.useState<string | null>(null);
   const [savingLogo, setSavingLogo] = React.useState(false);
@@ -198,6 +210,43 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingParentPortal(false);
+    }
+  };
+
+  const handlePreviewVertical = async (candidate: AdminVertical) => {
+    const requestId = verticalPreviewRequest.current + 1;
+    verticalPreviewRequest.current = requestId;
+    setVerticalSaveError(null);
+    setVerticalPreview(null);
+    try {
+      const capabilities = await fetchVerticalCapabilities(candidate);
+      if (requestId === verticalPreviewRequest.current) {
+        setVerticalPreview(capabilities);
+      }
+    } catch (e) {
+      if (requestId === verticalPreviewRequest.current) {
+        setVerticalSaveError(
+          e instanceof Error ? e.message : "Failed to preview capabilities",
+        );
+      }
+    }
+  };
+
+  const handleChangeVertical = async (vertical: AdminVertical) => {
+    if (!org || vertical === org.vertical) return;
+    setVerticalSaveError(null);
+    setSavingVertical(true);
+    try {
+      const updated = await updateOrgVertical(vertical);
+      verticalPreviewRequest.current += 1;
+      setOrg(updated);
+      setVerticalPreview(null);
+    } catch (e) {
+      setVerticalSaveError(
+        e instanceof Error ? e.message : "Failed to save vertical",
+      );
+    } finally {
+      setSavingVertical(false);
     }
   };
 
@@ -467,6 +516,17 @@ export default function SettingsPage() {
           isSaving={savingParentPortal}
           error={parentPortalSaveError}
           onToggle={handleToggleParentPortal}
+        />
+
+        <VerticalSettingsCard
+          vertical={org?.vertical ?? null}
+          canEdit={canEditOrg}
+          isLoading={isLoading}
+          isSaving={savingVertical}
+          error={verticalSaveError}
+          previewCapabilities={verticalPreview}
+          onPreview={handlePreviewVertical}
+          onSave={handleChangeVertical}
         />
 
         {/* A) Active Site */}
