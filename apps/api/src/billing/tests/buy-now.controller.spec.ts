@@ -89,4 +89,19 @@ describe("BuyNowController", () => {
 
     expect(serviceMock.checkout).not.toHaveBeenCalled();
   });
+
+  it("rejects duplicate or unknown module selections with 400", async () => {
+    await request(app.getHttpServer())
+      .post("/billing/buy-now/checkout")
+      .send({
+        ...baseBody,
+        plan: {
+          ...baseBody.plan,
+          selectedModules: ["FINANCE", "FINANCE", "NOT_A_MODULE"],
+        },
+      })
+      .expect(400);
+
+    expect(serviceMock.checkout).not.toHaveBeenCalled();
+  });
 });

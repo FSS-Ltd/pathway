@@ -1,3 +1,4 @@
+import type { Module } from "@pathway/db";
 import type { Sector } from "@pathway/types";
 import type { PlanCode, PlanTier } from "./billing-plans";
 
@@ -8,6 +9,7 @@ export type BuyNowPlanSelection = {
   extraStorageGb?: number;
   extraSmsMessages?: number;
   extraLeaderSeats?: number;
+  selectedModules?: Module[];
 };
 
 export type BuyNowOrgDetails = {
@@ -37,6 +39,7 @@ export type OrgPurchaseRequest = {
   extraStorageGb?: number;
   extraSmsMessages?: number;
   extraLeaderSeats?: number;
+  selectedModules?: Module[];
 };
 
 export type BuyNowCheckoutPreview = {

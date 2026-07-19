@@ -1,13 +1,17 @@
 import { BuyNowService, TIER_HIERARCHY } from "../buy-now.service";
 import { PlanPreviewService } from "../plan-preview.service";
 import { BuyNowProvider } from "../buy-now.provider";
-import { BillingProvider } from "@pathway/db";
+import { BillingProvider, Module, OrgRole } from "@pathway/db";
 import { type BillingProviderConfig } from "../billing-provider.config";
 import type { PathwayRequestContext } from "@pathway/auth";
 import { Auth0ManagementService } from "../../auth/auth0-management.service";
 
 const prismaMock = {
   pendingOrder: { create: jest.fn(), update: jest.fn() },
+  orgMembership: { findUnique: jest.fn() },
+  org: { findUnique: jest.fn() },
+  subscription: { findFirst: jest.fn() },
+  user: { findUnique: jest.fn() },
 };
 
 jest.mock("@pathway/db", () => {
@@ -53,6 +57,12 @@ describe("BuyNowService", () => {
 
   beforeEach(() => {
     providerMock.createCheckoutSession.mockReset();
+    prismaMock.pendingOrder.create.mockReset();
+    prismaMock.pendingOrder.update.mockReset();
+    prismaMock.orgMembership.findUnique.mockReset();
+    prismaMock.org.findUnique.mockReset();
+    prismaMock.subscription.findFirst.mockReset();
+    prismaMock.user.findUnique.mockReset();
     providerMock.createCheckoutSession.mockResolvedValue({
       provider: "fake",
       sessionId: "fake_session",
@@ -64,6 +74,15 @@ describe("BuyNowService", () => {
       orgId: contextMock.currentOrgId,
     });
     prismaMock.pendingOrder.update.mockResolvedValue({});
+    prismaMock.orgMembership.findUnique.mockResolvedValue({
+      role: OrgRole.ORG_ADMIN,
+    });
+    prismaMock.org.findUnique.mockResolvedValue({ isMasterOrg: false });
+    prismaMock.subscription.findFirst.mockResolvedValue(null);
+    prismaMock.user.findUnique.mockResolvedValue({
+      email: "alice@example.com",
+      name: "Alice Doe",
+    });
   });
 
   it("computes preview caps for known plan and calls provider", async () => {
@@ -178,6 +197,109 @@ describe("BuyNowService", () => {
         "core_capacity_addon_blocked_sites",
       ]),
     );
+  });
+
+  it("persists selected modules and passes them to the provider for public checkout", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await service.checkout({
+      ...baseRequest,
+      plan: {
+        planCode: "STARTER_MONTHLY",
+        selectedModules: [Module.FINANCE, Module.EVENTS],
+      },
+    });
+
+    expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          selectedModules: [Module.FINANCE, Module.EVENTS],
+        }),
+      }),
+    );
+    expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: expect.objectContaining({
+          selectedModules: [Module.FINANCE, Module.EVENTS],
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it("permits a same-plan module-only purchase and persists its selection", async () => {
+    prismaMock.subscription.findFirst.mockResolvedValue({
+      planCode: "STARTER_MONTHLY",
+    });
+    prismaMock.org.findUnique
+      .mockResolvedValueOnce({ isMasterOrg: false })
+      .mockResolvedValueOnce({
+        name: "Test Org",
+        stripeCustomerId: "cus_123",
+      });
+
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await service.purchaseForOrg(
+      {
+        planCode: "STARTER_MONTHLY",
+        selectedModules: [Module.FINANCE],
+      },
+      { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+    );
+
+    expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ selectedModules: [Module.FINANCE] }),
+      }),
+    );
+    expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        addonsOnly: true,
+        plan: expect.objectContaining({ selectedModules: [Module.FINANCE] }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it("rejects a Stripe module selection that has no configured price", async () => {
+    const stripeConfig: BillingProviderConfig = {
+      activeProvider: "STRIPE",
+      stripe: { priceMap: { STARTER_MONTHLY: "price_starter" } },
+      goCardless: {},
+    };
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      stripeConfig,
+    );
+
+    await expect(
+      service.checkout({
+        ...baseRequest,
+        plan: {
+          planCode: "STARTER_MONTHLY",
+          selectedModules: [Module.FINANCE],
+        },
+      }),
+    ).rejects.toThrow("Missing Stripe price configuration for selected modules");
+
+    expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
+    expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
   });
 });
 
