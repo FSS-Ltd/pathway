@@ -1036,6 +1036,7 @@ model PendingOrder {
   smsMessagesCap         Int?
   leaderSeatsIncluded    Int?
   maxSites               Int?
+  selectedModules        Module[]           @default([])
   flags                  Json?
   warnings               Json?
   provider               BillingProvider
