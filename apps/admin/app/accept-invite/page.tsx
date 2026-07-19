@@ -29,8 +29,6 @@ function AcceptInviteContent() {
     if (status === "loading") return;
 
     if (status === "authenticated" && token && state === "welcome") {
-      console.log("[ACCEPT-INVITE] User authenticated, accepting invite...");
-      
       // Check if user has been created in DB
       const userId = (session as any)?.user?.id;
       if (!userId) {
