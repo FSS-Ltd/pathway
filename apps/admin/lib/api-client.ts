@@ -469,6 +469,35 @@ export const VERTICAL_LABELS: Record<AdminVertical, string> = {
   CLUB: "Club",
 };
 
+export type AdminModule =
+  | "FINANCE"
+  | "EVENTS"
+  | "TRANSPORT"
+  | "MEALS"
+  | "ASSET_MANAGEMENT"
+  | "HR"
+  | "AI_WORKSPACE"
+  | "ADVANCED_REPORTING";
+
+export const MODULE_LABELS: Record<AdminModule, string> = {
+  FINANCE: "Finance",
+  EVENTS: "Events",
+  TRANSPORT: "Transport",
+  MEALS: "Meals",
+  ASSET_MANAGEMENT: "Asset Management",
+  HR: "HR",
+  AI_WORKSPACE: "AI Workspace",
+  ADVANCED_REPORTING: "Advanced Reporting",
+};
+
+export type AdminOrgModule = {
+  module: AdminModule;
+  status: string | null;
+  activatedAt: string | null;
+  expiresAt: string | null;
+  billingSource: string | null;
+};
+
 export type AdminOrgOverview = {
   id: string;
   name: string;
@@ -4363,6 +4392,43 @@ export async function fetchVerticalCapabilities(
   }
   const json = (await res.json()) as { capabilities: string[] };
   return json.capabilities ?? [];
+}
+
+export async function fetchOrgModules(): Promise<AdminOrgModule[]> {
+  if (isUsingMockApi()) {
+    return [];
+  }
+  const res = await fetch(`${API_BASE_URL}/platform/modules`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch modules: ${res.status} ${body}`);
+  }
+  const json = (await res.json()) as { modules?: AdminOrgModule[] };
+  return json.modules ?? [];
+}
+
+export async function toggleOrgModule(
+  module: AdminModule,
+  active: boolean,
+): Promise<void> {
+  if (isUsingMockApi()) {
+    throw new Error("Module updates are not available in mock mode.");
+  }
+  const res = await fetch(`${API_BASE_URL}/platform/modules/toggle`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({ module, active }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to update module: ${res.status} ${body}`);
+  }
 }
 
 /** Upload/replace the current org's white-label logo. ORG_ADMIN only. */

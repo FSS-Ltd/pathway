@@ -5,6 +5,8 @@ import request from "supertest";
 import { AppModule } from "../../app.module";
 import type { PathwayAuthClaims } from "@pathway/auth";
 import {
+  Module,
+  ModuleStatus,
   OrgRole,
   SiteRole,
   Vertical,
@@ -25,6 +27,9 @@ describe("Orgs (e2e)", () => {
   const authSubject = `orgs-e2e-${userId}`;
   const userEmail = `${authSubject}@pathway.test`;
   let originalVertical: Vertical | null = null;
+  let originalFinanceModule: {
+    status: ModuleStatus;
+  } | null = null;
   let authHeader: string;
 
   const buildAuthHeader = (claims: PathwayAuthClaims) => {
@@ -52,6 +57,14 @@ describe("Orgs (e2e)", () => {
         where: { orgId },
       });
       originalVertical = currentVertical?.vertical ?? null;
+      const currentFinanceModule = await tx.orgModule.findUnique({
+        where: { orgId_module: { orgId, module: Module.FINANCE } },
+      });
+      originalFinanceModule = currentFinanceModule
+        ? {
+            status: currentFinanceModule.status,
+          }
+        : null;
       await tx.user.create({
         data: {
           id: userId,
@@ -99,6 +112,18 @@ describe("Orgs (e2e)", () => {
           });
         } else {
           await tx.orgVertical.deleteMany({ where: { orgId } });
+        }
+        if (originalFinanceModule) {
+          await tx.orgModule.update({
+            where: { orgId_module: { orgId, module: Module.FINANCE } },
+            data: {
+              status: originalFinanceModule.status,
+            },
+          });
+        } else {
+          await tx.orgModule.deleteMany({
+            where: { orgId, module: Module.FINANCE },
+          });
         }
         await tx.siteMembership.deleteMany({ where: { userId } });
         await tx.orgMembership.deleteMany({ where: { userId } });
@@ -168,5 +193,66 @@ describe("Orgs (e2e)", () => {
     expect(capabilities.body.capabilities).toEqual(
       expect.arrayContaining(VERTICAL_CAPABILITIES.CLUB),
     );
+  });
+
+  it("POST /platform/modules/toggle rejects production requests without writing", async () => {
+    if (!app) return;
+    const previousNodeEnv = process.env.NODE_ENV;
+    const before = await withTenantRlsContext(tenantId, orgId, (tx) =>
+      tx.orgModule.findUnique({
+        where: { orgId_module: { orgId, module: Module.FINANCE } },
+      }),
+    );
+
+    try {
+      process.env.NODE_ENV = "production";
+      const response = await request(app.getHttpServer())
+        .post("/platform/modules/toggle")
+        .set("Authorization", authHeader)
+        .send({ module: Module.FINANCE, active: true });
+
+      expect(response.status).toBe(403);
+      const after = await withTenantRlsContext(tenantId, orgId, (tx) =>
+        tx.orgModule.findUnique({
+          where: { orgId_module: { orgId, module: Module.FINANCE } },
+        }),
+      );
+      expect(after).toEqual(before);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
+  it("POST /platform/modules/toggle writes the current organisation outside production", async () => {
+    if (!app) return;
+    const previousNodeEnv = process.env.NODE_ENV;
+
+    try {
+      process.env.NODE_ENV = "test";
+      const response = await request(app.getHttpServer())
+        .post("/platform/modules/toggle")
+        .set("Authorization", authHeader)
+        .send({ module: Module.FINANCE, active: true });
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({
+        orgId,
+        module: Module.FINANCE,
+        status: ModuleStatus.ACTIVE,
+      });
+
+      const saved = await withTenantRlsContext(tenantId, orgId, (tx) =>
+        tx.orgModule.findUnique({
+          where: { orgId_module: { orgId, module: Module.FINANCE } },
+        }),
+      );
+      expect(saved).toMatchObject({
+        orgId,
+        module: Module.FINANCE,
+        status: ModuleStatus.ACTIVE,
+      });
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 });
