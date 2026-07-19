@@ -315,4 +315,33 @@ describe("BillingWebhookController", () => {
     });
     expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
   });
+
+  it("cancels only modules tied to the cancelled subscription", async () => {
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      eventId: "evt_cancelled",
+      kind: "subscription.canceled",
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ status: SubscriptionStatus.CANCELED }),
+      }),
+    );
+    expect(prismaMock.orgModule.updateMany).toHaveBeenCalledWith({
+      where: {
+        orgId: baseEvent.orgId,
+        status: ModuleStatus.ACTIVE,
+        metadata: {
+          path: ["subscriptionId"],
+          equals: baseEvent.subscriptionId,
+        },
+      },
+      data: { status: ModuleStatus.CANCELLED },
+    });
+    expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
+  });
 });

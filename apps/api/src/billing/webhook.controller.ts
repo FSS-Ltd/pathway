@@ -251,8 +251,15 @@ export class BillingWebhookController {
     }
 
     const pendingOrder = await this.findPendingOrder(event);
+    await this.upsertSubscription(event, status);
+    if (status === SubscriptionStatus.CANCELED) {
+      await this.cancelActiveModulesForSubscription(
+        event.orgId,
+        event.subscriptionId,
+      );
+    }
+
     if (pendingOrder) {
-      await this.upsertSubscription(event, status);
       if (pendingOrder.status !== PendingOrderStatus.COMPLETED) {
         await this.applyPendingOrder(event, status, pendingOrder);
       } else if (status === SubscriptionStatus.ACTIVE) {
@@ -265,7 +272,6 @@ export class BillingWebhookController {
       return;
     }
 
-    await this.upsertSubscription(event, status);
     if (status === SubscriptionStatus.ACTIVE) {
       await this.extendActiveModulesExpiry(
         event.orgId,
@@ -324,6 +330,20 @@ export class BillingWebhookController {
         metadata: { path: ["subscriptionId"], equals: subscriptionId },
       },
       data: { expiresAt: periodEnd },
+    });
+  }
+
+  private async cancelActiveModulesForSubscription(
+    orgId: string,
+    subscriptionId: string,
+  ): Promise<void> {
+    await prisma.orgModule.updateMany({
+      where: {
+        orgId,
+        status: ModuleStatus.ACTIVE,
+        metadata: { path: ["subscriptionId"], equals: subscriptionId },
+      },
+      data: { status: ModuleStatus.CANCELLED },
     });
   }
 
