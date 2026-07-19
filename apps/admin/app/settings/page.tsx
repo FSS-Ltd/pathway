@@ -6,6 +6,8 @@ import { useSession } from "next-auth/react";
 import { Badge, Button, Card, Input, Label } from "@pathway/ui";
 import {
   AdminBillingOverview,
+  type AdminModule,
+  type AdminOrgModule,
   AdminOrgOverview,
   AdminRetentionOverview,
   type AdminVertical,
@@ -13,10 +15,12 @@ import {
   deleteOrgLogo,
   fetchActiveSiteState,
   fetchBillingOverview,
+  fetchOrgModules,
   fetchOrgOverview,
   fetchRetentionOverview,
   fetchVerticalCapabilities,
   requestExportOrganisationData,
+  toggleOrgModule,
   updateOrgProfile,
   updateOrgVertical,
   updateSiteProfile,
@@ -35,6 +39,7 @@ import { QrCodeCard } from "../../components/qr/QrCodeCard";
 import { getSafeDisplayName } from "../../lib/names";
 import { ParentPortalSettingsCard } from "./parent-portal-settings-card";
 import { VerticalSettingsCard } from "./vertical-settings-card";
+import { ModulesSettingsCard } from "./modules-settings-card";
 
 function getRoleLabel(role: AdminRoleInfo): string {
   if (role.isOrgAdmin || role.isOrgOwner) return "Organisation admin";
@@ -70,6 +75,12 @@ export default function SettingsPage() {
     null,
   );
   const verticalPreviewRequest = React.useRef(0);
+  const [modules, setModules] = React.useState<AdminOrgModule[]>([]);
+  const [modulesLoading, setModulesLoading] = React.useState(true);
+  const [modulesError, setModulesError] = React.useState<string | null>(null);
+  const [savingModule, setSavingModule] = React.useState<AdminModule | null>(
+    null,
+  );
 
   const [logoError, setLogoError] = React.useState<string | null>(null);
   const [savingLogo, setSavingLogo] = React.useState(false);
@@ -89,16 +100,33 @@ export default function SettingsPage() {
 
   const [signupUrl, setSignupUrl] = React.useState("");
 
+  const loadModules = React.useCallback(async () => {
+    setModulesLoading(true);
+    setModulesError(null);
+    try {
+      setModules(await fetchOrgModules());
+    } catch (err) {
+      setModules([]);
+      setModulesError(
+        err instanceof Error ? err.message : "Failed to load modules",
+      );
+    } finally {
+      setModulesLoading(false);
+    }
+  }, []);
+
   const load = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [orgData, retentionData, billingData, activeSiteData] = await Promise.all([
-        fetchOrgOverview(),
-        fetchRetentionOverview(),
-        fetchBillingOverview(),
-        fetchActiveSiteState(),
-      ]);
+      const [orgData, retentionData, billingData, activeSiteData] =
+        await Promise.all([
+          fetchOrgOverview(),
+          fetchRetentionOverview(),
+          fetchBillingOverview(),
+          fetchActiveSiteState(),
+          loadModules(),
+        ]);
       setOrg(orgData);
       setRetention(retentionData);
       setBilling(billingData);
@@ -114,7 +142,7 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadModules]);
 
   React.useEffect(() => {
     if (
@@ -247,6 +275,20 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingVertical(false);
+    }
+  };
+
+  const handleToggleModule = async (module: AdminModule, active: boolean) => {
+    if (savingModule) return;
+    setModulesError(null);
+    setSavingModule(module);
+    try {
+      await toggleOrgModule(module, active);
+      setModules(await fetchOrgModules());
+    } catch (e) {
+      setModulesError(e instanceof Error ? e.message : "Failed to save module");
+    } finally {
+      setSavingModule(null);
     }
   };
 
@@ -527,6 +569,15 @@ export default function SettingsPage() {
           previewCapabilities={verticalPreview}
           onPreview={handlePreviewVertical}
           onSave={handleChangeVertical}
+        />
+
+        <ModulesSettingsCard
+          modules={modules}
+          canToggle={canEditOrg && process.env.NODE_ENV !== "production"}
+          isLoading={modulesLoading}
+          savingModule={savingModule}
+          error={modulesError}
+          onToggle={handleToggleModule}
         />
 
         {/* A) Active Site */}

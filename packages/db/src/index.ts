@@ -141,6 +141,8 @@ export {
   ChildGuardianContactType,
   OrgSector,
   Vertical,
+  Module,
+  ModuleStatus,
 } from "@prisma/client";
 export { Prisma };
 
