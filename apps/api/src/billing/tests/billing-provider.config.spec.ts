@@ -102,5 +102,35 @@ describe("billing provider config", () => {
     expect(config.stripe.priceMap?.GROWTH_99_MONTHLY).toBe("price_growth99_m");
     expect(config.stripe.priceMap?.PROFESSIONAL_149_MONTHLY).toBe("price_pro149_m");
   });
-});
 
+  it("Phase 3 PR 3.1: accepts module price codes in STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      MODULE_FINANCE_MONTHLY: "price_fin_m",
+      MODULE_AI_WORKSPACE_YEARLY: "price_ai_y",
+    });
+
+    const config = loadBillingProviderConfig();
+
+    expect(config.stripe.priceMap?.MODULE_FINANCE_MONTHLY).toBe("price_fin_m");
+    expect(config.stripe.priceMap?.MODULE_AI_WORKSPACE_YEARLY).toBe("price_ai_y");
+  });
+
+  it("Phase 3 PR 3.1: filters unknown module price codes from STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      MODULE_FINANCE_MONTHLY: "price_fin_m",
+      MODULE_NOT_A_REAL_ONE_MONTHLY: "price_bogus",
+    });
+
+    const config = loadBillingProviderConfig();
+    const priceMap = config.stripe.priceMap as Record<string, string> | undefined;
+
+    expect(priceMap?.MODULE_FINANCE_MONTHLY).toBe("price_fin_m");
+    expect(priceMap?.MODULE_NOT_A_REAL_ONE_MONTHLY).toBeUndefined();
+  });
+});
