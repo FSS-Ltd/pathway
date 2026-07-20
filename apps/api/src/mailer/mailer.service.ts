@@ -7,6 +7,19 @@ const DEFAULT_FROM = "Nexsteps <noreply@mail.nexsteps.dev>";
 const FEEDBACK_RECIPIENT = "support@faithfulsoftware.dev";
 const DEMO_REQUEST_RECIPIENT = "sales@faithfulsoftware.dev";
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;",
+    };
+    return entities[character] ?? character;
+  });
+}
+
 function parseAndValidateFromAddress(
   raw: string | undefined,
 ): { from: string; usedFallback: boolean } {
@@ -37,6 +50,27 @@ export type SendToolkitLinkParams = {
   name?: string;
   orgName?: string;
   downloadUrl: string;
+};
+
+export type SendTeamTrackerDeliveryParams = {
+  to: string;
+  name: string;
+  downloadUrl: string;
+  previewImageUrl: string;
+  unsubscribeUrl?: string;
+};
+
+export type TeamTrackerFollowUpKind = "day_3" | "day_7" | "day_12";
+
+export type ScheduleTeamTrackerFollowUpParams = {
+  to: string;
+  name: string;
+  previewImageUrl: string;
+  unsubscribeUrl: string;
+  scheduledAt: string;
+  kind: TeamTrackerFollowUpKind;
+  callUrl?: string;
+  trackerUrl?: string;
 };
 
 /** Params for shift-assignment notification (staff asked to accept a class shift). */
@@ -234,6 +268,171 @@ Download: ${downloadUrl}
 
 If you didn't request this, you can safely ignore this email.
     `.trim();
+  }
+
+  async sendTeamTrackerDelivery(
+    params: SendTeamTrackerDeliveryParams,
+  ): Promise<string | null> {
+    return this.sendTeamTrackerEmail({
+      ...params,
+      heading: "Your clearer week starts here.",
+      subject: "Your free Nexsteps One-Page Team Tracker",
+      body: "Your workbook is ready. Start with the role tab that matches your work, then replace or delete the yellow example row. The dashboard will do the counting for you.",
+      ctaLabel: "Download the tracker",
+      safetyNote:
+        "For day-to-day coordination only. Do not store safeguarding concerns or sensitive personal information in this workbook; use your organisation’s approved secure process.",
+    });
+  }
+
+  async scheduleTeamTrackerFollowUp(
+    params: ScheduleTeamTrackerFollowUpParams,
+  ): Promise<string | null> {
+    const messages: Record<
+      TeamTrackerFollowUpKind,
+      { subject: string; heading: string; body: string; ctaLabel: string; ctaUrl: string }
+    > = {
+      day_3: {
+        subject: "What are you still tracking somewhere else?",
+        heading: "One useful question for this week.",
+        body: "The tracker works best when it becomes the place your team checks first. What are you still tracking in a chat, notebook or another spreadsheet? Hit reply and tell us. We read every response.",
+        ctaLabel: "Reply to this email",
+        ctaUrl: "mailto:hello@nexsteps.dev?subject=What%20we%20are%20still%20tracking",
+      },
+      day_7: {
+        subject: "A 10-minute review that keeps actions moving",
+        heading: "Make Friday’s work visible before Monday.",
+        body: "Set aside ten minutes at the end of the week. Open the Dashboard, scan open and overdue follow-ups, then agree the next owner and date. It is a small habit that prevents important actions becoming hidden work.",
+        ctaLabel: "Open the free tracker",
+        ctaUrl: params.trackerUrl ?? "https://nexsteps.dev/team-tracker",
+      },
+      day_12: {
+        subject: "When one page stops being enough",
+        heading: "Your team may be ready for the next step.",
+        body: "One page is a strong place to start. If you are coordinating a larger team, several sites, or information spread across multiple tools, a short operational-readiness call can help you decide what should be connected next.",
+        ctaLabel: "Book an operational-readiness call",
+        ctaUrl: params.callUrl ?? "https://nexsteps.dev/demo",
+      },
+    };
+    const message = messages[params.kind];
+
+    return this.sendTeamTrackerEmail({
+      to: params.to,
+      name: params.name,
+      previewImageUrl: params.previewImageUrl,
+      unsubscribeUrl: params.unsubscribeUrl,
+      subject: message.subject,
+      heading: message.heading,
+      body: message.body,
+      ctaLabel: message.ctaLabel,
+      ctaUrl: message.ctaUrl,
+      scheduledAt: params.scheduledAt,
+    });
+  }
+
+  async cancelScheduledEmail(emailId: string): Promise<void> {
+    if (!this.isEnabled || !this.resend) {
+      this.logger.log(`[📧 MAILER] MOCK MODE - Would cancel scheduled email ${emailId}`);
+      return;
+    }
+
+    const result = await this.resend.emails.cancel(emailId);
+    if (result.error) {
+      throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+    }
+  }
+
+  private async sendTeamTrackerEmail(params: {
+    to: string;
+    name: string;
+    previewImageUrl: string;
+    subject: string;
+    heading: string;
+    body: string;
+    ctaLabel: string;
+    ctaUrl?: string;
+    downloadUrl?: string;
+    unsubscribeUrl?: string;
+    safetyNote?: string;
+    scheduledAt?: string;
+  }): Promise<string | null> {
+    const ctaUrl = params.ctaUrl ?? params.downloadUrl;
+    if (!ctaUrl) {
+      throw new Error("Team tracker email requires a call-to-action URL");
+    }
+
+    const html = this.buildTeamTrackerEmailHtml({ ...params, ctaUrl });
+    const text = this.buildTeamTrackerEmailText({ ...params, ctaUrl });
+    const schedule = params.scheduledAt ? ` for ${params.scheduledAt}` : "";
+
+    if (!this.isEnabled || !this.resend) {
+      this.logger.log(`[📧 MAILER] MOCK MODE - Would send team tracker email to ${params.to}${schedule}\nSubject: ${params.subject}`);
+      return null;
+    }
+
+    const result = await this.resend.emails.send({
+      from: this.fromAddress,
+      to: params.to,
+      subject: params.subject,
+      html,
+      text,
+      ...(params.scheduledAt ? { scheduledAt: params.scheduledAt } : {}),
+      ...(params.unsubscribeUrl
+        ? { headers: { "List-Unsubscribe": `<${params.unsubscribeUrl}>` } }
+        : {}),
+    });
+
+    if (result.error) {
+      throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+    }
+
+    return result.data?.id ?? null;
+  }
+
+  private buildTeamTrackerEmailHtml(params: {
+    name: string;
+    previewImageUrl: string;
+    heading: string;
+    body: string;
+    ctaLabel: string;
+    ctaUrl: string;
+    unsubscribeUrl?: string;
+    safetyNote?: string;
+  }): string {
+    const greeting = `Hi ${escapeHtml(params.name)},`;
+    const unsubscribe = params.unsubscribeUrl
+      ? `<p style="margin: 20px 0 0; font-size: 12px; line-height: 1.5; color: #65758b;">You are receiving this because you asked for Nexsteps updates. <a href="${escapeHtml(params.unsubscribeUrl)}" style="color: #65758b;">Unsubscribe</a>.</p>`
+      : "";
+    const safetyNote = params.safetyNote
+      ? `<p style="margin: 24px 0 0; padding: 14px 16px; border-radius: 10px; background: #fff7df; font-size: 13px; line-height: 1.55; color: #76590b;">${escapeHtml(params.safetyNote)}</p>`
+      : "";
+
+    return `<!doctype html><html><body style="margin:0;padding:0;background:#edf2f4;font-family:Arial,Helvetica,sans-serif;color:#112035;"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 16px;background:#edf2f4;"><tr><td align="center"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;overflow:hidden;border-radius:18px;background:#ffffff;"><tr><td style="padding:24px 32px;background:#0c1726;"><table role="presentation" width="100%"><tr><td style="font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;">Nexsteps</td><td align="right" style="font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#a9f1df;">Forward together</td></tr></table></td></tr><tr><td><img src="${escapeHtml(params.previewImageUrl)}" alt="Nexsteps One-Page Team Tracker" width="600" style="display:block;width:100%;height:auto;border:0;" /></td></tr><tr><td style="padding:32px;"><p style="margin:0 0 16px;font-size:16px;line-height:1.5;">${greeting}</p><h1 style="margin:0 0 16px;font-size:30px;line-height:1.12;letter-spacing:-0.035em;color:#112035;">${escapeHtml(params.heading)}</h1><p style="margin:0;font-size:16px;line-height:1.6;color:#46566b;">${escapeHtml(params.body)}</p><table role="presentation" cellspacing="0" cellpadding="0" style="margin-top:28px;"><tr><td style="border-radius:10px;background:#149b7e;"><a href="${escapeHtml(params.ctaUrl)}" style="display:inline-block;padding:14px 20px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">${escapeHtml(params.ctaLabel)}</a></td></tr></table>${safetyNote}${unsubscribe}</td></tr></table></td></tr></table></body></html>`;
+  }
+
+  private buildTeamTrackerEmailText(params: {
+    name: string;
+    heading: string;
+    body: string;
+    ctaLabel: string;
+    ctaUrl: string;
+    unsubscribeUrl?: string;
+    safetyNote?: string;
+  }): string {
+    return [
+      "Nexsteps",
+      "",
+      `Hi ${params.name},`,
+      "",
+      params.heading,
+      "",
+      params.body,
+      "",
+      `${params.ctaLabel}: ${params.ctaUrl}`,
+      ...(params.safetyNote ? ["", params.safetyNote] : []),
+      ...(params.unsubscribeUrl
+        ? ["", `Unsubscribe from Nexsteps updates: ${params.unsubscribeUrl}`]
+        : []),
+    ].join("\n");
   }
 
   /**
@@ -927,4 +1126,3 @@ ${message ? `\n${message}` : ""}
     `.trim();
   }
 }
-

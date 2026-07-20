@@ -27,7 +27,15 @@ export type AnalyticsEvent =
   | { type: "readiness_complete"; score: number; band: string; utm?: AnalyticsUtm }
   | { type: "readiness_result_view"; score: number; band: string; utm?: AnalyticsUtm }
   | { type: "readiness_cta_click"; location: string; destination: string; utm?: AnalyticsUtm }
-  | { type: "readiness_lead_submit"; utm?: AnalyticsUtm };
+  | { type: "readiness_lead_submit"; utm?: AnalyticsUtm }
+  | {
+      type: "team_tracker_form_submit";
+      organisationType: string;
+      role: string;
+      marketingOptIn: boolean;
+      utm?: AnalyticsUtm;
+    }
+  | { type: "team_tracker_download"; utm?: AnalyticsUtm };
 
 /**
  * Track an analytics event.
@@ -101,4 +109,3 @@ export function track(event: AnalyticsEvent): void {
     console.log("[Analytics] Event:", event);
   }
 }
-

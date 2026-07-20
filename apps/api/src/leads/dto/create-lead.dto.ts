@@ -35,6 +35,50 @@ export const createToolkitLeadDto = z.object({
 
 export type CreateToolkitLeadDto = z.infer<typeof createToolkitLeadDto>;
 
+const teamTrackerOrganisationTypes = [
+  "school",
+  "youth_group_or_church",
+  "club",
+  "charity",
+  "other",
+] as const;
+
+const teamTrackerRoles = [
+  "leader",
+  "administrator",
+  "safeguarding_lead",
+  "volunteer_coordinator",
+  "other",
+] as const;
+
+const teamTrackerTeamSizes = ["1-10", "11-25", "26-50", "51+"] as const;
+const teamTrackerCurrentTools = [
+  "spreadsheet",
+  "whatsapp",
+  "paper",
+  "multiple_tools",
+  "system",
+] as const;
+
+export const createTeamTrackerLeadDto = z.object({
+  name: z.string().trim().min(1, "First name is required").max(100),
+  email: z.string().email("Invalid email address"),
+  organisationType: z.enum(teamTrackerOrganisationTypes),
+  role: z.enum(teamTrackerRoles),
+  teamSize: z.enum(teamTrackerTeamSizes).optional(),
+  currentTools: z.enum(teamTrackerCurrentTools).optional(),
+  consentMarketing: z.boolean().default(false),
+  utm: utmSchema,
+});
+
+export type CreateTeamTrackerLeadDto = z.infer<typeof createTeamTrackerLeadDto>;
+
+export const unsubscribeTeamTrackerDto = z.object({
+  token: z.string().regex(/^[a-f0-9]{64}$/i, "Invalid unsubscribe token"),
+});
+
+export type UnsubscribeTeamTrackerDto = z.infer<typeof unsubscribeTeamTrackerDto>;
+
 export const createTrialLeadDto = z.object({
   email: z.string().email("Invalid email address"),
   name: z.string().optional(),
@@ -64,4 +108,3 @@ export const createReadinessLeadDto = z.object({
 });
 
 export type CreateReadinessLeadDto = z.infer<typeof createReadinessLeadDto>;
-
