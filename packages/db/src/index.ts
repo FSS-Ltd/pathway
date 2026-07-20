@@ -57,6 +57,10 @@ export async function resetDatabase() {
         "PendingOrder",
         "UsageCounters",
         "StaffActivity",
+        "ReportBundle",
+        "Evidence",
+        "LearningLog",
+        "Subject",
         "OrgEntitlementSnapshot",
         "Subscription",
         "Announcement",
@@ -93,6 +97,10 @@ export async function resetDatabase() {
         "UsageCounters",
         "StaffActivity",
         "OrgEntitlementSnapshot",
+        "ReportBundle",
+        "Evidence",
+        "LearningLog",
+        "Subject",
         "PendingOrder",
         "Subscription",
         "Announcement",
@@ -143,6 +151,7 @@ export {
   Vertical,
   Module,
   ModuleStatus,
+  ReportBundleStatus,
 } from "@prisma/client";
 export { Prisma };
 

@@ -18,21 +18,25 @@ const SUPABASE_RLS_HARDENED_TABLES = [
   "BlogAsset",
   "BlogPost",
   "DownloadToken",
+  "Evidence",
   "EmergencyContact",
   "HandoverLog",
   "HandoverLogVersion",
   "Invite",
   "Lead",
+  "LearningLog",
   "OrgEntitlementSnapshot",
   "OrgMembership",
   "OrgRetentionPolicy",
   "ParentSignupConsent",
   "PublicSignupLink",
+  "ReportBundle",
   "SessionStaffAttendance",
   "SiteMembership",
   "StaffPreferredGroup",
   "StaffUnavailableDate",
   "Subscription",
+  "Subject",
   "UsageCounters",
   "UserIdentity",
 ] as const;
@@ -44,6 +48,7 @@ interface TenantFixtures {
   sessionId: string;
   attendanceId: string;
   assignmentId: string;
+  learningLogId: string;
   userId: string;
   orgId: string;
 }
@@ -61,6 +66,8 @@ async function seedTenantData(
   const sessionId = randomUUID();
   const assignmentId = randomUUID();
   const attendanceId = randomUUID();
+  const subjectId = randomUUID();
+  const learningLogId = randomUUID();
   const baseTime = new Date("2025-01-01T09:00:00.000Z");
 
   await withTenantRlsContext(
@@ -74,6 +81,13 @@ async function seedTenantData(
           email: `teacher-${label}-${userId}@example.test`,
           tenantId,
           name: `Teacher ${label}`,
+        },
+      });
+
+      await tx.siteMembership.create({
+        data: {
+          tenantId,
+          userId,
         },
       });
 
@@ -143,6 +157,26 @@ async function seedTenantData(
           present: true,
         },
       });
+
+      await tx.subject.create({
+        data: {
+          id: subjectId,
+          tenantId,
+          name: `Subject ${label}`,
+        },
+      });
+
+      await tx.learningLog.create({
+        data: {
+          id: learningLogId,
+          tenantId,
+          childId,
+          subjectId,
+          loggedByUserId: userId,
+          activityDate: baseTime,
+          title: `Learning log ${label}`,
+        },
+      });
     },
   );
 
@@ -153,6 +187,7 @@ async function seedTenantData(
     sessionId,
     attendanceId,
     assignmentId,
+    learningLogId,
     userId,
     orgId,
   };
@@ -338,6 +373,43 @@ describe("Postgres RLS policies", () => {
         expect(note).toBeNull();
       },
     );
+  });
+
+  it("blocks cross-tenant learning log lookups silently", async () => {
+    if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
+      return;
+    const targetLearningLog = fixtures[TENANT_B].learningLogId;
+    await withTenantRlsContext(
+      TENANT_A,
+      fixtures[TENANT_A].orgId,
+      async (tx) => {
+        const learningLog = await tx.learningLog.findUnique({
+          where: { id: targetLearningLog },
+        });
+        expect(learningLog).toBeNull();
+      },
+    );
+  });
+
+  it("rejects learning logs linked to another tenant's child", async () => {
+    if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
+      return;
+    await expect(
+      withTenantRlsContext(
+        TENANT_A,
+        fixtures[TENANT_A].orgId,
+        (tx) =>
+          tx.learningLog.create({
+            data: {
+              tenantId: TENANT_A,
+              childId: fixtures[TENANT_B].childId,
+              loggedByUserId: fixtures[TENANT_A].userId,
+              activityDate: new Date("2025-01-01"),
+              title: "Cross-tenant write",
+            },
+          }),
+      ),
+    ).rejects.toMatchObject({ code: "P2003" });
   });
 
   it("raises P2025 when updating another tenant's concern", async () => {
