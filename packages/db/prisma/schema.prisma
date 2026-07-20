@@ -146,6 +146,13 @@ enum ModuleStatus {
   CANCELLED
 }
 
+enum ReportBundleStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
 model OrgVertical {
   id        String   @id @default(uuid())
   orgId     String   @unique
@@ -349,6 +356,10 @@ model Tenant {
   parentSignupConsents   ParentSignupConsent[]
   childGuardianContacts  ChildGuardianContact[]
   handoverLogs           HandoverLog[]
+  subjects               Subject[]
+  learningLogs           LearningLog[]
+  evidence               Evidence[]
+  reportBundles          ReportBundle[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -436,6 +447,9 @@ model User {
   handoverLogsCreated     HandoverLog[]           @relation("HandoverLogCreatedBy")
   handoverLogsApproved    HandoverLog[]           @relation("HandoverLogApprovedBy")
   handoverLogVersions     HandoverLogVersion[]    @relation("HandoverLogVersionEditedBy")
+  loggedLearningLogs      LearningLog[]           @relation("LearningLogLoggedBy")
+  uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
+  requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.
@@ -662,6 +676,9 @@ model Child {
   concerns            Concern[]
   attendance          Attendance[]
   childNotes          ChildNote[]
+  learningLogs        LearningLog[]
+  evidence            Evidence[]
+  reportBundles       ReportBundle[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
   // ~1h after guestExpiresAt. See docs/design/guest-pass-24h.md.
   isGuest             Boolean      @default(false)
@@ -671,6 +688,7 @@ model Child {
 
   @@index([tenantId])
   @@index([isGuest, guestExpiresAt])
+  @@unique([id, tenantId])
 }
 
 model Group {
@@ -907,6 +925,89 @@ model Lesson {
   @@index([groupId])
   @@index([sessionId])
   @@index([weekOf])
+}
+
+model Subject {
+  id           String        @id @default(uuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  name         String
+  category     String?
+  color        String?
+  isActive     Boolean       @default(true)
+  sortOrder    Int?
+  learningLogs LearningLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([tenantId, name])
+  @@unique([id, tenantId])
+  @@index([tenantId])
+}
+
+model LearningLog {
+  id             String     @id @default(uuid())
+  tenantId       String
+  tenant         Tenant     @relation(fields: [tenantId], references: [id])
+  childId        String
+  child          Child      @relation(fields: [childId, tenantId], references: [id, tenantId])
+  subjectId      String?
+  subject        Subject?   @relation(fields: [subjectId, tenantId], references: [id, tenantId])
+  loggedByUserId String
+  loggedBy       User       @relation("LearningLogLoggedBy", fields: [loggedByUserId], references: [id])
+  activityDate   DateTime   @db.Date
+  minutes        Int?
+  title          String
+  description    String?    @db.Text
+  evidence       Evidence[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([tenantId, activityDate])
+  @@index([tenantId, childId, activityDate])
+  @@index([subjectId])
+  @@unique([id, tenantId])
+}
+
+model Evidence {
+  id               String       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  childId          String
+  child            Child        @relation(fields: [childId, tenantId], references: [id, tenantId])
+  learningLogId    String?
+  learningLog      LearningLog? @relation(fields: [learningLogId, tenantId], references: [id, tenantId])
+  title            String
+  storageKey       String
+  mimeType         String
+  byteSize         Int
+  capturedAt       DateTime?
+  uploadedByUserId String
+  uploadedBy       User         @relation("EvidenceUploadedBy", fields: [uploadedByUserId], references: [id])
+  createdAt        DateTime     @default(now())
+
+  @@index([tenantId, childId])
+  @@index([learningLogId])
+}
+
+model ReportBundle {
+  id                String             @id @default(uuid())
+  tenantId          String
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  childId           String?
+  child             Child?             @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  requestedByUserId String
+  requestedBy       User               @relation("ReportBundleRequestedBy", fields: [requestedByUserId], references: [id])
+  periodStart       DateTime           @db.Date
+  periodEnd         DateTime           @db.Date
+  status            ReportBundleStatus @default(PENDING)
+  storageKey        String?
+  failureReason     String?
+  createdAt         DateTime           @default(now())
+  completedAt       DateTime?
+
+  @@index([tenantId, childId])
+  @@index([status])
 }
 
 model Announcement {
