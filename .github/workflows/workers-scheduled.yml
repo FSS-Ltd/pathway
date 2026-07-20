@@ -16,7 +16,11 @@ jobs:
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       AV30_TENANT_IDS: ${{ secrets.AV30_TENANT_IDS }}
+      REPORT_BUNDLE_TENANT_IDS: ${{ secrets.REPORT_BUNDLE_TENANT_IDS }}
       RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      SUPABASE_STORAGE_PRIVATE_BUCKET: ${{ secrets.SUPABASE_STORAGE_PRIVATE_BUCKET }}
 
     steps:
       - name: Checkout code
@@ -59,12 +63,27 @@ jobs:
             echo "RETENTION_ENABLED must be set to true for scheduled retention." >&2
             exit 1
           }
+          test -n "$SUPABASE_URL" || {
+            echo "SUPABASE_URL secret is required for report bundles." >&2
+            exit 1
+          }
+          test -n "$SUPABASE_SECRET_KEY" || {
+            echo "SUPABASE_SECRET_KEY secret is required for report bundles." >&2
+            exit 1
+          }
+          test -n "$SUPABASE_STORAGE_PRIVATE_BUCKET" || {
+            echo "SUPABASE_STORAGE_PRIVATE_BUCKET secret is required for report bundles." >&2
+            exit 1
+          }
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
 
       - name: Compute AV30
         run: pnpm --filter @pathway/workers compute:av30
+
+      - name: Generate report bundles
+        run: pnpm --filter @pathway/workers generate:report-bundle
 
       - name: Run retention
         run: pnpm --filter @pathway/workers retention:run
