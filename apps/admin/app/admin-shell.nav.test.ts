@@ -38,6 +38,18 @@ assert.ok(
   `iconComponents (${iconNames.length} entries) must cover the highest iconIndex used (${maxIconIndex})`,
 );
 
+const learningNavEntry = shellSource.match(
+  /label:\s*"Learning"[\s\S]*?href:\s*"\/learning"[\s\S]*?iconIndex:\s*(\d+)[\s\S]*?access:\s*"staff-or-admin"[\s\S]*?capability:\s*"learning\.log\.read"[\s\S]*?group:\s*"Teaching"/,
+);
+assert.ok(
+  learningNavEntry,
+  "expected Learning navigation to require the learning.log.read capability",
+);
+assert.ok(
+  Number(learningNavEntry[1]) < iconNames.length,
+  "Learning navigation iconIndex must be covered by iconComponents",
+);
+
 // Grouped items render as accordion sections; Dashboard stays top-level.
 const groupLabels = [...shellSource.matchAll(/group:\s*"([^"]+)"/g)].map((m) => m[1]);
 assert.ok(groupLabels.length > 0, "expected nav items to declare accordion groups");

@@ -7,6 +7,7 @@ import {
   UserRound,
   GraduationCap,
   BookOpen,
+  BookMarked,
   Layers,
   CalendarClock,
   CheckSquare,
@@ -76,6 +77,7 @@ const iconComponents: LucideIcon[] = [
   History, // 17 Handover logs
   AlertTriangle, // 18 Create concern
   Newspaper, // 19 Blog
+  BookMarked, // 20 Learning
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.
