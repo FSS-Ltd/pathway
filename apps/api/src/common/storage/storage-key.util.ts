@@ -38,6 +38,10 @@ export function lessonResourceKey(
   return `tenants/${tenantId}/lessons/${lessonId}/resources/${sanitizeStorageSegment(fileName)}`;
 }
 
+export function reportBundleKey(tenantId: string, bundleId: string): string {
+  return `tenants/${tenantId}/reports/${bundleId}/bundle.csv`;
+}
+
 export function blogAssetKey(sha256: string, mimeType: string): string {
   return `blog/assets/${sha256}.${storageExtension(mimeType)}`;
 }
