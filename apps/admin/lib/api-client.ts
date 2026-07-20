@@ -570,6 +570,53 @@ export type AdminLessonFormValues = {
   resourceFileName?: string | null;
 };
 
+export type AdminLearningSubject = {
+  id: string;
+  name: string;
+  category: string | null;
+  color: string | null;
+  isActive: boolean;
+  sortOrder: number | null;
+};
+
+export type AdminLearningLogRow = {
+  id: string;
+  childId: string;
+  subjectId: string | null;
+  activityDate: string;
+  minutes: number | null;
+  title: string;
+  description: string | null;
+  createdAt: string;
+};
+
+export type AdminLearningLogInput = {
+  childId: string;
+  subjectId?: string;
+  activityDate: string;
+  minutes?: number;
+  title: string;
+  description?: string;
+};
+
+export type AdminReportBundleRow = {
+  id: string;
+  childId: string | null;
+  periodStart: string;
+  periodEnd: string;
+  status: "PENDING" | "GENERATING" | "READY" | "FAILED";
+  storageKey: string | null;
+  failureReason: string | null;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+export type AdminReportBundleInput = {
+  childId?: string;
+  periodStart: string;
+  periodEnd: string;
+};
+
 // Auth header builder with support for runtime token injection.
 // Preferred: NextAuth access token via setApiClientToken().
 // Dev fallback: NEXT_PUBLIC_DEV_BEARER_TOKEN (should be empty in prod).
@@ -3301,6 +3348,161 @@ export async function updateLesson(
 
   const json = (await res.json()) as ApiLesson;
   return mapApiLessonToAdminDetail(json);
+}
+
+type ApiLearningSubject = {
+  id: string;
+  name: string;
+  category?: string | null;
+  color?: string | null;
+  isActive?: boolean | null;
+  sortOrder?: number | null;
+};
+
+type ApiLearningLog = {
+  id: string;
+  childId: string;
+  subjectId?: string | null;
+  activityDate: string;
+  minutes?: number | null;
+  title: string;
+  description?: string | null;
+  createdAt: string;
+};
+
+type ApiReportBundle = {
+  id: string;
+  childId?: string | null;
+  periodStart: string;
+  periodEnd: string;
+  status: AdminReportBundleRow["status"];
+  storageKey?: string | null;
+  failureReason?: string | null;
+  createdAt: string;
+  completedAt?: string | null;
+};
+
+const mapApiLearningSubjectToAdmin = (subject: ApiLearningSubject): AdminLearningSubject => ({
+  id: subject.id,
+  name: subject.name,
+  category: subject.category ?? null,
+  color: subject.color ?? null,
+  isActive: subject.isActive ?? true,
+  sortOrder: subject.sortOrder ?? null,
+});
+
+const mapApiLearningLogToAdmin = (log: ApiLearningLog): AdminLearningLogRow => ({
+  id: log.id,
+  childId: log.childId,
+  subjectId: log.subjectId ?? null,
+  activityDate: log.activityDate,
+  minutes: log.minutes ?? null,
+  title: log.title,
+  description: log.description ?? null,
+  createdAt: log.createdAt,
+});
+
+const mapApiReportBundleToAdmin = (bundle: ApiReportBundle): AdminReportBundleRow => ({
+  id: bundle.id,
+  childId: bundle.childId ?? null,
+  periodStart: bundle.periodStart,
+  periodEnd: bundle.periodEnd,
+  status: bundle.status,
+  storageKey: bundle.storageKey ?? null,
+  failureReason: bundle.failureReason ?? null,
+  createdAt: bundle.createdAt,
+  completedAt: bundle.completedAt ?? null,
+});
+
+async function learningRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/learning/${path}`, {
+    ...init,
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Learning request failed (${response.status}): ${body || response.statusText}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function fetchLearningSubjects(): Promise<AdminLearningSubject[]> {
+  if (isUsingMockApi()) return [];
+  const subjects = await learningRequest<ApiLearningSubject[]>("subjects");
+  return subjects.map(mapApiLearningSubjectToAdmin);
+}
+
+export async function createLearningSubject(
+  input: Pick<AdminLearningSubject, "name"> & Partial<Pick<AdminLearningSubject, "category" | "color" | "isActive" | "sortOrder">>,
+): Promise<AdminLearningSubject> {
+  const subject = await learningRequest<ApiLearningSubject>("subjects", {
+    method: "POST",
+    body: JSON.stringify({
+      name: input.name.trim(),
+      category: input.category?.trim() || undefined,
+      color: input.color?.trim() || undefined,
+      isActive: input.isActive,
+      sortOrder: input.sortOrder,
+    }),
+  });
+  return mapApiLearningSubjectToAdmin(subject);
+}
+
+export async function fetchLearningLogs(): Promise<AdminLearningLogRow[]> {
+  if (isUsingMockApi()) return [];
+  const logs = await learningRequest<ApiLearningLog[]>("logs");
+  return logs.map(mapApiLearningLogToAdmin);
+}
+
+export async function createLearningLog(input: AdminLearningLogInput): Promise<AdminLearningLogRow> {
+  const log = await learningRequest<ApiLearningLog>("logs", {
+    method: "POST",
+    body: JSON.stringify({
+      childId: input.childId,
+      subjectId: input.subjectId || undefined,
+      activityDate: input.activityDate,
+      minutes: input.minutes,
+      title: input.title.trim(),
+      description: input.description?.trim() || undefined,
+    }),
+  });
+  return mapApiLearningLogToAdmin(log);
+}
+
+export async function fetchReportBundles(): Promise<AdminReportBundleRow[]> {
+  if (isUsingMockApi()) return [];
+  const bundles = await learningRequest<ApiReportBundle[]>("report-bundles");
+  return bundles.map(mapApiReportBundleToAdmin);
+}
+
+export async function createReportBundle(input: AdminReportBundleInput): Promise<AdminReportBundleRow> {
+  const bundle = await learningRequest<ApiReportBundle>("report-bundles", {
+    method: "POST",
+    body: JSON.stringify({
+      childId: input.childId || undefined,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+    }),
+  });
+  return mapApiReportBundleToAdmin(bundle);
+}
+
+export async function downloadReportBundle(bundleId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/learning/report-bundles/${encodeURIComponent(bundleId)}/download`, {
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`Failed to download report bundle (${response.status}): ${body || response.statusText}`);
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${bundleId}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Download the lesson resource file (stored as bytes until S3). Triggers browser download. */

@@ -53,6 +53,7 @@ const navItemsWithAccess: (SidebarNavItem & {
   { ...defaultSidebarItems[3], access: "staff-or-admin", group: "People" }, // Parents & Guardians
   { ...defaultSidebarItems[4], access: "staff-or-admin", group: "Teaching" }, // Lessons
   { ...defaultSidebarItems[5], access: "site-admin-or-higher", group: "Teaching" }, // Classes (admins only)
+  { label: "Learning", href: "/learning", iconIndex: 20, access: "staff-or-admin", capability: "learning.log.read", group: "Teaching" },
   { ...defaultSidebarItems[6], access: "staff-or-admin", group: "Schedule" }, // Sessions & Rota
   { ...defaultSidebarItems[7], access: "staff-or-admin", group: "Schedule" }, // My schedule
   { ...defaultSidebarItems[8], access: "staff-or-admin", group: "Schedule" }, // Attendance
@@ -77,6 +78,7 @@ const titleMap: Record<string, string> = {
   "/children": "Children",
   "/parents": "Parents & Guardians",
   "/lessons": "Lessons",
+  "/learning": "Learning",
   "/classes": "Classes",
   "/sessions": "Sessions & Rota",
   "/my-schedule": "My schedule",
