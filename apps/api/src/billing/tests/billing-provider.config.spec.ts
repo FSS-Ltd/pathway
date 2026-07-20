@@ -133,4 +133,39 @@ describe("billing provider config", () => {
     expect(priceMap?.MODULE_FINANCE_MONTHLY).toBe("price_fin_m");
     expect(priceMap?.MODULE_NOT_A_REAL_ONE_MONTHLY).toBeUndefined();
   });
+
+  it("Phase 4 PR 4.6: accepts Learning module price codes in STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      MODULE_LEARNING_MONTHLY: "price_learning_m",
+      MODULE_LEARNING_YEARLY: "price_learning_y",
+    });
+
+    const config = loadBillingProviderConfig();
+
+    expect(config.stripe.priceMap?.MODULE_LEARNING_MONTHLY).toBe(
+      "price_learning_m",
+    );
+    expect(config.stripe.priceMap?.MODULE_LEARNING_YEARLY).toBe(
+      "price_learning_y",
+    );
+  });
+
+  it("Phase 4 PR 4.6: filters unknown Learning module price codes from STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      MODULE_LEARNING_MONTHLY: "price_learning_m",
+      MODULE_LEARNING_QUARTERLY: "price_learning_q",
+    });
+
+    const config = loadBillingProviderConfig();
+    const priceMap = config.stripe.priceMap as Record<string, string> | undefined;
+
+    expect(priceMap?.MODULE_LEARNING_MONTHLY).toBe("price_learning_m");
+    expect(priceMap?.MODULE_LEARNING_QUARTERLY).toBeUndefined();
+  });
 });
