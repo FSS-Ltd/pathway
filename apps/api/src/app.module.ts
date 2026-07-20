@@ -12,6 +12,7 @@ import { GroupsModule } from "./groups/groups.module";
 import { ChildrenModule } from "./children/children.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { LessonsModule } from "./lessons/lessons.module";
+import { LearningModule } from "./learning/learning.module";
 
 // // Scheduling / Rota
 import { SessionsModule } from "./sessions/sessions.module";
@@ -50,6 +51,7 @@ import { GuestPassModule } from "./guest-pass/guest-pass.module";
     ChildrenModule,
     AttendanceModule,
     LessonsModule,
+    LearningModule,
     SessionsModule,
     AssignmentsModule,
     PreferencesModule,
