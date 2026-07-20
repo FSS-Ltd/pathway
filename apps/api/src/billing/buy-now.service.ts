@@ -239,7 +239,8 @@ export class BuyNowService {
     const intervalSuffix = planCode.endsWith("_YEARLY")
       ? "YEARLY"
       : "MONTHLY";
-    const priceMap = this.providerConfig?.stripe.priceMap ?? {};
+    const priceMap: Record<string, string | undefined> =
+      this.providerConfig?.stripe.priceMap ?? {};
     const missingModules = selectedModules.filter(
       (module) => !priceMap[`MODULE_${module}_${intervalSuffix}`],
     );

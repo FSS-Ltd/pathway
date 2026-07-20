@@ -477,7 +477,8 @@ export type AdminModule =
   | "ASSET_MANAGEMENT"
   | "HR"
   | "AI_WORKSPACE"
-  | "ADVANCED_REPORTING";
+  | "ADVANCED_REPORTING"
+  | "LEARNING";
 
 export const MODULE_LABELS: Record<AdminModule, string> = {
   FINANCE: "Finance",
@@ -488,6 +489,7 @@ export const MODULE_LABELS: Record<AdminModule, string> = {
   HR: "HR",
   AI_WORKSPACE: "AI Workspace",
   ADVANCED_REPORTING: "Advanced Reporting",
+  LEARNING: "Learning",
 };
 
 export type AdminOrgModule = {
