@@ -20,6 +20,13 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    outputFileTracingIncludes: {
+      "/api/team-tracker/download": [
+        "./content/resources/Nexsteps_One_Page_Team_Tracker.xlsx",
+      ],
+    },
+  },
   async headers() {
     return [
       {

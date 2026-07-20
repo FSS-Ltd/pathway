@@ -13,10 +13,14 @@ import {
   createToolkitLeadDto,
   createTrialLeadDto,
   createReadinessLeadDto,
+  createTeamTrackerLeadDto,
+  unsubscribeTeamTrackerDto,
   type CreateDemoLeadDto,
   type CreateToolkitLeadDto,
   type CreateTrialLeadDto,
   type CreateReadinessLeadDto,
+  type CreateTeamTrackerLeadDto,
+  type UnsubscribeTeamTrackerDto,
 } from "./dto/create-lead.dto";
 import {
   redeemToolkitTokenDto,
@@ -63,6 +67,29 @@ export class LeadsController {
     return result;
   }
 
+  @Post("team-tracker")
+  @HttpCode(HttpStatus.OK)
+  async createTeamTrackerLead(@Body() dto: CreateTeamTrackerLeadDto) {
+    const parsed = createTeamTrackerLeadDto.safeParse(dto);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.errors);
+    }
+
+    return this.leadsService.createTeamTrackerLead(parsed.data);
+  }
+
+  @Post("team-tracker/unsubscribe")
+  @HttpCode(HttpStatus.OK)
+  async unsubscribeTeamTracker(@Body() dto: UnsubscribeTeamTrackerDto) {
+    const parsed = unsubscribeTeamTrackerDto.safeParse(dto);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.errors);
+    }
+
+    await this.leadsService.unsubscribeTeamTracker(parsed.data.token);
+    return { success: true };
+  }
+
   @Post("trial")
   @HttpCode(HttpStatus.OK)
   async createTrialLead(@Body() dto: CreateTrialLeadDto) {
@@ -87,4 +114,3 @@ export class LeadsController {
     return { success: true, id: lead.id };
   }
 }
-
