@@ -66,4 +66,11 @@ export const MODULE_CAPABILITIES: Record<Module, Capability[]> = {
   HR: ["hr.staff", "hr.leave"],
   AI_WORKSPACE: ["ai.workspace"],
   ADVANCED_REPORTING: ["reporting.advanced"],
+  LEARNING: [
+    "learning.log.read",
+    "learning.log.write",
+    "learning.evidence.read",
+    "learning.evidence.write",
+    "learning.reports.generate",
+  ],
 };

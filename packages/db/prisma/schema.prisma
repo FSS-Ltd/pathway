@@ -137,6 +137,7 @@ enum Module {
   HR
   AI_WORKSPACE
   ADVANCED_REPORTING
+  LEARNING
 }
 
 enum ModuleStatus {

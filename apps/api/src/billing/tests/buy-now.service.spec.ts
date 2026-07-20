@@ -274,7 +274,7 @@ describe("BuyNowService", () => {
     );
   });
 
-  it("rejects a Stripe module selection that has no configured price", async () => {
+  it("rejects a Stripe selection for a module without a configured price", async () => {
     const stripeConfig: BillingProviderConfig = {
       activeProvider: "STRIPE",
       stripe: { priceMap: { STARTER_MONTHLY: "price_starter" } },
@@ -293,7 +293,7 @@ describe("BuyNowService", () => {
         ...baseRequest,
         plan: {
           planCode: "STARTER_MONTHLY",
-          selectedModules: [Module.FINANCE],
+          selectedModules: [Module.LEARNING],
         },
       }),
     ).rejects.toThrow("Missing Stripe price configuration for selected modules");
