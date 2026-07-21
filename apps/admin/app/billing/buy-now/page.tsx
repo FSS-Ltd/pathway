@@ -87,6 +87,7 @@ export default function BuyNowPage() {
   const [planTier, setPlanTier] = React.useState<(typeof planOptions)[number]["code"]>("STARTER");
   const [billingPeriod, setBillingPeriod] = React.useState<"monthly" | "yearly">("monthly");
   const [storageChoice, setStorageChoice] = React.useState<"none" | "100" | "200" | "1000">("none");
+  const [learningModule, setLearningModule] = React.useState(false);
   const [planPriceOverrides, setPlanPriceOverrides] = React.useState<
     Partial<Record<PlanCode, (typeof PLAN_PRICES)[Exclude<PlanCode, "ENTERPRISE_CONTACT">]>>
   >({});
@@ -281,7 +282,7 @@ export default function BuyNowPage() {
   ]);
 
   const isCurrentPlan = Boolean(planCode && currentPlanCode && planCode === currentPlanCode);
-  const hasAddons = storageChoice !== "none";
+  const hasAddons = storageChoice !== "none" || learningModule;
 
   const handleCheckout = async () => {
     setCheckoutError(null);
@@ -325,6 +326,7 @@ export default function BuyNowPage() {
         extraSites: 0,
         extraStorageGb,
         extraLeaderSeats: 0,
+        selectedModules: learningModule ? ["LEARNING"] : undefined,
         successUrl,
         cancelUrl,
       });
@@ -363,6 +365,7 @@ export default function BuyNowPage() {
   const storage100 = mergedAddonPrices[`STORAGE_100GB_${storageSuffix}` as keyof typeof mergedAddonPrices];
   const storage200 = mergedAddonPrices[`STORAGE_200GB_${storageSuffix}` as keyof typeof mergedAddonPrices];
   const storage1tb = mergedAddonPrices[`STORAGE_1TB_${storageSuffix}` as keyof typeof mergedAddonPrices];
+  const learningPrice = mergedAddonPrices[`MODULE_LEARNING_${storageSuffix}` as keyof typeof mergedAddonPrices];
   const storageOptions = [
     { value: "none", meta: null, label: "No additional storage" },
     {
@@ -392,6 +395,7 @@ export default function BuyNowPage() {
         {
           planCode,
           storageChoice,
+          learningModule,
         },
         {
           planPrices: mergedPlanPrices,
@@ -533,6 +537,23 @@ export default function BuyNowPage() {
                   Storage add-ons are charged as {billingPeriod} line items at checkout.
                 </p>
               </div>
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border-subtle p-3 text-sm md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={learningModule}
+                  onChange={(event) => setLearningModule(event.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-border-subtle"
+                />
+                <span>
+                  <span className="block font-medium text-text-primary">Learning module</span>
+                  <span className="block text-text-muted">
+                    £{formatAmount(learningPrice?.amountMajor ?? (billingPeriod === "yearly" ? 290 : 29))} / {billingPeriod === "yearly" ? "year" : "month"}
+                  </span>
+                  <span className="block text-xs text-text-muted">
+                    Available to organisations other than home-education providers.
+                  </span>
+                </span>
+              </label>
             </div>
           </Card>
 
@@ -710,4 +731,3 @@ export default function BuyNowPage() {
     </div>
   );
 }
-

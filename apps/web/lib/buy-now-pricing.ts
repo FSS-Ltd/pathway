@@ -21,7 +21,9 @@ export type AddonCode =
   | "STORAGE_200GB_MONTHLY"
   | "STORAGE_200GB_YEARLY"
   | "STORAGE_1TB_MONTHLY"
-  | "STORAGE_1TB_YEARLY";
+  | "STORAGE_1TB_YEARLY"
+  | "MODULE_LEARNING_MONTHLY"
+  | "MODULE_LEARNING_YEARLY";
 
 export type StripePriceMeta = {
   stripePriceId: string;
@@ -119,6 +121,20 @@ export const ADDON_PRICES: Record<AddonCode, StripePriceMeta> = {
     interval: "year",
     label: "+1TB storage - £1,500 / year",
   },
+  MODULE_LEARNING_MONTHLY: {
+    stripePriceId: "price_learning_monthly",
+    amountMajor: 29,
+    currency: "gbp",
+    interval: "month",
+    label: "Learning module",
+  },
+  MODULE_LEARNING_YEARLY: {
+    stripePriceId: "price_learning_yearly",
+    amountMajor: 290,
+    currency: "gbp",
+    interval: "year",
+    label: "Learning module",
+  },
 };
 
 export type BuyNowSelection = {
@@ -127,6 +143,7 @@ export type BuyNowSelection = {
   storageAddon100Gb?: number;
   storageAddon200Gb?: number;
   storageAddon1Tb?: number;
+  learningModule?: boolean;
 };
 
 export type CartTotals = {
@@ -186,6 +203,15 @@ export function calculateCartTotals(
     addonPrices[`STORAGE_1TB_${intervalKey}` as AddonCode],
     selection.storageAddon1Tb,
   );
+  if (selection.learningModule) {
+    const learningPrice = addonPrices[`MODULE_LEARNING_${intervalKey}` as AddonCode];
+    if (learningPrice) {
+      lines.push({
+        label: "Learning module",
+        amountMajor: learningPrice.amountMajor,
+      });
+    }
+  }
 
   const subtotalMajor = lines.reduce((sum, line) => sum + line.amountMajor, 0);
 
@@ -247,4 +273,3 @@ export function mergeBillingPrices(
 
   return { planPrices, addonPrices };
 }
-

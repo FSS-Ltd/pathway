@@ -19,4 +19,10 @@ describe("Marketing pricing page (Phase 0 PR 0.5: four target tiers)", () => {
     expect(source).not.toContain("CORE_YEARLY");
     expect(source).not.toContain("Core Card");
   });
+
+  it("lists the Learning module as a purchasable add-on", () => {
+    expect(source).toContain("Learning module");
+    expect(source).toContain("MODULE_LEARNING_MONTHLY");
+    expect(source).toContain("MODULE_LEARNING_YEARLY");
+  });
 });

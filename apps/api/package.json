@@ -17,6 +17,7 @@
     "storage:backfill": "tsx scripts/backfill-supabase-storage.ts",
     "pii:backfill": "tsx scripts/backfill-pii-encryption.ts",
     "stripe:provision:phase0": "tsx scripts/stripe-provision-phase0-plans.ts",
+    "stripe:provision:learning": "tsx scripts/stripe-provision-learning-module.ts",
     "db:generate": "pnpm --filter @pathway/db run prisma:generate",
     "db:migrate": "pnpm --filter @pathway/db run prisma:migrate:dev",
     "db:deploy": "pnpm --filter @pathway/db run prisma:migrate:deploy",

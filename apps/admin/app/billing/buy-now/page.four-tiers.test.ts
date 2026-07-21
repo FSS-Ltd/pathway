@@ -23,3 +23,11 @@ assert.ok(
   !source.includes('"GROWTH_MONTHLY"'),
   "admin buy-now page must not default new checkouts to the grandfathered Growth code",
 );
+assert.ok(
+  source.includes("Learning module"),
+  "admin buy-now page must expose the Learning module add-on",
+);
+assert.ok(
+  source.includes('selectedModules: learningModule ? ["LEARNING"] : undefined'),
+  "admin buy-now page must include the Learning module in checkout requests",
+);

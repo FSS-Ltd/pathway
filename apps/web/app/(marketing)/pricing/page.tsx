@@ -46,6 +46,7 @@ type PriceOverride = {
 
 type AddonDescriptions = {
   storage?: string;
+  learning?: string;
 };
 
 const formatMoney = (amount?: number | null) => {
@@ -67,6 +68,8 @@ const buildAddonDescriptions = (prices: PublicBillingPrices["prices"]): AddonDes
   const storage100 = getMajor("STORAGE_100GB_YEARLY");
   const storage200 = getMajor("STORAGE_200GB_YEARLY");
   const storage1tb = getMajor("STORAGE_1TB_YEARLY");
+  const learningMonthly = getMajor("MODULE_LEARNING_MONTHLY");
+  const learningYearly = getMajor("MODULE_LEARNING_YEARLY");
 
   const storage =
     storage100 && storage200 && storage1tb
@@ -76,9 +79,14 @@ const buildAddonDescriptions = (prices: PublicBillingPrices["prices"]): AddonDes
           storage1tb,
         )}/year)`
       : undefined;
+  const learning =
+    learningMonthly && learningYearly
+      ? `Learning module: £${formatMoney(learningMonthly)}/month or £${formatMoney(learningYearly)}/year. Available to organisations other than home-education providers.`
+      : undefined;
 
   return {
     storage,
+    learning,
   };
 };
 
@@ -166,6 +174,9 @@ export default function PricingPage() {
   const starterAddons = applyStorageDescription(starterMonthly);
   const growthAddons = applyStorageDescription(growthMonthly);
   const professionalAddons = applyStorageDescription(professionalMonthly);
+  const learningDescription =
+    addonDescriptions.learning ??
+    "Learning module: £29/month or £290/year. Available to organisations other than home-education providers.";
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-16 md:py-24">
@@ -548,6 +559,13 @@ export default function PricingPage() {
                 </div>
               </li>
             ))}
+            <li className="flex items-start gap-2">
+              <span className="mt-1 text-pw-primary">+</span>
+              <div>
+                <strong className="text-pw-text">Learning module</strong>
+                <p className="text-xs">{learningDescription}</p>
+              </div>
+            </li>
           </ul>
         </section>
       </div>
