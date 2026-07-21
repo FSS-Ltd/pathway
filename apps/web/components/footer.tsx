@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { APP_VERSION } from "@pathway/util";
+import { configuratorRolloutHref } from "../lib/configurator-rollout";
 
 interface FooterSection {
   title: string;
@@ -21,7 +22,7 @@ const footerSections: FooterSection[] = [
       { label: "Family Communication", href: "/features/family-communication" },
       { label: "Safeguarding", href: "/features/safeguarding" },
       { label: "Reporting", href: "/features/reporting" },
-      { label: "Pricing", href: "/pricing" },
+      { label: "Pricing", href: configuratorRolloutHref("/pricing") },
     ],
   },
   {

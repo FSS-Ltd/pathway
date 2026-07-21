@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { track } from "../lib/analytics";
+import { configuratorRolloutHref } from "../lib/configurator-rollout";
 
 type NavChildLink = {
   label: string;
@@ -94,7 +95,7 @@ export default function HeaderNav() {
       ],
     },
     { label: "Reporting", href: "/features/reporting" },
-    { label: "Pricing", href: "/pricing" },
+    { label: "Pricing", href: configuratorRolloutHref("/pricing") },
     {
       label: "Toolkit",
       children: [
