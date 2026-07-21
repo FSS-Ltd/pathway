@@ -118,6 +118,21 @@ describe("billing provider config", () => {
     expect(config.stripe.priceMap?.MODULE_AI_WORKSPACE_YEARLY).toBe("price_ai_y");
   });
 
+  it("accepts Learning module price codes in STRIPE_PRICE_MAP", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      MODULE_LEARNING_MONTHLY: "price_learning_m",
+      MODULE_LEARNING_YEARLY: "price_learning_y",
+    });
+
+    const config = loadBillingProviderConfig();
+
+    expect(config.stripe.priceMap?.MODULE_LEARNING_MONTHLY).toBe("price_learning_m");
+    expect(config.stripe.priceMap?.MODULE_LEARNING_YEARLY).toBe("price_learning_y");
+  });
+
   it("Phase 3 PR 3.1: filters unknown module price codes from STRIPE_PRICE_MAP", () => {
     process.env.BILLING_PROVIDER = "STRIPE";
     process.env.STRIPE_SECRET_KEY = "sk_test";

@@ -13,4 +13,14 @@ describe("capability maps completeness", () => {
       expect(MODULE_CAPABILITIES[m]?.length ?? 0).toBeGreaterThan(0);
     }
   });
+
+  it("gives the Learning module its learning capabilities", () => {
+    expect(MODULE_CAPABILITIES.LEARNING).toEqual([
+      "learning.log.read",
+      "learning.log.write",
+      "learning.evidence.read",
+      "learning.evidence.write",
+      "learning.reports.generate",
+    ]);
+  });
 });

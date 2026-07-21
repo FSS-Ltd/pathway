@@ -85,11 +85,20 @@ export const ADDON_PRICES = {
     amountMajor: 1500,
     label: "+1TB storage - £1,500 / year",
   },
+  MODULE_LEARNING_MONTHLY: {
+    amountMajor: 29,
+    label: "Learning module",
+  },
+  MODULE_LEARNING_YEARLY: {
+    amountMajor: 290,
+    label: "Learning module",
+  },
 } as const;
 
 export type AdminSelection = {
   planCode: PlanCode;
   storageChoice?: "none" | "100" | "200" | "1000";
+  learningModule?: boolean;
 };
 
 export type CartTotals = {
@@ -151,6 +160,17 @@ export function calculateCartTotals(
     }
   }
 
+  if (selection.learningModule) {
+    const suffix = selection.planCode.endsWith("YEARLY") ? "YEARLY" : "MONTHLY";
+    const learningLine = addonPrices[`MODULE_LEARNING_${suffix}` as keyof typeof addonPrices];
+    if (learningLine) {
+      lines.push({
+        label: learningLine.label,
+        amountMajor: learningLine.amountMajor,
+      });
+    }
+  }
+
   const subtotalMajor = lines.reduce((sum, line) => sum + line.amountMajor, 0);
   return { currency: "gbp", subtotalMajor, totalMajor: subtotalMajor, lines };
 }
@@ -203,4 +223,3 @@ export function mergeBillingPrices(
 
   return { planPrices, addonPrices };
 }
-

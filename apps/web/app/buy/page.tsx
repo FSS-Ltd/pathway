@@ -51,16 +51,10 @@ export default function BuyNowPage() {
   const [frequency, setFrequency] = useState<BillingFrequency>("monthly");
 
   const [storageChoice, setStorageChoice] = useState<"none" | "100" | "200" | "1000">("none");
+  const [learningModule, setLearningModule] = useState(false);
   const [planPriceOverrides, setPlanPriceOverrides] = useState<Partial<Record<PlanCode, typeof PLAN_PRICES[PlanCode]>>>({});
   const [addonPriceOverrides, setAddonPriceOverrides] = useState<
-    Partial<
-      Record<
-        | "STORAGE_100GB_YEARLY"
-        | "STORAGE_200GB_YEARLY"
-        | "STORAGE_1TB_YEARLY",
-        { amountMajor: number; label: string }
-      >
-    >
+    Partial<Record<AddonCode, { amountMajor: number; label: string }>>
   >({});
 
   const [orgName, setOrgName] = useState("");
@@ -111,6 +105,7 @@ export default function BuyNowPage() {
         storageAddon100Gb: storageChoice === "100" ? 1 : 0,
         storageAddon200Gb: storageChoice === "200" ? 1 : 0,
         storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
+        learningModule,
       }
     : null;
 
@@ -218,6 +213,7 @@ export default function BuyNowPage() {
         storageAddon100Gb: storageChoice === "100" ? 1 : 0,
         storageAddon200Gb: storageChoice === "200" ? 1 : 0,
         storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
+        selectedModules: learningModule ? ["LEARNING"] : undefined,
         orgName,
         contactName,
         contactEmail,
@@ -243,6 +239,7 @@ export default function BuyNowPage() {
   const storage100 = mergedAddonPrices[`STORAGE_100GB_${storageKey}` as keyof typeof mergedAddonPrices];
   const storage200 = mergedAddonPrices[`STORAGE_200GB_${storageKey}` as keyof typeof mergedAddonPrices];
   const storage1tb = mergedAddonPrices[`STORAGE_1TB_${storageKey}` as keyof typeof mergedAddonPrices];
+  const learningPrice = mergedAddonPrices[`MODULE_LEARNING_${storageKey}` as keyof typeof mergedAddonPrices];
   const storageOptions = [
     { value: "none", label: "No additional storage" },
     {
@@ -414,7 +411,7 @@ export default function BuyNowPage() {
             <div className="rounded-xl border border-pw-border bg-white p-4 shadow-sm">
               <h2 className="text-lg font-semibold">Add-ons</h2>
               <p className="text-sm text-pw-text-muted">
-                Adjust capacity now or leave at zero-you can add more later.
+                Add capacity or the Learning module now. You can add more later.
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-1">
@@ -434,6 +431,25 @@ export default function BuyNowPage() {
                   </select>
                   <span className="text-xs text-pw-text-muted">
                     Storage add-ons are charged as {frequency} line items at checkout.
+                  </span>
+                </div>
+                <div className="flex flex-col gap-2 rounded-md border border-pw-border p-3">
+                  <label className="flex cursor-pointer items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={learningModule}
+                      onChange={(event) => setLearningModule(event.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-pw-border text-pw-primary focus:ring-pw-primary"
+                    />
+                    <span>
+                      <span className="block font-medium">Learning module</span>
+                      <span className="block text-pw-text-muted">
+                        {formatAmount(learningPrice?.amountMajor ?? (frequency === "yearly" ? 290 : 29))} / {storageUnit}
+                      </span>
+                    </span>
+                  </label>
+                  <span className="text-xs text-pw-text-muted">
+                    Available to organisations other than home-education providers.
                   </span>
                 </div>
               </div>

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { PLAN_PRICES } from "./buy-now-pricing";
+import { ADDON_PRICES, PLAN_PRICES } from "./buy-now-pricing";
 
 assert.ok(
   "STARTER_49_MONTHLY" in PLAN_PRICES,
@@ -20,4 +20,8 @@ assert.ok(
 assert.ok(
   !("GROWTH_MONTHLY" in PLAN_PRICES),
   "admin PLAN_PRICES must not default new checkouts to the grandfathered Growth code",
+);
+assert.ok(
+  "MODULE_LEARNING_MONTHLY" in ADDON_PRICES,
+  "admin add-on prices must include the Learning module monthly price",
 );
