@@ -1,5 +1,8 @@
 import { VERTICAL_OPTIONS, type Vertical } from "@pathway/types";
-import { SelectionCard } from "../../../components/configurator/selection-card";
+import {
+  SelectionCard,
+  SelectionCardGroup,
+} from "../../../components/configurator/selection-card";
 import { verticalsForOrgType, type OrgType } from "../state";
 
 type VerticalStepProps = {
@@ -30,7 +33,7 @@ export function VerticalStep({
           Choose the setting that most closely matches your daily work.
         </p>
       </div>
-      <div className="grid gap-3">
+      <SelectionCardGroup className="grid gap-3">
         {options.map((option) => (
           <SelectionCard
             key={option.value}
@@ -42,7 +45,7 @@ export function VerticalStep({
             </span>
           </SelectionCard>
         ))}
-      </div>
+      </SelectionCardGroup>
     </section>
   );
 }

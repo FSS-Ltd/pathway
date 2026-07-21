@@ -1,5 +1,8 @@
 import { PriceChip } from "../../../components/configurator/price-chip";
-import { SelectionCard } from "../../../components/configurator/selection-card";
+import {
+  SelectionCard,
+  SelectionCardGroup,
+} from "../../../components/configurator/selection-card";
 import {
   optionDelta,
   type OptionPriceLookup,
@@ -59,7 +62,7 @@ export function StorageStep({
           Add storage if your team expects to keep a larger library of files.
         </p>
       </div>
-      <div className="grid gap-3">
+      <SelectionCardGroup className="grid gap-3">
         {STORAGE_OPTIONS.map((option) => {
           const delta = optionDelta(
             { kind: "storage", storageChoice: option.value },
@@ -87,7 +90,7 @@ export function StorageStep({
             </SelectionCard>
           );
         })}
-      </div>
+      </SelectionCardGroup>
     </section>
   );
 }

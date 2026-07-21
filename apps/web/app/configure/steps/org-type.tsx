@@ -1,4 +1,7 @@
-import { SelectionCard } from "../../../components/configurator/selection-card";
+import {
+  SelectionCard,
+  SelectionCardGroup,
+} from "../../../components/configurator/selection-card";
 import type { OrgType } from "../state";
 
 type OrgTypeStepProps = {
@@ -28,7 +31,7 @@ export function OrgTypeStep({ orgType, onSelect }: OrgTypeStepProps) {
           We will tailor the workspace around how your organisation works.
         </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <SelectionCardGroup className="grid gap-3 sm:grid-cols-2">
         {(Object.keys(ORG_TYPE_LABELS) as OrgType[]).map((type) => (
           <SelectionCard
             key={type}
@@ -40,7 +43,7 @@ export function OrgTypeStep({ orgType, onSelect }: OrgTypeStepProps) {
             </span>
           </SelectionCard>
         ))}
-      </div>
+      </SelectionCardGroup>
     </section>
   );
 }

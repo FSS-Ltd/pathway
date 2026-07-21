@@ -1,4 +1,11 @@
 import type { ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import {
+  optionCardVariants,
+  optionGroupVariants,
+  reducedMotionFade,
+  reducedOptionGroupVariants,
+} from "../../lib/motion";
 
 type SelectionCardProps = {
   children: ReactNode;
@@ -7,15 +14,50 @@ type SelectionCardProps = {
   onClick: () => void;
 };
 
+type SelectionCardGroupProps = {
+  children: ReactNode;
+  className: string;
+};
+
+export function SelectionCardGroup({
+  children,
+  className,
+}: SelectionCardGroupProps) {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      variants={
+        prefersReducedMotion ? reducedOptionGroupVariants : optionGroupVariants
+      }
+      initial="hidden"
+      animate="visible"
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 export function SelectionCard({
   children,
   isSelected,
   isDisabled = false,
   onClick,
 }: SelectionCardProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
-    <button
+    <motion.button
       type="button"
+      variants={
+        prefersReducedMotion
+          ? {
+              hidden: { opacity: 0 },
+              visible: { opacity: 1, transition: reducedMotionFade },
+            }
+          : optionCardVariants
+      }
       aria-pressed={isSelected}
       disabled={isDisabled}
       onClick={onClick}
@@ -26,6 +68,6 @@ export function SelectionCard({
       }`}
     >
       {children}
-    </button>
+    </motion.button>
   );
 }

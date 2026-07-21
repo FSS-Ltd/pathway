@@ -1,5 +1,8 @@
 import { PriceChip } from "../../../components/configurator/price-chip";
-import { SelectionCard } from "../../../components/configurator/selection-card";
+import {
+  SelectionCard,
+  SelectionCardGroup,
+} from "../../../components/configurator/selection-card";
 import {
   MODULE_CATALOG,
   optionDelta,
@@ -51,7 +54,7 @@ export function ModulesStep({
           these later.
         </p>
       </div>
-      <div className="grid gap-3">
+      <SelectionCardGroup className="grid gap-3">
         {modules.map(({ module, entry, delta }) => (
           <SelectionCard
             key={module}
@@ -72,7 +75,7 @@ export function ModulesStep({
             </span>
           </SelectionCard>
         ))}
-      </div>
+      </SelectionCardGroup>
     </section>
   );
 }

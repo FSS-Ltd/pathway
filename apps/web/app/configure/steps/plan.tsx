@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { PLANS } from "@pathway/pricing";
 import { PriceChip } from "../../../components/configurator/price-chip";
-import { SelectionCard } from "../../../components/configurator/selection-card";
+import {
+  SelectionCard,
+  SelectionCardGroup,
+} from "../../../components/configurator/selection-card";
 import type { PlanCode, StripePriceMeta } from "../../../lib/buy-now-pricing";
 
 type PlanStepProps = {
@@ -61,7 +64,7 @@ export function PlanStep({
           </button>
         ))}
       </div>
-      <div className="grid gap-3">
+      <SelectionCardGroup className="grid gap-3">
         {(Object.keys(PLAN_CODES) as (keyof typeof PLAN_CODES)[]).map(
           (tier) => {
             const code = PLAN_CODES[tier][frequency];
@@ -107,7 +110,7 @@ export function PlanStep({
             Contact sales for a tailored plan for your organisation.
           </span>
         </Link>
-      </div>
+      </SelectionCardGroup>
     </section>
   );
 }

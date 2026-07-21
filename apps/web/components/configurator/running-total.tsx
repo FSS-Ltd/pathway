@@ -24,6 +24,12 @@ import {
   type PlanPreviewResponse,
 } from "../../lib/buy-now-client";
 import type { ModulePriceCode } from "../../lib/module-catalog";
+import {
+  exitEase,
+  reducedMotionFade,
+  springEnter,
+  totalTick,
+} from "../../lib/motion";
 import type { ConfiguratorState } from "../../app/configure/state";
 
 type RunningTotalProps = {
@@ -37,6 +43,7 @@ type RunningTotalProps = {
   >;
   modulePrices: Partial<Record<ModulePriceCode, ModulePriceMeta>>;
   showEntitlementPreview: boolean;
+  compact?: boolean;
 };
 
 function storageGb(storageChoice: ConfiguratorState["storageChoice"]): number {
@@ -64,6 +71,7 @@ export function RunningTotal({
   addonPrices,
   modulePrices,
   showEntitlementPreview,
+  compact = false,
 }: RunningTotalProps) {
   const selection = useMemo(() => buildSelection(state), [state]);
   const totals = useMemo(
@@ -134,37 +142,52 @@ export function RunningTotal({
       <div>
         <h2
           id="running-total-title"
-          className="font-heading text-xl font-bold text-text-primary"
+          className={`font-heading text-xl font-bold text-text-primary ${compact ? "sr-only lg:not-sr-only" : ""}`}
         >
           Your configuration
         </h2>
-        <p className="mt-1 text-sm text-text-muted">{caption}</p>
-      </div>
-      {totals?.lines.length ? (
-        <motion.div layout={!prefersReducedMotion} className="space-y-3">
-          <AnimatePresence initial={!prefersReducedMotion}>
-            {totals.lines.map((line) => (
-              <motion.div
-                layout={!prefersReducedMotion}
-                key={line.label}
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={prefersReducedMotion ? undefined : { opacity: 0, y: -8 }}
-                className="flex items-start justify-between gap-4 text-sm"
-              >
-                <span className="text-text-muted">{line.label}</span>
-                <span className="font-medium text-text-primary">
-                  {formatConfiguratorMoney(line.amountMajor)}
-                </span>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </motion.div>
-      ) : (
-        <p className="text-sm text-text-muted">
-          Select a plan to see your total.
+        <p
+          className={`mt-1 text-sm text-text-muted ${compact ? "hidden lg:block" : ""}`}
+        >
+          {caption}
         </p>
-      )}
+      </div>
+      <div className={compact ? "hidden lg:block" : ""}>
+        {totals?.lines.length ? (
+          <motion.div layout={!prefersReducedMotion} className="space-y-3">
+            <AnimatePresence initial={!prefersReducedMotion}>
+              {totals.lines.map((line) => (
+                <motion.div
+                  layout={!prefersReducedMotion}
+                  key={line.label}
+                  initial={
+                    prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 8 }
+                  }
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={
+                    prefersReducedMotion
+                      ? { opacity: 0, transition: reducedMotionFade }
+                      : { opacity: 0, y: -8, transition: exitEase }
+                  }
+                  transition={
+                    prefersReducedMotion ? reducedMotionFade : springEnter
+                  }
+                  className="flex items-start justify-between gap-4 text-sm"
+                >
+                  <span className="text-text-muted">{line.label}</span>
+                  <span className="font-medium text-text-primary">
+                    {formatConfiguratorMoney(line.amountMajor)}
+                  </span>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        ) : (
+          <p className="text-sm text-text-muted">
+            Select a plan to see your total.
+          </p>
+        )}
+      </div>
       <div className="border-t border-border-subtle pt-4">
         <p className="text-sm font-medium text-text-primary">
           Total per {state.frequency === "monthly" ? "month" : "year"}
@@ -206,7 +229,7 @@ function AnimatedTotal({
       return;
     }
 
-    const controls = animate(total, amountMajor);
+    const controls = animate(total, amountMajor, totalTick);
     return () => controls.stop();
   }, [amountMajor, prefersReducedMotion, total]);
 
