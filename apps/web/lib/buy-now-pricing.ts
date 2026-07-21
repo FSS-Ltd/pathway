@@ -150,7 +150,9 @@ export const ADDON_PRICES: Record<AddonCode, StripePriceMeta> = {
   },
 };
 
-const MODULE_PRICE_FALLBACKS: Partial<Record<ModulePriceCode, ModulePriceMeta>> = {
+const MODULE_PRICE_FALLBACKS: Partial<
+  Record<ModulePriceCode, ModulePriceMeta>
+> = {
   MODULE_LEARNING_MONTHLY: ADDON_PRICES.MODULE_LEARNING_MONTHLY,
   MODULE_LEARNING_YEARLY: ADDON_PRICES.MODULE_LEARNING_YEARLY,
 };
@@ -177,7 +179,10 @@ export function calculateCartTotals(
   opts?: {
     planPrices?: Partial<Record<PlanCode, StripePriceMeta>>;
     addonPrices?: Partial<
-      Record<AddonCode, { stripePriceId?: string; amountMajor: number; label: string }>
+      Record<
+        AddonCode,
+        { stripePriceId?: string; amountMajor: number; label: string }
+      >
     >;
     modulePrices?: Partial<Record<ModulePriceCode, ModulePriceMeta>>;
   },
@@ -206,7 +211,8 @@ export function calculateCartTotals(
 
   const intervalKey = selection.frequency === "yearly" ? "YEARLY" : "MONTHLY";
   const addonPrices = { ...ADDON_PRICES, ...(opts?.addonPrices ?? {}) };
-  const intervalLabel = selection.frequency === "monthly" ? " (monthly)" : " (yearly)";
+  const intervalLabel =
+    selection.frequency === "monthly" ? " (monthly)" : " (yearly)";
 
   addLine(
     `+100GB storage${intervalLabel}`,
@@ -238,7 +244,10 @@ export function calculateCartTotals(
       MODULE_PRICE_FALLBACKS[priceCode];
 
     if (modulePrice) {
-      lines.push({ label: modulePrice.label, amountMajor: modulePrice.amountMajor });
+      lines.push({
+        label: modulePrice.label,
+        amountMajor: modulePrice.amountMajor,
+      });
     }
   }
 
@@ -253,21 +262,35 @@ export function calculateCartTotals(
 }
 
 export function mergeBillingPrices(
-  prices: { code: string; unitAmount: number; interval: "month" | "year" | null }[],
+  prices: {
+    code: string;
+    unitAmount: number;
+    interval: "month" | "year" | null;
+  }[],
 ): {
   planPrices: Partial<Record<PlanCode, StripePriceMeta>>;
-  addonPrices: Partial<Record<AddonCode, { amountMajor: number; label: string; stripePriceId?: string }>>;
+  addonPrices: Partial<
+    Record<
+      AddonCode,
+      { amountMajor: number; label: string; stripePriceId?: string }
+    >
+  >;
   modulePrices: Partial<Record<ModulePriceCode, ModulePriceMeta>>;
 } {
   const planPrices: Partial<Record<PlanCode, StripePriceMeta>> = {};
   const addonPrices: Partial<
-    Record<AddonCode, { amountMajor: number; label: string; stripePriceId?: string }>
+    Record<
+      AddonCode,
+      { amountMajor: number; label: string; stripePriceId?: string }
+    >
   > = {};
   const modulePrices: Partial<Record<ModulePriceCode, ModulePriceMeta>> = {};
 
   prices.forEach((p) => {
     const amountMajor =
-      typeof p.unitAmount === "number" ? Number((p.unitAmount / 100).toFixed(2)) : 0;
+      typeof p.unitAmount === "number"
+        ? Number((p.unitAmount / 100).toFixed(2))
+        : 0;
     if (!amountMajor) return;
     const interval = p.interval ?? "month";
 
@@ -325,12 +348,16 @@ export function mergeBillingPrices(
 
 function findModulePrice(
   code: string,
-): { module: WebModule; entry: ModuleCatalogEntry; priceCode: ModulePriceCode } | undefined {
+):
+  | { module: WebModule; entry: ModuleCatalogEntry; priceCode: ModulePriceCode }
+  | undefined {
   for (const [module, entry] of Object.entries(MODULE_CATALOG) as [
     WebModule,
     ModuleCatalogEntry,
   ][]) {
-    const priceCode = Object.values(entry.priceCodes).find((value) => value === code);
+    const priceCode = Object.values(entry.priceCodes).find(
+      (value) => value === code,
+    );
     if (priceCode) {
       return { module, entry, priceCode };
     }

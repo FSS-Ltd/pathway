@@ -27,7 +27,9 @@ describe("module catalogue", () => {
       expect(entry.imageAlt).not.toBe("");
       expect(entry.imagePath).toBe(moduleImagePath(module));
       expect(entry.imagePath).toBe(`/configurator/modules/${slug}.png`);
-      expect(entry.imagePath).toMatch(/^\/configurator\/modules\/[a-z0-9-]+\.png$/);
+      expect(entry.imagePath).toMatch(
+        /^\/configurator\/modules\/[a-z0-9-]+\.png$/,
+      );
       expect(entry.priceCodes).toEqual({
         monthly: `MODULE_${module}_MONTHLY`,
         yearly: `MODULE_${module}_YEARLY`,
@@ -64,7 +66,9 @@ describe("module catalogue", () => {
     });
 
     expect(totals.totalMajor).toBe(78);
-    expect(totals.lines.filter((line) => line.label === "Learning module")).toHaveLength(1);
+    expect(
+      totals.lines.filter((line) => line.label === "Learning module"),
+    ).toHaveLength(1);
   });
 
   it("does not charge an unmapped selected module", () => {
@@ -104,6 +108,9 @@ describe("module catalogue", () => {
       stripePriceId: "",
     });
     expect(totals.totalMajor).toBe(68);
-    expect(totals.lines).toContainEqual({ label: "Finance module", amountMajor: 19 });
+    expect(totals.lines).toContainEqual({
+      label: "Finance module",
+      amountMajor: 19,
+    });
   });
 });
