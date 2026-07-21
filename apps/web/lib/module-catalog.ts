@@ -1,3 +1,5 @@
+import type { Vertical } from "@pathway/types";
+
 export type WebModule =
   | "FINANCE"
   | "EVENTS"
@@ -10,6 +12,13 @@ export type WebModule =
   | "LEARNING";
 
 export type ModulePriceCode = `MODULE_${WebModule}_${"MONTHLY" | "YEARLY"}`;
+export type StoragePriceCode =
+  | "STORAGE_100GB_MONTHLY"
+  | "STORAGE_100GB_YEARLY"
+  | "STORAGE_200GB_MONTHLY"
+  | "STORAGE_200GB_YEARLY"
+  | "STORAGE_1TB_MONTHLY"
+  | "STORAGE_1TB_YEARLY";
 
 export type ModuleCatalogEntry = {
   label: string;
@@ -88,3 +97,108 @@ export const MODULE_CATALOG: Record<WebModule, ModuleCatalogEntry> = {
     "Log learning activity, attach evidence and generate progress reports.",
   ),
 };
+
+export const VERTICAL_FEATURES: Record<Vertical, string[]> = {
+  CHURCH: [
+    "View attendance",
+    "Manage attendance registers",
+    "Manage volunteers",
+    "Manage giving",
+    "View your calendar",
+  ],
+  INDEPENDENT_SCHOOL: [
+    "View attendance",
+    "Manage attendance registers",
+    "Manage student records",
+    "Manage classes",
+    "View parent information",
+    "View standard reports",
+  ],
+  ACE_SCHOOL: [
+    "View attendance",
+    "Manage attendance registers",
+    "Manage student records",
+    "Manage classes",
+    "Manage PACE work",
+    "View parent information",
+    "View standard reports",
+  ],
+  STATE_SCHOOL: [
+    "View attendance",
+    "Manage attendance registers",
+    "Manage student records",
+    "Manage classes",
+    "View parent information",
+    "View standard reports",
+  ],
+  NURSERY: [
+    "View attendance",
+    "Manage attendance registers",
+    "Manage child records",
+    "View parent information",
+  ],
+  CHARITY: [
+    "View attendance",
+    "Manage attendance registers",
+    "Manage volunteers",
+    "View your calendar",
+  ],
+  CLUB: [
+    "View attendance",
+    "Manage attendance registers",
+    "Manage member records",
+    "View your calendar",
+  ],
+};
+
+export type ConfiguratorOption =
+  | { kind: "module"; module: WebModule }
+  | { kind: "storage"; storageChoice: StorageChoice };
+
+export type StorageChoice = "none" | "100" | "200" | "1000";
+
+export type OptionPriceLookup = Partial<
+  Record<ModulePriceCode | StoragePriceCode, { amountMajor: number }>
+>;
+
+export type OptionDelta =
+  | { status: "included" }
+  | { status: "priced"; amountMajor: number }
+  | { status: "coming-soon" };
+
+const STORAGE_PRICE_CODES: Record<
+  Exclude<StorageChoice, "none">,
+  { monthly: StoragePriceCode; yearly: StoragePriceCode }
+> = {
+  "100": {
+    monthly: "STORAGE_100GB_MONTHLY",
+    yearly: "STORAGE_100GB_YEARLY",
+  },
+  "200": {
+    monthly: "STORAGE_200GB_MONTHLY",
+    yearly: "STORAGE_200GB_YEARLY",
+  },
+  "1000": {
+    monthly: "STORAGE_1TB_MONTHLY",
+    yearly: "STORAGE_1TB_YEARLY",
+  },
+};
+
+export function optionDelta(
+  option: ConfiguratorOption,
+  frequency: "monthly" | "yearly",
+  prices: OptionPriceLookup,
+): OptionDelta {
+  let priceCode: ModulePriceCode | StoragePriceCode;
+  if (option.kind === "module") {
+    priceCode = MODULE_CATALOG[option.module].priceCodes[frequency];
+  } else {
+    if (option.storageChoice === "none") return { status: "included" };
+    priceCode = STORAGE_PRICE_CODES[option.storageChoice][frequency];
+  }
+  const price = prices[priceCode];
+
+  return price
+    ? { status: "priced", amountMajor: price.amountMajor }
+    : { status: "coming-soon" };
+}
