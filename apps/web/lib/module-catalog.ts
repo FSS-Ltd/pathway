@@ -1,4 +1,4 @@
-import type { Vertical } from "@pathway/types";
+import { VERTICAL_OPTIONS, type Vertical } from "@pathway/types";
 
 export type WebModule =
   | "FINANCE"
@@ -31,6 +31,11 @@ export type ModuleCatalogEntry = {
 export function moduleImagePath(module: WebModule): string {
   const slug = module.toLowerCase().replace(/_/g, "-");
   return `/configurator/modules/${slug}.png`;
+}
+
+export function verticalImagePath(vertical: Vertical): string {
+  const slug = vertical.toLowerCase().replace(/_/g, "-");
+  return `/configurator/verticals/${slug}.png`;
 }
 
 function moduleEntry(
@@ -156,6 +161,28 @@ export type ConfiguratorOption =
   | { kind: "storage"; storageChoice: StorageChoice };
 
 export type StorageChoice = "none" | "100" | "200" | "1000";
+
+export function storageImagePath(
+  choice: Exclude<StorageChoice, "none">,
+): string {
+  const filename = choice === "1000" ? "storage-1tb" : `storage-${choice}gb`;
+  return `/configurator/storage/${filename}.png`;
+}
+
+export const CONFIGURATOR_IMAGE_PATHS: readonly string[] = [
+  ...Object.values(MODULE_CATALOG).map(({ imagePath }) => imagePath),
+  ...(["100", "200", "1000"] as const).map(storageImagePath),
+  ...VERTICAL_OPTIONS.map(({ value }) => verticalImagePath(value)),
+];
+
+export const CONFIGURATOR_BACKDROP_SIZES = "(min-width: 1024px) 44vw, 34vw";
+export const CONFIGURATOR_OBJECT_SIZES = "(min-width: 1024px) 128px, 48px";
+
+export function configuratorImageSizes(path: string): string {
+  return path.startsWith("/configurator/verticals/")
+    ? CONFIGURATOR_BACKDROP_SIZES
+    : CONFIGURATOR_OBJECT_SIZES;
+}
 
 export type OptionPriceLookup = Partial<
   Record<ModulePriceCode | StoragePriceCode, { amountMajor: number }>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useReducer, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ADDON_PRICES,
   PLAN_PRICES,
@@ -13,7 +14,13 @@ import type {
   StorageChoice,
   WebModule,
 } from "../../lib/module-catalog";
+import {
+  configuratorStepVariants,
+  reducedStepVariants,
+  type StepDirection,
+} from "../../lib/motion";
 import { RunningTotal } from "../../components/configurator/running-total";
+import { ConfiguratorStage } from "../../components/configurator/stage";
 import {
   ConfiguratorStepper,
   type ConfiguratorProgressStep,
@@ -122,6 +129,8 @@ export default function ConfigurePage() {
     mergeBillingPrices([]),
   );
   const [pricingWarning, setPricingWarning] = useState<string | null>(null);
+  const [stepDirection, setStepDirection] = useState<StepDirection>("forward");
+  const prefersReducedMotion = useReducedMotion();
   const currentStep = firstIncompleteStep(state);
 
   useEffect(() => {
@@ -162,6 +171,9 @@ export default function ConfigurePage() {
   const progressSteps: ConfiguratorProgressStep[] = progressStepsForOrgType(
     state.orgType,
   ).map((step) => ({ id: step, label: STEP_LABELS[step] }));
+  const stepVariants = prefersReducedMotion
+    ? reducedStepVariants
+    : configuratorStepVariants;
 
   return (
     <main className="bg-shell py-10 sm:py-14">
@@ -186,77 +198,114 @@ export default function ConfigurePage() {
           <ConfiguratorStepper
             steps={progressSteps}
             currentStep={currentStep}
-            onBack={() => dispatch({ type: "back" })}
-            onContinue={() => dispatch({ type: "next" })}
+            onBack={() => {
+              setStepDirection("back");
+              dispatch({ type: "back" });
+            }}
+            onContinue={() => {
+              setStepDirection("forward");
+              dispatch({ type: "next" });
+            }}
             isBackDisabled={currentStep === "org-type"}
             isContinueDisabled={isContinueDisabled(state, currentStep)}
           />
-          {currentStep === "org-type" ? (
-            <OrgTypeStep
-              orgType={state.orgType}
-              onSelect={(orgType) => dispatch({ type: "org-type", orgType })}
-            />
-          ) : null}
-          {currentStep === "vertical" && state.orgType ? (
-            <VerticalStep
-              orgType={state.orgType}
-              vertical={state.vertical}
-              onSelect={(vertical) => dispatch({ type: "vertical", vertical })}
-            />
-          ) : null}
-          {currentStep === "included" && state.vertical ? (
-            <IncludedStep vertical={state.vertical} />
-          ) : null}
-          {currentStep === "modules" ? (
-            <ModulesStep
-              selectedModules={state.selectedModules}
-              frequency={state.frequency}
-              prices={optionPrices}
-              onToggle={(module) => dispatch({ type: "module", module })}
-            />
-          ) : null}
-          {currentStep === "plan" ? (
-            <PlanStep
-              planCode={state.planCode}
-              frequency={state.frequency}
-              planPrices={mergedPlanPrices}
-              onSelectPlan={(planCode) => dispatch({ type: "plan", planCode })}
-              onSelectFrequency={(frequency) =>
-                dispatch({ type: "frequency", frequency, prices: optionPrices })
-              }
-            />
-          ) : null}
-          {currentStep === "storage" ? (
-            <StorageStep
-              storageChoice={state.storageChoice}
-              frequency={state.frequency}
-              prices={optionPrices}
-              onSelect={(storageChoice) =>
-                dispatch({ type: "storage", storageChoice })
-              }
-            />
-          ) : null}
-          {currentStep === "summary" && state.vertical && state.planCode ? (
-            <SummaryStep
-              vertical={state.vertical}
-              selectedModules={state.selectedModules}
-              planCode={state.planCode}
-              frequency={state.frequency}
-              storageChoice={state.storageChoice}
-              accountDetails={accountDetails}
-              onAccountDetailsChange={setAccountDetails}
-            />
-          ) : null}
         </section>
-        <aside className="sticky top-24 h-fit rounded-2xl bg-muted p-6 shadow-card sm:p-8">
-          <RunningTotal
-            state={state}
-            planPrices={mergedPlanPrices}
-            addonPrices={mergedAddonPrices}
-            modulePrices={billingPrices.modulePrices}
-            showEntitlementPreview={currentStep === "summary"}
-          />
+        <aside className="sticky top-2 z-10 grid h-fit grid-cols-[minmax(0,1.4fr),minmax(0,1fr)] gap-3 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:space-y-6">
+          <ConfiguratorStage state={state} />
+          <div className="rounded-2xl bg-muted p-4 shadow-card lg:p-6">
+            <RunningTotal
+              state={state}
+              planPrices={mergedPlanPrices}
+              addonPrices={mergedAddonPrices}
+              modulePrices={billingPrices.modulePrices}
+              showEntitlementPreview={currentStep === "summary"}
+              compact
+            />
+          </div>
         </aside>
+        <section className="max-w-xl lg:col-start-1 lg:row-start-2">
+          <AnimatePresence
+            mode="wait"
+            initial={!prefersReducedMotion}
+            custom={stepDirection}
+          >
+            <motion.div
+              key={currentStep}
+              custom={stepDirection}
+              variants={stepVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+            >
+              {currentStep === "org-type" ? (
+                <OrgTypeStep
+                  orgType={state.orgType}
+                  onSelect={(orgType) =>
+                    dispatch({ type: "org-type", orgType })
+                  }
+                />
+              ) : null}
+              {currentStep === "vertical" && state.orgType ? (
+                <VerticalStep
+                  orgType={state.orgType}
+                  vertical={state.vertical}
+                  onSelect={(vertical) =>
+                    dispatch({ type: "vertical", vertical })
+                  }
+                />
+              ) : null}
+              {currentStep === "included" && state.vertical ? (
+                <IncludedStep vertical={state.vertical} />
+              ) : null}
+              {currentStep === "modules" ? (
+                <ModulesStep
+                  selectedModules={state.selectedModules}
+                  frequency={state.frequency}
+                  prices={optionPrices}
+                  onToggle={(module) => dispatch({ type: "module", module })}
+                />
+              ) : null}
+              {currentStep === "plan" ? (
+                <PlanStep
+                  planCode={state.planCode}
+                  frequency={state.frequency}
+                  planPrices={mergedPlanPrices}
+                  onSelectPlan={(planCode) =>
+                    dispatch({ type: "plan", planCode })
+                  }
+                  onSelectFrequency={(frequency) =>
+                    dispatch({
+                      type: "frequency",
+                      frequency,
+                      prices: optionPrices,
+                    })
+                  }
+                />
+              ) : null}
+              {currentStep === "storage" ? (
+                <StorageStep
+                  storageChoice={state.storageChoice}
+                  frequency={state.frequency}
+                  prices={optionPrices}
+                  onSelect={(storageChoice) =>
+                    dispatch({ type: "storage", storageChoice })
+                  }
+                />
+              ) : null}
+              {currentStep === "summary" && state.vertical && state.planCode ? (
+                <SummaryStep
+                  vertical={state.vertical}
+                  selectedModules={state.selectedModules}
+                  planCode={state.planCode}
+                  frequency={state.frequency}
+                  storageChoice={state.storageChoice}
+                  accountDetails={accountDetails}
+                  onAccountDetailsChange={setAccountDetails}
+                />
+              ) : null}
+            </motion.div>
+          </AnimatePresence>
+        </section>
       </div>
     </main>
   );
