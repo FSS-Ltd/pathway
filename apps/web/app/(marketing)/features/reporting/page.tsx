@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import CtaButton from "../../../../components/cta-button";
 import PageWrapper from "../../../../components/page-wrapper";
+import { configuratorRolloutHref } from "../../../../lib/configurator-rollout";
 
 export const metadata: Metadata = {
   title: "Reporting | Nexsteps",
@@ -66,7 +67,7 @@ export default function ReportingFeaturePage() {
               Book a Demo
             </CtaButton>
             <Link
-              href="/pricing"
+              href={configuratorRolloutHref("/pricing")}
               className="rounded-md border border-pw-border bg-white px-6 py-3 text-base font-medium text-pw-text transition hover:bg-pw-surface"
             >
               View Pricing

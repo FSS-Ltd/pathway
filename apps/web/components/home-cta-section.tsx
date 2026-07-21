@@ -1,6 +1,7 @@
 import Link from "next/link";
 import CtaButton from "./cta-button";
 import ScrollReveal from "./scroll-reveal";
+import { configuratorRolloutHref } from "../lib/configurator-rollout";
 
 export default function HomeCtaSection() {
   return (
@@ -23,7 +24,7 @@ export default function HomeCtaSection() {
               Book a demo
             </CtaButton>
             <Link
-              href="/pricing"
+              href={configuratorRolloutHref("/pricing")}
               className="rounded-md border border-white/25 bg-white/10 px-6 py-3 text-base font-medium text-white backdrop-blur transition hover:bg-white/20"
             >
               View pricing

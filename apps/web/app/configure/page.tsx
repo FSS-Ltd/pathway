@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ADDON_PRICES,
@@ -8,7 +8,11 @@ import {
   mergeBillingPrices,
   type PlanCode,
 } from "../../lib/buy-now-pricing";
-import { fetchPublicBillingPrices } from "../../lib/buy-now-client";
+import {
+  createCheckoutSession,
+  fetchPublicBillingPrices,
+} from "../../lib/buy-now-client";
+import { buildCheckoutPayload } from "../../lib/configurator-checkout";
 import type {
   OptionPriceLookup,
   StorageChoice,
@@ -81,6 +85,12 @@ const EMPTY_ACCOUNT_DETAILS: AccountDetails = {
   password: "",
 };
 
+function buildRedirectUrl(path: string): string | null {
+  if (typeof window === "undefined" || !window.location) return null;
+
+  return new URL(path, window.location.href).toString();
+}
+
 function configuratorReducer(
   state: ConfiguratorState,
   action: ConfiguratorAction,
@@ -129,6 +139,9 @@ export default function ConfigurePage() {
     mergeBillingPrices([]),
   );
   const [pricingWarning, setPricingWarning] = useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [isCheckoutPending, setIsCheckoutPending] = useState(false);
+  const checkoutInFlightRef = useRef(false);
   const [stepDirection, setStepDirection] = useState<StepDirection>("forward");
   const prefersReducedMotion = useReducedMotion();
   const currentStep = firstIncompleteStep(state);
@@ -174,6 +187,41 @@ export default function ConfigurePage() {
   const stepVariants = prefersReducedMotion
     ? reducedStepVariants
     : configuratorStepVariants;
+  const handleCheckout = async () => {
+    if (checkoutInFlightRef.current) return;
+    checkoutInFlightRef.current = true;
+    setCheckoutError(null);
+    setIsCheckoutPending(true);
+
+    try {
+      const successUrl = buildRedirectUrl("/buy/thanks");
+      const cancelUrl = buildRedirectUrl("/buy/cancelled");
+      if (!successUrl || !cancelUrl) {
+        setCheckoutError(
+          "Unable to determine redirect URLs; please try again in the browser.",
+        );
+        return;
+      }
+
+      const { sessionUrl } = await createCheckoutSession(
+        buildCheckoutPayload(state, {
+          ...accountDetails,
+          successUrl,
+          cancelUrl,
+        }),
+      );
+      window.location.href = sessionUrl;
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error
+          ? error.message
+          : "We couldn’t start checkout. Please try again.",
+      );
+    } finally {
+      setIsCheckoutPending(false);
+      checkoutInFlightRef.current = false;
+    }
+  };
 
   return (
     <main className="bg-shell py-10 sm:py-14">
@@ -199,6 +247,7 @@ export default function ConfigurePage() {
             steps={progressSteps}
             currentStep={currentStep}
             onBack={() => {
+              if (isCheckoutPending || checkoutInFlightRef.current) return;
               setStepDirection("back");
               dispatch({ type: "back" });
             }}
@@ -206,7 +255,7 @@ export default function ConfigurePage() {
               setStepDirection("forward");
               dispatch({ type: "next" });
             }}
-            isBackDisabled={currentStep === "org-type"}
+            isBackDisabled={currentStep === "org-type" || isCheckoutPending}
             isContinueDisabled={isContinueDisabled(state, currentStep)}
           />
         </section>
@@ -301,6 +350,9 @@ export default function ConfigurePage() {
                   storageChoice={state.storageChoice}
                   accountDetails={accountDetails}
                   onAccountDetailsChange={setAccountDetails}
+                  onCheckout={handleCheckout}
+                  isCheckoutPending={isCheckoutPending}
+                  checkoutError={checkoutError}
                 />
               ) : null}
             </motion.div>

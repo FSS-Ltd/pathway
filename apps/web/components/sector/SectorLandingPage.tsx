@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { SectorDefinition } from "../../content/sectors";
 import { track } from "../../lib/analytics";
 import { getFirstTouchAttribution } from "../../lib/attribution";
+import { configuratorRolloutHref } from "../../lib/configurator-rollout";
 import CtaButton from "../cta-button";
 import PageWrapper from "../page-wrapper";
 
@@ -83,7 +84,7 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
               {sector.primaryCtaLabel}
             </CtaButton>
             <Link
-              href={sector.secondaryCtaHref}
+              href={configuratorRolloutHref(sector.secondaryCtaHref)}
               className="rounded-md border border-pw-border bg-white px-6 py-3 text-base font-medium text-pw-text transition hover:bg-pw-surface"
             >
               {sector.secondaryCtaLabel}
@@ -179,7 +180,7 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
               Book a demo
             </CtaButton>
             <Link
-              href="/pricing"
+              href={configuratorRolloutHref("/pricing")}
               className="rounded-md border border-pw-border bg-white px-6 py-3 text-base font-medium text-pw-text transition hover:bg-pw-surface"
             >
               View pricing

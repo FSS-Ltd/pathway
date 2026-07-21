@@ -26,6 +26,7 @@ const PROJECTS = {
       "NEXT_PUBLIC_API_URL",
       "API_INTERNAL_URL",
       "NEXT_PUBLIC_SITE_URL",
+      "NEXT_PUBLIC_USE_CONFIGURATOR",
       "REVALIDATE_SECRET",
       "NEXT_PUBLIC_ANALYTICS_ENDPOINT",
     ],
@@ -285,6 +286,7 @@ function withDerivedValues(values) {
   next.NEXT_PUBLIC_SITE_URL ??= webUrl;
   next.NEXTAUTH_URL ??= adminUrl;
   next.NEXT_PUBLIC_USE_MOCK_API ??= "false";
+  next.NEXT_PUBLIC_USE_CONFIGURATOR ??= "false";
 
   next.API_HOST ??= new URL(apiUrl).host;
   next.API_BIND_HOST ??= "0.0.0.0";

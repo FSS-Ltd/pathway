@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { track } from "../../../../lib/analytics";
 import { getFirstTouchAttribution } from "../../../../lib/attribution";
 import { createReadinessLead } from "../../../../lib/leads-client";
+import { configuratorRolloutHref } from "../../../../lib/configurator-rollout";
 import PageWrapper from "../../../../components/page-wrapper";
 import {
   QUIZ_STORAGE_KEY,
@@ -64,6 +65,7 @@ export default function ReadinessScoreResultsPage() {
   const band = getBand(score);
   const riskAreas = getRiskAreas(answers);
   const recommendedPlan = getRecommendedPlan(answers);
+  const pricingHref = configuratorRolloutHref("/pricing");
 
   const adminHours = (answers.admin_time_hours as number) ?? 2;
   const weeklyCost = adminHours * hourlyCost;
@@ -300,8 +302,8 @@ export default function ReadinessScoreResultsPage() {
                   Get Your Tailored Rollout Plan (free)
                 </Link>
                 <Link
-                  href="/pricing"
-                  onClick={() => handleCtaClick("/pricing")}
+                  href={pricingHref}
+                  onClick={() => handleCtaClick(pricingHref)}
                   className="rounded-md border border-border-subtle bg-surface px-6 py-3 text-center font-medium text-text-primary transition hover:bg-muted focus-visible:outline focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2"
                 >
                   View Pricing

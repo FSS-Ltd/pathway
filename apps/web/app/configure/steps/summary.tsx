@@ -1,5 +1,7 @@
+import { type FormEvent, useState } from "react";
 import { VERTICAL_LABELS, type Vertical } from "@pathway/types";
 import { PLANS } from "@pathway/pricing";
+import { isValidWorkEmail } from "../../../lib/configurator-checkout";
 import {
   MODULE_CATALOG,
   type StorageChoice,
@@ -22,6 +24,9 @@ type SummaryStepProps = {
   storageChoice: StorageChoice;
   accountDetails: AccountDetails;
   onAccountDetailsChange: (details: AccountDetails) => void;
+  onCheckout: () => Promise<void>;
+  isCheckoutPending: boolean;
+  checkoutError: string | null;
 };
 
 export function SummaryStep({
@@ -32,9 +37,40 @@ export function SummaryStep({
   storageChoice,
   accountDetails,
   onAccountDetailsChange,
+  onCheckout,
+  isCheckoutPending,
+  checkoutError,
 }: SummaryStepProps) {
+  const [validationError, setValidationError] = useState<string | null>(null);
   const updateField = (field: keyof AccountDetails, value: string) =>
     onAccountDetailsChange({ ...accountDetails, [field]: value });
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (
+      !accountDetails.organisationName.trim() ||
+      !accountDetails.contactName.trim() ||
+      !accountDetails.workEmail.trim() ||
+      !accountDetails.password
+    ) {
+      setValidationError(
+        "Please complete all organisation and contact details, including password.",
+      );
+      return;
+    }
+    if (accountDetails.password.length < 8) {
+      setValidationError("Password must be at least 8 characters long.");
+      return;
+    }
+    if (!isValidWorkEmail(accountDetails.workEmail)) {
+      setValidationError("Enter a valid work email address.");
+      return;
+    }
+
+    setValidationError(null);
+    await onCheckout();
+  };
+  const errorMessage = validationError ?? checkoutError;
   const storageLabel =
     storageChoice === "none"
       ? "No extra storage"
@@ -84,7 +120,10 @@ export function SummaryStep({
           </dd>
         </div>
       </dl>
-      <div className="space-y-4 rounded-xl border border-border-subtle bg-surface p-5">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-4 rounded-xl border border-border-subtle bg-surface p-5"
+      >
         <h3 className="font-heading text-lg font-bold text-text-primary">
           Organisation and contact
         </h3>
@@ -92,17 +131,20 @@ export function SummaryStep({
           <Field
             label="Organisation name"
             value={accountDetails.organisationName}
+            disabled={isCheckoutPending}
             onChange={(value) => updateField("organisationName", value)}
           />
           <Field
             label="Contact name"
             value={accountDetails.contactName}
+            disabled={isCheckoutPending}
             onChange={(value) => updateField("contactName", value)}
           />
           <Field
             label="Work email"
             type="email"
             value={accountDetails.workEmail}
+            disabled={isCheckoutPending}
             onChange={(value) => updateField("workEmail", value)}
           />
           <Field
@@ -110,10 +152,27 @@ export function SummaryStep({
             type="password"
             value={accountDetails.password}
             helper="Minimum 8 characters. You'll use this to log into Nexsteps."
+            disabled={isCheckoutPending}
             onChange={(value) => updateField("password", value)}
           />
         </div>
-      </div>
+        {errorMessage ? (
+          <p
+            role="alert"
+            className="rounded-md bg-status-danger/10 px-3 py-2 text-sm text-status-danger"
+          >
+            {errorMessage}
+          </p>
+        ) : null}
+        <button
+          type="submit"
+          disabled={isCheckoutPending}
+          aria-busy={isCheckoutPending}
+          className="rounded-md bg-accent-primary px-5 py-3 text-sm font-semibold text-white transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {isCheckoutPending ? "Starting checkout…" : "Continue to checkout"}
+        </button>
+      </form>
     </section>
   );
 }
@@ -123,10 +182,18 @@ type FieldProps = {
   value: string;
   type?: "text" | "email" | "password";
   helper?: string;
+  disabled: boolean;
   onChange: (value: string) => void;
 };
 
-function Field({ label, value, type = "text", helper, onChange }: FieldProps) {
+function Field({
+  label,
+  value,
+  type = "text",
+  helper,
+  disabled,
+  onChange,
+}: FieldProps) {
   const id = label.toLowerCase().replaceAll(" ", "-");
   return (
     <label htmlFor={id} className="flex flex-col gap-1 text-sm">
@@ -136,6 +203,7 @@ function Field({ label, value, type = "text", helper, onChange }: FieldProps) {
         type={type}
         required
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         className="rounded-md border border-border-subtle bg-surface px-3 py-2 text-text-primary"
       />
