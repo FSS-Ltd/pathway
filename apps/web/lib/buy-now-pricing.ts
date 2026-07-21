@@ -5,6 +5,13 @@
  * so keep these codes consistent with `apps/api/src/billing/billing-plans.ts`.
  */
 
+import {
+  MODULE_CATALOG,
+  type ModuleCatalogEntry,
+  type ModulePriceCode,
+  type WebModule,
+} from "./module-catalog";
+
 export type BillingInterval = "month" | "year";
 
 export type PlanCode =
@@ -30,6 +37,12 @@ export type StripePriceMeta = {
   amountMajor: number; // e.g. 149 => £149
   currency: "gbp";
   interval: BillingInterval;
+  label: string;
+};
+
+export type ModulePriceMeta = {
+  stripePriceId?: string;
+  amountMajor: number;
   label: string;
 };
 
@@ -137,6 +150,11 @@ export const ADDON_PRICES: Record<AddonCode, StripePriceMeta> = {
   },
 };
 
+const MODULE_PRICE_FALLBACKS: Partial<Record<ModulePriceCode, ModulePriceMeta>> = {
+  MODULE_LEARNING_MONTHLY: ADDON_PRICES.MODULE_LEARNING_MONTHLY,
+  MODULE_LEARNING_YEARLY: ADDON_PRICES.MODULE_LEARNING_YEARLY,
+};
+
 export type BuyNowSelection = {
   planCode: PlanCode;
   frequency: "monthly" | "yearly";
@@ -144,6 +162,7 @@ export type BuyNowSelection = {
   storageAddon200Gb?: number;
   storageAddon1Tb?: number;
   learningModule?: boolean;
+  selectedModules?: WebModule[];
 };
 
 export type CartTotals = {
@@ -160,6 +179,7 @@ export function calculateCartTotals(
     addonPrices?: Partial<
       Record<AddonCode, { stripePriceId?: string; amountMajor: number; label: string }>
     >;
+    modulePrices?: Partial<Record<ModulePriceCode, ModulePriceMeta>>;
   },
 ): CartTotals {
   const lines: CartTotals["lines"] = [];
@@ -203,13 +223,22 @@ export function calculateCartTotals(
     addonPrices[`STORAGE_1TB_${intervalKey}` as AddonCode],
     selection.storageAddon1Tb,
   );
+  const selectedModules = new Set(selection.selectedModules ?? []);
   if (selection.learningModule) {
-    const learningPrice = addonPrices[`MODULE_LEARNING_${intervalKey}` as AddonCode];
-    if (learningPrice) {
-      lines.push({
-        label: "Learning module",
-        amountMajor: learningPrice.amountMajor,
-      });
+    selectedModules.add("LEARNING");
+  }
+
+  for (const module of selectedModules) {
+    const priceCode = MODULE_CATALOG[module].priceCodes[selection.frequency];
+    const modulePrice =
+      opts?.modulePrices?.[priceCode] ??
+      (module === "LEARNING"
+        ? opts?.addonPrices?.[priceCode as AddonCode]
+        : undefined) ??
+      MODULE_PRICE_FALLBACKS[priceCode];
+
+    if (modulePrice) {
+      lines.push({ label: modulePrice.label, amountMajor: modulePrice.amountMajor });
     }
   }
 
@@ -228,11 +257,13 @@ export function mergeBillingPrices(
 ): {
   planPrices: Partial<Record<PlanCode, StripePriceMeta>>;
   addonPrices: Partial<Record<AddonCode, { amountMajor: number; label: string; stripePriceId?: string }>>;
+  modulePrices: Partial<Record<ModulePriceCode, ModulePriceMeta>>;
 } {
   const planPrices: Partial<Record<PlanCode, StripePriceMeta>> = {};
   const addonPrices: Partial<
     Record<AddonCode, { amountMajor: number; label: string; stripePriceId?: string }>
   > = {};
+  const modulePrices: Partial<Record<ModulePriceCode, ModulePriceMeta>> = {};
 
   prices.forEach((p) => {
     const amountMajor =
@@ -258,6 +289,24 @@ export function mergeBillingPrices(
       return;
     }
 
+    const modulePrice = findModulePrice(p.code);
+    if (modulePrice) {
+      modulePrices[modulePrice.priceCode] = {
+        amountMajor,
+        stripePriceId: "",
+        label: `${modulePrice.entry.label} module`,
+      };
+
+      if (modulePrice.module === "LEARNING") {
+        addonPrices[modulePrice.priceCode as AddonCode] = {
+          amountMajor,
+          stripePriceId: "",
+          label: `${modulePrice.entry.label} module`,
+        };
+      }
+      return;
+    }
+
     const addonKey = p.code as AddonCode;
     if (addonKey in ADDON_PRICES) {
       addonPrices[addonKey] = {
@@ -271,5 +320,21 @@ export function mergeBillingPrices(
     }
   });
 
-  return { planPrices, addonPrices };
+  return { planPrices, addonPrices, modulePrices };
+}
+
+function findModulePrice(
+  code: string,
+): { module: WebModule; entry: ModuleCatalogEntry; priceCode: ModulePriceCode } | undefined {
+  for (const [module, entry] of Object.entries(MODULE_CATALOG) as [
+    WebModule,
+    ModuleCatalogEntry,
+  ][]) {
+    const priceCode = Object.values(entry.priceCodes).find((value) => value === code);
+    if (priceCode) {
+      return { module, entry, priceCode };
+    }
+  }
+
+  return undefined;
 }

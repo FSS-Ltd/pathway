@@ -9,6 +9,8 @@
  * customer portal), but for now we only redirect to Stripe-hosted Checkout.
  */
 
+import type { WebModule } from "./module-catalog";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
 export type Sector = "CHURCH" | "CLUB" | "SCHOOL" | "CHARITY";
@@ -57,7 +59,7 @@ export type BuyNowCheckoutPayload = {
   storageAddon200Gb?: number;
   storageAddon1Tb?: number;
   smsBundles1000?: number;
-  selectedModules?: Array<"LEARNING">;
+  selectedModules?: WebModule[];
   orgName: string;
   contactName: string;
   contactEmail: string;

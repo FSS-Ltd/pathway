@@ -333,6 +333,9 @@ importers:
       '@pathway/pricing':
         specifier: workspace:*
         version: link:../../packages/pricing
+      '@pathway/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       '@pathway/util':
         specifier: workspace:*
         version: link:../../packages/util
