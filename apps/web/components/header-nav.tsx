@@ -100,6 +100,7 @@ export default function HeaderNav() {
       children: [
         { label: "Assessment Test", href: "/readiness-score" },
         { label: "Free Toolkit", href: "/toolkit" },
+        { label: "Free Team Tracker", href: "/team-tracker" },
       ],
     },
     { label: "Resources", href: "/blog" },

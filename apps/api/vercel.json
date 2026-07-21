@@ -6,7 +6,7 @@
   "functions": {
     "api/[...path].js": {
       "maxDuration": 30,
-      "includeFiles": "{api/package.json,tsconfig.json,src/**,../../packages/{auth,db,types,util}/src/**,../../packages/{auth,db,types,util}/package.json,../../packages/config/{package.json,tsconfig/**},../../packages/db/prisma/**}"
+      "includeFiles": "{api/package.json,tsconfig.json,src/**,../../packages/{auth,db,platform,types,util}/src/**,../../packages/{auth,db,platform,types,util}/package.json,../../packages/config/{package.json,tsconfig/**},../../packages/db/prisma/**}"
     }
   },
   "routes": [
