@@ -1,6 +1,10 @@
 import type { Vertical } from "@pathway/types";
 import type { PlanCode } from "../../lib/buy-now-pricing";
-import type { WebModule } from "../../lib/module-catalog";
+import {
+  optionDelta,
+  type OptionPriceLookup,
+  type WebModule,
+} from "../../lib/module-catalog";
 
 export type OrgType = "SCHOOL" | "CHURCH" | "CHARITY" | "CLUB" | "NURSERY";
 
@@ -145,4 +149,108 @@ export function prevStep(state: ConfiguratorState): ConfiguratorState {
     case "summary":
       return { ...state, step: "storage" };
   }
+}
+
+export function selectOrgType(
+  state: ConfiguratorState,
+  orgType: OrgType,
+): ConfiguratorState {
+  const validVerticals = verticalsForOrgType(orgType);
+  return {
+    ...state,
+    orgType,
+    vertical:
+      state.vertical && validVerticals.includes(state.vertical)
+        ? state.vertical
+        : null,
+  };
+}
+
+export function selectVertical(
+  state: ConfiguratorState,
+  vertical: Vertical,
+): ConfiguratorState {
+  if (
+    !state.orgType ||
+    !verticalsForOrgType(state.orgType).includes(vertical)
+  ) {
+    return state;
+  }
+  return { ...state, vertical };
+}
+
+export function toggleModule(
+  state: ConfiguratorState,
+  module: WebModule,
+): ConfiguratorState {
+  const selectedModules = state.selectedModules.includes(module)
+    ? state.selectedModules.filter((selected) => selected !== module)
+    : [...state.selectedModules, module];
+  return { ...state, selectedModules };
+}
+
+export function selectPlan(
+  state: ConfiguratorState,
+  planCode: PlanCode,
+): ConfiguratorState {
+  return { ...state, planCode };
+}
+
+export function selectFrequency(
+  state: ConfiguratorState,
+  frequency: ConfiguratorState["frequency"],
+  prices: OptionPriceLookup,
+): ConfiguratorState {
+  const planCode = state.planCode
+    ? remapPlanFrequency(state.planCode, frequency)
+    : null;
+  const selectedModules = state.selectedModules.filter(
+    (module) =>
+      optionDelta({ kind: "module", module }, frequency, prices).status ===
+      "priced",
+  );
+  return { ...state, frequency, planCode, selectedModules };
+}
+
+export function selectStorage(
+  state: ConfiguratorState,
+  storageChoice: ConfiguratorState["storageChoice"],
+): ConfiguratorState {
+  return { ...state, storageChoice };
+}
+
+function remapPlanFrequency(
+  planCode: PlanCode,
+  frequency: ConfiguratorState["frequency"],
+): PlanCode {
+  const planCodes: Record<
+    PlanCode,
+    Record<ConfiguratorState["frequency"], PlanCode>
+  > = {
+    STARTER_49_MONTHLY: {
+      monthly: "STARTER_49_MONTHLY",
+      yearly: "STARTER_49_YEARLY",
+    },
+    STARTER_49_YEARLY: {
+      monthly: "STARTER_49_MONTHLY",
+      yearly: "STARTER_49_YEARLY",
+    },
+    GROWTH_99_MONTHLY: {
+      monthly: "GROWTH_99_MONTHLY",
+      yearly: "GROWTH_99_YEARLY",
+    },
+    GROWTH_99_YEARLY: {
+      monthly: "GROWTH_99_MONTHLY",
+      yearly: "GROWTH_99_YEARLY",
+    },
+    PROFESSIONAL_149_MONTHLY: {
+      monthly: "PROFESSIONAL_149_MONTHLY",
+      yearly: "PROFESSIONAL_149_YEARLY",
+    },
+    PROFESSIONAL_149_YEARLY: {
+      monthly: "PROFESSIONAL_149_MONTHLY",
+      yearly: "PROFESSIONAL_149_YEARLY",
+    },
+  };
+  return planCodes[planCode][frequency];
 }

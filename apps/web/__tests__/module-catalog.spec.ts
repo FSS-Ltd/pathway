@@ -1,10 +1,17 @@
-import { MODULE_CAPABILITIES } from "../../../packages/platform/src/capability-maps";
+import {
+  MODULE_CAPABILITIES,
+  VERTICAL_CAPABILITIES,
+} from "../../../packages/platform/src/capability-maps";
+import { VERTICAL_OPTIONS } from "@pathway/types";
 import {
   MODULE_CATALOG,
+  VERTICAL_FEATURES,
   moduleImagePath,
+  optionDelta,
   type WebModule,
 } from "../lib/module-catalog";
 import {
+  ADDON_PRICES,
   calculateCartTotals,
   mergeBillingPrices,
 } from "../lib/buy-now-pricing";
@@ -111,6 +118,110 @@ describe("module catalogue", () => {
     expect(totals.lines).toContainEqual({
       label: "Finance module",
       amountMajor: 19,
+    });
+  });
+
+  it("covers every vertical with customer-readable included features", () => {
+    expect(Object.keys(VERTICAL_FEATURES).sort()).toEqual(
+      VERTICAL_OPTIONS.map(({ value }) => value).sort(),
+    );
+    expect(Object.keys(VERTICAL_FEATURES).sort()).toEqual(
+      Object.keys(VERTICAL_CAPABILITIES).sort(),
+    );
+
+    for (const [vertical, features] of Object.entries(VERTICAL_FEATURES)) {
+      expect(features).toHaveLength(VERTICAL_CAPABILITIES[vertical].length);
+      expect(features.length).toBeGreaterThan(0);
+      features.forEach((feature) =>
+        expect(feature.trim().length).toBeGreaterThan(3),
+      );
+    }
+  });
+
+  it("keeps every option delta aligned with cart totals across billing intervals", () => {
+    const syntheticPrices = mergeBillingPrices(
+      Object.keys(MODULE_CATALOG).flatMap((module, index) => [
+        {
+          code: `MODULE_${module}_MONTHLY`,
+          unitAmount: (index + 1) * 1000,
+          interval: "month" as const,
+        },
+        {
+          code: `MODULE_${module}_YEARLY`,
+          unitAmount: (index + 1) * 10000,
+          interval: "year" as const,
+        },
+      ]),
+    );
+    const priceLookup = {
+      ...ADDON_PRICES,
+      ...syntheticPrices.addonPrices,
+      ...syntheticPrices.modulePrices,
+    };
+
+    for (const frequency of ["monthly", "yearly"] as const) {
+      const planCode =
+        frequency === "monthly" ? "STARTER_49_MONTHLY" : "STARTER_49_YEARLY";
+      const baseline = calculateCartTotals({ planCode, frequency });
+
+      for (const module of Object.keys(MODULE_CATALOG) as WebModule[]) {
+        const delta = optionDelta(
+          { kind: "module", module },
+          frequency,
+          priceLookup,
+        );
+        const totals = calculateCartTotals(
+          { planCode, frequency, selectedModules: [module] },
+          syntheticPrices,
+        );
+
+        expect(delta.status).toBe("priced");
+        if (delta.status === "priced") {
+          expect(delta.amountMajor).toBeCloseTo(
+            totals.totalMajor - baseline.totalMajor,
+          );
+        }
+      }
+
+      for (const storageChoice of ["100", "200", "1000"] as const) {
+        const delta = optionDelta(
+          { kind: "storage", storageChoice },
+          frequency,
+          priceLookup,
+        );
+        const totals = calculateCartTotals(
+          {
+            planCode,
+            frequency,
+            storageAddon100Gb: storageChoice === "100" ? 1 : 0,
+            storageAddon200Gb: storageChoice === "200" ? 1 : 0,
+            storageAddon1Tb: storageChoice === "1000" ? 1 : 0,
+          },
+          syntheticPrices,
+        );
+
+        expect(delta.status).toBe("priced");
+        if (delta.status === "priced") {
+          expect(delta.amountMajor).toBeCloseTo(
+            totals.totalMajor - baseline.totalMajor,
+          );
+        }
+      }
+    }
+
+    expect(
+      optionDelta(
+        { kind: "storage", storageChoice: "none" },
+        "monthly",
+        priceLookup,
+      ),
+    ).toEqual({
+      status: "included",
+    });
+    expect(
+      optionDelta({ kind: "module", module: "FINANCE" }, "monthly", {}),
+    ).toEqual({
+      status: "coming-soon",
     });
   });
 });
