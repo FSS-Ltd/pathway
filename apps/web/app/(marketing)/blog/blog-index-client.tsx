@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, Search, ExternalLink } from "lucide-react";
 import type { BlogPostSummary } from "../../../lib/blog-client";
 
 const POSTS_PER_PAGE = 10;
+const CATEGORIES_PER_PAGE = 10;
 
 type Props = {
   posts: BlogPostSummary[];
@@ -17,6 +18,7 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(0);
+  const [categoryPage, setCategoryPage] = useState(0);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -45,6 +47,18 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
   );
   const filteredFeatured = currentPage === 0 ? pagePosts[0] : undefined;
   const paginatedGridPosts = currentPage === 0 ? pagePosts.slice(1) : pagePosts;
+  const totalCategoryPages = Math.max(
+    1,
+    Math.ceil(allTags.length / CATEGORIES_PER_PAGE),
+  );
+  const paginatedTags = useMemo(
+    () =>
+      allTags.slice(
+        categoryPage * CATEGORIES_PER_PAGE,
+        (categoryPage + 1) * CATEGORIES_PER_PAGE,
+      ),
+    [allTags, categoryPage],
+  );
 
   useEffect(() => {
     setCurrentPage(0);
@@ -53,6 +67,12 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, Math.max(totalPages - 1, 0)));
   }, [totalPages]);
+
+  useEffect(() => {
+    setCategoryPage((page) =>
+      Math.min(page, Math.max(totalCategoryPages - 1, 0)),
+    );
+  }, [totalCategoryPages]);
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row lg:gap-12">
@@ -93,7 +113,7 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
                   All Category
                 </button>
               </li>
-              {allTags.map((tag) => (
+              {paginatedTags.map((tag) => (
                 <li key={tag}>
                   <button
                     type="button"
@@ -109,6 +129,38 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
                 </li>
               ))}
             </ul>
+            {allTags.length > CATEGORIES_PER_PAGE ? (
+              <nav
+                aria-label="Blog categories pagination"
+                className="mt-3 flex items-center justify-between gap-2"
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCategoryPage((page) => Math.max(0, page - 1))
+                  }
+                  disabled={categoryPage === 0}
+                  className="rounded-md border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-text-primary transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span aria-live="polite" className="text-xs text-text-muted">
+                  Page {categoryPage + 1} of {totalCategoryPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCategoryPage((page) =>
+                      Math.min(totalCategoryPages - 1, page + 1),
+                    )
+                  }
+                  disabled={categoryPage >= totalCategoryPages - 1}
+                  className="rounded-md border border-border-subtle px-2.5 py-1.5 text-xs font-medium text-text-primary transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </nav>
+            ) : null}
           </div>
         </div>
       </aside>

@@ -17,8 +17,6 @@ import {
   fetchLearningSubjects,
 } from "../../../lib/api-client";
 
-const SUBJECTS_PER_PAGE = 10;
-
 export default function LearningSubjectsPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [subjects, setSubjects] = React.useState<AdminLearningSubject[]>([]);
@@ -27,7 +25,6 @@ export default function LearningSubjectsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [currentPage, setCurrentPage] = React.useState(0);
   const load = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -62,7 +59,6 @@ export default function LearningSubjectsPage() {
       );
       setName("");
       setCategory("");
-      setCurrentPage(0);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Failed to create subject",
@@ -99,22 +95,6 @@ export default function LearningSubjectsPage() {
     ],
     [],
   );
-  const totalPages = Math.max(
-    1,
-    Math.ceil(subjects.length / SUBJECTS_PER_PAGE),
-  );
-  const paginatedSubjects = React.useMemo(
-    () =>
-      subjects.slice(
-        currentPage * SUBJECTS_PER_PAGE,
-        (currentPage + 1) * SUBJECTS_PER_PAGE,
-      ),
-    [currentPage, subjects],
-  );
-
-  React.useEffect(() => {
-    setCurrentPage((page) => Math.min(page, Math.max(totalPages - 1, 0)));
-  }, [totalPages]);
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -179,45 +159,11 @@ export default function LearningSubjectsPage() {
           </div>
         ) : null}
         <DataTable
-          data={paginatedSubjects}
+          data={subjects}
           columns={columns}
           isLoading={isLoading}
           emptyMessage="No subjects have been added yet."
         />
-        {subjects.length > SUBJECTS_PER_PAGE ? (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3">
-            <p className="text-sm text-text-muted">
-              Showing {currentPage * SUBJECTS_PER_PAGE + 1}–
-              {Math.min((currentPage + 1) * SUBJECTS_PER_PAGE, subjects.length)}{" "}
-              of {subjects.length}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={currentPage === 0}
-                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
-                aria-label="Previous subjects page"
-              >
-                Previous
-              </Button>
-              <span className="text-sm text-text-muted">
-                Page {currentPage + 1} of {totalPages}
-              </span>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={currentPage >= totalPages - 1}
-                onClick={() =>
-                  setCurrentPage((page) => Math.min(totalPages - 1, page + 1))
-                }
-                aria-label="Next subjects page"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
       </Card>
     </div>
   );
