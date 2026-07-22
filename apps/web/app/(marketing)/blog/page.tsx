@@ -7,6 +7,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchBlogPosts } from "../../../lib/blog-client";
+import BlogFaq from "./blog-faq";
 import BlogIndexClient from "./blog-index-client";
 
 export const metadata: Metadata = {
@@ -50,10 +51,9 @@ export default async function BlogIndexPage() {
         </p>
       </div>
 
-      <BlogIndexClient
-        posts={posts}
-        allTags={allTags}
-      />
+      <BlogIndexClient posts={posts} allTags={allTags} />
+
+      <BlogFaq />
     </div>
   );
 }

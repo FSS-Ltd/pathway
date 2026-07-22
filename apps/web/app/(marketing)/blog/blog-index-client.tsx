@@ -3,21 +3,20 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, ExternalLink } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ExternalLink } from "lucide-react";
 import type { BlogPostSummary } from "../../../lib/blog-client";
+
+const POSTS_PER_PAGE = 10;
 
 type Props = {
   posts: BlogPostSummary[];
   allTags: string[];
 };
 
-export default function BlogIndexClient({
-  posts,
-  allTags,
-}: Props) {
+export default function BlogIndexClient({ posts, allTags }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [currentPage, setCurrentPage] = useState(0);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -36,14 +35,24 @@ export default function BlogIndexClient({
     });
   }, [posts, selectedCategory, searchQuery]);
 
-  const filteredFeatured = filteredPosts[0];
-  const filteredGrid = filteredPosts.slice(1);
-  const visibleGridPosts = filteredGrid.slice(0, visibleCount);
-  const hasMoreVisiblePosts = visibleGridPosts.length < filteredGrid.length;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredPosts.length / POSTS_PER_PAGE),
+  );
+  const pagePosts = filteredPosts.slice(
+    currentPage * POSTS_PER_PAGE,
+    (currentPage + 1) * POSTS_PER_PAGE,
+  );
+  const filteredFeatured = currentPage === 0 ? pagePosts[0] : undefined;
+  const paginatedGridPosts = currentPage === 0 ? pagePosts.slice(1) : pagePosts;
 
   useEffect(() => {
-    setVisibleCount(10);
+    setCurrentPage(0);
   }, [searchQuery, selectedCategory]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, Math.max(totalPages - 1, 0)));
+  }, [totalPages]);
 
   return (
     <div className="flex flex-col gap-8 lg:flex-row lg:gap-12">
@@ -108,7 +117,9 @@ export default function BlogIndexClient({
       <main className="min-w-0 flex-1">
         {filteredPosts.length === 0 ? (
           <div className="rounded-xl border border-border-subtle bg-surface p-12 text-center">
-            <p className="text-text-muted">No posts found matching your filters.</p>
+            <p className="text-text-muted">
+              No posts found matching your filters.
+            </p>
           </div>
         ) : (
           <div className="space-y-8">
@@ -184,7 +195,7 @@ export default function BlogIndexClient({
 
             {/* Grid of Posts */}
             <div className="grid gap-6 sm:grid-cols-2">
-              {visibleGridPosts.map((post) => (
+              {paginatedGridPosts.map((post) => (
                 <Link
                   key={post.id}
                   href={`/blog/${post.slug}`}
@@ -257,15 +268,43 @@ export default function BlogIndexClient({
           </div>
         )}
 
-        {hasMoreVisiblePosts && filteredPosts.length > 0 && (
-          <div className="mt-8 text-center">
-            <button
-              type="button"
-              onClick={() => setVisibleCount((count) => count + 10)}
-              className="inline-flex items-center gap-2 rounded-lg bg-accent-subtle px-6 py-3 text-sm font-medium text-accent-strong transition hover:bg-accent-primary hover:text-white"
-            >
-              Show more
-            </button>
+        {filteredPosts.length > POSTS_PER_PAGE && (
+          <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-border-subtle pt-6 sm:flex-row">
+            <p className="text-sm text-text-muted">
+              Showing {currentPage * POSTS_PER_PAGE + 1}–
+              {Math.min(
+                (currentPage + 1) * POSTS_PER_PAGE,
+                filteredPosts.length,
+              )}{" "}
+              of {filteredPosts.length}
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
+                disabled={currentPage === 0}
+                className="inline-flex items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Previous blog page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </button>
+              <span className="text-sm text-text-muted">
+                Page {currentPage + 1} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(totalPages - 1, page + 1))
+                }
+                disabled={currentPage >= totalPages - 1}
+                className="inline-flex items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Next blog page"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
       </main>
