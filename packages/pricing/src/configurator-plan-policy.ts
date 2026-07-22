@@ -102,5 +102,7 @@ const CONFIGURATOR_PLAN_POLICIES: Readonly<Record<string, ConfiguratorPlanPolicy
 export function getConfiguratorPlanPolicy(
   planCode: string,
 ): ConfiguratorPlanPolicy | undefined {
-  return CONFIGURATOR_PLAN_POLICIES[planCode];
+  return Object.hasOwn(CONFIGURATOR_PLAN_POLICIES, planCode)
+    ? CONFIGURATOR_PLAN_POLICIES[planCode]
+    : undefined;
 }

@@ -94,9 +94,12 @@ describe("configurator plan policy", () => {
     });
   });
 
-  it("returns undefined for an unknown plan code", () => {
-    expect(getConfiguratorPlanPolicy("UNKNOWN_PLAN")).toBeUndefined();
-  });
+  it.each(["UNKNOWN_PLAN", "toString", "constructor"])(
+    "returns undefined for unknown plan code %s",
+    (planCode) => {
+      expect(getConfiguratorPlanPolicy(planCode)).toBeUndefined();
+    },
+  );
 
   it.each([
     "STARTER_49_MONTHLY",
