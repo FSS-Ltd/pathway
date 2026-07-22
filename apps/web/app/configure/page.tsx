@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { getConfiguratorPlanPolicy, PLANS } from "@pathway/pricing";
 import {
   ADDON_PRICES,
   PLAN_PRICES,
@@ -38,6 +40,7 @@ import { SummaryStep, type AccountDetails } from "./steps/summary";
 import { VerticalStep } from "./steps/vertical";
 import {
   firstIncompleteStep,
+  includedModulesForState,
   INITIAL_CONFIGURATOR_STATE,
   nextStep,
   prevStep,
@@ -59,8 +62,8 @@ type ConfiguratorAction =
   | { type: "back" }
   | { type: "org-type"; orgType: OrgType }
   | { type: "vertical"; vertical: Vertical }
-  | { type: "module"; module: WebModule }
-  | { type: "plan"; planCode: PlanCode }
+  | { type: "module"; module: WebModule; prices: OptionPriceLookup }
+  | { type: "plan"; planCode: PlanCode; prices: OptionPriceLookup }
   | {
       type: "frequency";
       frequency: "monthly" | "yearly";
@@ -105,9 +108,9 @@ function configuratorReducer(
     case "vertical":
       return selectVertical(state, action.vertical);
     case "module":
-      return toggleModule(state, action.module);
+      return toggleModule(state, action.module, action.prices);
     case "plan":
-      return selectPlan(state, action.planCode);
+      return selectPlan(state, action.planCode, action.prices);
     case "frequency":
       return selectFrequency(state, action.frequency, action.prices);
     case "storage":
@@ -128,6 +131,7 @@ function isContinueDisabled(
 }
 
 export default function ConfigurePage() {
+  const router = useRouter();
   const [state, dispatch] = useReducer(
     configuratorReducer,
     INITIAL_CONFIGURATOR_STATE,
@@ -173,14 +177,20 @@ export default function ConfigurePage() {
     () => ({ ...ADDON_PRICES, ...billingPrices.addonPrices }),
     [billingPrices.addonPrices],
   );
-  const optionPrices = useMemo<OptionPriceLookup>(
+  const storagePrices = useMemo<OptionPriceLookup>(
     () => ({
       ...ADDON_PRICES,
       ...billingPrices.addonPrices,
-      ...billingPrices.modulePrices,
     }),
-    [billingPrices.addonPrices, billingPrices.modulePrices],
+    [billingPrices.addonPrices],
   );
+  const includedModules = includedModulesForState(state);
+  const eligibleOptionalModules = state.planCode
+    ? [
+        ...(getConfiguratorPlanPolicy(state.planCode)
+          ?.eligibleOptionalModules ?? []),
+      ]
+    : [];
   const progressSteps: ConfiguratorProgressStep[] = progressStepsForOrgType(
     state.orgType,
   ).map((step) => ({ id: step, label: STEP_LABELS[step] }));
@@ -255,7 +265,7 @@ export default function ConfigurePage() {
               setStepDirection("forward");
               dispatch({ type: "next" });
             }}
-            isBackDisabled={currentStep === "org-type" || isCheckoutPending}
+            isBackDisabled={currentStep === "plan" || isCheckoutPending}
             isContinueDisabled={isContinueDisabled(state, currentStep)}
           />
         </section>
@@ -286,6 +296,30 @@ export default function ConfigurePage() {
               animate="animate"
               exit="exit"
             >
+              {currentStep === "plan" ? (
+                <PlanStep
+                  planCode={state.planCode}
+                  frequency={state.frequency}
+                  planPrices={mergedPlanPrices}
+                  onSelectPlan={(planCode) =>
+                    dispatch({
+                      type: "plan",
+                      planCode,
+                      prices: billingPrices.modulePrices,
+                    })
+                  }
+                  onSelectFrequency={(frequency) =>
+                    dispatch({
+                      type: "frequency",
+                      frequency,
+                      prices: billingPrices.modulePrices,
+                    })
+                  }
+                  onSelectEnterprise={() =>
+                    router.push("/demo?plan=enterprise")
+                  }
+                />
+              ) : null}
               {currentStep === "org-type" ? (
                 <OrgTypeStep
                   orgType={state.orgType}
@@ -308,25 +342,21 @@ export default function ConfigurePage() {
               ) : null}
               {currentStep === "modules" ? (
                 <ModulesStep
-                  selectedModules={state.selectedModules}
+                  includedModules={includedModules}
+                  selectedOptionalModules={state.selectedOptionalModules}
+                  eligibleOptionalModules={eligibleOptionalModules}
                   frequency={state.frequency}
-                  prices={optionPrices}
-                  onToggle={(module) => dispatch({ type: "module", module })}
-                />
-              ) : null}
-              {currentStep === "plan" ? (
-                <PlanStep
-                  planCode={state.planCode}
-                  frequency={state.frequency}
-                  planPrices={mergedPlanPrices}
-                  onSelectPlan={(planCode) =>
-                    dispatch({ type: "plan", planCode })
+                  prices={billingPrices.modulePrices}
+                  planLabel={
+                    state.planCode
+                      ? PLANS[state.planCode].displayName
+                      : "your plan"
                   }
-                  onSelectFrequency={(frequency) =>
+                  onToggle={(module) =>
                     dispatch({
-                      type: "frequency",
-                      frequency,
-                      prices: optionPrices,
+                      type: "module",
+                      module,
+                      prices: billingPrices.modulePrices,
                     })
                   }
                 />
@@ -335,7 +365,7 @@ export default function ConfigurePage() {
                 <StorageStep
                   storageChoice={state.storageChoice}
                   frequency={state.frequency}
-                  prices={optionPrices}
+                  prices={storagePrices}
                   onSelect={(storageChoice) =>
                     dispatch({ type: "storage", storageChoice })
                   }
@@ -344,7 +374,8 @@ export default function ConfigurePage() {
               {currentStep === "summary" && state.vertical && state.planCode ? (
                 <SummaryStep
                   vertical={state.vertical}
-                  selectedModules={state.selectedModules}
+                  includedModules={includedModules}
+                  selectedOptionalModules={state.selectedOptionalModules}
                   planCode={state.planCode}
                   frequency={state.frequency}
                   storageChoice={state.storageChoice}

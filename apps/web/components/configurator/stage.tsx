@@ -10,7 +10,10 @@ import {
   useAnimationControls,
   useReducedMotion,
 } from "framer-motion";
-import type { ConfiguratorState } from "../../app/configure/state";
+import {
+  configuredModulesForState,
+  type ConfiguratorState,
+} from "../../app/configure/state";
 import {
   CONFIGURATOR_IMAGE_PATHS,
   CONFIGURATOR_BACKDROP_SIZES,
@@ -34,11 +37,11 @@ type ConfiguratorStageProps = {
 };
 
 const STEP_ORDER: ConfiguratorState["step"][] = [
+  "plan",
   "org-type",
   "vertical",
   "included",
   "modules",
-  "plan",
   "storage",
   "summary",
 ];
@@ -111,7 +114,7 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
   }, [prefersReducedMotion, stageControls, state.step]);
 
   const vertical = state.vertical;
-  const selectedModules = state.selectedModules.map((module) => ({
+  const selectedModules = configuredModulesForState(state).map((module) => ({
     module,
     entry: MODULE_CATALOG[module],
   }));

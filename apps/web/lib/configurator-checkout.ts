@@ -46,7 +46,9 @@ export function buildCheckoutPayload(
     storageAddon200Gb: state.storageChoice === "200" ? 1 : 0,
     storageAddon1Tb: state.storageChoice === "1000" ? 1 : 0,
     selectedModules:
-      state.selectedModules.length > 0 ? state.selectedModules : undefined,
+      state.selectedOptionalModules.length > 0
+        ? state.selectedOptionalModules
+        : undefined,
     orgName: organisation.organisationName,
     contactName: organisation.contactName,
     contactEmail: organisation.workEmail,

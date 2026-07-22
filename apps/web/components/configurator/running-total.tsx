@@ -13,7 +13,7 @@ import { VERTICAL_LABELS } from "@pathway/types";
 import { PLANS } from "@pathway/pricing";
 import { formatConfiguratorMoney } from "./price-chip";
 import {
-  calculateCartTotals,
+  calculateConfiguratorCartTotals,
   type AddonCode,
   type ModulePriceMeta,
   type PlanCode,
@@ -61,7 +61,7 @@ function buildSelection(state: ConfiguratorState) {
     storageAddon100Gb: state.storageChoice === "100" ? 1 : 0,
     storageAddon200Gb: state.storageChoice === "200" ? 1 : 0,
     storageAddon1Tb: state.storageChoice === "1000" ? 1 : 0,
-    selectedModules: state.selectedModules,
+    selectedModules: state.selectedOptionalModules,
   };
 }
 
@@ -77,7 +77,7 @@ export function RunningTotal({
   const totals = useMemo(
     () =>
       selection
-        ? calculateCartTotals(selection, {
+        ? calculateConfiguratorCartTotals(selection, {
             planPrices,
             addonPrices,
             modulePrices,

@@ -12,6 +12,7 @@ import {
 } from "../lib/module-catalog";
 import {
   ADDON_PRICES,
+  calculateConfiguratorCartTotals,
   calculateCartTotals,
   mergeBillingPrices,
 } from "../lib/buy-now-pricing";
@@ -119,6 +120,51 @@ describe("module catalogue", () => {
       label: "Finance module",
       amountMajor: 19,
     });
+  });
+
+  it("charges only paid optional modules for configured plans", () => {
+    const { modulePrices } = mergeBillingPrices([
+      {
+        code: "MODULE_LEARNING_MONTHLY",
+        unitAmount: 2900,
+        interval: "month",
+      },
+    ]);
+
+    const total = calculateCartTotals(
+      {
+        planCode: "GROWTH_99_MONTHLY",
+        frequency: "monthly",
+        selectedModules: ["LEARNING"],
+      },
+      { modulePrices },
+    );
+
+    expect(total.totalMajor).toBe(128);
+    expect(total.lines).toEqual([
+      { label: "£99 / month", amountMajor: 99 },
+      { label: "Learning module", amountMajor: 29 },
+    ]);
+  });
+
+  it("does not use published module fallbacks in configurator totals", () => {
+    const selection = {
+      planCode: "STARTER_49_MONTHLY" as const,
+      frequency: "monthly" as const,
+      selectedModules: ["LEARNING" as const],
+    };
+
+    expect(calculateConfiguratorCartTotals(selection).totalMajor).toBe(49);
+    expect(
+      calculateConfiguratorCartTotals(selection, {
+        modulePrices: {
+          MODULE_LEARNING_MONTHLY: {
+            amountMajor: 29,
+            label: "Learning module",
+          },
+        },
+      }).totalMajor,
+    ).toBe(78);
   });
 
   it("covers every vertical with customer-readable included features", () => {

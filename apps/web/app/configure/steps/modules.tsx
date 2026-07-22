@@ -11,24 +11,35 @@ import {
 } from "../../../lib/module-catalog";
 
 type ModulesStepProps = {
-  selectedModules: WebModule[];
+  includedModules: WebModule[];
+  selectedOptionalModules: WebModule[];
+  eligibleOptionalModules: WebModule[];
   frequency: "monthly" | "yearly";
   prices: OptionPriceLookup;
+  planLabel: string;
   onToggle: (module: WebModule) => void;
 };
 
 export function ModulesStep({
-  selectedModules,
+  includedModules,
+  selectedOptionalModules,
+  eligibleOptionalModules,
   frequency,
   prices,
+  planLabel,
   onToggle,
 }: ModulesStepProps) {
-  const modules = (
+  const included = includedModules.map((module) => ({
+    module,
+    entry: MODULE_CATALOG[module],
+  }));
+  const optionalModules = (
     Object.entries(MODULE_CATALOG) as [
       WebModule,
       (typeof MODULE_CATALOG)[WebModule],
     ][]
   )
+    .filter(([module]) => eligibleOptionalModules.includes(module))
     .map(([module, entry]) => ({
       module,
       entry,
@@ -55,10 +66,32 @@ export function ModulesStep({
         </p>
       </div>
       <SelectionCardGroup className="grid gap-3">
-        {modules.map(({ module, entry, delta }) => (
+        {included.map(({ module, entry }) => (
           <SelectionCard
             key={module}
-            isSelected={selectedModules.includes(module)}
+            isSelected
+            isDisabled={true}
+            onClick={() => undefined}
+          >
+            <span className="flex items-start justify-between gap-3">
+              <span>
+                <span className="block font-semibold text-text-primary">
+                  {entry.label}
+                </span>
+                <span className="mt-1 block text-sm text-text-muted">
+                  Included in {planLabel}
+                </span>
+              </span>
+              <span className="text-sm font-semibold text-text-muted">
+                Included
+              </span>
+            </span>
+          </SelectionCard>
+        ))}
+        {optionalModules.map(({ module, entry, delta }) => (
+          <SelectionCard
+            key={module}
+            isSelected={selectedOptionalModules.includes(module)}
             isDisabled={delta.status === "coming-soon"}
             onClick={() => onToggle(module)}
           >

@@ -91,4 +91,47 @@ describe("configurator step contracts", () => {
     }
     expect(page).not.toContain("will be available here in the next stage");
   });
+
+  it("renders Plan first and sends only live module prices to policy actions", () => {
+    const page = readFileSync(join(configureDirectory, "page.tsx"), "utf8");
+
+    expect(page).toContain("useRouter");
+    expect(page).toContain('router.push("/demo?plan=enterprise")');
+    expect(page).toContain("prices: billingPrices.modulePrices");
+    expect(page).toContain(
+      "selectedOptionalModules={state.selectedOptionalModules}",
+    );
+    expect(page).toContain("includedModules={includedModules}");
+    expect(page).toContain("eligibleOptionalModules={eligibleOptionalModules}");
+    expect(page.indexOf('{currentStep === "plan"')).toBeLessThan(
+      page.indexOf('{currentStep === "org-type"'),
+    );
+  });
+
+  it("routes Enterprise directly to the demo path without a checkout plan", () => {
+    const plan = readFileSync(join(stepsDirectory, "plan.tsx"), "utf8");
+
+    expect(plan).toContain("onSelectEnterprise");
+    expect(plan).toContain("onClick={onSelectEnterprise}");
+    expect(plan).not.toContain("mailto:");
+  });
+
+  it("distinguishes included, eligible, and unavailable modules", () => {
+    const modules = readFileSync(join(stepsDirectory, "modules.tsx"), "utf8");
+
+    expect(modules).toContain("includedModules");
+    expect(modules).toContain("eligibleOptionalModules");
+    expect(modules).toContain("Included in {planLabel}");
+    expect(modules).toContain("isDisabled={true}");
+    expect(modules).toContain("eligibleOptionalModules.includes(module)");
+  });
+
+  it("separates included modules from paid add-ons in the review", () => {
+    const summary = readFileSync(join(stepsDirectory, "summary.tsx"), "utf8");
+
+    expect(summary).toContain("Included modules");
+    expect(summary).toContain("Paid add-ons");
+    expect(summary).toContain("includedModules");
+    expect(summary).toContain("selectedOptionalModules");
+  });
 });
