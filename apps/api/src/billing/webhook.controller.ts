@@ -18,8 +18,13 @@ import {
   Role,
   OrgRole,
   OrgSector,
+  Module,
   ModuleStatus,
 } from "@pathway/db";
+import {
+  getConfiguratorPlanPolicy,
+  type ConfiguratorModuleCode,
+} from "@pathway/pricing";
 import { EntitlementsService } from "./entitlements.service";
 import {
   BILLING_WEBHOOK_PROVIDER,
@@ -40,6 +45,21 @@ type WebhookResult =
 type PendingOrderRecord = Prisma.PendingOrderGetPayload<
   Record<string, never>
 >;
+
+const PRISMA_MODULE_BY_CONFIGURATOR_CODE: Record<
+  ConfiguratorModuleCode,
+  Module
+> = {
+  FINANCE: Module.FINANCE,
+  EVENTS: Module.EVENTS,
+  TRANSPORT: Module.TRANSPORT,
+  MEALS: Module.MEALS,
+  ASSET_MANAGEMENT: Module.ASSET_MANAGEMENT,
+  HR: Module.HR,
+  AI_WORKSPACE: Module.AI_WORKSPACE,
+  ADVANCED_REPORTING: Module.ADVANCED_REPORTING,
+  LEARNING: Module.LEARNING,
+};
 
 export function isOrgSector(value: string | undefined): value is OrgSector {
   return !!value && (Object.values(OrgSector) as string[]).includes(value);
@@ -288,15 +308,33 @@ export class BillingWebhookController {
     pendingOrder: PendingOrderRecord,
     event: ParsedBillingWebhookEvent,
   ): Promise<void> {
+    const policy = getConfiguratorPlanPolicy(pendingOrder.planCode);
+    const includedModules =
+      policy?.outcome === "checkout"
+        ? policy.includedModules.map(
+            (moduleCode) => PRISMA_MODULE_BY_CONFIGURATOR_CODE[moduleCode],
+          )
+        : [];
     const selectedModules = pendingOrder.selectedModules ?? [];
-    if (selectedModules.length === 0) return;
+    const entitlementSources = new Map<Module, "plan" | "add-on">();
+
+    for (const module of includedModules) {
+      entitlementSources.set(module, "plan");
+    }
+    for (const module of selectedModules) {
+      if (!entitlementSources.has(module)) {
+        entitlementSources.set(module, "add-on");
+      }
+    }
+    if (entitlementSources.size === 0) return;
 
     const now = new Date();
-    const metadata = {
-      billingSource: "subscription",
-      subscriptionId: event.subscriptionId,
-    };
-    for (const module of selectedModules) {
+    for (const [module, entitlementSource] of entitlementSources) {
+      const metadata = {
+        billingSource: "subscription",
+        subscriptionId: event.subscriptionId,
+        entitlementSource,
+      };
       await tx.orgModule.upsert({
         where: { orgId_module: { orgId, module } },
         create: {
