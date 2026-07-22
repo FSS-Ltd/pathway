@@ -266,6 +266,42 @@ describe("BuyNowService", () => {
     );
   });
 
+  it("normalizes CORE before resolving modules for public checkout", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await service.checkout({
+      ...baseRequest,
+      plan: {
+        planCode: "CORE_MONTHLY",
+        selectedModules: [Module.FINANCE],
+      },
+    });
+
+    expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          planCode: "MINIMUM_MONTHLY",
+          selectedModules: [Module.FINANCE],
+        }),
+      }),
+    );
+    expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: expect.objectContaining({
+          planCode: "MINIMUM_MONTHLY",
+          selectedModules: [Module.FINANCE],
+        }),
+      }),
+      expect.anything(),
+    );
+  });
+
   it("rejects contact-only public plans before creating a pending order", async () => {
     const service = new BuyNowService(
       previewService,
@@ -322,6 +358,82 @@ describe("BuyNowService", () => {
       expect.objectContaining({
         addonsOnly: true,
         plan: expect.objectContaining({ selectedModules: [Module.FINANCE] }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it("strips included modules and deduplicates eligible paid modules for authenticated checkout", async () => {
+    prismaMock.org.findUnique
+      .mockResolvedValueOnce({ isMasterOrg: false })
+      .mockResolvedValueOnce({ name: "Test Org", stripeCustomerId: "cus_123" });
+
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await service.purchaseForOrg(
+      {
+        planCode: "GROWTH_99_MONTHLY",
+        selectedModules: [
+          Module.FINANCE,
+          Module.TRANSPORT,
+          Module.TRANSPORT,
+          Module.EVENTS,
+        ],
+      },
+      { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+    );
+
+    expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ selectedModules: [Module.TRANSPORT] }),
+      }),
+    );
+    expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: expect.objectContaining({ selectedModules: [Module.TRANSPORT] }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it("normalizes CORE before resolving modules for authenticated checkout", async () => {
+    prismaMock.org.findUnique
+      .mockResolvedValueOnce({ isMasterOrg: false })
+      .mockResolvedValueOnce({ name: "Test Org", stripeCustomerId: "cus_123" });
+
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await service.purchaseForOrg(
+      { planCode: "CORE_MONTHLY", selectedModules: [Module.FINANCE] },
+      { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+    );
+
+    expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          planCode: "MINIMUM_MONTHLY",
+          selectedModules: [Module.FINANCE],
+        }),
+      }),
+    );
+    expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: expect.objectContaining({
+          planCode: "MINIMUM_MONTHLY",
+          selectedModules: [Module.FINANCE],
+        }),
       }),
       expect.anything(),
     );
