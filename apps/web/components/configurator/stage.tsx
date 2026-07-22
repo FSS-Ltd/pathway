@@ -2,37 +2,26 @@
 
 import { useEffect, useRef } from "react";
 import Image, { getImageProps } from "next/image";
-import { PLANS } from "@pathway/pricing";
-import { VERTICAL_LABELS } from "@pathway/types";
 import {
   AnimatePresence,
   motion,
   useAnimationControls,
   useReducedMotion,
 } from "framer-motion";
-import {
-  configuredModulesForState,
-  type ConfiguratorState,
-} from "../../app/configure/state";
+import type { ConfiguratorState } from "../../app/configure/state";
 import {
   CONFIGURATOR_IMAGE_PATHS,
   CONFIGURATOR_BACKDROP_SIZES,
   CONFIGURATOR_OBJECT_SIZES,
-  MODULE_CATALOG,
-  SCHOOL_PREVIEW_VERTICALS,
   configuratorImageSizes,
-  storageImagePath,
-  verticalImagePath,
 } from "../../lib/module-catalog";
+import { backdropFade, instantSwap, settleZoom } from "../../lib/motion";
 import {
-  backdropFade,
-  exitEase,
-  instantSwap,
-  reducedMotionFade,
-  settleZoom,
-  springEnter,
-} from "../../lib/motion";
-import { sceneSlots, type SceneSlot } from "./scene-layout";
+  buildSceneModel,
+  sceneImageMotion,
+  type SceneForegroundLayer,
+  type SceneImageMotion,
+} from "./scene-layout";
 
 type ConfiguratorStageProps = {
   state: ConfiguratorState;
@@ -47,18 +36,6 @@ const STEP_ORDER: ConfiguratorState["step"][] = [
   "storage",
   "summary",
 ];
-
-function stageCaption(state: ConfiguratorState): string {
-  if (state.orgType === "SCHOOL" && !state.vertical) {
-    return "School workspace preview showing Independent School, ACE School and State School.";
-  }
-
-  if (!state.vertical || !state.planCode) {
-    return "Choose a setting and plan to complete your configuration.";
-  }
-
-  return `${VERTICAL_LABELS[state.vertical]} · ${PLANS[state.planCode].displayName} · billed ${state.frequency}`;
-}
 
 function useConfiguratorImagePreloads(): void {
   useEffect(() => {
@@ -100,44 +77,24 @@ function useConfiguratorImagePreloads(): void {
   }, []);
 }
 
-type ForegroundLayer = {
-  id: string;
-  imagePath: string;
-};
-
 type SceneImageProps = {
-  imagePath: string;
-  slot: SceneSlot;
-  prefersReducedMotion: boolean;
+  layer: SceneForegroundLayer;
+  motion: SceneImageMotion;
 };
 
-function SceneImage({
-  imagePath,
-  slot,
-  prefersReducedMotion,
-}: SceneImageProps) {
+function SceneImage({ layer, motion: imageMotion }: SceneImageProps) {
   return (
     <motion.div
-      layout={!prefersReducedMotion}
-      initial={
-        prefersReducedMotion
-          ? { opacity: 0 }
-          : { opacity: 0, scale: 0.85, y: -12 }
-      }
-      animate={
-        prefersReducedMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }
-      }
-      exit={
-        prefersReducedMotion
-          ? { opacity: 0, transition: reducedMotionFade }
-          : { opacity: 0, scale: 0.9, transition: exitEase }
-      }
-      transition={prefersReducedMotion ? reducedMotionFade : springEnter}
-      style={slot}
+      layout={imageMotion.layout}
+      initial={imageMotion.initial}
+      animate={imageMotion.animate}
+      exit={imageMotion.exit}
+      transition={imageMotion.transition}
+      style={layer.slot}
       className="absolute aspect-square"
     >
       <Image
-        src={imagePath}
+        src={layer.imagePath}
         alt=""
         fill
         sizes={CONFIGURATOR_OBJECT_SIZES}
@@ -147,13 +104,13 @@ function SceneImage({
   );
 }
 
-function SchoolPreview() {
+function SchoolPreview({ imagePaths }: { imagePaths: readonly string[] }) {
   return (
     <div className="absolute inset-0 grid grid-cols-3">
-      {SCHOOL_PREVIEW_VERTICALS.map((vertical) => (
+      {imagePaths.map((imagePath) => (
         <Image
-          key={vertical}
-          src={verticalImagePath(vertical)}
+          key={imagePath}
+          src={imagePath}
           alt=""
           fill={false}
           width={512}
@@ -185,22 +142,8 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
     previousStep.current = state.step;
   }, [prefersReducedMotion, stageControls, state.step]);
 
-  const vertical = state.vertical;
-  const foregroundLayers: ForegroundLayer[] = configuredModulesForState(
-    state,
-  ).map((module) => ({
-    id: module,
-    imagePath: MODULE_CATALOG[module].imagePath,
-  }));
-  const storagePath =
-    state.storageChoice === "none"
-      ? null
-      : storageImagePath(state.storageChoice);
-  if (storagePath) {
-    foregroundLayers.push({ id: state.storageChoice, imagePath: storagePath });
-  }
-  const slots = sceneSlots(foregroundLayers.length);
-  const caption = stageCaption(state);
+  const scene = buildSceneModel(state);
+  const imageMotion = sceneImageMotion(prefersReducedMotion);
   const swapTransition = prefersReducedMotion ? instantSwap : backdropFade;
 
   return (
@@ -211,13 +154,13 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
       >
         <div
           role="img"
-          aria-label={caption}
+          aria-label={scene.caption}
           className="relative aspect-[3/2] overflow-hidden rounded-xl bg-surface lg:rounded-2xl"
         >
           <AnimatePresence mode="sync" initial={false}>
-            {vertical ? (
+            {scene.base.kind === "vertical" ? (
               <motion.div
-                key={vertical}
+                key={scene.base.imagePaths[0]}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -225,7 +168,7 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
                 className="absolute inset-0"
               >
                 <Image
-                  src={verticalImagePath(vertical)}
+                  src={scene.base.imagePaths[0]}
                   alt=""
                   fill
                   priority
@@ -233,7 +176,7 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
                   className="object-cover"
                 />
               </motion.div>
-            ) : state.orgType === "SCHOOL" ? (
+            ) : scene.base.kind === "school-preview" ? (
               <motion.div
                 key="school-preview"
                 initial={{ opacity: 0 }}
@@ -242,29 +185,24 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
                 transition={swapTransition}
                 className="absolute inset-0"
               >
-                <SchoolPreview />
+                <SchoolPreview imagePaths={scene.base.imagePaths} />
               </motion.div>
             ) : null}
           </AnimatePresence>
-          {!vertical && state.orgType !== "SCHOOL" ? (
+          {scene.base.kind === "empty" ? (
             <p className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-text-muted">
               Choose a setting to start building your workspace.
             </p>
           ) : null}
           <AnimatePresence initial={!prefersReducedMotion}>
-            {foregroundLayers.map((layer, index) => (
-              <SceneImage
-                key={layer.id}
-                imagePath={layer.imagePath}
-                slot={slots[index]}
-                prefersReducedMotion={prefersReducedMotion}
-              />
+            {scene.foreground.map((layer) => (
+              <SceneImage key={layer.id} layer={layer} motion={imageMotion} />
             ))}
           </AnimatePresence>
         </div>
       </motion.div>
       <p aria-hidden="true" className="mt-4 text-xs text-text-muted lg:text-sm">
-        {caption}
+        {scene.caption}
       </p>
     </section>
   );

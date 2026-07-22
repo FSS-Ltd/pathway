@@ -10,7 +10,15 @@ import {
   storageImagePath,
   verticalImagePath,
 } from "../lib/module-catalog";
-import { sceneSlots } from "../components/configurator/scene-layout";
+import {
+  buildSceneModel,
+  sceneImageMotion,
+  sceneSlots,
+} from "../components/configurator/scene-layout";
+import {
+  INITIAL_CONFIGURATOR_STATE,
+  type ConfiguratorState,
+} from "../app/configure/state";
 import {
   backdropFade,
   configuratorStepVariants,
@@ -228,6 +236,13 @@ describe("configurator imagery and motion contract", () => {
     ]);
   });
 
+  it("returns defensive scene slots", () => {
+    const mutated = [...sceneSlots(4)];
+    mutated[0].left = "0%";
+
+    expect(sceneSlots(4)[0]).toEqual({ left: "12%", top: "25%", width: "16%" });
+  });
+
   it("keeps every scene object inside the 3:2 frame and staggers seven through ten objects over two rows", () => {
     for (let count = 1; count <= 10; count += 1) {
       const slots = sceneSlots(count);
@@ -254,25 +269,116 @@ describe("configurator imagery and motion contract", () => {
       "utf8",
     );
 
-    expect(stage).toContain("sceneSlots");
-    expect(stage).toContain('state.orgType === "SCHOOL"');
-    expect(stage).toContain("SCHOOL_PREVIEW_VERTICALS");
+    expect(stage).toContain("buildSceneModel");
+    expect(stage).toContain("sceneImageMotion");
     expect(stage).toContain('alt=""');
-    expect(stage).toContain("aria-label={caption}");
-    expect(stage).toContain(
-      "School workspace preview showing Independent School, ACE School and State School.",
-    );
+    expect(stage).toContain("aria-label={scene.caption}");
     expect(stage).not.toContain("selectedModules.map");
     expect(stage).not.toContain("lg:grid-cols-3");
-    expect(stage).toContain("layout={!prefersReducedMotion}");
-    expect(stage).toContain(
-      "prefersReducedMotion ? reducedMotionFade : springEnter",
-    );
     expect(stage).toContain(
       "animate={prefersReducedMotion ? { opacity: 1 } : stageControls}",
     );
-    expect(stage).toContain(
-      "const slots = sceneSlots(foregroundLayers.length)",
+  });
+
+  it("models resolved single-vertical artwork immediately", () => {
+    const scene = buildSceneModel({
+      ...INITIAL_CONFIGURATOR_STATE,
+      orgType: "CHURCH",
+      vertical: "CHURCH",
+      planCode: "STARTER_49_MONTHLY",
+    });
+
+    expect(scene.base).toEqual({
+      kind: "vertical",
+      imagePaths: ["/configurator/verticals/church.png"],
+    });
+  });
+
+  it("models the School preview until a selected subtype replaces it", () => {
+    const preview = buildSceneModel({
+      ...INITIAL_CONFIGURATOR_STATE,
+      orgType: "SCHOOL",
+      planCode: "STARTER_49_MONTHLY",
+    });
+
+    expect(preview.base).toEqual({
+      kind: "school-preview",
+      imagePaths: [
+        "/configurator/verticals/independent-school.png",
+        "/configurator/verticals/ace-school.png",
+        "/configurator/verticals/state-school.png",
+      ],
+    });
+    expect(preview.caption).toBe(
+      "School workspace preview showing Independent School, ACE School and State School.",
     );
+
+    const selected = buildSceneModel({
+      ...INITIAL_CONFIGURATOR_STATE,
+      orgType: "SCHOOL",
+      vertical: "ACE_SCHOOL",
+      planCode: "STARTER_49_MONTHLY",
+    });
+    expect(selected.base).toEqual({
+      kind: "vertical",
+      imagePaths: ["/configurator/verticals/ace-school.png"],
+    });
+  });
+
+  it("models configured Growth modules and storage in scene slots", () => {
+    const scene = buildSceneModel({
+      ...INITIAL_CONFIGURATOR_STATE,
+      orgType: "CHURCH",
+      vertical: "CHURCH",
+      planCode: "GROWTH_99_MONTHLY",
+      selectedOptionalModules: ["LEARNING"],
+      storageChoice: "200",
+    });
+
+    expect(scene.foreground).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          imagePath: "/configurator/modules/finance.png",
+        }),
+        expect.objectContaining({
+          imagePath: "/configurator/modules/events.png",
+        }),
+        expect.objectContaining({
+          imagePath: "/configurator/modules/advanced-reporting.png",
+        }),
+        expect.objectContaining({
+          imagePath: "/configurator/modules/learning.png",
+        }),
+        expect.objectContaining({
+          imagePath: "/configurator/storage/storage-200gb.png",
+        }),
+      ]),
+    );
+    expect(scene.foreground).toHaveLength(5);
+    expect(scene.foreground.map(({ slot }) => slot)).toEqual(sceneSlots(5));
+  });
+
+  it("models reduced-motion foreground layers with opacity-only motion", () => {
+    expect(sceneImageMotion(true)).toEqual({
+      layout: false,
+      initial: { opacity: 0 },
+      animate: { opacity: 1 },
+      exit: { opacity: 0, transition: expect.any(Object) },
+      transition: expect.any(Object),
+    });
+    expect(sceneImageMotion(true).exit).not.toHaveProperty("scale");
+    expect(sceneImageMotion(true).exit).not.toHaveProperty("x");
+    expect(sceneImageMotion(true).exit).not.toHaveProperty("y");
+  });
+
+  it("keeps Stage connected to the pure scene model and motion helpers", () => {
+    const stage = readFileSync(
+      join(process.cwd(), "components/configurator/stage.tsx"),
+      "utf8",
+    );
+
+    expect(stage).toContain("buildSceneModel");
+    expect(stage).toContain("sceneImageMotion");
+    expect(stage).toContain('role="img"');
   });
 });
