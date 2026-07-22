@@ -9,7 +9,7 @@ const shellSource = readFileSync(
 
 assert.equal(
   APP_VERSION,
-  "2.3.0",
+  "2.4.0",
   "admin footer must surface the current product version",
 );
 assert.ok(
