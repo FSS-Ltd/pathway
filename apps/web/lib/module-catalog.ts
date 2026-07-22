@@ -30,6 +30,12 @@ export function verticalImagePath(vertical: Vertical): string {
   return `/configurator/verticals/${slug}.png`;
 }
 
+export const SCHOOL_PREVIEW_VERTICALS = [
+  "INDEPENDENT_SCHOOL",
+  "ACE_SCHOOL",
+  "STATE_SCHOOL",
+] as const satisfies readonly Vertical[];
+
 function moduleEntry(
   module: WebModule,
   label: string,

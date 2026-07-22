@@ -10,6 +10,7 @@ import {
   storageImagePath,
   verticalImagePath,
 } from "../lib/module-catalog";
+import { sceneSlots } from "../components/configurator/scene-layout";
 import {
   backdropFade,
   configuratorStepVariants,
@@ -152,7 +153,9 @@ describe("configurator imagery and motion contract", () => {
 
     expect(stage).toContain("useAnimationControls");
     expect(stage).toContain("stageControls.start(settleZoom)");
-    expect(stage).toContain("animate={stageControls}");
+    expect(stage).toContain(
+      "animate={prefersReducedMotion ? { opacity: 1 } : stageControls}",
+    );
     expect(motionSource).toContain("configuratorStepVariants");
     expect(page).toContain("custom={stepDirection}");
     expect(page).toContain("configuratorStepVariants");
@@ -203,5 +206,73 @@ describe("configurator imagery and motion contract", () => {
     expect(page).toContain("sticky top-2");
     expect(page).toContain("lg:col-start-2");
     expect(page).toContain("lg:row-span-2");
+  });
+
+  it("uses stable percentage slots for compact and staggered foreground scenes", () => {
+    expect(sceneSlots(0)).toEqual([]);
+    expect(sceneSlots(1)).toEqual([{ left: "27%", top: "16%", width: "46%" }]);
+    expect(sceneSlots(4)).toEqual([
+      { left: "12%", top: "25%", width: "16%" },
+      { left: "32%", top: "25%", width: "16%" },
+      { left: "52%", top: "25%", width: "16%" },
+      { left: "72%", top: "25%", width: "16%" },
+    ]);
+    expect(sceneSlots(7)).toEqual([
+      { left: "7%", top: "12%", width: "20%" },
+      { left: "29%", top: "12%", width: "20%" },
+      { left: "51%", top: "12%", width: "20%" },
+      { left: "73%", top: "12%", width: "20%" },
+      { left: "19%", top: "56%", width: "20%" },
+      { left: "41%", top: "56%", width: "20%" },
+      { left: "63%", top: "56%", width: "20%" },
+    ]);
+  });
+
+  it("keeps every scene object inside the 3:2 frame and staggers seven through ten objects over two rows", () => {
+    for (let count = 1; count <= 10; count += 1) {
+      const slots = sceneSlots(count);
+      expect(slots).toHaveLength(count);
+
+      for (const slot of slots) {
+        const left = Number.parseFloat(slot.left);
+        const top = Number.parseFloat(slot.top);
+        const width = Number.parseFloat(slot.width);
+
+        expect(left + width).toBeLessThanOrEqual(100);
+        expect(top + width * 1.5).toBeLessThanOrEqual(100);
+      }
+    }
+
+    for (const count of [7, 8, 9, 10]) {
+      expect(new Set(sceneSlots(count).map(({ top }) => top)).size).toBe(2);
+    }
+  });
+
+  it("composes truthful decorative artwork inside one accessible scene", () => {
+    const stage = readFileSync(
+      join(process.cwd(), "components/configurator/stage.tsx"),
+      "utf8",
+    );
+
+    expect(stage).toContain("sceneSlots");
+    expect(stage).toContain('state.orgType === "SCHOOL"');
+    expect(stage).toContain("SCHOOL_PREVIEW_VERTICALS");
+    expect(stage).toContain('alt=""');
+    expect(stage).toContain("aria-label={caption}");
+    expect(stage).toContain(
+      "School workspace preview showing Independent School, ACE School and State School.",
+    );
+    expect(stage).not.toContain("selectedModules.map");
+    expect(stage).not.toContain("lg:grid-cols-3");
+    expect(stage).toContain("layout={!prefersReducedMotion}");
+    expect(stage).toContain(
+      "prefersReducedMotion ? reducedMotionFade : springEnter",
+    );
+    expect(stage).toContain(
+      "animate={prefersReducedMotion ? { opacity: 1 } : stageControls}",
+    );
+    expect(stage).toContain(
+      "const slots = sceneSlots(foregroundLayers.length)",
+    );
   });
 });
