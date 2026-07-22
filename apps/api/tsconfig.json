@@ -13,6 +13,8 @@
       "@pathway/db/*": ["../../packages/db/src/*"],
       "@pathway/platform": ["../../packages/platform/src/index.ts"],
       "@pathway/platform/*": ["../../packages/platform/src/*"],
+      "@pathway/pricing": ["../../packages/pricing/src/index.ts"],
+      "@pathway/pricing/*": ["../../packages/pricing/src/*"],
       "@pathway/types": ["../../packages/types/src/index.ts"],
       "@pathway/types/*": ["../../packages/types/src/*"],
       "@pathway/util": ["../../packages/util/src/index.ts"],
@@ -26,6 +28,7 @@
     "../../packages/auth/src",
     "../../packages/db/src",
     "../../packages/platform/src",
+    "../../packages/pricing/src",
     "../../packages/types/src",
     "../../packages/util/src"
   ],

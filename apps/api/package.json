@@ -33,6 +33,7 @@
     "@pathway/auth": "workspace:*",
     "@pathway/db": "workspace:*",
     "@pathway/platform": "workspace:*",
+    "@pathway/pricing": "workspace:*",
     "@pathway/types": "workspace:*",
     "@pathway/util": "workspace:*",
     "class-transformer": "^0.5.1",

@@ -178,6 +178,9 @@ importers:
       '@pathway/platform':
         specifier: workspace:*
         version: link:../../packages/platform
+      '@pathway/pricing':
+        specifier: workspace:*
+        version: link:../../packages/pricing
       '@pathway/types':
         specifier: workspace:*
         version: link:../../packages/types
