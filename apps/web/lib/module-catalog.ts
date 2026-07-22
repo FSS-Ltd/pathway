@@ -1,15 +1,7 @@
 import { VERTICAL_OPTIONS, type Vertical } from "@pathway/types";
+import type { ConfiguratorModuleCode } from "@pathway/pricing";
 
-export type WebModule =
-  | "FINANCE"
-  | "EVENTS"
-  | "TRANSPORT"
-  | "MEALS"
-  | "ASSET_MANAGEMENT"
-  | "HR"
-  | "AI_WORKSPACE"
-  | "ADVANCED_REPORTING"
-  | "LEARNING";
+export type WebModule = ConfiguratorModuleCode;
 
 export type ModulePriceCode = `MODULE_${WebModule}_${"MONTHLY" | "YEARLY"}`;
 export type StoragePriceCode =
