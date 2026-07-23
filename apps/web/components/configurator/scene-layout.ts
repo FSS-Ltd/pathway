@@ -2,6 +2,7 @@ import { PLANS } from "@pathway/pricing";
 import { VERTICAL_LABELS } from "@pathway/types";
 import {
   configuredModulesForState,
+  includedModulesForState,
   type ConfiguratorState,
 } from "../../app/configure/state";
 import {
@@ -134,6 +135,7 @@ export type SceneForegroundLayer = {
 export type SceneModel = {
   base: SceneBase;
   caption: string;
+  accessibleDescription: string;
   foreground: readonly SceneForegroundLayer[];
 };
 
@@ -183,6 +185,34 @@ function sceneBase(state: ConfiguratorState): SceneBase {
   return { kind: "empty", imagePaths: [] };
 }
 
+const STORAGE_LABELS: Record<
+  Exclude<ConfiguratorState["storageChoice"], "none">,
+  string
+> = {
+  "100": "100GB",
+  "200": "200GB",
+  "1000": "1TB",
+};
+
+function moduleList(modules: readonly (keyof typeof MODULE_CATALOG)[]): string {
+  return modules.length > 0
+    ? modules.map((module) => MODULE_CATALOG[module].label).join(", ")
+    : "none";
+}
+
+function sceneAccessibleDescription(
+  state: ConfiguratorState,
+  caption: string,
+): string {
+  const sentence = caption.endsWith(".") ? caption.slice(0, -1) : caption;
+  const storage =
+    state.storageChoice === "none"
+      ? "none"
+      : STORAGE_LABELS[state.storageChoice];
+
+  return `${sentence}. Included modules: ${moduleList(includedModulesForState(state))}. Optional modules: ${moduleList(state.selectedOptionalModules)}. Extra storage: ${storage}.`;
+}
+
 export function buildSceneModel(state: ConfiguratorState): SceneModel {
   const layers: Array<Pick<SceneForegroundLayer, "id" | "imagePath">> =
     configuredModulesForState(state).map((module) => ({
@@ -196,10 +226,12 @@ export function buildSceneModel(state: ConfiguratorState): SceneModel {
     });
   }
   const slots = sceneSlots(layers.length);
+  const caption = sceneCaption(state);
 
   return {
     base: sceneBase(state),
-    caption: sceneCaption(state),
+    caption,
+    accessibleDescription: sceneAccessibleDescription(state, caption),
     foreground: layers.map((layer, index) => ({
       ...layer,
       slot: slots[index],

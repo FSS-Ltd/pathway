@@ -98,7 +98,7 @@ function SceneImage({ layer, motion: imageMotion }: SceneImageProps) {
         alt=""
         fill
         sizes={CONFIGURATOR_OBJECT_SIZES}
-        className="object-contain"
+        className="object-contain drop-shadow-[0_8px_10px_rgba(15,23,42,0.22)]"
       />
     </motion.div>
   );
@@ -154,7 +154,7 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
       >
         <div
           role="img"
-          aria-label={scene.caption}
+          aria-label={scene.accessibleDescription}
           className="relative aspect-[3/2] overflow-hidden rounded-xl bg-surface lg:rounded-2xl"
         >
           <AnimatePresence mode="sync" initial={false}>

@@ -318,6 +318,141 @@ describe("BillingWebhookController", () => {
     expect(firstActivation.update).not.toHaveProperty("activatedAt");
   });
 
+  it("keeps the base subscription and activates only purchased modules for an add-on order", async () => {
+    const pending = {
+      id: "po_growth_add_on",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "GROWTH_99_MONTHLY",
+      av30Cap: 75,
+      storageGbCap: 100,
+      smsMessagesCap: 500,
+      leaderSeatsIncluded: 5,
+      maxSites: 2,
+      selectedModules: [Module.TRANSPORT],
+      flags: { purchaseKind: "add-on" },
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_add_on",
+      providerSubscriptionId: null,
+      status: PendingOrderStatus.PENDING,
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      subscriptionId: "sub_add_on",
+      pendingOrderId: pending.id,
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.subscription.findMany).not.toHaveBeenCalled();
+    expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(1);
+    expect(prismaMock.orgModule.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          orgId_module: {
+            orgId: baseEvent.orgId,
+            module: Module.TRANSPORT,
+          },
+        },
+        create: expect.objectContaining({
+          metadata: {
+            billingSource: "subscription",
+            subscriptionId: "sub_add_on",
+            entitlementSource: "add-on",
+          },
+        }),
+      }),
+    );
+  });
+
+  it("waits for an active event before completing and provisioning a pending order", async () => {
+    const pending = {
+      id: "po_out_of_order",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "GROWTH_99_MONTHLY",
+      av30Cap: 75,
+      storageGbCap: 100,
+      smsMessagesCap: 500,
+      leaderSeatsIncluded: 5,
+      maxSites: 2,
+      selectedModules: [Module.TRANSPORT],
+      flags: null,
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_out_of_order",
+      providerSubscriptionId: null,
+      status: PendingOrderStatus.PENDING,
+    };
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+    (provider.verifyAndParse as jest.Mock).mockResolvedValueOnce({
+      ...baseEvent,
+      eventId: "evt_incomplete",
+      status: SubscriptionStatus.PAST_DUE,
+      pendingOrderId: pending.id,
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.pendingOrder.update).not.toHaveBeenCalled();
+    expect(prismaMock.orgEntitlementSnapshot.create).not.toHaveBeenCalled();
+    expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
+
+    (provider.verifyAndParse as jest.Mock).mockResolvedValueOnce({
+      ...baseEvent,
+      eventId: "evt_active",
+      status: SubscriptionStatus.ACTIVE,
+      pendingOrderId: pending.id,
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.pendingOrder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: pending.id },
+        data: expect.objectContaining({ status: PendingOrderStatus.COMPLETED }),
+      }),
+    );
+    expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(4);
+  });
+
+  it("keeps add-on payment failures out of base subscription state", async () => {
+    const pending = {
+      id: "po_add_on_failed",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "GROWTH_99_MONTHLY",
+      selectedModules: [Module.TRANSPORT],
+      flags: { purchaseKind: "add-on" },
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_add_on_failed",
+      providerSubscriptionId: "sub_add_on_failed",
+      status: PendingOrderStatus.COMPLETED,
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      eventId: "evt_add_on_failed",
+      kind: "invoice.payment_failed",
+      status: SubscriptionStatus.PAST_DUE,
+      subscriptionId: pending.providerSubscriptionId,
+      pendingOrderId: pending.id,
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.pendingOrder.update).not.toHaveBeenCalled();
+    expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
+  });
+
   it("activates the six Professional inclusions without paid module selections", async () => {
     const pending = {
       id: "po_professional_modules",

@@ -472,6 +472,7 @@ export class BuyNowService {
           previewResult.effectiveCaps.leaderSeatsIncluded ?? undefined,
         maxSites: previewResult.effectiveCaps.maxSites ?? undefined,
         selectedModules,
+        flags: addonsOnly ? { purchaseKind: "add-on" } : undefined,
         provider: prismaProvider,
         status: PendingOrderStatus.PENDING,
       },

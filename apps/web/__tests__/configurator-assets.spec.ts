@@ -272,9 +272,10 @@ describe("configurator imagery and motion contract", () => {
     expect(stage).toContain("buildSceneModel");
     expect(stage).toContain("sceneImageMotion");
     expect(stage).toContain('alt=""');
-    expect(stage).toContain("aria-label={scene.caption}");
+    expect(stage).toContain("aria-label={scene.accessibleDescription}");
     expect(stage).not.toContain("selectedModules.map");
     expect(stage).not.toContain("lg:grid-cols-3");
+    expect(stage).toContain("drop-shadow-");
     expect(stage).toContain(
       "animate={prefersReducedMotion ? { opacity: 1 } : stageControls}",
     );
@@ -356,6 +357,9 @@ describe("configurator imagery and motion contract", () => {
     );
     expect(scene.foreground).toHaveLength(5);
     expect(scene.foreground.map(({ slot }) => slot)).toEqual(sceneSlots(5));
+    expect(scene.accessibleDescription).toBe(
+      "Church · Growth · billed monthly. Included modules: Finance, Events, Advanced Reporting. Optional modules: Learning. Extra storage: 200GB.",
+    );
   });
 
   it("models reduced-motion foreground layers with opacity-only motion", () => {

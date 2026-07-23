@@ -351,7 +351,10 @@ describe("BuyNowService", () => {
 
     expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ selectedModules: [Module.FINANCE] }),
+        data: expect.objectContaining({
+          selectedModules: [Module.FINANCE],
+          flags: { purchaseKind: "add-on" },
+        }),
       }),
     );
     expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
