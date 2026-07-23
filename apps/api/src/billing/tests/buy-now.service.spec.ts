@@ -349,6 +349,13 @@ describe("BuyNowService", () => {
       { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
     );
 
+    expect(prismaMock.subscription.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          planCode: { not: { startsWith: "ADD_ON:" } },
+        }),
+      }),
+    );
     expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

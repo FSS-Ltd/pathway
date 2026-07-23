@@ -40,6 +40,7 @@ import {
   type BillingProviderConfig,
 } from "./billing-provider.config";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "./subscription-plan-code";
 
 // Phase 0 PR 0.2: adds "professional" between growth and enterprise. Exported
 // (not a local const) so it's directly testable without instantiating the service.
@@ -337,6 +338,9 @@ export class BuyNowService {
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         orgId,
+        planCode: {
+          not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+        },
         status: {
           in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
         },
@@ -546,6 +550,9 @@ export class BuyNowService {
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         orgId,
+        planCode: {
+          not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+        },
         status: {
           in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
         },
@@ -573,7 +580,12 @@ export class BuyNowService {
 
     // Check if org has any previous subscriptions (active, canceled, or past_due)
     const latestSubscription = await prisma.subscription.findFirst({
-      where: { orgId },
+      where: {
+        orgId,
+        planCode: {
+          not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+        },
+      },
       orderBy: { createdAt: "desc" },
       select: { planCode: true, status: true },
     });

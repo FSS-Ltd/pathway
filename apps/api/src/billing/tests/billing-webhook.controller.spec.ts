@@ -347,7 +347,16 @@ describe("BillingWebhookController", () => {
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
-    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.subscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          planCode: "ADD_ON:GROWTH_99_MONTHLY",
+        }),
+        create: expect.objectContaining({
+          planCode: "ADD_ON:GROWTH_99_MONTHLY",
+        }),
+      }),
+    );
     expect(prismaMock.subscription.findMany).not.toHaveBeenCalled();
     expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(1);
     expect(prismaMock.orgModule.upsert).toHaveBeenCalledWith(
@@ -421,7 +430,7 @@ describe("BillingWebhookController", () => {
     expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(4);
   });
 
-  it("keeps add-on payment failures out of base subscription state", async () => {
+  it("records add-on payment failures without changing base subscription state", async () => {
     const pending = {
       id: "po_add_on_failed",
       orgId: baseEvent.orgId,
@@ -448,9 +457,105 @@ describe("BillingWebhookController", () => {
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
-    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.subscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          planCode: "ADD_ON:GROWTH_99_MONTHLY",
+          status: SubscriptionStatus.PAST_DUE,
+        }),
+        create: expect.objectContaining({
+          planCode: "ADD_ON:GROWTH_99_MONTHLY",
+          status: SubscriptionStatus.PAST_DUE,
+        }),
+      }),
+    );
     expect(prismaMock.pendingOrder.update).not.toHaveBeenCalled();
     expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
+  });
+
+  it("does not reactivate modules for an already completed order", async () => {
+    const pending = {
+      id: "po_completed",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "GROWTH_99_MONTHLY",
+      selectedModules: [Module.TRANSPORT],
+      flags: null,
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_completed",
+      providerSubscriptionId: baseEvent.subscriptionId,
+      status: PendingOrderStatus.COMPLETED,
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      eventId: "evt_completed_renewal",
+      kind: "invoice.paid",
+      pendingOrderId: pending.id,
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.orgModule.updateMany).toHaveBeenCalledWith({
+      where: {
+        orgId: baseEvent.orgId,
+        status: ModuleStatus.ACTIVE,
+        metadata: {
+          path: ["subscriptionId"],
+          equals: baseEvent.subscriptionId,
+        },
+      },
+      data: { expiresAt: baseEvent.periodEnd },
+    });
+  });
+
+  it("cancels persisted add-on subscriptions when a new plan activates", async () => {
+    const pending = {
+      id: "po_plan_change",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "PROFESSIONAL_149_MONTHLY",
+      selectedModules: [],
+      flags: null,
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_plan_change",
+      providerSubscriptionId: null,
+      status: PendingOrderStatus.PENDING,
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      eventId: "evt_plan_change",
+      subscriptionId: "sub_new_plan",
+      pendingOrderId: pending.id,
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+    prismaMock.subscription.findMany.mockResolvedValue([
+      {
+        id: "subscription_add_on",
+        providerSubId: "sub_old_add_on",
+        planCode: "ADD_ON:STARTER_MONTHLY",
+      },
+    ]);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          orgId: baseEvent.orgId,
+          providerSubId: { not: "sub_new_plan" },
+        }),
+      }),
+    );
+    expect(prismaMock.subscription.update).toHaveBeenCalledWith({
+      where: { id: "subscription_add_on" },
+      data: { status: SubscriptionStatus.CANCELED },
+    });
   });
 
   it("activates the six Professional inclusions without paid module selections", async () => {

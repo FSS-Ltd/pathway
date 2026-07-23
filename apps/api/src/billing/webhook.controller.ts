@@ -36,6 +36,7 @@ import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-p
 import { LoggingService, StructuredLogger } from "../common/logging/logging.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 import Stripe from "stripe";
+import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
 
 type WebhookResult =
   | { status: "ok"; eventId: string }
@@ -55,6 +56,16 @@ function isAddOnOnlyOrder(pendingOrder: PendingOrderRecord): boolean {
     isRecord(pendingOrder.flags) &&
     pendingOrder.flags.purchaseKind === "add-on"
   );
+}
+
+function subscriptionPlanCode(
+  event: ParsedBillingWebhookEvent,
+  pendingOrder: PendingOrderRecord | null,
+): string | undefined {
+  if (!pendingOrder) return event.planCode ?? undefined;
+  return isAddOnOnlyOrder(pendingOrder)
+    ? addOnSubscriptionPlanCode(pendingOrder.planCode)
+    : pendingOrder.planCode;
 }
 
 const PRISMA_MODULE_BY_CONFIGURATOR_CODE: Record<
@@ -255,12 +266,12 @@ export class BillingWebhookController {
       case "invoice.payment_failed":
         {
           const pendingOrder = await this.findPendingOrder(event);
-          if (!pendingOrder || !isAddOnOnlyOrder(pendingOrder)) {
-            await this.upsertSubscription(
-              event,
-              event.status ?? SubscriptionStatus.PAST_DUE,
-            );
-          }
+          await this.upsertSubscription(
+            event,
+            event.status ?? SubscriptionStatus.PAST_DUE,
+            prisma,
+            subscriptionPlanCode(event, pendingOrder),
+          );
         }
         return true;
       case "subscription.canceled":
@@ -286,8 +297,17 @@ export class BillingWebhookController {
     }
 
     const pendingOrder = await this.findPendingOrder(event);
-    if (!pendingOrder || !isAddOnOnlyOrder(pendingOrder)) {
-      await this.upsertSubscription(event, status);
+    const shouldApplyPendingOrder =
+      pendingOrder !== null &&
+      pendingOrder.status !== PendingOrderStatus.COMPLETED &&
+      status === SubscriptionStatus.ACTIVE;
+    if (!shouldApplyPendingOrder) {
+      await this.upsertSubscription(
+        event,
+        status,
+        prisma,
+        subscriptionPlanCode(event, pendingOrder),
+      );
     }
     if (status === SubscriptionStatus.CANCELED) {
       await this.cancelActiveModulesForSubscription(
@@ -302,14 +322,6 @@ export class BillingWebhookController {
       if (pendingOrder.status !== PendingOrderStatus.COMPLETED) {
         await this.applyPendingOrder(event, status, pendingOrder);
       } else {
-        await prisma.$transaction((tx) =>
-          this.activateModulesFromPendingOrder(
-            tx,
-            event.orgId,
-            pendingOrder,
-            event,
-          ),
-        );
         await this.extendActiveModulesExpiry(
           event.orgId,
           event.subscriptionId,
@@ -416,12 +428,13 @@ export class BillingWebhookController {
     event: ParsedBillingWebhookEvent,
     status: SubscriptionStatus,
     tx: Prisma.TransactionClient | typeof prisma = prisma,
+    planCode: string | undefined = event.planCode ?? undefined,
   ) {
     const now = new Date();
     await tx.subscription.upsert({
       where: { providerSubId: event.subscriptionId },
       update: {
-        planCode: event.planCode ?? undefined,
+        planCode,
         status,
         periodStart: event.periodStart ?? now,
         periodEnd: event.periodEnd ?? now,
@@ -431,7 +444,7 @@ export class BillingWebhookController {
         orgId: event.orgId,
         provider: event.provider,
         providerSubId: event.subscriptionId,
-        planCode: event.planCode ?? "unknown",
+        planCode: planCode ?? "unknown",
         status,
         periodStart: event.periodStart ?? now,
         periodEnd: event.periodEnd ?? now,
@@ -460,9 +473,12 @@ export class BillingWebhookController {
     }
     
     await prisma.$transaction(async (tx) => {
-      if (!isAddOnOnlyOrder(pendingOrder)) {
-        await this.upsertSubscription(event, status, tx);
-      }
+      await this.upsertSubscription(
+        event,
+        status,
+        tx,
+        subscriptionPlanCode(event, pendingOrder),
+      );
       await tx.orgEntitlementSnapshot.create({
         data: {
           orgId: actualOrgId,
