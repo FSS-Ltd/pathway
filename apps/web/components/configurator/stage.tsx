@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Image, { getImageProps } from "next/image";
+import Image from "next/image";
 import {
   AnimatePresence,
   motion,
@@ -10,10 +10,8 @@ import {
 } from "framer-motion";
 import type { ConfiguratorState } from "../../app/configure/state";
 import {
-  CONFIGURATOR_IMAGE_PATHS,
   CONFIGURATOR_BACKDROP_SIZES,
   CONFIGURATOR_OBJECT_SIZES,
-  configuratorImageSizes,
 } from "../../lib/module-catalog";
 import { backdropFade, instantSwap, settleZoom } from "../../lib/motion";
 import {
@@ -37,50 +35,12 @@ const STEP_ORDER: ConfiguratorState["step"][] = [
   "summary",
 ];
 
-function useConfiguratorImagePreloads(): void {
-  useEffect(() => {
-    const links = CONFIGURATOR_IMAGE_PATHS.map((imagePath) => {
-      const isBackdrop = imagePath.startsWith("/configurator/verticals/");
-      const { props } = getImageProps({
-        src: imagePath,
-        alt: "",
-        width: isBackdrop ? 1536 : 1024,
-        height: 1024,
-        sizes: configuratorImageSizes(imagePath),
-      });
-      const imageHref = new URL(props.src, window.location.href).href;
-      const existing = Array.from(
-        document.head.querySelectorAll<HTMLLinkElement>(
-          'link[rel="preload"][as="image"]',
-        ),
-      ).find(
-        (link) =>
-          link.dataset.configuratorImage === imagePath ||
-          link.href === imageHref,
-      );
-      if (existing) return null;
-
-      const link = document.createElement("link");
-      link.rel = "preload";
-      link.as = "image";
-      link.href = props.src;
-      link.imageSrcset = props.srcSet ?? "";
-      link.imageSizes = props.sizes ?? configuratorImageSizes(imagePath);
-      link.dataset.configuratorImage = imagePath;
-      document.head.append(link);
-      return link;
-    });
-
-    return () => {
-      links.forEach((link) => link?.remove());
-    };
-  }, []);
-}
-
 type SceneImageProps = {
   layer: SceneForegroundLayer;
   motion: SceneImageMotion;
 };
+
+const SCHOOL_PREVIEW_POSITIONS = ["-1%", "29.5%", "60%"] as const;
 
 function SceneImage({ layer, motion: imageMotion }: SceneImageProps) {
   return (
@@ -91,7 +51,7 @@ function SceneImage({ layer, motion: imageMotion }: SceneImageProps) {
       exit={imageMotion.exit}
       transition={imageMotion.transition}
       style={layer.slot}
-      className="absolute aspect-square"
+      className="pointer-events-none absolute z-10 aspect-square"
     >
       <Image
         src={layer.imagePath}
@@ -104,20 +64,27 @@ function SceneImage({ layer, motion: imageMotion }: SceneImageProps) {
   );
 }
 
-function SchoolPreview({ imagePaths }: { imagePaths: readonly string[] }) {
+function SchoolPreview({
+  imagePaths,
+}: {
+  imagePaths: readonly [string, string, string];
+}) {
   return (
-    <div className="absolute inset-0 grid grid-cols-3">
-      {imagePaths.map((imagePath) => (
-        <Image
+    <div className="absolute inset-0">
+      {imagePaths.map((imagePath, index) => (
+        <div
           key={imagePath}
-          src={imagePath}
-          alt=""
-          fill={false}
-          width={512}
-          height={512}
-          sizes="(min-width: 1024px) 15vw, 30vw"
-          className="h-full w-full object-cover"
-        />
+          style={{ left: SCHOOL_PREVIEW_POSITIONS[index] }}
+          className="absolute top-[18%] aspect-[3/2] w-[41.5%]"
+        >
+          <Image
+            src={imagePath}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 19vw, 24vw"
+            className="object-contain"
+          />
+        </div>
       ))}
     </div>
   );
@@ -127,8 +94,6 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
   const prefersReducedMotion = useReducedMotion() ?? false;
   const previousStep = useRef(state.step);
   const stageControls = useAnimationControls();
-
-  useConfiguratorImagePreloads();
 
   useEffect(() => {
     const isForwardStep =

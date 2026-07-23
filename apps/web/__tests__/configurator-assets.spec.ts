@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { VERTICAL_OPTIONS } from "@pathway/types";
@@ -6,6 +7,7 @@ import {
   CONFIGURATOR_IMAGE_PATHS,
   CONFIGURATOR_OBJECT_SIZES,
   MODULE_CATALOG,
+  SCHOOL_PREVIEW_VERTICALS,
   configuratorImageSizes,
   storageImagePath,
   verticalImagePath,
@@ -15,10 +17,7 @@ import {
   sceneImageMotion,
   sceneSlots,
 } from "../components/configurator/scene-layout";
-import {
-  INITIAL_CONFIGURATOR_STATE,
-  type ConfiguratorState,
-} from "../app/configure/state";
+import { INITIAL_CONFIGURATOR_STATE } from "../app/configure/state";
 import {
   backdropFade,
   configuratorStepVariants,
@@ -58,6 +57,16 @@ describe("configurator imagery and motion contract", () => {
       expect(image.length).toBeGreaterThan(0);
       expect(image.subarray(0, pngSignature.length)).toEqual(pngSignature);
     }
+  });
+
+  it("uses distinct artwork rather than one repeated placeholder", () => {
+    const imageHashes = CONFIGURATOR_IMAGE_PATHS.map((path) =>
+      createHash("sha256")
+        .update(readFileSync(join(publicDirectory, path)))
+        .digest("hex"),
+    );
+
+    expect(new Set(imageHashes).size).toBe(CONFIGURATOR_IMAGE_PATHS.length);
   });
 
   it("derives the planned vertical and storage filenames", () => {
@@ -119,7 +128,7 @@ describe("configurator imagery and motion contract", () => {
     expect(stage).toContain("next/image");
     expect(stage).toContain("priority");
     expect(stage).toContain("sizes");
-    expect(stage).toContain("CONFIGURATOR_IMAGE_PATHS");
+    expect(stage).not.toContain("CONFIGURATOR_IMAGE_PATHS");
     expect(stage).not.toContain("duration:");
     expect(page).toContain("ConfiguratorStage");
     expect(page).toContain("AnimatePresence");
@@ -171,7 +180,7 @@ describe("configurator imagery and motion contract", () => {
     expect(configuratorStepVariants.exit("back")).toMatchObject({ x: 24 });
   });
 
-  it("preloads optimized image resources with their displayed size category", () => {
+  it("keeps image size categories centralized without preloading the full catalogue", () => {
     const stage = readFileSync(
       join(process.cwd(), "components/configurator/stage.tsx"),
       "utf8",
@@ -181,11 +190,9 @@ describe("configurator imagery and motion contract", () => {
       "utf8",
     );
 
-    expect(stage).toContain("getImageProps");
-    expect(stage).toContain("imageSrcset");
-    expect(stage).toContain("imageSizes");
-    expect(stage).toContain("configuratorImageSizes");
-    expect(stage).toContain("dataset.configuratorImage");
+    expect(stage).not.toContain("getImageProps");
+    expect(stage).not.toContain("rel = \"preload\"");
+    expect(stage).toContain('sizes="(min-width: 1024px) 19vw, 24vw"');
     expect(catalogue).toContain("CONFIGURATOR_BACKDROP_SIZES");
     expect(catalogue).toContain("CONFIGURATOR_OBJECT_SIZES");
     expect(catalogue).toContain("configuratorImageSizes");
@@ -216,23 +223,25 @@ describe("configurator imagery and motion contract", () => {
     expect(page).toContain("lg:row-span-2");
   });
 
-  it("uses stable percentage slots for compact and staggered foreground scenes", () => {
+  it("uses stable bottom slots for compact and staggered foreground scenes", () => {
     expect(sceneSlots(0)).toEqual([]);
-    expect(sceneSlots(1)).toEqual([{ left: "27%", top: "16%", width: "46%" }]);
+    expect(sceneSlots(1)).toEqual([
+      { left: "41%", bottom: "1%", width: "18%" },
+    ]);
     expect(sceneSlots(4)).toEqual([
-      { left: "12%", top: "25%", width: "16%" },
-      { left: "32%", top: "25%", width: "16%" },
-      { left: "52%", top: "25%", width: "16%" },
-      { left: "72%", top: "25%", width: "16%" },
+      { left: "4%", bottom: "1%", width: "15%" },
+      { left: "29%", bottom: "1%", width: "15%" },
+      { left: "54%", bottom: "1%", width: "15%" },
+      { left: "79%", bottom: "1%", width: "15%" },
     ]);
     expect(sceneSlots(7)).toEqual([
-      { left: "7%", top: "12%", width: "20%" },
-      { left: "29%", top: "12%", width: "20%" },
-      { left: "51%", top: "12%", width: "20%" },
-      { left: "73%", top: "12%", width: "20%" },
-      { left: "19%", top: "56%", width: "20%" },
-      { left: "41%", top: "56%", width: "20%" },
-      { left: "63%", top: "56%", width: "20%" },
+      { left: "15%", bottom: "17%", width: "12%" },
+      { left: "44%", bottom: "17%", width: "12%" },
+      { left: "73%", bottom: "17%", width: "12%" },
+      { left: "5%", bottom: "1%", width: "12%" },
+      { left: "31%", bottom: "1%", width: "12%" },
+      { left: "57%", bottom: "1%", width: "12%" },
+      { left: "83%", bottom: "1%", width: "12%" },
     ]);
   });
 
@@ -240,26 +249,33 @@ describe("configurator imagery and motion contract", () => {
     const mutated = [...sceneSlots(4)];
     mutated[0].left = "0%";
 
-    expect(sceneSlots(4)[0]).toEqual({ left: "12%", top: "25%", width: "16%" });
+    expect(sceneSlots(4)[0]).toEqual({
+      left: "4%",
+      bottom: "1%",
+      width: "15%",
+    });
   });
 
-  it("keeps every scene object inside the 3:2 frame and staggers seven through ten objects over two rows", () => {
+  it("keeps every add-on near the base and inside the 3:2 frame", () => {
     for (let count = 1; count <= 10; count += 1) {
       const slots = sceneSlots(count);
       expect(slots).toHaveLength(count);
 
       for (const slot of slots) {
         const left = Number.parseFloat(slot.left);
-        const top = Number.parseFloat(slot.top);
+        const bottom = Number.parseFloat(slot.bottom);
         const width = Number.parseFloat(slot.width);
 
         expect(left + width).toBeLessThanOrEqual(100);
-        expect(top + width * 1.5).toBeLessThanOrEqual(100);
+        expect(bottom + width * 1.5).toBeLessThanOrEqual(100);
+        expect(bottom).toBeLessThanOrEqual(17);
       }
     }
 
     for (const count of [7, 8, 9, 10]) {
-      expect(new Set(sceneSlots(count).map(({ top }) => top)).size).toBe(2);
+      expect(new Set(sceneSlots(count).map(({ bottom }) => bottom)).size).toBe(
+        2,
+      );
     }
   });
 
@@ -295,13 +311,22 @@ describe("configurator imagery and motion contract", () => {
     });
   });
 
-  it("models the School preview until a selected subtype replaces it", () => {
+  it("shows all three approved School settings until one is selected", () => {
+    const stage = readFileSync(
+      join(process.cwd(), "components/configurator/stage.tsx"),
+      "utf8",
+    );
     const preview = buildSceneModel({
       ...INITIAL_CONFIGURATOR_STATE,
       orgType: "SCHOOL",
       planCode: "STARTER_49_MONTHLY",
     });
 
+    expect(SCHOOL_PREVIEW_VERTICALS).toEqual([
+      "INDEPENDENT_SCHOOL",
+      "ACE_SCHOOL",
+      "STATE_SCHOOL",
+    ]);
     expect(preview.base).toEqual({
       kind: "school-preview",
       imagePaths: [
@@ -313,6 +338,9 @@ describe("configurator imagery and motion contract", () => {
     expect(preview.caption).toBe(
       "School workspace preview showing Independent School, ACE School and State School.",
     );
+    expect(stage).toContain("SchoolPreview");
+    expect(stage).toContain("imagePaths.map");
+    expect(stage).toContain("w-[41.5%]");
 
     const selected = buildSceneModel({
       ...INITIAL_CONFIGURATOR_STATE,
@@ -326,7 +354,7 @@ describe("configurator imagery and motion contract", () => {
     });
   });
 
-  it("models configured Growth modules and storage in scene slots", () => {
+  it("models configured Growth modules and storage around the scene base", () => {
     const scene = buildSceneModel({
       ...INITIAL_CONFIGURATOR_STATE,
       orgType: "CHURCH",
@@ -357,6 +385,9 @@ describe("configurator imagery and motion contract", () => {
     );
     expect(scene.foreground).toHaveLength(5);
     expect(scene.foreground.map(({ slot }) => slot)).toEqual(sceneSlots(5));
+    expect(scene.foreground.every(({ slot }) => slot.bottom === "1%")).toBe(
+      true,
+    );
     expect(scene.accessibleDescription).toBe(
       "Church · Growth · billed monthly. Included modules: Finance, Events, Advanced Reporting. Optional modules: Learning. Extra storage: 200GB.",
     );

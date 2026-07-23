@@ -113,7 +113,9 @@ export function firstIncompleteStep(
   state: ConfiguratorState,
 ): ConfiguratorStep {
   if (!state.planCode) return "plan";
+  if (state.step === "plan") return "plan";
   if (!state.orgType) return "org-type";
+  if (state.step === "org-type") return "org-type";
   if (state.orgType === "SCHOOL" && !state.vertical) return "vertical";
   return state.step;
 }

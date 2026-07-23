@@ -131,6 +131,30 @@ describe("configurator state", () => {
     );
   });
 
+  it("keeps the current selection step visible until Continue advances it", () => {
+    const organisationStep = {
+      ...selectPlan(
+        INITIAL_CONFIGURATOR_STATE,
+        "STARTER_49_MONTHLY",
+        PRICES,
+      ),
+      step: "org-type" as const,
+    };
+    const school = selectOrgType(organisationStep, "SCHOOL");
+
+    expect(firstIncompleteStep(school)).toBe("org-type");
+
+    const settingStep = nextStep(school);
+    expect(settingStep.step).toBe("vertical");
+
+    const selectedSetting = selectVertical(
+      settingStep,
+      "INDEPENDENT_SCHOOL",
+    );
+    expect(firstIncompleteStep(selectedSetting)).toBe("vertical");
+    expect(nextStep(selectedSetting).step).toBe("included");
+  });
+
   it("stores only eligible live-priced optional modules", () => {
     const growth = selectPlan(
       INITIAL_CONFIGURATOR_STATE,

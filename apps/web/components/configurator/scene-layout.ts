@@ -15,92 +15,89 @@ import { exitEase, reducedMotionFade, springEnter } from "../../lib/motion";
 
 export type SceneSlot = {
   left: `${number}%`;
-  top: `${number}%`;
+  bottom: `${number}%`;
   width: `${number}%`;
 };
 
-const LARGE_SLOTS: Readonly<Record<1 | 2 | 3, readonly SceneSlot[]>> = {
-  1: [{ left: "27%", top: "16%", width: "46%" }],
+type SceneObjectCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
+const SCENE_SLOTS: Readonly<
+  Record<SceneObjectCount, readonly SceneSlot[]>
+> = {
+  1: [{ left: "41%", bottom: "1%", width: "18%" }],
   2: [
-    { left: "8%", top: "19%", width: "38%" },
-    { left: "54%", top: "19%", width: "38%" },
+    { left: "20%", bottom: "1%", width: "18%" },
+    { left: "62%", bottom: "1%", width: "18%" },
   ],
   3: [
-    { left: "4%", top: "25%", width: "30%" },
-    { left: "35%", top: "25%", width: "30%" },
-    { left: "66%", top: "25%", width: "30%" },
+    { left: "8%", bottom: "1%", width: "16%" },
+    { left: "42%", bottom: "1%", width: "16%" },
+    { left: "76%", bottom: "1%", width: "16%" },
   ],
-};
-
-const COMPACT_ROW_SLOTS: Readonly<Record<4 | 5 | 6, readonly SceneSlot[]>> = {
   4: [
-    { left: "12%", top: "25%", width: "16%" },
-    { left: "32%", top: "25%", width: "16%" },
-    { left: "52%", top: "25%", width: "16%" },
-    { left: "72%", top: "25%", width: "16%" },
+    { left: "4%", bottom: "1%", width: "15%" },
+    { left: "29%", bottom: "1%", width: "15%" },
+    { left: "54%", bottom: "1%", width: "15%" },
+    { left: "79%", bottom: "1%", width: "15%" },
   ],
   5: [
-    { left: "5%", top: "25%", width: "16%" },
-    { left: "24%", top: "25%", width: "16%" },
-    { left: "43%", top: "25%", width: "16%" },
-    { left: "62%", top: "25%", width: "16%" },
-    { left: "81%", top: "25%", width: "16%" },
+    { left: "3%", bottom: "1%", width: "14%" },
+    { left: "23%", bottom: "1%", width: "14%" },
+    { left: "43%", bottom: "1%", width: "14%" },
+    { left: "63%", bottom: "1%", width: "14%" },
+    { left: "83%", bottom: "1%", width: "14%" },
   ],
   6: [
-    { left: "2%", top: "25%", width: "16%" },
-    { left: "18%", top: "25%", width: "16%" },
-    { left: "34%", top: "25%", width: "16%" },
-    { left: "50%", top: "25%", width: "16%" },
-    { left: "66%", top: "25%", width: "16%" },
-    { left: "82%", top: "25%", width: "16%" },
+    { left: "2%", bottom: "1%", width: "13%" },
+    { left: "18.5%", bottom: "1%", width: "13%" },
+    { left: "35%", bottom: "1%", width: "13%" },
+    { left: "51.5%", bottom: "1%", width: "13%" },
+    { left: "68%", bottom: "1%", width: "13%" },
+    { left: "84.5%", bottom: "1%", width: "13%" },
+  ],
+  7: [
+    { left: "15%", bottom: "17%", width: "12%" },
+    { left: "44%", bottom: "17%", width: "12%" },
+    { left: "73%", bottom: "17%", width: "12%" },
+    { left: "5%", bottom: "1%", width: "12%" },
+    { left: "31%", bottom: "1%", width: "12%" },
+    { left: "57%", bottom: "1%", width: "12%" },
+    { left: "83%", bottom: "1%", width: "12%" },
+  ],
+  8: [
+    { left: "5%", bottom: "17%", width: "12%" },
+    { left: "31%", bottom: "17%", width: "12%" },
+    { left: "57%", bottom: "17%", width: "12%" },
+    { left: "83%", bottom: "17%", width: "12%" },
+    { left: "17%", bottom: "1%", width: "12%" },
+    { left: "39%", bottom: "1%", width: "12%" },
+    { left: "61%", bottom: "1%", width: "12%" },
+    { left: "83%", bottom: "1%", width: "12%" },
+  ],
+  9: [
+    { left: "8%", bottom: "15%", width: "11%" },
+    { left: "34%", bottom: "15%", width: "11%" },
+    { left: "60%", bottom: "15%", width: "11%" },
+    { left: "86%", bottom: "15%", width: "11%" },
+    { left: "3%", bottom: "1%", width: "10%" },
+    { left: "24%", bottom: "1%", width: "10%" },
+    { left: "45%", bottom: "1%", width: "10%" },
+    { left: "66%", bottom: "1%", width: "10%" },
+    { left: "87%", bottom: "1%", width: "10%" },
+  ],
+  10: [
+    { left: "3%", bottom: "15%", width: "10%" },
+    { left: "24%", bottom: "15%", width: "10%" },
+    { left: "45%", bottom: "15%", width: "10%" },
+    { left: "66%", bottom: "15%", width: "10%" },
+    { left: "87%", bottom: "15%", width: "10%" },
+    { left: "13%", bottom: "1%", width: "10%" },
+    { left: "31%", bottom: "1%", width: "10%" },
+    { left: "49%", bottom: "1%", width: "10%" },
+    { left: "67%", bottom: "1%", width: "10%" },
+    { left: "85%", bottom: "1%", width: "10%" },
   ],
 };
-
-const STAGGERED_SLOTS: Readonly<Record<7 | 8 | 9 | 10, readonly SceneSlot[]>> =
-  {
-    7: [
-      { left: "7%", top: "12%", width: "20%" },
-      { left: "29%", top: "12%", width: "20%" },
-      { left: "51%", top: "12%", width: "20%" },
-      { left: "73%", top: "12%", width: "20%" },
-      { left: "19%", top: "56%", width: "20%" },
-      { left: "41%", top: "56%", width: "20%" },
-      { left: "63%", top: "56%", width: "20%" },
-    ],
-    8: [
-      { left: "7%", top: "12%", width: "20%" },
-      { left: "29%", top: "12%", width: "20%" },
-      { left: "51%", top: "12%", width: "20%" },
-      { left: "73%", top: "12%", width: "20%" },
-      { left: "7%", top: "56%", width: "20%" },
-      { left: "29%", top: "56%", width: "20%" },
-      { left: "51%", top: "56%", width: "20%" },
-      { left: "73%", top: "56%", width: "20%" },
-    ],
-    9: [
-      { left: "2%", top: "12%", width: "16%" },
-      { left: "22%", top: "12%", width: "16%" },
-      { left: "42%", top: "12%", width: "16%" },
-      { left: "62%", top: "12%", width: "16%" },
-      { left: "82%", top: "12%", width: "16%" },
-      { left: "12%", top: "56%", width: "16%" },
-      { left: "32%", top: "56%", width: "16%" },
-      { left: "52%", top: "56%", width: "16%" },
-      { left: "72%", top: "56%", width: "16%" },
-    ],
-    10: [
-      { left: "2%", top: "12%", width: "16%" },
-      { left: "22%", top: "12%", width: "16%" },
-      { left: "42%", top: "12%", width: "16%" },
-      { left: "62%", top: "12%", width: "16%" },
-      { left: "82%", top: "12%", width: "16%" },
-      { left: "2%", top: "56%", width: "16%" },
-      { left: "22%", top: "56%", width: "16%" },
-      { left: "42%", top: "56%", width: "16%" },
-      { left: "62%", top: "56%", width: "16%" },
-      { left: "82%", top: "56%", width: "16%" },
-    ],
-  };
 
 export function sceneSlots(count: number): readonly SceneSlot[] {
   if (!Number.isInteger(count) || count < 0 || count > 10) {
@@ -110,15 +107,7 @@ export function sceneSlots(count: number): readonly SceneSlot[] {
   }
 
   if (count === 0) return [];
-
-  const slots =
-    count <= 3
-      ? LARGE_SLOTS[count as 1 | 2 | 3]
-      : count <= 6
-        ? COMPACT_ROW_SLOTS[count as 4 | 5 | 6]
-        : STAGGERED_SLOTS[count as 7 | 8 | 9 | 10];
-
-  return slots.map((slot) => ({ ...slot }));
+  return SCENE_SLOTS[count as SceneObjectCount].map((slot) => ({ ...slot }));
 }
 
 export type SceneBase =
