@@ -265,7 +265,7 @@ export default function BillingPage() {
           <p className="text-sm text-text-muted">
             No active subscription found for this organisation.
           </p>
-          <Button size="sm" onClick={() => router.push("/billing/buy-now")}>
+          <Button size="sm" onClick={() => router.push("/billing/configure")}>
             Get started with a plan
           </Button>
         </div>
@@ -433,7 +433,7 @@ export default function BillingPage() {
             </p>
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" onClick={() => router.push("/billing/buy-now")}>
+                <Button size="sm" onClick={() => router.push("/billing/configure")}>
                   {data?.planCode ? "Upgrade plan" : "Choose a plan"}
                 </Button>
                 <p className="text-xs text-text-muted">

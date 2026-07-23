@@ -437,7 +437,7 @@ export type AdminBuyNowPurchaseRequest = {
   extraSmsMessages?: number | null;
   extraLeaderSeats?: number | null;
   extraSites?: number | null;
-  selectedModules?: Array<"LEARNING">;
+  selectedModules?: AdminModule[];
   successUrl?: string | null;
   cancelUrl?: string | null;
 };
