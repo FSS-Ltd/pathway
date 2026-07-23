@@ -6,7 +6,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
-import { fetchBlogPosts } from "../../../lib/blog-client";
+import { fetchAllBlogPosts } from "../../../lib/blog-client";
 import BlogFaq from "./blog-faq";
 import BlogIndexClient from "./blog-index-client";
 
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 export const revalidate = 60;
 
 export default async function BlogIndexPage() {
-  const { posts } = await fetchBlogPosts(undefined, 110);
+  const posts = await fetchAllBlogPosts();
 
   // All unique tags for categories
   const allTags = Array.from(
