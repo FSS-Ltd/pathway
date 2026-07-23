@@ -75,6 +75,24 @@ export async function fetchBlogPosts(
   }
 }
 
+export async function fetchAllBlogPosts(
+  pageLimit = 50,
+  maxPages = 50,
+): Promise<BlogPostSummary[]> {
+  const posts: BlogPostSummary[] = [];
+  let cursor: string | undefined;
+
+  for (let page = 0; page < maxPages; page += 1) {
+    const result = await fetchBlogPosts(cursor, pageLimit);
+    posts.push(...result.posts);
+
+    if (!result.nextCursor) break;
+    cursor = result.nextCursor;
+  }
+
+  return posts;
+}
+
 export async function fetchBlogPostBySlug(slug: string): Promise<BlogPostDetail | null> {
   try {
     const res = await fetch(`${API_BASE_URL}/public/blog/posts/${encodeURIComponent(slug)}`, {
