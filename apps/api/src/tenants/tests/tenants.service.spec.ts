@@ -230,6 +230,14 @@ describe("TenantsService", () => {
       await expect(
         svc.create({ name: "Second Site", slug: "second-site", orgId: ORG_ID }),
       ).rejects.toThrow(/sites cap reached/i);
+      expect(subscriptionFindFirst).toHaveBeenCalledWith({
+        where: {
+          orgId: ORG_ID,
+          planCode: { not: { startsWith: "ADD_ON:" } },
+        },
+        orderBy: [{ periodEnd: "desc" }],
+        select: { planCode: true },
+      });
       expect(create).not.toHaveBeenCalled();
     });
   });
