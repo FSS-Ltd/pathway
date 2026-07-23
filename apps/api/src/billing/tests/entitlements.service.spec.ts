@@ -83,6 +83,13 @@ describe("EntitlementsService", () => {
 
     const result = await service.resolve(orgId);
 
+    expect(prismaMock.subscription.findFirst).toHaveBeenCalledWith({
+      where: {
+        orgId,
+        planCode: { not: { startsWith: "ADD_ON:" } },
+      },
+      orderBy: [{ periodEnd: "desc" }],
+    });
     expect(result.isMasterOrg).toBe(false);
     expect(result.subscriptionStatus).toBe(SubscriptionStatus.ACTIVE);
     expect(result.subscription).toEqual(

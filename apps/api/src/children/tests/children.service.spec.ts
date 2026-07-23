@@ -239,6 +239,14 @@ describe("ChildrenService", () => {
       await expect(svc.create({ ...baseDto }, tenantId)).rejects.toThrow(
         /children cap reached/i,
       );
+      expect(subscriptionFindFirst).toHaveBeenCalledWith({
+        where: {
+          orgId: "org_1",
+          planCode: { not: { startsWith: "ADD_ON:" } },
+        },
+        orderBy: [{ periodEnd: "desc" }],
+        select: { planCode: true },
+      });
       expect(create).not.toHaveBeenCalled();
     });
   });

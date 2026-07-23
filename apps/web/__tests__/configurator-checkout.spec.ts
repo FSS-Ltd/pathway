@@ -25,7 +25,7 @@ const completeState = (
   step: "summary",
   orgType: "SCHOOL",
   vertical: "INDEPENDENT_SCHOOL",
-  selectedModules: [],
+  selectedOptionalModules: [],
   planCode: "STARTER_49_MONTHLY",
   frequency: "monthly",
   storageChoice: "none",
@@ -49,7 +49,7 @@ describe("configurator checkout payload", () => {
     [
       "maps Starter monthly with Learning and 100GB",
       completeState({
-        selectedModules: ["LEARNING"],
+        selectedOptionalModules: ["LEARNING"],
         storageChoice: "100",
       }),
       {
@@ -275,13 +275,20 @@ describe("configurator checkout and rollout source contracts", () => {
     expect(configurePage).toContain("checkoutInFlightRef.current = true;");
     expect(configurePage).toContain("checkoutInFlightRef.current = false;");
     expect(configurePage).toContain(
-      'isBackDisabled={currentStep === "org-type" || isCheckoutPending}',
+      'isBackDisabled={currentStep === "plan" || isCheckoutPending}',
     );
     expect(configurePage).toContain(
       "if (isCheckoutPending || checkoutInFlightRef.current) return;",
     );
     expect(summary.match(/disabled=\{isCheckoutPending\}/g)).toHaveLength(5);
     expect(summary).toContain("disabled={disabled}");
+  });
+
+  it("builds checkout payloads from paid optional modules only", () => {
+    const checkout = readSource("lib/configurator-checkout.ts");
+
+    expect(checkout).toContain("state.selectedOptionalModules");
+    expect(checkout).not.toContain("state.selectedModules");
   });
 
   it("syncs and documents the configurator rollout flag for web builds", () => {

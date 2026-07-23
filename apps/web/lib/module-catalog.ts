@@ -1,15 +1,7 @@
 import { VERTICAL_OPTIONS, type Vertical } from "@pathway/types";
+import type { ConfiguratorModuleCode } from "@pathway/pricing";
 
-export type WebModule =
-  | "FINANCE"
-  | "EVENTS"
-  | "TRANSPORT"
-  | "MEALS"
-  | "ASSET_MANAGEMENT"
-  | "HR"
-  | "AI_WORKSPACE"
-  | "ADVANCED_REPORTING"
-  | "LEARNING";
+export type WebModule = ConfiguratorModuleCode;
 
 export type ModulePriceCode = `MODULE_${WebModule}_${"MONTHLY" | "YEARLY"}`;
 export type StoragePriceCode =
@@ -37,6 +29,12 @@ export function verticalImagePath(vertical: Vertical): string {
   const slug = vertical.toLowerCase().replace(/_/g, "-");
   return `/configurator/verticals/${slug}.png`;
 }
+
+export const SCHOOL_PREVIEW_VERTICALS = [
+  "INDEPENDENT_SCHOOL",
+  "ACE_SCHOOL",
+  "STATE_SCHOOL",
+] as const satisfies readonly Vertical[];
 
 function moduleEntry(
   module: WebModule,

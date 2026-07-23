@@ -18,7 +18,8 @@ export type AccountDetails = {
 
 type SummaryStepProps = {
   vertical: Vertical;
-  selectedModules: WebModule[];
+  includedModules: WebModule[];
+  selectedOptionalModules: WebModule[];
   planCode: PlanCode;
   frequency: "monthly" | "yearly";
   storageChoice: StorageChoice;
@@ -31,7 +32,8 @@ type SummaryStepProps = {
 
 export function SummaryStep({
   vertical,
-  selectedModules,
+  includedModules,
+  selectedOptionalModules,
   planCode,
   frequency,
   storageChoice,
@@ -104,10 +106,20 @@ export function SummaryStep({
           </dd>
         </div>
         <div>
-          <dt className="text-text-muted">Modules</dt>
+          <dt className="text-text-muted">Included modules</dt>
           <dd className="mt-1 font-semibold text-text-primary">
-            {selectedModules.length
-              ? selectedModules
+            {includedModules.length
+              ? includedModules
+                  .map((module) => MODULE_CATALOG[module].label)
+                  .join(", ")
+              : "None"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-text-muted">Paid add-ons</dt>
+          <dd className="mt-1 font-semibold text-text-primary">
+            {selectedOptionalModules.length
+              ? selectedOptionalModules
                   .map((module) => MODULE_CATALOG[module].label)
                   .join(", ")
               : "None selected"}

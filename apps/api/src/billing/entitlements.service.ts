@@ -2,6 +2,7 @@ import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { prisma, SubscriptionStatus, BillingProvider } from "@pathway/db";
 import { getPlanDefinition } from "./billing-plans";
+import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "./subscription-plan-code";
 
 export type SubscriptionState = SubscriptionStatus | "NONE";
 
@@ -80,7 +81,12 @@ export class EntitlementsService {
 
     const [subscription, snapshot, usage] = await Promise.all([
       prisma.subscription.findFirst({
-        where: { orgId: resolvedOrgId },
+        where: {
+          orgId: resolvedOrgId,
+          planCode: {
+            not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+          },
+        },
         orderBy: [{ periodEnd: "desc" }],
       }),
       prisma.orgEntitlementSnapshot.findFirst({

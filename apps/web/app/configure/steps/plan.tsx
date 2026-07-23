@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { PLANS } from "@pathway/pricing";
 import { PriceChip } from "../../../components/configurator/price-chip";
 import {
@@ -13,6 +12,7 @@ type PlanStepProps = {
   planPrices: Partial<Record<PlanCode, StripePriceMeta>>;
   onSelectPlan: (planCode: PlanCode) => void;
   onSelectFrequency: (frequency: "monthly" | "yearly") => void;
+  onSelectEnterprise: () => void;
 };
 
 const PLAN_CODES: Record<
@@ -33,6 +33,7 @@ export function PlanStep({
   planPrices,
   onSelectPlan,
   onSelectFrequency,
+  onSelectEnterprise,
 }: PlanStepProps) {
   return (
     <section aria-labelledby="configurator-step-title" className="space-y-5">
@@ -99,17 +100,14 @@ export function PlanStep({
             );
           },
         )}
-        <Link
-          href="mailto:hello@pathway.app?subject=Nexsteps%20Enterprise%20plan"
-          className="rounded-xl border border-border-subtle bg-surface p-4 text-text-primary transition hover:border-border-strong"
-        >
+        <SelectionCard isSelected={false} onClick={onSelectEnterprise}>
           <span className="block font-semibold">
             {PLANS.ENTERPRISE_CONTACT.displayName}
           </span>
           <span className="mt-1 block text-sm text-text-muted">
             Contact sales for a tailored plan for your organisation.
           </span>
-        </Link>
+        </SelectionCard>
       </SelectionCardGroup>
     </section>
   );

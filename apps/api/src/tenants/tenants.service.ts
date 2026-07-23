@@ -8,6 +8,7 @@ import { prisma } from "@pathway/db";
 import { createTenantDto, type CreateTenantDto } from "./dto/create-tenant.dto";
 import type { UpdateTenantDto } from "./dto/update-tenant.dto";
 import { getPlanDefinition } from "../billing/billing-plans";
+import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "../billing/subscription-plan-code";
 
 const PUBLIC_SIGNUP_PATH = "/signup";
 const TOKEN_BYTES = 32;
@@ -276,7 +277,12 @@ export class TenantsService {
         select: { maxSites: true },
       }),
       prisma.subscription.findFirst({
-        where: { orgId },
+        where: {
+          orgId,
+          planCode: {
+            not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+          },
+        },
         orderBy: [{ periodEnd: "desc" }],
         select: { planCode: true },
       }),

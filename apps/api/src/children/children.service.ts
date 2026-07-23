@@ -11,6 +11,7 @@ import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
 import { InvitesService } from "../invites/invites.service";
 import { getPlanDefinition } from "../billing/billing-plans";
+import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "../billing/subscription-plan-code";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { childPhotoKey } from "../common/storage/storage-key.util";
 
@@ -281,7 +282,12 @@ export class ChildrenService {
         select: { flagsJson: true },
       }),
       prisma.subscription.findFirst({
-        where: { orgId },
+        where: {
+          orgId,
+          planCode: {
+            not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+          },
+        },
         orderBy: [{ periodEnd: "desc" }],
         select: { planCode: true },
       }),

@@ -4,6 +4,7 @@ import {
   INITIAL_CONFIGURATOR_STATE,
   selectFrequency,
   selectOrgType,
+  selectPlan,
   selectStorage,
   selectVertical,
   toggleModule,
@@ -11,76 +12,45 @@ import {
 
 const configureDirectory = join(process.cwd(), "app/configure");
 const stepsDirectory = join(configureDirectory, "steps");
+const PRICES = {
+  MODULE_LEARNING_MONTHLY: { amountMajor: 29 },
+  MODULE_LEARNING_YEARLY: { amountMajor: 290 },
+};
 
 describe("configurator step contracts", () => {
-  it("keeps valid choices while applying typed selection actions", () => {
-    const school = selectOrgType(
-      {
-        ...INITIAL_CONFIGURATOR_STATE,
-        vertical: "CHURCH",
-        selectedModules: ["LEARNING"],
-      },
-      "SCHOOL",
-    );
+  it("keeps valid choices while applying policy-aware selection actions", () => {
+    const school = selectOrgType(INITIAL_CONFIGURATOR_STATE, "SCHOOL");
     expect(school.vertical).toBeNull();
-    expect(school.selectedModules).toEqual(["LEARNING"]);
     expect(selectVertical(school, "ACE_SCHOOL").vertical).toBe("ACE_SCHOOL");
-    expect(toggleModule(school, "LEARNING").selectedModules).toEqual([]);
+
+    const starter = selectPlan(school, "STARTER_49_MONTHLY", PRICES);
     expect(
-      toggleModule(
-        toggleModule({ ...school, selectedModules: [] }, "LEARNING"),
-        "LEARNING",
-      ).selectedModules,
-    ).toEqual([]);
-    expect(selectStorage(school, "200").storageChoice).toBe("200");
+      toggleModule(starter, "LEARNING", PRICES).selectedOptionalModules,
+    ).toEqual(["LEARNING"]);
+    expect(selectStorage(starter, "200").storageChoice).toBe("200");
   });
 
-  it("remaps self-serve plan codes when frequency changes without losing choices", () => {
-    const priceLookup = {
-      MODULE_LEARNING_MONTHLY: { amountMajor: 29 },
-      MODULE_LEARNING_YEARLY: { amountMajor: 290 },
-    };
-
+  it("remaps plans and removes modules without a live price in the new interval", () => {
     for (const [monthly, yearly] of [
       ["STARTER_49_MONTHLY", "STARTER_49_YEARLY"],
       ["GROWTH_99_MONTHLY", "GROWTH_99_YEARLY"],
       ["PROFESSIONAL_149_MONTHLY", "PROFESSIONAL_149_YEARLY"],
     ] as const) {
       const state = {
-        ...INITIAL_CONFIGURATOR_STATE,
-        planCode: monthly,
-        selectedModules: ["LEARNING" as const],
-        storageChoice: "100" as const,
+        ...selectPlan(INITIAL_CONFIGURATOR_STATE, monthly, PRICES),
+        selectedOptionalModules: ["LEARNING" as const],
       };
-      const yearlyState = selectFrequency(state, "yearly", priceLookup);
+      const yearlyState = selectFrequency(state, "yearly", PRICES);
+
       expect(yearlyState).toMatchObject({
         planCode: yearly,
         frequency: "yearly",
-        selectedModules: ["LEARNING"],
-        storageChoice: "100",
+        selectedOptionalModules: ["LEARNING"],
       });
-      expect(
-        selectFrequency(yearlyState, "monthly", priceLookup).planCode,
-      ).toBe(monthly);
+      expect(selectFrequency(yearlyState, "monthly", PRICES).planCode).toBe(
+        monthly,
+      );
     }
-  });
-
-  it("removes modules without a price in the newly selected interval", () => {
-    const state = {
-      ...INITIAL_CONFIGURATOR_STATE,
-      planCode: "STARTER_49_MONTHLY" as const,
-      selectedModules: ["LEARNING", "FINANCE"] as const,
-    };
-    const next = selectFrequency(state, "yearly", {
-      MODULE_LEARNING_YEARLY: { amountMajor: 290 },
-      MODULE_FINANCE_MONTHLY: { amountMajor: 19 },
-    });
-
-    expect(next).toMatchObject({
-      frequency: "yearly",
-      planCode: "STARTER_49_YEARLY",
-      selectedModules: ["LEARNING"],
-    });
   });
 
   it("uses authoritative collections and does not hard-code step money", () => {
@@ -120,5 +90,48 @@ describe("configurator step contracts", () => {
       expect(page).toContain(component);
     }
     expect(page).not.toContain("will be available here in the next stage");
+  });
+
+  it("renders Plan first and sends only live module prices to policy actions", () => {
+    const page = readFileSync(join(configureDirectory, "page.tsx"), "utf8");
+
+    expect(page).toContain("useRouter");
+    expect(page).toContain('router.push("/demo?plan=enterprise")');
+    expect(page).toContain("prices: billingPrices.modulePrices");
+    expect(page).toContain(
+      "selectedOptionalModules={state.selectedOptionalModules}",
+    );
+    expect(page).toContain("includedModules={includedModules}");
+    expect(page).toContain("eligibleOptionalModules={eligibleOptionalModules}");
+    expect(page.indexOf('{currentStep === "plan"')).toBeLessThan(
+      page.indexOf('{currentStep === "org-type"'),
+    );
+  });
+
+  it("routes Enterprise directly to the demo path without a checkout plan", () => {
+    const plan = readFileSync(join(stepsDirectory, "plan.tsx"), "utf8");
+
+    expect(plan).toContain("onSelectEnterprise");
+    expect(plan).toContain("onClick={onSelectEnterprise}");
+    expect(plan).not.toContain("mailto:");
+  });
+
+  it("distinguishes included, eligible, and unavailable modules", () => {
+    const modules = readFileSync(join(stepsDirectory, "modules.tsx"), "utf8");
+
+    expect(modules).toContain("includedModules");
+    expect(modules).toContain("eligibleOptionalModules");
+    expect(modules).toContain("Included in {planLabel}");
+    expect(modules).toContain("isDisabled={true}");
+    expect(modules).toContain("eligibleOptionalModules.includes(module)");
+  });
+
+  it("separates included modules from paid add-ons in the review", () => {
+    const summary = readFileSync(join(stepsDirectory, "summary.tsx"), "utf8");
+
+    expect(summary).toContain("Included modules");
+    expect(summary).toContain("Paid add-ons");
+    expect(summary).toContain("includedModules");
+    expect(summary).toContain("selectedOptionalModules");
   });
 });

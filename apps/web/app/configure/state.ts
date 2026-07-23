@@ -1,3 +1,4 @@
+import { getConfiguratorPlanPolicy } from "@pathway/pricing";
 import type { Vertical } from "@pathway/types";
 import type { PlanCode } from "../../lib/buy-now-pricing";
 import {
@@ -9,11 +10,11 @@ import {
 export type OrgType = "SCHOOL" | "CHURCH" | "CHARITY" | "CLUB" | "NURSERY";
 
 export type ConfiguratorStep =
+  | "plan"
   | "org-type"
   | "vertical"
   | "included"
   | "modules"
-  | "plan"
   | "storage"
   | "summary";
 
@@ -21,7 +22,7 @@ export type ConfiguratorState = {
   step: ConfiguratorStep;
   orgType: OrgType | null;
   vertical: Vertical | null;
-  selectedModules: WebModule[];
+  selectedOptionalModules: WebModule[];
   planCode: PlanCode | null;
   frequency: "monthly" | "yearly";
   storageChoice: "none" | "100" | "200" | "1000";
@@ -36,32 +37,25 @@ const VERTICALS_BY_ORG_TYPE: Record<OrgType, Vertical[]> = {
 };
 
 const PROGRESS_STEPS_WITH_VERTICAL: ConfiguratorStep[] = [
+  "plan",
   "org-type",
   "vertical",
   "included",
   "modules",
-  "plan",
   "storage",
 ];
-
 const PROGRESS_STEPS_WITHOUT_VERTICAL: ConfiguratorStep[] = [
+  "plan",
   "org-type",
   "included",
   "modules",
-  "plan",
   "storage",
 ];
-
-const SCREEN_STEPS: ConfiguratorStep[] = [
-  ...PROGRESS_STEPS_WITH_VERTICAL,
-  "summary",
-];
-
 export const INITIAL_CONFIGURATOR_STATE: ConfiguratorState = {
-  step: "org-type",
+  step: "plan",
   orgType: null,
   vertical: null,
-  selectedModules: [],
+  selectedOptionalModules: [],
   planCode: null,
   frequency: "monthly",
   storageChoice: "none",
@@ -75,24 +69,54 @@ export function progressStepsForOrgType(
   orgType: OrgType | null,
 ): ConfiguratorStep[] {
   return [
-    ...(orgType === null || orgType === "SCHOOL"
+    ...(orgType === "SCHOOL" || orgType === null
       ? PROGRESS_STEPS_WITH_VERTICAL
       : PROGRESS_STEPS_WITHOUT_VERTICAL),
   ];
 }
 
+export function includedModulesForState(state: ConfiguratorState): WebModule[] {
+  return state.planCode
+    ? [...(getConfiguratorPlanPolicy(state.planCode)?.includedModules ?? [])]
+    : [];
+}
+
+export function configuredModulesForState(
+  state: ConfiguratorState,
+): WebModule[] {
+  return [
+    ...new Set([
+      ...includedModulesForState(state),
+      ...state.selectedOptionalModules,
+    ]),
+  ];
+}
+
+function reconcileOptionalModules(
+  modules: readonly WebModule[],
+  planCode: PlanCode | null,
+  frequency: ConfiguratorState["frequency"],
+  prices: OptionPriceLookup,
+): WebModule[] {
+  const policy = planCode ? getConfiguratorPlanPolicy(planCode) : undefined;
+  if (!policy || policy.outcome !== "checkout") return [];
+
+  return [...new Set(modules)].filter(
+    (module) =>
+      policy.eligibleOptionalModules.includes(module) &&
+      optionDelta({ kind: "module", module }, frequency, prices).status ===
+        "priced",
+  );
+}
+
 export function firstIncompleteStep(
   state: ConfiguratorState,
 ): ConfiguratorStep {
+  if (!state.planCode) return "plan";
+  if (state.step === "plan") return "plan";
   if (!state.orgType) return "org-type";
-
-  const stepIndex = SCREEN_STEPS.indexOf(state.step);
-  const verticalIndex = SCREEN_STEPS.indexOf("vertical");
-  const planIndex = SCREEN_STEPS.indexOf("plan");
-
-  if (!state.vertical && stepIndex > verticalIndex) return "vertical";
-  if (!state.planCode && stepIndex > planIndex) return "plan";
-
+  if (state.step === "org-type") return "org-type";
+  if (state.orgType === "SCHOOL" && !state.vertical) return "vertical";
   return state.step;
 }
 
@@ -101,24 +125,19 @@ export function nextStep(state: ConfiguratorState): ConfiguratorState {
   if (guardedStep !== state.step) return { ...state, step: guardedStep };
 
   switch (state.step) {
-    case "org-type": {
+    case "plan":
+      return state.planCode ? { ...state, step: "org-type" } : state;
+    case "org-type":
       if (!state.orgType) return state;
-
-      const verticals = verticalsForOrgType(state.orgType);
-      if (verticals.length === 1) {
-        return { ...state, step: "included", vertical: verticals[0] };
-      }
-
-      return { ...state, step: "vertical" };
-    }
+      return state.orgType === "SCHOOL"
+        ? { ...state, step: "vertical" }
+        : { ...state, step: "included" };
     case "vertical":
       return state.vertical ? { ...state, step: "included" } : state;
     case "included":
       return { ...state, step: "modules" };
     case "modules":
-      return { ...state, step: "plan" };
-    case "plan":
-      return state.planCode ? { ...state, step: "storage" } : state;
+      return { ...state, step: "storage" };
     case "storage":
       return { ...state, step: "summary" };
     case "summary":
@@ -131,8 +150,10 @@ export function prevStep(state: ConfiguratorState): ConfiguratorState {
   if (guardedStep !== state.step) return { ...state, step: guardedStep };
 
   switch (state.step) {
-    case "org-type":
+    case "plan":
       return state;
+    case "org-type":
+      return { ...state, step: "plan" };
     case "vertical":
       return { ...state, step: "org-type" };
     case "included":
@@ -142,10 +163,8 @@ export function prevStep(state: ConfiguratorState): ConfiguratorState {
       };
     case "modules":
       return { ...state, step: "included" };
-    case "plan":
-      return { ...state, step: "modules" };
     case "storage":
-      return { ...state, step: "plan" };
+      return { ...state, step: "modules" };
     case "summary":
       return { ...state, step: "storage" };
   }
@@ -155,14 +174,11 @@ export function selectOrgType(
   state: ConfiguratorState,
   orgType: OrgType,
 ): ConfiguratorState {
-  const validVerticals = verticalsForOrgType(orgType);
+  const verticals = verticalsForOrgType(orgType);
   return {
     ...state,
     orgType,
-    vertical:
-      state.vertical && validVerticals.includes(state.vertical)
-        ? state.vertical
-        : null,
+    vertical: verticals.length === 1 ? verticals[0] : null,
   };
 }
 
@@ -170,30 +186,52 @@ export function selectVertical(
   state: ConfiguratorState,
   vertical: Vertical,
 ): ConfiguratorState {
-  if (
-    !state.orgType ||
-    !verticalsForOrgType(state.orgType).includes(vertical)
-  ) {
-    return state;
-  }
-  return { ...state, vertical };
+  return state.orgType && verticalsForOrgType(state.orgType).includes(vertical)
+    ? { ...state, vertical }
+    : state;
 }
 
 export function toggleModule(
   state: ConfiguratorState,
   module: WebModule,
+  prices: OptionPriceLookup,
 ): ConfiguratorState {
-  const selectedModules = state.selectedModules.includes(module)
-    ? state.selectedModules.filter((selected) => selected !== module)
-    : [...state.selectedModules, module];
-  return { ...state, selectedModules };
+  const policy = state.planCode
+    ? getConfiguratorPlanPolicy(state.planCode)
+    : undefined;
+  if (
+    !policy ||
+    policy.outcome !== "checkout" ||
+    !policy.eligibleOptionalModules.includes(module) ||
+    optionDelta({ kind: "module", module }, state.frequency, prices).status !==
+      "priced"
+  )
+    return state;
+
+  const selectedOptionalModules = state.selectedOptionalModules.includes(module)
+    ? state.selectedOptionalModules.filter((selected) => selected !== module)
+    : [...state.selectedOptionalModules, module];
+  return { ...state, selectedOptionalModules };
 }
 
 export function selectPlan(
   state: ConfiguratorState,
   planCode: PlanCode,
+  prices: OptionPriceLookup,
 ): ConfiguratorState {
-  return { ...state, planCode };
+  const previouslyIncluded = new Set(includedModulesForState(state));
+  return {
+    ...state,
+    planCode,
+    selectedOptionalModules: reconcileOptionalModules(
+      state.selectedOptionalModules.filter(
+        (module) => !previouslyIncluded.has(module),
+      ),
+      planCode,
+      state.frequency,
+      prices,
+    ),
+  };
 }
 
 export function selectFrequency(
@@ -204,12 +242,17 @@ export function selectFrequency(
   const planCode = state.planCode
     ? remapPlanFrequency(state.planCode, frequency)
     : null;
-  const selectedModules = state.selectedModules.filter(
-    (module) =>
-      optionDelta({ kind: "module", module }, frequency, prices).status ===
-      "priced",
-  );
-  return { ...state, frequency, planCode, selectedModules };
+  return {
+    ...state,
+    frequency,
+    planCode,
+    selectedOptionalModules: reconcileOptionalModules(
+      state.selectedOptionalModules,
+      planCode,
+      frequency,
+      prices,
+    ),
+  };
 }
 
 export function selectStorage(

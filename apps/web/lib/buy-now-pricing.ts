@@ -174,18 +174,35 @@ export type CartTotals = {
   lines: { label: string; amountMajor: number }[];
 };
 
+export type CartTotalOptions = {
+  planPrices?: Partial<Record<PlanCode, StripePriceMeta>>;
+  addonPrices?: Partial<
+    Record<
+      AddonCode,
+      { stripePriceId?: string; amountMajor: number; label: string }
+    >
+  >;
+  modulePrices?: Partial<Record<ModulePriceCode, ModulePriceMeta>>;
+};
+
 export function calculateCartTotals(
   selection: BuyNowSelection,
-  opts?: {
-    planPrices?: Partial<Record<PlanCode, StripePriceMeta>>;
-    addonPrices?: Partial<
-      Record<
-        AddonCode,
-        { stripePriceId?: string; amountMajor: number; label: string }
-      >
-    >;
-    modulePrices?: Partial<Record<ModulePriceCode, ModulePriceMeta>>;
-  },
+  opts?: CartTotalOptions,
+): CartTotals {
+  return calculateTotals(selection, opts, true);
+}
+
+export function calculateConfiguratorCartTotals(
+  selection: BuyNowSelection,
+  opts?: CartTotalOptions,
+): CartTotals {
+  return calculateTotals(selection, opts, false);
+}
+
+function calculateTotals(
+  selection: BuyNowSelection,
+  opts: CartTotalOptions | undefined,
+  includeModuleFallbacks: boolean,
 ): CartTotals {
   const lines: CartTotals["lines"] = [];
 
@@ -238,10 +255,10 @@ export function calculateCartTotals(
     const priceCode = MODULE_CATALOG[module].priceCodes[selection.frequency];
     const modulePrice =
       opts?.modulePrices?.[priceCode] ??
-      (module === "LEARNING"
+      (includeModuleFallbacks && module === "LEARNING"
         ? opts?.addonPrices?.[priceCode as AddonCode]
         : undefined) ??
-      MODULE_PRICE_FALLBACKS[priceCode];
+      (includeModuleFallbacks ? MODULE_PRICE_FALLBACKS[priceCode] : undefined);
 
     if (modulePrice) {
       lines.push({

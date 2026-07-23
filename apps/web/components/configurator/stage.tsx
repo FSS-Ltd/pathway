@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Image, { getImageProps } from "next/image";
-import { PLANS } from "@pathway/pricing";
-import { VERTICAL_LABELS } from "@pathway/types";
+import Image from "next/image";
 import {
   AnimatePresence,
   motion,
@@ -12,91 +10,90 @@ import {
 } from "framer-motion";
 import type { ConfiguratorState } from "../../app/configure/state";
 import {
-  CONFIGURATOR_IMAGE_PATHS,
   CONFIGURATOR_BACKDROP_SIZES,
   CONFIGURATOR_OBJECT_SIZES,
-  MODULE_CATALOG,
-  configuratorImageSizes,
-  storageImagePath,
-  verticalImagePath,
 } from "../../lib/module-catalog";
+import { backdropFade, instantSwap, settleZoom } from "../../lib/motion";
 import {
-  backdropFade,
-  exitEase,
-  instantSwap,
-  reducedMotionFade,
-  settleZoom,
-  springEnter,
-} from "../../lib/motion";
+  buildSceneModel,
+  sceneImageMotion,
+  type SceneForegroundLayer,
+  type SceneImageMotion,
+} from "./scene-layout";
 
 type ConfiguratorStageProps = {
   state: ConfiguratorState;
 };
 
 const STEP_ORDER: ConfiguratorState["step"][] = [
+  "plan",
   "org-type",
   "vertical",
   "included",
   "modules",
-  "plan",
   "storage",
   "summary",
 ];
 
-function stageCaption(state: ConfiguratorState): string {
-  if (!state.vertical || !state.planCode) {
-    return "Choose a setting and plan to complete your configuration.";
-  }
+type SceneImageProps = {
+  layer: SceneForegroundLayer;
+  motion: SceneImageMotion;
+};
 
-  return `${VERTICAL_LABELS[state.vertical]} · ${PLANS[state.planCode].displayName} · billed ${state.frequency}`;
+const SCHOOL_PREVIEW_POSITIONS = ["-1%", "29.5%", "60%"] as const;
+
+function SceneImage({ layer, motion: imageMotion }: SceneImageProps) {
+  return (
+    <motion.div
+      layout={imageMotion.layout}
+      initial={imageMotion.initial}
+      animate={imageMotion.animate}
+      exit={imageMotion.exit}
+      transition={imageMotion.transition}
+      style={layer.slot}
+      className="pointer-events-none absolute z-10 aspect-square"
+    >
+      <Image
+        src={layer.imagePath}
+        alt=""
+        fill
+        sizes={CONFIGURATOR_OBJECT_SIZES}
+        className="object-contain drop-shadow-[0_8px_10px_rgba(15,23,42,0.22)]"
+      />
+    </motion.div>
+  );
 }
 
-function useConfiguratorImagePreloads(): void {
-  useEffect(() => {
-    const links = CONFIGURATOR_IMAGE_PATHS.map((imagePath) => {
-      const isBackdrop = imagePath.startsWith("/configurator/verticals/");
-      const { props } = getImageProps({
-        src: imagePath,
-        alt: "",
-        width: isBackdrop ? 1536 : 1024,
-        height: 1024,
-        sizes: configuratorImageSizes(imagePath),
-      });
-      const imageHref = new URL(props.src, window.location.href).href;
-      const existing = Array.from(
-        document.head.querySelectorAll<HTMLLinkElement>(
-          'link[rel="preload"][as="image"]',
-        ),
-      ).find(
-        (link) =>
-          link.dataset.configuratorImage === imagePath ||
-          link.href === imageHref,
-      );
-      if (existing) return null;
-
-      const link = document.createElement("link");
-      link.rel = "preload";
-      link.as = "image";
-      link.href = props.src;
-      link.imageSrcset = props.srcSet ?? "";
-      link.imageSizes = props.sizes ?? configuratorImageSizes(imagePath);
-      link.dataset.configuratorImage = imagePath;
-      document.head.append(link);
-      return link;
-    });
-
-    return () => {
-      links.forEach((link) => link?.remove());
-    };
-  }, []);
+function SchoolPreview({
+  imagePaths,
+}: {
+  imagePaths: readonly [string, string, string];
+}) {
+  return (
+    <div className="absolute inset-0">
+      {imagePaths.map((imagePath, index) => (
+        <div
+          key={imagePath}
+          style={{ left: SCHOOL_PREVIEW_POSITIONS[index] }}
+          className="absolute top-[18%] aspect-[3/2] w-[41.5%]"
+        >
+          <Image
+            src={imagePath}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 19vw, 24vw"
+            className="object-contain"
+          />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const previousStep = useRef(state.step);
   const stageControls = useAnimationControls();
-
-  useConfiguratorImagePreloads();
 
   useEffect(() => {
     const isForwardStep =
@@ -104,39 +101,31 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
 
     if (!prefersReducedMotion && isForwardStep) {
       void stageControls.start(settleZoom);
-    } else {
+    } else if (!prefersReducedMotion) {
       stageControls.set({ scale: 1 });
     }
     previousStep.current = state.step;
   }, [prefersReducedMotion, stageControls, state.step]);
 
-  const vertical = state.vertical;
-  const selectedModules = state.selectedModules.map((module) => ({
-    module,
-    entry: MODULE_CATALOG[module],
-  }));
-  const storagePath =
-    state.storageChoice === "none"
-      ? null
-      : storageImagePath(state.storageChoice);
-  const caption = stageCaption(state);
-  const isEmpty = !vertical && selectedModules.length === 0 && !storagePath;
+  const scene = buildSceneModel(state);
+  const imageMotion = sceneImageMotion(prefersReducedMotion);
   const swapTransition = prefersReducedMotion ? instantSwap : backdropFade;
-  const entryTransition = prefersReducedMotion
-    ? reducedMotionFade
-    : springEnter;
 
   return (
-    <section
-      aria-label="Configuration stage"
-      className="flex gap-4 rounded-2xl bg-muted p-4 shadow-card lg:block lg:p-6"
-    >
-      <motion.div animate={stageControls} className="min-w-0 flex-1 lg:w-full">
-        <div className="relative aspect-[3/2] overflow-hidden rounded-xl bg-surface lg:rounded-2xl">
+    <section className="rounded-2xl bg-muted p-4 shadow-card lg:p-6">
+      <motion.div
+        animate={prefersReducedMotion ? { opacity: 1 } : stageControls}
+        className="min-w-0"
+      >
+        <div
+          role="img"
+          aria-label={scene.accessibleDescription}
+          className="relative aspect-[3/2] overflow-hidden rounded-xl bg-surface lg:rounded-2xl"
+        >
           <AnimatePresence mode="sync" initial={false}>
-            {vertical ? (
+            {scene.base.kind === "vertical" ? (
               <motion.div
-                key={vertical}
+                key={scene.base.imagePaths[0]}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -144,101 +133,42 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
                 className="absolute inset-0"
               >
                 <Image
-                  src={verticalImagePath(vertical)}
-                  alt={`${VERTICAL_LABELS[vertical]} workspace illustration`}
+                  src={scene.base.imagePaths[0]}
+                  alt=""
                   fill
                   priority
                   sizes={CONFIGURATOR_BACKDROP_SIZES}
                   className="object-cover"
                 />
               </motion.div>
+            ) : scene.base.kind === "school-preview" ? (
+              <motion.div
+                key="school-preview"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={swapTransition}
+                className="absolute inset-0"
+              >
+                <SchoolPreview imagePaths={scene.base.imagePaths} />
+              </motion.div>
             ) : null}
           </AnimatePresence>
-          {!vertical ? (
+          {scene.base.kind === "empty" ? (
             <p className="absolute inset-0 flex items-center justify-center px-4 text-center text-sm text-text-muted">
               Choose a setting to start building your workspace.
             </p>
           ) : null}
-        </div>
-      </motion.div>
-
-      <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 lg:mt-5 lg:block">
-        {isEmpty ? (
-          <p className="text-sm text-text-muted lg:hidden">
-            Add modules or storage to build your configuration.
-          </p>
-        ) : null}
-        <div className="flex min-h-16 flex-wrap items-center gap-2 lg:grid lg:min-h-24 lg:grid-cols-3">
           <AnimatePresence initial={!prefersReducedMotion}>
-            {selectedModules.map(({ module, entry }) => (
-              <motion.div
-                layout={!prefersReducedMotion}
-                key={module}
-                initial={
-                  prefersReducedMotion
-                    ? { opacity: 0 }
-                    : { opacity: 0, scale: 0.85, y: -12 }
-                }
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={
-                  prefersReducedMotion
-                    ? { opacity: 0, transition: reducedMotionFade }
-                    : { opacity: 0, scale: 0.9, transition: exitEase }
-                }
-                transition={entryTransition}
-                className="relative h-12 w-12 overflow-hidden rounded-lg bg-surface lg:h-24 lg:w-full"
-              >
-                <Image
-                  src={entry.imagePath}
-                  alt={entry.imageAlt}
-                  fill
-                  sizes={CONFIGURATOR_OBJECT_SIZES}
-                  className="object-contain p-1"
-                />
-              </motion.div>
+            {scene.foreground.map((layer) => (
+              <SceneImage key={layer.id} layer={layer} motion={imageMotion} />
             ))}
           </AnimatePresence>
-          <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-surface lg:h-24 lg:w-full">
-            <AnimatePresence mode="sync" initial={!prefersReducedMotion}>
-              {storagePath ? (
-                <motion.div
-                  key={storagePath}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{
-                    opacity: 0,
-                    transition: prefersReducedMotion
-                      ? reducedMotionFade
-                      : exitEase,
-                  }}
-                  transition={entryTransition}
-                  className="absolute inset-0"
-                >
-                  <Image
-                    src={storagePath}
-                    alt={`${state.storageChoice === "1000" ? "1TB" : `${state.storageChoice}GB`} extra storage illustration`}
-                    fill
-                    sizes={CONFIGURATOR_OBJECT_SIZES}
-                    className="object-contain p-1"
-                  />
-                </motion.div>
-              ) : null}
-            </AnimatePresence>
-          </div>
         </div>
-        <AnimatePresence mode="sync" initial={false}>
-          <motion.p
-            key={caption}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={swapTransition}
-            className="text-xs text-text-muted lg:mt-4 lg:text-sm"
-          >
-            {caption}
-          </motion.p>
-        </AnimatePresence>
-      </div>
+      </motion.div>
+      <p aria-hidden="true" className="mt-4 text-xs text-text-muted lg:text-sm">
+        {scene.caption}
+      </p>
     </section>
   );
 }

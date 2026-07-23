@@ -18,8 +18,13 @@ import {
   Role,
   OrgRole,
   OrgSector,
+  Module,
   ModuleStatus,
 } from "@pathway/db";
+import {
+  getConfiguratorPlanPolicy,
+  type ConfiguratorModuleCode,
+} from "@pathway/pricing";
 import { EntitlementsService } from "./entitlements.service";
 import {
   BILLING_WEBHOOK_PROVIDER,
@@ -31,6 +36,7 @@ import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-p
 import { LoggingService, StructuredLogger } from "../common/logging/logging.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 import Stripe from "stripe";
+import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
 
 type WebhookResult =
   | { status: "ok"; eventId: string }
@@ -40,6 +46,42 @@ type WebhookResult =
 type PendingOrderRecord = Prisma.PendingOrderGetPayload<
   Record<string, never>
 >;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isAddOnOnlyOrder(pendingOrder: PendingOrderRecord): boolean {
+  return (
+    isRecord(pendingOrder.flags) &&
+    pendingOrder.flags.purchaseKind === "add-on"
+  );
+}
+
+function subscriptionPlanCode(
+  event: ParsedBillingWebhookEvent,
+  pendingOrder: PendingOrderRecord | null,
+): string | undefined {
+  if (!pendingOrder) return event.planCode ?? undefined;
+  return isAddOnOnlyOrder(pendingOrder)
+    ? addOnSubscriptionPlanCode(pendingOrder.planCode)
+    : pendingOrder.planCode;
+}
+
+const PRISMA_MODULE_BY_CONFIGURATOR_CODE: Record<
+  ConfiguratorModuleCode,
+  Module
+> = {
+  FINANCE: Module.FINANCE,
+  EVENTS: Module.EVENTS,
+  TRANSPORT: Module.TRANSPORT,
+  MEALS: Module.MEALS,
+  ASSET_MANAGEMENT: Module.ASSET_MANAGEMENT,
+  HR: Module.HR,
+  AI_WORKSPACE: Module.AI_WORKSPACE,
+  ADVANCED_REPORTING: Module.ADVANCED_REPORTING,
+  LEARNING: Module.LEARNING,
+};
 
 export function isOrgSector(value: string | undefined): value is OrgSector {
   return !!value && (Object.values(OrgSector) as string[]).includes(value);
@@ -222,11 +264,15 @@ export class BillingWebhookController {
         );
         return true;
       case "invoice.payment_failed":
-        // Mark subscription as at-risk (past due) without applying pending orders.
-        await this.upsertSubscription(
-          event,
-          event.status ?? SubscriptionStatus.PAST_DUE,
-        );
+        {
+          const pendingOrder = await this.findPendingOrder(event);
+          await this.upsertSubscription(
+            event,
+            event.status ?? SubscriptionStatus.PAST_DUE,
+            prisma,
+            subscriptionPlanCode(event, pendingOrder),
+          );
+        }
         return true;
       case "subscription.canceled":
         await this.handleSubscriptionEvent(event, SubscriptionStatus.CANCELED);
@@ -251,7 +297,18 @@ export class BillingWebhookController {
     }
 
     const pendingOrder = await this.findPendingOrder(event);
-    await this.upsertSubscription(event, status);
+    const shouldApplyPendingOrder =
+      pendingOrder !== null &&
+      pendingOrder.status !== PendingOrderStatus.COMPLETED &&
+      status === SubscriptionStatus.ACTIVE;
+    if (!shouldApplyPendingOrder) {
+      await this.upsertSubscription(
+        event,
+        status,
+        prisma,
+        subscriptionPlanCode(event, pendingOrder),
+      );
+    }
     if (status === SubscriptionStatus.CANCELED) {
       await this.cancelActiveModulesForSubscription(
         event.orgId,
@@ -260,9 +317,11 @@ export class BillingWebhookController {
     }
 
     if (pendingOrder) {
+      if (status !== SubscriptionStatus.ACTIVE) return;
+
       if (pendingOrder.status !== PendingOrderStatus.COMPLETED) {
         await this.applyPendingOrder(event, status, pendingOrder);
-      } else if (status === SubscriptionStatus.ACTIVE) {
+      } else {
         await this.extendActiveModulesExpiry(
           event.orgId,
           event.subscriptionId,
@@ -288,15 +347,33 @@ export class BillingWebhookController {
     pendingOrder: PendingOrderRecord,
     event: ParsedBillingWebhookEvent,
   ): Promise<void> {
+    const policy = getConfiguratorPlanPolicy(pendingOrder.planCode);
+    const includedModules =
+      !isAddOnOnlyOrder(pendingOrder) && policy?.outcome === "checkout"
+        ? policy.includedModules.map(
+            (moduleCode) => PRISMA_MODULE_BY_CONFIGURATOR_CODE[moduleCode],
+          )
+        : [];
     const selectedModules = pendingOrder.selectedModules ?? [];
-    if (selectedModules.length === 0) return;
+    const entitlementSources = new Map<Module, "plan" | "add-on">();
+
+    for (const module of includedModules) {
+      entitlementSources.set(module, "plan");
+    }
+    for (const module of selectedModules) {
+      if (!entitlementSources.has(module)) {
+        entitlementSources.set(module, "add-on");
+      }
+    }
+    if (entitlementSources.size === 0) return;
 
     const now = new Date();
-    const metadata = {
-      billingSource: "subscription",
-      subscriptionId: event.subscriptionId,
-    };
-    for (const module of selectedModules) {
+    for (const [module, entitlementSource] of entitlementSources) {
+      const metadata = {
+        billingSource: "subscription",
+        subscriptionId: event.subscriptionId,
+        entitlementSource,
+      };
       await tx.orgModule.upsert({
         where: { orgId_module: { orgId, module } },
         create: {
@@ -351,12 +428,13 @@ export class BillingWebhookController {
     event: ParsedBillingWebhookEvent,
     status: SubscriptionStatus,
     tx: Prisma.TransactionClient | typeof prisma = prisma,
+    planCode: string | undefined = event.planCode ?? undefined,
   ) {
     const now = new Date();
     await tx.subscription.upsert({
       where: { providerSubId: event.subscriptionId },
       update: {
-        planCode: event.planCode ?? undefined,
+        planCode,
         status,
         periodStart: event.periodStart ?? now,
         periodEnd: event.periodEnd ?? now,
@@ -366,7 +444,7 @@ export class BillingWebhookController {
         orgId: event.orgId,
         provider: event.provider,
         providerSubId: event.subscriptionId,
-        planCode: event.planCode ?? "unknown",
+        planCode: planCode ?? "unknown",
         status,
         periodStart: event.periodStart ?? now,
         periodEnd: event.periodEnd ?? now,
@@ -395,7 +473,12 @@ export class BillingWebhookController {
     }
     
     await prisma.$transaction(async (tx) => {
-      await this.upsertSubscription(event, status, tx);
+      await this.upsertSubscription(
+        event,
+        status,
+        tx,
+        subscriptionPlanCode(event, pendingOrder),
+      );
       await tx.orgEntitlementSnapshot.create({
         data: {
           orgId: actualOrgId,
@@ -442,8 +525,13 @@ export class BillingWebhookController {
       });
     });
 
-    // When a new subscription is activated for an org (plan change), cancel any other active subscription so the org has only one
-    if (status === SubscriptionStatus.ACTIVE && event.subscriptionId) {
+    // A new plan subscription replaces the previous plan; add-on subscriptions
+    // remain separate and must not cancel the base plan.
+    if (
+      status === SubscriptionStatus.ACTIVE &&
+      event.subscriptionId &&
+      !isAddOnOnlyOrder(pendingOrder)
+    ) {
       await this.cancelOtherActiveSubscriptionsForOrg(actualOrgId, event.subscriptionId);
     }
   }

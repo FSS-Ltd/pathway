@@ -15,6 +15,10 @@ import {
   OrgRole,
   type Module,
 } from "@pathway/db";
+import {
+  getConfiguratorPlanPolicy,
+  type ConfiguratorModuleCode,
+} from "@pathway/pricing";
 import { getPlanDefinition } from "./billing-plans";
 import type { PlanTier } from "./billing-plans";
 import { PlanPreviewService } from "./plan-preview.service";
@@ -36,6 +40,7 @@ import {
   type BillingProviderConfig,
 } from "./billing-provider.config";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "./subscription-plan-code";
 
 // Phase 0 PR 0.2: adds "professional" between growth and enterprise. Exported
 // (not a local const) so it's directly testable without instantiating the service.
@@ -65,11 +70,13 @@ export class BuyNowService {
     private readonly providerConfig?: BillingProviderConfig,
   ) {}
 
-  async checkout(request: BuyNowCheckoutRequest): Promise<BuyNowCheckoutResponse> {
+  async checkout(
+    request: BuyNowCheckoutRequest,
+  ): Promise<BuyNowCheckoutResponse> {
     // Normalize plan code for Stripe compatibility
     // Frontend sends CORE_*, Stripe expects MINIMUM_*
     const normalizedPlanCode = this.normalizePlanCode(request.plan.planCode);
-    
+
     const sanitisedPlan = {
       ...request.plan,
       planCode: normalizedPlanCode,
@@ -83,11 +90,8 @@ export class BuyNowService {
     const planDefinition = getPlanDefinition(sanitisedPlan.planCode);
     const { selection: gatedPlan, warnings: gatingWarnings } =
       this.enforcePlanAddonPolicy(sanitisedPlan, planDefinition?.tier ?? null);
-    const selectedModules = this.normalizeSelectedModules(
+    const selectedModules = this.resolvePaidSelectedModules(
       sanitisedPlan.selectedModules,
-    );
-    this.assertSelectedModulesCanBeCharged(
-      selectedModules,
       sanitisedPlan.planCode,
     );
 
@@ -125,15 +129,15 @@ export class BuyNowService {
     // For authenticated purchases, use existing org/tenant context
     const orgId = this.requestContext?.currentOrgId;
     const tenantId = this.requestContext?.currentTenantId;
-    
+
     // For public buy-now, store org details to be created after payment confirmation
     let pendingOrgDetails: Record<string, string> | undefined;
-    
+
     if (!orgId || !tenantId) {
       // Public buy-now: defer org/tenant/user creation until webhook confirms payment
       const orgSlug = this.generateSlug(request.org.orgName);
       const normalizedEmail = request.org.contactEmail.toLowerCase().trim();
-      
+
       pendingOrgDetails = {
         orgName: request.org.orgName,
         slug: orgSlug,
@@ -143,7 +147,7 @@ export class BuyNowService {
         sector: request.org.sector ?? "",
         planCode: sanitisedPlan.planCode,
       };
-      
+
       this.logger.log(
         `Deferring org/user creation for ${normalizedEmail} until payment confirmed`,
       );
@@ -218,30 +222,52 @@ export class BuyNowService {
     return value < 0 ? 0 : Math.trunc(value);
   }
 
-  private normalizeSelectedModules(selectedModules?: Module[]): Module[] {
-    return [...new Set(selectedModules ?? [])];
-  }
-
-  private assertSelectedModulesCanBeCharged(
-    selectedModules: Module[],
+  private resolvePaidSelectedModules(
+    selectedModules: readonly Module[] | undefined,
     planCode: string,
-  ): void {
-    if (selectedModules.length === 0) return;
+  ): Module[] {
+    const policy = getConfiguratorPlanPolicy(planCode);
+    if (!policy) {
+      throw new BadRequestException(`Invalid plan code: ${planCode}`);
+    }
+    if (policy.outcome === "contact") {
+      throw new BadRequestException(
+        `Plan ${planCode} requires contact with sales`,
+      );
+    }
+
+    const includedModules = new Set<ConfiguratorModuleCode>(
+      policy.includedModules,
+    );
+    const eligibleOptionalModules = new Set<ConfiguratorModuleCode>(
+      policy.eligibleOptionalModules,
+    );
+    const paidModules = [...new Set(selectedModules ?? [])].filter(
+      (module) => !includedModules.has(module),
+    );
+    const ineligibleModules = paidModules.filter(
+      (module) => !eligibleOptionalModules.has(module),
+    );
+    if (ineligibleModules.length > 0) {
+      throw new BadRequestException(
+        "Selected modules are not eligible for the selected plan.",
+      );
+    }
+
+    if (paidModules.length === 0) return paidModules;
 
     const provider = this.providerConfig?.activeProvider ?? "FAKE";
-    if (provider === "FAKE") return;
+    if (provider === "FAKE") return paidModules;
     if (provider === "GOCARDLESS") {
       throw new BadRequestException(
         "Selected modules are not supported by the active billing provider.",
       );
     }
 
-    const intervalSuffix = planCode.endsWith("_YEARLY")
-      ? "YEARLY"
-      : "MONTHLY";
+    const intervalSuffix = planCode.endsWith("_YEARLY") ? "YEARLY" : "MONTHLY";
     const priceMap: Record<string, string | undefined> =
       this.providerConfig?.stripe.priceMap ?? {};
-    const missingModules = selectedModules.filter(
+    const missingModules = paidModules.filter(
       (module) => !priceMap[`MODULE_${module}_${intervalSuffix}`],
     );
     if (missingModules.length > 0) {
@@ -249,6 +275,8 @@ export class BuyNowService {
         "Missing Stripe price configuration for selected modules.",
       );
     }
+
+    return paidModules;
   }
 
   /**
@@ -260,7 +288,7 @@ export class BuyNowService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .substring(0, 50);
-    
+
     // Add random suffix to avoid collisions
     const suffix = Math.random().toString(36).substring(2, 8);
     return `${base}-${suffix}`;
@@ -276,8 +304,10 @@ export class BuyNowService {
     contextOverride?: { orgId: string; tenantId?: string; userId: string },
   ): Promise<BuyNowCheckoutResponse> {
     const orgId = contextOverride?.orgId ?? this.requestContext?.currentOrgId;
-    const tenantId = contextOverride?.tenantId ?? this.requestContext?.currentTenantId;
-    const userId = contextOverride?.userId ?? this.requestContext?.currentUserId;
+    const tenantId =
+      contextOverride?.tenantId ?? this.requestContext?.currentTenantId;
+    const userId =
+      contextOverride?.userId ?? this.requestContext?.currentUserId;
 
     if (!orgId || !userId) {
       throw new ForbiddenException(
@@ -299,12 +329,18 @@ export class BuyNowService {
     }
 
     const normalizedPlanCode = this.normalizePlanCode(request.planCode);
-    const selectedModules = this.normalizeSelectedModules(request.selectedModules);
+    const selectedModules = this.resolvePaidSelectedModules(
+      request.selectedModules,
+      normalizedPlanCode,
+    );
 
     // 2. If org has active subscription and selected plan is the same: allow checkout only for add-ons
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         orgId,
+        planCode: {
+          not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+        },
         status: {
           in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
         },
@@ -428,8 +464,6 @@ export class BuyNowService {
     const prismaProvider = activeProviderToPrismaProvider(
       this.providerConfig?.activeProvider ?? "FAKE",
     );
-    this.assertSelectedModulesCanBeCharged(selectedModules, normalizedPlanCode);
-
     const pendingOrder = await prisma.pendingOrder.create({
       data: {
         tenantId: tenantId ?? orgId,
@@ -442,6 +476,7 @@ export class BuyNowService {
           previewResult.effectiveCaps.leaderSeatsIncluded ?? undefined,
         maxSites: previewResult.effectiveCaps.maxSites ?? undefined,
         selectedModules,
+        flags: addonsOnly ? { purchaseKind: "add-on" } : undefined,
         provider: prismaProvider,
         status: PendingOrderStatus.PENDING,
       },
@@ -515,6 +550,9 @@ export class BuyNowService {
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         orgId,
+        planCode: {
+          not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+        },
         status: {
           in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
         },
@@ -542,7 +580,12 @@ export class BuyNowService {
 
     // Check if org has any previous subscriptions (active, canceled, or past_due)
     const latestSubscription = await prisma.subscription.findFirst({
-      where: { orgId },
+      where: {
+        orgId,
+        planCode: {
+          not: { startsWith: ADD_ON_SUBSCRIPTION_PLAN_PREFIX },
+        },
+      },
       orderBy: { createdAt: "desc" },
       select: { planCode: true, status: true },
     });
