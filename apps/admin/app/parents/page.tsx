@@ -13,8 +13,10 @@ import {
   type ColumnDef,
 } from "@pathway/ui";
 import { AdminParentRow, fetchParents } from "../../lib/api-client";
+import { useOrgLabel } from "@/lib/use-org-ui";
 
 export default function ParentsPage() {
+  const title = useOrgLabel("/parents", "Parents & Guardians");
   const { data: session, status: sessionStatus } = useSession();
   const [data, setData] = React.useState<AdminParentRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -142,7 +144,7 @@ export default function ParentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-text-primary font-heading">
-            Parents & Guardians
+            {title}
           </h1>
           <p className="text-sm text-text-muted">
             Contacts with family access for this organisation.
@@ -158,7 +160,7 @@ export default function ParentsPage() {
         </div>
       </div>
 
-      <Card title="Parents & Guardians">
+      <Card title={title}>
         {error ? (
           <div className="flex flex-col gap-2 rounded-md border border-status-danger/20 bg-status-danger/5 p-4 text-sm text-status-danger">
             <span className="font-semibold">Couldn’t load parents yet.</span>

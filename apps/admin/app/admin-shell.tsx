@@ -21,7 +21,8 @@ import {
   type AccessRequirement,
 } from "@/lib/access";
 import { OnboardingModal } from "@/components/onboarding-modal";
-import { fetchOrgOverview } from "@/lib/api-client";
+import { useOrgUi } from "@/lib/use-org-ui";
+import { orgLabel } from "@/lib/org-ui";
 import { cn } from "@pathway/ui";
 
 const getDevRuntimeState = () => {
@@ -205,7 +206,8 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const pathname = usePathname() || "/";
   const isAuthRoute = pathname === "/login";
-  const title = resolveTitle(pathname);
+  const { ui, logoUrl: orgLogoUrl } = useOrgUi();
+  const title = orgLabel(ui, pathname, resolveTitle(pathname));
   const { isMockApi, hasDevToken } = getDevRuntimeState();
   const { data: session } = useSession();
   
@@ -228,18 +230,9 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
     warning: accessWarning,
   } = useAdminAccess();
 
-  // Org's white-label logo for the day-to-day brand swap. Stays null pre-auth
-  // (login/accept-invite before sign-in), so those screens keep the Nexsteps mark.
-  const [orgLogoUrl, setOrgLogoUrl] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (!session) {
-      setOrgLogoUrl(null);
-      return;
-    }
-    fetchOrgOverview()
-      .then((org) => setOrgLogoUrl(org.logoUrl ?? null))
-      .catch(() => setOrgLogoUrl(null));
-  }, [session]);
+  // Org's white-label logo for the day-to-day brand swap, from OrgUiProvider.
+  // Stays null pre-auth (login/accept-invite before sign-in), so those screens
+  // keep the Nexsteps mark.
 
   // Collapsible sidebar state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
@@ -293,13 +286,15 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   // Filter nav items based on user's role (hide billing for master orgs)
   const visibleNavItems = React.useMemo(
     () =>
-      navItemsWithAccess.filter(
-        (item) =>
-          meetsAccessRequirement(role, item.access, {
-            currentOrgIsMasterOrg,
-          }) && hasCapability(capabilities, item.capability),
-      ),
-    [role, currentOrgIsMasterOrg, capabilities],
+      navItemsWithAccess
+        .filter(
+          (item) =>
+            meetsAccessRequirement(role, item.access, {
+              currentOrgIsMasterOrg,
+            }) && hasCapability(capabilities, item.capability),
+        )
+        .map((item) => ({ ...item, label: orgLabel(ui, item.href, item.label) })),
+    [role, currentOrgIsMasterOrg, capabilities, ui],
   );
 
   if (isAuthRoute) {

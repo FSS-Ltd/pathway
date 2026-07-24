@@ -10,8 +10,10 @@ import {
   setApiClientToken,
   type GuestPassResult,
 } from "../../lib/api-client";
+import { useOrgLabel } from "@/lib/use-org-ui";
 
 export default function GuestPassPage() {
+  const title = useOrgLabel("/guest-pass", "Guest pass");
   const { data: session, status: sessionStatus } = useSession();
 
   const [firstName, setFirstName] = React.useState("");
@@ -108,7 +110,7 @@ export default function GuestPassPage() {
       <Card>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-semibold text-text-primary font-heading">
-            Guest pass
+            {title}
           </h1>
           <p className="text-sm text-text-muted">
             Register a visiting child for today only. Their details are automatically

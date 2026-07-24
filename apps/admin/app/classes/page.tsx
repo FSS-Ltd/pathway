@@ -10,6 +10,7 @@ import {
   fetchClasses,
   type ClassRow,
 } from "../../lib/api-client";
+import { useOrgLabel } from "@/lib/use-org-ui";
 
 const resolveTenantId = (
   activeSiteId: string | null,
@@ -27,6 +28,7 @@ function formatAgeRange(min: number | null, max: number | null): string {
 }
 
 export default function ClassesPage() {
+  const title = useOrgLabel("/classes", "Classes");
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [data, setData] = React.useState<ClassRow[]>([]);
@@ -153,7 +155,7 @@ export default function ClassesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-text-primary">
-            Classes
+            {title}
           </h1>
           <p className="text-sm text-text-muted">
             Age groups and classes used for sessions and attendance.

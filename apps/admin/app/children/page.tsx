@@ -13,8 +13,10 @@ import {
   type ColumnDef,
 } from "@pathway/ui";
 import { AdminChildRow, fetchChildren } from "../../lib/api-client";
+import { useOrgLabel } from "@/lib/use-org-ui";
 
 export default function ChildrenPage() {
+  const title = useOrgLabel("/children", "Children");
   const { data: session, status: sessionStatus } = useSession();
   const [data, setData] = React.useState<AdminChildRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -138,7 +140,7 @@ export default function ChildrenPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-text-primary font-heading">
-            Children
+            {title}
           </h1>
           <p className="text-sm text-text-muted">
             Child records for this organisation, including needs awareness and organisation photo/video consent.
