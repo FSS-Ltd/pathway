@@ -21,6 +21,7 @@ import {
   mapApiAssignmentsToRotaDays,
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
+import { useOrgLabel } from "@/lib/use-org-ui";
 
 const statusCopy: Record<AdminSessionRow["status"], string> = {
   not_started: "Not started",
@@ -123,6 +124,7 @@ const formatWeekRange = (start: Date) => {
 };
 
 export default function SessionsPage() {
+  const title = useOrgLabel("/sessions", "Sessions & Rota");
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [activeTab, setActiveTab] = React.useState<"sessions" | "rota">(
@@ -679,7 +681,7 @@ export default function SessionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-text-primary font-heading">
-            Sessions & Rota
+            {title}
           </h1>
           <p className="text-sm text-text-muted">
             Manage sessions and see who is scheduled on the rota.

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { SessionProvider, useSession } from "next-auth/react";
 import { setApiClientToken } from "@/lib/api-client";
+import { OrgUiProvider } from "@/lib/use-org-ui";
 
 function ApiTokenSync() {
   const { data } = useSession();
@@ -19,7 +20,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <ApiTokenSync />
-      {children}
+      <OrgUiProvider>{children}</OrgUiProvider>
     </SessionProvider>
   );
 }

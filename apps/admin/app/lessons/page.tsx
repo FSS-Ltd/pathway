@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
 import { AdminLessonRow, fetchLessons } from "../../lib/api-client";
+import { useOrgLabel } from "@/lib/use-org-ui";
 
 const statusTone: Record<
   AdminLessonRow["status"],
@@ -25,6 +26,7 @@ function formatDate(value?: string | null) {
 }
 
 export default function LessonsPage() {
+  const title = useOrgLabel("/lessons", "Lessons");
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const [data, setData] = React.useState<AdminLessonRow[]>([]);
@@ -117,7 +119,7 @@ export default function LessonsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-text-primary font-heading">
-            Lessons
+            {title}
           </h1>
           <p className="text-sm text-text-muted">
             Curriculum content organised by age group and class.

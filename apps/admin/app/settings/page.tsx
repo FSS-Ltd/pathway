@@ -269,6 +269,9 @@ export default function SettingsPage() {
       verticalPreviewRequest.current += 1;
       setOrg(updated);
       setVerticalPreview(null);
+      // Nav/title vocabulary lives in OrgUiProvider, which only fetches once per
+      // session; reload so the sidebar picks up the new vertical immediately.
+      window.location.reload();
     } catch (e) {
       setVerticalSaveError(
         e instanceof Error ? e.message : "Failed to save vertical",
