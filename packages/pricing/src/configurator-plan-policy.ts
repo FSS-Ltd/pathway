@@ -74,7 +74,7 @@ const ENTERPRISE_POLICY: ConfiguratorPlanPolicy = {
   contactPath: "/demo?plan=enterprise",
 };
 
-const LEGACY_PLAN_CODES = [
+export const LEGACY_PLAN_CODES = [
   "CORE_MONTHLY",
   "CORE_YEARLY",
   "MINIMUM_MONTHLY",

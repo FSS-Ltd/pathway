@@ -17,6 +17,7 @@ import {
 } from "@pathway/db";
 import {
   getConfiguratorPlanPolicy,
+  LEGACY_PLAN_CODES,
   type ConfiguratorModuleCode,
 } from "@pathway/pricing";
 import { getPlanDefinition } from "./billing-plans";
@@ -135,6 +136,16 @@ export class BuyNowService {
 
     if (!orgId || !tenantId) {
       // Public buy-now: defer org/tenant/user creation until webhook confirms payment
+      if (
+        (LEGACY_PLAN_CODES as readonly string[]).includes(
+          sanitisedPlan.planCode,
+        )
+      ) {
+        throw new BadRequestException(
+          `Plan ${sanitisedPlan.planCode} is no longer available for new signups.`,
+        );
+      }
+
       const orgSlug = this.generateSlug(request.org.orgName);
       const normalizedEmail = request.org.contactEmail.toLowerCase().trim();
 

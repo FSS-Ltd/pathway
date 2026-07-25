@@ -148,6 +148,49 @@ describe("BuyNowService", () => {
     expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it("rejects a legacy plan code for a truly anonymous new signup before creating a pending order", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      undefined,
+      providerConfig,
+    );
+
+    await expect(
+      service.checkout({
+        ...baseRequest,
+        plan: { planCode: "CORE_MONTHLY", av30AddonBlocks: 2 },
+      }),
+    ).rejects.toThrow("no longer available for new signups");
+
+    expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
+    expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("accepts a new (non-legacy) plan code for a truly anonymous new signup", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      undefined,
+      providerConfig,
+    );
+
+    const result = await service.checkout({
+      ...baseRequest,
+      plan: { planCode: "STARTER_49_MONTHLY" },
+    });
+
+    expect(providerMock.createCheckoutSession).toHaveBeenCalledTimes(1);
+    expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ planCode: "STARTER_49_MONTHLY" }),
+      }),
+    );
+    expect(result.sessionId).toBe("fake_session");
+  });
+
   it("normalises negative add-ons to zero", async () => {
     const service = new BuyNowService(
       previewService,
