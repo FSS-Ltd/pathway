@@ -52,25 +52,59 @@ descriptions; they are not approved Stripe prices yet.
 | `MEALS` | Meals | Menus, dietary needs and meal counts | £12 | £120 | Proposed |
 | `ASSET_MANAGEMENT` | Asset Management | Equipment and resource tracking | £9 | £90 | Proposed |
 | `HR` | HR | Staff records, roles and onboarding | £15 | £150 | Proposed |
+| `CLUBS` | Clubs | Club sign-ups, rosters, sessions, attendance, notices, and scoped club leads | £12 | £120 | Proposed; included for the Clubs sector |
 | `AI_WORKSPACE` | AI Workspace | Drafting, summaries and admin assistance | £15 base | £150 base | Proposed — define included users and fair use first |
 | `ADVANCED_REPORTING` | Advanced Reporting | Cross-platform analytics, trends and exports | £10 | £100 | Proposed |
 | `LEARNING` | Learning | Learning logs, evidence and progress reports | £19 | £190 | Proposed |
+
+## ACE-originated add-ons
+
+The ACE build plan is the initial reference implementation for these products.
+Clubs is a reusable, global module and is included in the Clubs sector. Child
+Merit Market remains ACE-only. Both must use the existing module entitlement
+engine.
+
+| Code | Module | Current scope | Recommended monthly | Recommended annual | Status |
+| --- | --- | --- | ---: | ---: | --- |
+| `CHILD_MERIT_MARKET` | Child Merit Market | Wallet/ledger, savings, giving/tithe, Merit Shop, simulated investments, and positive leaderboards | £19 | £190 | Proposed — confirm market-data licence cost before launch |
+
+PACE progress, behaviour capture, homework and evidence, Faith Corner, site-level
+ACE reporting, and Student Community are ACE-core capabilities. They must not
+be sold as separate add-ons. Advanced Reporting remains the paid route for
+multi-site ACE analytics and benchmarking.
 
 ## Module bundle
 
 | Code | Bundle | Included selection | Monthly price | Annual price | Status |
 | --- | --- | --- | ---: | ---: | --- |
 | `OPERATIONS_BUNDLE` | Operations bundle | Any four eligible operations modules | £39 | £390 | Proposed |
+| `ALL_INCLUDED_BUNDLE` | All Included bundle | Every non-AI module, plus 1TB storage | £79 | £790 | Proposed |
 
 Eligible operations modules are Finance, Events, Transport, Meals, Asset
-Management, HR, and Advanced Reporting. Learning is excluded because it is a
-specialist evidence-and-reporting product. AI Workspace is excluded because its
-cost must be controlled through named-user and fair-use limits.
+Management, HR, Clubs, and Advanced Reporting. Learning is excluded because it
+is a specialist evidence-and-reporting product. AI Workspace is excluded
+because its cost must be controlled through named-user and fair-use limits.
 
 The customer selects up to four eligible modules when purchasing the bundle.
 Plan-included modules do not consume a bundle selection and must never be
 charged again. The bundle is optional; customers can still buy an individual
 module where that is cheaper or better fits their needs.
+
+### All Included bundle
+
+The All Included bundle activates Finance, Events, Transport, Meals, Asset
+Management, HR, Advanced Reporting, Learning, Clubs, and Child Merit Market.
+It also grants one 1TB storage entitlement; the 100GB and 200GB storage packs
+must not be added or stacked alongside it.
+
+AI Workspace is deliberately excluded. It will receive its own future billing
+model based on named users and/or metered usage, with an explicit fair-use
+allowance. It must not be bundled at a fixed organisation price.
+
+Child Merit Market is ACE-only. For non-ACE organisations the All Included
+bundle grants every applicable non-AI module, including Clubs, but does not
+expose the inapplicable Merit Market destination. The checkout must show this
+clearly.
 
 ### Learning module decision
 
@@ -97,6 +131,12 @@ These inclusion rules apply before optional-module charges are calculated.
 | Professional | Finance, Events, Advanced Reporting, HR, Asset Management, AI Workspace |
 | Enterprise | Commercial agreement |
 
+## Vertical inclusions
+
+| Vertical | Included module | Rule |
+| --- | --- | --- |
+| Clubs | Clubs | Included as a built-in sector capability; it is not separately charged. |
+
 ## Implementation checklist
 
 For each approved item:
@@ -106,8 +146,10 @@ For each approved item:
 3. Update checkout allow-lists, public pricing fallbacks, configurator copy,
    and tests from this catalogue.
 4. Confirm included-plan modules cannot be selected or charged separately.
-5. Validate a Stripe Checkout session using both monthly and yearly intervals.
-6. Update this document if a commercial decision changes before release.
+5. For bundles, grant every listed entitlement once and block duplicate module
+   or storage charges.
+6. Validate a Stripe Checkout session using both monthly and yearly intervals.
+7. Update this document if a commercial decision changes before release.
 
 ## Decision log
 
@@ -116,3 +158,5 @@ For each approved item:
 | 2026-07-25 | Storage monthly prices set to £1.49 / £2.49 / £5.99 for 100GB / 200GB / 1TB. Annual prices remain unconfirmed. | Product owner |
 | 2026-07-25 | Learning launch recommendation changed from £29/month to £19/month, pending commercial approval. | Product / Commercial |
 | 2026-07-25 | Operations bundle proposed: select any four eligible operations modules for £39/month or £390/year; Learning and AI Workspace excluded. | Product / Commercial |
+| 2026-07-25 | ACE-originated pricing proposed: global Clubs at £12/month (included for the Clubs sector) and ACE-only Child Merit Market at £19/month. | Product / Commercial |
+| 2026-07-25 | All Included bundle proposed: every non-AI module plus 1TB storage for £79/month or £790/year. | Product / Commercial |
