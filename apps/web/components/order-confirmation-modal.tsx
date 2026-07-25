@@ -128,7 +128,7 @@ export function OrderConfirmationModal({
                 className="w-full"
               >
                 <Link
-                  href="/buy"
+                  href="https://app.nexsteps.dev"
                   className="flex w-full items-center justify-center rounded-md border border-border-subtle bg-surface px-4 py-2.5 text-sm font-medium text-text-primary transition hover:bg-muted"
                 >
                   View Billing & Plans

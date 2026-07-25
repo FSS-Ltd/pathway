@@ -68,6 +68,12 @@ const nextConfig = {
         destination: "/blog/:slug",
         permanent: true,
       },
+      // permanent: false (307), unlike the /resources redirects above: this
+      // is a new redirect under a monitored bake-in period, so avoid
+      // aggressive browser/CDN caching until it's confirmed stable, then
+      // flip to permanent: true.
+      { source: "/pricing", destination: "/configure", permanent: false },
+      { source: "/buy", destination: "/configure", permanent: false },
     ];
   },
 };

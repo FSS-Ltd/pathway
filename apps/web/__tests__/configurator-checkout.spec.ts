@@ -149,46 +149,18 @@ describe("configurator checkout payload", () => {
 });
 
 describe("configurator rollout", () => {
-  const originalFlag = process.env.NEXT_PUBLIC_USE_CONFIGURATOR;
-
-  afterEach(() => {
-    if (originalFlag === undefined) {
-      delete process.env.NEXT_PUBLIC_USE_CONFIGURATOR;
-    } else {
-      process.env.NEXT_PUBLIC_USE_CONFIGURATOR = originalFlag;
-    }
-  });
-
-  it("routes only acquisition funnel paths when the flag is exactly true", () => {
-    process.env.NEXT_PUBLIC_USE_CONFIGURATOR = "true";
-
+  it("routes acquisition funnel paths to the configurator unconditionally", () => {
     expect(configuratorRolloutHref("/pricing")).toBe("/configure");
     expect(configuratorRolloutHref("/buy")).toBe("/configure");
     expect(configuratorRolloutHref("/buy/thanks")).toBe("/buy/thanks");
     expect(configuratorRolloutHref("/demo")).toBe("/demo");
   });
-
-  it.each([undefined, "false", "TRUE", "True", "1"])(
-    "leaves funnel links unchanged when the flag is %p",
-    (flag) => {
-      if (flag === undefined) {
-        delete process.env.NEXT_PUBLIC_USE_CONFIGURATOR;
-      } else {
-        process.env.NEXT_PUBLIC_USE_CONFIGURATOR = flag;
-      }
-
-      expect(configuratorRolloutHref("/pricing")).toBe("/pricing");
-      expect(configuratorRolloutHref("/buy")).toBe("/buy");
-    },
-  );
 });
 
 describe("configurator checkout and rollout source contracts", () => {
   const appRoot = process.cwd();
   const readSource = (path: string) =>
     readFileSync(join(appRoot, path), "utf8");
-  const readRepositorySource = (path: string) =>
-    readFileSync(join(appRoot, "..", "..", path), "utf8");
 
   it("uses the rollout helper from every named acquisition CTA source", () => {
     const sourceContracts: Record<string, string[]> = {
@@ -234,27 +206,34 @@ describe("configurator checkout and rollout source contracts", () => {
   });
 
   it("preserves legacy purchase and recovery paths outside the rollout helper", () => {
-    const pricingPage = readSource("app/(marketing)/pricing/page.tsx");
-    expect(pricingPage).toContain('href="/buy"');
-    expect(pricingPage).not.toContain("configuratorRolloutHref");
-
-    const buyPage = readSource("app/buy/page.tsx");
-    expect(buyPage).toContain("createCheckoutSession");
-    expect(buyPage).not.toContain("configuratorRolloutHref");
-
     const thanksPage = readSource("app/buy/thanks/page.tsx");
-    expect(thanksPage).toContain('href="/buy"');
+    expect(thanksPage).toContain('href="https://app.nexsteps.dev"');
     expect(thanksPage).not.toContain("configuratorRolloutHref");
 
     const cancelledPage = readSource("app/buy/cancelled/page.tsx");
-    expect(cancelledPage).toContain('href="/buy"');
+    expect(cancelledPage).toContain('href="/configure"');
     expect(cancelledPage).not.toContain("configuratorRolloutHref");
 
     const orderConfirmation = readSource(
       "components/order-confirmation-modal.tsx",
     );
-    expect(orderConfirmation).toContain('href="/buy"');
+    expect(orderConfirmation).toContain('href="https://app.nexsteps.dev"');
     expect(orderConfirmation).not.toContain("configuratorRolloutHref");
+  });
+
+  it("redirects the retired pricing and buy routes to the configurator", () => {
+    const nextConfig = readSource("next.config.mjs");
+
+    expect(nextConfig).toContain(
+      '{ source: "/pricing", destination: "/configure", permanent: false }',
+    );
+    expect(nextConfig).toContain(
+      '{ source: "/buy", destination: "/configure", permanent: false }',
+    );
+    // /buy/thanks and /buy/cancelled are live Stripe success/cancel return
+    // URLs (see app/configure/page.tsx). Guard against a future refactor
+    // widening the /buy redirect into a wildcard that would swallow them.
+    expect(nextConfig).not.toContain('"/buy/:path');
   });
 
   it("uses the existing danger tokens for summary checkout errors", () => {
@@ -289,73 +268,5 @@ describe("configurator checkout and rollout source contracts", () => {
 
     expect(checkout).toContain("state.selectedOptionalModules");
     expect(checkout).not.toContain("state.selectedModules");
-  });
-
-  it("syncs and documents the configurator rollout flag for web builds", () => {
-    const syncScript = readRepositorySource("scripts/sync-vercel-env.mjs");
-    const envExample = readRepositorySource(".env.example");
-
-    expect(syncScript).toContain('"NEXT_PUBLIC_USE_CONFIGURATOR",');
-    expect(syncScript).toContain(
-      'next.NEXT_PUBLIC_USE_CONFIGURATOR ??= "false";',
-    );
-    expect(envExample).toContain("NEXT_PUBLIC_USE_CONFIGURATOR=false");
-    expect(envExample).toContain("requires a web rebuild and redeploy");
-  });
-
-  it("keeps the configurator mapper aligned with the legacy buy payload", () => {
-    const buyPage = readSource("app/buy/page.tsx");
-    const checkoutPayloadStart = buyPage.indexOf(
-      "const { sessionUrl } = await createCheckoutSession({",
-    );
-    const checkoutPayloadEnd = buyPage.indexOf(
-      "\n      });",
-      checkoutPayloadStart,
-    );
-    const checkoutPayload = buyPage.slice(
-      checkoutPayloadStart,
-      checkoutPayloadEnd,
-    );
-
-    expect(checkoutPayloadStart).toBeGreaterThanOrEqual(0);
-    expect(checkoutPayloadEnd).toBeGreaterThan(checkoutPayloadStart);
-    expect(checkoutPayload).not.toContain("window.location.href = sessionUrl;");
-    for (const expression of [
-      "planCode,",
-      "billingPeriod: frequency,",
-      'storageAddon100Gb: storageChoice === "100" ? 1 : 0,',
-      'storageAddon200Gb: storageChoice === "200" ? 1 : 0,',
-      'storageAddon1Tb: storageChoice === "1000" ? 1 : 0,',
-      'selectedModules: learningModule ? ["LEARNING"] : undefined,',
-      "orgName,",
-      "contactName,",
-      "contactEmail,",
-      "password,",
-      "sector: sector as Sector,",
-      "successUrl,",
-      "cancelUrl,",
-    ]) {
-      expect(checkoutPayload).toContain(expression);
-    }
-    expect(
-      Array.from(
-        checkoutPayload.matchAll(/^\s{8}([A-Za-z][A-Za-z0-9]*)(?::|,)/gm),
-        (match) => match[1],
-      ),
-    ).toEqual([
-      "planCode",
-      "billingPeriod",
-      "storageAddon100Gb",
-      "storageAddon200Gb",
-      "storageAddon1Tb",
-      "selectedModules",
-      "orgName",
-      "contactName",
-      "contactEmail",
-      "password",
-      "sector",
-      "successUrl",
-      "cancelUrl",
-    ]);
   });
 });
