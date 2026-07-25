@@ -68,6 +68,8 @@ const nextConfig = {
         destination: "/blog/:slug",
         permanent: true,
       },
+      { source: "/pricing", destination: "/configure", permanent: false },
+      { source: "/buy", destination: "/configure", permanent: false },
     ];
   },
 };

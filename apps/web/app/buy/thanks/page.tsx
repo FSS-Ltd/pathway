@@ -23,7 +23,7 @@ export default function BuyThanksPage() {
       </p>
       <div className="mt-4 flex gap-3">
         <a
-          href="/buy"
+          href="/configure"
           className="rounded-md border border-pw-border px-4 py-2 text-sm font-medium text-pw-text transition hover:bg-white"
         >
           Back to Buy Now

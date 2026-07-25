@@ -12,7 +12,7 @@ export default function BuyCancelledPage() {
       </p>
       <div className="mt-4 flex gap-3">
         <Link
-          href="/buy"
+          href="/configure"
           className="rounded-md bg-pw-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600"
         >
           Return to Buy Now
