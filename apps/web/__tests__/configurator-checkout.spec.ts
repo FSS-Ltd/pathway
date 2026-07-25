@@ -161,8 +161,6 @@ describe("configurator checkout and rollout source contracts", () => {
   const appRoot = process.cwd();
   const readSource = (path: string) =>
     readFileSync(join(appRoot, path), "utf8");
-  const readRepositorySource = (path: string) =>
-    readFileSync(join(appRoot, "..", "..", path), "utf8");
 
   it("uses the rollout helper from every named acquisition CTA source", () => {
     const sourceContracts: Record<string, string[]> = {
