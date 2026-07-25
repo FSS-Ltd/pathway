@@ -74,6 +74,10 @@ const ENTERPRISE_POLICY: ConfiguratorPlanPolicy = {
   contactPath: "/demo?plan=enterprise",
 };
 
+// Two consumers rely on this list: it maps legacy codes to STARTER_POLICY
+// below, and apps/api/src/billing/buy-now.service.ts imports it to reject
+// these codes for brand-new signups. Editing it changes checkout behavior,
+// not just policy mapping.
 export const LEGACY_PLAN_CODES = [
   "CORE_MONTHLY",
   "CORE_YEARLY",

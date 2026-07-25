@@ -142,7 +142,7 @@ export class BuyNowService {
         )
       ) {
         throw new BadRequestException(
-          `Plan ${sanitisedPlan.planCode} is no longer available for new signups.`,
+          `Plan ${request.plan.planCode} is no longer available for new signups.`,
         );
       }
 
