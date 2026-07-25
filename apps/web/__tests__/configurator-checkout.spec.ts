@@ -149,38 +149,12 @@ describe("configurator checkout payload", () => {
 });
 
 describe("configurator rollout", () => {
-  const originalFlag = process.env.NEXT_PUBLIC_USE_CONFIGURATOR;
-
-  afterEach(() => {
-    if (originalFlag === undefined) {
-      delete process.env.NEXT_PUBLIC_USE_CONFIGURATOR;
-    } else {
-      process.env.NEXT_PUBLIC_USE_CONFIGURATOR = originalFlag;
-    }
-  });
-
-  it("routes only acquisition funnel paths when the flag is exactly true", () => {
-    process.env.NEXT_PUBLIC_USE_CONFIGURATOR = "true";
-
+  it("routes acquisition funnel paths to the configurator unconditionally", () => {
     expect(configuratorRolloutHref("/pricing")).toBe("/configure");
     expect(configuratorRolloutHref("/buy")).toBe("/configure");
     expect(configuratorRolloutHref("/buy/thanks")).toBe("/buy/thanks");
     expect(configuratorRolloutHref("/demo")).toBe("/demo");
   });
-
-  it.each([undefined, "false", "TRUE", "True", "1"])(
-    "leaves funnel links unchanged when the flag is %p",
-    (flag) => {
-      if (flag === undefined) {
-        delete process.env.NEXT_PUBLIC_USE_CONFIGURATOR;
-      } else {
-        process.env.NEXT_PUBLIC_USE_CONFIGURATOR = flag;
-      }
-
-      expect(configuratorRolloutHref("/pricing")).toBe("/pricing");
-      expect(configuratorRolloutHref("/buy")).toBe("/buy");
-    },
-  );
 });
 
 describe("configurator checkout and rollout source contracts", () => {
@@ -289,18 +263,6 @@ describe("configurator checkout and rollout source contracts", () => {
 
     expect(checkout).toContain("state.selectedOptionalModules");
     expect(checkout).not.toContain("state.selectedModules");
-  });
-
-  it("syncs and documents the configurator rollout flag for web builds", () => {
-    const syncScript = readRepositorySource("scripts/sync-vercel-env.mjs");
-    const envExample = readRepositorySource(".env.example");
-
-    expect(syncScript).toContain('"NEXT_PUBLIC_USE_CONFIGURATOR",');
-    expect(syncScript).toContain(
-      'next.NEXT_PUBLIC_USE_CONFIGURATOR ??= "false";',
-    );
-    expect(envExample).toContain("NEXT_PUBLIC_USE_CONFIGURATOR=false");
-    expect(envExample).toContain("requires a web rebuild and redeploy");
   });
 
   it("keeps the configurator mapper aligned with the legacy buy payload", () => {
