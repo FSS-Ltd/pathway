@@ -207,7 +207,7 @@ describe("configurator checkout and rollout source contracts", () => {
 
   it("preserves legacy purchase and recovery paths outside the rollout helper", () => {
     const thanksPage = readSource("app/buy/thanks/page.tsx");
-    expect(thanksPage).toContain('href="/configure"');
+    expect(thanksPage).toContain('href="https://app.nexsteps.dev"');
     expect(thanksPage).not.toContain("configuratorRolloutHref");
 
     const cancelledPage = readSource("app/buy/cancelled/page.tsx");
@@ -217,7 +217,7 @@ describe("configurator checkout and rollout source contracts", () => {
     const orderConfirmation = readSource(
       "components/order-confirmation-modal.tsx",
     );
-    expect(orderConfirmation).toContain('href="/configure"');
+    expect(orderConfirmation).toContain('href="https://app.nexsteps.dev"');
     expect(orderConfirmation).not.toContain("configuratorRolloutHref");
   });
 
@@ -230,6 +230,10 @@ describe("configurator checkout and rollout source contracts", () => {
     expect(nextConfig).toContain(
       '{ source: "/buy", destination: "/configure", permanent: false }',
     );
+    // /buy/thanks and /buy/cancelled are live Stripe success/cancel return
+    // URLs (see app/configure/page.tsx). Guard against a future refactor
+    // widening the /buy redirect into a wildcard that would swallow them.
+    expect(nextConfig).not.toContain('"/buy/:path');
   });
 
   it("uses the existing danger tokens for summary checkout errors", () => {
