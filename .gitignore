@@ -68,3 +68,6 @@ pgdata/
 
 # Local agent knowledge graph artifacts
 graphify-out/
+
+# Git worktrees
+.worktrees/
