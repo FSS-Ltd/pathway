@@ -69,7 +69,7 @@ AND tenant/RLS policy
 
 Include the updated Clubs and Child Merit Market prices and their Proposed status. Add owners for every open decision from source section 22 without converting an open decision into an assumed product fact.
 
-- [ ] **Step 4: Validate, update the semantic graph, and commit completion evidence**
+- [x] **Step 4: Validate, update the semantic graph, and commit completion evidence**
 
 Run:
 
@@ -83,6 +83,13 @@ matches. The main agent must then run the curated docs-aware Graphify
 `/graphify --update` workflow, verify the matrix and ADR are represented, and
 include the required graph artifacts according to repository policy before
 marking this step complete.
+
+Completion evidence: the docs-aware semantic update merged 24 document nodes
+and 38 relationships into the structural graph. The resulting ignored
+`graphify-out/graph.json`, `graphify-out/graph.html`, and
+`graphify-out/GRAPH_REPORT.md` contain 2,832 nodes and 3,659 edges and directly
+represent this plan, the governing master plan, the source/access matrix, and
+ADR 001.
 
 **Acceptance:** Every planned route has an explicit access decision and every unresolved commercial/security decision has an owner and blocking PR.
 
