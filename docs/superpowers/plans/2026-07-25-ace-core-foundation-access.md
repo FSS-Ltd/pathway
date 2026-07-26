@@ -104,7 +104,7 @@ permits selection across sites in the active organisation, while site-scoped
 roles still require an active assignment for the selected site. Section 22
 approval items remain open until their named owners record substantive
 approval. Round 1 adds the committed deterministic validator; the docs-aware
-semantic Graphify gate remains pending for the main agent.
+semantic Graphify gate is complete with the evidence recorded in Step 4.
 
 ### Task 2: ACE-F02 - Replace string capabilities with a compile-time registry
 
