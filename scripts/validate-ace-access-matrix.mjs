@@ -90,7 +90,11 @@ routeLines.forEach((line, index) => {
     allowedSensitivities.has(sensitivity),
     `${cells[0]}: invalid sensitivity ${cells[10]}`,
   );
-  actualRoutes.set(routeKey, { id: cells[0], sensitivity });
+  actualRoutes.set(routeKey, {
+    id: cells[0],
+    permission: cells[4].replaceAll("`", ""),
+    sensitivity,
+  });
 });
 
 const sourceStart = buildPlan.indexOf("## 8.2 Access-control endpoints");
@@ -160,9 +164,19 @@ assert(
     "sensitive",
   "Faith read-receipt route must be sensitive",
 );
+const communitySpaceCreation = actualRoutes.get("POST /ace/community/spaces");
 assert(
-  actualRoutes.get("POST /ace/community/spaces")?.sensitivity === "standard",
-  "ordinary Community space creation must be standard",
+  communitySpaceCreation?.permission === "ace.community.spaces.manage" &&
+    communitySpaceCreation.sensitivity === "standard",
+  "ordinary Community space creation must use the standard ace.community.spaces.manage permission",
+);
+const communityModeration = actualRoutes.get(
+  "POST /ace/community/posts/:postId/moderate",
+);
+assert(
+  communityModeration?.permission === "ace.community.moderate" &&
+    communityModeration.sensitivity === "protected",
+  "Community moderation must use the protected ace.community.moderate permission",
 );
 assert(
   expectedRoutes.filter((route) => route.endsWith("/reflections")).length === 2,

@@ -388,7 +388,8 @@ ace.reports.review ace.reports.publish
 ace.parent.progress.read ace.student.self.read
 ace.faith.read ace.faith.publish
 ace.faith.manage ace.community.read
-ace.community.post ace.community.moderate
+ace.community.post ace.community.spaces.manage
+ace.community.moderate
 school.trips.read school.trips.manage
 school.permission_slips.read school.permission_slips.manage
 school.permission_slips.respond
