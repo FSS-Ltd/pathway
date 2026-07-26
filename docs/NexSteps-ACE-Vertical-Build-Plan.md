@@ -811,7 +811,7 @@ GET /ace/reports/:id/download
 GET/POST /ace/faith/content
 POST /ace/faith/content/:id/publish
 POST /ace/faith/content/:id/read
-GET/POST /ace/faith/content/:id/refleections
+GET/POST /ace/faith/content/:id/reflections
 GET/PUT /ace/settings/features/student-community
 GET/POST /ace/community/spaces
 GET/POST /ace/community/spaces/:spaceId/posts
@@ -1559,6 +1559,24 @@ Do not modify or migrate Oasis data without separate authorisation.
 - [ ] web-first versus mobile-parity release scope confirmed.
 
 - [ ] pilot/UAT owners and delivery capacity agreed.
+
+ACE-F01 records accountable ownership and implementation blockers below. Every
+item remains open until the named owner records substantive approval; an
+implementation direction, candidate matrix, or authored ADR does not by itself
+close a checklist item.
+
+| Open decision | Accountable owner | Blocking PR/gate |
+| --- | --- | --- |
+| Detailed capability/permission matrix approved | Jean-Fidele Ntagengwa (Product & Engineering) | owner approval gate for `ACE-F01`; then consumed by `ACE-F02` through `ACE-F14` |
+| Access-control/delegation ADR approved | Jean-Fidele Ntagengwa (Product & Engineering) | owner approval gate for `ACE-F01`; then `ACE-F02` through `ACE-F14`, especially `ACE-F12` and `ACE-F14` |
+| Student identity ADR approved | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F17`, `ACE-M15` through `ACE-M20`, then identity-dependent pilot gates |
+| PACE correction model approved | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F16`, `ACE-O02`, `ACE-O03`, and `ACE-O09` through `ACE-O13` |
+| RLS launch blockers assigned | Technical Agent | `ACE-F03`, `ACE-F15` through `ACE-F22`, every add-on schema PR, `ACE-L05`, and `ACE-L09` |
+| UK-only versus EU residency confirmed | Jean-Fidele Ntagengwa (Product & Engineering), with Legal/Commercial review | child-data onboarding; `ACE-L04`, `ACE-L05`, and `ACE-L09` |
+| Market-data licensing owner assigned | Jean-Fidele Ntagengwa (Product & Engineering), with Legal/Commercial review | `ACE-MER01`, `ACE-MER12` through `ACE-MER14`, `ACE-MER17`, and `ACE-MER20` |
+| Finance V1 payment scope confirmed | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-FIN03` through `ACE-FIN13` |
+| web-first versus mobile-parity release scope confirmed | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-O13`, `ACE-O17`, `ACE-O19`, `ACE-M08` through `ACE-M11`, `ACE-M18`, `ACE-M19`, `ACE-L06`, and `ACE-L09`; add-on mobile gates where promised |
+| pilot/UAT owners and delivery capacity agreed | Jean-Fidele Ntagengwa (Product & Engineering), with Delivery | `ACE-L01`, `ACE-L08`, and `ACE-L09` |
 
 # 23. Evidence and Sources
 

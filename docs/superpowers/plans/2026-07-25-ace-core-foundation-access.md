@@ -34,11 +34,11 @@
 - Consumes: the two governing source documents and current route/nav inventory.
 - Produces: one row per planned API route with `capability`, `permission`, `persona`, `relationship`, `releasePolicy`, `featureToggle`, and `sensitivity`.
 
-- [ ] **Step 1: Write the failing completeness check**
+- [x] **Step 1: Write the failing completeness check**
 
 Add a checklist row for every endpoint in source sections 8.2 through 8.5 and assert no cell is blank. Use `none` only where the layer genuinely does not apply.
 
-- [ ] **Step 2: Verify the inventory is initially incomplete**
+- [x] **Step 2: Verify the inventory is initially incomplete**
 
 Run:
 
@@ -48,7 +48,7 @@ rg -n '\|[[:space:]]*\|' docs/ace-vertical/01-source-and-access-matrix.md
 
 Expected: missing file or incomplete route rows.
 
-- [ ] **Step 3: Write the decision artifacts**
+- [x] **Step 3: Write the decision artifacts**
 
 Record the access formula exactly:
 
@@ -65,7 +65,7 @@ AND tenant/RLS policy
 
 Include the updated Clubs and Child Merit Market prices and their Proposed status. Add owners for every open decision from source section 22 without converting an open decision into an assumed product fact.
 
-- [ ] **Step 4: Validate and commit**
+- [x] **Step 4: Validate and commit**
 
 Run:
 
@@ -81,6 +81,16 @@ Expected: no placeholder matches; Graphify succeeds.
 **Acceptance:** Every planned route has an explicit access decision and every unresolved commercial/security decision has an owner and blocking PR.
 
 **Rollback:** Revert the documentation commit. No runtime behaviour changes.
+
+**ACE-F01 decision note (26 July 2026):** The source lock records 68 exact
+method/path routes from source sections 8.2 through 8.4. The four section 8.5
+add-on families remain unresolved method/path contracts with accountable owners
+and blocking PRs; they are not counted as exact routes. The public Faith path
+uses the corrected `reflections` spelling. Organisation-head membership
+permits selection across sites in the active organisation, while site-scoped
+roles still require an active assignment for the selected site. Section 22
+approval items remain open until their named owners record substantive
+approval.
 
 ### Task 2: ACE-F02 - Replace string capabilities with a compile-time registry
 
