@@ -27,8 +27,9 @@
 **Files:**
 - Create: `docs/ace-vertical/01-source-and-access-matrix.md`
 - Create: `docs/ace-vertical/adrs/001-ace-packaging-and-access-layers.md`
+- Create: `scripts/validate-ace-access-matrix.mjs`
 - Modify: `docs/NexSteps-ACE-Vertical-Build-Plan.md`
-- Test: `docs/ace-vertical/01-source-and-access-matrix.md`
+- Test: `scripts/validate-ace-access-matrix.mjs`
 
 **Interfaces:**
 - Consumes: the two governing source documents and current route/nav inventory.
@@ -37,6 +38,9 @@
 - [x] **Step 1: Write the failing completeness check**
 
 Add a checklist row for every endpoint in source sections 8.2 through 8.5 and assert no cell is blank. Use `none` only where the layer genuinely does not apply.
+
+Preserve the executable completeness assertion in
+`scripts/validate-ace-access-matrix.mjs`.
 
 - [x] **Step 2: Verify the inventory is initially incomplete**
 
@@ -65,18 +69,20 @@ AND tenant/RLS policy
 
 Include the updated Clubs and Child Merit Market prices and their Proposed status. Add owners for every open decision from source section 22 without converting an open decision into an assumed product fact.
 
-- [x] **Step 4: Validate and commit**
+- [ ] **Step 4: Validate, update the semantic graph, and commit completion evidence**
 
 Run:
 
 ```bash
+node scripts/validate-ace-access-matrix.mjs
 rg -n 'TBD|TODO|permission goes here|capability goes here' docs/ace-vertical docs/NexSteps-ACE-Vertical-Build-Plan.md
-graphify update .
-git add docs/ace-vertical docs/NexSteps-ACE-Vertical-Build-Plan.md graphify-out
-git commit -m "docs: lock ACE access and source matrix"
 ```
 
-Expected: no placeholder matches; Graphify succeeds.
+Expected: the deterministic validator passes and the placeholder scan has no
+matches. The main agent must then run the curated docs-aware Graphify
+`/graphify --update` workflow, verify the matrix and ADR are represented, and
+include the required graph artifacts according to repository policy before
+marking this step complete.
 
 **Acceptance:** Every planned route has an explicit access decision and every unresolved commercial/security decision has an owner and blocking PR.
 
@@ -90,7 +96,8 @@ uses the corrected `reflections` spelling. Organisation-head membership
 permits selection across sites in the active organisation, while site-scoped
 roles still require an active assignment for the selected site. Section 22
 approval items remain open until their named owners record substantive
-approval.
+approval. Round 1 adds the committed deterministic validator; the docs-aware
+semantic Graphify gate remains pending for the main agent.
 
 ### Task 2: ACE-F02 - Replace string capabilities with a compile-time registry
 

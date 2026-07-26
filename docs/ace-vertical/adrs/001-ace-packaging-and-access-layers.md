@@ -93,7 +93,7 @@ No other exact route in sections 8.2 through 8.4 uses an included-feature toggle
 
 Sensitivity is metadata for delegability, step-up, audit, warning, and redaction. It never replaces relationship, release, or tenant enforcement.
 
-Corrections are `sensitive`; an override is `protected`. Report approval is `sensitive`; publication is `protected`. Permission-slip management is `sensitive`; publication is `protected`. Community content is `sensitive`; space administration and moderation are `protected`.
+Corrections are `sensitive`; an override is `protected`. Report approval is `sensitive`; publication is `protected`. Permission-slip management is `sensitive`; publication is `protected`. Identity-linked Faith read receipts are `sensitive`. Student-authored Community content is `sensitive`; ordinary space creation is `standard`; moderation is `protected`.
 
 ### 7. Lock exact routes and leave add-on contracts open
 

@@ -40,7 +40,7 @@ AND tenant/RLS policy
 - `sensitive`: child, family, consent, private-report, private-reflection, and student-authored Community data. Corrections are sensitive; they are not classified as protected unless they are an override.
 - `standard`: ordinary operational content such as settings, academic calendars, trips, and non-private published content.
 
-Edge cases follow the action and data, not the URL prefix. Report drafting and approval are `sensitive`; report publication is `protected`. Permission-slip management is `sensitive`; publication is `protected`. Community posts and reports are `sensitive`; space administration and moderation are `protected`. Community feature-setting routes do not require the feature to be enabled because they must remain reachable to enable or disable it.
+Edge cases follow the action and data, not the URL prefix. Report drafting and approval are `sensitive`; report publication is `protected`. Permission-slip management is `sensitive`; publication is `protected`. Identity-linked Faith read receipts are `sensitive`. Community posts and reports are `sensitive`; ordinary space creation is `standard`; moderation is `protected`. Community feature-setting routes do not require the feature to be enabled because they must remain reachable to enable or disable it.
 
 ## Exact route matrix
 
@@ -86,13 +86,13 @@ Edge cases follow the action and data, not the URL prefix. Report drafting and a
 | R38 | GET | `/ace/faith/content` | `ace.faith.read` | `ace.faith.read` | organisation-head, site-lead, staff, parent/guardian, student | active organisation/site portal context | staff active-site domain; guardian-child or student-self identity for portal readers | published active-version and audience policy for portal readers; staff workflow visibility for staff | `none` | `standard` | trusted tenant and actor context; tenant-scoped RLS |
 | R39 | POST | `/ace/faith/content` | `ace.faith.manage` | `ace.faith.manage` | organisation-head, site-lead, staff | active selected-site context | active-site-domain | staff-only draft workflow | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 | R40 | POST | `/ace/faith/content/:id/publish` | `ace.faith.publish` | `ace.faith.publish` | organisation-head, site-lead | active selected-site context | content belongs to active site | published active-version and audience policy | `none` | `protected` | trusted tenant and content scope; tenant-scoped RLS |
-| R41 | POST | `/ace/faith/content/:id/read` | `ace.faith.read` | `ace.faith.read` | staff, parent/guardian, student | active organisation/site portal context | staff active-site domain; guardian-child or student-self identity for portal readers | published active-version and audience policy | `none` | `standard` | trusted tenant and actor context; tenant-scoped RLS |
+| R41 | POST | `/ace/faith/content/:id/read` | `ace.faith.read` | `ace.faith.read` | staff, parent/guardian, student | active organisation/site portal context | staff active-site domain; guardian-child or student-self identity for portal readers | published active-version and audience policy | `none` | `sensitive` | trusted tenant and actor context; tenant-scoped RLS |
 | R42 | GET | `/ace/faith/content/:id/reflections` | `ace.faith.read` | `ace.faith.read` | organisation-head, site-lead, staff, parent/guardian, student | active organisation/site portal context | reflection audience plus staff active-site domain, guardian-child, or student-self identity | explicit reflection visibility and moderation policy | `none` | `sensitive` | trusted tenant, child, content, and reflection scope; tenantId/childId RLS |
 | R43 | POST | `/ace/faith/content/:id/reflections` | `ace.faith.read` | `ace.faith.reflect` | parent/guardian, student | active organisation/site portal context | guardian-child or student-self identity | published active-version; reflections enabled; explicit reflection visibility | `none` | `sensitive` | trusted tenant, child, content, and actor scope; tenantId/childId RLS |
 | R44 | GET | `/ace/settings/features/student-community` | `ace.community.read` | `ace.settings.read` | organisation-head, site-lead | active selected-site context | `none` | active-feature-setting | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 | R45 | PUT | `/ace/settings/features/student-community` | `ace.community.read` | `ace.community.settings.manage` | organisation-head | active organisation membership and selected-site context | target site belongs to active organisation | active-feature-setting | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 | R46 | GET | `/ace/community/spaces` | `ace.community.read` | `ace.community.read` | organisation-head, site-lead, staff, student | active selected-site context | derived-community-membership | community-moderation-policy | `ace.student_community` | `sensitive` | trusted tenant and derived membership; tenant-scoped RLS |
-| R47 | POST | `/ace/community/spaces` | `ace.community.read` | `ace.community.moderate` | organisation-head, site-lead | active selected-site context | active-site community administration | community-moderation-policy | `ace.student_community` | `protected` | trusted tenant and site scope; tenant-scoped RLS |
+| R47 | POST | `/ace/community/spaces` | `ace.community.read` | `ace.community.moderate` | organisation-head, site-lead | active selected-site context | active-site community administration | community-moderation-policy | `ace.student_community` | `standard` | trusted tenant and site scope; tenant-scoped RLS |
 | R48 | GET | `/ace/community/spaces/:spaceId/posts` | `ace.community.read` | `ace.community.read` | organisation-head, site-lead, staff, student | active selected-site context | derived-community-membership for space | community-moderation-policy | `ace.student_community` | `sensitive` | trusted tenant, space, and derived membership; tenant-scoped RLS |
 | R49 | POST | `/ace/community/spaces/:spaceId/posts` | `ace.community.post` | `ace.community.post` | staff, student | active selected-site context | derived-community-membership for space | community-moderation-policy | `ace.student_community` | `sensitive` | trusted tenant, actor, and space scope; tenant-scoped RLS |
 | R50 | POST | `/ace/community/posts/:postId/report` | `ace.community.read` | `ace.community.report` | organisation-head, site-lead, staff, student | active selected-site context | derived-community-membership for source space | community-moderation-policy | `ace.student_community` | `sensitive` | trusted tenant, actor, post, and space scope; tenant-scoped RLS |
@@ -166,7 +166,13 @@ Every section 22 decision remains open. An implementation direction or authored 
 
 ## Deterministic validation contract
 
-The ACE-F01 implementation report records the exact command and fresh output proving:
+Run the committed repository check:
+
+```bash
+node scripts/validate-ace-access-matrix.mjs
+```
+
+It proves:
 
 1. the header contains every required field;
 2. there are exactly 68 unique method/path rows;
