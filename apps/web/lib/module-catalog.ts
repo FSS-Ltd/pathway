@@ -125,6 +125,9 @@ export const VERTICAL_FEATURES: Record<Vertical, string[]> = {
     "Manage PACE work",
     "View parent information",
     "View standard reports",
+    "View and record learning logs",
+    "View and add learning evidence",
+    "Generate learning progress reports",
   ],
   STATE_SCHOOL: [
     "View attendance",

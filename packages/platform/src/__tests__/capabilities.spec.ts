@@ -28,6 +28,21 @@ describe("getOrgCapabilities", () => {
     expect(caps).toContain("giving.manage");
   });
 
+  it("returns ACE's Learning subset without a Learning module", async () => {
+    orgVerticalFindUnique.mockResolvedValueOnce({ vertical: "ACE_SCHOOL" });
+    orgModuleFindMany.mockResolvedValueOnce([]);
+
+    expect(await getOrgCapabilities("org-1")).toEqual(
+      expect.arrayContaining([
+        "learning.log.read",
+        "learning.log.write",
+        "learning.evidence.read",
+        "learning.evidence.write",
+        "learning.reports.generate",
+      ]),
+    );
+  });
+
   it("queries only ACTIVE modules", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([]);

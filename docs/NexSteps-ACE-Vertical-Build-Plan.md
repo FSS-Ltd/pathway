@@ -1541,9 +1541,9 @@ Do not modify or migrate Oasis data without separate authorisation.
 
 - [x] Configurable roles established as platform core.
 
-- [ ] Detailed capability/permission matrix approved.
+- [x] Detailed capability/permission matrix approved.
 
-- [ ] Access-control/delegation ADR approved.
+- [x] Access-control/delegation ADR approved.
 
 - [ ] Student identity ADR approved.
 
@@ -1562,14 +1562,15 @@ Do not modify or migrate Oasis data without separate authorisation.
 - [ ] pilot/UAT owners and delivery capacity agreed.
 
 ACE-F01 records accountable ownership and implementation blockers below. Every
-item remains open until the named owner records substantive approval; an
-implementation direction, candidate matrix, or authored ADR does not by itself
-close a checklist item.
+unchecked item remains open until the named owner records substantive approval.
+Jean-Fidele Ntagengwa (Product & Engineering) has substantively approved the
+capability/permission matrix and access-control/delegation ADR for `ACE-F02`
+through `ACE-F14`.
 
-| Open decision | Accountable owner | Blocking PR/gate |
+| Decision | Accountable owner | Approval or blocking PR/gate |
 | --- | --- | --- |
-| Detailed capability/permission matrix approved | Jean-Fidele Ntagengwa (Product & Engineering) | owner approval gate for `ACE-F01`; then consumed by `ACE-F02` through `ACE-F14` |
-| Access-control/delegation ADR approved | Jean-Fidele Ntagengwa (Product & Engineering) | owner approval gate for `ACE-F01`; then `ACE-F02` through `ACE-F14`, especially `ACE-F12` and `ACE-F14` |
+| Detailed capability/permission matrix approved | Jean-Fidele Ntagengwa (Product & Engineering) | Approved; consumed by `ACE-F02` through `ACE-F14` |
+| Access-control/delegation ADR approved | Jean-Fidele Ntagengwa (Product & Engineering) | Approved; governs `ACE-F02` through `ACE-F14`, especially `ACE-F12` and `ACE-F14` |
 | Student identity ADR approved | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F17`, `ACE-M15` through `ACE-M20`, then identity-dependent pilot gates |
 | PACE correction model approved | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F16`, `ACE-O02`, `ACE-O03`, and `ACE-O09` through `ACE-O13` |
 | RLS launch blockers assigned | Technical Agent | `ACE-F03`, `ACE-F15` through `ACE-F22`, every add-on schema PR, `ACE-L05`, and `ACE-L09` |

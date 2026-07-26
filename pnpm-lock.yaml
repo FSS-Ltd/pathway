@@ -78,6 +78,9 @@ importers:
 
   apps/admin:
     dependencies:
+      '@pathway/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
       '@pathway/util':
         specifier: workspace:*
         version: link:../../packages/util

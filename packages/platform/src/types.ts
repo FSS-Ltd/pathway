@@ -1,1 +1,1 @@
-export type Capability = string;
+export type { Capability, PermissionKey } from "./capability-definitions";

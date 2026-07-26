@@ -1,4 +1,5 @@
 export * from "./types";
+export * from "./capability-definitions";
 export * from "./vertical";
 export * from "./modules";
 export * from "./capabilities";

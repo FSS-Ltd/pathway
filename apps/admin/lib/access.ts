@@ -5,6 +5,7 @@
  * Queries UserOrgRole, UserTenantRole, OrgMembership, and SiteMembership tables via API.
  */
 
+import type { Capability } from "@pathway/platform";
 import type { UserRolesResponse } from "./api-client";
 
 export type AdminRoleInfo = {
@@ -140,7 +141,7 @@ export type AccessContext = {
 
 export function hasCapability(
   capabilities: string[],
-  required: string | undefined,
+  required: Capability | undefined,
 ): boolean {
   if (!required) {
     return true;

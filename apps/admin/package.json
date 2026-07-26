@@ -21,6 +21,7 @@
     "tailwindcss": "^3.4.13"
   },
   "dependencies": {
+    "@pathway/platform": "workspace:*",
     "@pathway/util": "workspace:*",
     "@tiptap/extension-image": "^3.19.0",
     "@tiptap/extension-link": "^3.19.0",

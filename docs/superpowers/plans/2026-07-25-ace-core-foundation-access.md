@@ -143,11 +143,11 @@ export const CAPABILITY_DEFINITIONS = { /* exhaustive literals */ } as const
 export type Capability = keyof typeof CAPABILITY_DEFINITIONS;
 ```
 
-- [ ] **Step 1: Write failing registry and map tests**
+- [x] **Step 1: Write failing registry and map tests**
 
 Assert that every value in `VERTICAL_CAPABILITIES` and `MODULE_CAPABILITIES` exists in `CAPABILITY_DEFINITIONS`, and that every source section 5.2 capability is present. Assert ACE grants the confirmed Learning subset without requiring `Module.LEARNING`.
 
-- [ ] **Step 2: Run the failing tests**
+- [x] **Step 2: Run the failing tests**
 
 Run:
 
@@ -157,11 +157,14 @@ pnpm --filter @pathway/platform test:unit -- --runInBand capability-definitions
 
 Expected: failure because `Capability` is still `string`.
 
-- [ ] **Step 3: Implement the registry**
+Evidence: exited 1 with TS2307 for the not-yet-created registry and TS2344
+because `"unknown.capability"` still extended the string-based `Capability`.
+
+- [x] **Step 3: Implement the registry**
 
 Add platform, ACE, school operations, messaging, safeguarding, Clubs, Finance, Merit, and Advanced Reporting literals. Keep capability maps exhaustive with `satisfies Record<Vertical | Module, readonly Capability[]>`.
 
-- [ ] **Step 4: Run verification**
+- [x] **Step 4: Run verification**
 
 Run:
 
@@ -173,12 +176,27 @@ pnpm --filter @pathway/platform lint
 
 Expected: all pass and unknown literals fail TypeScript compilation.
 
-- [ ] **Step 5: Commit**
+Evidence: 7 platform suites and 131 tests passed. Platform typecheck and lint
+both exited 0. The structural Graphify update and the curated docs-aware
+semantic gate were completed after the task changes. `GRAPH_REPORT.md` records
+2,874 nodes, 3,721 edges, and 128 non-empty communities. A read-only
+`graph.json` query found 28 newly added `ace_f02_` semantic nodes and 42 newly
+added semantic relationships, all `EXTRACTED`, with zero inferred ACE-F02
+items. The registry is structurally represented by
+`ace_f02_unified_typed_registry` and has queryable relationships to its
+metadata contract, derived capability union, exact-coverage test, granted-key
+coverage test, scope policies, sensitivity policy, delegation policy,
+entitlement-metadata policy, and governance approval record.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/platform
 git commit -m "feat: add typed capability registry"
 ```
+
+Evidence: the exact-message task commit was created after all required checks
+passed.
 
 **Acceptance:** No runtime guard, controller decorator, or map can reference an unknown capability.
 
