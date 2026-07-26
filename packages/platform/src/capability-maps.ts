@@ -1,71 +1,132 @@
 import type { Vertical, Module } from "@prisma/client";
-import type { Capability } from "./types";
+import type { Capability } from "./capability-definitions";
 
-// Starter capabilities (domain.action per dev-doc §4). The exact capability→nav
-// contract is refined in Phase 2; adding a Vertical/Module enum value without a
-// mapping breaks the build (Record) and the completeness test below.
-export const VERTICAL_CAPABILITIES: Record<Vertical, Capability[]> = {
+// These maps remain the commercial entitlement authority. Adding a
+// Vertical/Module enum value without a mapping breaks the build.
+const PLATFORM_CORE_CAPABILITIES = [
+  "attendance.read",
+  "attendance.manage",
+  "platform.access.roles.read",
+  "platform.access.roles.manage",
+  "platform.access.permissions.read",
+  "platform.access.assignments.read",
+  "platform.access.assignments.manage",
+  "platform.access.users.read",
+  "platform.access.audit.read",
+  "messaging.conversations.read",
+  "messaging.conversations.create",
+  "messaging.messages.read",
+  "messaging.messages.send",
+  "notices.read",
+  "notices.manage",
+  "notices.publish",
+  "safeguarding.concerns.record",
+  "safeguarding.concerns.read",
+  "safeguarding.concerns.manage",
+] as const satisfies readonly Capability[];
+
+export const VERTICAL_CAPABILITIES = {
   CHURCH: [
-    "attendance.read",
-    "attendance.manage",
+    ...PLATFORM_CORE_CAPABILITIES,
     "volunteers.manage",
     "giving.manage",
     "calendar.read",
   ],
   INDEPENDENT_SCHOOL: [
-    "attendance.read",
-    "attendance.manage",
+    ...PLATFORM_CORE_CAPABILITIES,
     "students.manage",
     "classes.manage",
     "parents.read",
     "reports.read",
   ],
   ACE_SCHOOL: [
-    "attendance.read",
-    "attendance.manage",
+    ...PLATFORM_CORE_CAPABILITIES,
     "students.manage",
     "classes.manage",
     "pace.manage",
     "parents.read",
     "reports.read",
+    "ace.settings.read",
+    "ace.settings.manage",
+    "ace.pace.read",
+    "ace.pace.record",
+    "ace.pace.correct",
+    "ace.pace.override",
+    "ace.behaviour.read",
+    "ace.behaviour.record",
+    "ace.behaviour.sensitive.read",
+    "ace.behaviour.policy.manage",
+    "ace.reports.read",
+    "ace.reports.compile",
+    "ace.reports.review",
+    "ace.reports.publish",
+    "ace.parent.progress.read",
+    "ace.student.self.read",
+    "ace.faith.read",
+    "ace.faith.manage",
+    "ace.faith.publish",
+    "ace.faith.reflect",
+    "ace.community.read",
+    "ace.community.post",
+    "ace.community.report",
+    "ace.community.spaces.manage",
+    "ace.community.settings.manage",
+    "ace.community.moderate",
+    "school.trips.read",
+    "school.trips.manage",
+    "school.permission_slips.read",
+    "school.permission_slips.manage",
+    "school.permission_slips.respond",
+    "learning.log.read",
+    "learning.log.write",
+    "learning.evidence.read",
+    "learning.evidence.write",
+    "learning.reports.generate",
   ],
   STATE_SCHOOL: [
-    "attendance.read",
-    "attendance.manage",
+    ...PLATFORM_CORE_CAPABILITIES,
     "students.manage",
     "classes.manage",
     "parents.read",
     "reports.read",
   ],
   NURSERY: [
-    "attendance.read",
-    "attendance.manage",
+    ...PLATFORM_CORE_CAPABILITIES,
     "children.manage",
     "parents.read",
   ],
   CHARITY: [
-    "attendance.read",
-    "attendance.manage",
+    ...PLATFORM_CORE_CAPABILITIES,
     "volunteers.manage",
     "calendar.read",
   ],
   CLUB: [
-    "attendance.read",
-    "attendance.manage",
+    ...PLATFORM_CORE_CAPABILITIES,
     "members.manage",
     "calendar.read",
   ],
-};
+} as const satisfies Record<Vertical, readonly Capability[]>;
 
-export const MODULE_CAPABILITIES: Record<Module, Capability[]> = {
-  FINANCE: ["finance.invoices", "finance.payments", "finance.reports"],
+export const MODULE_CAPABILITIES = {
+  FINANCE: [
+    "finance.invoices",
+    "finance.payments",
+    "finance.reports",
+    "finance.family_invoices.read",
+    "finance.family_invoices.manage",
+    "finance.family_payments.record",
+    "finance.family_reports.read",
+  ],
   EVENTS: ["events.booking", "events.manage"],
   TRANSPORT: ["transport.routes", "transport.manage"],
   MEALS: ["meals.manage", "meals.orders"],
   ASSET_MANAGEMENT: ["assets.manage", "assets.audit"],
   HR: ["hr.staff", "hr.leave"],
   AI_WORKSPACE: ["ai.workspace"],
-  ADVANCED_REPORTING: ["reporting.advanced"],
+  ADVANCED_REPORTING: [
+    "reporting.advanced",
+    "advanced_reporting.ace.multisite.read",
+  ],
   LEARNING: [
     "learning.log.read",
     "learning.log.write",
@@ -73,4 +134,4 @@ export const MODULE_CAPABILITIES: Record<Module, Capability[]> = {
     "learning.evidence.write",
     "learning.reports.generate",
   ],
-};
+} as const satisfies Record<Module, readonly Capability[]>;

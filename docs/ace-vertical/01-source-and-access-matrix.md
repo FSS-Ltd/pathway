@@ -1,6 +1,6 @@
 # ACE Source and Access Matrix
 
-**Status:** ACE-F01 implementation source lock. The approval gates in section 22 of the ACE build plan remain open until their accountable owners record substantive approval.
+**Status:** Approved capability and permission execution contract for `ACE-F02` through `ACE-F14`.
 
 **Applies to:** the planned public API contract in sections 8.2 through 8.5 of `docs/NexSteps-ACE-Vertical-Build-Plan.md`.
 
@@ -149,12 +149,14 @@ remains open; absent support fails closed.
 
 ## Open decision ownership
 
-Every section 22 decision remains open. An implementation direction or authored ADR is not substantive approval.
+The capability/permission matrix and access-control/delegation ADR have
+substantive owner approval. Every other section 22 decision remains open until
+its accountable owner records approval.
 
 | Decision | Status | Accountable owner | Blocking PR/gate |
 | --- | --- | --- | --- |
-| Detailed capability/permission matrix approved | Open; this ACE-F01 matrix is the approval candidate | Jean-Fidele Ntagengwa (Product & Engineering) | owner approval gate for ACE-F01; then consumed by `ACE-F02` through `ACE-F14` |
-| Access-control/delegation ADR approved | Open; ADR 001 is the approval candidate | Jean-Fidele Ntagengwa (Product & Engineering) | owner approval gate for ACE-F01; then `ACE-F02` through `ACE-F14`, especially `ACE-F12` and `ACE-F14` |
+| Detailed capability/permission matrix approved | Approved for `ACE-F02` through `ACE-F14` | Jean-Fidele Ntagengwa (Product & Engineering) | consumed by `ACE-F02` through `ACE-F14` |
+| Access-control/delegation ADR approved | Approved for `ACE-F02` through `ACE-F14` | Jean-Fidele Ntagengwa (Product & Engineering) | governs `ACE-F02` through `ACE-F14`, especially `ACE-F12` and `ACE-F14` |
 | Student identity ADR approved | Open | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F17`, `ACE-M15` through `ACE-M20`, then identity-dependent pilot gates |
 | PACE correction model approved | Open | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F16`, `ACE-O02`, `ACE-O03`, and `ACE-O09` through `ACE-O13` |
 | RLS launch blockers assigned | Open | Technical Agent | `ACE-F03`, `ACE-F15` through `ACE-F22`, every add-on schema PR, `ACE-L05`, and `ACE-L09` |

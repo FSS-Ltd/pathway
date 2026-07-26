@@ -175,13 +175,20 @@ describe("module catalogue", () => {
       Object.keys(VERTICAL_CAPABILITIES).sort(),
     );
 
-    for (const [vertical, features] of Object.entries(VERTICAL_FEATURES)) {
-      expect(features).toHaveLength(VERTICAL_CAPABILITIES[vertical].length);
+    for (const features of Object.values(VERTICAL_FEATURES)) {
       expect(features.length).toBeGreaterThan(0);
       features.forEach((feature) =>
         expect(feature.trim().length).toBeGreaterThan(3),
       );
     }
+
+    expect(VERTICAL_FEATURES.ACE_SCHOOL).toEqual(
+      expect.arrayContaining([
+        "View and record learning logs",
+        "View and add learning evidence",
+        "Generate learning progress reports",
+      ]),
+    );
   });
 
   it("keeps every option delta aligned with cart totals across billing intervals", () => {

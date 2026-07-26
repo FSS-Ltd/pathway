@@ -75,7 +75,7 @@ export class PlatformController {
 
   @Get("verticals/:vertical/capabilities")
   verticalCapabilities(@Param("vertical") vertical: string): {
-    capabilities: Capability[];
+    capabilities: readonly Capability[];
   } {
     if (!isVertical(vertical)) {
       throw new BadRequestException("Unknown vertical");

@@ -83,7 +83,7 @@ describe("PlatformController", () => {
   });
 
   it("returns the current organisation capabilities", async () => {
-    const capabilities: Capability[] = ["finance.invoices", "people.directory"];
+    const capabilities: Capability[] = ["finance.invoices", "finance.payments"];
     mockGetOrgCapabilities.mockResolvedValue(capabilities);
     const controller = new PlatformController();
 

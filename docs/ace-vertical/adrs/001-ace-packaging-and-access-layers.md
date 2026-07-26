@@ -1,6 +1,6 @@
 # ADR 001: ACE Packaging and Access Layers
 
-**Status:** Proposed implementation source lock. Substantive approval remains open in section 22 of the ACE build plan.
+**Status:** Approved. Governs `ACE-F02` through `ACE-F14`.
 
 **Owner:** Jean-Fidele Ntagengwa (Product & Engineering)
 
@@ -111,9 +111,12 @@ relevant `ACE-F02` mapping and must be resolved by `ACE-CLB01` and `ACE-MER01`
 before either entitlement becomes active. Missing enum/registry support fails
 closed.
 
-## Open approval gates
+## Approval record
 
-Authoring this ADR does not close the build plan's section 22 decisions. The detailed matrix and this ADR remain approval candidates owned by Jean-Fidele Ntagengwa (Product & Engineering).
+Jean-Fidele Ntagengwa (Product & Engineering) substantively approved this ADR
+and the detailed capability/permission matrix for `ACE-F02` through `ACE-F14`.
+The remaining section 22 decisions stay open until their accountable owners
+record approval.
 
 The same owner is accountable for student identity, PACE corrections, Finance V1 scope, and web/mobile release parity. The Technical Agent owns the RLS blockers. Jean-Fidele Ntagengwa with Legal/Commercial review owns residency and market-data licensing. Jean-Fidele Ntagengwa with Delivery owns pilot/UAT capacity.
 
