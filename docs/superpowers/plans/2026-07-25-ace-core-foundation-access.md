@@ -84,10 +84,13 @@ matches. The main agent must then run the curated docs-aware Graphify
 include the required graph artifacts according to repository policy before
 marking this step complete.
 
-Completion evidence: the docs-aware semantic update merged 24 document nodes
-and 38 relationships into the structural graph. The resulting ignored
+Completion evidence: the initial docs-aware semantic update merged 24 document
+nodes and 38 relationships into the structural graph. Review-fix semantic
+updates then recorded the completed gate and the separate standard
+`ace.community.spaces.manage` and protected `ace.community.moderate` keys. The
+resulting ignored
 `graphify-out/graph.json`, `graphify-out/graph.html`, and
-`graphify-out/GRAPH_REPORT.md` contain 2,832 nodes and 3,659 edges and directly
+`graphify-out/GRAPH_REPORT.md` contain 2,843 nodes and 3,678 edges and directly
 represent this plan, the governing master plan, the source/access matrix, and
 ADR 001.
 
