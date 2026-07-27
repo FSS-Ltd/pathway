@@ -35,5 +35,8 @@ describe("configureCiRlsRole", () => {
         'GRANT "pathway_e2e_rls" TO "pathway_test_user";',
       ]),
     );
+    expect(statements.join("\n")).not.toMatch(
+      /"OrgMembership"|"SiteMembership"|"User"/,
+    );
   });
 });

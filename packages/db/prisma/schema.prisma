@@ -244,7 +244,6 @@ model UserRoleAssignment {
   org            Org               @relation(fields: [orgId], references: [id])
   tenant         Tenant?           @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
   user           User              @relation("UserRoleAssignmentAssignee", fields: [userId], references: [id])
-  orgMembership  OrgMembership     @relation(fields: [orgId, userId], references: [orgId, userId])
   roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id])
   assignedBy     User              @relation("UserRoleAssignmentAssignedBy", fields: [assignedById], references: [id])
   revokedBy      User?             @relation("UserRoleAssignmentRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
@@ -589,7 +588,6 @@ model OrgMembership {
 
   org  Org  @relation(fields: [orgId], references: [id])
   user User @relation(fields: [userId], references: [id])
-  roleAssignments UserRoleAssignment[]
 
   @@unique([orgId, userId])
   @@index([userId])
