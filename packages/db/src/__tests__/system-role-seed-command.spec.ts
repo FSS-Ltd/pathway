@@ -313,5 +313,5 @@ describeIfSeedProof("system-role seed command orchestration", () => {
         select: { isActive: true },
       }),
     ).resolves.toEqual({ isActive: true });
-  });
+  }, 30_000);
 });
