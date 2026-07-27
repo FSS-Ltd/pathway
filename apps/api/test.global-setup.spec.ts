@@ -21,7 +21,7 @@ describe("configureCiRlsRole", () => {
       statements.push(statement.trim());
     });
 
-    expect(statements).toHaveLength(8);
+    expect(statements).toHaveLength(9);
     expect(statements[0]).toContain('CREATE ROLE "pathway_e2e_rls"');
     expect(statements).toEqual(
       expect.arrayContaining([
@@ -30,9 +30,13 @@ describe("configureCiRlsRole", () => {
         'GRANT USAGE ON SCHEMA app TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleDefinition" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO "pathway_e2e_rls";',
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "PermissionDefinition" TO "pathway_e2e_rls";',
         'GRANT "pathway_e2e_rls" TO "pathway_test_user";',
       ]),
+    );
+    expect(statements.join("\n")).not.toMatch(
+      /"OrgMembership"|"SiteMembership"|"User"/,
     );
   });
 });

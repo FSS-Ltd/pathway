@@ -36,6 +36,7 @@ export async function configureCiRlsRole(
     `GRANT USAGE ON SCHEMA app TO ${rlsRole};`,
     `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleDefinition" TO ${rlsRole};`,
     `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO ${rlsRole};`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO ${rlsRole};`,
     `GRANT SELECT ON TABLE "PermissionDefinition" TO ${rlsRole};`,
     `GRANT ${rlsRole} TO ${bootstrapRole};`,
   ];

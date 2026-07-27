@@ -15,6 +15,7 @@ const REQUIRED_RLS_TABLES = [
   "PermissionDefinition",
   "OrgRoleDefinition",
   "OrgRolePermission",
+  "UserRoleAssignment",
 ];
 
 await main().catch((error) => {
