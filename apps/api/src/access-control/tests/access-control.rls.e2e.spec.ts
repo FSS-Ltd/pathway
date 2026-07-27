@@ -62,9 +62,9 @@ async function insertRole(
   await withRoleRlsContext(tenantId, async (tx) => {
     await tx.$executeRaw`
       INSERT INTO "OrgRoleDefinition" (
-        "id", "orgId", "tenantId", "name", "scope", "createdById", "updatedById"
+        "id", "orgId", "tenantId", "name", "scope", "createdById", "updatedById", "updatedAt"
       ) VALUES (
-        ${roleId}, ${ORG_ID}, ${tenantId}, ${name}, 'site'::"RoleScope", ${randomUUID()}, ${randomUUID()}
+        ${roleId}, ${ORG_ID}, ${tenantId}, ${name}, 'site'::"RoleScope", ${randomUUID()}, ${randomUUID()}, CURRENT_TIMESTAMP
       )
     `;
   });
@@ -81,6 +81,23 @@ async function insertRolePermission(
       VALUES (${roleId}, ${permissionKey}, ${randomUUID()})
     `;
   });
+}
+
+async function expectDatabaseRejection(
+  operation: () => Promise<unknown>,
+  postgresCode: string,
+): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    expect(error).toMatchObject({
+      code: "P2010",
+      meta: { code: postgresCode },
+    });
+    return;
+  }
+
+  throw new Error("Expected the database operation to be rejected");
 }
 
 describe("organisation role definition RLS", () => {
@@ -149,63 +166,71 @@ describe("organisation role definition RLS", () => {
   it("rejects a role definition that claims another organisation's site", async () => {
     if (!isDatabaseAvailable()) return;
 
-    await expect(
-      withRoleRlsContext(
-        TENANT_A,
-        (tx) =>
-          tx.$executeRaw`
+    await expectDatabaseRejection(
+      () =>
+        withRoleRlsContext(
+          TENANT_A,
+          (tx) =>
+            tx.$executeRaw`
           INSERT INTO "OrgRoleDefinition" (
-            "id", "orgId", "tenantId", "name", "scope", "createdById", "updatedById"
+            "id", "orgId", "tenantId", "name", "scope", "createdById", "updatedById", "updatedAt"
           ) VALUES (
-            ${randomUUID()}, ${randomUUID()}, ${TENANT_A}, 'Mismatched organisation site role', 'site'::"RoleScope", ${randomUUID()}, ${randomUUID()}
+            ${randomUUID()}, ${randomUUID()}, ${TENANT_A}, 'Mismatched organisation site role', 'site'::"RoleScope", ${randomUUID()}, ${randomUUID()}, CURRENT_TIMESTAMP
           )
         `,
-      ),
-    ).rejects.toThrow();
+        ),
+      "42501",
+    );
   });
 
   it("rejects a permission row for an unknown platform permission key", async () => {
     if (!isDatabaseAvailable()) return;
 
-    await expect(
-      insertRolePermission(TENANT_A, fixtures[TENANT_A].roleId, randomUUID()),
-    ).rejects.toThrow();
+    await expectDatabaseRejection(
+      () =>
+        insertRolePermission(TENANT_A, fixtures[TENANT_A].roleId, randomUUID()),
+      "23503",
+    );
   });
 
   it("rejects organisation attempts to create a platform permission key", async () => {
     if (!isDatabaseAvailable()) return;
 
-    await expect(
-      withRoleRlsContext(
-        TENANT_A,
-        (tx) =>
-          tx.$executeRaw`
+    await expectDatabaseRejection(
+      () =>
+        withRoleRlsContext(
+          TENANT_A,
+          (tx) =>
+            tx.$executeRaw`
           INSERT INTO "PermissionDefinition" (
             "key", "label", "description", "scope", "sensitivity", "delegable"
           ) VALUES (
             ${`organisation-created.${randomUUID()}`}, 'Organisation-created key', 'Must be blocked', 'site'::"PermissionScope", 'standard'::"PermissionSensitivity", true
           )
         `,
-      ),
-    ).rejects.toThrow();
+        ),
+      "42501",
+    );
   });
 
   it("blocks cross-site role definition creation, update, and deletion", async () => {
     if (!isDatabaseAvailable()) return;
 
-    await expect(
-      withRoleRlsContext(
-        TENANT_A,
-        (tx) =>
-          tx.$executeRaw`
+    await expectDatabaseRejection(
+      () =>
+        withRoleRlsContext(
+          TENANT_A,
+          (tx) =>
+            tx.$executeRaw`
           INSERT INTO "OrgRoleDefinition" (
-            "id", "orgId", "tenantId", "name", "scope", "createdById", "updatedById"
+            "id", "orgId", "tenantId", "name", "scope", "createdById", "updatedById", "updatedAt"
           ) VALUES (
-            ${randomUUID()}, ${ORG_ID}, ${TENANT_B}, 'Cross-site role', 'site'::"RoleScope", ${randomUUID()}, ${randomUUID()}
+            ${randomUUID()}, ${ORG_ID}, ${TENANT_B}, 'Cross-site role', 'site'::"RoleScope", ${randomUUID()}, ${randomUUID()}, CURRENT_TIMESTAMP
           )
         `,
-      ),
-    ).rejects.toThrow();
+        ),
+      "42501",
+    );
 
     const updated = await withRoleRlsContext(
       TENANT_A,
@@ -239,9 +264,15 @@ describe("organisation role definition RLS", () => {
       { roleDefinitionId: fixtures[TENANT_A].roleId },
     ]);
 
-    await expect(
-      insertRolePermission(TENANT_A, fixtures[TENANT_B].roleId, permissionKey),
-    ).rejects.toThrow();
+    await expectDatabaseRejection(
+      () =>
+        insertRolePermission(
+          TENANT_A,
+          fixtures[TENANT_B].roleId,
+          permissionKey,
+        ),
+      "42501",
+    );
 
     const updated = await withRoleRlsContext(
       TENANT_A,

@@ -12,6 +12,39 @@ function quoteIdentifier(identifier: string): string {
   return `"${identifier}"`;
 }
 
+type RawStatementExecutor = (statement: string) => Promise<unknown>;
+
+export async function configureCiRlsRole(
+  executeStatement: RawStatementExecutor,
+): Promise<void> {
+  const rlsRole = quoteIdentifier(CI_RLS_ROLE);
+  const bootstrapRole = quoteIdentifier(CI_BOOTSTRAP_ROLE);
+  const statements = [
+    `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${CI_RLS_ROLE}') THEN
+          CREATE ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+        ELSE
+          ALTER ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+        END IF;
+      END;
+      $$;
+    `,
+    `REVOKE ALL PRIVILEGES ON SCHEMA app FROM ${rlsRole};`,
+    `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA app FROM ${rlsRole};`,
+    `GRANT USAGE ON SCHEMA app TO ${rlsRole};`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleDefinition" TO ${rlsRole};`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "PermissionDefinition" TO ${rlsRole};`,
+    `GRANT ${rlsRole} TO ${bootstrapRole};`,
+  ];
+
+  for (const statement of statements) {
+    await executeStatement(statement);
+  }
+}
+
 // Jest will call this once before running the e2e project
 export default async function globalSetup(): Promise<void> {
   const usesGlobalSetup = process.env.E2E_USE_GLOBAL_SETUP === "true";
@@ -104,27 +137,9 @@ export default async function globalSetup(): Promise<void> {
     process.env.E2E_TENANT_ID = tenantA.id;
     process.env.E2E_TENANT2_ID = tenantB.id;
 
-    const rlsRole = quoteIdentifier(CI_RLS_ROLE);
-    const bootstrapRole = quoteIdentifier(CI_BOOTSTRAP_ROLE);
-    await prisma.$executeRawUnsafe(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${CI_RLS_ROLE}') THEN
-          CREATE ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
-        ELSE
-          ALTER ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
-        END IF;
-      END;
-      $$;
-
-      REVOKE ALL PRIVILEGES ON SCHEMA app FROM ${rlsRole};
-      REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA app FROM ${rlsRole};
-      GRANT USAGE ON SCHEMA app TO ${rlsRole};
-      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleDefinition" TO ${rlsRole};
-      GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO ${rlsRole};
-      GRANT SELECT ON TABLE "PermissionDefinition" TO ${rlsRole};
-      GRANT ${rlsRole} TO ${bootstrapRole};
-    `);
+    await configureCiRlsRole((statement) =>
+      prisma.$executeRawUnsafe(statement),
+    );
   } finally {
     await closePrisma();
   }
