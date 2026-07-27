@@ -136,6 +136,46 @@ pnpm --filter @pathway/db run prisma migrate deploy
 pnpm test:integration
 ```
 
+### Protected system-role seed identity
+
+`pnpm db:seed`, the `@pathway/db` seed script, and Prisma's seed entrypoint all
+delegate to the same root seed command. The command fails before synchronising
+permission metadata unless `SYSTEM_ROLE_SEED_DATABASE_URL` is present and
+authenticates as the PostgreSQL login `pathway_system_role_seed`. Use a direct
+or session connection URL; transaction-pooler URLs cannot preserve that
+identity guarantee.
+
+Provision that login outside Prisma migrations with `LOGIN NOINHERIT
+NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION`. Grant it
+`USAGE` on the application schema; `SELECT` on `Org`, `Tenant`, `OrgVertical`,
+`OrgModule`, `PermissionDefinition`, `OrgRoleDefinition`, and
+`OrgRolePermission`; write access only on `PermissionDefinition`,
+`OrgRoleDefinition`, and `OrgRolePermission`; and database `CONNECT`. Never
+grant the seed role to the runtime application login or place its URL in
+runtime service secrets.
+
+Run the following through the environment's reviewed DBA connection, replacing
+the database name and password through the environment's secret-management
+workflow:
+
+```sql
+CREATE ROLE pathway_system_role_seed
+  LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS
+  NOCREATEDB NOCREATEROLE NOREPLICATION
+  PASSWORD '<managed-secret>';
+GRANT CONNECT ON DATABASE <database_name> TO pathway_system_role_seed;
+GRANT USAGE ON SCHEMA app TO pathway_system_role_seed;
+GRANT SELECT ON TABLE
+  app."Org", app."Tenant", app."OrgVertical", app."OrgModule",
+  app."PermissionDefinition", app."OrgRoleDefinition",
+  app."OrgRolePermission"
+TO pathway_system_role_seed;
+GRANT INSERT, UPDATE, DELETE ON TABLE
+  app."PermissionDefinition", app."OrgRoleDefinition",
+  app."OrgRolePermission"
+TO pathway_system_role_seed;
+```
+
 #### Option 2: Using a Local Postgres Instance
 
 1. Ensure PostgreSQL is running locally

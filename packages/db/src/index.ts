@@ -147,6 +147,7 @@ export async function resetDatabase() {
 // Re-export types & enums (public API unchanged)
 export type { PrismaClient as PrismaClientType } from "@prisma/client";
 export {
+  PrismaClient,
   AssignmentStatus,
   Role,
   Weekday,

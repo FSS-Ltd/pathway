@@ -202,15 +202,3 @@ export async function seedDemoData(prisma: PrismaClient): Promise<void> {
 
   console.log("✅ Suite seed complete.");
 }
-
-if (path.resolve(process.argv[1] ?? "") === __filename) {
-  const prisma = new PrismaClient();
-  seedDemoData(prisma)
-    .catch((error: unknown) => {
-      console.error("❌ Seed failed:", error);
-      process.exitCode = 1;
-    })
-    .finally(async () => {
-      await prisma.$disconnect();
-    });
-}

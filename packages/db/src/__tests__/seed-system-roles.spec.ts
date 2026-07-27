@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
-import type { PrismaClientType } from "../index";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import {
   seedSystemRoles,
-  SYSTEM_ACTOR_ID,
-  type SystemRoleSeedTransaction,
+  SYSTEM_ROLE_SEED_DATABASE_ROLE,
+  type SystemRoleSeedClient,
   type SystemRoleTemplates,
 } from "../seed-system-roles";
+import {
+  deleteSystemRoleSeedTestOrganisation,
+  provisionSystemRoleSeedTestRoles,
+} from "./system-role-seed-test-database";
 
 const TEMPLATES = {
   organisationHead: {
@@ -52,11 +56,11 @@ interface StoredRole {
   version: number;
   createdById: string;
   updatedById: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-class InMemorySystemRoleSeedTransaction {
-  trustedSeed = false;
-  assignmentDelegateAccesses = 0;
+class InMemorySystemRoleSeedClient {
   readonly roles = new Map<string, StoredRole>([
     [
       "custom-role",
@@ -64,89 +68,130 @@ class InMemorySystemRoleSeedTransaction {
         id: "custom-role",
         orgId: "org-a",
         tenantId: "site-a",
-        name: "Custom clone",
+        name: "Site Lead",
         scope: "site",
         isSystem: false,
         isActive: true,
         version: 3,
         createdById: "customer",
         updatedById: "customer",
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-02T00:00:00.000Z"),
       },
     ],
   ]);
-  readonly permissions = new Set(["custom-role:site.active"]);
+  readonly permissions = new Map([
+    [
+      "custom-role:site.active",
+      {
+        roleDefinitionId: "custom-role",
+        permissionKey: "site.active",
+        grantedById: "customer",
+        grantedAt: new Date("2026-01-03T00:00:00.000Z"),
+      },
+    ],
+  ]);
+  sessionUser = SYSTEM_ROLE_SEED_DATABASE_ROLE;
+  transactionCount = 0;
+  roleCreates = 0;
+  roleUpdates = 0;
+  permissionCreates = 0;
+  permissionDeletes = 0;
+  organisationReads = 0;
+  assignmentDelegateAccesses = 0;
 
   readonly org = {
-    findMany: async () => [
-      {
-        id: "org-b",
-        tenants: [{ id: "site-b-2" }, { id: "site-b-1" }],
-      },
-      { id: "org-a", tenants: [{ id: "site-a" }] },
-    ],
+    findMany: async () => {
+      this.organisationReads += 1;
+      return [
+        {
+          id: "org-b",
+          tenants: [{ id: "site-b-2" }, { id: "site-b-1" }],
+        },
+        { id: "org-a", tenants: [{ id: "site-a" }] },
+      ];
+    },
   };
 
   readonly permissionDefinition = {
-    findMany: async () => [
-      {
-        key: "assignment.active",
-        scope: "assignment" as const,
-        isActive: true,
-      },
-      { key: "inactive", scope: "site" as const, isActive: false },
-      { key: "org.active", scope: "organisation" as const, isActive: true },
-      {
-        key: "relationship.active",
-        scope: "relationship" as const,
-        isActive: true,
-      },
-      { key: "site.active", scope: "site" as const, isActive: true },
-      { key: "unavailable", scope: "site" as const, isActive: true },
-    ],
+    findMany: async ({
+      where,
+    }: {
+      where: { key: { in: string[] }; isActive: true };
+    }) =>
+      [
+        {
+          key: "assignment.active",
+          scope: "assignment" as const,
+          isActive: true,
+        },
+        { key: "inactive", scope: "site" as const, isActive: false },
+        { key: "org.active", scope: "organisation" as const, isActive: true },
+        {
+          key: "relationship.active",
+          scope: "relationship" as const,
+          isActive: true,
+        },
+        { key: "site.active", scope: "site" as const, isActive: true },
+        { key: "unavailable", scope: "site" as const, isActive: true },
+      ].filter(
+        ({ key, isActive }) =>
+          where.key.in.includes(key) && isActive === where.isActive,
+      ),
   };
 
   readonly orgRoleDefinition = {
-    upsert: async ({
+    findUnique: async ({ where }: { where: { id: string } }) =>
+      this.roles.get(where.id) ?? null,
+    create: async ({ data }: { data: StoredRole }) => {
+      this.roleCreates += 1;
+      const now = new Date("2026-02-01T00:00:00.000Z");
+      const role = { ...data, createdAt: now, updatedAt: now };
+      this.roles.set(role.id, role);
+      return role;
+    },
+    update: async ({
       where,
-      update,
-      create,
+      data,
     }: {
       where: { id: string };
-      update: Partial<StoredRole>;
-      create: StoredRole;
-    }): Promise<StoredRole> => {
-      this.assertTrusted();
-      const stored = this.roles.get(where.id);
-      const next = stored ? { ...stored, ...update } : create;
-      this.roles.set(where.id, next);
-      return next;
+      data: Partial<StoredRole>;
+    }) => {
+      this.roleUpdates += 1;
+      const role = this.roles.get(where.id);
+      if (!role) throw new Error(`Missing role ${where.id}`);
+      const updated = {
+        ...role,
+        ...data,
+        updatedAt: new Date(role.updatedAt.getTime() + 1),
+      };
+      this.roles.set(where.id, updated);
+      return updated;
     },
   };
 
   readonly orgRolePermission = {
+    findMany: async ({ where }: { where: { roleDefinitionId: string } }) =>
+      [...this.permissions.values()].filter(
+        ({ roleDefinitionId }) => roleDefinitionId === where.roleDefinitionId,
+      ),
     deleteMany: async ({
       where,
     }: {
       where: {
         roleDefinitionId: string;
-        permissionKey?: { notIn: string[] };
+        permissionKey: { in: string[] };
       };
-    }): Promise<{ count: number }> => {
-      this.assertTrusted();
+    }) => {
       let count = 0;
-      for (const value of [...this.permissions]) {
-        const separatorIndex = value.lastIndexOf(":");
-        const roleDefinitionId = value.slice(0, separatorIndex);
-        const permissionKey = value.slice(separatorIndex + 1);
+      for (const permissionKey of where.permissionKey.in) {
         if (
-          roleDefinitionId === where.roleDefinitionId &&
-          (!where.permissionKey ||
-            !where.permissionKey.notIn.includes(permissionKey ?? ""))
+          this.permissions.delete(`${where.roleDefinitionId}:${permissionKey}`)
         ) {
-          this.permissions.delete(value);
           count += 1;
         }
       }
+      this.permissionDeletes += count;
       return { count };
     },
     createMany: async ({
@@ -158,18 +203,15 @@ class InMemorySystemRoleSeedTransaction {
         grantedById: string;
       }>;
       skipDuplicates: true;
-    }): Promise<{ count: number }> => {
-      this.assertTrusted();
-      let count = 0;
+    }) => {
       for (const row of data) {
-        expect(row.grantedById).toBe(SYSTEM_ACTOR_ID);
-        const value = `${row.roleDefinitionId}:${row.permissionKey}`;
-        if (!this.permissions.has(value)) {
-          this.permissions.add(value);
-          count += 1;
-        }
+        this.permissions.set(`${row.roleDefinitionId}:${row.permissionKey}`, {
+          ...row,
+          grantedAt: new Date("2026-02-01T00:00:00.000Z"),
+        });
       }
-      return { count };
+      this.permissionCreates += data.length;
+      return { count: data.length };
     },
   };
 
@@ -178,24 +220,41 @@ class InMemorySystemRoleSeedTransaction {
     throw new Error("System-role seeding must not create assignments");
   }
 
-  async $executeRawUnsafe(query: string): Promise<number> {
-    if (query.includes("app.system_role_seed")) {
-      this.trustedSeed = true;
-      return 1;
-    }
-    throw new Error(`Unexpected SQL: ${query}`);
+  async $queryRawUnsafe(): Promise<Array<{ sessionUser: string }>> {
+    return [{ sessionUser: this.sessionUser }];
   }
 
-  private assertTrusted(): void {
-    if (!this.trustedSeed) {
-      throw new Error("System role mutation requires trusted seed context");
-    }
+  async $transaction<T>(
+    callback: (tx: InMemorySystemRoleSeedClient) => Promise<T>,
+  ): Promise<T> {
+    this.transactionCount += 1;
+    return callback(this);
+  }
+
+  resetMutationCounts(): void {
+    this.roleCreates = 0;
+    this.roleUpdates = 0;
+    this.permissionCreates = 0;
+    this.permissionDeletes = 0;
   }
 }
 
+function snapshot(client: InMemorySystemRoleSeedClient): unknown {
+  return {
+    roles: [...client.roles.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    ),
+    permissions: [...client.permissions.values()].sort((left, right) =>
+      `${left.roleDefinitionId}:${left.permissionKey}`.localeCompare(
+        `${right.roleDefinitionId}:${right.permissionKey}`,
+      ),
+    ),
+  };
+}
+
 describe("system role seeding", () => {
-  it("seeds every organisation/site deterministically without duplicates or assignments", async () => {
-    const tx = new InMemorySystemRoleSeedTransaction();
+  it("uses one transaction per organisation and performs no writes on an unchanged rerun", async () => {
+    const client = new InMemorySystemRoleSeedClient();
     const resolveAvailablePermissionKeys = async (orgId: string) =>
       orgId === "org-a"
         ? [
@@ -207,49 +266,78 @@ describe("system role seeding", () => {
         : ["relationship.active", "site.active"];
 
     await seedSystemRoles(
-      tx as unknown as SystemRoleSeedTransaction,
+      client as unknown as SystemRoleSeedClient,
       TEMPLATES,
       resolveAvailablePermissionKeys,
     );
-    const rolesAfterFirstRun = [...tx.roles.values()].sort((left, right) =>
-      left.id.localeCompare(right.id),
-    );
-    const permissionsAfterFirstRun = [...tx.permissions].sort();
-    const siteLeadRoleId = rolesAfterFirstRun.find(
-      ({ orgId, tenantId, name }) =>
-        orgId === "org-a" && tenantId === "site-a" && name === "Site Lead",
-    )?.id;
-    tx.permissions.add(`${siteLeadRoleId}:org.active`);
-
-    await seedSystemRoles(
-      tx as unknown as SystemRoleSeedTransaction,
-      TEMPLATES,
-      resolveAvailablePermissionKeys,
-    );
-
-    expect(
-      [...tx.roles.values()].sort((left, right) =>
-        left.id.localeCompare(right.id),
-      ),
-    ).toEqual(rolesAfterFirstRun);
-    expect([...tx.permissions].sort()).toEqual(permissionsAfterFirstRun);
-    expect(tx.roles.size).toBe(8);
-    expect(tx.permissions.size).toBe(16);
-    expect(tx.roles.get("custom-role")).toMatchObject({
-      name: "Custom clone",
+    const firstSnapshot = snapshot(client);
+    expect(client.transactionCount).toBe(2);
+    expect(client.roles.get("custom-role")).toMatchObject({
+      name: "Site Lead",
       isSystem: false,
       version: 3,
       updatedById: "customer",
     });
-    expect(tx.permissions).toContain("custom-role:site.active");
-    expect(tx.assignmentDelegateAccesses).toBe(0);
+
+    client.resetMutationCounts();
+    await seedSystemRoles(
+      client as unknown as SystemRoleSeedClient,
+      TEMPLATES,
+      resolveAvailablePermissionKeys,
+    );
+
+    expect(snapshot(client)).toEqual(firstSnapshot);
+    expect(client).toMatchObject({
+      roleCreates: 0,
+      roleUpdates: 0,
+      permissionCreates: 0,
+      permissionDeletes: 0,
+      transactionCount: 4,
+      assignmentDelegateAccesses: 0,
+    });
+  });
+
+  it("fails before reading organisations when the connection identity is wrong", async () => {
+    const client = new InMemorySystemRoleSeedClient();
+    client.sessionUser = "pathway_runtime";
+
+    await expect(
+      seedSystemRoles(
+        client as unknown as SystemRoleSeedClient,
+        TEMPLATES,
+        async () => ["site.active"],
+      ),
+    ).rejects.toThrow(/pathway_system_role_seed/);
+    expect(client.organisationReads).toBe(0);
+    expect(client.transactionCount).toBe(0);
+  });
+
+  it("keeps prior organisation commits when a later organisation fails", async () => {
+    const client = new InMemorySystemRoleSeedClient();
+
+    await expect(
+      seedSystemRoles(
+        client as unknown as SystemRoleSeedClient,
+        TEMPLATES,
+        async (orgId) => {
+          if (orgId === "org-b") throw new Error("org-b capability failure");
+          return ["site.active"];
+        },
+      ),
+    ).rejects.toThrow("org-b capability failure");
+
+    expect(
+      [...client.roles.values()].filter(
+        ({ orgId, isSystem }) => orgId === "org-a" && isSystem,
+      ),
+    ).toHaveLength(3);
   });
 
   it("filters inactive, unavailable, unknown, and scope-incompatible permissions", async () => {
-    const tx = new InMemorySystemRoleSeedTransaction();
+    const client = new InMemorySystemRoleSeedClient();
 
     await seedSystemRoles(
-      tx as unknown as SystemRoleSeedTransaction,
+      client as unknown as SystemRoleSeedClient,
       TEMPLATES,
       async () => [
         "assignment.active",
@@ -261,41 +349,18 @@ describe("system role seeding", () => {
       ],
     );
 
-    const organisationRoleId = [...tx.roles.values()].find(
-      ({ orgId, name }) => orgId === "org-a" && name === "Organisation Head",
-    )?.id;
-    const siteRoleId = [...tx.roles.values()].find(
-      ({ orgId, tenantId, name }) =>
-        orgId === "org-a" && tenantId === "site-a" && name === "Site Lead",
-    )?.id;
-    const parentRoleId = [...tx.roles.values()].find(
-      ({ orgId, name }) => orgId === "org-a" && name === "Parent",
-    )?.id;
-
+    const roleId = "system-role:org-a:organisation:organisationHead";
     expect(
-      [...tx.permissions]
-        .filter((value) => value.startsWith(`${organisationRoleId}:`))
+      [...client.permissions.values()]
+        .filter(({ roleDefinitionId }) => roleDefinitionId === roleId)
+        .map(({ permissionKey }) => permissionKey)
         .sort(),
     ).toEqual([
-      `${organisationRoleId}:assignment.active`,
-      `${organisationRoleId}:org.active`,
-      `${organisationRoleId}:relationship.active`,
-      `${organisationRoleId}:site.active`,
+      "assignment.active",
+      "org.active",
+      "relationship.active",
+      "site.active",
     ]);
-    expect(
-      [...tx.permissions]
-        .filter((value) => value.startsWith(`${siteRoleId}:`))
-        .sort(),
-    ).toEqual([
-      `${siteRoleId}:assignment.active`,
-      `${siteRoleId}:relationship.active`,
-      `${siteRoleId}:site.active`,
-    ]);
-    expect(
-      [...tx.permissions]
-        .filter((value) => value.startsWith(`${parentRoleId}:`))
-        .sort(),
-    ).toEqual([`${parentRoleId}:relationship.active`]);
   });
 });
 
@@ -304,23 +369,33 @@ const describeIfDb =
     ? describe
     : describe.skip;
 
-describeIfDb("system role database protection", () => {
-  let prisma: PrismaClientType;
+describeIfDb("system role database identity protection", () => {
+  let admin: PrismaClient;
+  let runtime: PrismaClient;
+  let seedClient: PrismaClient;
   let orgId: string;
   let tenantId: string;
 
   beforeAll(async () => {
-    const hostname = new URL(process.env.DATABASE_URL ?? "").hostname;
+    const databaseUrl = process.env.DATABASE_URL ?? "";
+    const hostname = new URL(databaseUrl).hostname;
     if (hostname !== "localhost" && hostname !== "127.0.0.1") {
       throw new Error(
         `Refusing to run system-role protection tests against "${hostname}"`,
       );
     }
-    prisma = (await import("../index")).prisma;
+    const urls = await provisionSystemRoleSeedTestRoles(databaseUrl);
+    admin = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+    runtime = new PrismaClient({
+      datasources: { db: { url: urls.runtimeUrl } },
+    });
+    seedClient = new PrismaClient({
+      datasources: { db: { url: urls.seedUrl } },
+    });
   });
 
   beforeEach(async () => {
-    const org = await prisma.org.create({
+    const org = await admin.org.create({
       data: {
         id: randomUUID(),
         name: "System role protection",
@@ -328,7 +403,7 @@ describeIfDb("system role database protection", () => {
         planCode: "trial",
       },
     });
-    const tenant = await prisma.tenant.create({
+    const tenant = await admin.tenant.create({
       data: {
         id: randomUUID(),
         orgId: org.id,
@@ -338,7 +413,7 @@ describeIfDb("system role database protection", () => {
     });
     orgId = org.id;
     tenantId = tenant.id;
-    await prisma.permissionDefinition.upsert({
+    await admin.permissionDefinition.upsert({
       where: { key: "site.active" },
       update: { isActive: true, scope: "site" },
       create: {
@@ -353,21 +428,34 @@ describeIfDb("system role database protection", () => {
   });
 
   afterEach(async () => {
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe(
-        "SELECT set_config('app.system_role_seed', 'on', true)",
-      );
-      await tx.orgRoleDefinition.deleteMany({ where: { orgId } });
-    });
-    await prisma.tenant.deleteMany({ where: { orgId } });
-    await prisma.org.delete({ where: { id: orgId } });
+    await deleteSystemRoleSeedTestOrganisation(admin, orgId);
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    await Promise.all([
+      admin.$disconnect(),
+      runtime.$disconnect(),
+      seedClient.$disconnect(),
+    ]);
   });
 
-  it("rejects customer changes to system templates and grants while allowing trusted reruns", async () => {
+  async function withRuntimeContext<T>(
+    callback: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return runtime.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(
+        "SELECT set_config('app.org_id', $1, true)",
+        orgId,
+      );
+      await tx.$executeRawUnsafe(
+        "SELECT set_config('app.tenant_id', $1, true)",
+        tenantId,
+      );
+      return callback(tx);
+    });
+  }
+
+  it("rejects marker and SET ROLE bypasses from a fresh runtime connection while the seed login succeeds", async () => {
     const templates = {
       siteLead: {
         name: "Site Lead",
@@ -377,36 +465,113 @@ describeIfDb("system role database protection", () => {
       },
     } as const satisfies SystemRoleTemplates;
 
-    await prisma.$transaction((tx) =>
-      seedSystemRoles(tx, templates, async () => ["site.active"]),
+    await seedSystemRoles(
+      seedClient as unknown as SystemRoleSeedClient,
+      templates,
+      async () => ["site.active"],
     );
-    const role = await prisma.orgRoleDefinition.findFirstOrThrow({
-      where: { orgId, tenantId, isSystem: true },
-    });
+    const roleId = `system-role:${orgId}:${tenantId}:siteLead`;
+    await expect(
+      admin.$queryRawUnsafe<
+        Array<{
+          rolinherit: boolean;
+          rolbypassrls: boolean;
+          rolcreaterole: boolean;
+          rolsuper: boolean;
+        }>
+      >(
+        `SELECT rolinherit, rolbypassrls, rolcreaterole, rolsuper
+         FROM pg_roles
+         WHERE rolname = 'pathway_system_role_seed'`,
+      ),
+    ).resolves.toEqual([
+      {
+        rolinherit: false,
+        rolbypassrls: false,
+        rolcreaterole: false,
+        rolsuper: false,
+      },
+    ]);
 
     await expect(
-      prisma.orgRoleDefinition.update({
-        where: { id: role.id },
-        data: { name: "Customer edit" },
+      withRuntimeContext(async (tx) => {
+        await tx.$executeRawUnsafe(
+          "SELECT set_config('app.system_role_seed', 'on', true)",
+        );
+        await tx.orgRoleDefinition.update({
+          where: { id: roleId },
+          data: { name: "Runtime marker edit" },
+        });
       }),
-    ).rejects.toThrow(/trusted system-role seed context/i);
+    ).rejects.toThrow(/dedicated system-role seed identity/i);
+
     await expect(
-      prisma.orgRolePermission.delete({
-        where: {
-          roleDefinitionId_permissionKey: {
-            roleDefinitionId: role.id,
-            permissionKey: "site.active",
+      withRuntimeContext((tx) =>
+        tx.orgRoleDefinition.create({
+          data: {
+            id: `runtime-system-role:${randomUUID()}`,
+            orgId,
+            tenantId,
+            name: "Runtime system insert",
+            scope: "site",
+            isSystem: true,
+            createdById: randomUUID(),
+            updatedById: randomUUID(),
           },
-        },
-      }),
-    ).rejects.toThrow(/trusted system-role seed context/i);
+        }),
+      ),
+    ).rejects.toThrow(/dedicated system-role seed identity/i);
     await expect(
-      prisma.orgRoleDefinition.delete({ where: { id: role.id } }),
-    ).rejects.toThrow(/trusted system-role seed context/i);
+      withRuntimeContext((tx) =>
+        tx.orgRoleDefinition.delete({ where: { id: roleId } }),
+      ),
+    ).rejects.toThrow(/dedicated system-role seed identity/i);
 
     await expect(
-      prisma.$transaction((tx) =>
-        seedSystemRoles(tx, templates, async () => ["site.active"]),
+      runtime.$executeRawUnsafe("SET ROLE pathway_system_role_seed"),
+    ).rejects.toThrow(/permission denied/i);
+    await expect(
+      withRuntimeContext((tx) =>
+        tx.orgRolePermission.create({
+          data: {
+            roleDefinitionId: roleId,
+            permissionKey: "site.active",
+            grantedById: randomUUID(),
+          },
+        }),
+      ),
+    ).rejects.toThrow(/dedicated system-role seed identity/i);
+    await expect(
+      withRuntimeContext((tx) =>
+        tx.orgRolePermission.update({
+          where: {
+            roleDefinitionId_permissionKey: {
+              roleDefinitionId: roleId,
+              permissionKey: "site.active",
+            },
+          },
+          data: { grantedById: randomUUID() },
+        }),
+      ),
+    ).rejects.toThrow(/dedicated system-role seed identity/i);
+    await expect(
+      withRuntimeContext((tx) =>
+        tx.orgRolePermission.delete({
+          where: {
+            roleDefinitionId_permissionKey: {
+              roleDefinitionId: roleId,
+              permissionKey: "site.active",
+            },
+          },
+        }),
+      ),
+    ).rejects.toThrow(/dedicated system-role seed identity/i);
+
+    await expect(
+      seedSystemRoles(
+        seedClient as unknown as SystemRoleSeedClient,
+        templates,
+        async () => ["site.active"],
       ),
     ).resolves.toBeDefined();
   });
