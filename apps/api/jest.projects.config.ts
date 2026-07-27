@@ -51,6 +51,7 @@ const unit = {
 const e2e = {
   ...baseSafe,
   displayName: "e2e",
+  globalSetup: "<rootDir>/test.global-setup.e2e.ts",
   testMatch: ["**/*.e2e-spec.ts", "**/*.e2e.spec.ts"],
   testPathIgnorePatterns: ["/node_modules/", "/dist/"],
   setupFilesAfterEnv: ["<rootDir>/test.setup.e2e.ts"],

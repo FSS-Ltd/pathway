@@ -11,6 +11,11 @@ const fileEnv = loadEnvFile(envFile);
 const env = { ...fileEnv, ...process.env };
 const databaseUrl = firstPresent(env.DIRECT_URL, env.DATABASE_URL);
 const accepted = isTrue(env.SUPABASE_RLS_GATE_ACCEPTED);
+const REQUIRED_RLS_TABLES = [
+  "PermissionDefinition",
+  "OrgRoleDefinition",
+  "OrgRolePermission",
+];
 
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
@@ -45,7 +50,7 @@ async function main() {
   });
 
   try {
-    const [disabledTables, publicRoleGrants] = await Promise.all([
+    const [disabledTables, publicRoleGrants, publicTables] = await Promise.all([
       prisma.$queryRaw`
       SELECT n.nspname AS schema_name, c.relname AS table_name
       FROM pg_class c
@@ -70,13 +75,41 @@ async function main() {
       GROUP BY tp.table_schema, tp.table_name, tp.grantee
       ORDER BY tp.table_name, tp.grantee
     `,
+      prisma.$queryRaw`
+      SELECT c.relname AS table_name
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relkind IN ('r', 'p')
+      ORDER BY c.relname
+    `,
     ]);
 
-    if (disabledTables.length === 0 && publicRoleGrants.length === 0) {
+    const presentTables = new Set(
+      publicTables.map((table) => table.table_name),
+    );
+    const missingRequiredTables = REQUIRED_RLS_TABLES.filter(
+      (table) => !presentTables.has(table),
+    );
+
+    if (
+      missingRequiredTables.length === 0 &&
+      disabledTables.length === 0 &&
+      publicRoleGrants.length === 0
+    ) {
       console.log(
         "[supabase-rls] all public tables have RLS enabled and no anon/authenticated table grants.",
       );
       return;
+    }
+
+    if (missingRequiredTables.length > 0) {
+      console.warn(
+        `[supabase-rls] ${missingRequiredTables.length} required RLS tables are missing:`,
+      );
+      for (const tableName of missingRequiredTables) {
+        console.warn(`[supabase-rls] - public.${tableName}`);
+      }
     }
 
     if (disabledTables.length > 0) {
@@ -101,15 +134,23 @@ async function main() {
       }
     }
 
-    if (accepted) {
+    if (accepted && missingRequiredTables.length === 0) {
       console.warn(
         "[supabase-rls] SUPABASE_RLS_GATE_ACCEPTED=true; continuing because these public-table exposures have been explicitly accepted.",
       );
       return;
     }
 
-    const message =
-      "Supabase public-table RLS gate failed. Enable RLS and remove anon/authenticated table grants, or remove the public schema from Data API exposure before setting SUPABASE_RLS_GATE_ACCEPTED=true.";
+    const message = [
+      missingRequiredTables.length > 0
+        ? "Required RLS tables are missing. Apply the current Prisma migrations before running the RLS gate."
+        : undefined,
+      disabledTables.length > 0 || publicRoleGrants.length > 0
+        ? "Supabase public-table RLS gate failed. Enable RLS and remove anon/authenticated table grants, or remove the public schema from Data API exposure before setting SUPABASE_RLS_GATE_ACCEPTED=true."
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ");
     if (strict) throw new Error(message);
     console.warn(`[supabase-rls] warning: ${message}`);
   } finally {
