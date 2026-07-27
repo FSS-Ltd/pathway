@@ -227,9 +227,11 @@ jobs:
           SYSTEM_ROLE_SEED_TEST_DISPOSABLE_TOKEN: provision-and-drop-system-role-seed-test-logins
           PATHWAY_RUN_DB_INTEGRATION_TESTS: "1"
           PATHWAY_RUN_DB_SEED_PROOF: "1"
+          DOTENV_CONFIG_PATH: ../../.env.test
         run: >-
-          pnpm exec dotenv -e .env.test --
-          pnpm --filter @pathway/db exec jest --runInBand --runTestsByPath
+          pnpm --filter @pathway/db exec
+          node -r dotenv/config node_modules/jest/bin/jest.js
+          --runInBand --runTestsByPath
           src/__tests__/system-role-seed-test-database.spec.ts
           src/__tests__/seed-system-roles.spec.ts
           src/__tests__/system-role-seed-command.spec.ts
