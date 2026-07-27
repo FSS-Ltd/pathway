@@ -166,6 +166,12 @@ enum PermissionSensitivity {
   protected
 }
 
+enum RoleScope {
+  organisation
+  site
+  relationship
+}
+
 // Platform-global searchable metadata. Executable permission keys remain owned
 // by the compile-time registry in @pathway/platform.
 model PermissionDefinition {
@@ -180,9 +186,46 @@ model PermissionDefinition {
   isActive         Boolean               @default(true)
   createdAt        DateTime              @default(now())
   updatedAt        DateTime              @updatedAt
+  rolePermissions  OrgRolePermission[]
 
   @@index([isActive])
   @@index([scope, sensitivity])
+}
+
+model OrgRoleDefinition {
+  id          String    @id @default(uuid())
+  orgId       String
+  tenantId    String?
+  name        String
+  description String?   @db.Text
+  scope       RoleScope
+  isSystem    Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  version     Int       @default(1)
+  createdById String
+  updatedById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  org         Org      @relation(fields: [orgId], references: [id])
+  tenant      Tenant?  @relation(fields: [tenantId, orgId], references: [id, orgId])
+  permissions OrgRolePermission[]
+
+  @@unique([orgId, tenantId, name])
+  @@index([orgId, tenantId, isActive])
+}
+
+model OrgRolePermission {
+  roleDefinitionId String
+  permissionKey     String
+  grantedById       String
+  grantedAt         DateTime          @default(now())
+
+  roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id], onDelete: Cascade)
+  permission     PermissionDefinition @relation(fields: [permissionKey], references: [key])
+
+  @@id([roleDefinitionId, permissionKey])
+  @@index([permissionKey])
 }
 
 model OrgVertical {
@@ -350,6 +393,7 @@ model Org {
   deletedUsers      OrgDeletedUser[]
   orgVertical       OrgVertical?
   orgModules        OrgModule[]
+  roleDefinitions   OrgRoleDefinition[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
@@ -392,10 +436,12 @@ model Tenant {
   learningLogs           LearningLog[]
   evidence               Evidence[]
   reportBundles          ReportBundle[]
+  roleDefinitions        OrgRoleDefinition[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
   @@index([orgId])
+  @@unique([id, orgId])
 }
 
 model UserTenantRole {
