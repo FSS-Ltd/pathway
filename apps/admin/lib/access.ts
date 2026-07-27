@@ -165,7 +165,7 @@ export function meetsAccessRequirement(
     case "admin-only":
       return canAccessAdminSection(role);
     case "billing":
-      return canAccessBilling(role);
+      return !context?.currentOrgIsMasterOrg && canAccessBilling(role);
     case "safeguarding-admin":
       return canAccessSafeguardingAdmin(role);
     case "staff-only":

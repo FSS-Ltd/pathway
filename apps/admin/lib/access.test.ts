@@ -3,7 +3,11 @@
  * Run with: node --import tsx apps/admin/lib/access.test.ts
  */
 
-import { getAdminRoleInfoFromApiResponse, hasCapability } from "./access";
+import {
+  getAdminRoleInfoFromApiResponse,
+  hasCapability,
+  meetsAccessRequirement,
+} from "./access";
 
 function runTests() {
   let passed = 0;
@@ -61,6 +65,14 @@ function runTests() {
   assert(
     hasCapability([], undefined),
     "items without a capability requirement stay visible",
+  );
+
+  console.log("meetsAccessRequirement");
+  assert(
+    !meetsAccessRequirement(superUserRole, "billing", {
+      currentOrgIsMasterOrg: true,
+    }),
+    "master/internal orgs hide billing even from org admins",
   );
 
   console.log("");
