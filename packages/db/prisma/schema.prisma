@@ -210,6 +210,7 @@ model OrgRoleDefinition {
   org         Org      @relation(fields: [orgId], references: [id])
   tenant      Tenant?  @relation(fields: [tenantId, orgId], references: [id, orgId])
   permissions OrgRolePermission[]
+  assignments UserRoleAssignment[]
 
   @@unique([orgId, tenantId, name])
   @@index([orgId, tenantId, isActive])
@@ -226,6 +227,31 @@ model OrgRolePermission {
 
   @@id([roleDefinitionId, permissionKey])
   @@index([permissionKey])
+}
+
+model UserRoleAssignment {
+  id               String    @id @default(uuid())
+  orgId            String
+  tenantId         String?
+  userId           String
+  roleDefinitionId String
+  assignedById     String
+  startsAt         DateTime  @default(now())
+  expiresAt        DateTime?
+  revokedAt        DateTime?
+  revokedById      String?
+
+  org            Org               @relation(fields: [orgId], references: [id])
+  tenant         Tenant?           @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  user           User              @relation("UserRoleAssignmentAssignee", fields: [userId], references: [id])
+  orgMembership  OrgMembership     @relation(fields: [orgId, userId], references: [orgId, userId])
+  roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id])
+  assignedBy     User              @relation("UserRoleAssignmentAssignedBy", fields: [assignedById], references: [id])
+  revokedBy      User?             @relation("UserRoleAssignmentRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([orgId, userId, revokedAt])
+  @@index([tenantId, userId, revokedAt])
+  @@index([roleDefinitionId])
 }
 
 model OrgVertical {
@@ -394,6 +420,7 @@ model Org {
   orgVertical       OrgVertical?
   orgModules        OrgModule[]
   roleDefinitions   OrgRoleDefinition[]
+  roleAssignments   UserRoleAssignment[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
@@ -437,6 +464,7 @@ model Tenant {
   evidence               Evidence[]
   reportBundles          ReportBundle[]
   roleDefinitions        OrgRoleDefinition[]
+  roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -528,6 +556,9 @@ model User {
   loggedLearningLogs      LearningLog[]           @relation("LearningLogLoggedBy")
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
+  roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
+  roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
+  roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.
@@ -558,6 +589,7 @@ model OrgMembership {
 
   org  Org  @relation(fields: [orgId], references: [id])
   user User @relation(fields: [userId], references: [id])
+  roleAssignments UserRoleAssignment[]
 
   @@unique([orgId, userId])
   @@index([userId])

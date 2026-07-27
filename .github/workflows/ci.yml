@@ -295,4 +295,4 @@ jobs:
           E2E_ORG_ID: "00000000-0000-0000-0000-000000000001"
           E2E_TENANT_ID: "00000000-0000-0000-0000-00000000000a"
           E2E_TENANT2_ID: "00000000-0000-0000-0000-00000000000b"
-        run: pnpm --filter @pathway/api test:integration -- --runInBand access-control.rls
+        run: pnpm --filter @pathway/api test:integration -- --runInBand access-control.rls role-assignment.rls
