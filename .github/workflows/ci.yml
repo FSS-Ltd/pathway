@@ -145,6 +145,25 @@ jobs:
         run: |
           # Create the e2e database if it doesn't exist
           psql -c "CREATE DATABASE pathway_test_e2e;" || true
+          psql -c "CREATE DATABASE pathway_system_role_seed_test_ci;" || true
+
+      - name: Apply system-role seed proof migrations
+        env:
+          DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_system_role_seed_test_ci?schema=app
+        run: pnpm db:deploy
+
+      - name: Prove system-role seed database identity
+        env:
+          SYSTEM_ROLE_SEED_TEST_ADMIN_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_system_role_seed_test_ci?schema=app
+          SYSTEM_ROLE_SEED_TEST_DISPOSABLE_TOKEN: provision-and-drop-system-role-seed-test-logins
+          PATHWAY_RUN_DB_INTEGRATION_TESTS: "1"
+          PATHWAY_RUN_DB_SEED_PROOF: "1"
+        run: >-
+          pnpm exec dotenv -e .env.test --
+          pnpm --filter @pathway/db exec jest --runInBand --runTestsByPath
+          src/__tests__/system-role-seed-test-database.spec.ts
+          src/__tests__/seed-system-roles.spec.ts
+          src/__tests__/system-role-seed-command.spec.ts
 
       - name: Run integration tests
         env:

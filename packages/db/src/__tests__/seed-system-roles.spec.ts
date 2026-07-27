@@ -9,6 +9,7 @@ import {
 import {
   deleteSystemRoleSeedTestOrganisation,
   provisionSystemRoleSeedTestRoles,
+  type ProvisionedSystemRoleSeedTestRoles,
 } from "./system-role-seed-test-database";
 
 const TEMPLATES = {
@@ -375,23 +376,21 @@ describeIfDb("system role database identity protection", () => {
   let seedClient: PrismaClient;
   let orgId: string;
   let tenantId: string;
+  let testRoles: ProvisionedSystemRoleSeedTestRoles | undefined;
+  const clients: PrismaClient[] = [];
 
   beforeAll(async () => {
-    const databaseUrl = process.env.DATABASE_URL ?? "";
-    const hostname = new URL(databaseUrl).hostname;
-    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
-      throw new Error(
-        `Refusing to run system-role protection tests against "${hostname}"`,
-      );
-    }
-    const urls = await provisionSystemRoleSeedTestRoles(databaseUrl);
-    admin = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
+    testRoles = await provisionSystemRoleSeedTestRoles();
+    admin = new PrismaClient({
+      datasources: { db: { url: testRoles.adminDatabaseUrl } },
+    });
     runtime = new PrismaClient({
-      datasources: { db: { url: urls.runtimeUrl } },
+      datasources: { db: { url: testRoles.runtimeUrl } },
     });
     seedClient = new PrismaClient({
-      datasources: { db: { url: urls.seedUrl } },
+      datasources: { db: { url: testRoles.seedUrl } },
     });
+    clients.push(admin, runtime, seedClient);
   });
 
   beforeEach(async () => {
@@ -432,11 +431,11 @@ describeIfDb("system role database identity protection", () => {
   });
 
   afterAll(async () => {
-    await Promise.all([
-      admin.$disconnect(),
-      runtime.$disconnect(),
-      seedClient.$disconnect(),
-    ]);
+    try {
+      await Promise.all(clients.map((client) => client.$disconnect()));
+    } finally {
+      await testRoles?.cleanup();
+    }
   });
 
   async function withRuntimeContext<T>(

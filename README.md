@@ -176,6 +176,33 @@ GRANT INSERT, UPDATE, DELETE ON TABLE
 TO pathway_system_role_seed;
 ```
 
+The database identity proofs never use or infer safety from `DATABASE_URL`.
+Run them only against a disposable Postgres instance owned by the test run.
+Set `SYSTEM_ROLE_SEED_TEST_ADMIN_DATABASE_URL` to an admin connection for an
+already migrated database named `pathway_system_role_seed_test` or
+`pathway_system_role_seed_test_<suffix>`, with `?schema=app`, and set:
+
+```text
+SYSTEM_ROLE_SEED_TEST_DISPOSABLE_TOKEN=provision-and-drop-system-role-seed-test-logins
+```
+
+The proof fails if the canonical `pathway_system_role_seed` login already
+exists. On an accepted disposable instance it generates fresh passwords,
+marks the roles it owns, and revokes privileges and drops both test logins
+after each suite. A failed or interrupted cleanup deliberately causes the next
+run to fail closed instead of altering the remaining login.
+
+With the disposable database migrated, run the same proof used by CI:
+
+```bash
+PATHWAY_RUN_DB_INTEGRATION_TESTS=1 \
+PATHWAY_RUN_DB_SEED_PROOF=1 \
+pnpm --filter @pathway/db exec jest --runInBand --runTestsByPath \
+  src/__tests__/system-role-seed-test-database.spec.ts \
+  src/__tests__/seed-system-roles.spec.ts \
+  src/__tests__/system-role-seed-command.spec.ts
+```
+
 #### Option 2: Using a Local Postgres Instance
 
 1. Ensure PostgreSQL is running locally

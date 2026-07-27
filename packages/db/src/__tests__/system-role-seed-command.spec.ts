@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import path from "node:path";
-import type { PrismaClientType } from "../index";
+import { PrismaClient } from "@prisma/client";
 import {
   deleteSystemRoleSeedTestOrganisation,
   provisionSystemRoleSeedTestRoles,
+  type ProvisionedSystemRoleSeedTestRoles,
 } from "./system-role-seed-test-database";
 
 const describeIfSeedProof =
@@ -110,22 +111,18 @@ const APPROVED_GRANTS = {
 } as const;
 
 describeIfSeedProof("system-role seed command orchestration", () => {
-  let prisma: PrismaClientType;
+  let prisma: PrismaClient;
   let orgId: string;
   let seedUrl: string;
   let runtimeUrl: string;
+  let testRoles: ProvisionedSystemRoleSeedTestRoles | undefined;
 
   beforeAll(async () => {
-    const databaseUrl = process.env.DATABASE_URL ?? "";
-    const hostname = new URL(databaseUrl).hostname;
-    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
-      throw new Error(
-        `Refusing to run system-role seed proof against "${hostname}"`,
-      );
-    }
-    prisma = (await import("../index")).prisma;
-    ({ seedUrl, runtimeUrl } =
-      await provisionSystemRoleSeedTestRoles(databaseUrl));
+    testRoles = await provisionSystemRoleSeedTestRoles();
+    ({ seedUrl, runtimeUrl } = testRoles);
+    prisma = new PrismaClient({
+      datasources: { db: { url: testRoles.adminDatabaseUrl } },
+    });
   });
 
   beforeEach(async () => {
@@ -158,9 +155,19 @@ describeIfSeedProof("system-role seed command orchestration", () => {
         updatedById: randomUUID(),
       },
     });
-    await prisma.permissionDefinition.updateMany({
+    await prisma.permissionDefinition.upsert({
       where: { key: "ace.behaviour.read" },
-      data: { isActive: false },
+      update: { isActive: false },
+      create: {
+        key: "ace.behaviour.read",
+        label: "View behaviour",
+        description: "View behaviour records and policy",
+        scope: "site",
+        sensitivity: "sensitive",
+        delegable: true,
+        requiredVertical: "ACE_SCHOOL",
+        isActive: false,
+      },
     });
   });
 
@@ -169,7 +176,11 @@ describeIfSeedProof("system-role seed command orchestration", () => {
   });
 
   afterAll(async () => {
-    await prisma.$disconnect();
+    try {
+      await prisma?.$disconnect();
+    } finally {
+      await testRoles?.cleanup();
+    }
   });
 
   function runSeed(
@@ -181,6 +192,7 @@ describeIfSeedProof("system-role seed command orchestration", () => {
     if (systemRoleSeedDatabaseUrl) {
       env.SYSTEM_ROLE_SEED_DATABASE_URL = systemRoleSeedDatabaseUrl;
     }
+    env.DATABASE_URL = testRoles?.adminDatabaseUrl ?? "";
     return spawnSync("pnpm", command, {
       cwd: REPOSITORY_ROOT,
       encoding: "utf8",
