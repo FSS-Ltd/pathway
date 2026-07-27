@@ -16,8 +16,7 @@ const config: Config = {
       },
     ],
   },
-  testMatch: ["**/__tests__/**/*.spec.ts"],
+  testMatch: ["**/__tests__/**/*.spec.ts", "**/access/**/*.spec.ts"],
 };
 
 export default config;
-

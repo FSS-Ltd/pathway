@@ -1,17 +1,16 @@
 {
   "extends": "../packages/config/tsconfig/base.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "resolvePackageJsonExports": true,
     "types": ["node"],
     "baseUrl": "..",
     "paths": {
-      "@pathway/db": ["../packages/db/src/index.ts"],
-      "@pathway/db/*": ["../packages/db/src/*"]
+      "@pathway/db": ["packages/db/src/index.ts"],
+      "@pathway/db/*": ["packages/db/src/*"]
     }
   },
   "include": ["*.ts"],
   "exclude": ["node_modules"]
 }
-

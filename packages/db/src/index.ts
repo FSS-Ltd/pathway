@@ -4,6 +4,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { withPiiEncryption } from "./pii-encryption";
 
 export * from "./permission-definition-sync";
+export * from "./seed-system-roles";
 
 // Keep a single PrismaClient instance across hot-reloads in dev/test
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient };

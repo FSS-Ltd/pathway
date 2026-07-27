@@ -9,9 +9,7 @@ const __dirname = path.dirname(__filename);
 // prisma/ → db → packages → repo root
 config({ path: path.resolve(__dirname, "../../../.env") });
 
-const prisma = new PrismaClient();
-
-async function main() {
+export async function seedDemoData(prisma: PrismaClient): Promise<void> {
   console.log("Seeding PathWay suite demo data…");
 
   // Deterministic IDs so dev JWTs can target them
@@ -35,7 +33,12 @@ async function main() {
   const tenant = await prisma.tenant.upsert({
     where: { slug: "demo-church" },
     update: {},
-    create: { id: TENANT_ID, name: "Demo Church", slug: "demo-church", orgId: org.id },
+    create: {
+      id: TENANT_ID,
+      name: "Demo Church",
+      slug: "demo-church",
+      orgId: org.id,
+    },
   });
 
   // 2) Age Groups (Group)
@@ -200,11 +203,14 @@ async function main() {
   console.log("✅ Suite seed complete.");
 }
 
-main()
-  .catch((e) => {
-    console.error("❌ Seed failed:", e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+if (path.resolve(process.argv[1] ?? "") === __filename) {
+  const prisma = new PrismaClient();
+  seedDemoData(prisma)
+    .catch((error: unknown) => {
+      console.error("❌ Seed failed:", error);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}
