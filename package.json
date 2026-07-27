@@ -29,6 +29,8 @@
     "db:deploy:production": "node scripts/prisma-production.mjs deploy",
     "db:reset": "pnpm --filter @pathway/db run prisma:migrate:reset",
     "db:seed": "pnpm --filter @pathway/db run seed",
+    "permission-definitions:sync": "pnpm --filter @pathway/platform run permission-definitions:sync",
+    "permission-definitions:check": "pnpm --filter @pathway/platform run permission-definitions:check",
     "env:production:prepare": "node scripts/prepare-production-env.mjs",
     "launch:preflight": "node scripts/launch-preflight.mjs",
     "supabase:rls:check": "node scripts/check-supabase-rls.mjs",

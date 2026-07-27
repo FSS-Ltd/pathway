@@ -3,6 +3,8 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { withPiiEncryption } from "./pii-encryption";
 
+export * from "./permission-definition-sync";
+
 // Keep a single PrismaClient instance across hot-reloads in dev/test
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient };
 const prismaContext = new AsyncLocalStorage<Prisma.TransactionClient>();
@@ -53,6 +55,7 @@ export async function resetDatabase() {
   try {
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "PermissionDefinition",
         "BillingEvent",
         "PendingOrder",
         "UsageCounters",
@@ -94,6 +97,7 @@ export async function resetDatabase() {
     // Fallback for environments where the current DB user cannot truncate billing tables.
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "PermissionDefinition",
         "UsageCounters",
         "StaffActivity",
         "OrgEntitlementSnapshot",
@@ -180,6 +184,15 @@ export async function runTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   return basePrismaClient.$transaction(fn);
+}
+
+export async function runReadOnlyTransaction<T>(
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return basePrismaClient.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+    return fn(tx);
+  });
 }
 
 export async function withTenantRlsContext<T>(

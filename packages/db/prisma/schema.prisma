@@ -153,6 +153,38 @@ enum ReportBundleStatus {
   FAILED
 }
 
+enum PermissionScope {
+  organisation
+  site
+  relationship
+  assignment
+}
+
+enum PermissionSensitivity {
+  standard
+  sensitive
+  protected
+}
+
+// Platform-global searchable metadata. Executable permission keys remain owned
+// by the compile-time registry in @pathway/platform.
+model PermissionDefinition {
+  key              String                @id
+  label            String
+  description      String                @db.Text
+  scope            PermissionScope
+  sensitivity      PermissionSensitivity
+  delegable        Boolean               @default(true)
+  requiredModule   Module?
+  requiredVertical Vertical?
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  @@index([isActive])
+  @@index([scope, sensitivity])
+}
+
 model OrgVertical {
   id        String   @id @default(uuid())
   orgId     String   @unique

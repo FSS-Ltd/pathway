@@ -4,6 +4,10 @@ import process from "node:process";
 
 const STEPS = [
   {
+    label: "Permission definition registry drift",
+    command: ["pnpm", "permission-definitions:check"],
+  },
+  {
     label: "Supabase public-table RLS readiness",
     command: [process.execPath, "scripts/check-supabase-rls.mjs", "--strict"],
   },

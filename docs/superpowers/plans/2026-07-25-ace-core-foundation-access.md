@@ -212,7 +212,16 @@ passed.
 - Create: `packages/db/src/permission-definition-sync.ts`
 - Modify: `packages/db/src/index.ts`
 - Test: `packages/db/src/__tests__/permission-definition-sync.spec.ts`
+- Create: `packages/platform/src/permission-definition-sync.ts`
+- Test: `packages/platform/src/__tests__/permission-definition-sync.spec.ts`
+- Test: `packages/platform/src/__tests__/permission-definition-database.integration.spec.ts`
+- Create: `packages/platform/scripts/sync-permission-definitions.ts`
+- Create: `packages/platform/scripts/check-permission-definitions.ts`
+- Modify: `package.json`
+- Modify: `packages/platform/package.json`
 - Modify: `scripts/launch-preflight.mjs`
+- Modify: `.github/workflows/ci.yml`
+- Modify: `apps/api/test.global-setup.e2e.ts`
 
 **Interfaces:**
 - Consumes: `CAPABILITY_DEFINITIONS`.
@@ -224,11 +233,15 @@ export async function syncPermissionDefinitions(
 ): Promise<{ inserted: number; updated: number; deactivated: number }>;
 ```
 
-- [ ] **Step 1: Write failing drift tests**
+- [x] **Step 1: Write failing drift tests**
 
 Test insert, metadata update, deactivation of removed keys, and rejection when a database key is executable but absent from the registry.
 
-- [ ] **Step 2: Run the failing test**
+Evidence: focused unit coverage now proves insertion, metadata correction,
+reactivation, active database-only deactivation, inactive tombstone retention,
+zero-write idempotence, and every read-only drift failure mode.
+
+- [x] **Step 2: Run the failing test**
 
 ```bash
 pnpm --filter @pathway/db test:unit -- --runInBand permission-definition-sync
@@ -236,11 +249,22 @@ pnpm --filter @pathway/db test:unit -- --runInBand permission-definition-sync
 
 Expected: module not found.
 
-- [ ] **Step 3: Add the model and synchroniser**
+Evidence: the focused command exited 1 with TypeScript `TS2307`, reporting
+that `../permission-definition-sync` did not exist. Each later drift behavior
+was also observed failing for its intended reason before its implementation.
 
-Create `PermissionDefinition` with registry-owned primary key, label, description, scope, sensitivity, delegability, optional required capability metadata, `isActive`, and timestamps. Synchronisation may update metadata but may not create executable keys from database input.
+- [x] **Step 3: Add the model and synchroniser**
 
-- [ ] **Step 4: Verify migration and preflight**
+Create `PermissionDefinition` with registry-owned primary key, label,
+description, scope, sensitivity, delegability, optional `requiredModule` and
+`requiredVertical` metadata, `isActive`, and timestamps. Synchronisation may
+update metadata but may not create executable keys from database input.
+
+Evidence: `@pathway/db` owns the registry-agnostic engine and
+`@pathway/platform` owns the thin wrappers over `CAPABILITY_DEFINITIONS`.
+The global table has forced RLS, one read policy, and no runtime write policy.
+
+- [x] **Step 4: Verify migration and preflight**
 
 ```bash
 pnpm db:generate
@@ -251,16 +275,34 @@ node scripts/launch-preflight.mjs
 
 Expected: all pass; preflight reports zero registry drift.
 
-- [ ] **Step 5: Commit**
+Evidence: Prisma generation, focused package tests and typechecks, the real
+local migration, and the four-test PostgreSQL smoke passed. Explicit sync
+inserted all 100 registry definitions and the read-only check reported zero
+drift. Full launch preflight passed the new drift step and then stopped on
+pre-existing missing production environment and provider credentials.
+
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/db scripts/launch-preflight.mjs
 git commit -m "feat: synchronise permission definitions"
 ```
 
+Evidence: the exact-message task commit records the implementation after the
+required code, migration, RLS, CI, documentation, and Graphify checks.
+
 **Acceptance:** The database is searchable metadata for the compile-time registry, never a source of executable permission keys.
 
 **Rollback:** Forward-mitigate by leaving the additive table unused; drop only in a reviewed follow-up migration.
+
+**Decision note:** The database table is a platform-global searchable mirror,
+not an executable permission source. Synchronization is an explicit privileged
+operation. Launch validation is read-only. Inactive database-only rows are
+retained history, while active database-only rows are drift. The pull-request
+`Permission Definition Database` job applies reviewed migrations and runs the
+focused database proof as a required check. The legacy broad `Integration
+Tests` job retains its existing branch/manual cadence. Neither path uses a
+`db push` fallback.
 
 ### Task 4: ACE-F04 - Add organisation role definitions and permissions
 
