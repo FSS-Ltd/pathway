@@ -49,6 +49,23 @@ Required Supabase-backed production vars:
 - `SUPABASE_STORAGE_PRIVATE_BUCKET=pathway-private`
 - `SUPABASE_STORAGE_PUBLIC_BUCKET=pathway-public`
 
+Permission-definition registry rollout must use this order:
+
+```bash
+pnpm db:deploy:production
+DATABASE_URL="$DIRECT_URL" pnpm permission-definitions:sync
+DATABASE_URL="$DIRECT_URL" pnpm permission-definitions:check
+```
+
+Run the migration and sync with a reviewed direct/session database role that is
+`SUPERUSER` or has `BYPASSRLS`. Table ownership alone is insufficient because
+`PermissionDefinition` uses `FORCE ROW LEVEL SECURITY` and has no write policy.
+Do not use Supabase `anon` or `authenticated` roles; they have no write grant on
+`PermissionDefinition`. The check command starts a PostgreSQL read-only
+transaction, so the database rejects writes even if the supplied role is
+privileged. A fresh deployment cannot pass launch preflight until the migration
+and one explicit sync have completed.
+
 `SUPABASE_SECRET_KEY` must be copied from the Supabase dashboard. The Supabase
 connector can confirm the project URL and publishable keys, but it does not
 return `sb_secret_...` or service-role-equivalent keys.
@@ -238,22 +255,27 @@ Minimum launch sequence:
    `RESEND_WEBHOOK_SECRET` is optional until Resend webhooks are enabled.
 2. If values currently live in `.env.production` or `.env.prod`, run
    `pnpm env:production:prepare`.
-3. Run `pnpm launch:preflight`.
+3. Run `pnpm launch:preflight`. On a fresh database, the permission-definition
+   step remains blocked until steps 7 and 8 complete.
 4. Create/link the three Vercel projects and record their project IDs if the
    preflight reports missing Vercel project IDs.
-5. Run `pnpm launch:preflight` again until it passes.
-6. Run `pnpm vercel:env:sync -- --apply`.
-7. Run `pnpm github:secrets:setup -- --apply`.
-8. Check migrations with `pnpm db:status:production`, then either run
+5. Run `pnpm vercel:env:sync -- --apply`.
+6. Run `pnpm github:secrets:setup -- --apply`.
+7. Check migrations with `pnpm db:status:production`, then either run
    `pnpm db:deploy:production` locally or dispatch `Deploy database migrations`.
-9. Dispatch `Deploy to Vercel` with target `all`.
-10. Dispatch `Post-deploy smoke tests` using the deployed API, web, and admin
+8. Using the privileged direct/session connection, run
+   `DATABASE_URL="$DIRECT_URL" pnpm permission-definitions:sync`, then
+   `DATABASE_URL="$DIRECT_URL" pnpm permission-definitions:check`.
+9. Run `pnpm launch:preflight` again until it passes.
+10. Dispatch `Deploy to Vercel` with target `all`.
+11. Dispatch `Post-deploy smoke tests` using the deployed API, web, and admin
     URLs. Use Vercel URLs before DNS cutover, then rerun with custom domains
     after DNS is pointed.
 
-`pnpm launch:preflight` is read-only. It runs the Supabase RLS check, Vercel
-project setup, Vercel environment sync, and GitHub secret helpers in strict mode
-so missing values are reported before any remote writes happen.
+`pnpm launch:preflight` is read-only. It first runs the database-enforced
+permission-definition drift check, then the Supabase RLS check, Vercel project
+setup, Vercel environment sync, and GitHub secret helpers in strict mode so
+missing values are reported before any remote writes happen.
 
 ## 4. GitHub Actions
 

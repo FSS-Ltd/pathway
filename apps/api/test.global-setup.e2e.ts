@@ -22,76 +22,63 @@ export default async function globalSetup(): Promise<void> {
   }
   process.env.DATABASE_URL = process.env.E2E_DATABASE_URL;
 
-  // 3) Prepare schema ONCE per e2e run
-  //    Prefer migrations; if none exist yet, fallback to db push
+  // 3) Prepare schema ONCE per e2e run from reviewed migrations only.
+  execSync(
+    "pnpm --filter @pathway/db exec prisma migrate reset --force --skip-generate --skip-seed",
+    {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        PRISMA_IGNORE_ENV_FILE: "1",
+        DATABASE_URL: process.env.DATABASE_URL!,
+      },
+    },
+  );
+
+  execSync("pnpm --filter @pathway/db exec prisma migrate deploy", {
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      PRISMA_IGNORE_ENV_FILE: "1",
+      DATABASE_URL: process.env.DATABASE_URL!,
+    },
+  });
+
+  // Seed two tenants after migrations
+  const { prisma } = await import("@pathway/db");
   try {
-    execSync(
-      "pnpm --filter @pathway/db exec prisma migrate reset --force --skip-generate --skip-seed",
-      {
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          PRISMA_IGNORE_ENV_FILE: "1",
-          DATABASE_URL: process.env.DATABASE_URL!,
-        },
-      },
-    );
-
-    execSync("pnpm --filter @pathway/db exec prisma migrate deploy", {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        PRISMA_IGNORE_ENV_FILE: "1",
-        DATABASE_URL: process.env.DATABASE_URL!,
+    const org = await prisma.org.upsert({
+      where: { slug: "e2e-org" },
+      update: { name: "E2E Org" },
+      create: {
+        slug: "e2e-org",
+        name: "E2E Org",
+        planCode: "trial",
+        isSuite: false,
       },
     });
-
-    // Seed two tenants after migrations
-    const { prisma } = await import("@pathway/db");
-    try {
-      const org = await prisma.org.upsert({
-        where: { slug: "e2e-org" },
-        update: { name: "E2E Org" },
-        create: {
-          slug: "e2e-org",
-          name: "E2E Org",
-          planCode: "trial",
-          isSuite: false,
-        },
-      });
-      process.env.E2E_ORG_ID = org.id;
-      const tenantA = await prisma.tenant.upsert({
-        where: { slug: "tenant-a-e2e" },
-        update: { name: "Tenant A (e2e)" },
-        create: {
-          slug: "tenant-a-e2e",
-          name: "Tenant A (e2e)",
-          org: { connect: { id: org.id } },
-        },
-      });
-      const tenantB = await prisma.tenant.upsert({
-        where: { slug: "tenant-b-e2e" },
-        update: { name: "Tenant B (e2e)" },
-        create: {
-          slug: "tenant-b-e2e",
-          name: "Tenant B (e2e)",
-          org: { connect: { id: org.id } },
-        },
-      });
-      process.env.E2E_TENANT_ID = tenantA.id;
-      process.env.E2E_TENANT2_ID = tenantB.id;
-    } finally {
-      await prisma.$disconnect();
-    }
-  } catch {
-    // No migrations present: push current schema as baseline
-    execSync("pnpm --filter @pathway/db exec prisma db push --force-reset", {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        PRISMA_IGNORE_ENV_FILE: "1",
-        DATABASE_URL: process.env.DATABASE_URL!,
+    process.env.E2E_ORG_ID = org.id;
+    const tenantA = await prisma.tenant.upsert({
+      where: { slug: "tenant-a-e2e" },
+      update: { name: "Tenant A (e2e)" },
+      create: {
+        slug: "tenant-a-e2e",
+        name: "Tenant A (e2e)",
+        org: { connect: { id: org.id } },
       },
     });
+    const tenantB = await prisma.tenant.upsert({
+      where: { slug: "tenant-b-e2e" },
+      update: { name: "Tenant B (e2e)" },
+      create: {
+        slug: "tenant-b-e2e",
+        name: "Tenant B (e2e)",
+        org: { connect: { id: org.id } },
+      },
+    });
+    process.env.E2E_TENANT_ID = tenantA.id;
+    process.env.E2E_TENANT2_ID = tenantB.id;
+  } finally {
+    await prisma.$disconnect();
   }
 }

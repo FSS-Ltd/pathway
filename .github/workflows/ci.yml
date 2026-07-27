@@ -158,3 +158,72 @@ jobs:
           E2E_ALLOW_RESET: "true"
         run: pnpm test:integration
         continue-on-error: false
+
+  permission-definitions:
+    name: Permission Definition Database
+    runs-on: ubuntu-22.04
+    needs: ci
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pathway_permission_definition_smoke_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Apply Prisma migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_permission_definition_smoke_ci?schema=app
+        run: pnpm db:deploy
+
+      - name: Run permission-definition database smoke
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_permission_definition_smoke_ci?schema=app
+          PATHWAY_RUN_PERMISSION_DEFINITION_DB_SMOKE: "1"
+          PATHWAY_PERMISSION_DEFINITION_DB_SMOKE_DESTRUCTIVE_TOKEN: destroy-permission-definitions-in-disposable-database
+        run: pnpm --filter @pathway/platform test:unit -- permission-definition-database.integration
