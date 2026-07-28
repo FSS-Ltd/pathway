@@ -228,6 +228,7 @@ export async function withOrgRlsContext<T>(
   }
 
   return basePrismaClient.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
     await applyTenantContext(tx, "", orgId);
     return prismaContext.run(tx, () => callback(tx));
   });

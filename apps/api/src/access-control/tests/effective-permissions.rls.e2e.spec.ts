@@ -65,6 +65,22 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
 
 const rlsRoleIsConfigured = process.env.E2E_RLS_ROLE === CI_RLS_ROLE;
 
+async function expectReadOnlyRejection(
+  operation: () => Promise<unknown>,
+): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    expect(error).toMatchObject({
+      code: "P2010",
+      meta: { code: "25006" },
+    });
+    return;
+  }
+
+  throw new Error("Expected the read-only transaction to reject the write");
+}
+
 describe("effective permission RLS resolution", () => {
   const fixture = {
     orgA: randomUUID(),
@@ -225,6 +241,26 @@ describe("effective permission RLS resolution", () => {
     );
 
     expect(memberships).toHaveLength(1);
+  });
+
+  it("permits organisation-context reads but rejects attempted writes", async () => {
+    const visibleRoleIds = await withOrgRlsContext(fixture.orgA, (tx) =>
+      tx.orgRoleDefinition.findMany({
+        where: { id: fixture.orgARole },
+        select: { id: true },
+      }),
+    );
+
+    expect(visibleRoleIds).toEqual([{ id: fixture.orgARole }]);
+    await expectReadOnlyRejection(() =>
+      withOrgRlsContext(fixture.orgA, async (tx) => {
+        return tx.$executeRaw`
+          UPDATE "OrgRoleDefinition"
+          SET "name" = "name"
+          WHERE "id" = ${fixture.orgARole}
+        `;
+      }),
+    );
   });
 
   it("allows a valid organisation role without a selected tenant", async () => {
