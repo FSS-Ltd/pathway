@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { prisma, withOrgRlsContext } from "@pathway/db";
 import { getOrgCapabilities, type PermissionKey } from "@pathway/platform";
+import { CommonModule } from "../common/common.module";
+import { AccessDecisionLogger } from "./access-decision-logger";
 import {
   EFFECTIVE_PERMISSIONS_READER,
   EFFECTIVE_PERMISSIONS_CONTEXT,
@@ -12,6 +14,7 @@ import {
   type FeatureAvailabilityReader,
   type OrgCapabilitiesReader,
 } from "./effective-permissions.service";
+import { PermissionGuard } from "./permission.guard";
 
 const effectivePermissionsReader: EffectivePermissionsReader = {
   async getOrganisationMembership(userId, orgId) {
@@ -95,8 +98,11 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
 };
 
 @Module({
+  imports: [CommonModule],
   providers: [
     EffectivePermissionsService,
+    AccessDecisionLogger,
+    PermissionGuard,
     {
       provide: EFFECTIVE_PERMISSIONS_READER,
       useValue: effectivePermissionsReader,
@@ -114,6 +120,6 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
       useValue: effectivePermissionsContext,
     },
   ],
-  exports: [EffectivePermissionsService],
+  exports: [EffectivePermissionsService, PermissionGuard],
 })
 export class AccessControlModule {}
