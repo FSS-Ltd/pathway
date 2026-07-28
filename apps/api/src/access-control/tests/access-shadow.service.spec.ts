@@ -2,13 +2,13 @@ import type { PermissionKey } from "@pathway/platform";
 import type { StructuredLogger } from "../../common/logging/logging.service";
 import type { AccessDecision } from "../access-decision.types";
 import {
+  ACCESS_SHADOW_ALLOW_LIST,
   AccessShadowService,
   type AccessShadowConfig,
 } from "../access-shadow.service";
 import type { EffectivePermissionsService } from "../effective-permissions.service";
 
-const ROUTE = "GET /access/users/:userId/effective-permissions";
-const PERMISSION = "platform.access.users.read" as PermissionKey;
+const { route: ROUTE, permission: PERMISSION } = ACCESS_SHADOW_ALLOW_LIST[0];
 
 describe("AccessShadowService", () => {
   const resolve = jest.fn<Promise<AccessDecision>, []>();
@@ -30,7 +30,7 @@ describe("AccessShadowService", () => {
       logger,
       {
         enabled: true,
-        allowList: [{ route: ROUTE, permission: PERMISSION }],
+        allowList: ACCESS_SHADOW_ALLOW_LIST,
         ...config,
       },
     );
@@ -72,6 +72,28 @@ describe("AccessShadowService", () => {
           orgId: "org-should-not-be-logged",
           tenantId: "site-should-not-be-logged",
           permission: PERMISSION,
+          now: new Date("2026-07-28T12:00:00.000Z"),
+        },
+      }),
+    ).resolves.toBe(false);
+
+    expect(resolve).not.toHaveBeenCalled();
+    expect(info).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("does not evaluate or emit when an allow-listed route has a different permission", async () => {
+    const service = createService();
+
+    await expect(
+      service.compare({
+        route: ROUTE,
+        legacyAllowed: false,
+        request: {
+          userId: "user-should-not-be-logged",
+          orgId: "org-should-not-be-logged",
+          tenantId: "site-should-not-be-logged",
+          permission: "platform.access.roles.read" as PermissionKey,
           now: new Date("2026-07-28T12:00:00.000Z"),
         },
       }),
