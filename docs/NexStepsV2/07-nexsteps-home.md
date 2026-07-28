@@ -12,10 +12,22 @@
 
 Ship NexSteps Home as a Home-Education vertical + plan + family surface on the same codebase, per decision D1: reuse the CEE vertical's already-designed TEACH Hub / Family Hub thinking rather than redesigning a sister product from scratch.
 
+## Approved product and UX contract
+
+The mandatory implementation entry point is
+[`nexsteps-home/README.md`](nexsteps-home/README.md). Its approved product
+contract, 76-screen inventory, implementation map and runnable prototype
+supersede the old hardcoded Family Space mockup as the user-experience target.
+
+The prototype is a reference, not production React Native code. Implement each
+small slice with the existing Expo, API, tenant, storage, capability and audit
+patterns. The merge-safe slice order is defined in
+[`nexsteps-home/implementation-map.md`](nexsteps-home/implementation-map.md).
+
 ## Grounding: what already exists to reuse
 
 - **`Child`, `ChildGuardianContact`, and the `ParentChildren` relation already model a household's core data**, tenant-scoped: `Child` (`schema.prisma:577-616`) belongs to a `Tenant`, has `guardians: User[] @relation("ParentChildren")` (an implicit many-to-many, not a standalone join model — more precise than the CEE doc's phrasing of it as "`ParentChildren`" model) and a separate `ChildGuardianContact` model (552-572, PII-encrypted fields per `packages/db/src/pii-encryption.ts`) for contact-specific detail. A homeschooling household's children and guardians fit this shape without any new model.
-- **The mobile parent surface already exists as a static mockup**, confirmed unwired: `apps/mobile/app/(family)/(tabs)/home/index.tsx` — literally titled "Family Space" (`badge="Family Space"`, line 9), with sibling tabs `updates` and `account`. Grepped all three screens for `fetch|useQuery|axios|apiClient|useState|useEffect` — **zero matches**. Every value ("Ava Brown," "96% attendance," "Summer trip reminder") is hardcoded JSX. **This phase is the first time this screen gets wired to a real API** — not a redesign, a backend connection.
+- **The mobile parent surface already exists as a static mockup**, confirmed unwired: `apps/mobile/app/(family)/(tabs)/home/index.tsx` — literally titled "Family Space" (`badge="Family Space"`, line 9), with sibling tabs `updates` and `account`. Grepped all three screens for `fetch|useQuery|axios|apiClient|useState|useEffect` — **zero matches**. Every value ("Ava Brown," "96% attendance," "Summer trip reminder") is hardcoded JSX. **This phase replaces that mockup incrementally with the approved NexSteps Home experience and real APIs**; it must not layer more hardcoded content onto the old screen.
 - **The CEE package already designed this exact surface** (`docs/cee-vertical/01-architecture-overview.md:7-12,36-62,122-130`): Family Hub as "the parent visibility layer" and TEACH Hub as "the parent-led home-education operating system," with a mapping table entry: *"TEACH household → Org + Tenant, gap: Add `orgType = TEACH_HOUSEHOLD`; lighter surface"*.
 - **The CEE package already flagged, and deliberately left open, the exact household-modeling question this phase needs answered**: `docs/cee-vertical/02-multi-tenancy-and-scalability.md:16-17` — "either one Org with many household Tenants, or one lightweight Org per household" — and `docs/cee-vertical/07-delivery-roadmap-and-decisions.md:97` lists it as an unresolved open decision there too. **This phase inherits that same unresolved question rather than re-litigating it** — see Open Decision 2.
 
@@ -67,10 +79,10 @@ Ship NexSteps Home as a Home-Education vertical + plan + family surface on the s
 
 ### PR 7.3 — Family surface + household dashboard
 
-**Scope:** Wire the existing static "Family Space" mockup to real data: attendance, learning logs (Phase 4), calendar, tasks for the household.
+**Scope:** Deliver the first live household-dashboard slice from the approved NexSteps Home contract: real learning rhythm, learning logs (Phase 4), calendar and tasks. The remaining approved screens are delivered through the independent H2–H7 slices in the implementation map, not folded into one large PR.
 
 **Key files:**
-- `apps/mobile/app/(family)/(tabs)/home/index.tsx`, `updates/index.tsx`, `account/index.tsx` (E) — replace hardcoded JSX with real data fetches (this app's existing data-fetching pattern — confirm against a wired screen elsewhere in `apps/mobile` for the idiomatic approach, since this route group currently has none to copy from directly).
+- `apps/mobile/app/(family)/(tabs)/home/index.tsx`, `updates/index.tsx`, `account/index.tsx` (E during migration) and additive Home/family routes from the approved implementation map (N) — replace hardcoded JSX with real data fetches while keeping rollback possible (confirm the idiomatic data-fetching pattern against a wired screen elsewhere in `apps/mobile`).
 - New/extended API endpoints (N/E) surfacing a household's children's attendance, learning logs, and any relevant calendar/task data, capability-guarded per Phase 2's guard pattern.
 
 **Failing test first:** integration test — a parent user in a `HOME_EDUCATION` org fetches their household dashboard data and sees their own children's real attendance/learning-log data, not the mockup's hardcoded names; a guard test confirming a parent can't see another household's data (tenant isolation, already enforced elsewhere in this codebase — this is a regression guard, not new isolation logic).
@@ -97,7 +109,7 @@ Ship NexSteps Home as a Home-Education vertical + plan + family surface on the s
 
 - [ ] `Vertical.HOME_EDUCATION` exists with a capability map granting Learning capabilities at the vertical level (no module purchase required for a Home-Education org's own children).
 - [ ] A NexSteps Home plan exists in the catalogue once pricing is decided.
-- [ ] The mobile Family Space screens show real, tenant-isolated household data — the mockup is gone, not just extended.
+- [ ] Implemented screen IDs from the approved inventory show real, tenant-isolated household data; the old hardcoded Family Space mockup is retired after equivalent live routes exist.
 - [ ] Household-to-Org/Tenant modelling is decided and documented, not left as a silent assumption baked into code.
 
 ## Open decisions

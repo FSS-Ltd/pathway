@@ -12,6 +12,19 @@
 
 A built-in, opt-in community for NexSteps Home households: a cross-family directory, channels/threads, and meetup planning. This is genuinely net-new — the smallest amount of prior art in this codebase of any phase in this doc set — and it carries its own safeguarding-first stance because it's the first feature in this platform's history that deliberately crosses tenant boundaries.
 
+## Approved product and UX contract
+
+The mandatory Community implementation reference is
+[`nexsteps-home/README.md`](nexsteps-home/README.md), with detailed behaviour in
+[`nexsteps-home/community-user-flows.md`](nexsteps-home/community-user-flows.md)
+and stable screen IDs in
+[`nexsteps-home/screen-inventory.json`](nexsteps-home/screen-inventory.json).
+
+Those approved flows make Community appealing and usable, but do not relax any
+safeguarding rule in this phase. Opt-in, child-data exclusion, coarse location,
+mutual adult connection, public-venue meetups, least-privilege moderation and
+auditing remain implementation gates.
+
 ## Grounding: why this phase gets a heavier safeguarding treatment than the others
 
 Every other feature in this codebase is tenant-isolated by design — `Child`, `ChildGuardianContact`, `Session`, `Attendance`, all scoped to a single `Tenant`, and every other phase in this doc set (Learning, Home) operates strictly within one household's own data. **Community is the first feature that intentionally shows one household's (limited, opted-in) information to another.** That's a structural first, not a variation on an existing pattern, and it's exactly the kind of change that deserves a safeguarding-first design pass before implementation, not just careful code review after.
@@ -91,6 +104,19 @@ Two existing models are close in spirit but **not reusable as-is**, and the diff
 **Rollback:** revert the new model/surface; PR 8.1-8.3's data model stays intact but inert without a UI (safer partial-rollback shape than deleting underlying data).
 
 ---
+
+## Approved merge-safe slices
+
+The implementation map decomposes Community into independently mergeable slices:
+
+- H8 — opt-in, directory and mutual connection;
+- H9 — adult-authored conversations;
+- H10 — public-venue meetups;
+- H11 — moderation, appeals and operating controls.
+
+Each slice must list its approved screen IDs and retain the Phase 8 safeguarding
+gates. See
+[`nexsteps-home/implementation-map.md`](nexsteps-home/implementation-map.md).
 
 ## Acceptance criteria
 
