@@ -25,6 +25,16 @@ AND release/visibility policy
 AND tenant/RLS policy
 ```
 
+## ACE-F09 inactive shadow comparison
+
+`ACE_ACCESS_SHADOW_ENABLED=true` permits comparison only for the approved matrix entry below. This is an inactive migration instrument until a later route-migration PR introduces an explicit call site that supplies the authoritative legacy decision. It does not register a route, change a live decision, or authorise from typed permissions.
+
+| Exact matrix route | Matrix permission (`PermissionKey`) | Matrix ID | Activation boundary |
+| --- | --- | --- | --- |
+| `GET /access/users/:userId/effective-permissions` | `platform.access.users.read` | R12 | No current call site. A future explicit route migration may call the comparator with the legacy result; the comparator must return that same legacy result. |
+
+The comparator allow-list repeats this approved route and compile-time `PermissionKey` pair only. It is not a fixed-role-to-capability mapping, resolver output, or executable permission registry.
+
 `none` means the layer is genuinely inapplicable to that route. It never means undecided.
 
 ### Membership and tenant context

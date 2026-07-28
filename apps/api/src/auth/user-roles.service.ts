@@ -34,6 +34,8 @@ export type UserRolesResponse = {
   hasServeAccess: boolean;
 };
 
+export type LegacyAccessEvaluator = (roles: UserRolesResponse) => boolean;
+
 @Injectable()
 export class UserRolesService {
   private readonly logger = new Logger(UserRolesService.name);
@@ -200,6 +202,14 @@ export class UserRolesService {
       hasFamilyAccess: computedHasFamilyAccess,
       hasServeAccess: computedHasServeAccess,
     };
+  }
+
+  async evaluateLegacyAccess(
+    userId: string,
+    evaluator: LegacyAccessEvaluator,
+    options: RoleLookupOptions = {},
+  ): Promise<boolean> {
+    return evaluator(await this.getUserRoles(userId, options));
   }
 
   private mapRoleToSiteRole(role: Role): SiteRole | null {

@@ -2,7 +2,12 @@ import { Module } from "@nestjs/common";
 import { prisma, withOrgRlsContext } from "@pathway/db";
 import { getOrgCapabilities, type PermissionKey } from "@pathway/platform";
 import { CommonModule } from "../common/common.module";
+import { LoggingService } from "../common/logging/logging.service";
 import { AccessDecisionLogger } from "./access-decision-logger";
+import {
+  accessShadowConfigFromEnvironment,
+  AccessShadowService,
+} from "./access-shadow.service";
 import {
   EFFECTIVE_PERMISSIONS_READER,
   EFFECTIVE_PERMISSIONS_CONTEXT,
@@ -101,6 +106,19 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
   imports: [CommonModule],
   providers: [
     EffectivePermissionsService,
+    {
+      provide: AccessShadowService,
+      useFactory: (
+        permissions: EffectivePermissionsService,
+        logging: LoggingService,
+      ) =>
+        new AccessShadowService(
+          permissions,
+          logging.createLogger(AccessShadowService.name),
+          accessShadowConfigFromEnvironment(),
+        ),
+      inject: [EffectivePermissionsService, LoggingService],
+    },
     AccessDecisionLogger,
     PermissionGuard,
     {
@@ -120,6 +138,6 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
       useValue: effectivePermissionsContext,
     },
   ],
-  exports: [EffectivePermissionsService, PermissionGuard],
+  exports: [AccessShadowService, EffectivePermissionsService, PermissionGuard],
 })
 export class AccessControlModule {}
