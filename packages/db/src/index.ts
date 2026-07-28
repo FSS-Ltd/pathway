@@ -218,3 +218,18 @@ export async function withTenantRlsContext<T>(
     return prismaContext.run(tx, () => callback(tx));
   });
 }
+
+export async function withOrgRlsContext<T>(
+  orgId: string,
+  callback: (client: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if (!orgId) {
+    throw new Error("withOrgRlsContext requires an orgId");
+  }
+
+  return basePrismaClient.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+    await applyTenantContext(tx, "", orgId);
+    return prismaContext.run(tx, () => callback(tx));
+  });
+}
