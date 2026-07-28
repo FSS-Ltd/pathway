@@ -1,7 +1,13 @@
 import type { PermissionKey } from "@pathway/platform";
+import { Test } from "@nestjs/testing";
+import { AccessControlModule } from "../access-control.module";
 import {
+  EFFECTIVE_PERMISSIONS_CONTEXT,
+  EFFECTIVE_PERMISSIONS_READER,
   EffectivePermissionsService,
+  ORG_CAPABILITIES_READER,
   type EffectivePermissionsReader,
+  type EffectivePermissionsContext,
   type FeatureAvailabilityReader,
   type OrgCapabilitiesReader,
 } from "../effective-permissions.service";
@@ -11,6 +17,12 @@ const ORG_ID = "org-1";
 const SITE_ID = "site-1";
 const USER_ID = "user-1";
 const OTHER_SITE_ID = "site-2";
+
+const testPermissionsContext: EffectivePermissionsContext = {
+  async run(_orgId, _tenantId, operation) {
+    return operation();
+  },
+};
 
 type Grant = Awaited<
   ReturnType<EffectivePermissionsReader["findAssignments"]>
@@ -57,6 +69,7 @@ function createService({
     reader,
     capabilityReader,
     featureAvailability,
+    testPermissionsContext,
   );
 }
 
@@ -147,6 +160,7 @@ describe("EffectivePermissionsService", () => {
       reader,
       { get: async () => ["ace.pace.read"] },
       { isAvailable: async () => true },
+      testPermissionsContext,
     );
 
     await resolve(service);
@@ -205,6 +219,28 @@ describe("EffectivePermissionsService", () => {
     });
   });
 
+  it.each([
+    ["a required module", "finance.family_invoices.read" as PermissionKey],
+    ["a required vertical", "ace.pace.read" as PermissionKey],
+  ])(
+    "returns capability-missing when %s is unavailable",
+    async (_requirement, permission) => {
+      const decision = await resolve(
+        createService({
+          grants: [grant({ permissionKey: permission })],
+          capabilities: [],
+        }),
+        { permission },
+      );
+
+      expect(decision).toEqual({
+        allowed: false,
+        reason: "capability-missing",
+        sourceRoleIds: [],
+      });
+    },
+  );
+
   it("denies a disabled feature through the injected availability port", async () => {
     const decision = await resolve(createService({ available: false }));
 
@@ -213,6 +249,38 @@ describe("EffectivePermissionsService", () => {
       reason: "feature-disabled",
       sourceRoleIds: [],
     });
+  });
+
+  it("denies features by default until a feature source is available", async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AccessControlModule],
+    })
+      .overrideProvider(EFFECTIVE_PERMISSIONS_READER)
+      .useValue({
+        getOrganisationMembership: async () => true,
+        findAssignments: async () => [grant()],
+      } satisfies EffectivePermissionsReader)
+      .overrideProvider(ORG_CAPABILITIES_READER)
+      .useValue({
+        get: async () => ["ace.pace.read"],
+      } satisfies OrgCapabilitiesReader)
+      .overrideProvider(EFFECTIVE_PERMISSIONS_CONTEXT)
+      .useValue({
+        run: async (_orgId, _tenantId, operation) => operation(),
+      } satisfies EffectivePermissionsContext)
+      .compile();
+
+    try {
+      await expect(
+        resolve(moduleRef.get(EffectivePermissionsService)),
+      ).resolves.toEqual({
+        allowed: false,
+        reason: "feature-disabled",
+        sourceRoleIds: [],
+      });
+    } finally {
+      await moduleRef.close();
+    }
   });
 
   it("denies a user without an active organisation membership", async () => {
@@ -224,6 +292,44 @@ describe("EffectivePermissionsService", () => {
       sourceRoleIds: [],
     });
   });
+
+  it.each([
+    [
+      "future assignment",
+      { grants: [grant({ startsAt: new Date("2100-01-01") })] },
+      undefined,
+    ],
+    [
+      "expired assignment",
+      { grants: [grant({ expiresAt: new Date(0) })] },
+      undefined,
+    ],
+    [
+      "revoked assignment",
+      { grants: [grant({ revokedAt: new Date(0) })] },
+      undefined,
+    ],
+    ["inactive role", { grants: [grant({ roleIsActive: false })] }, undefined],
+    [
+      "inactive permission",
+      { grants: [grant({ permissionIsActive: false })] },
+      undefined,
+    ],
+    ["disabled feature", { available: false }, undefined],
+    [
+      "site role at another tenant",
+      { grants: [grant({ roleScope: "site", roleTenantId: SITE_ID })] },
+      OTHER_SITE_ID,
+    ],
+    ["missing organisation membership", { hasMembership: false }, undefined],
+  ] as const)(
+    "omits a %s from listForUser",
+    async (_name, options, tenantId) => {
+      await expect(
+        createService(options).listForUser(USER_ID, ORG_ID, tenantId),
+      ).resolves.toEqual([]);
+    },
+  );
 
   it("deduplicates permissions and deterministically redacts source roles", async () => {
     const service = createService({

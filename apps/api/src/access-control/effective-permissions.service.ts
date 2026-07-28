@@ -35,12 +35,23 @@ export interface FeatureAvailabilityReader {
   isAvailable(orgId: string, permission: PermissionKey): Promise<boolean>;
 }
 
+export interface EffectivePermissionsContext {
+  run<T>(
+    orgId: string,
+    tenantId: string | undefined,
+    operation: () => Promise<T>,
+  ): Promise<T>;
+}
+
 export const EFFECTIVE_PERMISSIONS_READER = Symbol(
   "EFFECTIVE_PERMISSIONS_READER",
 );
 export const ORG_CAPABILITIES_READER = Symbol("ORG_CAPABILITIES_READER");
 export const FEATURE_AVAILABILITY_READER = Symbol(
   "FEATURE_AVAILABILITY_READER",
+);
+export const EFFECTIVE_PERMISSIONS_CONTEXT = Symbol(
+  "EFFECTIVE_PERMISSIONS_CONTEXT",
 );
 
 @Injectable()
@@ -52,9 +63,29 @@ export class EffectivePermissionsService {
     private readonly capabilityReader: OrgCapabilitiesReader,
     @Inject(FEATURE_AVAILABILITY_READER)
     private readonly featureAvailability: FeatureAvailabilityReader,
+    @Inject(EFFECTIVE_PERMISSIONS_CONTEXT)
+    private readonly context: EffectivePermissionsContext,
   ) {}
 
   async resolve(request: EffectiveAccessRequest): Promise<AccessDecision> {
+    return this.context.run(request.orgId, request.tenantId, () =>
+      this.resolveInContext(request),
+    );
+  }
+
+  async listForUser(
+    userId: string,
+    orgId: string,
+    tenantId?: string,
+  ): Promise<PermissionKey[]> {
+    return this.context.run(orgId, tenantId, () =>
+      this.listForUserInContext(userId, orgId, tenantId),
+    );
+  }
+
+  private async resolveInContext(
+    request: EffectiveAccessRequest,
+  ): Promise<AccessDecision> {
     if (
       !(await this.reader.getOrganisationMembership(
         request.userId,
@@ -112,7 +143,7 @@ export class EffectivePermissionsService {
       : denied("permission-missing");
   }
 
-  async listForUser(
+  private async listForUserInContext(
     userId: string,
     orgId: string,
     tenantId?: string,

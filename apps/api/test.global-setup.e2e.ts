@@ -38,6 +38,9 @@ export async function configureCiRlsRole(
     `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO ${rlsRole};`,
     `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO ${rlsRole};`,
     `GRANT SELECT ON TABLE "PermissionDefinition" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "OrgMembership" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "OrgVertical" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "OrgModule" TO ${rlsRole};`,
     `GRANT ${rlsRole} TO ${bootstrapRole};`,
   ];
 

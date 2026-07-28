@@ -1,12 +1,14 @@
 import { Module } from "@nestjs/common";
-import { prisma } from "@pathway/db";
+import { prisma, withOrgRlsContext } from "@pathway/db";
 import { getOrgCapabilities, type PermissionKey } from "@pathway/platform";
 import {
   EFFECTIVE_PERMISSIONS_READER,
+  EFFECTIVE_PERMISSIONS_CONTEXT,
   EffectivePermissionsService,
   FEATURE_AVAILABILITY_READER,
   ORG_CAPABILITIES_READER,
   type EffectivePermissionsReader,
+  type EffectivePermissionsContext,
   type FeatureAvailabilityReader,
   type OrgCapabilitiesReader,
 } from "./effective-permissions.service";
@@ -80,7 +82,15 @@ const orgCapabilitiesReader: OrgCapabilitiesReader = {
 
 const featureAvailabilityReader: FeatureAvailabilityReader = {
   async isAvailable() {
-    return true;
+    return false;
+  },
+};
+
+const effectivePermissionsContext: EffectivePermissionsContext = {
+  async run(orgId, tenantId, operation) {
+    return tenantId === undefined
+      ? withOrgRlsContext(orgId, operation)
+      : operation();
   },
 };
 
@@ -98,6 +108,10 @@ const featureAvailabilityReader: FeatureAvailabilityReader = {
     {
       provide: FEATURE_AVAILABILITY_READER,
       useValue: featureAvailabilityReader,
+    },
+    {
+      provide: EFFECTIVE_PERMISSIONS_CONTEXT,
+      useValue: effectivePermissionsContext,
     },
   ],
   exports: [EffectivePermissionsService],
