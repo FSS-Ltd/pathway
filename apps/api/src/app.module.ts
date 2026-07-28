@@ -37,6 +37,7 @@ import { ExportsModule } from "./exports/exports.module";
 import { BlogModule } from "./blog/blog.module";
 import { HandoverModule } from "./handover/handover.module";
 import { GuestPassModule } from "./guest-pass/guest-pass.module";
+import { AccessControlModule } from "./access-control/access-control.module";
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { GuestPassModule } from "./guest-pass/guest-pass.module";
     DsarModule,
     OrgsModule,
     PlatformModule,
+    AccessControlModule,
     BillingModule,
     LeadsModule,
     StaffModule,
