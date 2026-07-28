@@ -20,6 +20,13 @@ CREATE POLICY "OrgVertical_org_context_read"
     AND "orgId" = app.current_org_id()
   );
 
+-- System-role templates are seeded through the dedicated non-bypass login,
+-- before an organisation context exists. It needs only capability metadata.
+CREATE POLICY "OrgVertical_system_role_seed_select"
+  ON "OrgVertical"
+  FOR SELECT
+  USING (session_user = 'pathway_system_role_seed');
+
 ALTER TABLE "OrgModule" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "OrgModule_org_context_read"
   ON "OrgModule"
@@ -28,6 +35,11 @@ CREATE POLICY "OrgModule_org_context_read"
     app.current_org_id() IS NOT NULL
     AND "orgId" = app.current_org_id()
   );
+
+CREATE POLICY "OrgModule_system_role_seed_select"
+  ON "OrgModule"
+  FOR SELECT
+  USING (session_user = 'pathway_system_role_seed');
 
 REVOKE ALL PRIVILEGES ON TABLE "OrgMembership" FROM PUBLIC;
 REVOKE ALL PRIVILEGES ON TABLE "OrgVertical" FROM PUBLIC;
