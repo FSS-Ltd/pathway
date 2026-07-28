@@ -58,6 +58,7 @@ export async function resetDatabase() {
       TRUNCATE TABLE
         "UserRoleAssignment",
         "OrgRolePermission",
+        "OrgRoleRevision",
         "OrgRoleDefinition",
         "PermissionDefinition",
         "BillingEvent",
@@ -103,6 +104,7 @@ export async function resetDatabase() {
       TRUNCATE TABLE
         "UserRoleAssignment",
         "OrgRolePermission",
+        "OrgRoleRevision",
         "OrgRoleDefinition",
         "PermissionDefinition",
         "UsageCounters",
@@ -167,6 +169,11 @@ export {
   RoleScope,
 } from "@prisma/client";
 export { Prisma };
+export {
+  roleScopeAcceptsPermissionScope,
+  type CompatibleRoleScope,
+  type RolePermissionScope,
+} from "./role-scope-compatibility";
 
 async function applyTenantContext(
   tx: Prisma.TransactionClient,

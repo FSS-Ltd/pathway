@@ -1,0 +1,263 @@
+import { randomUUID } from "node:crypto";
+import {
+  prisma,
+  runTransaction,
+} from "@pathway/db";
+import {
+  createRolesTransactionBoundary,
+  RolesService,
+  type RoleActorContext,
+} from "../roles.service";
+import { isDatabaseAvailable, requireDatabase } from "../../../test-helpers.e2e";
+
+const ORG_A = process.env.E2E_ORG_ID as string;
+const SITE_A = process.env.E2E_TENANT_ID as string;
+const SITE_B = process.env.E2E_TENANT2_ID as string;
+const RLS_ROLE = "pathway_e2e_rls";
+
+function testTransactionBoundary() {
+  return createRolesTransactionBoundary(async (operation) =>
+    runTransaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${RLS_ROLE}"`);
+      const roleAttributes = await tx.$queryRaw<
+        Array<{ currentUser: string; rolsuper: boolean; rolbypassrls: boolean }>
+      >`
+        SELECT current_user AS "currentUser", rolsuper, rolbypassrls
+        FROM pg_roles
+        WHERE rolname = current_user
+      `;
+      expect(roleAttributes).toEqual([
+        {
+          currentUser: RLS_ROLE,
+          rolsuper: false,
+          rolbypassrls: false,
+        },
+      ]);
+      return operation(tx);
+    }),
+  );
+}
+
+async function expectMissing(operation: () => Promise<unknown>): Promise<void> {
+  await expect(operation()).rejects.toMatchObject({
+    response: { statusCode: 404, code: "ROLE_NOT_FOUND" },
+  });
+}
+
+async function expectDatabaseRejection(
+  operation: () => Promise<unknown>,
+  postgresCode: string,
+): Promise<void> {
+  try {
+    await operation();
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2010"
+    ) {
+      expect(error).toMatchObject({ meta: { code: postgresCode } });
+    } else {
+      expect(error).toMatchObject({
+        message: expect.stringContaining(
+          `PostgresError { code: "${postgresCode}"`,
+        ),
+      });
+    }
+    return;
+  }
+
+  throw new Error("Expected the database operation to be rejected");
+}
+
+describe("role API transaction and forced-RLS integration", () => {
+  const userA = randomUUID();
+  const userB = randomUUID();
+  const orgB = randomUUID();
+  const siteB = randomUUID();
+  const actorA: RoleActorContext = {
+    orgId: ORG_A,
+    tenantId: SITE_A,
+    userId: userA,
+    legacyOrgRoles: ["org:admin"],
+    requestId: "role-api-transaction-rls",
+  };
+  let actorB: RoleActorContext;
+  let service: RolesService;
+
+  beforeAll(async () => {
+    if (!requireDatabase()) return;
+
+    await prisma.user.createMany({
+      data: [
+        { id: userA, email: `${userA}@example.test` },
+        { id: userB, email: `${userB}@example.test` },
+      ],
+    });
+    await prisma.orgMembership.create({
+      data: { orgId: ORG_A, userId: userA, role: "ORG_ADMIN" },
+    });
+    await prisma.orgVertical.upsert({
+      where: { orgId: ORG_A },
+      update: { vertical: "ACE_SCHOOL" },
+      create: { orgId: ORG_A, vertical: "ACE_SCHOOL" },
+    });
+    await prisma.org.create({
+      data: { id: orgB, name: `Role API org ${orgB}`, slug: `role-api-${orgB}`, planCode: "trial" },
+    });
+    await prisma.tenant.create({
+      data: { id: siteB, name: "Role API site B", slug: `role-api-site-${siteB}`, orgId: orgB },
+    });
+    await prisma.orgMembership.create({
+      data: { orgId: orgB, userId: userB, role: "ORG_ADMIN" },
+    });
+    await prisma.orgVertical.create({ data: { orgId: orgB, vertical: "ACE_SCHOOL" } });
+    actorB = { ...actorA, orgId: orgB, tenantId: siteB, userId: userB };
+    service = new RolesService(testTransactionBoundary());
+  });
+
+  it("commits every role mutation with its revision and audit event under the non-bypass role", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await service.create({
+      name: `Transactional role ${randomUUID()}`,
+      scope: "site",
+      permissionKeys: ["ace.pace.read"],
+    }, actorA);
+    const cloned = await service.clone(created.id, { name: `Transactional clone ${randomUUID()}` }, actorA);
+    const updated = await service.update({
+      roleId: created.id,
+      expectedVersion: created.version,
+      name: `${created.name} updated`,
+      permissionKeys: ["ace.pace.read"],
+    }, actorA);
+    await service.retire(cloned.id, { expectedVersion: cloned.version }, actorA);
+
+    await testTransactionBoundary().run(actorA, async (tx) => {
+      const [revisions, audits] = await Promise.all([
+        tx.orgRoleRevision.findMany({ where: { roleDefinitionId: { in: [created.id, cloned.id] } } }),
+        tx.auditEvent.findMany({ where: { entityId: { in: [created.id, cloned.id] } } }),
+      ]);
+      expect(updated.version).toBe(2);
+      expect(revisions).toHaveLength(4);
+      expect(audits).toHaveLength(4);
+      expect(audits.every((audit) => audit.orgId === ORG_A && audit.tenantId === SITE_A)).toBe(true);
+      expect(
+        audits.every(
+          (audit) =>
+            typeof audit.metadata === "object" &&
+            audit.metadata !== null &&
+            "requestId" in audit.metadata &&
+            audit.metadata.requestId === actorA.requestId,
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("rolls back the role mutation when the audit write is denied", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const name = `Audit rollback ${randomUUID()}`;
+    const before = await testTransactionBoundary().run(actorA, async (tx) => ({
+      roles: await tx.orgRoleDefinition.count({ where: { name } }),
+      revisions: await tx.orgRoleRevision.count({ where: { actorUserId: userA } }),
+      audits: await tx.auditEvent.count({ where: { actorUserId: userA, action: "ROLE_CREATED" } }),
+    }));
+    await prisma.$executeRawUnsafe(`REVOKE INSERT ON TABLE "AuditEvent" FROM "${RLS_ROLE}"`);
+    try {
+      await expectDatabaseRejection(
+        () =>
+          service.create(
+            { name, scope: "site", permissionKeys: ["ace.pace.read"] },
+            actorA,
+          ),
+        "42501",
+      );
+    } finally {
+      await prisma.$executeRawUnsafe(`GRANT SELECT, INSERT ON TABLE "AuditEvent" TO "${RLS_ROLE}"`);
+    }
+    await testTransactionBoundary().run(actorA, async (tx) => {
+      expect(await tx.orgRoleDefinition.findFirst({ where: { name } })).toBeNull();
+      await expect(Promise.all([
+        tx.orgRoleDefinition.count({ where: { name } }),
+        tx.orgRoleRevision.count({ where: { actorUserId: userA } }),
+        tx.auditEvent.count({ where: { actorUserId: userA, action: "ROLE_CREATED" } }),
+      ])).resolves.toEqual([before.roles, before.revisions, before.audits]);
+    });
+  });
+
+  it("records organisation-scoped audit rows with no tenant and isolates them by organisation", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const organisationActor = { ...actorA, tenantId: undefined };
+    const role = await service.create({
+      name: `Organisation audit ${randomUUID()}`,
+      scope: "organisation",
+      permissionKeys: ["ace.pace.read"],
+    }, organisationActor);
+
+    await testTransactionBoundary().run(organisationActor, async (tx) => {
+      await expect(tx.auditEvent.findFirst({ where: { entityId: role.id } })).resolves.toMatchObject({
+        orgId: ORG_A,
+        tenantId: null,
+      });
+    });
+    await testTransactionBoundary().run({ ...actorA, tenantId: SITE_B }, async (tx) => {
+      await expect(tx.auditEvent.findFirst({ where: { entityId: role.id } })).resolves.toMatchObject({
+        orgId: ORG_A,
+        tenantId: null,
+      });
+    });
+    await testTransactionBoundary().run(actorB, async (tx) => {
+      await expect(tx.auditEvent.findFirst({ where: { entityId: role.id } })).resolves.toBeNull();
+    });
+  });
+
+  it("denies cross-site and cross-organisation role reads through the real service", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const role = await service.create({
+      name: `Isolation role ${randomUUID()}`,
+      scope: "site",
+      permissionKeys: ["ace.pace.read"],
+    }, actorA);
+    await expectMissing(() => service.get(role.id, { ...actorA, tenantId: SITE_B }));
+    await expectMissing(() => service.get(role.id, actorB));
+  });
+
+  it("rejects direct revision updates and deletes after RLS has admitted the row", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const role = await service.create({
+      name: `Immutable revision ${randomUUID()}`,
+      scope: "site",
+      permissionKeys: ["ace.pace.read"],
+    }, actorA);
+    const revision = await testTransactionBoundary().run(actorA, (tx) =>
+      tx.orgRoleRevision.findFirstOrThrow({ where: { roleDefinitionId: role.id } }),
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        testTransactionBoundary().run(actorA, (tx) =>
+          tx.$executeRaw`
+            UPDATE "OrgRoleRevision"
+            SET "name" = 'blocked'
+            WHERE "id" = ${revision.id}
+          `,
+        ),
+      "P0001",
+    );
+    await expectDatabaseRejection(
+      () =>
+        testTransactionBoundary().run(actorA, (tx) =>
+          tx.$executeRaw`
+            DELETE FROM "OrgRoleRevision"
+            WHERE "id" = ${revision.id}
+          `,
+        ),
+      "P0001",
+    );
+  });
+});
