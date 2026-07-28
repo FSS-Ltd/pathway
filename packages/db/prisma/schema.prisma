@@ -212,7 +212,7 @@ model OrgRoleDefinition {
   permissions OrgRolePermission[]
   assignments UserRoleAssignment[]
 
-  @@unique([orgId, tenantId, name])
+  @@unique([orgId, tenantId, name, isSystem])
   @@index([orgId, tenantId, isActive])
 }
 

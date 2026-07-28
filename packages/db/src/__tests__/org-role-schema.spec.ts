@@ -26,7 +26,7 @@ describe("organisation role schema contract", () => {
 
   it("requires active role metadata to be isolated by organisation and site", () => {
     expect(schema).toContain("@@unique([id, orgId])");
-    expect(schema).toContain("@@unique([orgId, tenantId, name])");
+    expect(schema).toContain("@@unique([orgId, tenantId, name, isSystem])");
     expect(schema).toContain("@@index([orgId, tenantId, isActive])");
     expect(schema).toMatch(
       /tenant\s+Tenant\?\s+@relation\(fields: \[tenantId, orgId\], references: \[id, orgId\]\)/,

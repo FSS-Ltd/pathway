@@ -1,12 +1,20 @@
+import type { Prisma } from "@prisma/client";
 import type { Capability } from "./types";
 import { prisma } from "./db";
-import { getOrgVertical } from "./vertical";
+import { getOrgVertical, type OrgVerticalReader } from "./vertical";
 import { VERTICAL_CAPABILITIES, MODULE_CAPABILITIES } from "./capability-maps";
 
-export async function getOrgCapabilities(orgId: string): Promise<Capability[]> {
+export interface OrgCapabilityReader extends OrgVerticalReader {
+  orgModule: Pick<Prisma.TransactionClient["orgModule"], "findMany">;
+}
+
+export async function getOrgCapabilities(
+  orgId: string,
+  client: OrgCapabilityReader = prisma,
+): Promise<Capability[]> {
   const now = Date.now();
-  const vertical = await getOrgVertical(orgId);
-  const modules = await prisma.orgModule.findMany({
+  const vertical = await getOrgVertical(orgId, client);
+  const modules = await client.orgModule.findMany({
     where: { orgId, status: "ACTIVE" },
   });
 

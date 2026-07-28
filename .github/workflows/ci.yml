@@ -159,6 +159,83 @@ jobs:
         run: pnpm test:integration
         continue-on-error: false
 
+  system-role-seed-proof:
+    name: System Role Seed Database Identity
+    runs-on: ubuntu-22.04
+    needs: ci
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pathway_system_role_seed_test_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Apply Prisma migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_system_role_seed_test_ci?schema=app
+        run: pnpm db:deploy
+
+      - name: Prove system-role seed database identity
+        env:
+          SYSTEM_ROLE_SEED_TEST_ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_system_role_seed_test_ci?schema=app
+          SYSTEM_ROLE_SEED_TEST_DISPOSABLE_TOKEN: provision-and-drop-system-role-seed-test-logins
+          PATHWAY_RUN_DB_INTEGRATION_TESTS: "1"
+          PATHWAY_RUN_DB_SEED_PROOF: "1"
+          DOTENV_CONFIG_PATH: ../../.env.test
+        run: >-
+          pnpm --filter @pathway/db exec
+          node -r dotenv/config node_modules/jest/bin/jest.js
+          --runInBand --runTestsByPath
+          src/__tests__/system-role-seed-test-database.spec.ts
+          src/__tests__/seed-system-roles.spec.ts
+          src/__tests__/system-role-seed-command.spec.ts
+
   permission-definitions:
     name: Permission Definition Database
     runs-on: ubuntu-22.04

@@ -196,6 +196,15 @@ describeIfDatabaseSmoke("PermissionDefinition database smoke", () => {
         usingExpression: "true",
         withCheckExpression: null,
       },
+      {
+        policyname: "PermissionDefinition_system_role_seed",
+        permissive: "PERMISSIVE",
+        roles: ["public"],
+        command: "ALL",
+        usingExpression: "(SESSION_USER = 'pathway_system_role_seed'::name)",
+        withCheckExpression:
+          "(SESSION_USER = 'pathway_system_role_seed'::name)",
+      },
     ]);
 
     const privileges = await prisma.$queryRaw<TablePrivilegeGrant[]>`
