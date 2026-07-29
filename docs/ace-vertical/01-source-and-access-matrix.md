@@ -35,6 +35,34 @@ AND tenant/RLS policy
 
 The comparator allow-list repeats this approved route and compile-time `PermissionKey` pair only. It is not a fixed-role-to-capability mapping, resolver output, or executable permission registry.
 
+## ACE-F10 to ACE-F14 temporary role-API bootstrap
+
+R01 through R07 keep the approved capability and permission contract while
+the route-by-route cutover remains incomplete. Until ACE-F14 removes this
+bootstrap, each role endpoint requires all of the following:
+
+- authenticated trusted request context;
+- an active `ORG_ADMIN` organisation membership confirmed from the database;
+- the matching active legacy `org:admin` request-context role;
+- the route's active `platform.access.roles.read` or
+  `platform.access.roles.manage` capability and active permission metadata;
+- inclusion of that route permission in the protected Organisation Head
+  system template; and
+- organisation/site ownership checks and forced RLS.
+
+For create, clone, update, and permission replacement, grantable keys are the
+intersection of the protected Organisation Head template, active organisation
+capabilities, and active delegable permission metadata. R05 may use a protected
+system template as a read-only clone source. It never mutates that template,
+and the clone still passes source organisation/site and grantable-key checks.
+R04, R06, and R07 continue to reject mutation or retirement of system roles.
+
+ACE-F12 owns transactional last-organisation-head and same-request
+self-lockout enforcement. Those controls remain required for the approved
+R04, R06, R07, R10, and R11 contract, but ACE-F10 does not claim to implement
+them early. ACE-F14 removes the legacy bootstrap after shadow comparison and
+bounded route migration prove parity.
+
 `none` means the layer is genuinely inapplicable to that route. It never means undecided.
 
 ### Membership and tenant context

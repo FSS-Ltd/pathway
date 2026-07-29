@@ -87,11 +87,15 @@ enum AuditAction {
   UPDATED
   DELETED
   VIEWED
+  ROLE_CREATED
+  ROLE_UPDATED
+  ROLE_RETIRED
 }
 
 enum AuditEntityType {
   CONCERN
   CHILD_NOTE
+  ORG_ROLE
 }
 
 enum LeadKind {
@@ -210,10 +214,34 @@ model OrgRoleDefinition {
   org         Org      @relation(fields: [orgId], references: [id])
   tenant      Tenant?  @relation(fields: [tenantId, orgId], references: [id, orgId])
   permissions OrgRolePermission[]
+  revisions   OrgRoleRevision[]
   assignments UserRoleAssignment[]
 
   @@unique([orgId, tenantId, name, isSystem])
   @@index([orgId, tenantId, isActive])
+}
+
+// Immutable snapshots make role changes reconstructable even when current
+// permission membership has changed or a role has since been retired.
+model OrgRoleRevision {
+  id               String    @id @default(uuid())
+  roleDefinitionId String
+  orgId            String
+  tenantId         String?
+  version          Int
+  name             String
+  description      String?   @db.Text
+  scope            RoleScope
+  isActive         Boolean
+  permissionKeys   Json
+  actorUserId      String
+  createdAt        DateTime  @default(now())
+
+  roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id], onDelete: Restrict)
+  org            Org               @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([roleDefinitionId, version])
+  @@index([orgId, roleDefinitionId, createdAt])
 }
 
 model OrgRolePermission {
@@ -419,6 +447,7 @@ model Org {
   orgVertical       OrgVertical?
   orgModules        OrgModule[]
   roleDefinitions   OrgRoleDefinition[]
+  roleRevisions     OrgRoleRevision[]
   roleAssignments   UserRoleAssignment[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
@@ -1156,8 +1185,8 @@ model ChildNote {
 model AuditEvent {
   id          String          @id @default(uuid())
   createdAt   DateTime        @default(now())
-  tenantId    String
-  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  tenantId    String?
+  tenant      Tenant?         @relation(fields: [tenantId], references: [id])
   orgId       String
   org         Org             @relation(fields: [orgId], references: [id])
   actorUserId String

@@ -1,10 +1,13 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import {
+  roleScopeAcceptsPermissionScope,
+  type RolePermissionScope,
+} from "./role-scope-compatibility";
 
 export const SYSTEM_ACTOR_ID = "00000000-0000-0000-0000-000000000000";
 export const SYSTEM_ROLE_SEED_DATABASE_ROLE = "pathway_system_role_seed";
 
 export type SystemRoleScope = "organisation" | "site" | "relationship";
-type PermissionScope = SystemRoleScope | "assignment";
 
 export interface SystemRoleTemplateInput {
   readonly name: string;
@@ -46,14 +49,6 @@ const SYSTEM_ROLE_SEED_TRANSACTION_OPTIONS = {
   maxWait: 10_000,
   timeout: 15_000,
 } as const;
-
-const COMPATIBLE_PERMISSION_SCOPES: Readonly<
-  Record<SystemRoleScope, ReadonlySet<PermissionScope>>
-> = {
-  organisation: new Set(["organisation", "site", "relationship", "assignment"]),
-  site: new Set(["site", "relationship", "assignment"]),
-  relationship: new Set(["relationship"]),
-};
 
 function getSystemRoleId(
   orgId: string,
@@ -272,8 +267,9 @@ export async function seedSystemRoles(
                 return (
                   permissionScope !== undefined &&
                   availablePermissionKeys.has(permissionKey) &&
-                  COMPATIBLE_PERMISSION_SCOPES[template.scope].has(
-                    permissionScope,
+                  roleScopeAcceptsPermissionScope(
+                    template.scope,
+                    permissionScope as RolePermissionScope,
                   )
                 );
               }),

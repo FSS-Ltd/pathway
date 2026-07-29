@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { prisma, withOrgRlsContext } from "@pathway/db";
 import { getOrgCapabilities, type PermissionKey } from "@pathway/platform";
 import { CommonModule } from "../common/common.module";
+import { AuthModule } from "../auth/auth.module";
 import { LoggingService } from "../common/logging/logging.service";
 import { AccessDecisionLogger } from "./access-decision-logger";
 import {
@@ -20,6 +21,12 @@ import {
   type OrgCapabilitiesReader,
 } from "./effective-permissions.service";
 import { PermissionGuard } from "./permission.guard";
+import { RolesController } from "./roles.controller";
+import {
+  ROLES_TRANSACTION_BOUNDARY,
+  rolesTransactionBoundary,
+  RolesService,
+} from "./roles.service";
 
 const effectivePermissionsReader: EffectivePermissionsReader = {
   async getOrganisationMembership(userId, orgId) {
@@ -103,8 +110,14 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
 };
 
 @Module({
-  imports: [CommonModule],
+  imports: [CommonModule, AuthModule],
+  controllers: [RolesController],
   providers: [
+    RolesService,
+    {
+      provide: ROLES_TRANSACTION_BOUNDARY,
+      useValue: rolesTransactionBoundary,
+    },
     EffectivePermissionsService,
     {
       provide: AccessShadowService,

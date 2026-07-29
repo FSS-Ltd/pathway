@@ -10,6 +10,7 @@ import type { PermissionKey } from "@pathway/platform";
 import { AccessDecisionLogger } from "./access-decision-logger";
 import type { AccessDecision } from "./access-decision.types";
 import { EffectivePermissionsService } from "./effective-permissions.service";
+import { getOrCreateRequestId } from "./request-id";
 import { REQUIRED_PERMISSION } from "./require-permission.decorator";
 
 type RequestWithDecisionMetadata = {
@@ -90,14 +91,13 @@ function requestMetadata(context: ExecutionContext): DecisionRequestMetadata {
   const request = context
     .switchToHttp()
     .getRequest<RequestWithDecisionMetadata>();
-  const requestId = request.headers?.["x-request-id"];
   const routePath = request.route?.path;
   const route = routePath
     ? `${request.method ?? "UNKNOWN"} ${routePath}`
     : `${context.getClass().name}.${context.getHandler().name}`;
 
   return {
-    requestId: Array.isArray(requestId) ? requestId[0] : requestId,
+    requestId: getOrCreateRequestId(request),
     route,
   };
 }
