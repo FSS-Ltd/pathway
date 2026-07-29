@@ -10,9 +10,6 @@ import {
 } from "../roles.service";
 import { isDatabaseAvailable, requireDatabase } from "../../../test-helpers.e2e";
 
-const ORG_A = process.env.E2E_ORG_ID as string;
-const SITE_A = process.env.E2E_TENANT_ID as string;
-const SITE_B = process.env.E2E_TENANT2_ID as string;
 const RLS_ROLE = "pathway_e2e_rls";
 
 function testTransactionBoundary() {
@@ -74,11 +71,14 @@ async function expectDatabaseRejection(
 describe("role API transaction and forced-RLS integration", () => {
   const userA = randomUUID();
   const userB = randomUUID();
+  const orgA = randomUUID();
   const orgB = randomUUID();
+  const siteA = randomUUID();
+  const siteA2 = randomUUID();
   const siteB = randomUUID();
   const actorA: RoleActorContext = {
-    orgId: ORG_A,
-    tenantId: SITE_A,
+    orgId: orgA,
+    tenantId: siteA,
     userId: userA,
     legacyOrgRoles: ["org:admin"],
     requestId: "role-api-transaction-rls",
@@ -95,24 +95,56 @@ describe("role API transaction and forced-RLS integration", () => {
         { id: userB, email: `${userB}@example.test` },
       ],
     });
+    await prisma.org.createMany({
+      data: [
+        {
+          id: orgA,
+          name: `Role API org ${orgA}`,
+          slug: `role-api-${orgA}`,
+          planCode: "trial",
+        },
+        {
+          id: orgB,
+          name: `Role API org ${orgB}`,
+          slug: `role-api-${orgB}`,
+          planCode: "trial",
+        },
+      ],
+    });
+    await prisma.tenant.createMany({
+      data: [
+        {
+          id: siteA,
+          name: "Role API site A",
+          slug: `role-api-site-${siteA}`,
+          orgId: orgA,
+        },
+        {
+          id: siteA2,
+          name: "Role API site A2",
+          slug: `role-api-site-${siteA2}`,
+          orgId: orgA,
+        },
+        {
+          id: siteB,
+          name: "Role API site B",
+          slug: `role-api-site-${siteB}`,
+          orgId: orgB,
+        },
+      ],
+    });
     await prisma.orgMembership.create({
-      data: { orgId: ORG_A, userId: userA, role: "ORG_ADMIN" },
-    });
-    await prisma.orgVertical.upsert({
-      where: { orgId: ORG_A },
-      update: { vertical: "ACE_SCHOOL" },
-      create: { orgId: ORG_A, vertical: "ACE_SCHOOL" },
-    });
-    await prisma.org.create({
-      data: { id: orgB, name: `Role API org ${orgB}`, slug: `role-api-${orgB}`, planCode: "trial" },
-    });
-    await prisma.tenant.create({
-      data: { id: siteB, name: "Role API site B", slug: `role-api-site-${siteB}`, orgId: orgB },
+      data: { orgId: orgA, userId: userA, role: "ORG_ADMIN" },
     });
     await prisma.orgMembership.create({
       data: { orgId: orgB, userId: userB, role: "ORG_ADMIN" },
     });
-    await prisma.orgVertical.create({ data: { orgId: orgB, vertical: "ACE_SCHOOL" } });
+    await prisma.orgVertical.createMany({
+      data: [
+        { orgId: orgA, vertical: "ACE_SCHOOL" },
+        { orgId: orgB, vertical: "ACE_SCHOOL" },
+      ],
+    });
     actorB = { ...actorA, orgId: orgB, tenantId: siteB, userId: userB };
     service = new RolesService(testTransactionBoundary());
   });
@@ -142,7 +174,11 @@ describe("role API transaction and forced-RLS integration", () => {
       expect(updated.version).toBe(2);
       expect(revisions).toHaveLength(4);
       expect(audits).toHaveLength(4);
-      expect(audits.every((audit) => audit.orgId === ORG_A && audit.tenantId === SITE_A)).toBe(true);
+      expect(
+        audits.every(
+          (audit) => audit.orgId === orgA && audit.tenantId === siteA,
+        ),
+      ).toBe(true);
       expect(
         audits.every(
           (audit) =>
@@ -199,13 +235,13 @@ describe("role API transaction and forced-RLS integration", () => {
 
     await testTransactionBoundary().run(organisationActor, async (tx) => {
       await expect(tx.auditEvent.findFirst({ where: { entityId: role.id } })).resolves.toMatchObject({
-        orgId: ORG_A,
+        orgId: orgA,
         tenantId: null,
       });
     });
-    await testTransactionBoundary().run({ ...actorA, tenantId: SITE_B }, async (tx) => {
+    await testTransactionBoundary().run({ ...actorA, tenantId: siteA2 }, async (tx) => {
       await expect(tx.auditEvent.findFirst({ where: { entityId: role.id } })).resolves.toMatchObject({
-        orgId: ORG_A,
+        orgId: orgA,
         tenantId: null,
       });
     });
@@ -222,7 +258,9 @@ describe("role API transaction and forced-RLS integration", () => {
       scope: "site",
       permissionKeys: ["ace.pace.read"],
     }, actorA);
-    await expectMissing(() => service.get(role.id, { ...actorA, tenantId: SITE_B }));
+    await expectMissing(() =>
+      service.get(role.id, { ...actorA, tenantId: siteA2 }),
+    );
     await expectMissing(() => service.get(role.id, actorB));
   });
 

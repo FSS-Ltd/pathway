@@ -203,9 +203,6 @@ export class AuthIdentityService {
       }
     }
 
-    // Auto-provision site membership for new users (skip if user already has memberships)
-    await this.ensureUserHasSiteAccess(user.id);
-
     // Return safe display name using fallback logic
     const safeDisplayName =
       safeName ??
@@ -220,36 +217,6 @@ export class AuthIdentityService {
       email: normalizedEmail ?? user.email,
       displayName: safeDisplayName,
     };
-  }
-
-  /**
-   * Ensures a user has at least one site membership.
-   * If they don't, assign them to the first available site or create a default.
-   */
-  private async ensureUserHasSiteAccess(userId: string): Promise<void> {
-    const existingMembership = await prisma.siteMembership.findFirst({
-      where: { userId },
-    });
-
-    if (existingMembership) {
-      return; // User already has access
-    }
-
-    // Find the first available site (prefer demo site)
-    const site = await prisma.tenant.findFirst({
-      orderBy: { createdAt: "asc" },
-    });
-
-    if (site) {
-      // Assign as STAFF by default
-      await prisma.siteMembership.create({
-        data: {
-          userId,
-          tenantId: site.id,
-          role: "STAFF",
-        },
-      });
-    }
   }
 
   async resolveUserFromClaims(
@@ -288,5 +255,4 @@ export class AuthIdentityService {
     return { ...result, provider, subject };
   }
 }
-
 

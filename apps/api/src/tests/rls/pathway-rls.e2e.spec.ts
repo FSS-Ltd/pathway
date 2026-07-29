@@ -7,6 +7,7 @@ import {
 
 const TENANT_A = process.env.E2E_TENANT_ID as string;
 const TENANT_B = process.env.E2E_TENANT2_ID as string;
+const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 
 const SUPABASE_RLS_HARDENED_TABLES = [
   "_GroupToSession",
@@ -51,6 +52,32 @@ interface TenantFixtures {
   learningLogId: string;
   userId: string;
   orgId: string;
+}
+
+function getTenantRlsRoleName(): string | undefined {
+  const configuredRole = process.env.E2E_TENANT_RLS_ROLE;
+  if (!configuredRole) return undefined;
+  if (
+    configuredRole !== TENANT_RLS_ROLE ||
+    !/^[a-z_][a-z0-9_]*$/.test(configuredRole)
+  ) {
+    throw new Error(`Unexpected E2E tenant RLS role: ${configuredRole}`);
+  }
+  return configuredRole;
+}
+
+async function withEnforcedTenantRlsContext<T>(
+  tenantId: string,
+  orgId: string,
+  callback: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  const roleName = getTenantRlsRoleName();
+  return withTenantRlsContext(tenantId, orgId, async (tx) => {
+    if (roleName) {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${roleName}"`);
+    }
+    return callback(tx);
+  });
 }
 
 async function seedTenantData(
@@ -227,25 +254,45 @@ describe("Postgres RLS policies", () => {
 
   it("verifies RLS context is set correctly", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
-    const result = await withTenantRlsContext(
+    const result = await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) => {
         const [row] = await tx.$queryRaw<
-          Array<{ tid: string | null; oid: string | null }>
+          Array<{
+            tid: string | null;
+            oid: string | null;
+            currentUser: string;
+            rolsuper: boolean;
+            rolbypassrls: boolean;
+          }>
         >`
-          SELECT app.current_tenant_id() as tid, app.current_org_id() as oid
+          SELECT
+            app.current_tenant_id() AS tid,
+            app.current_org_id() AS oid,
+            current_user AS "currentUser",
+            rolsuper,
+            rolbypassrls
+          FROM pg_roles
+          WHERE rolname = current_user
         `;
         return row;
       },
     );
     expect(result.tid).toBe(TENANT_A);
     expect(result.oid).toBe(fixtures[TENANT_A].orgId);
+    if (getTenantRlsRoleName()) {
+      expect(result).toMatchObject({
+        currentUser: TENANT_RLS_ROLE,
+        rolsuper: false,
+        rolbypassrls: false,
+      });
+    }
   });
 
   it("verifies RLS is enabled and forced on Child table", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
-    const result = await withTenantRlsContext(
+    const result = await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) => {
@@ -270,7 +317,7 @@ describe("Postgres RLS policies", () => {
 
   it("verifies a Child policy exists", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
-    const policies = await withTenantRlsContext(
+    const policies = await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) =>
@@ -292,7 +339,7 @@ describe("Postgres RLS policies", () => {
 
   it("verifies newly hardened Supabase public tables have RLS enabled", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
-    const rows = await withTenantRlsContext(
+    const rows = await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) =>
@@ -307,20 +354,24 @@ describe("Postgres RLS policies", () => {
           JOIN pg_namespace n ON n.oid = c.relnamespace
           WHERE n.nspname = current_schema()
             AND c.relkind IN ('r', 'p')
-            AND c.relname IN (${Prisma.join(SUPABASE_RLS_HARDENED_TABLES)})
           ORDER BY c.relname
         `,
     );
+    const hardenedRows = rows.filter((row) =>
+      SUPABASE_RLS_HARDENED_TABLES.some(
+        (tableName) => tableName === row.relname,
+      ),
+    );
 
-    expect(rows.map((row) => row.relname).sort()).toEqual(
+    expect(hardenedRows.map((row) => row.relname).sort()).toEqual(
       [...SUPABASE_RLS_HARDENED_TABLES].sort(),
     );
-    expect(rows.filter((row) => !row.relrowsecurity)).toEqual([]);
+    expect(hardenedRows.filter((row) => !row.relrowsecurity)).toEqual([]);
   });
 
   it("verifies anon and authenticated have no direct grants on hardened public tables", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
-    const grants = await withTenantRlsContext(
+    const grants = await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) =>
@@ -335,25 +386,33 @@ describe("Postgres RLS policies", () => {
           FROM information_schema.table_privileges tp
           WHERE tp.table_schema = current_schema()
             AND tp.grantee IN ('anon', 'authenticated')
-            AND tp.table_name IN (${Prisma.join(SUPABASE_RLS_HARDENED_TABLES)})
           ORDER BY tp.table_name, tp.grantee, tp.privilege_type
         `,
     );
+    const hardenedTableGrants = grants.filter((grant) =>
+      SUPABASE_RLS_HARDENED_TABLES.some(
+        (tableName) => tableName === grant.table_name,
+      ),
+    );
 
-    expect(grants).toEqual([]);
+    expect(hardenedTableGrants).toEqual([]);
   });
 
   it("returns only in-tenant children and notes", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
     const { childId, noteId, orgId } = fixtures[TENANT_A];
-    const result = await withTenantRlsContext(TENANT_A, orgId, async (tx) => {
-      const children = await tx.child.findMany({ select: { id: true } });
-      const notes = await tx.childNote.findMany({ select: { id: true } });
-      return {
-        childIds: children.map((c) => c.id),
-        noteIds: notes.map((n) => n.id),
-      };
-    });
+    const result = await withEnforcedTenantRlsContext(
+      TENANT_A,
+      orgId,
+      async (tx) => {
+        const children = await tx.child.findMany({ select: { id: true } });
+        const notes = await tx.childNote.findMany({ select: { id: true } });
+        return {
+          childIds: children.map((c) => c.id),
+          noteIds: notes.map((n) => n.id),
+        };
+      },
+    );
 
     expect(result.childIds).toEqual(expect.arrayContaining([childId]));
     expect(result.noteIds).toEqual(expect.arrayContaining([noteId]));
@@ -363,7 +422,7 @@ describe("Postgres RLS policies", () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
       return;
     const targetNote = fixtures[TENANT_B].noteId;
-    await withTenantRlsContext(
+    await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) => {
@@ -379,7 +438,7 @@ describe("Postgres RLS policies", () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
       return;
     const targetLearningLog = fixtures[TENANT_B].learningLogId;
-    await withTenantRlsContext(
+    await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) => {
@@ -395,7 +454,7 @@ describe("Postgres RLS policies", () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
       return;
     await expect(
-      withTenantRlsContext(
+      withEnforcedTenantRlsContext(
         TENANT_A,
         fixtures[TENANT_A].orgId,
         (tx) =>
@@ -416,11 +475,14 @@ describe("Postgres RLS policies", () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
       return;
     await expect(
-      withTenantRlsContext(TENANT_A, fixtures[TENANT_A].orgId, async (tx) =>
-        tx.concern.update({
-          where: { id: fixtures[TENANT_B].concernId },
-          data: { summary: "not allowed" },
-        }),
+      withEnforcedTenantRlsContext(
+        TENANT_A,
+        fixtures[TENANT_A].orgId,
+        async (tx) =>
+          tx.concern.update({
+            where: { id: fixtures[TENANT_B].concernId },
+            data: { summary: "not allowed" },
+          }),
       ),
     ).rejects.toMatchObject({ code: "P2025" });
   });
@@ -428,12 +490,12 @@ describe("Postgres RLS policies", () => {
   it("counts only attendance rows for the active tenant", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
       return;
-    const countA = await withTenantRlsContext(
+    const countA = await withEnforcedTenantRlsContext(
       TENANT_A,
       fixtures[TENANT_A].orgId,
       async (tx) => tx.attendance.count(),
     );
-    const countB = await withTenantRlsContext(
+    const countB = await withEnforcedTenantRlsContext(
       TENANT_B,
       fixtures[TENANT_B].orgId,
       async (tx) => tx.attendance.count(),
@@ -446,11 +508,14 @@ describe("Postgres RLS policies", () => {
   it("allows in-tenant session + assignment updates", async () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
     const { sessionId, orgId } = fixtures[TENANT_A];
-    const updated = await withTenantRlsContext(TENANT_A, orgId, async (tx) =>
-      tx.session.update({
-        where: { id: sessionId },
-        data: { title: "Updated Session A" },
-      }),
+    const updated = await withEnforcedTenantRlsContext(
+      TENANT_A,
+      orgId,
+      async (tx) =>
+        tx.session.update({
+          where: { id: sessionId },
+          data: { title: "Updated Session A" },
+        }),
     );
     expect(updated.title).toBe("Updated Session A");
   });
@@ -459,11 +524,14 @@ describe("Postgres RLS policies", () => {
     if (!isDatabaseAvailable() || !fixtures[TENANT_A] || !fixtures[TENANT_B])
       return;
     await expect(
-      withTenantRlsContext(TENANT_A, fixtures[TENANT_A].orgId, async (tx) =>
-        tx.session.update({
-          where: { id: fixtures[TENANT_B].sessionId },
-          data: { title: "should fail" },
-        }),
+      withEnforcedTenantRlsContext(
+        TENANT_A,
+        fixtures[TENANT_A].orgId,
+        async (tx) =>
+          tx.session.update({
+            where: { id: fixtures[TENANT_B].sessionId },
+            data: { title: "should fail" },
+          }),
       ),
     ).rejects.toMatchObject({ code: "P2025" });
   });
