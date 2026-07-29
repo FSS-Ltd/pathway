@@ -4,6 +4,9 @@
 
 PathWay is a comprehensive monorepo project designed to streamline the development of a scalable and maintainable platform. This repository contains multiple applications and shared packages, enabling efficient code reuse and unified development workflows.
 
+The approved NexSteps Home product and UX implementation reference starts at
+[`docs/NexStepsV2/nexsteps-home/README.md`](docs/NexStepsV2/nexsteps-home/README.md).
+
 ## Monorepo Structure
 
 The repository is organized into the following main directories:
