@@ -148,14 +148,15 @@ jobs:
 
       - name: Run integration tests
         env:
-          # Jest's global setup will handle migrations and seeding
+          # Jest's global setup resets, migrates, and seeds the database once.
+          E2E_USE_GLOBAL_SETUP: "true"
           E2E_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_test_e2e?schema=app
+          E2E_BOOTSTRAP_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_test_e2e?schema=app
           E2E_ORG_ID: "00000000-0000-0000-0000-000000000001"
           E2E_TENANT_ID: "00000000-0000-0000-0000-00000000000a"
           E2E_TENANT2_ID: "00000000-0000-0000-0000-00000000000b"
           E2E_TENANT_SLUG: "e2e-tenant-a"
-          # Allow Jest's global setup to reset the database
-          E2E_ALLOW_RESET: "true"
+          E2E_ALLOW_RESET: "false"
         run: pnpm test:integration
         continue-on-error: false
 

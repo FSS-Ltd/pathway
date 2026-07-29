@@ -4,6 +4,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { PrismaClientType } from "@pathway/db";
+import { selectE2eDatabaseUrl } from "./test-environment.e2e";
 
 // E2E tests can be slow (DB, HTTP); set default timeout
 if (typeof jest !== "undefined") {
@@ -11,19 +12,24 @@ if (typeof jest !== "undefined") {
 }
 
 const usesGlobalSetup = process.env.E2E_USE_GLOBAL_SETUP === "true";
+const explicitDatabaseEnvironment: NodeJS.ProcessEnv = {
+  TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
+  E2E_DATABASE_URL: process.env.E2E_DATABASE_URL,
+};
 
 // 1) Load test env first, then fallback to root .env
 config({
   path: path.resolve(__dirname, "../../.env.test"),
-  override: !usesGlobalSetup,
+  override: false,
 });
 config({ path: path.resolve(__dirname, "../../.env"), override: false });
 
 // 2) Point Prisma at the dedicated E2E database (prefer TEST_DATABASE_URL if provided)
-const BASE_E2E_URL =
-  process.env.E2E_USE_GLOBAL_SETUP === "true"
-    ? process.env.E2E_DATABASE_URL
-    : (process.env.TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL);
+const BASE_E2E_URL = selectE2eDatabaseUrl(
+  explicitDatabaseEnvironment,
+  process.env,
+  usesGlobalSetup,
+);
 
 if (!BASE_E2E_URL) {
   throw new Error(
