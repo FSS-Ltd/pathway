@@ -1,10 +1,13 @@
 import request from "supertest";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { withTenantRlsContext } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
+import { prisma, withTenantRlsContext } from "@pathway/db";
 import { AppModule } from "../../app.module";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 describe("Parents (e2e)", () => {
   let app: INestApplication;
@@ -14,12 +17,8 @@ describe("Parents (e2e)", () => {
   let parentIdTenant1: string;
   let parentIdTenant2: string;
   let authHeaderTenant1: string;
+  let authUserId: string;
   const nonce = Date.now();
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -90,22 +89,21 @@ describe("Parents (e2e)", () => {
       parentIdTenant2 = otherParent.id;
     });
 
-    authHeaderTenant1 = buildAuthHeader({
-      sub: "parents-e2e",
-      "https://pathway.app/user": { id: "parents-e2e" },
-      "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: "e2e-tenant-a",
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "parents-e2e",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeaderTenant1 = auth.authorization;
   });
 
   afterAll(async () => {
     if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

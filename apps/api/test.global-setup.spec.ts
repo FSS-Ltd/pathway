@@ -21,7 +21,7 @@ describe("configureCiRlsRole", () => {
       statements.push(statement.trim());
     });
 
-    expect(statements).toHaveLength(15);
+    expect(statements).toHaveLength(21);
     expect(statements[0]).toContain('CREATE ROLE "pathway_e2e_rls"');
     expect(statements).toEqual(
       expect.arrayContaining([
@@ -39,6 +39,12 @@ describe("configureCiRlsRole", () => {
         'GRANT SELECT ON TABLE "OrgVertical" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgModule" TO "pathway_e2e_rls";',
         'GRANT "pathway_e2e_rls" TO "pathway_test_user";',
+        expect.stringContaining('CREATE ROLE "pathway_e2e_tenant_rls"'),
+        'REVOKE ALL PRIVILEGES ON SCHEMA app FROM "pathway_e2e_tenant_rls";',
+        'REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA app FROM "pathway_e2e_tenant_rls";',
+        'GRANT USAGE ON SCHEMA app TO "pathway_e2e_tenant_rls";',
+        'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO "pathway_e2e_tenant_rls";',
+        'GRANT "pathway_e2e_tenant_rls" TO "pathway_test_user";',
       ]),
     );
     expect(statements.join("\n")).not.toMatch(

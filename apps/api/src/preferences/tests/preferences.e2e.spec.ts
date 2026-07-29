@@ -3,23 +3,23 @@ import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { AppModule } from "../../app.module";
-import { Weekday, withTenantRlsContext } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import { prisma, Weekday, withTenantRlsContext } from "@pathway/db";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 describe("Preferences (e2e)", () => {
   let app: INestApplication;
   let authHeader: string;
+  let authUserId: string;
 
   // IDs we will create and reuse
   const tenantId = process.env.E2E_TENANT_ID as string;
   const orgId = process.env.E2E_ORG_ID as string;
   const userId = randomUUID();
   let prefId = "";
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -38,14 +38,15 @@ describe("Preferences (e2e)", () => {
     // Use the global pipes configured in AppModule (Zod-based); no class-validator here.
     await app.init();
 
-    authHeader = buildAuthHeader({
-      sub: "preferences-e2e",
-      "https://pathway.app/user": { id: "preferences-e2e" },
-      "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-      "https://pathway.app/tenant": { tenantId, orgId, slug: "e2e-tenant-a" },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "preferences-e2e",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
 
     await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await tx.volunteerPreference.deleteMany({
@@ -63,14 +64,16 @@ describe("Preferences (e2e)", () => {
   });
 
   afterAll(async () => {
-    if (app) {
-      await app.close();
-    }
     if (prefId) {
       await withTenantRlsContext(tenantId, orgId, async (tx) => {
         await tx.volunteerPreference.deleteMany({ where: { id: prefId } });
         await tx.user.deleteMany({ where: { id: userId } });
       });
+    }
+    if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
+      await app.close();
     }
   });
 

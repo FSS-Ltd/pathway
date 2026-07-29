@@ -1,3 +1,103 @@
+import { OrgRole, prisma, SiteRole } from "@pathway/db";
+import { randomUUID } from "node:crypto";
+
+interface SeedE2eAuthUserOptions {
+  subject: string;
+  tenantId?: string;
+  siteRole?: SiteRole;
+  orgId?: string;
+  orgRole?: OrgRole;
+  userId?: string;
+  email?: string;
+  name?: string;
+  hasFamilyAccess?: boolean;
+}
+
+interface E2eAuthUser {
+  userId: string;
+  authorization: string;
+}
+
+export async function seedE2eAuthUser(
+  options: SeedE2eAuthUserOptions,
+): Promise<E2eAuthUser> {
+  if (options.siteRole && !options.tenantId) {
+    throw new Error("tenantId is required when seeding a site role");
+  }
+  if (options.orgRole && !options.orgId) {
+    throw new Error("orgId is required when seeding an organisation role");
+  }
+
+  const userId = options.userId ?? randomUUID();
+  const email = options.email ?? `${userId}@example.test`;
+
+  await prisma.user.upsert({
+    where: { id: userId },
+    update: {
+      lastActiveTenantId: options.tenantId,
+      hasFamilyAccess: options.hasFamilyAccess,
+    },
+    create: {
+      id: userId,
+      email,
+      name: options.name,
+      lastActiveTenantId: options.tenantId,
+      hasFamilyAccess: options.hasFamilyAccess,
+    },
+  });
+  await prisma.userIdentity.upsert({
+    where: {
+      provider_providerSubject: {
+        provider: "auth0",
+        providerSubject: options.subject,
+      },
+    },
+    update: { userId, email },
+    create: {
+      userId,
+      provider: "auth0",
+      providerSubject: options.subject,
+      email,
+    },
+  });
+
+  if (options.tenantId && options.siteRole) {
+    await prisma.siteMembership.upsert({
+      where: {
+        tenantId_userId: { tenantId: options.tenantId, userId },
+      },
+      update: { role: options.siteRole },
+      create: {
+        tenantId: options.tenantId,
+        userId,
+        role: options.siteRole,
+      },
+    });
+  }
+  if (options.orgId && options.orgRole) {
+    await prisma.orgMembership.upsert({
+      where: { orgId_userId: { orgId: options.orgId, userId } },
+      update: { role: options.orgRole },
+      create: { orgId: options.orgId, userId, role: options.orgRole },
+    });
+  }
+
+  const payload = Buffer.from(
+    JSON.stringify({ sub: options.subject, email }),
+  ).toString("base64url");
+
+  return {
+    userId,
+    authorization: `Bearer test.${payload}.sig`,
+  };
+}
+
+export async function clearE2eAuthAccess(userId: string): Promise<void> {
+  await prisma.userIdentity.deleteMany({ where: { userId } });
+  await prisma.siteMembership.deleteMany({ where: { userId } });
+  await prisma.orgMembership.deleteMany({ where: { userId } });
+}
+
 /**
  * Helper function to check if database is available for e2e tests.
  * Returns true if database is available, false otherwise.

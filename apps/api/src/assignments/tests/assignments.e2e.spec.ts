@@ -2,9 +2,17 @@ import request from "supertest";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../../app.module";
-import { withTenantRlsContext, Role, AssignmentStatus } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  prisma,
+  withTenantRlsContext,
+  Role,
+  AssignmentStatus,
+} from "@pathway/db";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 // Utility to make unique slugs/names per run
 const nonce = Math.random().toString(36).slice(2, 8);
@@ -12,6 +20,7 @@ const nonce = Math.random().toString(36).slice(2, 8);
 describe("Assignments (e2e)", () => {
   let app: INestApplication;
   let authHeader: string;
+  let authUserId: string;
 
   // Seeded ids we reuse across tests
   const orgId = process.env.E2E_ORG_ID as string;
@@ -27,11 +36,6 @@ describe("Assignments (e2e)", () => {
     otherSession: undefined as undefined | string,
     otherUser: undefined as undefined | string,
     otherAssignment: undefined as undefined | string,
-  };
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
   };
 
   beforeAll(async () => {
@@ -128,22 +132,15 @@ describe("Assignments (e2e)", () => {
       ids.otherAssignment = otherAssignment.id;
     });
 
-    authHeader = buildAuthHeader({
-      sub: "assignments-e2e",
-      "https://pathway.app/user": { id: "assignments-e2e" },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: "e2e-tenant-a",
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "assignments-e2e",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
   });
 
   afterAll(async () => {
@@ -181,6 +178,8 @@ describe("Assignments (e2e)", () => {
     }
 
     if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

@@ -3,9 +3,12 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { AppModule } from "../../app.module";
-import { withTenantRlsContext } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import { Role, withTenantRlsContext } from "@pathway/db";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 // Types for responses
 type Note = {
@@ -24,18 +27,14 @@ describe("Notes (e2e)", () => {
   let app: INestApplication;
   const orgId = process.env.E2E_ORG_ID as string;
   const tenantId = process.env.E2E_TENANT_ID as string;
-  const tenantSlug = "e2e-tenant-a";
   const seededAuthorId = randomUUID();
   const seededChildId = randomUUID();
   let childId: string | null = null;
   let authorId: string | null = null;
   let createdId: string;
   let authHeader: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
+  let parentAuthHeader: string;
+  let parentUserId: string;
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -84,32 +83,35 @@ describe("Notes (e2e)", () => {
       childId = child.id;
     });
 
-    const claimUserId = authorId ?? "notes-e2e-user";
-    authHeader = buildAuthHeader({
-      sub: claimUserId,
-      "https://pathway.app/user": {
-        id: claimUserId,
-        email: "notes.e2e@pathway.app",
-      },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: tenantSlug,
-      },
-      "https://pathway.app/org_roles": ["org:admin", "org:safeguarding_lead"],
-      "https://pathway.app/tenant_roles": [
-        "tenant:admin",
-        "tenant:coordinator",
-      ],
+    const authorAuth = await seedE2eAuthUser({
+      subject: `notes-author-${seededAuthorId}`,
+      userId: seededAuthorId,
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
+      email: "notes.e2e@pathway.app",
+    });
+    authHeader = authorAuth.authorization;
+
+    const parentAuth = await seedE2eAuthUser({
+      subject: `notes-parent-${randomUUID()}`,
+      tenantId,
+      orgId,
+      hasFamilyAccess: true,
+    });
+    parentUserId = parentAuth.userId;
+    parentAuthHeader = parentAuth.authorization;
+    await withTenantRlsContext(tenantId, orgId, async (tx) => {
+      await tx.userTenantRole.create({
+        data: { userId: parentUserId, tenantId, role: Role.PARENT },
+      });
     });
   });
 
   afterAll(async () => {
+    await clearE2eAuthAccess(seededAuthorId);
+    await clearE2eAuthAccess(parentUserId);
     // Cleanup in reverse order; guard for missing FKs
     if (createdId || childId || authorId) {
       await withTenantRlsContext(tenantId, orgId, async (tx) => {
@@ -119,7 +121,10 @@ describe("Notes (e2e)", () => {
           await tx.concern.deleteMany({ where: { childId } });
           await tx.child.deleteMany({ where: { id: childId } });
         }
-        if (authorId) await tx.user.deleteMany({ where: { id: authorId } });
+        await tx.userTenantRole.deleteMany({ where: { userId: parentUserId } });
+        await tx.user.deleteMany({
+          where: { id: { in: [seededAuthorId, parentUserId] } },
+        });
       }).catch(() => undefined);
     }
     if (app) {
@@ -147,24 +152,9 @@ describe("Notes (e2e)", () => {
   describe("RBAC", () => {
     it("blocks parents from accessing staff notes", async () => {
       if (!seedOk()) return;
-      const parentHeader = buildAuthHeader({
-        sub: "parent-user",
-        "https://pathway.app/user": { id: "parent-user" },
-        "https://pathway.app/org": {
-          orgId,
-          slug: "parent",
-        },
-        "https://pathway.app/tenant": {
-          tenantId,
-          orgId,
-          slug: tenantSlug,
-        },
-        "https://pathway.app/tenant_roles": ["tenant:parent"],
-      });
-
       const res = await request(app.getHttpServer())
         .get("/notes")
-        .set("Authorization", parentHeader);
+        .set("Authorization", parentAuthHeader);
       expect(res.status).toBe(403);
     });
   });

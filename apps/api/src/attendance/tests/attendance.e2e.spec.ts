@@ -1,11 +1,15 @@
-import { withTenantRlsContext } from "@pathway/db";
+import { prisma, withTenantRlsContext } from "@pathway/db";
 import { randomUUID } from "node:crypto";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../app.module";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase, isDatabaseAvailable } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  isDatabaseAvailable,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 const ids = {
   group: randomUUID(),
@@ -18,9 +22,6 @@ const nonce = Date.now();
 const TENANT_A_ID = process.env.E2E_TENANT_ID;
 const TENANT_B_ID = process.env.E2E_TENANT2_ID;
 const ORG_ID = process.env.E2E_ORG_ID;
-const TENANT_A_SLUG = "e2e-tenant-a";
-const ORG_SLUG = "e2e-org";
-
 if (!TENANT_A_ID || !TENANT_B_ID || !ORG_ID) {
   throw new Error(
     "E2E_TENANT_ID / E2E_TENANT2_ID / E2E_ORG_ID are missing. Ensure test.setup.e2e.ts seeds tenants and exports their IDs.",
@@ -31,11 +32,7 @@ describe("Attendance (e2e)", () => {
   let app: INestApplication;
   let createdId: string;
   let authHeader: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
+  let authUserId: string;
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -87,9 +84,7 @@ describe("Attendance (e2e)", () => {
     });
 
     await withTenantRlsContext(TENANT_B_ID, ORG_ID, async (tx) => {
-      await tx.group.deleteMany({
-        where: { id: { in: [ids.group, ids.group2] } },
-      });
+      await tx.group.deleteMany({ where: { id: ids.group2 } });
       await tx.group.create({
         data: {
           id: ids.group2,
@@ -101,26 +96,38 @@ describe("Attendance (e2e)", () => {
       });
     });
 
-    authHeader = buildAuthHeader({
-      sub: "attendance-e2e",
-      "https://pathway.app/user": { id: "attendance-e2e" },
-      "https://pathway.app/org": {
-        orgId: ORG_ID,
-        slug: ORG_SLUG,
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId: TENANT_A_ID,
-        orgId: ORG_ID,
-        slug: TENANT_A_SLUG,
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "attendance-e2e",
+      tenantId: TENANT_A_ID,
+      siteRole: "SITE_ADMIN",
+      orgId: ORG_ID,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
   });
 
   afterAll(async () => {
     if (app) {
+      await prisma.staffActivity.deleteMany({
+        where: { staffUserId: authUserId },
+      });
+      await prisma.attendance.deleteMany({
+        where: { groupId: { in: [ids.group, ids.group2] } },
+      });
+      await prisma.child.deleteMany({
+        where: {
+          OR: [
+            { id: ids.child },
+            { groupId: { in: [ids.group, ids.group2] } },
+          ],
+        },
+      });
+      await prisma.group.deleteMany({
+        where: { id: { in: [ids.group, ids.group2] } },
+      });
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

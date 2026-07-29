@@ -2,10 +2,13 @@ import request from "supertest";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../../app.module";
-import { withTenantRlsContext } from "@pathway/db";
+import { prisma, withTenantRlsContext } from "@pathway/db";
 import { randomUUID } from "crypto";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 // Sessions e2e: reuse seeded org/tenants and seed records via RLS context
 
@@ -15,9 +18,6 @@ describe("Sessions (e2e)", () => {
   const orgId = process.env.E2E_ORG_ID as string;
   const tenantId = process.env.E2E_TENANT_ID as string; // main tenant
   const otherTenantId = process.env.E2E_TENANT2_ID as string; // other tenant
-  const tenantSlug = "e2e-tenant-a";
-  const otherTenantSlug = "e2e-tenant-b";
-
   const ids = {
     group: randomUUID(),
     session: randomUUID(),
@@ -27,11 +27,8 @@ describe("Sessions (e2e)", () => {
 
   let authHeader: string;
   let otherAuthHeader: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
+  let authUserId: string;
+  let otherAuthUserId: string;
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -49,27 +46,25 @@ describe("Sessions (e2e)", () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    authHeader = buildAuthHeader({
-      sub: "sessions-e2e",
-      "https://pathway.app/user": { id: "sessions-e2e" },
-      "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-      "https://pathway.app/tenant": { tenantId, orgId, slug: tenantSlug },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "sessions-e2e",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
 
-    otherAuthHeader = buildAuthHeader({
-      sub: "sessions-e2e-other",
-      "https://pathway.app/user": { id: "sessions-e2e-other" },
-      "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-      "https://pathway.app/tenant": {
-        tenantId: otherTenantId,
-        orgId,
-        slug: otherTenantSlug,
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const otherAuth = await seedE2eAuthUser({
+      subject: "sessions-e2e-other",
+      tenantId: otherTenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    otherAuthUserId = otherAuth.userId;
+    otherAuthHeader = otherAuth.authorization;
 
     // Seed groups and sessions in each tenant via RLS
     await withTenantRlsContext(tenantId, orgId, async (tx) => {
@@ -125,6 +120,11 @@ describe("Sessions (e2e)", () => {
       await tx.group.deleteMany({ where: { id: ids.otherGroup } });
     }).catch(() => undefined);
     if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await clearE2eAuthAccess(otherAuthUserId);
+      await prisma.user.deleteMany({
+        where: { id: { in: [authUserId, otherAuthUserId] } },
+      });
       await app.close();
     }
   });
