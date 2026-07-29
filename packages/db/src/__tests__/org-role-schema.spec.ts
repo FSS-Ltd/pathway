@@ -86,14 +86,18 @@ describe("organisation role schema contract", () => {
   });
 
   it("enforces immutable, role-consistent revision snapshots and organisation audit access", () => {
-    expect(roleRevisionMigration).toContain("app.enforce_org_role_revision_immutable");
+    expect(roleRevisionMigration).toContain(
+      "app.enforce_org_role_revision_immutable",
+    );
     expect(roleRevisionMigration).toContain("BEFORE UPDATE OR DELETE");
     expect(roleRevisionMigration).toContain("app.validate_org_role_revision");
-    expect(roleRevisionMigration).toContain('role_record app."OrgRoleDefinition"%ROWTYPE');
-    expect(roleRevisionMigration).toContain('FROM app."OrgRoleDefinition"');
     expect(roleRevisionMigration).toContain("SET search_path = ''");
-    expect(roleRevisionMigration).toContain('DROP POLICY IF EXISTS "AuditEvent_tenant_rls"');
-    expect(roleRevisionMigration).toContain('CREATE POLICY "AuditEvent_org_or_site_rls"');
+    expect(roleRevisionMigration).toContain(
+      'DROP POLICY IF EXISTS "AuditEvent_tenant_rls"',
+    );
+    expect(roleRevisionMigration).toContain(
+      'CREATE POLICY "AuditEvent_org_or_site_rls"',
+    );
   });
 });
 
@@ -293,7 +297,9 @@ describeIfDb("organisation role schema database constraints", () => {
             '[]'::jsonb, ${randomUUID()}
           )
         `;
-        const revisions = await tx.$queryRaw<Array<{ roleDefinitionId: string }>>`
+        const revisions = await tx.$queryRaw<
+          Array<{ roleDefinitionId: string }>
+        >`
           SELECT "roleDefinitionId"
           FROM app."OrgRoleRevision"
           WHERE "roleDefinitionId" = ${role.id}

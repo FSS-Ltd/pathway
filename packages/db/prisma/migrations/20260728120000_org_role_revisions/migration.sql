@@ -74,17 +74,26 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  role_record app."OrgRoleDefinition"%ROWTYPE;
+  role_definition_id text;
+  role_org_id text;
+  role_tenant_id text;
+  role_scope text;
+  role_version integer;
 BEGIN
-  SELECT * INTO role_record
-  FROM app."OrgRoleDefinition"
-  WHERE "id" = NEW."roleDefinitionId";
+  EXECUTE pg_catalog.format(
+    'SELECT "id", "orgId", "tenantId", "scope"::text, "version"
+       FROM %I."OrgRoleDefinition"
+      WHERE "id" = $1',
+    TG_TABLE_SCHEMA
+  )
+  INTO role_definition_id, role_org_id, role_tenant_id, role_scope, role_version
+  USING NEW."roleDefinitionId";
 
-  IF NOT FOUND
-    OR NEW."orgId" <> role_record."orgId"
-    OR NEW."tenantId" IS DISTINCT FROM role_record."tenantId"
-    OR NEW."scope" <> role_record."scope"
-    OR NEW."version" <> role_record."version"
+  IF role_definition_id IS NULL
+    OR NEW."orgId" <> role_org_id
+    OR NEW."tenantId" IS DISTINCT FROM role_tenant_id
+    OR NEW."scope"::text <> role_scope
+    OR NEW."version" <> role_version
   THEN
     RAISE EXCEPTION 'OrgRoleRevision must match its role definition identity and version';
   END IF;
