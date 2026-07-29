@@ -1,7 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import type { AuthContext } from "@pathway/auth";
 import type { PermissionKey } from "@pathway/platform";
-import { LoggingService, type StructuredLogger } from "../common/logging/logging.service";
+import {
+  LoggingService,
+  type StructuredLogger,
+} from "../common/logging/logging.service";
 import type { AccessDecision } from "./access-decision.types";
 
 export interface AccessDecisionTelemetry {
@@ -16,7 +19,7 @@ export interface AccessDecisionTelemetry {
 export class AccessDecisionLogger {
   private readonly logger: StructuredLogger;
 
-  constructor(logging: LoggingService) {
+  constructor(@Inject(LoggingService) logging: LoggingService) {
     this.logger = logging.createLogger(AccessDecisionLogger.name);
   }
 

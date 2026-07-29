@@ -2,6 +2,7 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  Inject,
   Injectable,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
@@ -22,9 +23,13 @@ type RequestWithDecisionMetadata = {
 @Injectable()
 export class PermissionGuard implements CanActivate {
   constructor(
+    @Inject(Reflector)
     private readonly reflector: Reflector,
+    @Inject(EffectivePermissionsService)
     private readonly permissions: EffectivePermissionsService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
+    @Inject(AccessDecisionLogger)
     private readonly decisionLogger: AccessDecisionLogger,
   ) {}
 
