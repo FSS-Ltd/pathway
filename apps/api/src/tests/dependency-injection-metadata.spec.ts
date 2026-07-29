@@ -1,7 +1,10 @@
 import "reflect-metadata";
 import { SELF_DECLARED_DEPS_METADATA } from "@nestjs/common/constants";
-import { ModuleRef } from "@nestjs/core";
+import { ModuleRef, Reflector } from "@nestjs/core";
 import { PathwayRequestContext } from "@pathway/auth";
+import { AccessDecisionLogger } from "../access-control/access-decision-logger";
+import { EffectivePermissionsService } from "../access-control/effective-permissions.service";
+import { PermissionGuard } from "../access-control/permission.guard";
 import { AssignmentsService } from "../assignments/assignments.service";
 import { AttendanceService } from "../attendance/attendance.service";
 import { Av30ActivityService } from "../av30/av30-activity.service";
@@ -39,6 +42,19 @@ function getDeclaredDependencies(target: unknown): DeclaredDependency[] {
 
 describe("dependency injection metadata", () => {
   it.each([
+    {
+      target: AccessDecisionLogger,
+      dependencies: [{ index: 0, param: LoggingService }],
+    },
+    {
+      target: PermissionGuard,
+      dependencies: [
+        { index: 0, param: Reflector },
+        { index: 1, param: EffectivePermissionsService },
+        { index: 2, param: PathwayRequestContext },
+        { index: 3, param: AccessDecisionLogger },
+      ],
+    },
     {
       target: OrgsService,
       dependencies: [
