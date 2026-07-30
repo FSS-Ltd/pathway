@@ -16,6 +16,9 @@ const explicitDatabaseEnvironment: NodeJS.ProcessEnv = {
   TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
   E2E_DATABASE_URL: process.env.E2E_DATABASE_URL,
 };
+if (usesGlobalSetup) {
+  process.env.E2E_RLS_ROLE = "pathway_e2e_rls";
+}
 
 // 1) Load test env first, then fallback to root .env
 config({

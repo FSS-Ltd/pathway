@@ -10,7 +10,11 @@ const REQUIRED_QUALIFIER_BY_TABLE = {
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
   UserRoleAssignment:
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
+  OutboxEvent:
+    '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()))',
 };
+const REQUIRED_ASSIGNMENT_SELECT_QUALIFIER =
+  '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND ((current_setting(\'app.assignment_org_read\'::text, true) = \'on\'::text) OR ("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))';
 
 const REVIEWED_ROLE_POLICIES = [
   reviewedPolicy(
@@ -42,11 +46,12 @@ const REVIEWED_ROLE_POLICIES = [
     '((SESSION_USER = \'pathway_system_role_seed\'::name) AND (EXISTS ( SELECT 1 FROM "OrgRoleDefinition" role_definition WHERE ((role_definition.id = "OrgRolePermission"."roleDefinitionId") AND role_definition."isSystem"))))',
   ),
   reviewedPolicy("OrgRoleRevision", "OrgRoleRevision_rls", "OrgRoleRevision"),
+  reviewedPolicy("OutboxEvent", "OutboxEvent_rls", "OutboxEvent"),
   reviewedPolicy(
     "UserRoleAssignment",
     "UserRoleAssignment_rls_select",
-    "UserRoleAssignment",
     undefined,
+    REQUIRED_ASSIGNMENT_SELECT_QUALIFIER,
     { command: "r", check_qualifier: null },
   ),
   reviewedPolicy(
@@ -159,5 +164,10 @@ function hasRequiredPolicyQualifier(tableName, qualifier) {
 }
 
 function canonicalizeQualifier(qualifier) {
-  return qualifier.replaceAll("app.", "").replace(/\s+/g, " ").trim();
+  return qualifier
+    .replaceAll("app.current_org_id", "current_org_id")
+    .replaceAll("app.current_tenant_id", "current_tenant_id")
+    .replaceAll('app."OrgRoleDefinition"', '"OrgRoleDefinition"')
+    .replace(/\s+/g, " ")
+    .trim();
 }

@@ -56,6 +56,7 @@ export async function resetDatabase() {
   try {
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "OutboxEvent",
         "UserRoleAssignment",
         "OrgRolePermission",
         "OrgRoleRevision",
@@ -102,6 +103,7 @@ export async function resetDatabase() {
     // Fallback for environments where the current DB user cannot truncate billing tables.
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "OutboxEvent",
         "UserRoleAssignment",
         "OrgRolePermission",
         "OrgRoleRevision",

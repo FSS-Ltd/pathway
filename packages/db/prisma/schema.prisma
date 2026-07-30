@@ -90,12 +90,15 @@ enum AuditAction {
   ROLE_CREATED
   ROLE_UPDATED
   ROLE_RETIRED
+  ASSIGNMENT_CREATED
+  ASSIGNMENT_REVOKED
 }
 
 enum AuditEntityType {
   CONCERN
   CHILD_NOTE
   ORG_ROLE
+  ROLE_ASSIGNMENT
 }
 
 enum LeadKind {
@@ -268,6 +271,7 @@ model UserRoleAssignment {
   expiresAt        DateTime?
   revokedAt        DateTime?
   revokedById      String?
+  createdAt        DateTime  @default(now())
 
   org            Org               @relation(fields: [orgId], references: [id])
   tenant         Tenant?           @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
@@ -279,6 +283,24 @@ model UserRoleAssignment {
   @@index([orgId, userId, revokedAt])
   @@index([tenantId, userId, revokedAt])
   @@index([roleDefinitionId])
+  @@index([orgId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+model OutboxEvent {
+  id             String   @id @default(uuid())
+  orgId          String   @default(dbgenerated("app.current_org_id()"))
+  aggregateType  String
+  aggregateId    String
+  eventType      String
+  payload        Json
+  idempotencyKey String
+  createdAt      DateTime @default(now())
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@index([orgId, createdAt])
+  @@index([aggregateType, aggregateId, createdAt])
+  @@unique([orgId, idempotencyKey])
 }
 
 model OrgVertical {
@@ -449,6 +471,7 @@ model Org {
   roleDefinitions   OrgRoleDefinition[]
   roleRevisions     OrgRoleRevision[]
   roleAssignments   UserRoleAssignment[]
+  outboxEvents      OutboxEvent[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }

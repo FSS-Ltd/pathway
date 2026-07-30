@@ -13,6 +13,7 @@ import {
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
+import { AccessCacheService } from "./access-cache.service";
 import { roleApiError } from "./role-api-error";
 import type {
   CloneRoleDto,
@@ -127,6 +128,8 @@ export class RolesService {
   constructor(
     @Inject(ROLES_TRANSACTION_BOUNDARY)
     private readonly transaction: RolesTransactionBoundary,
+    @Inject(AccessCacheService)
+    private readonly cache: AccessCacheService,
   ) {}
 
   async list(actor: RoleActorContext) {
@@ -223,7 +226,7 @@ export class RolesService {
   }
 
   async retire(roleId: string, command: RetireRoleDto, actor: RoleActorContext) {
-    return this.inOrganisationContext(actor, async (tx) => {
+    const result = await this.inOrganisationContext(actor, async (tx) => {
       await this.assertRouteAccess(tx, actor, "manage");
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
@@ -240,14 +243,17 @@ export class RolesService {
       }
       const retired = await this.requireRoleInTransaction(tx, roleId, actor);
       await this.recordRevisionAndAudit(tx, retired, actor, "retire");
-      return retired;
+      const userIds = await this.findAssignedUserIds(tx, roleId, actor.orgId);
+      return { role: retired, userIds };
     });
+    await this.invalidateUsers(result.userIds, actor.orgId);
+    return result.role;
   }
 
   private async mutate(
     roleId: string, expectedVersion: number, command: UpdateRoleDto, actor: RoleActorContext, mutation: RoleMutation,
   ) {
-    return this.inOrganisationContext(actor, async (tx) => {
+    const result = await this.inOrganisationContext(actor, async (tx) => {
       await this.assertRouteAccess(tx, actor, "manage");
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
@@ -269,8 +275,35 @@ export class RolesService {
       await tx.orgRolePermission.createMany({ data: permissionKeys.map((permissionKey) => ({ roleDefinitionId: roleId, permissionKey, grantedById: actor.userId })) });
       const changed = await this.requireRoleInTransaction(tx, roleId, actor);
       await this.recordRevisionAndAudit(tx, changed, actor, mutation);
-      return changed;
+      const userIds = await this.findAssignedUserIds(tx, roleId, actor.orgId);
+      return { role: changed, userIds };
     });
+    await this.invalidateUsers(result.userIds, actor.orgId);
+    return result.role;
+  }
+
+  private async findAssignedUserIds(
+    tx: Prisma.TransactionClient,
+    roleDefinitionId: string,
+    orgId: string,
+  ): Promise<string[]> {
+    const assignments = await tx.userRoleAssignment.findMany({
+      where: { orgId, roleDefinitionId, revokedAt: null },
+      distinct: ["userId"],
+      select: { userId: true },
+    });
+    return assignments.map(({ userId }) => userId);
+  }
+
+  private async invalidateUsers(
+    userIds: readonly string[],
+    orgId: string,
+  ): Promise<void> {
+    await Promise.allSettled(
+      [...new Set(userIds)].map((userId) =>
+        this.cache.invalidateUser(userId, orgId),
+      ),
+    );
   }
 
   private async validatePermissionKeys(

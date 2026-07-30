@@ -1,6 +1,7 @@
 import type { PermissionKey } from "@pathway/platform";
 import { Test } from "@nestjs/testing";
 import { AccessControlModule } from "../access-control.module";
+import { AccessCacheService } from "../access-cache.service";
 import {
   EFFECTIVE_PERMISSIONS_CONTEXT,
   EFFECTIVE_PERMISSIONS_READER,
@@ -70,6 +71,7 @@ function createService({
     capabilityReader,
     featureAvailability,
     testPermissionsContext,
+    new AccessCacheService(),
   );
 }
 
@@ -161,12 +163,66 @@ describe("EffectivePermissionsService", () => {
       { get: async () => ["ace.pace.read"] },
       { isAvailable: async () => true },
       testPermissionsContext,
+      new AccessCacheService(),
     );
 
     await resolve(service);
     await resolve(service, { tenantId: SITE_ID });
 
     expect(requestedTenantIds).toEqual([undefined, SITE_ID]);
+  });
+
+  it("uses the shared access cache and reloads after user invalidation", async () => {
+    const getOrganisationMembership = jest.fn().mockResolvedValue(true);
+    const findAssignments = jest.fn().mockResolvedValue([grant()]);
+    const cache = new AccessCacheService();
+    const service = new EffectivePermissionsService(
+      { getOrganisationMembership, findAssignments },
+      { get: async () => ["ace.pace.read"] },
+      { isAvailable: async () => true },
+      testPermissionsContext,
+      cache,
+    );
+
+    await resolve(service, { tenantId: SITE_ID });
+    await resolve(service, { tenantId: SITE_ID });
+    expect(getOrganisationMembership).toHaveBeenCalledTimes(1);
+    expect(findAssignments).toHaveBeenCalledTimes(1);
+
+    await cache.invalidateUser(USER_ID, ORG_ID);
+    await resolve(service, { tenantId: SITE_ID });
+
+    expect(getOrganisationMembership).toHaveBeenCalledTimes(2);
+    expect(findAssignments).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses a shared cached snapshot but denies it once its assignment expires", async () => {
+    const expiresAt = new Date(NOW.getTime() + 1_000);
+    const findAssignments = jest
+      .fn()
+      .mockResolvedValue([grant({ expiresAt })]);
+    const service = new EffectivePermissionsService(
+      {
+        getOrganisationMembership: async () => true,
+        findAssignments,
+      },
+      { get: async () => ["ace.pace.read"] },
+      { isAvailable: async () => true },
+      testPermissionsContext,
+      new AccessCacheService(),
+    );
+
+    await expect(resolve(service)).resolves.toMatchObject({
+      allowed: true,
+    });
+    await expect(
+      resolve(service, { now: expiresAt }),
+    ).resolves.toEqual({
+      allowed: false,
+      reason: "permission-missing",
+      sourceRoleIds: [],
+    });
+    expect(findAssignments).toHaveBeenCalledTimes(1);
   });
 
   it.each([

@@ -4,6 +4,8 @@ import { execSync } from "node:child_process";
 
 const CI_RLS_ROLE = "pathway_e2e_rls";
 const CI_TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
+const CI_OUTBOX_DENIED_ROLE = "pathway_e2e_outbox_denied";
+const CI_AUDIT_DENIED_ROLE = "pathway_e2e_audit_denied";
 const CI_BOOTSTRAP_ROLE = "pathway_test_user";
 
 function quoteIdentifier(identifier: string): string {
@@ -18,35 +20,37 @@ type RawStatementExecutor = (statement: string) => Promise<unknown>;
 export async function configureCiRlsRole(
   executeStatement: RawStatementExecutor,
 ): Promise<void> {
-  const rlsRole = quoteIdentifier(CI_RLS_ROLE);
-  const tenantRlsRole = quoteIdentifier(CI_TENANT_RLS_ROLE);
   const bootstrapRole = quoteIdentifier(CI_BOOTSTRAP_ROLE);
   const statements = [
-    `
-      DO $$
-      BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${CI_RLS_ROLE}') THEN
-          CREATE ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
-        ELSE
-          ALTER ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
-        END IF;
-      END;
-      $$;
-    `,
-    `REVOKE ALL PRIVILEGES ON SCHEMA app FROM ${rlsRole};`,
-    `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA app FROM ${rlsRole};`,
-    `GRANT USAGE ON SCHEMA app TO ${rlsRole};`,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleDefinition" TO ${rlsRole};`,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO ${rlsRole};`,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO ${rlsRole};`,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleRevision" TO ${rlsRole};`,
-    `GRANT SELECT, INSERT ON TABLE "AuditEvent" TO ${rlsRole};`,
-    `GRANT SELECT ON TABLE "Tenant" TO ${rlsRole};`,
-    `GRANT SELECT ON TABLE "PermissionDefinition" TO ${rlsRole};`,
-    `GRANT SELECT ON TABLE "OrgMembership" TO ${rlsRole};`,
-    `GRANT SELECT ON TABLE "OrgVertical" TO ${rlsRole};`,
-    `GRANT SELECT ON TABLE "OrgModule" TO ${rlsRole};`,
-    `GRANT ${rlsRole} TO ${bootstrapRole};`,
+    ...roleProvisioningStatements(
+      CI_RLS_ROLE,
+      bootstrapRole,
+      "SELECT, INSERT",
+      "SELECT, INSERT",
+    ),
+    ...roleProvisioningStatements(
+      CI_OUTBOX_DENIED_ROLE,
+      bootstrapRole,
+      "SELECT, INSERT",
+      "SELECT",
+    ),
+    ...roleProvisioningStatements(
+      CI_AUDIT_DENIED_ROLE,
+      bootstrapRole,
+      "SELECT",
+      "SELECT, INSERT",
+    ),
+    ...tenantRoleProvisioningStatements(bootstrapRole),
+  ];
+
+  for (const statement of statements) {
+    await executeStatement(statement);
+  }
+}
+
+function tenantRoleProvisioningStatements(bootstrapRole: string): string[] {
+  const tenantRlsRole = quoteIdentifier(CI_TENANT_RLS_ROLE);
+  return [
     `
       DO $$
       BEGIN
@@ -64,10 +68,43 @@ export async function configureCiRlsRole(
     `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO ${tenantRlsRole};`,
     `GRANT ${tenantRlsRole} TO ${bootstrapRole};`,
   ];
+}
 
-  for (const statement of statements) {
-    await executeStatement(statement);
-  }
+function roleProvisioningStatements(
+  roleName: string,
+  bootstrapRole: string,
+  auditPrivileges: "SELECT" | "SELECT, INSERT",
+  outboxPrivileges: "SELECT" | "SELECT, INSERT",
+): string[] {
+  const rlsRole = quoteIdentifier(roleName);
+  return [
+    `
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${roleName}') THEN
+          CREATE ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+        ELSE
+          ALTER ROLE ${rlsRole} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+        END IF;
+      END;
+      $$;
+    `,
+    `REVOKE ALL PRIVILEGES ON SCHEMA app FROM ${rlsRole};`,
+    `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA app FROM ${rlsRole};`,
+    `GRANT USAGE ON SCHEMA app TO ${rlsRole};`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleDefinition" TO ${rlsRole};`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO ${rlsRole};`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO ${rlsRole};`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleRevision" TO ${rlsRole};`,
+    `GRANT ${auditPrivileges} ON TABLE "AuditEvent" TO ${rlsRole};`,
+    `GRANT ${outboxPrivileges} ON TABLE "OutboxEvent" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "Tenant" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "PermissionDefinition" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "OrgMembership" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "OrgVertical" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "OrgModule" TO ${rlsRole};`,
+    `GRANT ${rlsRole} TO ${bootstrapRole};`,
+  ];
 }
 
 // Jest will call this once before running the e2e project

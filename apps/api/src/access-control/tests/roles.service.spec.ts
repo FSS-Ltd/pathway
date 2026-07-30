@@ -8,6 +8,11 @@ import {
   type RoleActorContext,
   type RolesTransactionBoundary,
 } from "../roles.service";
+import { AccessCacheService } from "../access-cache.service";
+import {
+  EffectivePermissionsService,
+  type EffectivePermissionGrant,
+} from "../effective-permissions.service";
 
 const orgId = "org-1";
 
@@ -77,7 +82,10 @@ describe("RolesService route authority", () => {
     const transaction: RolesTransactionBoundary = {
       run: async (_actor, operation) => operation(tx as never),
     };
-    return new RolesService(transaction);
+    const cache = {
+      invalidateUser: jest.fn().mockResolvedValue(undefined),
+    } as unknown as AccessCacheService;
+    return new RolesService(transaction, cache);
   }
 
   function allowedService(options: {
@@ -87,6 +95,7 @@ describe("RolesService route authority", () => {
     roleCreate?: jest.Mock;
     roleUpdateMany?: jest.Mock;
     transaction?: RolesTransactionBoundary;
+    cache?: AccessCacheService;
   } = {}) {
     const tx = {
       orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "ORG_ADMIN" }) },
@@ -110,6 +119,13 @@ describe("RolesService route authority", () => {
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         createMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      userRoleAssignment: {
+        findMany: jest.fn().mockResolvedValue([
+          { userId: "assigned-user-1" },
+          { userId: "assigned-user-1" },
+          { userId: "assigned-user-2" },
+        ]),
+      },
       orgRoleRevision: { create: jest.fn().mockResolvedValue({ id: "revision-1" }) },
       auditEvent: { create: options.auditEventCreate ?? jest.fn().mockResolvedValue({ id: "audit-1" }) },
     };
@@ -121,7 +137,15 @@ describe("RolesService route authority", () => {
         return operation(tx as never);
       },
     };
-    return { service: new RolesService(transaction), tx };
+    return {
+      service: new RolesService(
+        transaction,
+        options.cache ?? {
+          invalidateUser: jest.fn().mockResolvedValue(undefined),
+        } as unknown as AccessCacheService,
+      ),
+      tx,
+    };
   }
 
   it("rechecks active database membership before allowing a read route", async () => {
@@ -215,6 +239,147 @@ describe("RolesService route authority", () => {
         metadata: expect.objectContaining({ requestId: actor.requestId }),
       }),
     }));
+  });
+
+  it("invalidates each assigned user only after update and retirement commits", async () => {
+    let committed = false;
+    const cache = {
+      invalidateUser: jest.fn().mockImplementation(async () => {
+        expect(committed).toBe(true);
+      }),
+    } as unknown as AccessCacheService;
+    const base = allowedService({ cache });
+    const transaction: RolesTransactionBoundary = {
+      async run(_actor, operation) {
+        committed = false;
+        const result = await operation(base.tx as never);
+        committed = true;
+        return result;
+      },
+    };
+    const service = new RolesService(
+      transaction,
+      cache,
+    );
+
+    await service.update({
+      roleId: "role-1",
+      expectedVersion: 1,
+      name: "PACE Staff",
+      permissionKeys: ["ace.pace.read"],
+    }, actor);
+    await service.retire("role-1", { expectedVersion: 1 }, actor);
+
+    expect(cache.invalidateUser).toHaveBeenCalledTimes(4);
+    expect(cache.invalidateUser).toHaveBeenCalledWith("assigned-user-1", orgId);
+    expect(cache.invalidateUser).toHaveBeenCalledWith("assigned-user-2", orgId);
+    expect(base.tx.userRoleAssignment.findMany).toHaveBeenCalledWith({
+      where: {
+        orgId,
+        roleDefinitionId: "role-1",
+        revokedAt: null,
+      },
+      distinct: ["userId"],
+      select: { userId: true },
+    });
+  });
+
+  it.each(["permission removal", "retirement"] as const)(
+    "immediately denies cached effective access after role %s",
+    async (mutation) => {
+      const cache = new AccessCacheService();
+      let permissionPresent = true;
+      let roleIsActive = true;
+      const reader = {
+        getOrganisationMembership: jest.fn().mockResolvedValue(true),
+        findAssignments: jest.fn().mockImplementation(async () => {
+          if (!permissionPresent) return [];
+          return [{
+            roleId: "role-1",
+            roleScope: "site",
+            roleTenantId: "site-1",
+            roleIsActive,
+            permissionKey: "ace.pace.read",
+            permissionIsActive: true,
+            startsAt: new Date("2026-07-01T00:00:00.000Z"),
+            expiresAt: null,
+            revokedAt: null,
+          }] satisfies EffectivePermissionGrant[];
+        }),
+      };
+      const resolver = new EffectivePermissionsService(
+        reader,
+        { get: async () => ["ace.pace.read"] },
+        { isAvailable: async () => true },
+        { run: async (_orgId, _tenantId, operation) => operation() },
+        cache,
+      );
+      const { service, tx } = allowedService({ cache });
+      tx.orgRolePermission.deleteMany.mockImplementation(async () => {
+        permissionPresent = false;
+        return { count: 1 };
+      });
+      tx.orgRoleDefinition.updateMany.mockImplementation(async () => {
+        if (mutation === "retirement") roleIsActive = false;
+        return { count: 1 };
+      });
+      const accessRequest = {
+        userId: "assigned-user-1",
+        orgId,
+        tenantId: "site-1",
+        permission: "ace.pace.read" as const,
+        now: new Date("2026-07-29T12:00:00.000Z"),
+      };
+
+      await expect(resolver.resolve(accessRequest)).resolves.toMatchObject({
+        allowed: true,
+      });
+      if (mutation === "permission removal") {
+        await service.update({
+          roleId: "role-1",
+          expectedVersion: 1,
+          name: "PACE Staff",
+          permissionKeys: [],
+        }, actor);
+      } else {
+        await service.retire("role-1", { expectedVersion: 1 }, actor);
+      }
+
+      await expect(resolver.resolve(accessRequest)).resolves.toMatchObject({
+        allowed: false,
+        reason: "permission-missing",
+      });
+      expect(reader.findAssignments).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("does not invalidate on a version conflict and tolerates post-commit invalidation failure", async () => {
+    const invalidateUser = jest.fn().mockRejectedValue(
+      new Error("cache unavailable"),
+    );
+    const cache = { invalidateUser } as unknown as AccessCacheService;
+    const conflicted = allowedService({
+      cache,
+      roleUpdateMany: jest.fn().mockResolvedValue({ count: 0 }),
+    });
+
+    await expect(conflicted.service.update({
+      roleId: "role-1",
+      expectedVersion: 1,
+      name: "PACE Staff",
+      permissionKeys: ["ace.pace.read"],
+    }, actor)).rejects.toMatchObject({
+      response: { code: "ROLE_VERSION_CONFLICT" },
+    });
+    expect(invalidateUser).not.toHaveBeenCalled();
+
+    const successful = allowedService({ cache });
+    await expect(successful.service.retire(
+      "role-1",
+      { expectedVersion: 1 },
+      actor,
+    )).resolves.toMatchObject({ id: "role-1" });
+    expect(invalidateUser).toHaveBeenCalledTimes(2);
   });
 
   it.each([
