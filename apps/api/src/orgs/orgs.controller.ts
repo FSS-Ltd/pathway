@@ -20,7 +20,7 @@ import { uploadLogoDto } from "./dto/upload-logo.dto";
 import { CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { OrgRole, prisma } from "@pathway/db";
-import { isVertical } from "@pathway/types";
+import { isSector, isVertical } from "@pathway/types";
 import type { Request } from "express";
 
 interface AuthenticatedRequest extends Request {
@@ -71,6 +71,12 @@ const updateCurrentOrgBody = z
 const updateCurrentVerticalBody = z
   .object({
     vertical: z.string(),
+  })
+  .strict();
+
+const updateCurrentSectorBody = z
+  .object({
+    sector: z.string(),
   })
   .strict();
 
@@ -166,6 +172,27 @@ export class OrgsController {
       throw new BadRequestException("Unknown vertical");
     }
     return this.service.changeVertical(orgId, vertical);
+  }
+
+  /**
+   * Change the current organisation's sector. ORG_ADMIN only, and only the
+   * master (internal/platform) organisation may cycle through sectors.
+   */
+  @Patch("current/sector")
+  @UseGuards(AuthUserGuard)
+  async updateCurrentSector(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+    @Body() body: unknown,
+  ) {
+    await this.ensureOrgAdmin(req, orgId);
+    const { sector } = await parseOrBadRequest<
+      z.infer<typeof updateCurrentSectorBody>
+    >(updateCurrentSectorBody, body);
+    if (!isSector(sector)) {
+      throw new BadRequestException("Unknown sector");
+    }
+    return this.service.changeSector(orgId, sector);
   }
 
   /**

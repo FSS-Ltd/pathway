@@ -22,6 +22,12 @@ import {
 } from "./effective-permissions.service";
 import { PermissionGuard } from "./permission.guard";
 import { AccessCacheService } from "./access-cache.service";
+import { AccessAuditController } from "./access-audit.controller";
+import { AccessAuditService } from "./access-audit.service";
+import { AccessPermissionsController } from "./access-permissions.controller";
+import { AccessPermissionsService } from "./access-permissions.service";
+import { AccessUsersController } from "./access-users.controller";
+import { AccessUsersService } from "./access-users.service";
 import { AssignmentsController } from "./assignments.controller";
 import { AssignmentsService } from "./assignments.service";
 import { RolesController } from "./roles.controller";
@@ -99,6 +105,12 @@ const orgCapabilitiesReader: OrgCapabilitiesReader = {
   get: getOrgCapabilities,
 };
 
+// ponytail: fails closed until a real feature-availability source is wired
+// (see a405683, "fail closed until feature availability is configured").
+// Every EffectivePermissionsService.resolve()/listForUser*() call returns
+// empty until then; the effective-access-preview admin UI documents this gap
+// rather than working around it. Upgrade: implement isAvailable against the
+// real feature-rollout source once it exists.
 const featureAvailabilityReader: FeatureAvailabilityReader = {
   async isAvailable() {
     return false;
@@ -115,10 +127,19 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
 
 @Module({
   imports: [CommonModule, AuthModule],
-  controllers: [AssignmentsController, RolesController],
+  controllers: [
+    AssignmentsController,
+    RolesController,
+    AccessUsersController,
+    AccessAuditController,
+    AccessPermissionsController,
+  ],
   providers: [
     AssignmentsService,
     RolesService,
+    AccessUsersService,
+    AccessAuditService,
+    AccessPermissionsService,
     RoleSafetyService,
     {
       provide: ROLES_TRANSACTION_BOUNDARY,

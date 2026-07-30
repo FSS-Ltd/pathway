@@ -6,6 +6,11 @@ import type {
 } from "./access-decision.types";
 import { AccessCacheService } from "./access-cache.service";
 
+export interface EffectivePermissionWithSources {
+  permissionKey: PermissionKey;
+  sourceRoleIds: string[];
+}
+
 export interface EffectivePermissionGrant {
   roleId: string;
   roleScope: "organisation" | "site" | "relationship";
@@ -83,6 +88,16 @@ export class EffectivePermissionsService {
   ): Promise<PermissionKey[]> {
     return this.context.run(orgId, tenantId, () =>
       this.listForUserInContext(userId, orgId, tenantId),
+    );
+  }
+
+  async listForUserWithSources(
+    userId: string,
+    orgId: string,
+    tenantId?: string,
+  ): Promise<EffectivePermissionWithSources[]> {
+    return this.context.run(orgId, tenantId, () =>
+      this.listForUserWithSourcesInContext(userId, orgId, tenantId),
     );
   }
 
@@ -178,6 +193,53 @@ export class EffectivePermissionsService {
     return availability
       .filter(({ available }) => available)
       .map(({ permission }) => permission);
+  }
+
+  private async listForUserWithSourcesInContext(
+    userId: string,
+    orgId: string,
+    tenantId?: string,
+  ): Promise<EffectivePermissionWithSources[]> {
+    const now = new Date();
+    const snapshot = await this.loadSnapshot(userId, orgId, tenantId, now);
+    if (!snapshot.hasMembership) {
+      return [];
+    }
+
+    const availableCapabilities = new Set(snapshot.capabilities);
+    const roleIdsByKey = new Map<PermissionKey, Set<string>>();
+    for (const grant of snapshot.grants) {
+      if (
+        !grant.roleIsActive ||
+        !grant.permissionIsActive ||
+        !isAssignmentActive(grant, now) ||
+        !appliesToScope(grant, tenantId) ||
+        !availableCapabilities.has(grant.permissionKey)
+      ) {
+        continue;
+      }
+      const roleIds = roleIdsByKey.get(grant.permissionKey) ?? new Set();
+      roleIds.add(grant.roleId);
+      roleIdsByKey.set(grant.permissionKey, roleIds);
+    }
+
+    const permissionKeys = [...roleIdsByKey.keys()].sort();
+    const availability = await Promise.all(
+      permissionKeys.map(async (permission) => ({
+        permission,
+        available: await this.featureAvailability.isAvailable(
+          orgId,
+          permission,
+        ),
+      })),
+    );
+
+    return availability
+      .filter(({ available }) => available)
+      .map(({ permission }) => ({
+        permissionKey: permission,
+        sourceRoleIds: [...(roleIdsByKey.get(permission) ?? [])].sort(),
+      }));
   }
 
   private loadSnapshot(

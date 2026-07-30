@@ -122,6 +122,15 @@ export function canAccessSafeguardingAdmin(role: AdminRoleInfo): boolean {
 }
 
 /**
+ * Check if user can access the roles & permissions admin surface.
+ * The backend's access-control routes require legacy ORG_ADMIN specifically
+ * (not SITE_ADMIN), so this is narrower than canAccessAdminSection.
+ */
+export function canAccessRolesAdmin(role: AdminRoleInfo): boolean {
+  return role.isOrgAdmin || role.isOrgOwner;
+}
+
+/**
  * Access requirement types for nav items
  */
 export type AccessRequirement =
@@ -132,6 +141,7 @@ export type AccessRequirement =
   | "staff-or-admin" // Any authenticated user
   | "staff-only" // Staff without admin (Profile, Create concern)
   | "site-admin-or-higher" // SITE_ADMIN or ORG_ADMIN (People, Classes, Announcements)
+  | "org-admin-only" // Legacy ORG_ADMIN only (Roles & Access)
   | "super-user"; // Nexsteps staff only (e.g. blog)
 
 export type AccessContext = {
@@ -172,6 +182,8 @@ export function meetsAccessRequirement(
       return isStaffOnly(role);
     case "site-admin-or-higher":
       return isSiteAdminOrHigher(role);
+    case "org-admin-only":
+      return canAccessRolesAdmin(role);
     case "super-user":
       return role.isSuperUser;
     default:

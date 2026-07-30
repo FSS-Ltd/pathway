@@ -9,6 +9,7 @@ import {
   type AdminModule,
   type AdminOrgModule,
   AdminOrgOverview,
+  type AdminOrgSector,
   AdminRetentionOverview,
   type AdminVertical,
   deactivateOrganisation,
@@ -22,6 +23,7 @@ import {
   requestExportOrganisationData,
   toggleOrgModule,
   updateOrgProfile,
+  updateOrgSector,
   updateOrgVertical,
   updateSiteProfile,
   uploadOrgLogo,
@@ -38,6 +40,7 @@ import { NoAccessCard } from "../../components/no-access-card";
 import { QrCodeCard } from "../../components/qr/QrCodeCard";
 import { getSafeDisplayName } from "../../lib/names";
 import { ParentPortalSettingsCard } from "./parent-portal-settings-card";
+import { SectorSettingsCard } from "./sector-settings-card";
 import { VerticalSettingsCard } from "./vertical-settings-card";
 import { ModulesSettingsCard } from "./modules-settings-card";
 
@@ -51,7 +54,11 @@ function getRoleLabel(role: AdminRoleInfo): string {
 
 export default function SettingsPage() {
   const { data: session, status: sessionStatus } = useSession();
-  const { role, isLoading: isLoadingAccess } = useAdminAccess();
+  const {
+    role,
+    isLoading: isLoadingAccess,
+    currentOrgIsMasterOrg,
+  } = useAdminAccess();
   const [org, setOrg] = React.useState<AdminOrgOverview | null>(null);
   const [retention, setRetention] = React.useState<AdminRetentionOverview | null>(null);
   const [billing, setBilling] = React.useState<AdminBillingOverview | null>(null);
@@ -75,6 +82,10 @@ export default function SettingsPage() {
     null,
   );
   const verticalPreviewRequest = React.useRef(0);
+  const [savingSector, setSavingSector] = React.useState(false);
+  const [sectorSaveError, setSectorSaveError] = React.useState<string | null>(
+    null,
+  );
   const [modules, setModules] = React.useState<AdminOrgModule[]>([]);
   const [modulesLoading, setModulesLoading] = React.useState(true);
   const [modulesError, setModulesError] = React.useState<string | null>(null);
@@ -278,6 +289,22 @@ export default function SettingsPage() {
       );
     } finally {
       setSavingVertical(false);
+    }
+  };
+
+  const handleChangeSector = async (sector: AdminOrgSector) => {
+    if (!org || sector === org.sector) return;
+    setSectorSaveError(null);
+    setSavingSector(true);
+    try {
+      const updated = await updateOrgSector(sector);
+      setOrg(updated);
+    } catch (e) {
+      setSectorSaveError(
+        e instanceof Error ? e.message : "Failed to save sector",
+      );
+    } finally {
+      setSavingSector(false);
     }
   };
 
@@ -573,6 +600,16 @@ export default function SettingsPage() {
           onPreview={handlePreviewVertical}
           onSave={handleChangeVertical}
         />
+
+        {currentOrgIsMasterOrg && (
+          <SectorSettingsCard
+            sector={org?.sector ?? null}
+            isLoading={isLoading}
+            isSaving={savingSector}
+            error={sectorSaveError}
+            onSave={handleChangeSector}
+          />
+        )}
 
         <ModulesSettingsCard
           modules={modules}

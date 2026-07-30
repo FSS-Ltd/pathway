@@ -12,6 +12,8 @@ type OrgRecord = {
   slug: string;
   planCode?: string;
   isSuite?: boolean;
+  isMasterOrg?: boolean;
+  sector?: string | null;
   parentPortalEnabled?: boolean;
   logoStorageKey?: string | null;
 };
@@ -261,6 +263,50 @@ describe("OrgsService", () => {
         service.changeVertical("missing-org", "CHURCH"),
       ).rejects.toThrow("Organisation not found");
       expect(prismaMock.orgVertical.upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("changeSector", () => {
+    it("updates the sector for the master organisation", async () => {
+      (prismaMock.org.findUnique as jest.Mock).mockResolvedValue({
+        id: "org_1",
+        isMasterOrg: true,
+      });
+      (prismaMock.org.update as jest.Mock).mockResolvedValue({
+        id: "org_1",
+        sector: "CLUB",
+      });
+
+      await expect(service.changeSector("org_1", "CLUB")).resolves.toEqual({
+        id: "org_1",
+        sector: "CLUB",
+      });
+      expect(prismaMock.org.update).toHaveBeenCalledWith({
+        where: { id: "org_1" },
+        data: { sector: "CLUB" },
+        select: { id: true, sector: true },
+      });
+    });
+
+    it("rejects a missing organisation before writing", async () => {
+      (prismaMock.org.findUnique as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        service.changeSector("missing-org", "CHURCH"),
+      ).rejects.toThrow("Organisation not found");
+      expect(prismaMock.org.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-master organisation", async () => {
+      (prismaMock.org.findUnique as jest.Mock).mockResolvedValue({
+        id: "org_1",
+        isMasterOrg: false,
+      });
+
+      await expect(
+        service.changeSector("org_1", "CHURCH"),
+      ).rejects.toThrow("Sector can only be changed for the master organisation");
+      expect(prismaMock.org.update).not.toHaveBeenCalled();
     });
   });
 

@@ -1,8 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
-import { SYSTEM_ROLE_TEMPLATES, UserOrgRole } from "@pathway/auth";
 import type { Prisma } from "@pathway/db";
-import { getOrgCapabilities, type PermissionKey } from "@pathway/platform";
+import type { PermissionKey } from "@pathway/platform";
 import {
   AuditAction,
   AuditEntityType,
@@ -10,6 +9,8 @@ import {
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { AccessCacheService } from "./access-cache.service";
+import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
+import { decodeCreatedAtIdCursor, encodeCreatedAtIdCursor } from "./cursor";
 import { roleApiError } from "./role-api-error";
 import { RoleSafetyService } from "./role-safety.service";
 import {
@@ -30,11 +31,6 @@ export interface AssignRoleCommand {
 export interface AssignmentListQuery {
   limit?: number;
   cursor?: string;
-}
-
-interface AssignmentCursor {
-  createdAt: Date;
-  id: string;
 }
 
 const DEFAULT_ASSIGNMENT_LIST_LIMIT = 50;
@@ -388,35 +384,12 @@ export class AssignmentsService {
   ): Promise<void> {
     const permissionKey =
       `platform.access.assignments.${access}` as PermissionKey;
-    const membership = await tx.orgMembership.findUnique({
-      where: {
-        orgId_userId: { orgId: actor.orgId, userId: actor.userId },
-      },
-      select: { role: true },
-    });
-    const [definition, capabilities] = await Promise.all([
-      tx.permissionDefinition.findUnique({
-        where: { key: permissionKey },
-        select: { isActive: true },
-      }),
-      getOrgCapabilities(actor.orgId, tx),
-    ]);
-    if (
-      membership?.role !== "ORG_ADMIN" ||
-      !actor.legacyOrgRoles.includes(UserOrgRole.ORG_ADMIN) ||
-      !definition?.isActive ||
-      !capabilities.includes(permissionKey) ||
-      !(
-        SYSTEM_ROLE_TEMPLATES.organisationHead
-          .permissions as readonly string[]
-      ).includes(permissionKey)
-    ) {
-      throw roleApiError(
-        HttpStatus.FORBIDDEN,
-        "ASSIGNMENT_API_ACCESS_DENIED",
-        actor.requestId,
-      );
-    }
+    await assertPlatformAccessRouteAccess(
+      tx,
+      actor,
+      permissionKey,
+      "ASSIGNMENT_API_ACCESS_DENIED",
+    );
   }
 
   private async invalidateUsers(
@@ -453,33 +426,9 @@ function parseAssignmentListLimit(
 function parseAssignmentCursor(
   encodedCursor: string,
   actor: RoleActorContext,
-): AssignmentCursor {
+): ReturnType<typeof decodeCreatedAtIdCursor> {
   try {
-    const value: unknown = JSON.parse(
-      Buffer.from(encodedCursor, "base64url").toString("utf8"),
-    );
-    if (
-      typeof value !== "object" ||
-      value === null ||
-      Array.isArray(value) ||
-      Object.keys(value).length !== 2 ||
-      !("createdAt" in value) ||
-      !("id" in value) ||
-      typeof value.createdAt !== "string" ||
-      typeof value.id !== "string" ||
-      value.id.length === 0 ||
-      value.id.length > 128
-    ) {
-      throw new Error("Invalid assignment cursor");
-    }
-    const createdAt = new Date(value.createdAt);
-    if (
-      Number.isNaN(createdAt.getTime()) ||
-      createdAt.toISOString() !== value.createdAt
-    ) {
-      throw new Error("Invalid assignment cursor");
-    }
-    return { createdAt, id: value.id };
+    return decodeCreatedAtIdCursor(encodedCursor);
   } catch {
     throw roleApiError(
       HttpStatus.BAD_REQUEST,
@@ -490,9 +439,7 @@ function parseAssignmentCursor(
 }
 
 function encodeAssignmentCursor(createdAt: Date, id: string): string {
-  return Buffer.from(
-    JSON.stringify({ createdAt: createdAt.toISOString(), id }),
-  ).toString("base64url");
+  return encodeCreatedAtIdCursor({ createdAt, id });
 }
 
 function isAssignmentConstraintError(error: unknown): boolean {

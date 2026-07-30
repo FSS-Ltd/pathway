@@ -411,4 +411,69 @@ describe("EffectivePermissionsService", () => {
       sourceRoleIds: ["role-a", "role-z"],
     });
   });
+
+  it.each([
+    [
+      "future assignment",
+      { grants: [grant({ startsAt: new Date("2100-01-01") })] },
+      undefined,
+    ],
+    [
+      "expired assignment",
+      { grants: [grant({ expiresAt: new Date(0) })] },
+      undefined,
+    ],
+    [
+      "revoked assignment",
+      { grants: [grant({ revokedAt: new Date(0) })] },
+      undefined,
+    ],
+    ["inactive role", { grants: [grant({ roleIsActive: false })] }, undefined],
+    [
+      "inactive permission",
+      { grants: [grant({ permissionIsActive: false })] },
+      undefined,
+    ],
+    ["disabled feature", { available: false }, undefined],
+    [
+      "site role at another tenant",
+      { grants: [grant({ roleScope: "site", roleTenantId: SITE_ID })] },
+      OTHER_SITE_ID,
+    ],
+    ["missing organisation membership", { hasMembership: false }, undefined],
+  ] as const)(
+    "omits a %s from listForUserWithSources",
+    async (_name, options, tenantId) => {
+      await expect(
+        createService(options).listForUserWithSources(
+          USER_ID,
+          ORG_ID,
+          tenantId,
+        ),
+      ).resolves.toEqual([]);
+    },
+  );
+
+  it("deduplicates and sorts source role ids per permission key", async () => {
+    const service = createService({
+      grants: [
+        grant({ roleId: "role-z", startsAt: new Date(0) }),
+        grant({ roleId: "role-a", startsAt: new Date(0) }),
+        grant({ roleId: "role-a", startsAt: new Date(0) }),
+        grant({
+          roleId: "role-other-permission",
+          permissionKey: "ace.behaviour.read",
+          startsAt: new Date(0),
+        }),
+      ],
+      capabilities: ["ace.behaviour.read", "ace.pace.read"],
+    });
+
+    await expect(
+      service.listForUserWithSources(USER_ID, ORG_ID),
+    ).resolves.toEqual([
+      { permissionKey: "ace.behaviour.read", sourceRoleIds: ["role-other-permission"] },
+      { permissionKey: "ace.pace.read", sourceRoleIds: ["role-a", "role-z"] },
+    ]);
+  });
 });
