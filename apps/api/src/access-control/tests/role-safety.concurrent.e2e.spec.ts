@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { SYSTEM_ROLE_TEMPLATES } from "@pathway/auth";
-import { Prisma, prisma, runTransaction } from "@pathway/db";
+import { Prisma, PrismaClient, prisma, runTransaction } from "@pathway/db";
 import { AccessCacheService } from "../access-cache.service";
 import { AssignmentsService } from "../assignments.service";
 import {
@@ -68,9 +68,10 @@ async function holdOrganisationSafetyLock(
 }
 
 async function countWaitingOrganisationSafetyLocks(
+  observer: PrismaClient,
   orgId: string,
 ): Promise<number> {
-  const [row] = await prisma.$queryRaw<{ waitingCount: number }[]>(
+  const [row] = await observer.$queryRaw<{ waitingCount: number }[]>(
     Prisma.sql`
       WITH lock_key AS (
         SELECT hashtextextended(${`ace-role-safety:${orgId}`}, 0) AS value
@@ -104,13 +105,15 @@ async function waitForCondition(
 }
 
 async function waitForWaitingOrganisationSafetyLocks(
+  observer: PrismaClient,
   orgId: string,
   expectedCount: number,
 ): Promise<void> {
   await waitForCondition(
     `${expectedCount} organisation safety lock waiters`,
     async () =>
-      (await countWaitingOrganisationSafetyLocks(orgId)) === expectedCount,
+      (await countWaitingOrganisationSafetyLocks(observer, orgId)) ===
+      expectedCount,
   );
 }
 
@@ -139,6 +142,7 @@ function transactionBoundary() {
 }
 
 describe("role safety concurrency and transactional rollback", () => {
+  const lockObserver = new PrismaClient();
   const orgId = randomUUID();
   const expiryOrgId = randomUUID();
   const crossOrgDecoyId = randomUUID();
@@ -226,6 +230,7 @@ describe("role safety concurrency and transactional rollback", () => {
   beforeAll(async () => {
     if (!requireDatabase()) return;
 
+    await lockObserver.$connect();
     await prisma.org.createMany({
       data: [orgId, expiryOrgId, crossOrgDecoyId].map((id) => ({
         id,
@@ -603,6 +608,10 @@ describe("role safety concurrency and transactional rollback", () => {
     await prisma.org.deleteMany({ where: { id: { in: orgIds } } });
   });
 
+  afterAll(async () => {
+    await lockObserver.$disconnect();
+  });
+
   it("rolls back a revocation that would leave the actor with legacy bootstrap authority only", async () => {
     if (!isDatabaseAvailable()) return;
 
@@ -765,7 +774,7 @@ describe("role safety concurrency and transactional rollback", () => {
         expiryTargetAssignmentId,
         expiryActor("head-expired-while-waiting"),
       );
-      await waitForWaitingOrganisationSafetyLocks(expiryOrgId, 1);
+      await waitForWaitingOrganisationSafetyLocks(lockObserver, expiryOrgId, 1);
       await waitUntilDatabaseTimeAfter(expiresAt);
       await heldLock.release();
 
@@ -810,7 +819,7 @@ describe("role safety concurrency and transactional rollback", () => {
           actor(operatorUserId, `concurrent-head-${index}`),
         ),
       );
-      await waitForWaitingOrganisationSafetyLocks(orgId, 2);
+      await waitForWaitingOrganisationSafetyLocks(lockObserver, orgId, 2);
       await heldLock.release();
       results = await Promise.allSettled(mutations);
     } finally {
