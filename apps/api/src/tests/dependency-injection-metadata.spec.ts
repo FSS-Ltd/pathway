@@ -4,6 +4,7 @@ import { ModuleRef, Reflector } from "@nestjs/core";
 import { PathwayRequestContext } from "@pathway/auth";
 import { AccessDecisionLogger } from "../access-control/access-decision-logger";
 import { AccessCacheService } from "../access-control/access-cache.service";
+import { RoleSafetyService } from "../access-control/role-safety.service";
 import { AssignmentsController } from "../access-control/assignments.controller";
 import { AssignmentsService as AccessControlAssignmentsService } from "../access-control/assignments.service";
 import { EffectivePermissionsService } from "../access-control/effective-permissions.service";
@@ -73,6 +74,7 @@ describe("dependency injection metadata", () => {
         { index: 0, param: ROLES_TRANSACTION_BOUNDARY },
         { index: 1, param: OutboxService },
         { index: 2, param: AccessCacheService },
+        { index: 3, param: RoleSafetyService },
       ],
     },
     {

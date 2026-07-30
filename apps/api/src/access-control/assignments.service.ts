@@ -11,6 +11,7 @@ import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { AccessCacheService } from "./access-cache.service";
 import { roleApiError } from "./role-api-error";
+import { RoleSafetyService } from "./role-safety.service";
 import {
   ROLES_TRANSACTION_BOUNDARY,
   type RoleActorContext,
@@ -59,6 +60,8 @@ export class AssignmentsService {
     private readonly outbox: OutboxService,
     @Inject(AccessCacheService)
     private readonly cache: AccessCacheService,
+    @Inject(RoleSafetyService)
+    private readonly roleSafety: RoleSafetyService,
   ) {}
 
   async list(
@@ -164,17 +167,25 @@ export class AssignmentsService {
       }
 
       const revokedAt = new Date();
-      const updated = await tx.userRoleAssignment.updateMany({
-        where: { id: assignmentId, orgId: actor.orgId, revokedAt: null },
-        data: { revokedAt, revokedById: actor.userId },
+      await this.roleSafety.assertHeadAndSelfLockoutSafe({
+        tx,
+        actorUserId: actor.userId,
+        orgId: actor.orgId,
+        requestId: actor.requestId,
+        mutate: async () => {
+          const updated = await tx.userRoleAssignment.updateMany({
+            where: { id: assignmentId, orgId: actor.orgId, revokedAt: null },
+            data: { revokedAt, revokedById: actor.userId },
+          });
+          if (updated.count !== 1) {
+            throw roleApiError(
+              HttpStatus.CONFLICT,
+              "ASSIGNMENT_ALREADY_REVOKED",
+              actor.requestId,
+            );
+          }
+        },
       });
-      if (updated.count !== 1) {
-        throw roleApiError(
-          HttpStatus.CONFLICT,
-          "ASSIGNMENT_ALREADY_REVOKED",
-          actor.requestId,
-        );
-      }
 
       await this.recordChange(tx, {
         actor,

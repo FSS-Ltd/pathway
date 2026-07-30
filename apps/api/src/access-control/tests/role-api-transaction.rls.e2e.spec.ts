@@ -9,10 +9,21 @@ import {
   type RoleActorContext,
 } from "../roles.service";
 import { AccessCacheService } from "../access-cache.service";
+import {
+  RoleSafetyService,
+  type RoleMutationCommand,
+} from "../role-safety.service";
 import { isDatabaseAvailable, requireDatabase } from "../../../test-helpers.e2e";
 
 const RLS_ROLE = "pathway_e2e_rls";
 const AUDIT_DENIED_ROLE = "pathway_e2e_audit_denied";
+const passThroughRoleSafety = {
+  async assertHeadAndSelfLockoutSafe(
+    command: RoleMutationCommand,
+  ): Promise<void> {
+    await command.mutate();
+  },
+} as RoleSafetyService;
 
 function testTransactionBoundary(roleName = RLS_ROLE) {
   return createRolesTransactionBoundary(async (operation) =>
@@ -151,6 +162,7 @@ describe("role API transaction and forced-RLS integration", () => {
     service = new RolesService(
       testTransactionBoundary(),
       new AccessCacheService(),
+      passThroughRoleSafety,
     );
   });
 
@@ -208,6 +220,7 @@ describe("role API transaction and forced-RLS integration", () => {
     const deniedService = new RolesService(
       testTransactionBoundary(AUDIT_DENIED_ROLE),
       new AccessCacheService(),
+      passThroughRoleSafety,
     );
     await expectDatabaseRejection(
       () =>

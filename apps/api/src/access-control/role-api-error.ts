@@ -16,6 +16,10 @@ const SAFE_MESSAGES: Readonly<Record<string, string>> = {
   ROLE_NAME_CONFLICT: "A role with this name already exists in this scope.",
   ROLE_VERSION_CONFLICT: "The role was changed by another request.",
   SYSTEM_ROLE_PROTECTED: "System roles cannot be changed.",
+  LAST_HEAD_PROTECTED:
+    "The final active organisation head cannot be removed.",
+  SELF_LOCKOUT_PROTECTED:
+    "This change would remove your access-management authority.",
   UNKNOWN_PERMISSION_KEY: "One or more permission keys are unknown.",
   INACTIVE_PERMISSION_KEY: "One or more permission keys are unavailable.",
   NON_DELEGABLE_PERMISSION_KEY: "One or more permission keys cannot be delegated.",
