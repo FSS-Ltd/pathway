@@ -7,9 +7,13 @@ import type { AdminRoleInfo } from "./access";
 import {
   canAccessAdminSection,
   canAccessBilling,
+  canAccessRolesAdmin,
   canAccessSafeguardingAdmin,
   isSiteAdminOrHigher,
 } from "./access";
+
+/** Paths restricted to legacy ORG_ADMIN only (Roles & Access), narrower than admin-only. */
+const ORG_ADMIN_ONLY_PREFIXES = ["/settings/roles"];
 
 /** Paths restricted to ORG_ADMIN or SITE_ADMIN (admin-only). */
 const ADMIN_ONLY_PATHS = [
@@ -50,6 +54,13 @@ export function canAccessRoute(
   if (path === CREATE_CONCERN_PATH) {
     return true; // Any authenticated staff can create concerns
   }
+  if (
+    ORG_ADMIN_ONLY_PREFIXES.some(
+      (p) => path === p || path.startsWith(p + "/"),
+    )
+  ) {
+    return canAccessRolesAdmin(role);
+  }
   if (path === "/safeguarding" || path.startsWith("/safeguarding/")) {
     return canAccessSafeguardingAdmin(role);
   }
@@ -86,7 +97,9 @@ export type AdminAction =
   | "reports:access"
   | "billing:access"
   | "safeguarding:access"
-  | "safeguarding:create";
+  | "safeguarding:create"
+  | "roles:manage"
+  | "assignments:manage";
 
 /**
  * Check if the user can perform the given action.
@@ -118,6 +131,9 @@ export function canPerform(
       return canAccessSafeguardingAdmin(role);
     case "safeguarding:create":
       return true; // Any staff can create concerns
+    case "roles:manage":
+    case "assignments:manage":
+      return canAccessRolesAdmin(role);
     default:
       return false;
   }

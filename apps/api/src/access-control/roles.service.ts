@@ -14,6 +14,7 @@ import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AccessCacheService } from "./access-cache.service";
+import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
 import { roleApiError } from "./role-api-error";
 import { RoleSafetyService } from "./role-safety.service";
 import type {
@@ -525,39 +526,12 @@ export class RolesService {
     access: "read" | "manage",
   ): Promise<void> {
     const permissionKey = `platform.access.roles.${access}` as PermissionKey;
-    const membership = await tx.orgMembership.findUnique({
-      where: { orgId_userId: { orgId: actor.orgId, userId: actor.userId } },
-      select: { role: true },
-    });
-    if (
-      membership?.role !== "ORG_ADMIN" ||
-      !actor.legacyOrgRoles.includes(UserOrgRole.ORG_ADMIN)
-    ) {
-      throw roleApiError(
-        HttpStatus.FORBIDDEN,
-        "ROLE_API_ACCESS_DENIED",
-        actor.requestId,
-      );
-    }
-
-    const [definition, capabilities] = await Promise.all([
-      tx.permissionDefinition.findUnique({
-        where: { key: permissionKey },
-        select: { isActive: true },
-      }),
-      getOrgCapabilities(actor.orgId, tx),
-    ]);
-    if (
-      !definition?.isActive ||
-      !capabilities.includes(permissionKey) ||
-      !(SYSTEM_ROLE_TEMPLATES.organisationHead.permissions as readonly string[]).includes(permissionKey)
-    ) {
-      throw roleApiError(
-        HttpStatus.FORBIDDEN,
-        "ROLE_API_ACCESS_DENIED",
-        actor.requestId,
-      );
-    }
+    await assertPlatformAccessRouteAccess(
+      tx,
+      actor,
+      permissionKey,
+      "ROLE_API_ACCESS_DENIED",
+    );
   }
 
   private async inOrganisationContext<T>(

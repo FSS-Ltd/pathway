@@ -69,6 +69,7 @@ const navItemsWithAccess: (SidebarNavItem & {
   { label: "Blog", href: "/admin/blog", iconIndex: 19, access: "super-user", group: "Communication" },
   { ...defaultSidebarItems[12], access: "admin-only", group: "Admin" }, // Reports
   { ...defaultSidebarItems[13], access: "admin-only", group: "Admin" }, // Settings
+  { label: "Roles & Access", href: "/settings/roles", iconIndex: 21, access: "org-admin-only", group: "Admin" },
 ];
 
 const titleMap: Record<string, string> = {
@@ -98,6 +99,7 @@ const titleMap: Record<string, string> = {
   "/admin/blog": "Blog",
   "/reports": "Reports & Insights",
   "/settings": "Settings & Organisation",
+  "/settings/roles": "Roles & Access",
   "/feedback": "Feedback",
 };
 

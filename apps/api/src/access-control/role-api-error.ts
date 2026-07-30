@@ -37,6 +37,14 @@ const SAFE_MESSAGES: Readonly<Record<string, string>> = {
   ROLE_NOT_ASSIGNABLE: "The selected role cannot be assigned.",
   ASSIGNEE_NOT_IN_ORGANISATION:
     "The selected user is not an active organisation member.",
+  INVALID_EFFECTIVE_ACCESS_REQUEST: "The effective access request is invalid.",
+  EFFECTIVE_ACCESS_API_ACCESS_DENIED:
+    "You are not allowed to view effective access.",
+  INVALID_AUDIT_REQUEST: "The audit log request is invalid.",
+  AUDIT_API_ACCESS_DENIED: "You are not allowed to view the audit log.",
+  INVALID_PERMISSIONS_REQUEST: "The permissions request is invalid.",
+  PERMISSIONS_API_ACCESS_DENIED:
+    "You are not allowed to view delegable permissions.",
 };
 
 export function roleApiError(
