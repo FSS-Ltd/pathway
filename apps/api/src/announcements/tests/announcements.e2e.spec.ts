@@ -3,8 +3,11 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import { prisma, withTenantRlsContext } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 // Types to keep the spec strongly typed (no any)
 type Announcement = {
@@ -25,12 +28,8 @@ describe("Announcements (e2e)", () => {
   const otherTenantId = process.env.E2E_TENANT2_ID as string;
   let createdId: string;
   let authHeader: string;
+  let authUserId: string;
   let otherAnnouncementId: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -47,22 +46,15 @@ describe("Announcements (e2e)", () => {
       throw new Error("E2E_ORG_ID / E2E_TENANT_ID / E2E_TENANT2_ID missing");
     }
 
-    authHeader = buildAuthHeader({
-      sub: "announcements-e2e",
-      "https://pathway.app/user": { id: "announcements-e2e" },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: "e2e-tenant-a",
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "announcements-e2e",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
 
     // seed announcement in other tenant
     await withTenantRlsContext(otherTenantId, orgId, async (tx) => {
@@ -84,6 +76,8 @@ describe("Announcements (e2e)", () => {
       await prisma.announcement
         .deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } })
         .catch(() => undefined);
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

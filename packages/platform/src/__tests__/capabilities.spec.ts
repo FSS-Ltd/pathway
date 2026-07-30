@@ -76,6 +76,31 @@ describe("getOrgCapabilities", () => {
       ]),
     );
   });
+
+  it("uses an injected operational reader when one is provided", async () => {
+    const reader = {
+      orgVertical: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ vertical: "ACE_SCHOOL" as const }),
+      },
+      orgModule: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    };
+
+    await expect(
+      getOrgCapabilities("org-operational", reader),
+    ).resolves.toContain("ace.behaviour.read");
+    expect(reader.orgVertical.findUnique).toHaveBeenCalledWith({
+      where: { orgId: "org-operational" },
+    });
+    expect(reader.orgModule.findMany).toHaveBeenCalledWith({
+      where: { orgId: "org-operational", status: "ACTIVE" },
+    });
+    expect(orgVerticalFindUnique).not.toHaveBeenCalled();
+    expect(orgModuleFindMany).not.toHaveBeenCalled();
+  });
 });
 
 describe("orgHasCapability", () => {

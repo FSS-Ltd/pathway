@@ -4,6 +4,9 @@
 
 PathWay is a comprehensive monorepo project designed to streamline the development of a scalable and maintainable platform. This repository contains multiple applications and shared packages, enabling efficient code reuse and unified development workflows.
 
+The approved NexSteps Home product and UX implementation reference starts at
+[`docs/NexStepsV2/nexsteps-home/README.md`](docs/NexStepsV2/nexsteps-home/README.md).
+
 ## Monorepo Structure
 
 The repository is organized into the following main directories:
@@ -134,6 +137,73 @@ pnpm --filter @pathway/db run prisma migrate deploy
 
 ```bash
 pnpm test:integration
+```
+
+### Protected system-role seed identity
+
+`pnpm db:seed`, the `@pathway/db` seed script, and Prisma's seed entrypoint all
+delegate to the same root seed command. The command fails before synchronising
+permission metadata unless `SYSTEM_ROLE_SEED_DATABASE_URL` is present and
+authenticates as the PostgreSQL login `pathway_system_role_seed`. Use a direct
+or session connection URL; transaction-pooler URLs cannot preserve that
+identity guarantee.
+
+Provision that login outside Prisma migrations with `LOGIN NOINHERIT
+NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION`. Grant it
+`USAGE` on the application schema; `SELECT` on `Org`, `Tenant`, `OrgVertical`,
+`OrgModule`, `PermissionDefinition`, `OrgRoleDefinition`, and
+`OrgRolePermission`; write access only on `PermissionDefinition`,
+`OrgRoleDefinition`, and `OrgRolePermission`; and database `CONNECT`. Never
+grant the seed role to the runtime application login or place its URL in
+runtime service secrets.
+
+Run the following through the environment's reviewed DBA connection, replacing
+the database name and password through the environment's secret-management
+workflow:
+
+```sql
+CREATE ROLE pathway_system_role_seed
+  LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS
+  NOCREATEDB NOCREATEROLE NOREPLICATION
+  PASSWORD '<managed-secret>';
+GRANT CONNECT ON DATABASE <database_name> TO pathway_system_role_seed;
+GRANT USAGE ON SCHEMA app TO pathway_system_role_seed;
+GRANT SELECT ON TABLE
+  app."Org", app."Tenant", app."OrgVertical", app."OrgModule",
+  app."PermissionDefinition", app."OrgRoleDefinition",
+  app."OrgRolePermission"
+TO pathway_system_role_seed;
+GRANT INSERT, UPDATE, DELETE ON TABLE
+  app."PermissionDefinition", app."OrgRoleDefinition",
+  app."OrgRolePermission"
+TO pathway_system_role_seed;
+```
+
+The database identity proofs never use or infer safety from `DATABASE_URL`.
+Run them only against a disposable Postgres instance owned by the test run.
+Set `SYSTEM_ROLE_SEED_TEST_ADMIN_DATABASE_URL` to an admin connection for an
+already migrated database named `pathway_system_role_seed_test` or
+`pathway_system_role_seed_test_<suffix>`, with `?schema=app`, and set:
+
+```text
+SYSTEM_ROLE_SEED_TEST_DISPOSABLE_TOKEN=provision-and-drop-system-role-seed-test-logins
+```
+
+The proof fails if the canonical `pathway_system_role_seed` login already
+exists. On an accepted disposable instance it generates fresh passwords,
+marks the roles it owns, and revokes privileges and drops both test logins
+after each suite. A failed or interrupted cleanup deliberately causes the next
+run to fail closed instead of altering the remaining login.
+
+With the disposable database migrated, run the same proof used by CI:
+
+```bash
+PATHWAY_RUN_DB_INTEGRATION_TESTS=1 \
+PATHWAY_RUN_DB_SEED_PROOF=1 \
+pnpm --filter @pathway/db exec jest --runInBand --runTestsByPath \
+  src/__tests__/system-role-seed-test-database.spec.ts \
+  src/__tests__/seed-system-roles.spec.ts \
+  src/__tests__/system-role-seed-command.spec.ts
 ```
 
 #### Option 2: Using a Local Postgres Instance

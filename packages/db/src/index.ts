@@ -3,6 +3,9 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { withPiiEncryption } from "./pii-encryption";
 
+export * from "./permission-definition-sync";
+export * from "./seed-system-roles";
+
 // Keep a single PrismaClient instance across hot-reloads in dev/test
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient };
 const prismaContext = new AsyncLocalStorage<Prisma.TransactionClient>();
@@ -53,6 +56,12 @@ export async function resetDatabase() {
   try {
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "OutboxEvent",
+        "UserRoleAssignment",
+        "OrgRolePermission",
+        "OrgRoleRevision",
+        "OrgRoleDefinition",
+        "PermissionDefinition",
         "BillingEvent",
         "PendingOrder",
         "UsageCounters",
@@ -94,6 +103,12 @@ export async function resetDatabase() {
     // Fallback for environments where the current DB user cannot truncate billing tables.
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "OutboxEvent",
+        "UserRoleAssignment",
+        "OrgRolePermission",
+        "OrgRoleRevision",
+        "OrgRoleDefinition",
+        "PermissionDefinition",
         "UsageCounters",
         "StaffActivity",
         "OrgEntitlementSnapshot",
@@ -136,6 +151,7 @@ export async function resetDatabase() {
 // Re-export types & enums (public API unchanged)
 export type { PrismaClient as PrismaClientType } from "@prisma/client";
 export {
+  PrismaClient,
   AssignmentStatus,
   Role,
   Weekday,
@@ -152,8 +168,14 @@ export {
   Module,
   ModuleStatus,
   ReportBundleStatus,
+  RoleScope,
 } from "@prisma/client";
 export { Prisma };
+export {
+  roleScopeAcceptsPermissionScope,
+  type CompatibleRoleScope,
+  type RolePermissionScope,
+} from "./role-scope-compatibility";
 
 async function applyTenantContext(
   tx: Prisma.TransactionClient,
@@ -182,6 +204,15 @@ export async function runTransaction<T>(
   return basePrismaClient.$transaction(fn);
 }
 
+export async function runReadOnlyTransaction<T>(
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  return basePrismaClient.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+    return fn(tx);
+  });
+}
+
 export async function withTenantRlsContext<T>(
   tenantId: string,
   orgId: string | null,
@@ -193,6 +224,21 @@ export async function withTenantRlsContext<T>(
 
   return basePrismaClient.$transaction(async (tx) => {
     await applyTenantContext(tx, tenantId, orgId);
+    return prismaContext.run(tx, () => callback(tx));
+  });
+}
+
+export async function withOrgRlsContext<T>(
+  orgId: string,
+  callback: (client: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  if (!orgId) {
+    throw new Error("withOrgRlsContext requires an orgId");
+  }
+
+  return basePrismaClient.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+    await applyTenantContext(tx, "", orgId);
     return prismaContext.run(tx, () => callback(tx));
   });
 }

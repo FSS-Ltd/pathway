@@ -30,6 +30,7 @@ Every phase doc in this set was grounded against the actual repo, not written fr
 | 06 | `06-cutover.md` | Removing legacy sector checks, feature-flag entitlement, and the old pricing/buy pages |
 | 07 | `07-nexsteps-home.md` | The Home-Education vertical + NexSteps Home plan + family surface |
 | 08 | `08-community.md` | The built-in cross-family community — last, because it crosses tenant boundaries |
+| H | `nexsteps-home/README.md` | Approved NexSteps Home product/UX contract, implementation map, screen inventory and runnable prototype |
 
 Each phase doc contains: a status header, the phase goal, its dependencies on prior phases, a grounded current-state note using the R/E/N legend below, the PR breakdown, acceptance criteria, and open decisions flagged for a human to resolve before that phase starts.
 
@@ -160,3 +161,4 @@ Collected here for visibility; each is repeated in its owning phase doc.
 - `packages/db/prisma/schema.prisma` (1,065 lines) — reviewed in full for the `OrgSector` enum, `Org`, `Subscription`, `Announcement`, and usage-counter models.
 - `apps/workers` — reviewed to confirm it's plain `tsx` CLI scripts today, not a BullMQ queue (the CEE docs' architecture diagram shows BullMQ as aspirational, not implemented).
 - `apps/mobile/app/(family)/` — the existing static "Family Space" mockup, confirmed unwired to any API, relevant to Phase 7.
+- `docs/NexStepsV2/nexsteps-home/` and `prototypes/nexsteps-home/` — the approved NexSteps Home implementation handoff that supersedes the static mockup as the product/UX target while preserving the production architecture.

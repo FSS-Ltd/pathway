@@ -8,9 +8,14 @@ import {
   AssignmentStatus,
   Role,
   SwapStatus,
+  prisma,
 } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase, isDatabaseAvailable } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  isDatabaseAvailable,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 // E2E for Swap Requests
 // This follows the same conventions as other e2e suites in this repo
@@ -27,13 +32,8 @@ describe("Swaps (e2e)", () => {
 
   const tenantId = process.env.E2E_TENANT_ID as string;
   const orgId = process.env.E2E_ORG_ID as string;
-  const tenantSlug = "e2e-tenant-a";
   let authHeader: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
+  let authUserId: string;
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -51,14 +51,15 @@ describe("Swaps (e2e)", () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    authHeader = buildAuthHeader({
-      sub: "swaps-e2e-user",
-      "https://pathway.app/user": { id: "swaps-e2e-user" },
-      "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-      "https://pathway.app/tenant": { tenantId, orgId, slug: tenantSlug },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "swaps-e2e-user",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
   });
 
   beforeEach(async () => {
@@ -119,6 +120,8 @@ describe("Swaps (e2e)", () => {
 
   afterAll(async () => {
     if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

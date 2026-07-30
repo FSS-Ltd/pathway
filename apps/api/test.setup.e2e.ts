@@ -4,19 +4,35 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { PrismaClientType } from "@pathway/db";
+import { selectE2eDatabaseUrl } from "./test-environment.e2e";
 
 // E2E tests can be slow (DB, HTTP); set default timeout
 if (typeof jest !== "undefined") {
   jest.setTimeout(30000);
 }
 
+const usesGlobalSetup = process.env.E2E_USE_GLOBAL_SETUP === "true";
+const explicitDatabaseEnvironment: NodeJS.ProcessEnv = {
+  TEST_DATABASE_URL: process.env.TEST_DATABASE_URL,
+  E2E_DATABASE_URL: process.env.E2E_DATABASE_URL,
+};
+if (usesGlobalSetup) {
+  process.env.E2E_RLS_ROLE = "pathway_e2e_rls";
+}
+
 // 1) Load test env first, then fallback to root .env
-config({ path: path.resolve(__dirname, "../../.env.test"), override: true });
+config({
+  path: path.resolve(__dirname, "../../.env.test"),
+  override: false,
+});
 config({ path: path.resolve(__dirname, "../../.env"), override: false });
 
 // 2) Point Prisma at the dedicated E2E database (prefer TEST_DATABASE_URL if provided)
-const BASE_E2E_URL =
-  process.env.TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL;
+const BASE_E2E_URL = selectE2eDatabaseUrl(
+  explicitDatabaseEnvironment,
+  process.env,
+  usesGlobalSetup,
+);
 
 if (!BASE_E2E_URL) {
   throw new Error(
@@ -165,6 +181,19 @@ beforeAll(async () => {
   if (!(globalThis as any).__E2E_DB_AVAILABLE) {
     return;
   }
+
+  if (usesGlobalSetup) {
+    console.log(
+      "[test.setup.e2e] Global setup prepared migrations, registry metadata, and tenant fixtures.",
+    );
+    return;
+  }
+
+  // Permission definitions are platform-owned global metadata. Seed them through
+  // the approved synchronizer using the test database's operational connection,
+  // not a tenant RLS context or a customer-created fixture key.
+  const { syncPermissionDefinitions } = await import("@pathway/platform");
+  await db.runTransaction(syncPermissionDefinitions);
 
   // 4) Minimal deterministic seed for all e2e specs (clean DB per run)
   // Stable defaults to align with e2e expectations; override via env if needed

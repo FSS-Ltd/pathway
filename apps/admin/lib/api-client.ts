@@ -4576,6 +4576,27 @@ export async function updateOrgVertical(
   return fetchOrgOverview();
 }
 
+/** Sector can only be changed for the master (internal) organisation. */
+export async function updateOrgSector(
+  sector: AdminOrgSector,
+): Promise<AdminOrgOverview> {
+  if (isUsingMockApi()) {
+    throw new Error("Sector updates are not available in mock mode.");
+  }
+  const res = await fetch(`${API_BASE_URL}/orgs/current/sector`, {
+    method: "PATCH",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({ sector }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to update sector: ${res.status} ${body}`);
+  }
+  return fetchOrgOverview();
+}
+
 export async function fetchVerticalCapabilities(
   vertical: AdminVertical,
 ): Promise<string[]> {
@@ -6189,4 +6210,263 @@ export async function uploadBlogAsset(
     throw new Error(`Failed to upload blog asset: ${res.status} ${body}`);
   }
   return res.json();
+}
+
+// --- Roles & permissions admin (ACE-F13) ---
+// Note: AdminAssignmentRow/AdminAssignmentInput above are unrelated
+// session-staffing rota assignments; these types are role-permission grants.
+
+export type AdminRoleDefinition = {
+  id: string;
+  orgId: string;
+  tenantId: string | null;
+  name: string;
+  description: string | null;
+  scope: "organisation" | "site";
+  isSystem: boolean;
+  isActive: boolean;
+  version: number;
+  permissions: { permissionKey: string }[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminRoleAssignment = {
+  id: string;
+  orgId: string;
+  tenantId: string | null;
+  userId: string;
+  roleDefinitionId: string;
+  assignedById: string;
+  startsAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+  revokedById: string | null;
+};
+
+export type AdminEffectivePermission = {
+  permissionKey: string;
+  sourceRoleIds: string[];
+};
+
+export type AdminAccessAuditEvent = {
+  id: string;
+  createdAt: string;
+  tenantId: string | null;
+  actorUserId: string;
+  entityType: "ORG_ROLE" | "ROLE_ASSIGNMENT";
+  entityId: string | null;
+  action: string;
+  metadata: unknown;
+};
+
+/** Throws `Error("${code}:${message}")` when the API returns a coded error body. */
+async function throwCodedRoleApiError(res: Response, fallback: string): Promise<never> {
+  const body = await res.json().catch(() => null);
+  if (body && typeof body.code === "string" && typeof body.message === "string") {
+    throw new Error(`${body.code}:${body.message}`);
+  }
+  const text = await res.text().catch(() => "");
+  throw new Error(`${fallback}: ${res.status} ${text}`);
+}
+
+export async function fetchRoles(): Promise<AdminRoleDefinition[]> {
+  const res = await fetch(`${API_BASE_URL}/access/roles`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch roles: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export async function fetchRole(roleId: string): Promise<AdminRoleDefinition | null> {
+  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch role: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export async function createRole(input: {
+  name: string;
+  description?: string;
+  scope: "organisation" | "site";
+  permissionKeys: string[];
+}): Promise<AdminRoleDefinition> {
+  const res = await fetch(`${API_BASE_URL}/access/roles`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to create role: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export async function updateRole(
+  roleId: string,
+  input: {
+    expectedVersion: number;
+    name: string;
+    description?: string;
+    permissionKeys: string[];
+  },
+): Promise<AdminRoleDefinition> {
+  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}`, {
+    method: "PATCH",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return throwCodedRoleApiError(res, "Failed to update role");
+  return res.json();
+}
+
+export async function cloneRole(
+  roleId: string,
+  input: { name: string; description?: string },
+): Promise<AdminRoleDefinition> {
+  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}/clone`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to clone role: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export async function retireRole(
+  roleId: string,
+  expectedVersion: number,
+): Promise<AdminRoleDefinition> {
+  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}/retire`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify({ expectedVersion }),
+  });
+  if (!res.ok) return throwCodedRoleApiError(res, "Failed to retire role");
+  return res.json();
+}
+
+export async function fetchRoleAssignments(params?: {
+  cursor?: string;
+  limit?: number;
+}): Promise<{ items: AdminRoleAssignment[]; nextCursor: string | null }> {
+  const query = new URLSearchParams();
+  if (params?.cursor) query.set("cursor", params.cursor);
+  if (params?.limit) query.set("limit", String(params.limit));
+  const suffix = query.toString() ? `?${query}` : "";
+  const res = await fetch(`${API_BASE_URL}/access/assignments${suffix}`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch role assignments: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export async function assignRole(input: {
+  userId: string;
+  roleDefinitionId: string;
+  startsAt: string;
+  expiresAt?: string;
+}): Promise<AdminRoleAssignment> {
+  const res = await fetch(`${API_BASE_URL}/access/assignments`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) return throwCodedRoleApiError(res, "Failed to assign role");
+  return res.json();
+}
+
+export async function revokeRoleAssignment(
+  assignmentId: string,
+): Promise<AdminRoleAssignment> {
+  const res = await fetch(`${API_BASE_URL}/access/assignments/${assignmentId}`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+  });
+  if (!res.ok) return throwCodedRoleApiError(res, "Failed to revoke role assignment");
+  return res.json();
+}
+
+export async function fetchEffectivePermissions(userId: string): Promise<{
+  userId: string;
+  orgId: string;
+  tenantId: string | null;
+  permissions: AdminEffectivePermission[];
+}> {
+  const res = await fetch(
+    `${API_BASE_URL}/access/users/${userId}/effective-permissions`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch effective permissions: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export async function fetchAccessAuditEvents(params?: {
+  cursor?: string;
+  limit?: number;
+  entityType?: "ORG_ROLE" | "ROLE_ASSIGNMENT";
+}): Promise<{ items: AdminAccessAuditEvent[]; nextCursor: string | null }> {
+  const query = new URLSearchParams();
+  if (params?.cursor) query.set("cursor", params.cursor);
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.entityType) query.set("entityType", params.entityType);
+  const suffix = query.toString() ? `?${query}` : "";
+  const res = await fetch(`${API_BASE_URL}/access/audit-events${suffix}`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch audit events: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
+export async function fetchDelegablePermissionKeys(): Promise<string[]> {
+  const res = await fetch(`${API_BASE_URL}/access/permissions/delegable`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch delegable permissions: ${res.status} ${body}`);
+  }
+  const { delegableKeys } = (await res.json()) as { delegableKeys: string[] };
+  return delegableKeys;
 }

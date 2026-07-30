@@ -1,7 +1,15 @@
 import "reflect-metadata";
 import { SELF_DECLARED_DEPS_METADATA } from "@nestjs/common/constants";
-import { ModuleRef } from "@nestjs/core";
+import { ModuleRef, Reflector } from "@nestjs/core";
 import { PathwayRequestContext } from "@pathway/auth";
+import { AccessDecisionLogger } from "../access-control/access-decision-logger";
+import { AccessCacheService } from "../access-control/access-cache.service";
+import { RoleSafetyService } from "../access-control/role-safety.service";
+import { AssignmentsController } from "../access-control/assignments.controller";
+import { AssignmentsService as AccessControlAssignmentsService } from "../access-control/assignments.service";
+import { EffectivePermissionsService } from "../access-control/effective-permissions.service";
+import { PermissionGuard } from "../access-control/permission.guard";
+import { ROLES_TRANSACTION_BOUNDARY } from "../access-control/roles.service";
 import { AssignmentsService } from "../assignments/assignments.service";
 import { AttendanceService } from "../attendance/attendance.service";
 import { Av30ActivityService } from "../av30/av30-activity.service";
@@ -19,6 +27,7 @@ import { StripeBillingWebhookProvider } from "../billing/providers/stripe-billin
 import { StripeBuyNowProvider } from "../billing/providers/stripe-buy-now.provider";
 import { BillingWebhookController } from "../billing/webhook.controller";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { OutboxService } from "../common/outbox/outbox.service";
 import { LoggingService } from "../common/logging/logging.service";
 import { LessonsService } from "../lessons/lessons.service";
 import { OrgsService } from "../orgs/orgs.service";
@@ -39,6 +48,35 @@ function getDeclaredDependencies(target: unknown): DeclaredDependency[] {
 
 describe("dependency injection metadata", () => {
   it.each([
+    {
+      target: AccessDecisionLogger,
+      dependencies: [{ index: 0, param: LoggingService }],
+    },
+    {
+      target: PermissionGuard,
+      dependencies: [
+        { index: 0, param: Reflector },
+        { index: 1, param: EffectivePermissionsService },
+        { index: 2, param: PathwayRequestContext },
+        { index: 3, param: AccessDecisionLogger },
+      ],
+    },
+    {
+      target: AssignmentsController,
+      dependencies: [
+        { index: 0, param: AccessControlAssignmentsService },
+        { index: 1, param: PathwayRequestContext },
+      ],
+    },
+    {
+      target: AccessControlAssignmentsService,
+      dependencies: [
+        { index: 0, param: ROLES_TRANSACTION_BOUNDARY },
+        { index: 1, param: OutboxService },
+        { index: 2, param: AccessCacheService },
+        { index: 3, param: RoleSafetyService },
+      ],
+    },
     {
       target: OrgsService,
       dependencies: [

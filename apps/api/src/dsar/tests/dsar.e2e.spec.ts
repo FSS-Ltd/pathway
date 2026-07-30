@@ -4,8 +4,11 @@ import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { AppModule } from "../../app.module";
 import { withTenantRlsContext, Role } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 describe("DSAR (e2e)", () => {
   let app: INestApplication;
@@ -17,13 +20,9 @@ describe("DSAR (e2e)", () => {
   let sessionId: string;
   let parentUserId: string;
   let staffUserId: string;
+  let otherTenantUserId: string;
   let adminHeader: string;
   let otherTenantHeader: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -138,41 +137,49 @@ describe("DSAR (e2e)", () => {
     });
 
     // Minimal seed for other tenant user so auth context is valid
-    const otherUserId = randomUUID();
+    otherTenantUserId = randomUUID();
     await withTenantRlsContext(tenantB, orgId, async (tx) => {
       await tx.user.create({
         data: {
-          id: otherUserId,
-          email: `dsar-other-${otherUserId}@example.com`,
+          id: otherTenantUserId,
+          email: `dsar-other-${otherTenantUserId}@example.com`,
           tenantId: tenantB,
           hasServeAccess: true,
         },
       });
       await tx.userTenantRole.create({
-        data: { userId: otherUserId, tenantId: tenantB, role: Role.ADMIN },
+        data: {
+          userId: otherTenantUserId,
+          tenantId: tenantB,
+          role: Role.ADMIN,
+        },
       });
     });
 
-    adminHeader = buildAuthHeader({
-      sub: "dsar-admin",
-      "https://pathway.app/user": { id: staffUserId },
-      "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-      "https://pathway.app/tenant": { tenantId: tenantA, orgId, slug: "e2e-tenant-a" },
-      "https://pathway.app/org_roles": ["org:admin", "org:safeguarding_lead"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const adminAuth = await seedE2eAuthUser({
+      subject: "dsar-admin",
+      userId: staffUserId,
+      tenantId: tenantA,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    adminHeader = adminAuth.authorization;
 
-    otherTenantHeader = buildAuthHeader({
-      sub: "dsar-other",
-      "https://pathway.app/user": { id: "other-user" },
-      "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-      "https://pathway.app/tenant": { tenantId: tenantB, orgId, slug: "e2e-tenant-b" },
-      "https://pathway.app/org_roles": ["org:admin", "org:safeguarding_lead"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const otherTenantAuth = await seedE2eAuthUser({
+      subject: "dsar-other",
+      userId: otherTenantUserId,
+      tenantId: tenantB,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    otherTenantHeader = otherTenantAuth.authorization;
   });
 
   afterAll(async () => {
+    await clearE2eAuthAccess(staffUserId);
+    await clearE2eAuthAccess(otherTenantUserId);
     await withTenantRlsContext(tenantA, orgId, async (tx) => {
       await tx.attendance.deleteMany({ where: { childId } }).catch(() => undefined);
       await tx.childNote.deleteMany({ where: { childId } }).catch(() => undefined);
@@ -186,6 +193,12 @@ describe("DSAR (e2e)", () => {
       await tx.user
         .deleteMany({ where: { id: { in: [parentUserId, staffUserId] } } })
         .catch(() => undefined);
+    }).catch(() => undefined);
+    await withTenantRlsContext(tenantB, orgId, async (tx) => {
+      await tx.userTenantRole.deleteMany({
+        where: { userId: otherTenantUserId, tenantId: tenantB },
+      });
+      await tx.user.deleteMany({ where: { id: otherTenantUserId } });
     }).catch(() => undefined);
 
     if (app) {
@@ -216,4 +229,3 @@ describe("DSAR (e2e)", () => {
       .expect(404);
   });
 });
-

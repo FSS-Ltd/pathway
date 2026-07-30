@@ -603,6 +603,17 @@ Auth0 | Stripe | Resend | optional licensed market-data provider
 ## 7.2 Access-control models
 
 ```text
+enum PermissionScope {
+organisation
+site
+relationship
+assignment
+}
+enum PermissionSensitivity {
+standard
+sensitive
+protected
+}
 model PermissionDefinition {
 key String @id
 label String
@@ -610,8 +621,11 @@ description String
 scope PermissionScope
 sensitivity PermissionSensitivity
 delegable Boolean @default(true)
-requiredCapability String?
+requiredModule Module?
+requiredVertical Vertical?
 isActive Boolean @default(true)
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
 }
 model OrgRoleDefinition {
 id String @id @default(uuid())

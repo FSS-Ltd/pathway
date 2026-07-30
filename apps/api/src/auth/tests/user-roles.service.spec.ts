@@ -1,5 +1,8 @@
 import { Logger } from "@nestjs/common";
-import { UserRolesService } from "../user-roles.service";
+import {
+  type UserRolesResponse,
+  UserRolesService,
+} from "../user-roles.service";
 
 jest.mock("@pathway/db", () => ({
   OrgRole: {
@@ -177,6 +180,48 @@ describe("UserRolesService", () => {
       hasServeAccess: true,
     });
   });
+
+  it.each([true, false])(
+    "returns the legacy evaluator's %s result for the resolved role response",
+    async (expectedDecision) => {
+      userFindUnique.mockResolvedValue({
+        superUser: false,
+        hasFamilyAccess: false,
+        hasServeAccess: true,
+        lastActiveTenantId: "tenant-1",
+      });
+      orgMembershipFindMany.mockResolvedValue([]);
+      siteMembershipFindMany.mockResolvedValue([
+        {
+          tenantId: "tenant-1",
+          role: "STAFF",
+          tenant: {
+            id: "tenant-1",
+            name: "Victorious Kids",
+            orgId: "org-1",
+          },
+        },
+      ]);
+      userOrgRoleFindMany.mockResolvedValue([]);
+      userTenantRoleFindMany.mockResolvedValue([]);
+      const evaluator = jest.fn<boolean, [UserRolesResponse]>((roles) => {
+        expect(roles).toMatchObject({
+          userId: "user-staff",
+          siteRoles: [{ tenantId: "tenant-1", role: "STAFF" }],
+          hasServeAccess: true,
+        });
+        return expectedDecision;
+      });
+
+      await expect(
+        service.evaluateLegacyAccess("user-staff", evaluator, {
+          activeSiteId: "tenant-1",
+        }),
+      ).resolves.toBe(expectedDecision);
+
+      expect(evaluator).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("returns roles when linked-child access derivation fails", async () => {
     userFindUnique.mockResolvedValue({

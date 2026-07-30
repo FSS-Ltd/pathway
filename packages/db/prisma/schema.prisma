@@ -87,11 +87,18 @@ enum AuditAction {
   UPDATED
   DELETED
   VIEWED
+  ROLE_CREATED
+  ROLE_UPDATED
+  ROLE_RETIRED
+  ASSIGNMENT_CREATED
+  ASSIGNMENT_REVOKED
 }
 
 enum AuditEntityType {
   CONCERN
   CHILD_NOTE
+  ORG_ROLE
+  ROLE_ASSIGNMENT
 }
 
 enum LeadKind {
@@ -151,6 +158,149 @@ enum ReportBundleStatus {
   GENERATING
   READY
   FAILED
+}
+
+enum PermissionScope {
+  organisation
+  site
+  relationship
+  assignment
+}
+
+enum PermissionSensitivity {
+  standard
+  sensitive
+  protected
+}
+
+enum RoleScope {
+  organisation
+  site
+  relationship
+}
+
+// Platform-global searchable metadata. Executable permission keys remain owned
+// by the compile-time registry in @pathway/platform.
+model PermissionDefinition {
+  key              String                @id
+  label            String
+  description      String                @db.Text
+  scope            PermissionScope
+  sensitivity      PermissionSensitivity
+  delegable        Boolean               @default(true)
+  requiredModule   Module?
+  requiredVertical Vertical?
+  isActive         Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  rolePermissions  OrgRolePermission[]
+
+  @@index([isActive])
+  @@index([scope, sensitivity])
+}
+
+model OrgRoleDefinition {
+  id          String    @id @default(uuid())
+  orgId       String
+  tenantId    String?
+  name        String
+  description String?   @db.Text
+  scope       RoleScope
+  isSystem    Boolean   @default(false)
+  isActive    Boolean   @default(true)
+  version     Int       @default(1)
+  createdById String
+  updatedById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  org         Org      @relation(fields: [orgId], references: [id])
+  tenant      Tenant?  @relation(fields: [tenantId, orgId], references: [id, orgId])
+  permissions OrgRolePermission[]
+  revisions   OrgRoleRevision[]
+  assignments UserRoleAssignment[]
+
+  @@unique([orgId, tenantId, name, isSystem])
+  @@index([orgId, tenantId, isActive])
+}
+
+// Immutable snapshots make role changes reconstructable even when current
+// permission membership has changed or a role has since been retired.
+model OrgRoleRevision {
+  id               String    @id @default(uuid())
+  roleDefinitionId String
+  orgId            String
+  tenantId         String?
+  version          Int
+  name             String
+  description      String?   @db.Text
+  scope            RoleScope
+  isActive         Boolean
+  permissionKeys   Json
+  actorUserId      String
+  createdAt        DateTime  @default(now())
+
+  roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id], onDelete: Restrict)
+  org            Org               @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([roleDefinitionId, version])
+  @@index([orgId, roleDefinitionId, createdAt])
+}
+
+model OrgRolePermission {
+  roleDefinitionId String
+  permissionKey     String
+  grantedById       String
+  grantedAt         DateTime          @default(now())
+
+  roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id], onDelete: Cascade)
+  permission     PermissionDefinition @relation(fields: [permissionKey], references: [key])
+
+  @@id([roleDefinitionId, permissionKey])
+  @@index([permissionKey])
+}
+
+model UserRoleAssignment {
+  id               String    @id @default(uuid())
+  orgId            String
+  tenantId         String?
+  userId           String
+  roleDefinitionId String
+  assignedById     String
+  startsAt         DateTime  @default(now())
+  expiresAt        DateTime?
+  revokedAt        DateTime?
+  revokedById      String?
+  createdAt        DateTime  @default(now())
+
+  org            Org               @relation(fields: [orgId], references: [id])
+  tenant         Tenant?           @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  user           User              @relation("UserRoleAssignmentAssignee", fields: [userId], references: [id])
+  roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id])
+  assignedBy     User              @relation("UserRoleAssignmentAssignedBy", fields: [assignedById], references: [id])
+  revokedBy      User?             @relation("UserRoleAssignmentRevokedBy", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([orgId, userId, revokedAt])
+  @@index([tenantId, userId, revokedAt])
+  @@index([roleDefinitionId])
+  @@index([orgId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+model OutboxEvent {
+  id             String   @id @default(uuid())
+  orgId          String   @default(dbgenerated("app.current_org_id()"))
+  aggregateType  String
+  aggregateId    String
+  eventType      String
+  payload        Json
+  idempotencyKey String
+  createdAt      DateTime @default(now())
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@index([orgId, createdAt])
+  @@index([aggregateType, aggregateId, createdAt])
+  @@unique([orgId, idempotencyKey])
 }
 
 model OrgVertical {
@@ -318,6 +468,10 @@ model Org {
   deletedUsers      OrgDeletedUser[]
   orgVertical       OrgVertical?
   orgModules        OrgModule[]
+  roleDefinitions   OrgRoleDefinition[]
+  roleRevisions     OrgRoleRevision[]
+  roleAssignments   UserRoleAssignment[]
+  outboxEvents      OutboxEvent[]
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 }
@@ -360,10 +514,13 @@ model Tenant {
   learningLogs           LearningLog[]
   evidence               Evidence[]
   reportBundles          ReportBundle[]
+  roleDefinitions        OrgRoleDefinition[]
+  roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
   @@index([orgId])
+  @@unique([id, orgId])
 }
 
 model UserTenantRole {
@@ -450,6 +607,9 @@ model User {
   loggedLearningLogs      LearningLog[]           @relation("LearningLogLoggedBy")
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
+  roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
+  roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
+  roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.
@@ -1048,8 +1208,8 @@ model ChildNote {
 model AuditEvent {
   id          String          @id @default(uuid())
   createdAt   DateTime        @default(now())
-  tenantId    String
-  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  tenantId    String?
+  tenant      Tenant?         @relation(fields: [tenantId], references: [id])
   orgId       String
   org         Org             @relation(fields: [orgId], references: [id])
   actorUserId String

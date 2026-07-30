@@ -2,9 +2,12 @@ import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../app.module";
-import { withTenantRlsContext } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import { prisma, withTenantRlsContext } from "@pathway/db";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 /**
  * E2E tests for Groups module
@@ -24,14 +27,10 @@ describe("Groups (e2e)", () => {
   let createdGroupId: string;
   let otherGroupId: string | undefined;
   let authHeader: string;
+  let authUserId: string;
 
   const nonce = Date.now();
   const baseName = `Group-${nonce}`;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -54,25 +53,16 @@ describe("Groups (e2e)", () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    authHeader = buildAuthHeader({
-      sub: "groups-e2e",
-      "https://pathway.app/user": {
-        id: "groups-e2e",
-        email: "groups.e2e@pathway.app",
-      },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: "e2e-tenant-a",
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "groups-e2e",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
+      email: "groups.e2e@pathway.app",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
 
     // Seed a group in another tenant to validate isolation
     await withTenantRlsContext(otherTenantId, orgId, async (tx) => {
@@ -90,8 +80,9 @@ describe("Groups (e2e)", () => {
   });
 
   afterAll(async () => {
-    // Cleanup is handled by per-suite TRUNCATE; nothing to do here except close app
     if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

@@ -71,8 +71,6 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: ci # Ensure unit tests and linting pass first
-    # Run on master/develop branch pushes or manual trigger
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop'
 
     services:
       postgres:
@@ -148,13 +146,249 @@ jobs:
 
       - name: Run integration tests
         env:
-          # Jest's global setup will handle migrations and seeding
+          # Jest's global setup resets, migrates, and seeds the database once.
+          E2E_USE_GLOBAL_SETUP: "true"
+          E2E_RLS_ROLE: pathway_e2e_rls
+          E2E_TENANT_RLS_ROLE: pathway_e2e_tenant_rls
           E2E_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_test_e2e?schema=app
+          E2E_BOOTSTRAP_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_test_e2e?schema=app
           E2E_ORG_ID: "00000000-0000-0000-0000-000000000001"
           E2E_TENANT_ID: "00000000-0000-0000-0000-00000000000a"
           E2E_TENANT2_ID: "00000000-0000-0000-0000-00000000000b"
           E2E_TENANT_SLUG: "e2e-tenant-a"
-          # Allow Jest's global setup to reset the database
-          E2E_ALLOW_RESET: "true"
+          E2E_ALLOW_RESET: "false"
         run: pnpm test:integration
         continue-on-error: false
+
+  system-role-seed-proof:
+    name: System Role Seed Database Identity
+    runs-on: ubuntu-22.04
+    needs: ci
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pathway_system_role_seed_test_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Apply Prisma migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_system_role_seed_test_ci?schema=app
+        run: pnpm db:deploy
+
+      - name: Prove system-role seed database identity
+        env:
+          SYSTEM_ROLE_SEED_TEST_ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_system_role_seed_test_ci?schema=app
+          SYSTEM_ROLE_SEED_TEST_DISPOSABLE_TOKEN: provision-and-drop-system-role-seed-test-logins
+          PATHWAY_RUN_DB_INTEGRATION_TESTS: "1"
+          PATHWAY_RUN_DB_SEED_PROOF: "1"
+          DOTENV_CONFIG_PATH: ../../.env.test
+        run: >-
+          pnpm --filter @pathway/db exec
+          node -r dotenv/config node_modules/jest/bin/jest.js
+          --runInBand --runTestsByPath
+          src/__tests__/system-role-seed-test-database.spec.ts
+          src/__tests__/seed-system-roles.spec.ts
+          src/__tests__/system-role-seed-command.spec.ts
+
+  permission-definitions:
+    name: Permission Definition Database
+    runs-on: ubuntu-22.04
+    needs: ci
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pathway_permission_definition_smoke_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Apply Prisma migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_permission_definition_smoke_ci?schema=public
+        run: pnpm db:deploy
+
+      - name: Run permission-definition database smoke
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_permission_definition_smoke_ci?schema=public
+          PATHWAY_RUN_PERMISSION_DEFINITION_DB_SMOKE: "1"
+          PATHWAY_PERMISSION_DEFINITION_DB_SMOKE_DESTRUCTIVE_TOKEN: destroy-permission-definitions-in-disposable-database
+        run: pnpm --filter @pathway/platform test:unit -- permission-definition-database.integration
+
+      - name: Run production-schema organisation role smoke
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_permission_definition_smoke_ci?schema=public
+          PATHWAY_RUN_DB_INTEGRATION_TESTS: "1"
+        run: >-
+          pnpm --filter @pathway/db exec
+          jest --config jest.config.ts --runInBand --runTestsByPath
+          src/__tests__/role-trigger-schema.integration.spec.ts
+
+  organisation-role-rls:
+    name: Organisation Role RLS
+    runs-on: ubuntu-22.04
+    needs: ci
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pathway_test_user
+          POSTGRES_PASSWORD: pathway_test_password
+          POSTGRES_DB: pathway_role_rls_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Generate Prisma Client
+        run: pnpm db:generate
+
+      - name: Run low-privilege organisation role RLS test
+        env:
+          E2E_USE_GLOBAL_SETUP: "true"
+          E2E_ALLOW_RESET: "false"
+          E2E_RLS_ROLE: pathway_e2e_rls
+          E2E_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_role_rls_ci?schema=app
+          E2E_BOOTSTRAP_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_role_rls_ci?schema=app
+          E2E_ORG_ID: "00000000-0000-0000-0000-000000000001"
+          E2E_TENANT_ID: "00000000-0000-0000-0000-00000000000a"
+          E2E_TENANT2_ID: "00000000-0000-0000-0000-00000000000b"
+        run: pnpm --filter @pathway/api test:integration -- --runInBand access-control.rls role-assignment.rls effective-permissions.rls role-api-transaction.rls
+
+      - name: Test organisation role RLS policy gate contract
+        run: node --test scripts/lib/role-rls-gate.test.mjs
+
+      - name: Verify organisation role RLS policies
+        env:
+          E2E_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_role_rls_ci?schema=app
+          SUPABASE_RLS_GATE_ACCEPTED: "true"
+        run: node scripts/check-supabase-rls.mjs --strict

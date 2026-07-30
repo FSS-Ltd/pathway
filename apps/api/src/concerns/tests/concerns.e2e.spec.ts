@@ -4,8 +4,11 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import { withTenantRlsContext, Role } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 // API response shape (serialized)
 type Concern = {
@@ -21,17 +24,13 @@ describe("Concerns (e2e)", () => {
   let app: INestApplication;
   let tenantId: string;
   let orgId: string;
-  let tenantSlug: string;
   let childId: string | null = null;
   let createdId: string | undefined;
   let authHeader: string;
+  let teacherAuthHeader: string;
+  let teacherUserId: string;
   const userId = randomUUID();
   const userEmail = `concerns.e2e-${userId}@pathway.app`;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -40,7 +39,6 @@ describe("Concerns (e2e)", () => {
 
     orgId = process.env.E2E_ORG_ID as string;
     tenantId = process.env.E2E_TENANT_ID as string;
-    tenantSlug = "e2e-tenant-a";
     if (!orgId || !tenantId) {
       throw new Error("E2E_ORG_ID / E2E_TENANT_ID missing");
     }
@@ -51,27 +49,6 @@ describe("Concerns (e2e)", () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
-    authHeader = buildAuthHeader({
-      sub: "concerns-e2e-user",
-      "https://pathway.app/user": {
-        id: userId,
-        email: userEmail,
-      },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: tenantSlug,
-      },
-      "https://pathway.app/org_roles": ["org:admin", "org:safeguarding_lead"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
-    });
-
-    // Best-effort seed a child; if your schema requires extra fields, adjust here
     await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await tx.user.create({
         data: {
@@ -94,6 +71,27 @@ describe("Concerns (e2e)", () => {
       });
       childId = child.id;
     });
+
+    const adminAuth = await seedE2eAuthUser({
+      subject: "concerns-e2e-user",
+      userId,
+      email: userEmail,
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
+    });
+    authHeader = adminAuth.authorization;
+
+    const teacherAuth = await seedE2eAuthUser({
+      subject: "concerns-e2e-teacher",
+      tenantId,
+      siteRole: "STAFF",
+      orgId,
+    });
+    teacherUserId = teacherAuth.userId;
+    teacherAuthHeader = teacherAuth.authorization;
+
     if (!childId) {
       throw new Error("failed to seed child for concerns e2e");
     }
@@ -114,12 +112,14 @@ describe("Concerns (e2e)", () => {
           .catch(() => undefined);
       }).catch(() => undefined);
     }
+    await clearE2eAuthAccess(userId);
+    await clearE2eAuthAccess(teacherUserId);
     await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await tx.userTenantRole
         .deleteMany({ where: { userId, tenantId } })
         .catch(() => undefined);
       await tx.user
-        .deleteMany({ where: { id: userId } })
+        .deleteMany({ where: { id: { in: [userId, teacherUserId] } } })
         .catch(() => undefined);
     }).catch(() => undefined);
     if (app) {
@@ -144,18 +144,9 @@ describe("Concerns (e2e)", () => {
   describe("RBAC", () => {
     it("returns 403 for teacher role accessing concerns", async () => {
       if (!app) return;
-      const teacherHeader = buildAuthHeader({
-        sub: "teacher",
-        "https://pathway.app/user": { id: "teacher" },
-        "https://pathway.app/org": { orgId, slug: "e2e-org", name: "E2E Org" },
-        "https://pathway.app/tenant": { tenantId, orgId, slug: tenantSlug },
-        "https://pathway.app/org_roles": ["org:teacher"],
-        "https://pathway.app/tenant_roles": ["tenant:teacher"],
-      });
-
       const res = await request(app.getHttpServer())
         .get("/concerns")
-        .set("Authorization", teacherHeader);
+        .set("Authorization", teacherAuthHeader);
 
       expect(res.status).toBe(403);
     });

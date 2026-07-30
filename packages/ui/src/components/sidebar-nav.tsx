@@ -23,6 +23,7 @@ import {
   History,
   AlertTriangle,
   Newspaper,
+  KeyRound,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -78,6 +79,7 @@ const iconComponents: LucideIcon[] = [
   AlertTriangle, // 18 Create concern
   Newspaper, // 19 Blog
   BookMarked, // 20 Learning
+  KeyRound, // 21 Roles & Access
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.

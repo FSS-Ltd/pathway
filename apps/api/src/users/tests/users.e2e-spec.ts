@@ -2,9 +2,13 @@ import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../app.module";
-import { withTenantRlsContext } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase, isDatabaseAvailable } from "../../../test-helpers.e2e";
+import { prisma, withTenantRlsContext } from "@pathway/db";
+import {
+  clearE2eAuthAccess,
+  isDatabaseAvailable,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 describe("Users (e2e)", () => {
   let app: INestApplication;
@@ -14,14 +18,9 @@ describe("Users (e2e)", () => {
   const unique = Date.now();
   const email = `user${unique}@example.com`;
   const name = "Test User";
-  const tenantSlug = "e2e-tenant-a";
   let authHeader: string;
+  let authUserId: string;
   let otherTenantUserId: string | undefined;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -40,25 +39,16 @@ describe("Users (e2e)", () => {
       throw new Error("E2E_ORG_ID / E2E_TENANT_ID / E2E_TENANT2_ID missing");
     }
 
-    authHeader = buildAuthHeader({
-      sub: "users-e2e",
-      "https://pathway.app/user": {
-        id: "users-e2e",
-        email: "users.e2e@pathway.app",
-      },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: tenantSlug,
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "users-e2e",
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
+      email: "users.e2e@pathway.app",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
 
     // Seed a user in another tenant to validate cross-tenant isolation
     const otherUser = await withTenantRlsContext(
@@ -84,6 +74,8 @@ describe("Users (e2e)", () => {
       }).catch(() => undefined);
     }
     if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

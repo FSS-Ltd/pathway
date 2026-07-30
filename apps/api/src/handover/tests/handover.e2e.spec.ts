@@ -7,15 +7,17 @@ import {
   Role,
   AssignmentStatus,
 } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 describe("Handover (e2e)", () => {
   let app: INestApplication | null = null;
 
   const orgId = process.env.E2E_ORG_ID as string;
   const tenantId = process.env.E2E_TENANT_ID as string;
-  const tenantSlug = "e2e-tenant-a";
 
   const ids = {
     group: "" as string,
@@ -24,15 +26,11 @@ describe("Handover (e2e)", () => {
     adminUser: "" as string,
     assignment: "" as string,
     handoverLog: "" as string,
+    versionedHandoverLog: "" as string,
   };
 
   let staffAuthHeader: string;
   let adminAuthHeader: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -113,43 +111,30 @@ describe("Handover (e2e)", () => {
       });
     });
 
-    staffAuthHeader = buildAuthHeader({
-      sub: ids.staffUser,
-      "https://pathway.app/user": { id: ids.staffUser },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: tenantSlug,
-      },
-      "https://pathway.app/org_roles": [],
-      "https://pathway.app/tenant_roles": ["tenant:staff"],
+    const staffAuth = await seedE2eAuthUser({
+      subject: `handover-staff-${ids.staffUser}`,
+      userId: ids.staffUser,
+      tenantId,
+      siteRole: "STAFF",
+      orgId,
     });
+    staffAuthHeader = staffAuth.authorization;
 
-    adminAuthHeader = buildAuthHeader({
-      sub: ids.adminUser,
-      "https://pathway.app/user": { id: ids.adminUser },
-      "https://pathway.app/org": {
-        orgId,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId,
-        orgId,
-        slug: tenantSlug,
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const adminAuth = await seedE2eAuthUser({
+      subject: `handover-admin-${ids.adminUser}`,
+      userId: ids.adminUser,
+      tenantId,
+      siteRole: "SITE_ADMIN",
+      orgId,
+      orgRole: "ORG_ADMIN",
     });
+    adminAuthHeader = adminAuth.authorization;
   });
 
   afterAll(async () => {
     if (!app) return;
+    await clearE2eAuthAccess(ids.staffUser);
+    await clearE2eAuthAccess(ids.adminUser);
     try {
       await withTenantRlsContext(tenantId, orgId, async (tx) => {
         if (ids.handoverLog) {
@@ -157,6 +142,14 @@ describe("Handover (e2e)", () => {
             where: { handoverLogId: ids.handoverLog },
           });
           await tx.handoverLog.deleteMany({ where: { id: ids.handoverLog } });
+        }
+        if (ids.versionedHandoverLog) {
+          await tx.handoverLogVersion.deleteMany({
+            where: { handoverLogId: ids.versionedHandoverLog },
+          });
+          await tx.handoverLog.deleteMany({
+            where: { id: ids.versionedHandoverLog },
+          });
         }
         if (ids.assignment) {
           await tx.assignment.deleteMany({ where: { id: ids.assignment } });
@@ -296,17 +289,20 @@ describe("Handover (e2e)", () => {
     expect([400, 403]).toContain(patchRes.status);
 
     // Instead, create a new log to test version increments
+    const nextHandoverDate = new Date();
+    nextHandoverDate.setUTCDate(nextHandoverDate.getUTCDate() + 1);
     const createRes = await request(app.getHttpServer())
       .post("/handover")
       .set("Authorization", staffAuthHeader)
       .send({
         groupId: ids.group,
-        handoverDate: new Date().toISOString(),
+        handoverDate: nextHandoverDate.toISOString(),
         contentJson: { summary: "V1", notes: [] },
         changeSummary: "v1",
       });
     expect(createRes.status).toBe(201);
     const logId: string = createRes.body.id;
+    ids.versionedHandoverLog = logId;
 
     const v2Res = await request(app.getHttpServer())
       .patch(`/handover/${logId}`)
@@ -338,4 +334,3 @@ describe("Handover (e2e)", () => {
     expect(numbers[0]).toBeGreaterThan(numbers[numbers.length - 1]);
   });
 });
-

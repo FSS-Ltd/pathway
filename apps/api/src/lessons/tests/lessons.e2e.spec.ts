@@ -4,12 +4,16 @@ import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import { prisma, withTenantRlsContext } from "@pathway/db";
-import type { PathwayAuthClaims } from "@pathway/auth";
-import { requireDatabase } from "../../../test-helpers.e2e";
+import {
+  clearE2eAuthAccess,
+  requireDatabase,
+  seedE2eAuthUser,
+} from "../../../test-helpers.e2e";
 
 describe("Lessons (e2e)", () => {
   let app: INestApplication;
   let authHeader: string;
+  let authUserId: string;
   let otherLessonId: string | undefined;
 
   const TENANT_A_ID = process.env.E2E_TENANT_ID as string;
@@ -56,25 +60,15 @@ describe("Lessons (e2e)", () => {
       });
     });
 
-    authHeader = ((claims: PathwayAuthClaims) => {
-      const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-      return `Bearer test.${payload}.sig`;
-    })({
-      sub: "lessons-e2e",
-      "https://pathway.app/user": { id: "lessons-e2e" },
-      "https://pathway.app/org": {
-        orgId: ORG_ID,
-        slug: "e2e-org",
-        name: "E2E Org",
-      },
-      "https://pathway.app/tenant": {
-        tenantId: ids.tenant,
-        orgId: ORG_ID,
-        slug: "lessons-tenant",
-      },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
+    const auth = await seedE2eAuthUser({
+      subject: "lessons-e2e",
+      tenantId: ids.tenant,
+      siteRole: "SITE_ADMIN",
+      orgId: ORG_ID,
+      orgRole: "ORG_ADMIN",
     });
+    authUserId = auth.userId;
+    authHeader = auth.authorization;
 
     // Seed another tenant/lesson to verify isolation (no cleanup needed; use unique records)
     await withTenantRlsContext(TENANT_B_ID, ORG_ID, async (tx) => {
@@ -102,8 +96,9 @@ describe("Lessons (e2e)", () => {
     if (otherLessonId) {
       await prisma.lesson.deleteMany({ where: { id: otherLessonId } });
     }
-    // Avoid deleting seeded tenants/org; only clean per-entity rows if needed
     if (app) {
+      await clearE2eAuthAccess(authUserId);
+      await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
     }
   });

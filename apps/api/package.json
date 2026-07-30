@@ -12,7 +12,7 @@
     "test": "jest -c jest.projects.config.ts --selectProjects unit",
     "test:watch": "jest --watch",
     "test:unit": "jest -c jest.projects.config.ts --selectProjects unit",
-    "test:integration": "jest -c jest.projects.config.ts --selectProjects e2e",
+    "test:integration": "jest -c jest.projects.config.ts --selectProjects e2e --runInBand",
     "test:e2e": "pnpm test:integration",
     "storage:backfill": "tsx scripts/backfill-supabase-storage.ts",
     "pii:backfill": "tsx scripts/backfill-pii-encryption.ts",
