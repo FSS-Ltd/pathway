@@ -75,6 +75,9 @@ describe("OrgsController", () => {
   const changeVerticalMock = jest.fn() as jest.MockedFunction<
     OrgsService["changeVertical"]
   >;
+  const changeSectorMock = jest.fn() as jest.MockedFunction<
+    OrgsService["changeSector"]
+  >;
   const getRetentionOverviewMock = jest.fn() as jest.MockedFunction<
     OrgsService["getRetentionOverview"]
   >;
@@ -98,6 +101,7 @@ describe("OrgsController", () => {
     | "register"
     | "updateCurrentOrg"
     | "changeVertical"
+    | "changeSector"
     | "getRetentionOverview"
     | "uploadLogo"
     | "deleteLogo"
@@ -105,6 +109,7 @@ describe("OrgsController", () => {
     register: registerMock,
     updateCurrentOrg: updateCurrentOrgMock,
     changeVertical: changeVerticalMock,
+    changeSector: changeSectorMock,
     getRetentionOverview: getRetentionOverviewMock,
     uploadLogo: uploadLogoMock,
     deleteLogo: deleteLogoMock,
@@ -136,6 +141,7 @@ describe("OrgsController", () => {
     registerMock.mockReset();
     updateCurrentOrgMock.mockReset();
     changeVerticalMock.mockReset();
+    changeSectorMock.mockReset();
     getRetentionOverviewMock.mockReset();
     uploadLogoMock.mockReset();
     deleteLogoMock.mockReset();
@@ -346,6 +352,54 @@ describe("OrgsController", () => {
         }),
       ).rejects.toThrow();
       expect(changeVerticalMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateCurrentSector", () => {
+    const request = {
+      authUserId: "user-1",
+    } as unknown as Parameters<OrgsController["updateCurrentSector"]>[1];
+
+    it("allows an organisation admin to change sector", async () => {
+      changeSectorMock.mockResolvedValue({
+        id: "org-1",
+        sector: "CLUB",
+      } as Awaited<ReturnType<OrgsService["changeSector"]>>);
+
+      await expect(
+        controller.updateCurrentSector("org-1", request, {
+          sector: "CLUB",
+        }),
+      ).resolves.toEqual({ id: "org-1", sector: "CLUB" });
+      expect(changeSectorMock).toHaveBeenCalledWith("org-1", "CLUB");
+    });
+
+    it("rejects an unknown sector before calling the service", async () => {
+      await expect(
+        controller.updateCurrentSector("org-1", request, {
+          sector: "UNKNOWN",
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(changeSectorMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a null body before calling the service", async () => {
+      await expect(
+        controller.updateCurrentSector("org-1", request, null),
+      ).rejects.toThrow(BadRequestException);
+      expect(changeSectorMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects a caller who is not an organisation admin", async () => {
+      mockPrisma.orgMembership.findFirst.mockResolvedValueOnce(null);
+      mockPrisma.userOrgRole.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        controller.updateCurrentSector("org-1", request, {
+          sector: "CHURCH",
+        }),
+      ).rejects.toThrow();
+      expect(changeSectorMock).not.toHaveBeenCalled();
     });
   });
 

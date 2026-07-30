@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -346,6 +347,31 @@ export class OrgsService {
       where: { orgId },
       create: { orgId, vertical },
       update: { vertical },
+    });
+  }
+
+  /**
+   * Change the current organisation's sector. Real customer orgs select their
+   * sector once at initial plan purchase and it stays fixed; only the master
+   * (internal/platform) org may cycle through sectors, for testing.
+   */
+  async changeSector(orgId: string, sector: OrgSector) {
+    const org = await prisma.org.findUnique({
+      where: { id: orgId },
+      select: { id: true, isMasterOrg: true },
+    });
+    if (!org) {
+      throw new NotFoundException("Organisation not found");
+    }
+    if (!org.isMasterOrg) {
+      throw new ForbiddenException(
+        "Sector can only be changed for the master organisation",
+      );
+    }
+    return prisma.org.update({
+      where: { id: orgId },
+      data: { sector },
+      select: { id: true, sector: true },
     });
   }
 
