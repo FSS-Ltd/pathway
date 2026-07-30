@@ -25,17 +25,21 @@ const jestGlobals = {
 };
 
 export default tseslint.config(
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
   {
-    files: ["**/*.{ts,tsx,js}"],
     ignores: [
       "**/node_modules/**",
       "**/dist/**",
       "**/.next/**",
       "**/.expo/**",
       "**/coverage/**",
+      "apps/*/src/**/*.js",
+      "packages/*/src/**/*.js",
     ],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    files: ["**/*.{ts,tsx,js}"],
     languageOptions: {
       parserOptions: {
         ecmaVersion: "latest",
