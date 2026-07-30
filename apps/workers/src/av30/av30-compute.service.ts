@@ -70,7 +70,7 @@ export class Av30ComputeService {
         const staffSet = orgToStaff.get(ctx.orgId) ?? new Set<string>();
         type StaffActivityClient = {
           findMany: (args: {
-            where: { occurredAt: { gte: Date } };
+            where: { tenantId: string; occurredAt: { gte: Date } };
             select: { staffUserId: boolean };
             distinct?: string[];
           }) => Promise<Array<{ staffUserId: string }>>;
@@ -80,7 +80,7 @@ export class Av30ComputeService {
         };
         const client = tx as TxWithStaff;
         const staff = await client.staffActivity.findMany({
-          where: { occurredAt: { gte: windowStart } },
+          where: { tenantId: ctx.tenantId, occurredAt: { gte: windowStart } },
           select: { staffUserId: true },
           distinct: ["staffUserId"],
         });
