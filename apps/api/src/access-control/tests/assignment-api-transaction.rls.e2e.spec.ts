@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { prisma, runTransaction } from "@pathway/db";
 import { AccessCacheService } from "../access-cache.service";
+import { RoleSafetyService } from "../role-safety.service";
 import { AssignmentsService } from "../assignments.service";
 import {
   createRolesTransactionBoundary,
@@ -77,6 +78,7 @@ describe("assignment API transaction and forced-RLS integration", () => {
     transactionBoundary(),
     outbox,
     new AccessCacheService(),
+    new RoleSafetyService(),
   );
 
   beforeAll(async () => {
@@ -319,6 +321,7 @@ describe("assignment API transaction and forced-RLS integration", () => {
       transactionBoundary(OUTBOX_DENIED_ROLE),
       outbox,
       new AccessCacheService(),
+      new RoleSafetyService(),
     );
     await expectDatabaseRejection(
       () =>

@@ -8,6 +8,10 @@ import {
 } from "../roles.service";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import {
+  RoleSafetyService,
+  type RoleMutationCommand,
+} from "../role-safety.service";
+import {
   isDatabaseAvailable,
   requireDatabase,
 } from "../../../test-helpers.e2e";
@@ -15,6 +19,13 @@ import {
 const ORG_ID = process.env.E2E_ORG_ID as string;
 const SITE_ID = process.env.E2E_TENANT_ID as string;
 const RLS_ROLE = "pathway_e2e_rls";
+const passThroughRoleSafety = {
+  async assertHeadAndSelfLockoutSafe(
+    command: RoleMutationCommand,
+  ): Promise<void> {
+    await command.mutate();
+  },
+} as RoleSafetyService;
 const UPGRADE_PREFLIGHT_SQL = `
 DO $$
 BEGIN
@@ -72,6 +83,7 @@ describe("assignment overlap integration", () => {
     transactionBoundary(),
     new OutboxService(),
     new AccessCacheService(),
+    passThroughRoleSafety,
   );
 
   beforeAll(async () => {

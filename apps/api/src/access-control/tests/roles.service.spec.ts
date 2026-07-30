@@ -10,11 +10,22 @@ import {
 } from "../roles.service";
 import { AccessCacheService } from "../access-cache.service";
 import {
+  RoleSafetyService,
+  type RoleMutationCommand,
+} from "../role-safety.service";
+import {
   EffectivePermissionsService,
   type EffectivePermissionGrant,
 } from "../effective-permissions.service";
 
 const orgId = "org-1";
+const passThroughRoleSafety = {
+  async assertHeadAndSelfLockoutSafe(
+    command: RoleMutationCommand,
+  ): Promise<void> {
+    await command.mutate();
+  },
+} as RoleSafetyService;
 
 describe("temporary role API bootstrap", () => {
   it("permits only an authenticated legacy organisation admin to bootstrap delegable organisation-head keys", () => {
@@ -85,7 +96,7 @@ describe("RolesService route authority", () => {
     const cache = {
       invalidateUser: jest.fn().mockResolvedValue(undefined),
     } as unknown as AccessCacheService;
-    return new RolesService(transaction, cache);
+    return new RolesService(transaction, cache, passThroughRoleSafety);
   }
 
   function allowedService(options: {
@@ -143,6 +154,7 @@ describe("RolesService route authority", () => {
         options.cache ?? {
           invalidateUser: jest.fn().mockResolvedValue(undefined),
         } as unknown as AccessCacheService,
+        passThroughRoleSafety,
       ),
       tx,
     };
@@ -260,6 +272,7 @@ describe("RolesService route authority", () => {
     const service = new RolesService(
       transaction,
       cache,
+      passThroughRoleSafety,
     );
 
     await service.update({

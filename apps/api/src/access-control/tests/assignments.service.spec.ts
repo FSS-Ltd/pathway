@@ -10,6 +10,10 @@ import type {
 } from "../roles.service";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import { getOrCreateRequestId } from "../request-id";
+import {
+  RoleSafetyService,
+  type RoleMutationCommand,
+} from "../role-safety.service";
 
 const actor: RoleActorContext = {
   orgId: "org-1",
@@ -26,6 +30,13 @@ const command: AssignRoleCommand = {
   startsAt: new Date("2026-07-30T09:00:00.000Z"),
   expiresAt: new Date("2026-08-30T09:00:00.000Z"),
 };
+const passThroughRoleSafety = {
+  async assertHeadAndSelfLockoutSafe(
+    safetyCommand: RoleMutationCommand,
+  ): Promise<void> {
+    await safetyCommand.mutate();
+  },
+} as RoleSafetyService;
 
 function buildHarness(options: {
   actorMembership?: { role: string } | null;
@@ -122,6 +133,7 @@ function buildHarness(options: {
       transaction,
       new OutboxService(),
       cache,
+      passThroughRoleSafety,
     ),
   };
 }
@@ -146,6 +158,7 @@ describe("AssignmentsService", () => {
       transaction,
       new OutboxService(),
       base.cache,
+      passThroughRoleSafety,
     );
 
     await expect(service.assign([command], actor)).resolves.toEqual([
@@ -252,6 +265,7 @@ describe("AssignmentsService", () => {
       transaction,
       new OutboxService(),
       base.cache,
+      passThroughRoleSafety,
     );
 
     await expect(
@@ -664,6 +678,7 @@ describe("AssignmentsService", () => {
         },
         new OutboxService(),
         cache,
+        passThroughRoleSafety,
       );
 
       await expect(service.assign([command], actor)).resolves.toHaveLength(1);

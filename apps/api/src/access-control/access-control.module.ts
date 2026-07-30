@@ -30,6 +30,7 @@ import {
   rolesTransactionBoundary,
   RolesService,
 } from "./roles.service";
+import { RoleSafetyService } from "./role-safety.service";
 
 const effectivePermissionsReader: EffectivePermissionsReader = {
   async getOrganisationMembership(userId, orgId) {
@@ -118,6 +119,7 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
   providers: [
     AssignmentsService,
     RolesService,
+    RoleSafetyService,
     {
       provide: ROLES_TRANSACTION_BOUNDARY,
       useValue: rolesTransactionBoundary,

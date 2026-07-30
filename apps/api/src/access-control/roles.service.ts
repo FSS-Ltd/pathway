@@ -15,6 +15,7 @@ import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AccessCacheService } from "./access-cache.service";
 import { roleApiError } from "./role-api-error";
+import { RoleSafetyService } from "./role-safety.service";
 import type {
   CloneRoleDto,
   CreateRoleDto,
@@ -130,6 +131,8 @@ export class RolesService {
     private readonly transaction: RolesTransactionBoundary,
     @Inject(AccessCacheService)
     private readonly cache: AccessCacheService,
+    @Inject(RoleSafetyService)
+    private readonly roleSafety: RoleSafetyService,
   ) {}
 
   async list(actor: RoleActorContext) {
@@ -230,17 +233,33 @@ export class RolesService {
       await this.assertRouteAccess(tx, actor, "manage");
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
-      const updated = await tx.orgRoleDefinition.updateMany({
-        where: { id: roleId, orgId: actor.orgId, version: command.expectedVersion },
-        data: { isActive: false, version: { increment: 1 }, updatedById: actor.userId },
+      await this.roleSafety.assertHeadAndSelfLockoutSafe({
+        tx,
+        actorUserId: actor.userId,
+        orgId: actor.orgId,
+        requestId: actor.requestId,
+        mutate: async () => {
+          const updated = await tx.orgRoleDefinition.updateMany({
+            where: {
+              id: roleId,
+              orgId: actor.orgId,
+              version: command.expectedVersion,
+            },
+            data: {
+              isActive: false,
+              version: { increment: 1 },
+              updatedById: actor.userId,
+            },
+          });
+          if (updated.count !== 1) {
+            throw roleApiError(
+              HttpStatus.CONFLICT,
+              "ROLE_VERSION_CONFLICT",
+              actor.requestId,
+            );
+          }
+        },
       });
-      if (updated.count !== 1) {
-        throw roleApiError(
-          HttpStatus.CONFLICT,
-          "ROLE_VERSION_CONFLICT",
-          actor.requestId,
-        );
-      }
       const retired = await this.requireRoleInTransaction(tx, roleId, actor);
       await this.recordRevisionAndAudit(tx, retired, actor, "retire");
       const userIds = await this.findAssignedUserIds(tx, roleId, actor.orgId);
@@ -258,21 +277,48 @@ export class RolesService {
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
       const permissionKeys = await this.validatePermissionKeys(tx, command.permissionKeys, role.scope, actor);
-      const updated = await this.withRoleNameConflictTranslation(actor, () =>
-        tx.orgRoleDefinition.updateMany({
-          where: { id: roleId, orgId: actor.orgId, version: expectedVersion },
-          data: { name: command.name, description: command.description, version: { increment: 1 }, updatedById: actor.userId },
-        }),
-      );
-      if (updated.count !== 1) {
-        throw roleApiError(
-          HttpStatus.CONFLICT,
-          "ROLE_VERSION_CONFLICT",
-          actor.requestId,
-        );
-      }
-      await tx.orgRolePermission.deleteMany({ where: { roleDefinitionId: roleId } });
-      await tx.orgRolePermission.createMany({ data: permissionKeys.map((permissionKey) => ({ roleDefinitionId: roleId, permissionKey, grantedById: actor.userId })) });
+      await this.roleSafety.assertHeadAndSelfLockoutSafe({
+        tx,
+        actorUserId: actor.userId,
+        orgId: actor.orgId,
+        requestId: actor.requestId,
+        mutate: async () => {
+          const updated = await this.withRoleNameConflictTranslation(
+            actor,
+            () =>
+              tx.orgRoleDefinition.updateMany({
+                where: {
+                  id: roleId,
+                  orgId: actor.orgId,
+                  version: expectedVersion,
+                },
+                data: {
+                  name: command.name,
+                  description: command.description,
+                  version: { increment: 1 },
+                  updatedById: actor.userId,
+                },
+              }),
+          );
+          if (updated.count !== 1) {
+            throw roleApiError(
+              HttpStatus.CONFLICT,
+              "ROLE_VERSION_CONFLICT",
+              actor.requestId,
+            );
+          }
+          await tx.orgRolePermission.deleteMany({
+            where: { roleDefinitionId: roleId },
+          });
+          await tx.orgRolePermission.createMany({
+            data: permissionKeys.map((permissionKey) => ({
+              roleDefinitionId: roleId,
+              permissionKey,
+              grantedById: actor.userId,
+            })),
+          });
+        },
+      });
       const changed = await this.requireRoleInTransaction(tx, roleId, actor);
       await this.recordRevisionAndAudit(tx, changed, actor, mutation);
       const userIds = await this.findAssignedUserIds(tx, roleId, actor.orgId);
