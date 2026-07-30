@@ -21,6 +21,9 @@ import {
   type OrgCapabilitiesReader,
 } from "./effective-permissions.service";
 import { PermissionGuard } from "./permission.guard";
+import { AccessCacheService } from "./access-cache.service";
+import { AssignmentsController } from "./assignments.controller";
+import { AssignmentsService } from "./assignments.service";
 import { RolesController } from "./roles.controller";
 import {
   ROLES_TRANSACTION_BOUNDARY,
@@ -111,13 +114,15 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
 
 @Module({
   imports: [CommonModule, AuthModule],
-  controllers: [RolesController],
+  controllers: [AssignmentsController, RolesController],
   providers: [
+    AssignmentsService,
     RolesService,
     {
       provide: ROLES_TRANSACTION_BOUNDARY,
       useValue: rolesTransactionBoundary,
     },
+    AccessCacheService,
     EffectivePermissionsService,
     {
       provide: AccessShadowService,
@@ -151,6 +156,11 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
       useValue: effectivePermissionsContext,
     },
   ],
-  exports: [AccessShadowService, EffectivePermissionsService, PermissionGuard],
+  exports: [
+    AccessCacheService,
+    AccessShadowService,
+    EffectivePermissionsService,
+    PermissionGuard,
+  ],
 })
 export class AccessControlModule {}

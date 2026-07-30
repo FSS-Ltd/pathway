@@ -13,9 +13,14 @@ const REQUIRED_TABLES = [
   "OrgRoleRevision",
   "UserRoleAssignment",
   "AuditEvent",
+  "OutboxEvent",
 ];
 const reviewedRoleQualifier =
   '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))';
+const reviewedAssignmentSelectQualifier =
+  '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND ((current_setting(\'app.assignment_org_read\'::text, true) = \'on\'::text) OR ("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))';
+const reviewedOutboxQualifier =
+  '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()))';
 const reviewedRolePermissionQualifier =
   '(EXISTS ( SELECT 1 FROM "OrgRoleDefinition" role_definition WHERE ((role_definition.id = "OrgRolePermission"."roleDefinitionId") AND (role_definition."orgId" = current_org_id()) AND ((role_definition."tenantId" IS NULL) OR (role_definition."tenantId" = current_tenant_id())))))';
 const reviewedSystemRoleDefinitionQualifier =
@@ -51,10 +56,11 @@ const reviewedPolicies = [
     reviewedSystemRolePermissionQualifier,
   ),
   policy("OrgRoleRevision", "OrgRoleRevision_rls", reviewedRoleQualifier),
+  policy("OutboxEvent", "OutboxEvent_rls", reviewedOutboxQualifier),
   policy(
     "UserRoleAssignment",
     "UserRoleAssignment_rls_select",
-    reviewedRoleQualifier,
+    reviewedAssignmentSelectQualifier,
     { command: "r", check_qualifier: null },
   ),
   policy(
@@ -169,6 +175,24 @@ test("rejects a changed UserRoleAssignment command-specific qualifier", () => {
 
   assert.deepEqual(findUnreviewedRolePolicies(policies), [
     "UserRoleAssignment.UserRoleAssignment_rls_insert",
+  ]);
+});
+
+test("rejects a widened assignment SELECT without the exact transaction-local flag", () => {
+  const policies = reviewedPolicies.map((entry) =>
+    entry.policy_name === "UserRoleAssignment_rls_select"
+      ? {
+          ...entry,
+          using_qualifier: entry.using_qualifier.replace(
+            "app.assignment_org_read",
+            "app.untrusted_org_read",
+          ),
+        }
+      : entry,
+  );
+
+  assert.deepEqual(findUnreviewedRolePolicies(policies), [
+    "UserRoleAssignment.UserRoleAssignment_rls_select",
   ]);
 });
 

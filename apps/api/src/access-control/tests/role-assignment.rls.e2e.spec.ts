@@ -382,14 +382,14 @@ describe("user role assignment RLS", () => {
       tenantId: TENANT_A,
       userId: fixture.orgAUserId,
       roleDefinitionId: fixture.orgASiteRoleId,
-      startsAt: new Date("2026-07-28T00:00:00.000Z"),
+      startsAt: new Date("2026-08-01T00:00:00.000Z"),
     });
     await insertAssignment({
       tenantId: TENANT_A,
       userId: fixture.orgAUserId,
       roleDefinitionId: fixture.orgASiteRoleId,
       startsAt: new Date("2026-06-01T00:00:00.000Z"),
-      expiresAt: new Date("2026-07-27T11:59:59.000Z"),
+      expiresAt: new Date("2026-07-01T00:00:00.000Z"),
     });
     await insertAssignment({
       tenantId: TENANT_A,

@@ -35,17 +35,17 @@ AND tenant/RLS policy
 
 The comparator allow-list repeats this approved route and compile-time `PermissionKey` pair only. It is not a fixed-role-to-capability mapping, resolver output, or executable permission registry.
 
-## ACE-F10 to ACE-F14 temporary role-API bootstrap
+## ACE-F10 to ACE-F14 temporary access-administration bootstrap
 
-R01 through R07 keep the approved capability and permission contract while
+R01 through R07 and R09 through R11 keep the approved capability and permission contract while
 the route-by-route cutover remains incomplete. Until ACE-F14 removes this
-bootstrap, each role endpoint requires all of the following:
+bootstrap, each role or assignment endpoint requires all of the following:
 
 - authenticated trusted request context;
 - an active `ORG_ADMIN` organisation membership confirmed from the database;
 - the matching active legacy `org:admin` request-context role;
-- the route's active `platform.access.roles.read` or
-  `platform.access.roles.manage` capability and active permission metadata;
+- the route's active `platform.access.roles.*` or
+  `platform.access.assignments.*` capability and active permission metadata;
 - inclusion of that route permission in the protected Organisation Head
   system template; and
 - organisation/site ownership checks and forced RLS.
@@ -56,6 +56,14 @@ capabilities, and active delegable permission metadata. R05 may use a protected
 system template as a read-only clone source. It never mutates that template,
 and the clone still passes source organisation/site and grantable-key checks.
 R04, R06, and R07 continue to reject mutation or retirement of system roles.
+R09 is organisation-scoped and returns an opaque `{ items, nextCursor }`
+creation-order page with a default and maximum of 50 rows. R10 derives
+organisation and selected-site scope from trusted context for one assignment or
+an atomic bulk request of 1 through 50 assignments, and R11 records one-way
+revocation without deleting assignment history. Successful writes
+enqueue an invalidation intent transactionally and invalidate every local
+user-and-organisation cache variant after commit. Other processes and failed
+direct invalidations converge through the hard 60-second cache TTL.
 
 ACE-F12 owns transactional last-organisation-head and same-request
 self-lockout enforcement. Those controls remain required for the approved

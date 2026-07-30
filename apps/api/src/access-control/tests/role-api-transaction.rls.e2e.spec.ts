@@ -8,14 +8,16 @@ import {
   RolesService,
   type RoleActorContext,
 } from "../roles.service";
+import { AccessCacheService } from "../access-cache.service";
 import { isDatabaseAvailable, requireDatabase } from "../../../test-helpers.e2e";
 
 const RLS_ROLE = "pathway_e2e_rls";
+const AUDIT_DENIED_ROLE = "pathway_e2e_audit_denied";
 
-function testTransactionBoundary() {
+function testTransactionBoundary(roleName = RLS_ROLE) {
   return createRolesTransactionBoundary(async (operation) =>
     runTransaction(async (tx) => {
-      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${RLS_ROLE}"`);
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${roleName}"`);
       const roleAttributes = await tx.$queryRaw<
         Array<{ currentUser: string; rolsuper: boolean; rolbypassrls: boolean }>
       >`
@@ -25,7 +27,7 @@ function testTransactionBoundary() {
       `;
       expect(roleAttributes).toEqual([
         {
-          currentUser: RLS_ROLE,
+          currentUser: roleName,
           rolsuper: false,
           rolbypassrls: false,
         },
@@ -146,7 +148,10 @@ describe("role API transaction and forced-RLS integration", () => {
       ],
     });
     actorB = { ...actorA, orgId: orgB, tenantId: siteB, userId: userB };
-    service = new RolesService(testTransactionBoundary());
+    service = new RolesService(
+      testTransactionBoundary(),
+      new AccessCacheService(),
+    );
   });
 
   it("commits every role mutation with its revision and audit event under the non-bypass role", async () => {
@@ -200,19 +205,18 @@ describe("role API transaction and forced-RLS integration", () => {
       revisions: await tx.orgRoleRevision.count({ where: { actorUserId: userA } }),
       audits: await tx.auditEvent.count({ where: { actorUserId: userA, action: "ROLE_CREATED" } }),
     }));
-    await prisma.$executeRawUnsafe(`REVOKE INSERT ON TABLE "AuditEvent" FROM "${RLS_ROLE}"`);
-    try {
-      await expectDatabaseRejection(
-        () =>
-          service.create(
-            { name, scope: "site", permissionKeys: ["ace.pace.read"] },
-            actorA,
-          ),
-        "42501",
-      );
-    } finally {
-      await prisma.$executeRawUnsafe(`GRANT SELECT, INSERT ON TABLE "AuditEvent" TO "${RLS_ROLE}"`);
-    }
+    const deniedService = new RolesService(
+      testTransactionBoundary(AUDIT_DENIED_ROLE),
+      new AccessCacheService(),
+    );
+    await expectDatabaseRejection(
+      () =>
+        deniedService.create(
+          { name, scope: "site", permissionKeys: ["ace.pace.read"] },
+          actorA,
+        ),
+      "42501",
+    );
     await testTransactionBoundary().run(actorA, async (tx) => {
       expect(await tx.orgRoleDefinition.findFirst({ where: { name } })).toBeNull();
       await expect(Promise.all([

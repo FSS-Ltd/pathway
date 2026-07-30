@@ -24,6 +24,7 @@ const REQUIRED_RLS_TABLES = [
   "OrgRoleRevision",
   "UserRoleAssignment",
   "AuditEvent",
+  "OutboxEvent",
 ];
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
@@ -66,7 +67,7 @@ async function main() {
       WHERE n.nspname = $1
         AND c.relkind IN ('r', 'p')
         AND c.relforcerowsecurity = false
-        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent')
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent')
       ORDER BY c.relname
     `, databaseSchema),
       prisma.$queryRawUnsafe(`
@@ -115,7 +116,7 @@ async function main() {
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = $1
-        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent')
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent')
       ORDER BY c.relname, p.polname
     `, databaseSchema),
     ]);

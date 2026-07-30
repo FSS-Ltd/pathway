@@ -4,6 +4,7 @@ import type {
   AccessDecision,
   EffectiveAccessRequest,
 } from "./access-decision.types";
+import { AccessCacheService } from "./access-cache.service";
 
 export interface EffectivePermissionGrant {
   roleId: string;
@@ -65,6 +66,8 @@ export class EffectivePermissionsService {
     private readonly featureAvailability: FeatureAvailabilityReader,
     @Inject(EFFECTIVE_PERMISSIONS_CONTEXT)
     private readonly context: EffectivePermissionsContext,
+    @Inject(AccessCacheService)
+    private readonly cache: AccessCacheService,
   ) {}
 
   async resolve(request: EffectiveAccessRequest): Promise<AccessDecision> {
@@ -86,18 +89,17 @@ export class EffectivePermissionsService {
   private async resolveInContext(
     request: EffectiveAccessRequest,
   ): Promise<AccessDecision> {
-    if (
-      !(await this.reader.getOrganisationMembership(
-        request.userId,
-        request.orgId,
-      ))
-    ) {
+    const snapshot = await this.loadSnapshot(
+      request.userId,
+      request.orgId,
+      request.tenantId,
+      request.now,
+    );
+    if (!snapshot.hasMembership) {
       return denied("no-membership");
     }
 
-    const capabilities = new Set(
-      await this.capabilityReader.get(request.orgId),
-    );
+    const capabilities = new Set(snapshot.capabilities);
     if (!capabilities.has(request.permission)) {
       return denied("capability-missing");
     }
@@ -111,14 +113,7 @@ export class EffectivePermissionsService {
       return denied("feature-disabled");
     }
 
-    const candidates = (
-      await this.reader.findAssignments(
-        request.userId,
-        request.orgId,
-        request.tenantId,
-        request.now,
-      )
-    ).filter(
+    const candidates = snapshot.grants.filter(
       (grant) =>
         grant.permissionKey === request.permission &&
         appliesToScope(grant, request.tenantId),
@@ -148,19 +143,16 @@ export class EffectivePermissionsService {
     orgId: string,
     tenantId?: string,
   ): Promise<PermissionKey[]> {
-    if (!(await this.reader.getOrganisationMembership(userId, orgId))) {
+    const now = new Date();
+    const snapshot = await this.loadSnapshot(userId, orgId, tenantId, now);
+    if (!snapshot.hasMembership) {
       return [];
     }
 
-    const now = new Date();
-    const [capabilities, grants] = await Promise.all([
-      this.capabilityReader.get(orgId),
-      this.reader.findAssignments(userId, orgId, tenantId, now),
-    ]);
-    const availableCapabilities = new Set(capabilities);
+    const availableCapabilities = new Set(snapshot.capabilities);
     const permissionKeys = [
       ...new Set(
-        grants
+        snapshot.grants
           .filter(
             (grant) =>
               grant.roleIsActive &&
@@ -187,6 +179,33 @@ export class EffectivePermissionsService {
       .filter(({ available }) => available)
       .map(({ permission }) => permission);
   }
+
+  private loadSnapshot(
+    userId: string,
+    orgId: string,
+    tenantId: string | undefined,
+    now: Date,
+  ): Promise<EffectiveAccessSnapshot> {
+    return this.cache.getOrLoad({ userId, orgId, tenantId }, async () => {
+      const hasMembership =
+        await this.reader.getOrganisationMembership(userId, orgId);
+      if (!hasMembership) {
+        return { hasMembership, capabilities: [], grants: [] };
+      }
+
+      const [capabilities, grants] = await Promise.all([
+        this.capabilityReader.get(orgId),
+        this.reader.findAssignments(userId, orgId, tenantId, now),
+      ]);
+      return { hasMembership, capabilities, grants };
+    });
+  }
+}
+
+interface EffectiveAccessSnapshot {
+  readonly hasMembership: boolean;
+  readonly capabilities: readonly PermissionKey[];
+  readonly grants: readonly EffectivePermissionGrant[];
 }
 
 function appliesToScope(
