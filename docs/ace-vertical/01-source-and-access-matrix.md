@@ -25,15 +25,30 @@ AND release/visibility policy
 AND tenant/RLS policy
 ```
 
-## ACE-F09 inactive shadow comparison
+## ACE-F14 active shadow comparison
 
-`ACE_ACCESS_SHADOW_ENABLED=true` permits comparison only for the approved matrix entry below. This is an inactive migration instrument until a later route-migration PR introduces an explicit call site that supplies the authoritative legacy decision. It does not register a route, change a live decision, or authorise from typed permissions.
+`ACE_ACCESS_SHADOW_ENABLED=true` permits comparison for the fourteen approved matrix entries below. Every `/access/*` service call site now supplies the bootstrap's real decision as `legacyAllowed`; the comparator still returns that same legacy result and never authorises from the typed resolver. It does not register a route or change a live decision.
 
-| Exact matrix route | Matrix permission (`PermissionKey`) | Matrix ID | Activation boundary |
-| --- | --- | --- | --- |
-| `GET /access/users/:userId/effective-permissions` | `platform.access.users.read` | R12 | No current call site. A future explicit route migration may call the comparator with the legacy result; the comparator must return that same legacy result. |
+| Exact matrix route | Matrix permission (`PermissionKey`) | Matrix ID |
+| --- | --- | --- |
+| `GET /access/roles` | `platform.access.roles.read` | R01 |
+| `POST /access/roles` | `platform.access.roles.manage` | R02 |
+| `GET /access/roles/:roleId` | `platform.access.roles.read` | R03 |
+| `PATCH /access/roles/:roleId` | `platform.access.roles.manage` | R04 |
+| `POST /access/roles/:roleId/clone` | `platform.access.roles.manage` | R05 |
+| `PUT /access/roles/:roleId/permissions` | `platform.access.roles.manage` | R06 |
+| `POST /access/roles/:roleId/retire` | `platform.access.roles.manage` | R07 |
+| `GET /access/permissions` | `platform.access.permissions.read` | R08 |
+| `GET /access/assignments` | `platform.access.assignments.read` | R09 |
+| `POST /access/assignments` | `platform.access.assignments.manage` | R10 |
+| `DELETE /access/assignments/:assignmentId` | `platform.access.assignments.manage` | R11 |
+| `GET /access/users/:userId/effective-permissions` | `platform.access.users.read` | R12 |
+| `GET /access/users/:userId/access-summary` | `platform.access.users.read` | R13 |
+| `GET /access/audit` | `platform.access.audit.read` | R14 |
 
-The comparator allow-list repeats this approved route and compile-time `PermissionKey` pair only. It is not a fixed-role-to-capability mapping, resolver output, or executable permission registry.
+`PUT /access/roles/:roleId/permissions` (R06) is served by `RolesService.get` (asserting `roles.read`) followed by `RolesService.update` (asserting `roles.manage`), so a single R06 request records drift against both the R03 and R04 pairs above; this is accurate to the matrix formula, which requires R06 to hold both.
+
+The comparator allow-list repeats these approved routes and their compile-time `PermissionKey` pairs only. It is not a fixed-role-to-capability mapping, resolver output, or executable permission registry. A staging run with the flag enabled must show zero unexplained `access-shadow-drift` before ACE-F14 removes the bootstrap these routes still run on.
 
 ## ACE-F10 to ACE-F14 temporary access-administration bootstrap
 
