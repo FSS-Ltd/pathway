@@ -21,6 +21,8 @@ import {
   AssignmentsService,
   type AssignRoleCommand,
 } from "./assignments.service";
+import { PermissionGuard } from "./permission.guard";
+import { RequirePermission } from "./require-permission.decorator";
 import { roleApiError } from "./role-api-error";
 import {
   getOrCreateRequestId,
@@ -32,7 +34,7 @@ const assignmentIdParam = z
   .object({ assignmentId: z.string().uuid() })
   .strict();
 
-@UseGuards(AuthUserGuard)
+@UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("access/assignments")
 export class AssignmentsController {
   constructor(
@@ -43,6 +45,7 @@ export class AssignmentsController {
   ) {}
 
   @Get()
+  @RequirePermission("platform.access.assignments.read")
   async list(
     @Query() query: unknown,
     @Req() request: RequestWithRequestId,
@@ -55,6 +58,7 @@ export class AssignmentsController {
   }
 
   @Post()
+  @RequirePermission("platform.access.assignments.manage")
   async assign(
     @Body() body: unknown,
     @Req() request: RequestWithRequestId,
@@ -73,6 +77,7 @@ export class AssignmentsController {
   }
 
   @Delete(":assignmentId")
+  @RequirePermission("platform.access.assignments.manage")
   revoke(
     @Param() params: unknown,
     @Req() request: RequestWithRequestId,

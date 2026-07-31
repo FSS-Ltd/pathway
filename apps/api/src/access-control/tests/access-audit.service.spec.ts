@@ -1,6 +1,5 @@
 import { AuditEntityType } from "../../audit/audit.types";
 import { AccessAuditService } from "../access-audit.service";
-import type { AccessShadowService } from "../access-shadow.service";
 import { encodeCreatedAtIdCursor } from "../cursor";
 import type { RoleActorContext, RolesTransactionBoundary } from "../roles.service";
 
@@ -12,22 +11,13 @@ const actor: RoleActorContext = {
   requestId: "access-audit-request-1",
 };
 
-const allowedTx = {
-  orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "ORG_ADMIN" }) },
-  permissionDefinition: { findUnique: jest.fn().mockResolvedValue({ isActive: true }) },
-  orgVertical: { findUnique: jest.fn().mockResolvedValue({ vertical: "ACE_SCHOOL" }) },
-  orgModule: { findMany: jest.fn().mockResolvedValue([]) },
-};
-
-const shadow = {
-  compare: jest.fn().mockResolvedValue(true),
-} as unknown as AccessShadowService;
+const allowedTx = {};
 
 function serviceWith(tx: object) {
   const transaction: RolesTransactionBoundary = {
     run: async (_actor, operation) => operation(tx as never),
   };
-  return new AccessAuditService(transaction, shadow);
+  return new AccessAuditService(transaction);
 }
 
 const events = [
@@ -54,16 +44,6 @@ const events = [
 ];
 
 describe("AccessAuditService", () => {
-  it("denies an actor who lacks audit-read authority", async () => {
-    const service = serviceWith({
-      orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "STAFF" }) },
-    });
-
-    await expect(service.list(actor)).rejects.toMatchObject({
-      response: { statusCode: 403, code: "AUDIT_API_ACCESS_DENIED" },
-    });
-  });
-
   it("defaults to role and assignment entity types and returns a stable page", async () => {
     const findMany = jest.fn().mockResolvedValue(events);
     const service = serviceWith({ ...allowedTx, auditEvent: { findMany } });

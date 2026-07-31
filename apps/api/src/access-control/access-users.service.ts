@@ -1,7 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { getOrgCapabilities } from "@pathway/platform";
-import { assertPlatformAccessRouteAccessWithShadow } from "./assert-platform-access";
-import { AccessShadowService } from "./access-shadow.service";
 import {
   EffectivePermissionsService,
   type EffectivePermissionWithSources,
@@ -46,24 +44,15 @@ export class AccessUsersService {
     private readonly transaction: RolesTransactionBoundary,
     @Inject(EffectivePermissionsService)
     private readonly effectivePermissions: EffectivePermissionsService,
-    @Inject(AccessShadowService)
-    private readonly shadow: AccessShadowService,
   ) {}
 
   async getEffectivePermissions(
     targetUserId: string,
     actor: RoleActorContext,
   ): Promise<EffectivePermissionsResult> {
-    await this.transaction.run(actor, (tx) =>
-      assertPlatformAccessRouteAccessWithShadow(
-        tx,
-        actor,
-        "platform.access.users.read",
-        "EFFECTIVE_ACCESS_API_ACCESS_DENIED",
-        "GET /access/users/:userId/effective-permissions",
-        this.shadow,
-      ),
-    );
+    // Validates the selected site belongs to the actor's organisation
+    // (INVALID_SELECTED_SITE) before resolving anything.
+    await this.transaction.run(actor, async () => {});
 
     const permissions = await this.effectivePermissions.listForUserWithSources(
       targetUserId,
@@ -84,15 +73,6 @@ export class AccessUsersService {
     actor: RoleActorContext,
   ): Promise<AccessSummaryResult> {
     return this.transaction.run(actor, async (tx) => {
-      await assertPlatformAccessRouteAccessWithShadow(
-        tx,
-        actor,
-        "platform.access.users.read",
-        "ACCESS_SUMMARY_API_ACCESS_DENIED",
-        "GET /access/users/:userId/access-summary",
-        this.shadow,
-      );
-
       const [membership, assignments, capabilities] = await Promise.all([
         tx.orgMembership.findUnique({
           where: {

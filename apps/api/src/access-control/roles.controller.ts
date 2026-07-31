@@ -19,6 +19,8 @@ import {
   retireRoleDto,
   updateRoleDto,
 } from "./dto/role.dto";
+import { PermissionGuard } from "./permission.guard";
+import { RequirePermission } from "./require-permission.decorator";
 import { RolesService, type RoleActorContext } from "./roles.service";
 import { roleApiError } from "./role-api-error";
 import {
@@ -32,7 +34,7 @@ const replacePermissionsDto = z.object({
   permissionKeys: z.array(z.string().min(1)).min(1),
 }).strict();
 
-@UseGuards(AuthUserGuard)
+@UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("access/roles")
 export class RolesController {
   constructor(
@@ -41,11 +43,13 @@ export class RolesController {
   ) {}
 
   @Get()
+  @RequirePermission("platform.access.roles.read")
   list(@Req() request: RequestWithRequestId) {
     return this.roles.list(this.actor(request));
   }
 
   @Post()
+  @RequirePermission("platform.access.roles.manage")
   async create(@Body() body: unknown, @Req() request: RequestWithRequestId) {
     const requestId = getOrCreateRequestId(request);
     return this.roles.create(
@@ -55,6 +59,7 @@ export class RolesController {
   }
 
   @Get(":roleId")
+  @RequirePermission("platform.access.roles.read")
   async get(@Param() params: unknown, @Req() request: RequestWithRequestId) {
     const requestId = getOrCreateRequestId(request);
     return this.roles.get(
@@ -64,6 +69,7 @@ export class RolesController {
   }
 
   @Patch(":roleId")
+  @RequirePermission("platform.access.roles.manage")
   async update(
     @Param() params: unknown,
     @Body() body: unknown,
@@ -77,6 +83,7 @@ export class RolesController {
   }
 
   @Post(":roleId/clone")
+  @RequirePermission("platform.access.roles.manage")
   async clone(
     @Param() params: unknown,
     @Body() body: unknown,
@@ -91,6 +98,7 @@ export class RolesController {
   }
 
   @Put(":roleId/permissions")
+  @RequirePermission("platform.access.roles.manage")
   async replacePermissions(
     @Param() params: unknown,
     @Body() body: unknown,
@@ -111,6 +119,7 @@ export class RolesController {
   }
 
   @Post(":roleId/retire")
+  @RequirePermission("platform.access.roles.manage")
   async retire(
     @Param() params: unknown,
     @Body() body: unknown,

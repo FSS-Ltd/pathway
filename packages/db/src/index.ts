@@ -177,7 +177,7 @@ export {
   type RolePermissionScope,
 } from "./role-scope-compatibility";
 
-async function applyTenantContext(
+export async function applyTenantContext(
   tx: Prisma.TransactionClient,
   tenantId: string,
   orgId?: string | null,

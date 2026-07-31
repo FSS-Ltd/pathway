@@ -27,12 +27,6 @@ describe("access-audit endpoint", () => {
     legacyOrgRoles: ["org:admin"],
     requestId: "access-audit-request-1",
   };
-  const actorNonAdminA: RoleActorContext = {
-    orgId: orgA,
-    userId: nonAdminA,
-    legacyOrgRoles: [],
-    requestId: "access-audit-request-2",
-  };
 
   let moduleRef: TestingModule | undefined;
   let service: AccessAuditService;
@@ -111,14 +105,6 @@ describe("access-audit endpoint", () => {
     await prisma.org.deleteMany({ where: { id: { in: orgIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await moduleRef?.close();
-  });
-
-  it("denies an actor without organisation-admin authority", async () => {
-    if (!isDatabaseAvailable()) return;
-
-    await expect(service.list(actorNonAdminA)).rejects.toMatchObject({
-      response: { statusCode: 403, code: "AUDIT_API_ACCESS_DENIED" },
-    });
   });
 
   it("returns only role and assignment events for the actor's own organisation, never CONCERN or another org's rows", async () => {

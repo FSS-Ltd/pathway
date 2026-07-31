@@ -25,66 +25,48 @@ AND release/visibility policy
 AND tenant/RLS policy
 ```
 
-## ACE-F14 active shadow comparison
+## ACE-F09 inactive shadow comparison
 
-`ACE_ACCESS_SHADOW_ENABLED=true` permits comparison for the fourteen approved matrix entries below. Every `/access/*` service call site now supplies the bootstrap's real decision as `legacyAllowed`; the comparator still returns that same legacy result and never authorises from the typed resolver. It does not register a route or change a live decision.
+`ACE_ACCESS_SHADOW_ENABLED=true` gates comparison entirely on
+`ACCESS_SHADOW_ALLOW_LIST`, which is empty: R01 through R14 observed shadow
+agreement, then ACE-F14 cut them over to `PermissionGuard` directly and
+deleted the legacy bootstrap they were compared against, so there is nothing
+left for them to compare. The instrument remains available, unpopulated,
+for a future bounded route migration (ACE-F15+) that needs the same
+inactive-until-populated observation step before its own cutover.
 
-| Exact matrix route | Matrix permission (`PermissionKey`) | Matrix ID |
-| --- | --- | --- |
-| `GET /access/roles` | `platform.access.roles.read` | R01 |
-| `POST /access/roles` | `platform.access.roles.manage` | R02 |
-| `GET /access/roles/:roleId` | `platform.access.roles.read` | R03 |
-| `PATCH /access/roles/:roleId` | `platform.access.roles.manage` | R04 |
-| `POST /access/roles/:roleId/clone` | `platform.access.roles.manage` | R05 |
-| `PUT /access/roles/:roleId/permissions` | `platform.access.roles.manage` | R06 |
-| `POST /access/roles/:roleId/retire` | `platform.access.roles.manage` | R07 |
-| `GET /access/permissions` | `platform.access.permissions.read` | R08 |
-| `GET /access/assignments` | `platform.access.assignments.read` | R09 |
-| `POST /access/assignments` | `platform.access.assignments.manage` | R10 |
-| `DELETE /access/assignments/:assignmentId` | `platform.access.assignments.manage` | R11 |
-| `GET /access/users/:userId/effective-permissions` | `platform.access.users.read` | R12 |
-| `GET /access/users/:userId/access-summary` | `platform.access.users.read` | R13 |
-| `GET /access/audit` | `platform.access.audit.read` | R14 |
+## ACE-F14 typed permission cutover
 
-`PUT /access/roles/:roleId/permissions` (R06) is served by `RolesService.get` (asserting `roles.read`) followed by `RolesService.update` (asserting `roles.manage`), so a single R06 request records drift against both the R03 and R04 pairs above; this is accurate to the matrix formula, which requires R06 to hold both.
+R01 through R14 are enforced by `PermissionGuard` reading
+`@RequirePermission(<matrix permission>)` directly off each handler. No
+route asserts a legacy role name, and no bootstrap remains: the full formula
+(membership, capability, and typed permission) is evaluated by
+`EffectivePermissionsService.resolve()` in one pass, matching every route's
+matrix row above where the `capability` and `permission` columns are the
+same key.
 
-The comparator allow-list repeats these approved routes and their compile-time `PermissionKey` pairs only. It is not a fixed-role-to-capability mapping, resolver output, or executable permission registry. A staging run with the flag enabled must show zero unexplained `access-shadow-drift` before ACE-F14 removes the bootstrap these routes still run on.
+For create, clone, update, and permission replacement, grantable keys are
+the intersection of the acting user's own effective permissions, the
+organisation's active capabilities, and active delegable permission
+metadata (`resolveDelegableCeiling`, `apps/api/src/access-control/roles.service.ts`).
+R05 may use a protected system template as a read-only clone source. It
+never mutates that template, and the clone still passes source
+organisation/site and grantable-key checks. R04, R06, and R07 continue to
+reject mutation or retirement of system roles. R09 is organisation-scoped
+and returns an opaque `{ items, nextCursor }` creation-order page with a
+default and maximum of 50 rows. R10 derives organisation and selected-site
+scope from trusted context for one assignment or an atomic bulk request of
+1 through 50 assignments, and R11 records one-way revocation without
+deleting assignment history. Successful writes enqueue an invalidation
+intent transactionally and invalidate every local user-and-organisation
+cache variant after commit; the route decision itself is therefore fresh at
+write time but can lag up to the hard 60-second cache TTL for a
+just-revoked actor's next read. Other processes and failed direct
+invalidations converge through that same TTL.
 
-## ACE-F10 to ACE-F14 temporary access-administration bootstrap
-
-R01 through R07 and R09 through R11 keep the approved capability and permission contract while
-the route-by-route cutover remains incomplete. Until ACE-F14 removes this
-bootstrap, each role or assignment endpoint requires all of the following:
-
-- authenticated trusted request context;
-- an active `ORG_ADMIN` organisation membership confirmed from the database;
-- the matching active legacy `org:admin` request-context role;
-- the route's active `platform.access.roles.*` or
-  `platform.access.assignments.*` capability and active permission metadata;
-- inclusion of that route permission in the protected Organisation Head
-  system template; and
-- organisation/site ownership checks and forced RLS.
-
-For create, clone, update, and permission replacement, grantable keys are the
-intersection of the protected Organisation Head template, active organisation
-capabilities, and active delegable permission metadata. R05 may use a protected
-system template as a read-only clone source. It never mutates that template,
-and the clone still passes source organisation/site and grantable-key checks.
-R04, R06, and R07 continue to reject mutation or retirement of system roles.
-R09 is organisation-scoped and returns an opaque `{ items, nextCursor }`
-creation-order page with a default and maximum of 50 rows. R10 derives
-organisation and selected-site scope from trusted context for one assignment or
-an atomic bulk request of 1 through 50 assignments, and R11 records one-way
-revocation without deleting assignment history. Successful writes
-enqueue an invalidation intent transactionally and invalidate every local
-user-and-organisation cache variant after commit. Other processes and failed
-direct invalidations converge through the hard 60-second cache TTL.
-
-ACE-F12 owns transactional last-organisation-head and same-request
-self-lockout enforcement. Those controls remain required for the approved
-R04, R06, R07, R10, and R11 contract, but ACE-F10 does not claim to implement
-them early. ACE-F14 removes the legacy bootstrap after shadow comparison and
-bounded route migration prove parity.
+ACE-F12's transactional last-organisation-head and same-request
+self-lockout enforcement remains required for R04, R06, R07, R10, and R11
+and is unaffected by this cutover.
 
 `none` means the layer is genuinely inapplicable to that route. It never means undecided.
 

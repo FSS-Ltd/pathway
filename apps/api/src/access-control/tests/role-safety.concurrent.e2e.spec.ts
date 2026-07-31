@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { SYSTEM_ROLE_TEMPLATES } from "@pathway/auth";
 import { Prisma, PrismaClient, prisma, runTransaction } from "@pathway/db";
 import { AccessCacheService } from "../access-cache.service";
-import type { AccessShadowService } from "../access-shadow.service";
+import type { EffectivePermissionsService } from "../effective-permissions.service";
 import { AssignmentsService } from "../assignments.service";
 import {
   createRolesTransactionBoundary,
@@ -16,9 +16,9 @@ import {
   requireDatabase,
 } from "../../../test-helpers.e2e";
 
-const noopShadow = {
-  compare: async ({ legacyAllowed }: { legacyAllowed: boolean }) => legacyAllowed,
-} as unknown as AccessShadowService;
+const actorHoldsEveryTestedKey = {
+  listForUser: async () => ["ace.pace.read", "ace.pace.record"],
+} as unknown as EffectivePermissionsService;
 const RLS_ROLE = "pathway_e2e_rls";
 const PAST = new Date("2026-07-01T00:00:00.000Z");
 const FUTURE = new Date("2090-01-01T00:00:00.000Z");
@@ -224,13 +224,12 @@ describe("role safety concurrency and transactional rollback", () => {
     new OutboxService(),
     new AccessCacheService(),
     new RoleSafetyService(),
-    noopShadow,
   );
   const rolesService = new RolesService(
     transactionBoundary(),
     new AccessCacheService(),
     new RoleSafetyService(),
-    noopShadow,
+    actorHoldsEveryTestedKey,
   );
 
   beforeAll(async () => {
