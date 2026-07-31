@@ -261,4 +261,10 @@ describe("capability definitions", () => {
       );
     }
   });
+
+  it("declares no feature toggle until a real rollout source exists", () => {
+    for (const definition of Object.values(CAPABILITY_DEFINITIONS)) {
+      expect(definition.featureToggle).toBeUndefined();
+    }
+  });
 });
