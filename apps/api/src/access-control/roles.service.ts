@@ -1,4 +1,4 @@
-import { SYSTEM_ROLE_TEMPLATES, UserOrgRole } from "@pathway/auth";
+import { UserOrgRole } from "@pathway/auth";
 import {
   Prisma,
   runTransaction,
@@ -39,6 +39,11 @@ export interface TemporaryRoleApiBootstrapInput {
 /**
  * Transitional authority for ACE-F10 routes only. It is intentionally isolated
  * so ACE-F14 can remove it without affecting the typed access resolver.
+ *
+ * The delegable ceiling is the org's own active capabilities (what it has
+ * purchased, via vertical + modules), intersected with the registry and the
+ * static `delegable` flag. `delegable: false` is what keeps platform-access
+ * and safeguarding-case keys ungrantable, regardless of vertical.
  */
 export function resolveTemporaryRoleApiBootstrap(
   input: TemporaryRoleApiBootstrapInput,
@@ -47,21 +52,18 @@ export function resolveTemporaryRoleApiBootstrap(
     return [];
   }
 
-  const activeCapabilities = new Set(input.activeCapabilities);
   const activeDelegableMetadata = new Set(
     input.activePermissionDefinitions
       .filter((definition) => definition.isActive && definition.delegable)
       .map((definition) => definition.key),
   );
 
-  return SYSTEM_ROLE_TEMPLATES.organisationHead.permissions
+  return [...new Set(input.activeCapabilities)]
     .filter(
       (key) =>
-      key in CAPABILITY_DEFINITIONS &&
-      activeCapabilities.has(key as PermissionKey) &&
-      activeDelegableMetadata.has(key),
+        key in CAPABILITY_DEFINITIONS && activeDelegableMetadata.has(key),
     )
-    .map((key) => key as PermissionKey);
+    .sort();
 }
 
 export interface RoleActorContext {

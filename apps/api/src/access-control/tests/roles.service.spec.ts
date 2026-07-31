@@ -1,4 +1,4 @@
-import { CAPABILITY_DEFINITIONS } from "@pathway/platform";
+import { CAPABILITY_DEFINITIONS, VERTICAL_CAPABILITIES } from "@pathway/platform";
 import type { Prisma } from "@pathway/db";
 import {
   createRolesTransactionBoundary,
@@ -28,7 +28,7 @@ const passThroughRoleSafety = {
 } as RoleSafetyService;
 
 describe("temporary role API bootstrap", () => {
-  it("permits only an authenticated legacy organisation admin to bootstrap delegable organisation-head keys", () => {
+  it("permits only an authenticated legacy organisation admin to bootstrap delegable keys the organisation has active", () => {
     const result = resolveTemporaryRoleApiBootstrap({
       orgId,
       userId: "user-1",
@@ -57,6 +57,41 @@ describe("temporary role API bootstrap", () => {
 
     expect(result).toEqual([]);
     expect(CAPABILITY_DEFINITIONS["platform.access.roles.manage"].delegable).toBe(false);
+  });
+
+  it("grants a non-ACE vertical its own delegable capabilities, never platform-access or safeguarding-case keys", () => {
+    const churchCapabilities = VERTICAL_CAPABILITIES.CHURCH;
+    const result = resolveTemporaryRoleApiBootstrap({
+      orgId,
+      userId: "user-1",
+      legacyOrgRoles: ["org:admin"],
+      activeCapabilities: churchCapabilities,
+      activePermissionDefinitions: churchCapabilities.map((key) => ({
+        key,
+        delegable: CAPABILITY_DEFINITIONS[key].delegable,
+        isActive: true,
+      })),
+    });
+
+    expect(result.length).toBeGreaterThan(0);
+    expect(result).toEqual(expect.arrayContaining(["notices.manage", "volunteers.manage", "giving.manage"]));
+    expect(result.some((key) => key.startsWith("platform.access."))).toBe(false);
+    expect(result).not.toEqual(expect.arrayContaining(["safeguarding.concerns.read", "safeguarding.concerns.manage"]));
+  });
+
+  it("excludes a delegable, active key the organisation has not purchased", () => {
+    const result = resolveTemporaryRoleApiBootstrap({
+      orgId,
+      userId: "user-1",
+      legacyOrgRoles: ["org:admin"],
+      activeCapabilities: ["notices.manage"],
+      activePermissionDefinitions: [
+        { key: "notices.manage", delegable: true, isActive: true },
+        { key: "ace.pace.read", delegable: true, isActive: true },
+      ],
+    });
+
+    expect(result).toEqual(["notices.manage"]);
   });
 });
 
@@ -401,13 +436,29 @@ describe("RolesService route authority", () => {
     ["illegal scope", ["ace.pace.read"], [{ key: "ace.pace.read", delegable: true, isActive: true, scope: "organisation" }], "ILLEGAL_ROLE_SCOPE"],
     ["inactive metadata", ["ace.pace.read"], [{ key: "ace.pace.read", delegable: true, isActive: false, scope: "site" }], "INACTIVE_PERMISSION_KEY"],
     ["inactive capability", ["finance.invoices"], [{ key: "finance.invoices", delegable: true, isActive: true, scope: "site" }], "INACTIVE_PERMISSION_KEY"],
-    ["non-template capability", ["ace.reports.compile"], [{ key: "ace.reports.compile", delegable: true, isActive: true, scope: "site" }], "ACTOR_CANNOT_DELEGATE"],
+    // Note: "non-template capability" (e.g. ace.reports.compile) is no longer a distinct
+    // rejection case — the delegable ceiling is now the org's own active+delegable
+    // capabilities, not an ACE-only allowlist, so any active/delegable/in-scope key an
+    // ORG_ADMIN's org holds is delegable by definition.
   ] as const)("rejects %s during permission validation", async (_caseName, permissionKeys, metadata, code) => {
     const { service } = allowedService({ metadata: [...metadata] });
 
     await expect(service.create({ name: "PACE Staff", scope: "site", permissionKeys: [...permissionKeys] }, actor)).rejects.toMatchObject({
       response: { code },
     });
+  });
+
+  it("allows a key the org actively holds and can delegate, even outside the old organisation-head template", async () => {
+    const { service } = allowedService({
+      metadata: [{ key: "ace.reports.compile", delegable: true, isActive: true, scope: "site" }],
+    });
+
+    await expect(
+      service.create(
+        { name: "PACE Staff", scope: "site", permissionKeys: ["ace.reports.compile"] },
+        actor,
+      ),
+    ).resolves.toMatchObject({ id: "role-1" });
   });
 
   it("clones only the delegable intersection from a protected system template without mutating its source", async () => {

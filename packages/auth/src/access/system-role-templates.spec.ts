@@ -1,5 +1,31 @@
 import { SYSTEM_ROLE_TEMPLATES } from "./system-role-templates";
 
+// Core permissions every template should carry so it's meaningful in every
+// vertical once seedSystemRoles intersects it with the org's active
+// capabilities (see packages/db/src/seed-system-roles.ts). Mirrors
+// PLATFORM_CORE_CAPABILITIES in packages/platform/src/capability-maps.ts.
+const CORE_PERMISSIONS = [
+  "attendance.read",
+  "attendance.manage",
+  "platform.access.roles.read",
+  "platform.access.roles.manage",
+  "platform.access.permissions.read",
+  "platform.access.assignments.read",
+  "platform.access.assignments.manage",
+  "platform.access.users.read",
+  "platform.access.audit.read",
+  "messaging.conversations.read",
+  "messaging.conversations.create",
+  "messaging.messages.read",
+  "messaging.messages.send",
+  "notices.read",
+  "notices.manage",
+  "notices.publish",
+  "safeguarding.concerns.record",
+  "safeguarding.concerns.read",
+  "safeguarding.concerns.manage",
+];
+
 describe("ACE system role templates", () => {
   it("defines the approved protected template scopes and permission mappings", () => {
     expect(SYSTEM_ROLE_TEMPLATES).toEqual({
@@ -15,6 +41,26 @@ describe("ACE system role templates", () => {
           "platform.access.assignments.manage",
           "platform.access.users.read",
           "platform.access.audit.read",
+          "attendance.read",
+          "attendance.manage",
+          "messaging.conversations.read",
+          "messaging.conversations.create",
+          "messaging.messages.read",
+          "messaging.messages.send",
+          "notices.read",
+          "notices.manage",
+          "notices.publish",
+          "safeguarding.concerns.read",
+          "safeguarding.concerns.manage",
+          "students.manage",
+          "classes.manage",
+          "parents.read",
+          "reports.read",
+          "children.manage",
+          "members.manage",
+          "volunteers.manage",
+          "giving.manage",
+          "calendar.read",
           "ace.settings.read",
           "ace.settings.manage",
           "ace.pace.read",
@@ -46,6 +92,25 @@ describe("ACE system role templates", () => {
         scope: "site",
         protected: true,
         permissions: [
+          "attendance.read",
+          "attendance.manage",
+          "messaging.conversations.read",
+          "messaging.conversations.create",
+          "messaging.messages.read",
+          "messaging.messages.send",
+          "notices.read",
+          "notices.manage",
+          "notices.publish",
+          "safeguarding.concerns.record",
+          "students.manage",
+          "classes.manage",
+          "parents.read",
+          "reports.read",
+          "children.manage",
+          "members.manage",
+          "volunteers.manage",
+          "giving.manage",
+          "calendar.read",
           "ace.settings.read",
           "ace.settings.manage",
           "ace.pace.read",
@@ -77,6 +142,14 @@ describe("ACE system role templates", () => {
         scope: "site",
         protected: true,
         permissions: [
+          "attendance.read",
+          "attendance.manage",
+          "messaging.conversations.read",
+          "messaging.conversations.create",
+          "messaging.messages.read",
+          "messaging.messages.send",
+          "notices.read",
+          "safeguarding.concerns.record",
           "ace.settings.read",
           "ace.pace.read",
           "ace.pace.record",
@@ -100,19 +173,39 @@ describe("ACE system role templates", () => {
         name: "Safeguarding Lead",
         scope: "site",
         protected: true,
-        permissions: ["ace.behaviour.read"],
+        permissions: [
+          "safeguarding.concerns.record",
+          "safeguarding.concerns.read",
+          "safeguarding.concerns.manage",
+          "attendance.read",
+          "notices.read",
+          "ace.behaviour.read",
+        ],
       },
       financeOperator: {
         name: "Finance Operator",
         scope: "organisation",
         protected: true,
-        permissions: [],
+        permissions: [
+          "finance.invoices",
+          "finance.payments",
+          "finance.reports",
+          "finance.family_invoices.read",
+          "finance.family_invoices.manage",
+          "finance.family_payments.record",
+          "finance.family_reports.read",
+        ],
       },
       parent: {
         name: "Parent",
         scope: "relationship",
         protected: true,
         permissions: [
+          "messaging.conversations.read",
+          "messaging.conversations.create",
+          "messaging.messages.read",
+          "messaging.messages.send",
+          "finance.family_invoices.read",
           "ace.parent.progress.read",
           "ace.faith.read",
           "ace.faith.reflect",
@@ -125,6 +218,9 @@ describe("ACE system role templates", () => {
         scope: "relationship",
         protected: true,
         permissions: [
+          "messaging.conversations.read",
+          "messaging.messages.read",
+          "messaging.messages.send",
           "ace.student.self.read",
           "ace.faith.read",
           "ace.faith.reflect",
@@ -134,5 +230,40 @@ describe("ACE system role templates", () => {
         ],
       },
     });
+  });
+
+  it("gives every template except financeOperator at least one core (vertical-independent) permission", () => {
+    const coreSet = new Set(CORE_PERMISSIONS);
+    for (const [key, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
+      if (key === "financeOperator") continue;
+      const hasCore = template.permissions.some((permission) =>
+        coreSet.has(permission),
+      );
+      expect(hasCore).toBe(true);
+    }
+  });
+
+  it("keeps relationship-scoped templates free of non-relationship-only core keys", () => {
+    // Silent-drop trap: seedSystemRoles filters each template's permissions by
+    // roleScopeAcceptsPermissionScope(template.scope, permissionScope), and a
+    // relationship-scoped role accepts ONLY relationship-scoped permissions.
+    // Site/org-scoped core keys (attendance.*, notices.*, safeguarding.concerns.*)
+    // would silently vanish from parent/student at seed time if added here.
+    const siteOrOrgOnlyCore = [
+      "attendance.read",
+      "attendance.manage",
+      "notices.read",
+      "notices.manage",
+      "notices.publish",
+      "safeguarding.concerns.record",
+      "safeguarding.concerns.read",
+      "safeguarding.concerns.manage",
+    ];
+    for (const key of ["parent", "student"] as const) {
+      const permissions = SYSTEM_ROLE_TEMPLATES[key].permissions;
+      for (const forbidden of siteOrOrgOnlyCore) {
+        expect(permissions).not.toContain(forbidden);
+      }
+    }
   });
 });

@@ -7,7 +7,8 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./capability-definitions": "./src/capability-definitions.ts"
+    "./capability-definitions": "./src/capability-definitions.ts",
+    "./capability-maps": "./src/capability-maps.ts"
   },
   "scripts": {
     "build": "echo platform-build",

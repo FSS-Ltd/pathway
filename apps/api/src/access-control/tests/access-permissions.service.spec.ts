@@ -27,7 +27,7 @@ describe("AccessPermissionsService", () => {
     });
   });
 
-  it("returns only active, delegable, org-enabled, organisation-head-template keys", async () => {
+  it("returns only active, delegable, org-enabled keys", async () => {
     const service = serviceWith({
       orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "ORG_ADMIN" }) },
       permissionDefinition: {
