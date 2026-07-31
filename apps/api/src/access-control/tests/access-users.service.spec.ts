@@ -19,6 +19,7 @@ function serviceWith(tx: object) {
     listForUserWithSources: jest.fn().mockResolvedValue([
       { permissionKey: "ace.pace.read", sourceRoleIds: ["role-1"] },
     ]),
+    listForUser: jest.fn().mockResolvedValue(["ace.pace.read"]),
   } as unknown as EffectivePermissionsService;
   const shadow = {
     compare: jest.fn().mockResolvedValue(true),
@@ -159,5 +160,20 @@ describe("AccessUsersService", () => {
     ).rejects.toMatchObject({
       response: { statusCode: 403, code: "ACCESS_SUMMARY_API_ACCESS_DENIED" },
     });
+  });
+
+  it("returns the actor's own effective permissions without any bootstrap check", async () => {
+    const { effectivePermissions, service } = serviceWith({
+      orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "STAFF" }) },
+    });
+
+    await expect(service.listOwnPermissions(actor)).resolves.toEqual([
+      "ace.pace.read",
+    ]);
+    expect(effectivePermissions.listForUser).toHaveBeenCalledWith(
+      "actor-1",
+      "org-1",
+      "site-1",
+    );
   });
 });

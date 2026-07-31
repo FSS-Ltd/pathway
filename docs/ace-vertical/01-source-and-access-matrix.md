@@ -176,6 +176,14 @@ Edge cases follow the action and data, not the URL prefix. Report drafting and a
 | R67 | GET | `/student/me/faith` | `ace.faith.read` | `ace.faith.read` | student | active student portal context | student-self-identity | released-to-student; published active-version and audience policy | `none` | `sensitive` | trusted StudentIdentity and content scope; tenantId/childId RLS |
 | R68 | GET | `/student/me/community` | `ace.community.read` | `ace.community.read` | student | active student portal and selected-site context | student-self-identity and derived-community-membership | community-moderation-policy | `ace.student_community` | `sensitive` | trusted StudentIdentity, tenant, and derived membership; tenantId/childId RLS |
 
+## Self-scoped access route
+
+Added by ACE-F14 to give the admin nav a source for the caller's own effective permissions, since every `/access/*` route above requires `platform.access.users.read`, which staff, parents, and students never hold. Not one of the 68 exact routes; recorded separately so that count stays accurate.
+
+| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R69 | GET | `/access/users/me/permissions` | `none` | `none` | any authenticated user | active organisation membership | self only; not a delegation-boundary read | current-effective-assignments-only | `none` | `standard` | trusted organisation/site context; organisation-scoped RLS |
+
 ## Unresolved section 8.5 API contracts
 
 No method or path is authorised by this table. The named owner must approve an exact contract before the blocking controller PR begins.
