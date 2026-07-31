@@ -9,6 +9,7 @@ import {
   type RolesTransactionBoundary,
 } from "../roles.service";
 import { AccessCacheService } from "../access-cache.service";
+import type { AccessShadowService } from "../access-shadow.service";
 import {
   RoleSafetyService,
   type RoleMutationCommand,
@@ -26,6 +27,9 @@ const passThroughRoleSafety = {
     await command.mutate();
   },
 } as RoleSafetyService;
+const shadow = {
+  compare: jest.fn().mockResolvedValue(true),
+} as unknown as AccessShadowService;
 
 describe("temporary role API bootstrap", () => {
   it("permits only an authenticated legacy organisation admin to bootstrap delegable keys the organisation has active", () => {
@@ -131,7 +135,7 @@ describe("RolesService route authority", () => {
     const cache = {
       invalidateUser: jest.fn().mockResolvedValue(undefined),
     } as unknown as AccessCacheService;
-    return new RolesService(transaction, cache, passThroughRoleSafety);
+    return new RolesService(transaction, cache, passThroughRoleSafety, shadow);
   }
 
   function allowedService(options: {
@@ -190,6 +194,7 @@ describe("RolesService route authority", () => {
           invalidateUser: jest.fn().mockResolvedValue(undefined),
         } as unknown as AccessCacheService,
         passThroughRoleSafety,
+        shadow,
       ),
       tx,
     };
@@ -308,6 +313,7 @@ describe("RolesService route authority", () => {
       transaction,
       cache,
       passThroughRoleSafety,
+      shadow,
     );
 
     await service.update({

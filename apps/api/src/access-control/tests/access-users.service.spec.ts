@@ -66,7 +66,7 @@ describe("AccessUsersService", () => {
       route: "GET /access/users/:userId/effective-permissions",
       legacyAllowed: true,
       request: expect.objectContaining({
-        userId: "target-user",
+        userId: "actor-1",
         orgId: "org-1",
         tenantId: "site-1",
         permission: "platform.access.users.read",

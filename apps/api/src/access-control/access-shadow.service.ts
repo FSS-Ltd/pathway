@@ -31,10 +31,53 @@ export interface AccessShadowComparison {
 }
 
 export const ACCESS_SHADOW_ALLOW_LIST = [
+  { route: "GET /access/roles", permission: "platform.access.roles.read" },
+  { route: "POST /access/roles", permission: "platform.access.roles.manage" },
+  {
+    route: "GET /access/roles/:roleId",
+    permission: "platform.access.roles.read",
+  },
+  {
+    route: "PATCH /access/roles/:roleId",
+    permission: "platform.access.roles.manage",
+  },
+  {
+    route: "POST /access/roles/:roleId/clone",
+    permission: "platform.access.roles.manage",
+  },
+  {
+    route: "PUT /access/roles/:roleId/permissions",
+    permission: "platform.access.roles.manage",
+  },
+  {
+    route: "POST /access/roles/:roleId/retire",
+    permission: "platform.access.roles.manage",
+  },
+  {
+    route: "GET /access/permissions",
+    permission: "platform.access.permissions.read",
+  },
+  {
+    route: "GET /access/assignments",
+    permission: "platform.access.assignments.read",
+  },
+  {
+    route: "POST /access/assignments",
+    permission: "platform.access.assignments.manage",
+  },
+  {
+    route: "DELETE /access/assignments/:assignmentId",
+    permission: "platform.access.assignments.manage",
+  },
   {
     route: "GET /access/users/:userId/effective-permissions",
     permission: "platform.access.users.read",
   },
+  {
+    route: "GET /access/users/:userId/access-summary",
+    permission: "platform.access.users.read",
+  },
+  { route: "GET /access/audit", permission: "platform.access.audit.read" },
 ] as const satisfies readonly AccessShadowAllowListEntry[];
 
 export function accessShadowConfigFromEnvironment(): AccessShadowConfig {

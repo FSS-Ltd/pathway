@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { getOrgCapabilities } from "@pathway/platform";
-import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
+import { assertPlatformAccessRouteAccessWithShadow } from "./assert-platform-access";
+import { AccessShadowService } from "./access-shadow.service";
 import {
   resolveTemporaryRoleApiBootstrap,
   ROLES_TRANSACTION_BOUNDARY,
@@ -13,15 +14,19 @@ export class AccessPermissionsService {
   constructor(
     @Inject(ROLES_TRANSACTION_BOUNDARY)
     private readonly transaction: RolesTransactionBoundary,
+    @Inject(AccessShadowService)
+    private readonly shadow: AccessShadowService,
   ) {}
 
   async listDelegableKeys(actor: RoleActorContext): Promise<string[]> {
     return this.transaction.run(actor, async (tx) => {
-      await assertPlatformAccessRouteAccess(
+      await assertPlatformAccessRouteAccessWithShadow(
         tx,
         actor,
         "platform.access.permissions.read",
         "PERMISSIONS_API_ACCESS_DENIED",
+        "GET /access/permissions",
+        this.shadow,
       );
 
       const [metadata, capabilities] = await Promise.all([

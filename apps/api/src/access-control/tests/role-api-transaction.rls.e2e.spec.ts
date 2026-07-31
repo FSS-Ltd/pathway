@@ -9,6 +9,7 @@ import {
   type RoleActorContext,
 } from "../roles.service";
 import { AccessCacheService } from "../access-cache.service";
+import type { AccessShadowService } from "../access-shadow.service";
 import {
   RoleSafetyService,
   type RoleMutationCommand,
@@ -24,6 +25,9 @@ const passThroughRoleSafety = {
     await command.mutate();
   },
 } as RoleSafetyService;
+const noopShadow = {
+  compare: async ({ legacyAllowed }: { legacyAllowed: boolean }) => legacyAllowed,
+} as unknown as AccessShadowService;
 
 function testTransactionBoundary(roleName = RLS_ROLE) {
   return createRolesTransactionBoundary(async (operation) =>
@@ -163,6 +167,7 @@ describe("role API transaction and forced-RLS integration", () => {
       testTransactionBoundary(),
       new AccessCacheService(),
       passThroughRoleSafety,
+      noopShadow,
     );
   });
 
@@ -221,6 +226,7 @@ describe("role API transaction and forced-RLS integration", () => {
       testTransactionBoundary(AUDIT_DENIED_ROLE),
       new AccessCacheService(),
       passThroughRoleSafety,
+      noopShadow,
     );
     await expectDatabaseRejection(
       () =>

@@ -1,5 +1,6 @@
 import { AuditEntityType } from "../../audit/audit.types";
 import { AccessAuditService } from "../access-audit.service";
+import type { AccessShadowService } from "../access-shadow.service";
 import { encodeCreatedAtIdCursor } from "../cursor";
 import type { RoleActorContext, RolesTransactionBoundary } from "../roles.service";
 
@@ -18,11 +19,15 @@ const allowedTx = {
   orgModule: { findMany: jest.fn().mockResolvedValue([]) },
 };
 
+const shadow = {
+  compare: jest.fn().mockResolvedValue(true),
+} as unknown as AccessShadowService;
+
 function serviceWith(tx: object) {
   const transaction: RolesTransactionBoundary = {
     run: async (_actor, operation) => operation(tx as never),
   };
-  return new AccessAuditService(transaction);
+  return new AccessAuditService(transaction, shadow);
 }
 
 const events = [
