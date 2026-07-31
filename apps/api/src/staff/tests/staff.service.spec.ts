@@ -3,8 +3,10 @@ import { StaffService } from "../staff.service";
 jest.mock("@pathway/db", () => ({
   prisma: {
     org: { findUnique: jest.fn() },
-    siteMembership: { findMany: jest.fn() },
-    user: { findMany: jest.fn() },
+    orgMembership: { findFirst: jest.fn() },
+    userOrgRole: { findFirst: jest.fn() },
+    siteMembership: { findMany: jest.fn(), upsert: jest.fn() },
+    user: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
     staffUnavailableDate: { findMany: jest.fn() },
     volunteerPreference: { findMany: jest.fn() },
     staffPreferredGroup: { findMany: jest.fn() },
@@ -21,9 +23,14 @@ jest.mock("@pathway/db", () => ({
   OrgRole: { ORG_ADMIN: "ORG_ADMIN" },
 }));
 
+import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@pathway/db";
 const orgFindUnique = prisma.org.findUnique as unknown as jest.Mock;
+const orgMembershipFindFirst = prisma.orgMembership.findFirst as unknown as jest.Mock;
+const userOrgRoleFindFirst = prisma.userOrgRole.findFirst as unknown as jest.Mock;
 const siteMembershipFindMany = prisma.siteMembership.findMany as unknown as jest.Mock;
+const siteMembershipUpsert = prisma.siteMembership.upsert as unknown as jest.Mock;
+const userFindUnique = prisma.user.findUnique as unknown as jest.Mock;
 const userFindMany = prisma.user.findMany as unknown as jest.Mock;
 const staffUnavailableDateFindMany =
   prisma.staffUnavailableDate.findMany as unknown as jest.Mock;
@@ -82,5 +89,27 @@ describe("StaffService", () => {
       "jean@personal.example",
       "jean@work.example",
     ]);
+  });
+
+  it("rejects a site-role change from a caller who is not an Organisation admin", async () => {
+    orgFindUnique.mockResolvedValue({ isMasterOrg: false });
+    orgMembershipFindFirst.mockResolvedValue(null);
+    userOrgRoleFindFirst.mockResolvedValue(null);
+    userFindUnique.mockResolvedValue({
+      tenantId: "tenant_1",
+      siteMemberships: [{ id: "sm_1" }],
+    });
+
+    await expect(
+      service.update(
+        "target_user",
+        "tenant_1",
+        "org_1",
+        { role: "SITE_ADMIN" },
+        "non_admin_caller",
+      ),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(siteMembershipUpsert).not.toHaveBeenCalled();
   });
 });
