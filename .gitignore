@@ -71,3 +71,5 @@ graphify-out/
 
 # Git worktrees
 .worktrees/
+.vercel
+.env*
