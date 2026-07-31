@@ -50,7 +50,7 @@ const SYSTEM_ROLE_SEED_TRANSACTION_OPTIONS = {
   timeout: 15_000,
 } as const;
 
-function getSystemRoleId(
+export function getSystemRoleId(
   orgId: string,
   tenantId: string | null,
   templateKey: string,
