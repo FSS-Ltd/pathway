@@ -4,12 +4,18 @@ import React from "react";
 import { Badge, Card, Label, Select } from "@pathway/ui";
 import { CAPABILITY_DEFINITIONS, type PermissionKey } from "@pathway/platform/capability-definitions";
 import {
+  fetchAccessSummary,
   fetchEffectivePermissions,
+  type AdminAccessSummaryAssignment,
   type AdminEffectivePermission,
   type AdminRoleDefinition,
   type PersonRow,
 } from "@/lib/api-client";
-import { groupPermissionsByPrefix, sensitivityBadgeVariant } from "@/lib/roles";
+import {
+  formatAssignmentWindow,
+  groupPermissionsByPrefix,
+  sensitivityBadgeVariant,
+} from "@/lib/roles";
 
 export type EffectiveAccessPanelProps = {
   roles: AdminRoleDefinition[];
@@ -25,20 +31,25 @@ function roleNames(roles: AdminRoleDefinition[], roleIds: string[]): string {
 export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProps) {
   const [userId, setUserId] = React.useState("");
   const [permissions, setPermissions] = React.useState<AdminEffectivePermission[] | null>(null);
+  const [assignments, setAssignments] = React.useState<AdminAccessSummaryAssignment[] | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if (!userId) {
       setPermissions(null);
+      setAssignments(null);
       return;
     }
     let cancelled = false;
     setIsLoading(true);
     setError(null);
-    fetchEffectivePermissions(userId)
-      .then((result) => {
-        if (!cancelled) setPermissions(result.permissions);
+    Promise.all([fetchEffectivePermissions(userId), fetchAccessSummary(userId)])
+      .then(([effective, summary]) => {
+        if (!cancelled) {
+          setPermissions(effective.permissions);
+          setAssignments(summary.assignments);
+        }
       })
       .catch((err) => {
         if (!cancelled) {
@@ -92,6 +103,30 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
 
       {isLoading && (
         <div className="mt-4 py-4 text-center text-sm text-text-muted">Loading...</div>
+      )}
+
+      {!isLoading && assignments && assignments.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+            Active assignments
+          </h4>
+          {assignments.map((assignment) => (
+            <div
+              key={assignment.id}
+              className="flex flex-col gap-1 rounded border border-border-subtle px-3 py-2 text-sm"
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-text-primary">
+                  {assignment.roleName}
+                </span>
+                <Badge variant="default">{assignment.scope}</Badge>
+              </div>
+              <span className="text-xs text-text-muted">
+                {formatAssignmentWindow(assignment.startsAt, assignment.expiresAt)}
+              </span>
+            </div>
+          ))}
+        </div>
       )}
 
       {!isLoading && userId && permissions && permissions.length === 0 && (

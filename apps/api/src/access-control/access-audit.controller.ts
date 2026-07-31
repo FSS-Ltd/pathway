@@ -11,7 +11,7 @@ import {
 } from "./request-id";
 
 @UseGuards(AuthUserGuard)
-@Controller("access/audit-events")
+@Controller("access/audit")
 export class AccessAuditController {
   constructor(
     @Inject(AccessAuditService) private readonly audit: AccessAuditService,

@@ -6260,6 +6260,26 @@ export type AdminAccessAuditEvent = {
   metadata: unknown;
 };
 
+export type AdminAccessSummaryAssignment = {
+  id: string;
+  roleDefinitionId: string;
+  roleName: string;
+  scope: string;
+  tenantId: string | null;
+  startsAt: string;
+  expiresAt: string | null;
+  isActive: boolean;
+};
+
+export type AdminAccessSummary = {
+  userId: string;
+  orgId: string;
+  tenantId: string | null;
+  organisationMembership: { role: string } | null;
+  assignments: AdminAccessSummaryAssignment[];
+  organisationCapabilities: string[];
+};
+
 /** Throws `Error("${code}:${message}")` when the API returns a coded error body. */
 async function throwCodedRoleApiError(res: Response, fallback: string): Promise<never> {
   const body = await res.json().catch(() => null);
@@ -6435,6 +6455,21 @@ export async function fetchEffectivePermissions(userId: string): Promise<{
   return res.json();
 }
 
+export async function fetchAccessSummary(
+  userId: string,
+): Promise<AdminAccessSummary> {
+  const res = await fetch(`${API_BASE_URL}/access/users/${userId}/access-summary`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch access summary: ${res.status} ${body}`);
+  }
+  return res.json();
+}
+
 export async function fetchAccessAuditEvents(params?: {
   cursor?: string;
   limit?: number;
@@ -6445,7 +6480,7 @@ export async function fetchAccessAuditEvents(params?: {
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.entityType) query.set("entityType", params.entityType);
   const suffix = query.toString() ? `?${query}` : "";
-  const res = await fetch(`${API_BASE_URL}/access/audit-events${suffix}`, {
+  const res = await fetch(`${API_BASE_URL}/access/audit${suffix}`, {
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",
@@ -6458,7 +6493,7 @@ export async function fetchAccessAuditEvents(params?: {
 }
 
 export async function fetchDelegablePermissionKeys(): Promise<string[]> {
-  const res = await fetch(`${API_BASE_URL}/access/permissions/delegable`, {
+  const res = await fetch(`${API_BASE_URL}/access/permissions`, {
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",

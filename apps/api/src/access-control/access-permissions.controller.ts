@@ -19,7 +19,7 @@ export class AccessPermissionsController {
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
-  @Get("delegable")
+  @Get()
   async listDelegable(@Req() request: RequestWithRequestId) {
     const requestId = getOrCreateRequestId(request);
     const delegableKeys = await this.permissions.listDelegableKeys(
