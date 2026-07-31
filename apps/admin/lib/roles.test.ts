@@ -6,11 +6,14 @@
 import { toLocalDateKey } from "./date";
 import {
   computePermissionCheckState,
+  filterPermissionsBySearch,
   formatAssignmentWindow,
   formatAuditTimestamp,
   groupPermissionsByPrefix,
+  partitionCorePermissions,
   parseCodedError,
   roleScopeAcceptsPermissionScope,
+  selectablePermissionKeys,
   sensitivityBadgeVariant,
 } from "./roles";
 
@@ -153,6 +156,77 @@ function runTests() {
     formatAuditTimestamp(auditIso),
     `${toLocalDateKey(auditDate)} ${expectedTime}`,
     "formats a local date and zero-padded time",
+  );
+
+  console.log("selectablePermissionKeys");
+  assertEqual(
+    selectablePermissionKeys("site", ["notices.manage", "ace.pace.read"]),
+    ["ace.pace.read", "notices.manage"],
+    "unions and sorts delegable keys compatible with the role scope",
+  );
+  assertEqual(
+    selectablePermissionKeys("site", ["notices.manage"], ["ace.pace.read"]),
+    ["ace.pace.read", "notices.manage"],
+    "keeps an already-selected key visible even when it isn't in the delegable set",
+  );
+  assertEqual(
+    selectablePermissionKeys("site", ["notices.manage"], ["notices.manage"]),
+    ["notices.manage"],
+    "deduplicates a key present in both delegable and already-selected",
+  );
+  assertEqual(
+    selectablePermissionKeys("site", ["platform.access.roles.manage"]),
+    [],
+    "drops an organisation-scoped key from a site-scoped role",
+  );
+  assertEqual(
+    selectablePermissionKeys("organisation", ["platform.access.roles.manage"]),
+    ["platform.access.roles.manage"],
+    "an organisation-scoped role accepts an organisation-scoped key",
+  );
+  assertEqual(
+    selectablePermissionKeys("site", ["not.a.real.key"]),
+    [],
+    "drops a key that isn't in the capability registry",
+  );
+
+  console.log("partitionCorePermissions");
+  assertEqual(
+    partitionCorePermissions(["notices.manage", "ace.pace.read", "volunteers.manage"]),
+    { core: ["notices.manage"], sector: ["ace.pace.read", "volunteers.manage"] },
+    "splits core (every-vertical) keys from sector-specific keys",
+  );
+  assertEqual(
+    partitionCorePermissions([]),
+    { core: [], sector: [] },
+    "empty input yields empty buckets",
+  );
+
+  console.log("filterPermissionsBySearch");
+  assertEqual(
+    filterPermissionsBySearch(["notices.manage", "ace.pace.read"], ""),
+    ["notices.manage", "ace.pace.read"],
+    "an empty query returns the input unchanged",
+  );
+  assertEqual(
+    filterPermissionsBySearch(["notices.manage", "ace.pace.read"], "notice"),
+    ["notices.manage"],
+    "matches on the key itself, case-insensitively",
+  );
+  assertEqual(
+    filterPermissionsBySearch(["notices.manage"], "NOTICE"),
+    ["notices.manage"],
+    "the match is case-insensitive",
+  );
+  assertEqual(
+    filterPermissionsBySearch(["ace.pace.read"], "roster"),
+    ["ace.pace.read"],
+    "matches on the definition's description even when the query isn't in the key",
+  );
+  assertEqual(
+    filterPermissionsBySearch(["notices.manage"], "nothing-matches-this"),
+    [],
+    "excludes a key with no match",
   );
 
   console.log("");

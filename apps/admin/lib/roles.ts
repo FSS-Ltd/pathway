@@ -4,6 +4,8 @@
  * tested with node:assert, matching this app's existing test convention.
  */
 
+import { CAPABILITY_DEFINITIONS, type PermissionKey } from "@pathway/platform/capability-definitions";
+import { VERTICAL_CAPABILITIES } from "@pathway/platform/capability-maps";
 import { toLocalDateKey } from "./date";
 
 export function groupPermissionsByPrefix(
@@ -57,6 +59,76 @@ export function roleScopeAcceptsPermissionScope(
   permissionScope: RolePermissionScope,
 ): boolean {
   return COMPATIBLE_PERMISSION_SCOPES[roleScope].has(permissionScope);
+}
+
+function isKnownPermissionKey(key: string): key is PermissionKey {
+  return key in CAPABILITY_DEFINITIONS;
+}
+
+/**
+ * The permission keys a picker should render: what the actor can delegate,
+ * unioned with any already-selected keys (e.g. on the edit page, a key the
+ * actor can no longer delegate must stay visible — checked and disabled —
+ * rather than disappear while still present in submitted state), filtered to
+ * keys compatible with the role's scope.
+ */
+export function selectablePermissionKeys(
+  roleScope: RoleScope,
+  delegableKeys: string[],
+  alsoInclude: string[] = [],
+): string[] {
+  const union = new Set([...delegableKeys, ...alsoInclude]);
+  return [...union]
+    .filter(
+      (key): key is PermissionKey =>
+        isKnownPermissionKey(key) &&
+        roleScopeAcceptsPermissionScope(roleScope, CAPABILITY_DEFINITIONS[key].scope),
+    )
+    .sort((a, b) => a.localeCompare(b));
+}
+
+// Intersection of every vertical's capability set — permissions meaningful to
+// every organisation regardless of sector. Derived at runtime rather than
+// hand-copied, so it can't drift from capability-maps.ts; that file is not
+// edited or re-exported beyond this read.
+const CORE_PERMISSION_KEYS: ReadonlySet<string> = (() => {
+  const verticalSets = Object.values(VERTICAL_CAPABILITIES).map(
+    (keys) => new Set<string>(keys),
+  );
+  const [first, ...rest] = verticalSets;
+  if (!first) return new Set();
+  return new Set(
+    [...first].filter((key) => rest.every((set) => set.has(key))),
+  );
+})();
+
+export function partitionCorePermissions(keys: string[]): {
+  core: string[];
+  sector: string[];
+} {
+  const core: string[] = [];
+  const sector: string[] = [];
+  for (const key of keys) {
+    (CORE_PERMISSION_KEYS.has(key) ? core : sector).push(key);
+  }
+  return { core, sector };
+}
+
+export function filterPermissionsBySearch(
+  keys: string[],
+  query: string,
+): string[] {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return keys;
+  return keys.filter((key) => {
+    if (key.toLowerCase().includes(trimmed)) return true;
+    if (!isKnownPermissionKey(key)) return false;
+    const definition = CAPABILITY_DEFINITIONS[key];
+    return (
+      definition.label.toLowerCase().includes(trimmed) ||
+      definition.description.toLowerCase().includes(trimmed)
+    );
+  });
 }
 
 export interface PermissionCheckState {

@@ -9,9 +9,11 @@ import { toast } from "sonner";
 import {
   createRole,
   fetchDelegablePermissionKeys,
+  fetchRoles,
 } from "@/lib/api-client";
-import { parseCodedError } from "@/lib/roles";
+import { parseCodedError, selectablePermissionKeys } from "@/lib/roles";
 import { RoleEditorForm } from "../role-editor-form";
+import { RoleTemplatePicker, type RoleTemplate } from "../role-template-picker";
 
 export default function NewRolePage() {
   const router = useRouter();
@@ -20,6 +22,7 @@ export default function NewRolePage() {
   const [scope, setScope] = React.useState<"organisation" | "site">("organisation");
   const [permissionKeys, setPermissionKeys] = React.useState<string[]>([]);
   const [delegableKeys, setDelegableKeys] = React.useState<string[]>([]);
+  const [templates, setTemplates] = React.useState<RoleTemplate[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -28,8 +31,26 @@ export default function NewRolePage() {
     let cancelled = false;
     (async () => {
       try {
-        const keys = await fetchDelegablePermissionKeys();
-        if (!cancelled) setDelegableKeys(keys);
+        const [keys, roles] = await Promise.all([
+          fetchDelegablePermissionKeys(),
+          fetchRoles(),
+        ]);
+        if (cancelled) return;
+        setDelegableKeys(keys);
+        // Site-scoped system roles exist once per site; the same template
+        // name always carries the same org-derived permissions, so the
+        // first occurrence is enough.
+        const seen = new Set<string>();
+        const roleTemplates: RoleTemplate[] = [];
+        for (const role of roles) {
+          if (!role.isSystem || seen.has(role.name)) continue;
+          seen.add(role.name);
+          roleTemplates.push({
+            name: role.name,
+            permissionKeys: role.permissions.map((p) => p.permissionKey),
+          });
+        }
+        setTemplates(roleTemplates);
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load delegable permissions");
@@ -42,6 +63,18 @@ export default function NewRolePage() {
       cancelled = true;
     };
   }, []);
+
+  const handleApplyTemplate = (templatePermissionKeys: string[]) => {
+    const selectable = new Set(selectablePermissionKeys(scope, delegableKeys));
+    const applied = templatePermissionKeys.filter((key) => selectable.has(key));
+    const dropped = templatePermissionKeys.length - applied.length;
+    setPermissionKeys(applied);
+    toast.success(
+      dropped > 0
+        ? `Prefilled ${applied.length} of ${templatePermissionKeys.length} permissions — ${dropped} aren't available to your organisation.`
+        : `Prefilled ${applied.length} permission${applied.length === 1 ? "" : "s"}.`,
+    );
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -92,18 +125,23 @@ export default function NewRolePage() {
           <div className="h-64 animate-pulse rounded bg-muted" />
         </Card>
       ) : (
-        <RoleEditorForm
-          name={name}
-          onNameChange={setName}
-          description={description}
-          onDescriptionChange={setDescription}
-          scope={scope}
-          onScopeChange={setScope}
-          scopeLocked={false}
-          permissionKeys={permissionKeys}
-          onPermissionKeysChange={setPermissionKeys}
-          delegableKeys={delegableKeys}
-        />
+        <>
+          {templates.length > 0 && (
+            <RoleTemplatePicker templates={templates} onApply={handleApplyTemplate} />
+          )}
+          <RoleEditorForm
+            name={name}
+            onNameChange={setName}
+            description={description}
+            onDescriptionChange={setDescription}
+            scope={scope}
+            onScopeChange={setScope}
+            scopeLocked={false}
+            permissionKeys={permissionKeys}
+            onPermissionKeysChange={setPermissionKeys}
+            delegableKeys={delegableKeys}
+          />
+        </>
       )}
     </div>
   );
