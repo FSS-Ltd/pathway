@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Executing PR6 (Plan 03 — tablet design pass + tablet baselines)
+**Current phase:** Between plans — Plan 04 needs product decisions (pricing, household modelling) before implementation starts (see "Next action")
 
 ---
 
@@ -27,6 +27,9 @@ continue.
 | 3 | ledger update | **merged** | `docs/nexsteps-home-progress-update` | [#268](https://github.com/FSS-Ltd/pathway/pull/268) | squash-merged, branch deleted |
 | 4 | 02 — fidelity harness + phone baselines | **merged** | `feat/nexsteps-home-fidelity-harness` | [#271](https://github.com/FSS-Ltd/pathway/pull/271) | squash-merged, branch deleted; 76 approved screens now have committed baselines |
 | 5 | ledger update | **merged** | `docs/nexsteps-home-progress-update-2` | [#272](https://github.com/FSS-Ltd/pathway/pull/272) | squash-merged, branch deleted; recorded the Plan 03 product/design blocker |
+| 6 | 03 — tablet design pass + tablet baselines | **merged** | `feat/nexsteps-home-tablet-design` | [#273](https://github.com/FSS-Ltd/pathway/pull/273) | squash-merged, branch deleted; 5 tablet composites, 81 screens / 10 groups in the inventory |
+| 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | **blocked on product decisions** | — | — | pricing + household modelling — see "Next action" |
+| 8-16 | 05-14 | not started | — | — | — |
 | 6 | 03 — tablet design pass + tablet baselines | in progress | `feat/nexsteps-home-tablet-design` | not yet opened | user approved the candidate list and gave design direction; code complete, verified locally, about to push |
 | 7-16 | 04-14 | not started | — | — | — |
 
@@ -465,15 +468,35 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-Push `feat/nexsteps-home-tablet-design`, open the PR against `fss`, confirm
-CI green, merge. Then start Plan 04 (`HOME_EDUCATION` vertical,
-capabilities, household model, plan) - the first plan to touch
-`packages/db/prisma/schema.prisma` and `packages/platform/src/capability-maps.ts`,
-exactly the files flagged in "Conflict watch" as shared with concurrent ACE
-work. Diff against fresh `fss/master` immediately before opening that PR,
-not just at series start. Plan 04 is also blocked on two open product
-decisions (NexSteps Home pricing, household-to-Org/Tenant modelling) per
-blocker 5 - raise those before or alongside starting the engineering.
+**Plan 04 is blocked on two open product decisions this series has flagged
+since it started (blocker 5) but not yet asked the user to resolve:**
+
+1. **NexSteps Home pricing** (`docs/NexStepsV2/07-nexsteps-home.md:70`) - a
+   light family tier or free. Not decided anywhere in the source material.
+2. **Household-to-Org/Tenant modelling** (`07-nexsteps-home.md:96-100`) -
+   one `Org` with many household `Tenant`s, vs. one lightweight `Org` per
+   household. The phase plan recommends the latter as the default absent a
+   concrete reason otherwise (matches every other vertical's existing
+   one-Org-per-customer shape, needs zero new tenancy concept), but this
+   has not been put to the user as a decision to confirm or override.
+
+Unlike Plan 03's blocker (a design-direction question this session could
+put a candidate answer in front of the user for), these are commercial/
+architecture decisions with real consequences (a wrong pricing default
+affects real billing; a wrong tenancy model is expensive to migrate later)
+that should not be defaulted to silently even though the phase plan states
+a recommendation.
+
+Once resolved, Plan 04's mechanical scope is: add `Vertical.HOME_EDUCATION`
+to `packages/db/prisma/schema.prisma`, the matching capability grant in
+`packages/platform/src/capability-maps.ts`, the vertical label in
+`packages/types/src/vertical.ts`, and the pricing catalogue entry once (1)
+is settled - see `implementation-map.md`'s H1 slice and
+`07-nexsteps-home.md`'s PR 7.1/7.2/7.4. **These are exactly the files
+"Conflict watch" flagged as shared with concurrent ACE-vertical work** -
+diff against fresh `fss/master` immediately before opening that PR, not
+just at series start; ACE branches were still active as of this ledger's
+last check.
 
 ---
 
@@ -584,4 +607,11 @@ blocker 5 - raise those before or alongside starting the engineering.
   incidentally-regenerated phone baseline PNGs (clock-timestamp drift only,
   confirmed via diff, not a real change) back to their Plan 02 committed
   versions before staging.
-- About to push and open PR6.
+- Pushed and opened PR6 ([#273](https://github.com/FSS-Ltd/pathway/pull/273));
+  all 5 CI checks passed; squash-merged; deleted the branch and its
+  worktree.
+- This entry: recorded PR6's merge and paused the series again rather than
+  starting Plan 04 unilaterally - it is blocked on two open product
+  decisions (pricing, household modelling) that carry real commercial and
+  migration-cost consequences if defaulted silently, unlike Plan 03's
+  design-direction question. Reporting to the user; awaiting reply.
