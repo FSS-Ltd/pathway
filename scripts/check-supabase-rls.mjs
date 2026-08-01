@@ -25,6 +25,9 @@ const REQUIRED_RLS_TABLES = [
   "UserRoleAssignment",
   "AuditEvent",
   "OutboxEvent",
+  "AcademicYear",
+  "AcademicPeriod",
+  "StudentSubjectEnrollment",
 ];
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
@@ -67,7 +70,7 @@ async function main() {
       WHERE n.nspname = $1
         AND c.relkind IN ('r', 'p')
         AND c.relforcerowsecurity = false
-        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent')
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent', 'AcademicYear', 'AcademicPeriod', 'StudentSubjectEnrollment')
       ORDER BY c.relname
     `, databaseSchema),
       prisma.$queryRawUnsafe(`
