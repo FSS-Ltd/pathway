@@ -307,7 +307,7 @@ describe("EffectivePermissionsService", () => {
     });
   });
 
-  it("denies features by default until a feature source is available", async () => {
+  it("allows a permission key that declares no feature toggle, using the real module wiring", async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AccessControlModule],
     })
@@ -329,6 +329,42 @@ describe("EffectivePermissionsService", () => {
     try {
       await expect(
         resolve(moduleRef.get(EffectivePermissionsService)),
+      ).resolves.toEqual({
+        allowed: true,
+        reason: "allowed",
+        sourceRoleIds: ["role-1"],
+      });
+    } finally {
+      await moduleRef.close();
+    }
+  });
+
+  it("denies an unregistered permission key by default, using the real module wiring", async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [AccessControlModule],
+    })
+      .overrideProvider(EFFECTIVE_PERMISSIONS_READER)
+      .useValue({
+        getOrganisationMembership: async () => true,
+        findAssignments: async () => [
+          grant({ permissionKey: "unregistered.key" as PermissionKey }),
+        ],
+      } satisfies EffectivePermissionsReader)
+      .overrideProvider(ORG_CAPABILITIES_READER)
+      .useValue({
+        get: async () => ["unregistered.key" as PermissionKey],
+      } satisfies OrgCapabilitiesReader)
+      .overrideProvider(EFFECTIVE_PERMISSIONS_CONTEXT)
+      .useValue({
+        run: async (_orgId, _tenantId, operation) => operation(),
+      } satisfies EffectivePermissionsContext)
+      .compile();
+
+    try {
+      await expect(
+        resolve(moduleRef.get(EffectivePermissionsService), {
+          permission: "unregistered.key" as PermissionKey,
+        }),
       ).resolves.toEqual({
         allowed: false,
         reason: "feature-disabled",

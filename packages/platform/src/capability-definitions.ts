@@ -8,6 +8,15 @@ export type PermissionScope =
 
 export type PermissionSensitivity = "standard" | "sensitive" | "protected";
 
+/**
+ * A permission key opts into this layer explicitly. Most keys have no
+ * feature toggle at all, meaning the layer is genuinely inapplicable to
+ * them (see docs/ace-vertical/01-source-and-access-matrix.md, "`none` means
+ * the layer is genuinely inapplicable to that route. It never means
+ * undecided.").
+ */
+export type FeatureToggle = "ace.student_community";
+
 export interface CapabilityDefinition {
   label: string;
   description: string;
@@ -16,11 +25,12 @@ export interface CapabilityDefinition {
   delegable: boolean;
   requiredModule?: Module;
   requiredVertical?: Vertical;
+  featureToggle?: FeatureToggle;
 }
 
 type CapabilityRequirement = Pick<
   CapabilityDefinition,
-  "requiredModule" | "requiredVertical"
+  "requiredModule" | "requiredVertical" | "featureToggle"
 >;
 
 function defineCapability(
