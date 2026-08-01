@@ -111,6 +111,7 @@ export default function Prototype() {
           <main
             className={`screen-content ${activeScreen.tab ? "has-bottom-nav" : ""}`}
             data-testid="wireframe-screen"
+            data-screen-id={activeScreen.id}
             aria-label={`${activeScreen.title} wireframe`}
           >
             <ReviewBar

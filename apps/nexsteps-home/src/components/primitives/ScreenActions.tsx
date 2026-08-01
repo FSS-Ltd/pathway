@@ -69,13 +69,13 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   primaryLabel: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.headingFamily.extraBold,
     fontWeight: homeTokens.typography.weight.extraBold,
     fontSize: homeTokens.typography.body.sm.size,
     color: homeTokens.colors.text.primary,
   },
   secondaryLabel: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.headingFamily.extraBold,
     fontWeight: homeTokens.typography.weight.extraBold,
     fontSize: homeTokens.typography.body.sm.size,
     color: homeTokens.colors.text.muted,

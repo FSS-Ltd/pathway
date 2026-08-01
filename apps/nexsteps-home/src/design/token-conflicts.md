@@ -2,10 +2,36 @@
 
 Recorded while building `src/design/tokens.ts` (Plan 01 of the NexSteps Home
 build-plan series — see `../../../docs/NexStepsV2/nexsteps-home/build-plans/`).
+Updated in Plan 02 (fidelity harness) with the `headingFamily`/`bodyFamily`
+addition below.
 
 Resolution rule: **the prototype wins on geometry, `design-system.md` wins on
 semantics.** `packages/mobile-core/src/tokens.ts` is never mutated —
 `apps/mobile` must stay byte-identical in behaviour.
+
+## Font weight requires a named font, not `fontWeight` (found in Plan 02)
+
+React Native does not synthesize font-weight on a custom font loaded under a
+fixed PostScript name — setting `fontWeight` on text styled with
+`fontFamily: "Nunito_700Bold"` has no visual effect; the weight is baked into
+the font file the name points at. `mobileTokens.typography.fontFamily.heading`
+and `.body` are each a *single, fixed* name for exactly this reason.
+
+Every primitive built in Plan 01 paired one of those two fixed names with a
+`fontWeight` token that didn't match the name's baked-in weight (e.g.
+`fontFamily.heading` — "Nunito_700Bold" — with `fontWeight: weight.extraBold`
+— "800"), which silently renders at the *named* font's weight regardless of
+the `fontWeight` value. Every occurrence was audited and fixed in Plan 02 —
+see the primitives' individual files for which weight each one actually
+needed.
+
+The fix is `homeTokens.typography.headingFamily`/`.bodyFamily`, weight-keyed
+maps to the specific loaded font name (`app/_layout.tsx`'s `useFonts` call is
+the source of truth for what's actually loaded — currently Nunito 700/800/900
+and Quicksand 400/500/600/700). Quicksand's real cuts stop at 700; wireframe
+CSS values above that (750, 800) rely on browser font-weight synthesis with
+no equivalent in React Native, so `bodyFamily.bold` (700) is the closest
+achievable match wherever the wireframe asks for more.
 
 ## Colour
 

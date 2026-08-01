@@ -35,7 +35,7 @@ const styles = StyleSheet.create({
     gap: homeTokens.spacing.xxxs,
   },
   value: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.headingFamily.extraBold,
     fontWeight: homeTokens.typography.weight.extraBold,
     fontSize: 21,
   },

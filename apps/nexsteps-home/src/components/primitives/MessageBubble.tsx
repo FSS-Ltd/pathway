@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 5,
   },
   sender: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.bodyFamily.semibold,
     fontWeight: homeTokens.typography.weight.semibold,
     fontSize: homeTokens.typography.body.xs.size,
     color: homeTokens.colors.wireframe.messageAvatar,

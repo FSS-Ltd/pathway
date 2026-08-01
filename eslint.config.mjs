@@ -57,6 +57,7 @@ export default tseslint.config(
       "apps/workers/**/*.{ts,tsx,js,cjs}",
       "packages/db/**/*.{ts,tsx,js,cjs}",
       "scripts/**/*.{js,mjs,cjs,ts}",
+      "apps/nexsteps-home/fidelity/**/*.{js,mjs,cjs,ts}",
     ],
     languageOptions: {
       globals: nodeGlobals,

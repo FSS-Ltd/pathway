@@ -25,6 +25,7 @@
   "include": [
     "app",
     "src",
+    "fidelity",
     "expo-env.d.ts",
     ".expo/types/**/*.ts"
   ]
