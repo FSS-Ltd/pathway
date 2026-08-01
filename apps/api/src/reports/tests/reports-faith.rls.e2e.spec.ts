@@ -2030,12 +2030,20 @@ describe("ACE report publication storage", () => {
 
   it("fails closed for every Faith table under forced tenant RLS", async () => {
     if (!isDatabaseAvailable()) return;
+    const tenantAAgeBand: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Tenant A Isolation Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
     const publication = await withReportsRlsContext(
       fixture.tenantAId,
       fixture.orgAId,
       async (tx) => {
+        await createFaithAgeBand(tx, tenantAAgeBand);
         const created = await publishFaithContent(tx, fixture, [
-          { type: "ALL_ACTIVE_STUDENTS" },
+          { type: "AGE_BAND", ageBand: tenantAAgeBand },
         ]);
         await insertFaithReadReceipt(tx, fixture, created.versionId);
         await insertFaithReflection(tx, fixture, created.versionId);
