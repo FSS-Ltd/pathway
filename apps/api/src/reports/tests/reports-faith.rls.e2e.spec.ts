@@ -19,6 +19,7 @@ interface ReportsFixture {
   tenantBId: string;
   childAId: string;
   childA2Id: string;
+  childA3Id: string;
   childBId: string;
   periodAId: string;
   periodBId: string;
@@ -26,8 +27,16 @@ interface ReportsFixture {
   reviewerUserId: string;
   fullGuardianUserId: string;
   limitedGuardianUserId: string;
+  endedGuardianUserId: string;
   studentUserId: string;
+  ineligibleStudentUserId: string;
+  noDobStudentUserId: string;
+  tenantBStudentUserId: string;
   unrelatedUserId: string;
+  studentIdentityId: string;
+  ineligibleStudentIdentityId: string;
+  noDobStudentIdentityId: string;
+  tenantBStudentIdentityId: string;
 }
 
 interface DraftFixture {
@@ -50,6 +59,28 @@ interface ReportVersionRow {
 
 interface BlockedApprovalSession {
   applicationName: string;
+}
+
+interface FaithAgeBandFixture {
+  id: string;
+  tenantId: string;
+  name: string;
+  minimumAge: number;
+  maximumAge: number;
+}
+
+interface FaithContentFixture {
+  contentId: string;
+  draftId: string;
+  versionId: string;
+}
+
+interface FaithAudienceRow {
+  type: "ALL_ACTIVE_STUDENTS" | "AGE_BAND";
+  sourceAgeBandId: string | null;
+  ageBandName: string | null;
+  minimumAge: number | null;
+  maximumAge: number | null;
 }
 
 function useTenantRlsRole(): boolean {
@@ -237,6 +268,236 @@ async function deleteReportRowsIfPresent(
   `);
 }
 
+async function deleteFaithRowsIfPresent(
+  client: PrismaClientType,
+): Promise<void> {
+  const [row] = await client.$queryRaw<Array<{ exists: string | null }>>`
+    SELECT to_regclass('app."FaithContent"')::text AS "exists"
+  `;
+  if (!row?.exists) return;
+  await client.$executeRawUnsafe(`
+    TRUNCATE TABLE
+      "FaithReflection",
+      "FaithReadReceipt",
+      "FaithContentAudience",
+      "FaithContentVersion",
+      "FaithContentDraft",
+      "FaithContent",
+      "FaithAgeBand"
+  `);
+}
+
+async function createFaithAgeBand(
+  tx: Prisma.TransactionClient,
+  ageBand: FaithAgeBandFixture,
+): Promise<void> {
+  await tx.$executeRaw`
+    INSERT INTO "FaithAgeBand" (
+      "id", "tenantId", "name", "minimumAge", "maximumAge"
+    ) VALUES (
+      ${ageBand.id}, ${ageBand.tenantId}, ${ageBand.name},
+      ${ageBand.minimumAge}, ${ageBand.maximumAge}
+    )
+  `;
+}
+
+async function createFaithDraft(
+  tx: Prisma.TransactionClient,
+  fixture: ReportsFixture,
+): Promise<Omit<FaithContentFixture, "versionId">> {
+  const contentId = randomUUID();
+  const draftId = randomUUID();
+  await tx.$executeRaw`
+    INSERT INTO "FaithContent" ("id", "tenantId")
+    VALUES (${contentId}, ${fixture.tenantAId})
+  `;
+  await tx.$executeRaw`
+    INSERT INTO "FaithContentDraft" (
+      "id", "tenantId", "faithContentId", "title", "contentPayload",
+      "status", "authorUserId"
+    ) VALUES (
+      ${draftId}, ${fixture.tenantAId}, ${contentId}, ${"Walking in wisdom"},
+      ${JSON.stringify({ body: "Choose wisdom today" })}::jsonb,
+      'DRAFT', ${fixture.authorUserId}
+    )
+  `;
+  return { contentId, draftId };
+}
+
+async function insertFaithVersion(
+  tx: Prisma.TransactionClient,
+  fixture: ReportsFixture,
+  draft: Omit<FaithContentFixture, "versionId">,
+  versionId = randomUUID(),
+): Promise<string> {
+  await tx.$executeRaw`
+    INSERT INTO "FaithContentVersion" (
+      "id", "tenantId", "faithContentId", "sourceDraftId",
+      "versionNumber", "title", "contentPayload", "publishedAt"
+    ) VALUES (
+      ${versionId}, ${fixture.tenantAId}, ${draft.contentId}, ${draft.draftId},
+      1, ${"Walking in wisdom"},
+      ${JSON.stringify({ body: "Choose wisdom today" })}::jsonb,
+      ${new Date("2026-08-01T09:00:00.000Z")}
+    )
+  `;
+  return versionId;
+}
+
+async function insertFaithAudience(
+  tx: Prisma.TransactionClient,
+  options: {
+    fixture: ReportsFixture;
+    versionId: string;
+    type: "ALL_ACTIVE_STUDENTS" | "AGE_BAND";
+    ageBand?: FaithAgeBandFixture;
+    snapshot?: {
+      name: string | null;
+      minimumAge: number | null;
+      maximumAge: number | null;
+    };
+  },
+): Promise<void> {
+  const snapshot = options.snapshot ?? {
+    name: options.ageBand?.name ?? null,
+    minimumAge: options.ageBand?.minimumAge ?? null,
+    maximumAge: options.ageBand?.maximumAge ?? null,
+  };
+  await tx.$executeRaw`
+    INSERT INTO "FaithContentAudience" (
+      "id", "tenantId", "faithContentVersionId", "type",
+      "sourceAgeBandId", "ageBandName", "minimumAge", "maximumAge"
+    ) VALUES (
+      ${randomUUID()}, ${options.fixture.tenantAId}, ${options.versionId},
+      ${options.type}::"FaithContentAudienceType",
+      ${options.ageBand?.id ?? null}, ${snapshot.name},
+      ${snapshot.minimumAge}, ${snapshot.maximumAge}
+    )
+  `;
+}
+
+async function validateFaithAudience(
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  await tx.$executeRawUnsafe(`
+    SET CONSTRAINTS
+      "FaithContentVersion_validate_audience",
+      "FaithContentAudience_validate_version"
+    IMMEDIATE
+  `);
+}
+
+async function publishFaithContent(
+  tx: Prisma.TransactionClient,
+  fixture: ReportsFixture,
+  audiences: Array<
+    | { type: "ALL_ACTIVE_STUDENTS" }
+    | { type: "AGE_BAND"; ageBand: FaithAgeBandFixture }
+  >,
+): Promise<FaithContentFixture> {
+  const draft = await createFaithDraft(tx, fixture);
+  const versionId = await insertFaithVersion(tx, fixture, draft);
+  for (const audience of audiences) {
+    await insertFaithAudience(tx, {
+      fixture,
+      versionId,
+      type: audience.type,
+      ageBand: audience.type === "AGE_BAND" ? audience.ageBand : undefined,
+    });
+  }
+  await validateFaithAudience(tx);
+  return { ...draft, versionId };
+}
+
+async function insertFaithReadReceipt(
+  tx: Prisma.TransactionClient,
+  fixture: ReportsFixture,
+  versionId: string,
+  studentIdentityId = fixture.studentIdentityId,
+): Promise<string> {
+  const receiptId = randomUUID();
+  await tx.$executeRaw`
+    INSERT INTO "FaithReadReceipt" (
+      "id", "tenantId", "faithContentVersionId", "studentIdentityId",
+      "readAt"
+    ) VALUES (
+      ${receiptId}, ${fixture.tenantAId}, ${versionId}, ${studentIdentityId},
+      ${new Date("2026-08-01T10:00:00.000Z")}
+    )
+  `;
+  return receiptId;
+}
+
+async function insertFaithReflection(
+  tx: Prisma.TransactionClient,
+  fixture: ReportsFixture,
+  versionId: string,
+): Promise<string> {
+  const reflectionId = randomUUID();
+  await tx.$executeRaw`
+    INSERT INTO "FaithReflection" (
+      "id", "tenantId", "faithContentVersionId", "studentIdentityId",
+      "reflectionEncrypted", "submittedAt"
+    ) VALUES (
+      ${reflectionId}, ${fixture.tenantAId}, ${versionId},
+      ${fixture.studentIdentityId}, ${"enc:private-reflection"},
+      ${new Date("2026-08-01T10:05:00.000Z")}
+    )
+  `;
+  return reflectionId;
+}
+
+async function countGuardianVisibleReflections(
+  tx: Prisma.TransactionClient,
+  options: {
+    versionId: string;
+    guardianUserId: string;
+  },
+): Promise<bigint> {
+  const [row] = await tx.$queryRaw<Array<{ count: bigint }>>`
+    SELECT count(DISTINCT reflection."id") AS "count"
+    FROM "FaithReflection" AS reflection
+    JOIN "StudentIdentityLink" AS student_link
+      ON student_link."tenantId" = reflection."tenantId"
+      AND student_link."studentIdentityId" = reflection."studentIdentityId"
+      AND student_link."endedAt" IS NULL
+      AND student_link."revokedAt" IS NULL
+    JOIN "Child" AS child
+      ON child."id" = student_link."childId"
+      AND child."tenantId" = student_link."tenantId"
+    JOIN "GuardianChildRelationship" AS relationship
+      ON relationship."tenantId" = child."tenantId"
+      AND relationship."childId" = child."id"
+      AND relationship."legalAccess" = 'FULL'
+      AND relationship."startsAt" <= ${new Date("2026-08-01T12:00:00.000Z")}
+      AND relationship."endedAt" IS NULL
+      AND relationship."revokedAt" IS NULL
+    JOIN "GuardianIdentity" AS guardian
+      ON guardian."id" = relationship."guardianIdentityId"
+      AND guardian."tenantId" = relationship."tenantId"
+    WHERE reflection."faithContentVersionId" = ${options.versionId}
+      AND reflection."guardianReleasedAt" IS NOT NULL
+      AND guardian."userId" = ${options.guardianUserId}
+      AND EXISTS (
+        SELECT 1
+        FROM "FaithContentAudience" AS audience
+        WHERE audience."faithContentVersionId" = reflection."faithContentVersionId"
+          AND audience."tenantId" = reflection."tenantId"
+          AND (
+            audience."type" = 'ALL_ACTIVE_STUDENTS'
+            OR (
+              child."dateOfBirth" IS NOT NULL
+              AND EXTRACT(YEAR FROM age(
+                ${new Date("2026-08-01T00:00:00.000Z")}::date,
+                child."dateOfBirth"
+              )) BETWEEN audience."minimumAge" AND audience."maximumAge"
+            )
+          )
+      )
+  `;
+  return row?.count ?? 0n;
+}
+
 describe("ACE report publication storage", () => {
   let fixture: ReportsFixture;
 
@@ -249,6 +510,7 @@ describe("ACE report publication storage", () => {
       tenantBId: randomUUID(),
       childAId: randomUUID(),
       childA2Id: randomUUID(),
+      childA3Id: randomUUID(),
       childBId: randomUUID(),
       periodAId: randomUUID(),
       periodBId: randomUUID(),
@@ -256,20 +518,48 @@ describe("ACE report publication storage", () => {
       reviewerUserId: randomUUID(),
       fullGuardianUserId: randomUUID(),
       limitedGuardianUserId: randomUUID(),
+      endedGuardianUserId: randomUUID(),
       studentUserId: randomUUID(),
+      ineligibleStudentUserId: randomUUID(),
+      noDobStudentUserId: randomUUID(),
+      tenantBStudentUserId: randomUUID(),
       unrelatedUserId: randomUUID(),
+      studentIdentityId: randomUUID(),
+      ineligibleStudentIdentityId: randomUUID(),
+      noDobStudentIdentityId: randomUUID(),
+      tenantBStudentIdentityId: randomUUID(),
     };
 
     await prisma.org.createMany({
       data: [
-        { id: fixture.orgAId, name: "Reports org A", slug: `reports-a-${fixture.orgAId}`, planCode: "trial" },
-        { id: fixture.orgBId, name: "Reports org B", slug: `reports-b-${fixture.orgBId}`, planCode: "trial" },
+        {
+          id: fixture.orgAId,
+          name: "Reports org A",
+          slug: `reports-a-${fixture.orgAId}`,
+          planCode: "trial",
+        },
+        {
+          id: fixture.orgBId,
+          name: "Reports org B",
+          slug: `reports-b-${fixture.orgBId}`,
+          planCode: "trial",
+        },
       ],
     });
     await prisma.tenant.createMany({
       data: [
-        { id: fixture.tenantAId, orgId: fixture.orgAId, name: "Reports tenant A", slug: `reports-a-${fixture.tenantAId}` },
-        { id: fixture.tenantBId, orgId: fixture.orgBId, name: "Reports tenant B", slug: `reports-b-${fixture.tenantBId}` },
+        {
+          id: fixture.tenantAId,
+          orgId: fixture.orgAId,
+          name: "Reports tenant A",
+          slug: `reports-a-${fixture.tenantAId}`,
+        },
+        {
+          id: fixture.tenantBId,
+          orgId: fixture.orgBId,
+          name: "Reports tenant B",
+          slug: `reports-b-${fixture.tenantBId}`,
+        },
       ],
     });
     await prisma.user.createMany({
@@ -278,7 +568,11 @@ describe("ACE report publication storage", () => {
         fixture.reviewerUserId,
         fixture.fullGuardianUserId,
         fixture.limitedGuardianUserId,
+        fixture.endedGuardianUserId,
         fixture.studentUserId,
+        fixture.ineligibleStudentUserId,
+        fixture.noDobStudentUserId,
+        fixture.tenantBStudentUserId,
         fixture.unrelatedUserId,
       ].map((id) => ({ id, email: `${id}@example.test` })),
     });
@@ -290,11 +584,32 @@ describe("ACE report publication storage", () => {
       })),
     });
 
-    await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+    await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
       await tx.child.createMany({
         data: [
-          { id: fixture.childAId, tenantId: fixture.tenantAId, firstName: "Report", lastName: "Child A" },
-          { id: fixture.childA2Id, tenantId: fixture.tenantAId, firstName: "Report", lastName: "Child A2" },
+            {
+              id: fixture.childAId,
+              tenantId: fixture.tenantAId,
+              firstName: "Report",
+              lastName: "Child A",
+              dateOfBirth: new Date("2016-04-10T00:00:00.000Z"),
+            },
+            {
+              id: fixture.childA2Id,
+              tenantId: fixture.tenantAId,
+              firstName: "Report",
+              lastName: "Child A2",
+              dateOfBirth: new Date("2008-04-10T00:00:00.000Z"),
+            },
+            {
+              id: fixture.childA3Id,
+              tenantId: fixture.tenantAId,
+              firstName: "Report",
+              lastName: "Child A3",
+            },
         ],
       });
       const year = await tx.academicYear.create({
@@ -318,7 +633,7 @@ describe("ACE report publication storage", () => {
 
       const fullGuardianIdentityId = randomUUID();
       const limitedGuardianIdentityId = randomUUID();
-      const studentIdentityId = randomUUID();
+        const endedGuardianIdentityId = randomUUID();
       await tx.$executeRaw`
         INSERT INTO "StudentPortalPolicy" ("tenantId", "studentPortalEnabled")
         VALUES (${fixture.tenantAId}, true)
@@ -326,29 +641,72 @@ describe("ACE report publication storage", () => {
       await tx.$executeRaw`
         INSERT INTO "GuardianIdentity" ("id", "tenantId", "userId") VALUES
           (${fullGuardianIdentityId}, ${fixture.tenantAId}, ${fixture.fullGuardianUserId}),
-          (${limitedGuardianIdentityId}, ${fixture.tenantAId}, ${fixture.limitedGuardianUserId})
+          (${limitedGuardianIdentityId}, ${fixture.tenantAId}, ${fixture.limitedGuardianUserId}),
+          (${endedGuardianIdentityId}, ${fixture.tenantAId}, ${fixture.endedGuardianUserId})
       `;
       await tx.$executeRaw`
         INSERT INTO "GuardianChildRelationship" (
-          "id", "tenantId", "guardianIdentityId", "childId", "legalAccess"
+          "id", "tenantId", "guardianIdentityId", "childId", "legalAccess",
+          "startsAt", "endedAt"
         ) VALUES
-          (${randomUUID()}, ${fixture.tenantAId}, ${fullGuardianIdentityId}, ${fixture.childAId}, 'FULL'),
-          (${randomUUID()}, ${fixture.tenantAId}, ${limitedGuardianIdentityId}, ${fixture.childAId}, 'LIMITED')
+          (
+            ${randomUUID()}, ${fixture.tenantAId}, ${fullGuardianIdentityId},
+            ${fixture.childAId}, 'FULL', ${new Date("2025-08-01T00:00:00.000Z")}, NULL
+          ),
+          (
+            ${randomUUID()}, ${fixture.tenantAId}, ${limitedGuardianIdentityId},
+            ${fixture.childAId}, 'LIMITED', ${new Date("2025-08-01T00:00:00.000Z")}, NULL
+          ),
+          (
+            ${randomUUID()}, ${fixture.tenantAId}, ${endedGuardianIdentityId},
+            ${fixture.childAId}, 'FULL',
+            ${new Date("2025-08-01T00:00:00.000Z")},
+            ${new Date("2026-07-01T00:00:00.000Z")}
+          )
       `;
       await tx.$executeRaw`
-        INSERT INTO "StudentIdentity" ("id", "tenantId", "userId")
-        VALUES (${studentIdentityId}, ${fixture.tenantAId}, ${fixture.studentUserId})
+        INSERT INTO "StudentIdentity" ("id", "tenantId", "userId") VALUES
+          (${fixture.studentIdentityId}, ${fixture.tenantAId}, ${fixture.studentUserId}),
+          (
+            ${fixture.ineligibleStudentIdentityId}, ${fixture.tenantAId},
+            ${fixture.ineligibleStudentUserId}
+          ),
+          (
+            ${fixture.noDobStudentIdentityId}, ${fixture.tenantAId},
+            ${fixture.noDobStudentUserId}
+          )
       `;
       await tx.$executeRaw`
         INSERT INTO "StudentIdentityLink" (
           "id", "tenantId", "studentIdentityId", "childId"
-        ) VALUES (${randomUUID()}, ${fixture.tenantAId}, ${studentIdentityId}, ${fixture.childAId})
+        ) VALUES
+          (
+            ${randomUUID()}, ${fixture.tenantAId},
+            ${fixture.studentIdentityId}, ${fixture.childAId}
+          ),
+          (
+            ${randomUUID()}, ${fixture.tenantAId},
+            ${fixture.ineligibleStudentIdentityId}, ${fixture.childA2Id}
+          ),
+          (
+            ${randomUUID()}, ${fixture.tenantAId},
+            ${fixture.noDobStudentIdentityId}, ${fixture.childA3Id}
+          )
       `;
-    });
+      },
+    );
 
-    await withReportsRlsContext(fixture.tenantBId, fixture.orgBId, async (tx) => {
+    await withReportsRlsContext(
+      fixture.tenantBId,
+      fixture.orgBId,
+      async (tx) => {
       await tx.child.create({
-        data: { id: fixture.childBId, tenantId: fixture.tenantBId, firstName: "Report", lastName: "Child B" },
+          data: {
+            id: fixture.childBId,
+            tenantId: fixture.tenantBId,
+            firstName: "Report",
+            lastName: "Child B",
+          },
       });
       const year = await tx.academicYear.create({
         data: {
@@ -368,19 +726,31 @@ describe("ACE report publication storage", () => {
           endsOn: new Date("2026-12-18T00:00:00.000Z"),
         },
       });
-    });
+        await tx.$executeRaw`
+        INSERT INTO "StudentIdentity" ("id", "tenantId", "userId")
+        VALUES (
+          ${fixture.tenantBStudentIdentityId}, ${fixture.tenantBId},
+          ${fixture.tenantBStudentUserId}
+        )
+      `;
+      },
+    );
   });
 
   afterEach(async () => {
     if (!isDatabaseAvailable()) return;
+    await deleteFaithRowsIfPresent(prisma);
     await deleteReportRowsIfPresent(prisma);
   });
 
   afterAll(async () => {
     if (!isDatabaseAvailable() || !fixture) return;
+    await deleteFaithRowsIfPresent(prisma);
     await deleteReportRowsIfPresent(prisma);
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "FaithReflection",
+        "FaithReadReceipt",
         "StudentIdentityLink",
         "GuardianChildRelationship",
         "FamilyIdentityInvite",
@@ -388,23 +758,68 @@ describe("ACE report publication storage", () => {
         "StudentIdentity",
         "StudentPortalPolicy"
     `);
-    await prisma.academicPeriod.deleteMany({ where: { id: { in: [fixture.periodAId, fixture.periodBId] } } });
-    await prisma.academicYear.deleteMany({ where: { tenantId: { in: [fixture.tenantAId, fixture.tenantBId] } } });
-    await prisma.child.deleteMany({ where: { id: { in: [fixture.childAId, fixture.childA2Id, fixture.childBId] } } });
-    await prisma.siteMembership.deleteMany({ where: { tenantId: fixture.tenantAId } });
-    await prisma.user.deleteMany({ where: { id: { in: [fixture.authorUserId, fixture.reviewerUserId, fixture.fullGuardianUserId, fixture.limitedGuardianUserId, fixture.studentUserId, fixture.unrelatedUserId] } } });
-    await prisma.tenant.deleteMany({ where: { id: { in: [fixture.tenantAId, fixture.tenantBId] } } });
-    await prisma.org.deleteMany({ where: { id: { in: [fixture.orgAId, fixture.orgBId] } } });
+    await prisma.academicPeriod.deleteMany({
+      where: { id: { in: [fixture.periodAId, fixture.periodBId] } },
+    });
+    await prisma.academicYear.deleteMany({
+      where: { tenantId: { in: [fixture.tenantAId, fixture.tenantBId] } },
+    });
+    await prisma.child.deleteMany({
+      where: {
+        id: {
+          in: [
+            fixture.childAId,
+            fixture.childA2Id,
+            fixture.childA3Id,
+            fixture.childBId,
+          ],
+        },
+      },
+    });
+    await prisma.siteMembership.deleteMany({
+      where: { tenantId: fixture.tenantAId },
+    });
+    await prisma.user.deleteMany({
+      where: {
+        id: {
+          in: [
+            fixture.authorUserId,
+            fixture.reviewerUserId,
+            fixture.fullGuardianUserId,
+            fixture.limitedGuardianUserId,
+            fixture.endedGuardianUserId,
+            fixture.studentUserId,
+            fixture.ineligibleStudentUserId,
+            fixture.noDobStudentUserId,
+            fixture.tenantBStudentUserId,
+            fixture.unrelatedUserId,
+          ],
+        },
+      },
+    });
+    await prisma.tenant.deleteMany({
+      where: { id: { in: [fixture.tenantAId, fixture.tenantBId] } },
+    });
+    await prisma.org.deleteMany({
+      where: { id: { in: [fixture.orgAId, fixture.orgBId] } },
+    });
   });
 
   it("rejects approval by the report author", async () => {
     if (!isDatabaseAvailable()) return;
-    const draft = await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
-      createDraftFixture(tx, fixture, "IN_REVIEW"),
+    const draft = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createDraftFixture(tx, fixture, "IN_REVIEW"),
     );
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
-        approveReport(tx, { tenantId: fixture.tenantAId, draftId: draft.draftId, reviewerUserId: fixture.authorUserId }),
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          approveReport(tx, {
+            tenantId: fixture.tenantAId,
+            draftId: draft.draftId,
+            reviewerUserId: fixture.authorUserId,
+          }),
       ),
       "23514",
     );
@@ -412,12 +827,19 @@ describe("ACE report publication storage", () => {
 
   it("requires review submission before approval", async () => {
     if (!isDatabaseAvailable()) return;
-    const draft = await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
-      createDraftFixture(tx, fixture),
+    const draft = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createDraftFixture(tx, fixture),
     );
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
-        approveReport(tx, { tenantId: fixture.tenantAId, draftId: draft.draftId, reviewerUserId: fixture.reviewerUserId }),
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          approveReport(tx, {
+            tenantId: fixture.tenantAId,
+            draftId: draft.draftId,
+            reviewerUserId: fixture.reviewerUserId,
+          }),
       ),
       "23514",
     );
@@ -426,7 +848,8 @@ describe("ACE report publication storage", () => {
   it("rejects a report compiler outside the tenant", async () => {
     if (!isDatabaseAvailable()) return;
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
         const reportId = randomUUID();
         await tx.$executeRaw`
           INSERT INTO "AceTermReport" ("id", "tenantId", "childId", "academicPeriodId")
@@ -453,7 +876,11 @@ describe("ACE report publication storage", () => {
       (tx) => createDraftFixture(tx, fixture),
     );
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+      () =>
+        withReportsRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
         INSERT INTO "AceReportDraft" (
           "id", "tenantId", "reportId", "compilationId", "familyPayload",
           "status", "authorUserId"
@@ -462,7 +889,8 @@ describe("ACE report publication storage", () => {
           ${source.compilationId}, ${JSON.stringify({ summary: "Bypass" })}::jsonb,
           'DRAFT', ${fixture.unrelatedUserId}
         )
-      `),
+      `,
+        ),
       "23503",
     );
   });
@@ -475,7 +903,8 @@ describe("ACE report publication storage", () => {
       (tx) => createDraftFixture(tx, fixture, "IN_REVIEW"),
     );
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
         approveReport(tx, {
           tenantId: fixture.tenantAId,
           draftId: draft.draftId,
@@ -538,10 +967,15 @@ describe("ACE report publication storage", () => {
 
     try {
       await expectDatabaseRejection(
-        () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+        () =>
+          withReportsRlsContext(
+            fixture.tenantAId,
+            fixture.orgAId,
+            (tx) => tx.$executeRaw`
           INSERT INTO "AceReportPublicationBypassProbe" ("draftId", "versionId")
           VALUES (${draft.draftId}, ${versionId})
-        `),
+        `,
+          ),
         "23514",
       );
     } finally {
@@ -570,8 +1004,18 @@ describe("ACE report publication storage", () => {
       `tenants/${fixture.tenantAId}/reports/${version.id}.pdf`,
     );
 
-    const [facts] = await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
-      tx.$queryRaw<Array<{ fullGuardians: bigint; limitedGuardians: bigint; activeStudents: bigint; unrelatedLinks: bigint }>>`
+    const [facts] = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<
+          Array<{
+            fullGuardians: bigint;
+            limitedGuardians: bigint;
+            activeStudents: bigint;
+            unrelatedLinks: bigint;
+          }>
+        >`
         SELECT
           (SELECT count(*) FROM "GuardianChildRelationship" WHERE "childId" = ${fixture.childAId} AND "legalAccess" = 'FULL' AND "endedAt" IS NULL AND "revokedAt" IS NULL) AS "fullGuardians",
           (SELECT count(*) FROM "GuardianChildRelationship" WHERE "childId" = ${fixture.childAId} AND "legalAccess" = 'LIMITED' AND "endedAt" IS NULL AND "revokedAt" IS NULL) AS "limitedGuardians",
@@ -579,7 +1023,12 @@ describe("ACE report publication storage", () => {
           (SELECT count(*) FROM "StudentIdentity" WHERE "userId" = ${fixture.unrelatedUserId}) AS "unrelatedLinks"
       `,
     );
-    expect(facts).toEqual({ fullGuardians: 1n, limitedGuardians: 1n, activeStudents: 1n, unrelatedLinks: 0n });
+    expect(facts).toEqual({
+      fullGuardians: 1n,
+      limitedGuardians: 1n,
+      activeStudents: 1n,
+      unrelatedLinks: 0n,
+    });
   });
 
   it("rejects direct publication and mutations of released data", async () => {
@@ -595,13 +1044,20 @@ describe("ACE report publication storage", () => {
     ];
     for (const statement of mutationStatements) {
       await expectDatabaseRejection(
-        () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRawUnsafe(statement)),
+        () =>
+          withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+            tx.$executeRawUnsafe(statement),
+          ),
         "55000",
       );
     }
 
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+      () =>
+        withReportsRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
         INSERT INTO "AceTermReportVersion" (
           "id", "tenantId", "reportId", "sourceDraftId", "versionNumber",
           "familyPayload", "guardianVisibleAt"
@@ -609,7 +1065,8 @@ describe("ACE report publication storage", () => {
           ${randomUUID()}, ${fixture.tenantAId}, ${draft.reportId}, ${draft.draftId},
           99, ${JSON.stringify({ bypass: true })}::jsonb, CURRENT_TIMESTAMP
         )
-      `),
+      `,
+        ),
       "55000",
     );
   });
@@ -738,7 +1195,14 @@ describe("ACE report publication storage", () => {
     const versions = await withReportsRlsContext(
       fixture.tenantAId,
       fixture.orgAId,
-      (tx) => tx.$queryRaw<Array<Pick<ReportVersionRow, "id" | "sourceDraftId" | "versionNumber" | "supersedesVersionId">>>`
+      (tx) => tx.$queryRaw<
+        Array<
+          Pick<
+            ReportVersionRow,
+            "id" | "sourceDraftId" | "versionNumber" | "supersedesVersionId"
+          >
+        >
+      >`
         SELECT "id", "sourceDraftId", "versionNumber", "supersedesVersionId"
         FROM "AceTermReportVersion"
         WHERE "reportId" = ${first.draft.reportId}
@@ -748,53 +1212,85 @@ describe("ACE report publication storage", () => {
     expect(versions.map((version) => version.versionNumber)).toEqual([1, 2, 3]);
     expect(versions[1]?.supersedesVersionId).toBe(versions[0]?.id);
     expect(versions[2]?.supersedesVersionId).toBe(versions[1]?.id);
-    expect(new Set(versions.slice(1).map((version) => version.sourceDraftId))).toEqual(
-      new Set(corrections.map((draft) => draft.draftId)),
-    );
+    expect(
+      new Set(versions.slice(1).map((version) => version.sourceDraftId)),
+    ).toEqual(new Set(corrections.map((draft) => draft.draftId)));
   });
 
   it("allows one explicit student release without opening published content", async () => {
     if (!isDatabaseAvailable()) return;
     const { version } = await publishReport(fixture);
     const releasedAt = new Date("2026-12-20T12:00:00.000Z");
-    await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+    await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$executeRaw`
       UPDATE "AceTermReportVersion"
       SET "studentVisibleAt" = ${releasedAt}
       WHERE "id" = ${version.id}
-    `);
-    const updated = await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => getReportVersion(tx, version.reportId));
+    `,
+    );
+    const updated = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => getReportVersion(tx, version.reportId),
+    );
     expect(updated.studentVisibleAt).toEqual(releasedAt);
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+      () =>
+        withReportsRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
         UPDATE "AceTermReportVersion"
         SET "studentVisibleAt" = ${new Date("2026-12-21T12:00:00.000Z")}
         WHERE "id" = ${version.id}
-      `),
+      `,
+        ),
       "55000",
     );
   });
 
   it("rejects report target changes and cross-tenant targets", async () => {
     if (!isDatabaseAvailable()) return;
-    const draft = await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => createDraftFixture(tx, fixture));
+    const draft = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createDraftFixture(tx, fixture),
+    );
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+      () =>
+        withReportsRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
         UPDATE "AceTermReport" SET "childId" = ${fixture.childA2Id} WHERE "id" = ${draft.reportId}
-      `),
+      `,
+        ),
       "55000",
     );
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+      () =>
+        withReportsRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
         INSERT INTO "AceTermReport" ("id", "tenantId", "childId", "academicPeriodId")
         VALUES (${randomUUID()}, ${fixture.tenantAId}, ${fixture.childBId}, ${fixture.periodAId})
-      `),
+      `,
+        ),
       "23503",
     );
     await expectDatabaseRejection(
-      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+      () =>
+        withReportsRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
         INSERT INTO "AceTermReport" ("id", "tenantId", "childId", "academicPeriodId")
         VALUES (${randomUUID()}, ${fixture.tenantAId}, ${fixture.childA2Id}, ${fixture.periodBId})
-      `),
+      `,
+        ),
       "23503",
     );
   });
@@ -802,14 +1298,667 @@ describe("ACE report publication storage", () => {
   it("fails closed under forced tenant RLS", async () => {
     if (!isDatabaseAvailable()) return;
     await publishReport(fixture);
-    const tenantBCounts = await withReportsRlsContext(fixture.tenantBId, fixture.orgBId, (tx) => tx.$queryRaw<Array<{ reports: bigint; compilations: bigint; drafts: bigint; reviews: bigint; versions: bigint }>>`
+    const tenantBCounts = await withReportsRlsContext(
+      fixture.tenantBId,
+      fixture.orgBId,
+      (tx) => tx.$queryRaw<
+        Array<{
+          reports: bigint;
+          compilations: bigint;
+          drafts: bigint;
+          reviews: bigint;
+          versions: bigint;
+        }>
+      >`
       SELECT
         (SELECT count(*) FROM "AceTermReport") AS "reports",
         (SELECT count(*) FROM "AceReportCompilation") AS "compilations",
         (SELECT count(*) FROM "AceReportDraft") AS "drafts",
         (SELECT count(*) FROM "AceReportReview") AS "reviews",
         (SELECT count(*) FROM "AceTermReportVersion") AS "versions"
-    `);
-    expect(tenantBCounts).toEqual([{ reports: 0n, compilations: 0n, drafts: 0n, reviews: 0n, versions: 0n }]);
+    `,
+    );
+    expect(tenantBCounts).toEqual([
+      { reports: 0n, compilations: 0n, drafts: 0n, reviews: 0n, versions: 0n },
+    ]);
+  });
+
+  it("publishes multiple age bands with frozen audience snapshots", async () => {
+    if (!isDatabaseAvailable()) return;
+    const juniors: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    const seniors: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Seniors",
+      minimumAge: 13,
+      maximumAge: 18,
+    };
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await createFaithAgeBand(tx, juniors);
+        await createFaithAgeBand(tx, seniors);
+        return publishFaithContent(tx, fixture, [
+          { type: "AGE_BAND", ageBand: juniors },
+          { type: "AGE_BAND", ageBand: seniors },
+        ]);
+      },
+    );
+
+    await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$executeRaw`
+        UPDATE "FaithAgeBand"
+        SET "name" = 'Primary', "minimumAge" = 7, "maximumAge" = 11
+        WHERE "id" = ${juniors.id}
+      `,
+    );
+
+    const result = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const audiences = await tx.$queryRaw<FaithAudienceRow[]>`
+          SELECT
+            "type", "sourceAgeBandId", "ageBandName", "minimumAge",
+            "maximumAge"
+          FROM "FaithContentAudience"
+          WHERE "faithContentVersionId" = ${publication.versionId}
+          ORDER BY "minimumAge"
+        `;
+        const [draft] = await tx.$queryRaw<Array<{ status: string }>>`
+          SELECT "status"
+          FROM "FaithContentDraft"
+          WHERE "id" = ${publication.draftId}
+        `;
+        return { audiences, draft };
+      },
+    );
+    expect(result.audiences).toEqual([
+      {
+        type: "AGE_BAND",
+        sourceAgeBandId: juniors.id,
+        ageBandName: "Juniors",
+        minimumAge: 8,
+        maximumAge: 12,
+      },
+      {
+        type: "AGE_BAND",
+        sourceAgeBandId: seniors.id,
+        ageBandName: "Seniors",
+        minimumAge: 13,
+        maximumAge: 18,
+      },
+    ]);
+    expect(result.draft).toEqual({ status: "PUBLISHED" });
+  });
+
+  it("publishes one atomic all-active-students audience", async () => {
+    if (!isDatabaseAvailable()) return;
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        publishFaithContent(tx, fixture, [{ type: "ALL_ACTIVE_STUDENTS" }]),
+    );
+    const audiences = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$queryRaw<FaithAudienceRow[]>`
+        SELECT
+          "type", "sourceAgeBandId", "ageBandName", "minimumAge",
+          "maximumAge"
+        FROM "FaithContentAudience"
+        WHERE "faithContentVersionId" = ${publication.versionId}
+      `,
+    );
+    expect(audiences).toEqual([
+      {
+        type: "ALL_ACTIVE_STUDENTS",
+        sourceAgeBandId: null,
+        ageBandName: null,
+        minimumAge: null,
+        maximumAge: null,
+      },
+    ]);
+  });
+
+  it("rejects an empty published audience", async () => {
+    if (!isDatabaseAvailable()) return;
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          const draft = await createFaithDraft(tx, fixture);
+          await insertFaithVersion(tx, fixture, draft);
+          await validateFaithAudience(tx);
+        }),
+      "23514",
+    );
+  });
+
+  it("rejects invalid and incomplete age-band snapshots", async () => {
+    if (!isDatabaseAvailable()) return;
+    const reversed: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Reversed",
+      minimumAge: 12,
+      maximumAge: 8,
+    };
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          createFaithAgeBand(tx, reversed),
+        ),
+      "23514",
+    );
+
+    const juniors: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          await createFaithAgeBand(tx, juniors);
+          const draft = await createFaithDraft(tx, fixture);
+          const versionId = await insertFaithVersion(tx, fixture, draft);
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "AGE_BAND",
+            ageBand: juniors,
+            snapshot: {
+              name: "Juniors",
+              minimumAge: 8,
+              maximumAge: null,
+            },
+          });
+          await validateFaithAudience(tx);
+        }),
+      "23514",
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          await createFaithAgeBand(tx, juniors);
+          const draft = await createFaithDraft(tx, fixture);
+          const versionId = await insertFaithVersion(tx, fixture, draft);
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "AGE_BAND",
+            ageBand: juniors,
+            snapshot: {
+              name: "Juniors",
+              minimumAge: 7,
+              maximumAge: 12,
+            },
+          });
+          await validateFaithAudience(tx);
+        }),
+      "23514",
+    );
+  });
+
+  it("rejects duplicate and mixed all-student audiences", async () => {
+    if (!isDatabaseAvailable()) return;
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          const draft = await createFaithDraft(tx, fixture);
+          const versionId = await insertFaithVersion(tx, fixture, draft);
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "ALL_ACTIVE_STUDENTS",
+          });
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "ALL_ACTIVE_STUDENTS",
+          });
+        }),
+      "23505",
+    );
+
+    const juniors: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          await createFaithAgeBand(tx, juniors);
+          const draft = await createFaithDraft(tx, fixture);
+          const versionId = await insertFaithVersion(tx, fixture, draft);
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "ALL_ACTIVE_STUDENTS",
+          });
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "AGE_BAND",
+            ageBand: juniors,
+          });
+          await validateFaithAudience(tx);
+        }),
+      "23514",
+    );
+  });
+
+  it("rejects a cross-tenant source age band", async () => {
+    if (!isDatabaseAvailable()) return;
+    const tenantBBand: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantBId,
+      name: "Tenant B Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    await withReportsRlsContext(fixture.tenantBId, fixture.orgBId, (tx) =>
+      createFaithAgeBand(tx, tenantBBand),
+    );
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          const draft = await createFaithDraft(tx, fixture);
+          const versionId = await insertFaithVersion(tx, fixture, draft);
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "AGE_BAND",
+            ageBand: tenantBBand,
+          });
+        }),
+      "23503",
+    );
+  });
+
+  it("rejects published version and final audience mutations", async () => {
+    if (!isDatabaseAvailable()) return;
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        publishFaithContent(tx, fixture, [{ type: "ALL_ACTIVE_STUDENTS" }]),
+    );
+    const mutationStatements = [
+      `UPDATE "FaithContentVersion" SET "title" = 'Changed' WHERE "id" = '${publication.versionId}'`,
+      `UPDATE "FaithContentVersion" SET "contentPayload" = '{"changed":true}'::jsonb WHERE "id" = '${publication.versionId}'`,
+      `DELETE FROM "FaithContentVersion" WHERE "id" = '${publication.versionId}'`,
+      `UPDATE "FaithContentAudience" SET "type" = 'AGE_BAND' WHERE "faithContentVersionId" = '${publication.versionId}'`,
+      `DELETE FROM "FaithContentAudience" WHERE "faithContentVersionId" = '${publication.versionId}'`,
+    ];
+    for (const statement of mutationStatements) {
+      await expectDatabaseRejection(
+        () =>
+          withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+            tx.$executeRawUnsafe(statement),
+          ),
+        "55000",
+      );
+    }
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertFaithAudience(tx, {
+            fixture,
+            versionId: publication.versionId,
+            type: "ALL_ACTIVE_STUDENTS",
+          }),
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          const draft = await createFaithDraft(tx, fixture);
+          await tx.$executeRaw`
+            INSERT INTO "FaithContentVersion" (
+              "id", "tenantId", "faithContentId", "sourceDraftId",
+              "versionNumber", "title", "contentPayload", "publishedAt"
+            ) VALUES (
+              ${randomUUID()}, ${fixture.tenantAId}, ${publication.contentId},
+              ${draft.draftId}, 1, ${"Duplicate"},
+              ${JSON.stringify({ body: "Duplicate" })}::jsonb,
+              ${new Date("2026-08-01T11:00:00.000Z")}
+            )
+          `;
+        }),
+      "23503",
+    );
+  });
+
+  it("retains the facts needed for age eligibility and missing-date denial", async () => {
+    if (!isDatabaseAvailable()) return;
+    const juniors: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    const ageBandPublication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await createFaithAgeBand(tx, juniors);
+        return publishFaithContent(tx, fixture, [
+          { type: "AGE_BAND", ageBand: juniors },
+        ]);
+      },
+    );
+    const eligibleUsers = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$queryRaw<Array<{ userId: string }>>`
+        SELECT DISTINCT identity."userId"
+        FROM "StudentIdentity" AS identity
+        JOIN "StudentIdentityLink" AS student_link
+          ON student_link."studentIdentityId" = identity."id"
+          AND student_link."tenantId" = identity."tenantId"
+          AND student_link."endedAt" IS NULL
+          AND student_link."revokedAt" IS NULL
+        JOIN "Child" AS child
+          ON child."id" = student_link."childId"
+          AND child."tenantId" = student_link."tenantId"
+        JOIN "FaithContentAudience" AS audience
+          ON audience."tenantId" = child."tenantId"
+          AND audience."faithContentVersionId" = ${ageBandPublication.versionId}
+        WHERE child."dateOfBirth" IS NOT NULL
+          AND EXTRACT(YEAR FROM age(
+            ${new Date("2026-08-01T00:00:00.000Z")}::date,
+            child."dateOfBirth"
+          )) BETWEEN audience."minimumAge" AND audience."maximumAge"
+      `,
+    );
+    expect(eligibleUsers).toEqual([{ userId: fixture.studentUserId }]);
+
+    const allStudentsPublication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        publishFaithContent(tx, fixture, [{ type: "ALL_ACTIVE_STUDENTS" }]),
+    );
+    const allActiveUsers = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$queryRaw<Array<{ userId: string }>>`
+        SELECT identity."userId"
+        FROM "StudentIdentity" AS identity
+        JOIN "StudentIdentityLink" AS student_link
+          ON student_link."studentIdentityId" = identity."id"
+          AND student_link."tenantId" = identity."tenantId"
+          AND student_link."endedAt" IS NULL
+          AND student_link."revokedAt" IS NULL
+        WHERE EXISTS (
+          SELECT 1
+          FROM "FaithContentAudience" AS audience
+          WHERE audience."faithContentVersionId" = ${allStudentsPublication.versionId}
+            AND audience."tenantId" = identity."tenantId"
+            AND audience."type" = 'ALL_ACTIVE_STUDENTS'
+        )
+        ORDER BY identity."userId"
+      `,
+    );
+    expect(allActiveUsers.map(({ userId }) => userId)).toEqual(
+      [
+        fixture.studentUserId,
+        fixture.ineligibleStudentUserId,
+        fixture.noDobStudentUserId,
+      ].sort(),
+    );
+  });
+
+  it("enforces unique identity read and reflection targets", async () => {
+    if (!isDatabaseAvailable()) return;
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        publishFaithContent(tx, fixture, [{ type: "ALL_ACTIVE_STUDENTS" }]),
+    );
+    const created = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => ({
+        receiptId: await insertFaithReadReceipt(
+          tx,
+          fixture,
+          publication.versionId,
+        ),
+        reflectionId: await insertFaithReflection(
+          tx,
+          fixture,
+          publication.versionId,
+        ),
+      }),
+    );
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertFaithReadReceipt(tx, fixture, publication.versionId),
+        ),
+      "23505",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertFaithReflection(tx, fixture, publication.versionId),
+        ),
+      "23505",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertFaithReadReceipt(
+            tx,
+            fixture,
+            publication.versionId,
+            fixture.tenantBStudentIdentityId,
+          ),
+        ),
+      "23503",
+    );
+    for (const statement of [
+      `UPDATE "FaithReadReceipt" SET "studentIdentityId" = '${fixture.ineligibleStudentIdentityId}' WHERE "id" = '${created.receiptId}'`,
+      `UPDATE "FaithReflection" SET "studentIdentityId" = '${fixture.ineligibleStudentIdentityId}' WHERE "id" = '${created.reflectionId}'`,
+    ]) {
+      await expectDatabaseRejection(
+        () =>
+          withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+            tx.$executeRawUnsafe(statement),
+          ),
+        "55000",
+      );
+    }
+  });
+
+  it("stores encrypted reflections and releases them once to eligible guardians", async () => {
+    if (!isDatabaseAvailable()) return;
+    const juniors: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await createFaithAgeBand(tx, juniors);
+        return publishFaithContent(tx, fixture, [
+          { type: "AGE_BAND", ageBand: juniors },
+        ]);
+      },
+    );
+    const reflectionId = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertFaithReflection(tx, fixture, publication.versionId),
+    );
+    const beforeRelease = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        countGuardianVisibleReflections(tx, {
+          versionId: publication.versionId,
+          guardianUserId: fixture.fullGuardianUserId,
+        }),
+    );
+    expect(beforeRelease).toBe(0n);
+
+    await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await tx.$executeRaw`
+          UPDATE "FaithReflection"
+          SET "reflectionEncrypted" = ${"enc:edited-before-release"}
+          WHERE "id" = ${reflectionId}
+        `;
+        await tx.$executeRaw`
+          UPDATE "FaithReflection"
+          SET
+            "guardianReleasedAt" = ${new Date("2026-08-01T11:00:00.000Z")},
+            "releasedByUserId" = ${fixture.reviewerUserId}
+          WHERE "id" = ${reflectionId}
+        `;
+      },
+    );
+
+    const visibility = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => ({
+        full: await countGuardianVisibleReflections(tx, {
+          versionId: publication.versionId,
+          guardianUserId: fixture.fullGuardianUserId,
+        }),
+        limited: await countGuardianVisibleReflections(tx, {
+          versionId: publication.versionId,
+          guardianUserId: fixture.limitedGuardianUserId,
+        }),
+        ended: await countGuardianVisibleReflections(tx, {
+          versionId: publication.versionId,
+          guardianUserId: fixture.endedGuardianUserId,
+        }),
+        unrelated: await countGuardianVisibleReflections(tx, {
+          versionId: publication.versionId,
+          guardianUserId: fixture.unrelatedUserId,
+        }),
+        reflection: (
+          await tx.$queryRaw<
+            Array<{
+              reflectionEncrypted: string;
+              guardianReleasedAt: Date | null;
+              releasedByUserId: string | null;
+            }>
+          >`
+            SELECT
+              "reflectionEncrypted", "guardianReleasedAt",
+              "releasedByUserId"
+            FROM "FaithReflection"
+            WHERE "id" = ${reflectionId}
+          `
+        )[0],
+      }),
+    );
+    expect(visibility).toMatchObject({
+      full: 1n,
+      limited: 0n,
+      ended: 0n,
+      unrelated: 0n,
+      reflection: {
+        reflectionEncrypted: "enc:edited-before-release",
+        guardianReleasedAt: new Date("2026-08-01T11:00:00.000Z"),
+        releasedByUserId: fixture.reviewerUserId,
+      },
+    });
+
+    for (const statement of [
+      `UPDATE "FaithReflection" SET "reflectionEncrypted" = 'enc:changed' WHERE "id" = '${reflectionId}'`,
+      `UPDATE "FaithReflection" SET "guardianReleasedAt" = NULL, "releasedByUserId" = NULL WHERE "id" = '${reflectionId}'`,
+    ]) {
+      await expectDatabaseRejection(
+        () =>
+          withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+            tx.$executeRawUnsafe(statement),
+          ),
+        "55000",
+      );
+    }
+  });
+
+  it("fails closed for every Faith table under forced tenant RLS", async () => {
+    if (!isDatabaseAvailable()) return;
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const created = await publishFaithContent(tx, fixture, [
+          { type: "ALL_ACTIVE_STUDENTS" },
+        ]);
+        await insertFaithReadReceipt(tx, fixture, created.versionId);
+        await insertFaithReflection(tx, fixture, created.versionId);
+        return created;
+      },
+    );
+    expect(publication.versionId).toEqual(expect.any(String));
+
+    const tenantBCounts = await withReportsRlsContext(
+      fixture.tenantBId,
+      fixture.orgBId,
+      (tx) => tx.$queryRaw<
+        Array<{
+          ageBands: bigint;
+          contents: bigint;
+          drafts: bigint;
+          versions: bigint;
+          audiences: bigint;
+          receipts: bigint;
+          reflections: bigint;
+        }>
+      >`
+        SELECT
+          (SELECT count(*) FROM "FaithAgeBand") AS "ageBands",
+          (SELECT count(*) FROM "FaithContent") AS "contents",
+          (SELECT count(*) FROM "FaithContentDraft") AS "drafts",
+          (SELECT count(*) FROM "FaithContentVersion") AS "versions",
+          (SELECT count(*) FROM "FaithContentAudience") AS "audiences",
+          (SELECT count(*) FROM "FaithReadReceipt") AS "receipts",
+          (SELECT count(*) FROM "FaithReflection") AS "reflections"
+      `,
+    );
+    expect(tenantBCounts).toEqual([
+      {
+        ageBands: 0n,
+        contents: 0n,
+        drafts: 0n,
+        versions: 0n,
+        audiences: 0n,
+        receipts: 0n,
+        reflections: 0n,
+      },
+    ]);
   });
 });

@@ -226,6 +226,16 @@ enum AceReportReviewDecision {
   REJECTED
 }
 
+enum FaithContentDraftStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum FaithContentAudienceType {
+  ALL_ACTIVE_STUDENTS
+  AGE_BAND
+}
+
 enum PermissionScope {
   organisation
   site
@@ -601,6 +611,13 @@ model Tenant {
   aceReportDrafts        AceReportDraft[]
   aceReportReviews       AceReportReview[]
   aceTermReportVersions  AceTermReportVersion[]
+  faithAgeBands          FaithAgeBand[]
+  faithContents          FaithContent[]
+  faithContentDrafts     FaithContentDraft[]
+  faithContentVersions   FaithContentVersion[]
+  faithContentAudiences  FaithContentAudience[]
+  faithReadReceipts      FaithReadReceipt[]
+  faithReflections       FaithReflection[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
@@ -711,6 +728,8 @@ model User {
   compiledAceReports          AceReportCompilation[]      @relation("AceReportCompilationCompiledBy")
   authoredAceReportDrafts     AceReportDraft[]            @relation("AceReportDraftAuthor")
   reviewedAceReports          AceReportReview[]           @relation("AceReportReviewReviewer")
+  authoredFaithContentDrafts  FaithContentDraft[]          @relation("FaithContentDraftAuthor")
+  releasedFaithReflections    FaithReflection[]            @relation("FaithReflectionReleasedBy")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
@@ -767,6 +786,8 @@ model StudentIdentity {
   user            User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
   links           StudentIdentityLink[]
   acceptedInvites FamilyIdentityInvite[] @relation("FamilyIdentityInviteAcceptedStudent")
+  faithReadReceipts FaithReadReceipt[]
+  faithReflections  FaithReflection[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, userId])
@@ -1503,6 +1524,152 @@ model AceTermReportVersion {
   @@unique([supersedesVersionId, tenantId, reportId])
   @@unique([reportId, versionNumber])
   @@index([tenantId, reportId, guardianVisibleAt])
+}
+
+model FaithAgeBand {
+  id         String    @id @default(uuid())
+  tenantId   String
+  name       String
+  minimumAge Int
+  maximumAge Int
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant    Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  audiences FaithContentAudience[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, name])
+  @@index([tenantId, archivedAt])
+}
+
+model FaithContent {
+  id        String   @id @default(uuid())
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  drafts   FaithContentDraft[]
+  versions FaithContentVersion[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, createdAt])
+}
+
+model FaithContentDraft {
+  id             String                  @id @default(uuid())
+  tenantId       String
+  faithContentId String
+  title          String
+  contentPayload Json
+  status         FaithContentDraftStatus @default(DRAFT)
+  authorUserId   String
+  publishedAt    DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  faithContent     FaithContent         @relation(fields: [faithContentId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  author           User                 @relation("FaithContentDraftAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  publishedVersion FaithContentVersion? @relation("FaithContentVersionSourceDraft")
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, faithContentId])
+  @@index([tenantId, faithContentId, status, createdAt])
+  @@index([tenantId, authorUserId])
+}
+
+model FaithContentVersion {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  faithContentId      String
+  sourceDraftId       String
+  versionNumber       Int
+  title               String
+  contentPayload      Json
+  publishedAt         DateTime
+  supersedesVersionId String?
+  createdAt           DateTime @default(now())
+
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  faithContent      FaithContent           @relation(fields: [faithContentId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sourceDraft       FaithContentDraft      @relation("FaithContentVersionSourceDraft", fields: [sourceDraftId, tenantId, faithContentId], references: [id, tenantId, faithContentId], onDelete: Restrict)
+  supersedesVersion FaithContentVersion?   @relation("FaithContentVersionSupersession", fields: [supersedesVersionId, tenantId, faithContentId], references: [id, tenantId, faithContentId], onDelete: Restrict)
+  supersededBy      FaithContentVersion?   @relation("FaithContentVersionSupersession")
+  audiences         FaithContentAudience[]
+  readReceipts      FaithReadReceipt[]
+  reflections       FaithReflection[]
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, faithContentId])
+  @@unique([sourceDraftId, tenantId, faithContentId])
+  @@unique([supersedesVersionId, tenantId, faithContentId])
+  @@unique([faithContentId, versionNumber])
+  @@index([tenantId, faithContentId, publishedAt])
+}
+
+model FaithContentAudience {
+  id                    String                   @id @default(uuid())
+  tenantId              String
+  faithContentVersionId String
+  type                  FaithContentAudienceType
+  sourceAgeBandId       String?
+  ageBandName           String?
+  minimumAge            Int?
+  maximumAge            Int?
+  createdAt             DateTime                 @default(now())
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  faithContentVersion FaithContentVersion @relation(fields: [faithContentVersionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sourceAgeBand       FaithAgeBand?       @relation(fields: [sourceAgeBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, faithContentVersionId, sourceAgeBandId])
+  @@index([tenantId, faithContentVersionId])
+}
+
+model FaithReadReceipt {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  faithContentVersionId String
+  studentIdentityId     String
+  readAt                DateTime
+  createdAt             DateTime @default(now())
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  faithContentVersion FaithContentVersion @relation(fields: [faithContentVersionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  studentIdentity     StudentIdentity     @relation(fields: [studentIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, faithContentVersionId, studentIdentityId])
+  @@index([tenantId, faithContentVersionId, readAt])
+  @@index([tenantId, studentIdentityId])
+}
+
+model FaithReflection {
+  id                    String    @id @default(uuid())
+  tenantId              String
+  faithContentVersionId String
+  studentIdentityId     String
+  reflectionEncrypted   String    @db.Text
+  submittedAt           DateTime
+  guardianReleasedAt    DateTime?
+  releasedByUserId      String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  faithContentVersion FaithContentVersion @relation(fields: [faithContentVersionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  studentIdentity     StudentIdentity     @relation(fields: [studentIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  releasedBy          User?               @relation("FaithReflectionReleasedBy", fields: [releasedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, faithContentVersionId, studentIdentityId])
+  @@index([tenantId, faithContentVersionId, submittedAt])
+  @@index([tenantId, studentIdentityId])
+  @@index([tenantId, guardianReleasedAt])
 }
 
 model StudentSubjectEnrollment {
