@@ -155,6 +155,14 @@ export const VERTICAL_FEATURES: Record<Vertical, string[]> = {
     "Manage member records",
     "View your calendar",
   ],
+  // Not selectable through this institutional configurator — NexSteps Home has
+  // its own onboarding (docs/NexStepsV2/07-nexsteps-home.md). Present only to
+  // satisfy the exhaustive Record<Vertical, ...> type.
+  HOME_EDUCATION: [
+    "Log learning activity",
+    "Add learning evidence",
+    "Generate learning progress reports",
+  ],
 };
 
 export type ConfiguratorOption =
@@ -173,7 +181,13 @@ export function storageImagePath(
 export const CONFIGURATOR_IMAGE_PATHS: readonly string[] = [
   ...Object.values(MODULE_CATALOG).map(({ imagePath }) => imagePath),
   ...(["100", "200", "1000"] as const).map(storageImagePath),
-  ...VERTICAL_OPTIONS.map(({ value }) => verticalImagePath(value)),
+  // HOME_EDUCATION is excluded: it's never selectable through this institutional
+  // configurator (see apps/web/app/configure/state.ts's VERTICALS_BY_ORG_TYPE), and
+  // has no configurator artwork asset — NexSteps Home has its own onboarding
+  // (docs/NexStepsV2/07-nexsteps-home.md).
+  ...VERTICAL_OPTIONS.filter(({ value }) => value !== "HOME_EDUCATION").map(
+    ({ value }) => verticalImagePath(value),
+  ),
 ];
 
 export const CONFIGURATOR_BACKDROP_SIZES = "(min-width: 1024px) 44vw, 34vw";

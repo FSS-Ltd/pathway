@@ -28,6 +28,10 @@ export function verticalToSector(vertical: Vertical): Sector {
     case "STATE_SCHOOL":
     case "NURSERY":
       return "SCHOOL";
+    case "HOME_EDUCATION":
+      // NexSteps Home has its own onboarding (docs/NexStepsV2/07-nexsteps-home.md)
+      // and is never selectable through this institutional configurator.
+      throw new Error("Home Education does not use the institutional checkout flow.");
   }
 }
 

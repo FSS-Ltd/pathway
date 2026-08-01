@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "Vertical" ADD VALUE 'HOME_EDUCATION';

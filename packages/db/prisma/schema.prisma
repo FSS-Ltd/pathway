@@ -133,6 +133,7 @@ enum Vertical {
   NURSERY
   CHARITY
   CLUB
+  HOME_EDUCATION
 }
 
 enum Module {

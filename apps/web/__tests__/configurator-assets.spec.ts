@@ -38,7 +38,11 @@ describe("configurator imagery and motion contract", () => {
     const derivedPaths = [
       ...Object.values(MODULE_CATALOG).map(({ imagePath }) => imagePath),
       ...(["100", "200", "1000"] as const).map(storageImagePath),
-      ...VERTICAL_OPTIONS.map(({ value }) => verticalImagePath(value)),
+      // HOME_EDUCATION is never selectable through this institutional
+      // configurator and has no configurator artwork asset — see module-catalog.ts.
+      ...VERTICAL_OPTIONS.filter(({ value }) => value !== "HOME_EDUCATION").map(
+        ({ value }) => verticalImagePath(value),
+      ),
     ];
 
     for (const path of derivedPaths) {
@@ -71,7 +75,9 @@ describe("configurator imagery and motion contract", () => {
 
   it("derives the planned vertical and storage filenames", () => {
     expect(
-      VERTICAL_OPTIONS.map(({ value }) => verticalImagePath(value)),
+      VERTICAL_OPTIONS.filter(({ value }) => value !== "HOME_EDUCATION").map(
+        ({ value }) => verticalImagePath(value),
+      ),
     ).toEqual([
       "/configurator/verticals/church.png",
       "/configurator/verticals/independent-school.png",
