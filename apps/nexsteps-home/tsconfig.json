@@ -1,0 +1,31 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@pathway/mobile-core": [
+        "../../packages/mobile-core/src/index.ts"
+      ],
+      "@pathway/mobile-core/*": [
+        "../../packages/mobile-core/src/*"
+      ],
+      "@pathway/types": [
+        "../../packages/types/src/index.ts"
+      ],
+      "@pathway/types/*": [
+        "../../packages/types/src/*"
+      ]
+    }
+  },
+  "include": [
+    "app",
+    "src",
+    "expo-env.d.ts",
+    ".expo/types/**/*.ts"
+  ]
+}

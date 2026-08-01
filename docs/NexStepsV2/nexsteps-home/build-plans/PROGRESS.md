@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Executing PR1 (Plan 00 — docs)
+**Current phase:** Executing PR2 (Plan 01 — app scaffolding)
 
 ---
 
@@ -22,8 +22,8 @@ continue.
 
 | # | Plan | Status | Branch | PR | Notes |
 |---|---|---|---|---|---|
-| 1 | 00 — series docs | in progress | `docs/nexsteps-home-build-plan-series` | not yet opened | this commit |
-| 2 | 01 — app scaffolding | not started | `feat/nexsteps-home-app-scaffolding` | — | starts after PR1 merges |
+| 1 | 00 — series docs | **merged** | `docs/nexsteps-home-build-plan-series` | [#265](https://github.com/FSS-Ltd/pathway/pull/265) | squash-merged, branch deleted |
+| 2 | 01 — app scaffolding | in progress | `feat/nexsteps-home-app-scaffolding` | not yet opened | code complete, verified locally, about to push |
 | 3-15 | 02-14 | not started | — | — | — |
 
 ## Environment
@@ -119,12 +119,121 @@ specifically: `packages/db/prisma/schema.prisma`,
 `packages/platform/src/capability-maps.ts`,
 `packages/types/src/vertical.ts`.
 
+## What Plan 01 built (PR2 content, for the reviewer / next agent)
+
+`apps/nexsteps-home/` — new Expo SDK 54 app, zero product screens:
+
+- **Wiring:** `package.json`, `metro.config.js` (copied from `apps/mobile`
+  verbatim), `tsconfig.json`, `babel.config.js` (drops the deprecated
+  `expo-router/babel` plugin `apps/mobile` still carries), `app.config.ts`
+  (`orientation: "default"`, not `"portrait"` — tablet needs rotation;
+  scheme `nexstepshome`, bundle id `com.nexsteps.home`; icon/splash
+  intentionally omitted rather than pointed at a placeholder — see the code
+  comment in `app.config.ts` for why), `eas.json`, `jest.config.js`
+  (`jest-expo` preset — **do not add a custom `transformIgnorePatterns`**,
+  it replaces rather than extends the preset's and breaks every test with a
+  `Cannot use import statement outside a module` error from
+  `react-native/jest/setup.js`; this was hit and fixed during this PR).
+- **Navigation:** `app/_layout.tsx` (fonts + `AppProviders` + root `Stack`),
+  `app/index.tsx` (bootstrap-state redirect), `(setup)/` (unauthenticated
+  stack, one real screen: `welcome.tsx`, wired to `signIn()`),
+  `(home)/(tabs)/` (5-tab shell). `HOME_TABS` in
+  `src/components/navigation/home-tab-bar.tsx` is the single source of
+  truth for the tab list — both `_layout.tsx`'s `Tabs.Screen` list and the
+  tab bar read from it, unlike `apps/mobile/.../family-bottom-nav.tsx`,
+  which duplicates its tab list in a separate `FAMILY_ITEMS` const.
+- **Tokens:** `src/design/tokens.ts` extends (never mutates)
+  `@pathway/mobile-core`'s `tokens`. Every added value's source and
+  derivation is in `src/design/token-conflicts.md`.
+- **Primitives:** one component per wireframe block type in
+  `src/components/primitives/` (`NoticeCard`, `ContentCard`, `FieldGroup`,
+  `ChipRow`, `ListCard`, `StatRow`, `MessageBubble`, `WeekStrip`) plus
+  chrome (`ScreenHeader`, `ScreenActions`). Covered by
+  `primitives.test.tsx` (one `describe` block per primitive, not 11
+  separate files).
+- **Tablet foundation:** `src/responsive/` — `useFormFactor` (live,
+  `useWindowDimensions`-based), `TwoPane` (renders only `list` on phone;
+  side-by-side on tablet at the exact wireframe list width). **No screen
+  consumes `TwoPane` yet** — that's a Plan 03 design decision, not this
+  plan's.
+- **Screen registry:** `src/screens/registry.ts` maps all 76 approved
+  screen IDs to their intended route path.
+  `registry.test.ts` diffs it live against
+  `docs/NexStepsV2/nexsteps-home/screen-inventory.json` — it fails if the
+  handoff and the registry ever diverge. Routing rule: `setup` group →
+  `/(setup)/<id>`; `moderation` group → `/(moderation)/<id>` (platform-admin,
+  not a household route, per `implementation-map.md`); everything else
+  keyed off each screen's own `tab` field (not its `group` — `week-today`
+  and `family-settings`/`regulations-evidence` each span screens routed to
+  different tabs).
+- **Auth/API:** `src/lib/api/` (split into `http.ts` + per-domain modules —
+  `auth.ts`, `platform.ts`, `health.ts` — from the start, resolving
+  `apps/mobile`'s own `TODO(api-domains)` comment) and `src/lib/auth/`,
+  ported from `apps/mobile` and simplified: **no dual-space (family/serve)
+  resolution** — this app is single-purpose, so `bootstrap.ts` has no
+  `space-resolver.ts` equivalent. Also **fixes a bug carried in
+  `apps/mobile`**: there, `status: "ready"` still returns
+  `route: "/(auth)/site-select"`, so a fully bootstrapped user is always
+  sent through the site picker; here, `ready` routes straight to
+  `/(home)/(tabs)/week`. Session storage key is `nexsteps.home.session`
+  (apps/mobile uses `nexsteps.session`) so both apps can be installed side
+  by side. `assertEnv()`/env var resolution is otherwise identical to
+  `apps/mobile`'s, including the `AUTH0_MOBILE_*` var names — **both apps
+  share the same Auth0 application**; only `AUTH0_MOBILE_CUSTOM_SCHEME`
+  differs by default (`nexstepshome` vs `nexsteps`) to avoid a deep-link
+  collision.
+- **Data fetching:** `@tanstack/react-query`, wired into `AppProviders` —
+  the one new runtime dependency this plan adds (see Decisions table).
+
+### Deliberate scope cuts from the original plan text (recorded so they
+aren't mistaken for omissions)
+
+- **No `@pathway/pricing` / `@pathway/auth` tsconfig path mappings.**
+  `apps/mobile` has them unused (confirmed during exploration); not carried
+  over — add back only when a plan actually needs them.
+- **No Playwright/pixelmatch dependency yet.** The original plan text put
+  these in Plan 01's `package.json`; they're Plan 02 (fidelity harness)
+  tooling and were deferred to keep this PR's diff to what it actually
+  uses — YAGNI. `react-dom` + `react-native-web` **are** included, because
+  they're what makes this app's own `web` script (`expo start --web`)
+  actually run, verified via `npx expo export -p web` (clean bundle, 921
+  modules, before this PR was opened).
+- **No `fidelity/` directory.** Same reasoning — empty scaffold for a plan
+  that hasn't started yet.
+
+### Verification performed (local, before opening the PR)
+
+```
+pnpm --filter @pathway/nexsteps-home typecheck   # clean
+pnpm --filter @pathway/nexsteps-home lint         # clean
+pnpm --filter @pathway/nexsteps-home test:unit    # 4 suites, 20 tests, all pass
+pnpm -r typecheck                                 # all 15 workspace projects, clean
+pnpm -r lint                                       # all 15 workspace projects, clean
+pnpm test:unit                                     # all 22 turbo tasks, clean (includes apps/api's 734 tests)
+npx expo export -p web                             # clean bundle, 921 modules, no errors
+```
+
+One benign, known warning in the test output: `@expo/vector-icons`'
+internal async font-loading state update triggers a React Test Renderer
+`act()` warning. Third-party library internals, not a bug in this PR's
+code, does not fail the suite.
+
+**Not verified:** an actual live sign-in on a booted iOS/Android
+simulator. No real Auth0 credentials are configured in this environment,
+and initiating a real OAuth flow wasn't attempted without the user present.
+The static web export proves the app bundles and every screen/provider
+constructs without runtime error; it does not prove the live auth
+round-trip. That remains open for whoever has real Auth0 dev credentials
+to click through once, or for Plan 02's automated harness.
+
 ## Next action
 
-Finish PR1 (this docs change): open against `fss`, confirm CI green, merge.
-Then start PR2 (Plan 01 scaffolding) from a fresh `fss/master`, following
-the full Plan 01 specification in the series plan file / this ledger's
-successor entries once written.
+Push `feat/nexsteps-home-app-scaffolding`, open the PR against `fss`,
+confirm CI green (watch specifically for anything `apps/nexsteps-home`
+might disturb in the wider `pnpm -r` runs, though local reproduction found
+none), merge. Then start Plan 02 (fidelity harness + phone baselines) from
+a fresh `fss/master` — its first job is fixing the prototype font mismatch
+(blocker 1) before any baseline is captured.
 
 ---
 
@@ -147,4 +256,23 @@ successor entries once written.
   `fss/master` (branched manually, not via the native worktree tool, because
   that tool's default base ref is `origin/master` and this repo's PR
   convention is `fss/master`).
-- Writing this ledger and the series README now (PR1 in progress).
+- Wrote this ledger and the series README; opened PR1
+  ([#265](https://github.com/FSS-Ltd/pathway/pull/265)); all 5 CI checks
+  passed; squash-merged; deleted the branch and its worktree.
+- Read every reference file Plan 01 needed to port precisely:
+  `apps/mobile`'s `metro.config.js`, `tsconfig.json`, `app.config.ts`,
+  `package.json`, `babel.config.js`, `_layout.tsx`, `bootstrap.ts`,
+  `session-store.ts`, `auth0-client.ts`, `client.ts`, `space-resolver.ts`,
+  `app-providers.tsx`, `env.ts`, `index.tsx`; `packages/mobile-core`'s
+  `index.ts`/`space.ts`/`api-types.ts`/`package.json`; the primitives'
+  `ui.tsx`/`screen.tsx`/`family-bottom-nav.tsx`/`tokens.ts`.
+- Created worktree `.worktrees/feat-nexsteps-home-app-scaffolding` off
+  fresh `fss/master` (rebased once, cleanly, after PR1 merged).
+- Built the full Plan 01 scaffolding (file list above). Caught and fixed
+  one real bug during local verification: a custom `transformIgnorePatterns`
+  in `jest.config.js` silently replaced `jest-expo`'s own, breaking every
+  test suite. Also added `react-dom`/`react-native-web` after discovering
+  the `web` script would otherwise be dead on arrival (an existing,
+  unfixed gap in `apps/mobile` this app doesn't want to inherit).
+- Ran the full local verification suite listed above; everything green.
+- About to push and open PR2.

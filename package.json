@@ -8,6 +8,7 @@
     "dev:web": "pnpm --filter @pathway/web dev",
     "dev:admin": "pnpm --filter @pathway/admin dev",
     "dev:api": "pnpm --filter @pathway/api dev",
+    "dev:nexsteps-home": "pnpm --filter @pathway/nexsteps-home dev",
     "dev:apps": "pnpm dev:web & pnpm dev:admin & pnpm dev:api",
     "dev:proxy": "caddy run --config Caddyfile.dev",
     "dev:all": "pnpm dev:apps & pnpm dev:proxy",
