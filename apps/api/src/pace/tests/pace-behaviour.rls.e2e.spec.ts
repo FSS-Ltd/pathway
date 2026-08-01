@@ -21,8 +21,10 @@ interface PaceBehaviourFixture {
   tenantAId: string;
   tenantBId: string;
   childAId: string;
+  childA2Id: string;
   childBId: string;
   subjectAId: string;
+  subjectA2Id: string;
   subjectBId: string;
   actorAId: string;
   actorBId: string;
@@ -202,8 +204,10 @@ describe("ACE PACE and behaviour fact storage", () => {
       tenantAId: randomUUID(),
       tenantBId: randomUUID(),
       childAId: randomUUID(),
+      childA2Id: randomUUID(),
       childBId: randomUUID(),
       subjectAId: randomUUID(),
+      subjectA2Id: randomUUID(),
       subjectBId: randomUUID(),
       actorAId: randomUUID(),
       actorBId: randomUUID(),
@@ -264,10 +268,25 @@ describe("ACE PACE and behaviour fact storage", () => {
             tenantId: fixture.tenantAId,
           },
         });
+        await tx.child.create({
+          data: {
+            id: fixture.childA2Id,
+            firstName: "PACE",
+            lastName: "Child A2",
+            tenantId: fixture.tenantAId,
+          },
+        });
         await tx.subject.create({
           data: {
             id: fixture.subjectAId,
             name: `PACE subject A ${fixture.subjectAId}`,
+            tenantId: fixture.tenantAId,
+          },
+        });
+        await tx.subject.create({
+          data: {
+            id: fixture.subjectA2Id,
+            name: `PACE subject A2 ${fixture.subjectA2Id}`,
             tenantId: fixture.tenantAId,
           },
         });
@@ -316,10 +335,16 @@ describe("ACE PACE and behaviour fact storage", () => {
 
     await deletePaceBehaviourRowsIfPresent(prisma);
     await prisma.subject.deleteMany({
-      where: { id: { in: [fixture.subjectAId, fixture.subjectBId] } },
+      where: {
+        id: {
+          in: [fixture.subjectAId, fixture.subjectA2Id, fixture.subjectBId],
+        },
+      },
     });
     await prisma.child.deleteMany({
-      where: { id: { in: [fixture.childAId, fixture.childBId] } },
+      where: {
+        id: { in: [fixture.childAId, fixture.childA2Id, fixture.childBId] },
+      },
     });
     await prisma.siteMembership.deleteMany({
       where: { userId: { in: [fixture.actorAId, fixture.actorBId] } },
@@ -478,6 +503,9 @@ describe("ACE PACE and behaviour fact storage", () => {
   it("requires non-empty reasons and future expiry for both override types", async () => {
     if (!isDatabaseAvailable()) return;
 
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    const expiredAt = new Date(Date.now() - 60 * 60 * 1000);
+    const forgedCreatedAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const { pacePolicyId, demeritPolicyId } = await withPaceRlsContext(
       fixture.tenantAId,
       fixture.orgAId,
@@ -497,7 +525,7 @@ describe("ACE PACE and behaviour fact storage", () => {
             ) VALUES (
               ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
               ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
-              ${fixture.actorAId}, '  ', ${new Date("2026-09-20T00:00:00.000Z")}
+              ${fixture.actorAId}, '  ', ${futureExpiry}
             )
           `,
         ),
@@ -533,7 +561,25 @@ describe("ACE PACE and behaviour fact storage", () => {
               ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
               ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
               ${fixture.actorAId}, 'Expired exception',
-              ${new Date("2000-01-01T00:00:00.000Z")}
+              ${expiredAt}
+            )
+          `,
+        ),
+      "23514",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            INSERT INTO "PacePolicyOverride" (
+              "id", "tenantId", "childId", "subjectId", "pacePolicyId",
+              "policyCode", "authorisedByUserId", "reason", "createdAt",
+              "expiresAt"
+            ) VALUES (
+              ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
+              ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
+              ${fixture.actorAId}, 'Forged timestamp', ${forgedCreatedAt},
+              ${expiredAt}
             )
           `,
         ),
@@ -552,7 +598,7 @@ describe("ACE PACE and behaviour fact storage", () => {
             ) VALUES (
               ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
               ${demeritPolicyId}, 2, ${fixture.actorAId}, '',
-              ${new Date("2026-09-20T00:00:00.000Z")}
+              ${futureExpiry}
             )
           `,
         ),
@@ -586,12 +632,196 @@ describe("ACE PACE and behaviour fact storage", () => {
             ) VALUES (
               ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
               ${demeritPolicyId}, 2, ${fixture.actorAId}, 'Expired stage',
-              ${new Date("2000-01-01T00:00:00.000Z")}
+              ${expiredAt}
             )
           `,
         ),
       "23514",
     );
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            INSERT INTO "DemeritStageOverride" (
+              "id", "tenantId", "childId", "demeritPolicyId", "stage",
+              "authorisedByUserId", "reason", "createdAt", "expiresAt"
+            ) VALUES (
+              ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
+              ${demeritPolicyId}, 2, ${fixture.actorAId}, 'Forged timestamp',
+              ${forgedCreatedAt}, ${expiredAt}
+            )
+          `,
+        ),
+      "23514",
+    );
+  });
+
+  it("rejects PACE overrides for another child or subject in the same tenant", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    const { pacePolicyId } = await withPaceRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertPolicies(tx, fixture),
+    );
+    const childOverrideId = randomUUID();
+    const subjectOverrideId = randomUUID();
+
+    await withPaceRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+      await tx.$executeRaw`
+        INSERT INTO "PacePolicyOverride" (
+          "id", "tenantId", "childId", "subjectId", "pacePolicyId",
+          "policyCode", "authorisedByUserId", "reason", "expiresAt"
+        ) VALUES (
+          ${childOverrideId}, ${fixture.tenantAId}, ${fixture.childAId},
+          ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
+          ${fixture.actorAId}, 'Child-scoped exception', ${futureExpiry}
+        )
+      `;
+      await tx.$executeRaw`
+        INSERT INTO "PacePolicyOverride" (
+          "id", "tenantId", "childId", "subjectId", "pacePolicyId",
+          "policyCode", "authorisedByUserId", "reason", "expiresAt"
+        ) VALUES (
+          ${subjectOverrideId}, ${fixture.tenantAId}, ${fixture.childAId},
+          ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
+          ${fixture.actorAId}, 'Subject-scoped exception', ${futureExpiry}
+        )
+      `;
+    });
+
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertPaceAssessment(tx, fixture, {
+            childId: fixture.childA2Id,
+            policyOverrideId: childOverrideId,
+          }),
+        ),
+      "23503",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertPaceAssessment(tx, fixture, {
+            subjectId: fixture.subjectA2Id,
+            policyOverrideId: subjectOverrideId,
+          }),
+        ),
+      "23503",
+    );
+  });
+
+  it("rejects PaceProgress linked to another child or subject in the same tenant", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const assessmentId = await withPaceRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertPaceAssessment(tx, fixture),
+    );
+
+    for (const [childId, subjectId] of [
+      [fixture.childA2Id, fixture.subjectAId],
+      [fixture.childAId, fixture.subjectA2Id],
+    ] as const) {
+      await expectDatabaseRejection(
+        () =>
+          withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+            tx.$executeRaw`
+              INSERT INTO "PaceProgress" (
+                "id", "tenantId", "childId", "subjectId", "currentPace",
+                "targetPace", "completedPaces", "trackStatus",
+                "lastAssessmentId", "rebuiltAt"
+              ) VALUES (
+                ${randomUUID()}, ${fixture.tenantAId}, ${childId}, ${subjectId},
+                101, 110, 1, 'ON_TRACK', ${assessmentId},
+                ${new Date("2026-09-16T00:00:00.000Z")}
+              )
+            `,
+          ),
+        "23503",
+      );
+    }
+  });
+
+  it("keeps policy override facts immutable", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000);
+    const forgedCreatedAt = new Date(Date.now() - 60 * 60 * 1000);
+    const earliestExpectedCreatedAt = new Date(Date.now() - 1000);
+    const { pacePolicyId, demeritPolicyId } = await withPaceRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertPolicies(tx, fixture),
+    );
+    const paceOverrideId = randomUUID();
+    const demeritOverrideId = randomUUID();
+
+    await withPaceRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+      await tx.$executeRaw`
+        INSERT INTO "PacePolicyOverride" (
+          "id", "tenantId", "childId", "subjectId", "pacePolicyId",
+          "policyCode", "authorisedByUserId", "reason", "createdAt",
+          "expiresAt"
+        ) VALUES (
+          ${paceOverrideId}, ${fixture.tenantAId}, ${fixture.childAId},
+          ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
+          ${fixture.actorAId}, 'Approved exception', ${forgedCreatedAt},
+          ${futureExpiry}
+        )
+      `;
+      await tx.$executeRaw`
+        INSERT INTO "DemeritStageOverride" (
+          "id", "tenantId", "childId", "demeritPolicyId", "stage",
+          "authorisedByUserId", "reason", "createdAt", "expiresAt"
+        ) VALUES (
+          ${demeritOverrideId}, ${fixture.tenantAId}, ${fixture.childAId},
+          ${demeritPolicyId}, 2, ${fixture.actorAId}, 'Manual stage',
+          ${forgedCreatedAt}, ${futureExpiry}
+        )
+      `;
+    });
+
+    const latestExpectedCreatedAt = new Date(Date.now() + 1000);
+    const [paceOverride] = await prisma.$queryRaw<Array<{ createdAt: Date }>>`
+      SELECT "createdAt" FROM "PacePolicyOverride" WHERE "id" = ${paceOverrideId}
+    `;
+    const [demeritOverride] = await prisma.$queryRaw<
+      Array<{ createdAt: Date }>
+    >`
+      SELECT "createdAt" FROM "DemeritStageOverride" WHERE "id" = ${demeritOverrideId}
+    `;
+
+    for (const override of [paceOverride, demeritOverride]) {
+      expect(override.createdAt.getTime()).toBeGreaterThanOrEqual(
+        earliestExpectedCreatedAt.getTime(),
+      );
+      expect(override.createdAt.getTime()).toBeLessThanOrEqual(
+        latestExpectedCreatedAt.getTime(),
+      );
+    }
+
+    for (const operation of [
+      () =>
+        withPaceRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`UPDATE "PacePolicyOverride" SET "reason" = 'Changed' WHERE "id" = ${paceOverrideId}`,
+        ),
+      () =>
+        withPaceRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`UPDATE "DemeritStageOverride" SET "reason" = 'Changed' WHERE "id" = ${demeritOverrideId}`,
+        ),
+    ]) {
+      await expectDatabaseRejection(operation, "55000");
+    }
   });
 
   it("rejects child, correction, and actor swaps across tenants", async () => {
@@ -674,6 +904,7 @@ describe("ACE PACE and behaviour fact storage", () => {
   it("isolates all PACE and behaviour tables with forced tenant RLS", async () => {
     if (!isDatabaseAvailable()) return;
 
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000);
     const { pacePolicyId, demeritPolicyId } = await withPaceRlsContext(
       fixture.tenantAId,
       fixture.orgAId,
@@ -704,7 +935,7 @@ describe("ACE PACE and behaviour fact storage", () => {
           ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
           ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
           ${fixture.actorAId}, 'Approved exception',
-          ${new Date("2099-09-20T00:00:00.000Z")}
+          ${futureExpiry}
         )
       `;
       await tx.$executeRaw`
@@ -714,7 +945,7 @@ describe("ACE PACE and behaviour fact storage", () => {
         ) VALUES (
           ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
           ${demeritPolicyId}, 2, ${fixture.actorAId}, 'Manual stage',
-          ${new Date("2099-09-20T00:00:00.000Z")}
+          ${futureExpiry}
         )
       `;
     });

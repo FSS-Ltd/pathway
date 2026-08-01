@@ -93,6 +93,8 @@ CREATE TABLE "PacePolicyOverride" (
   CONSTRAINT "PacePolicyOverride_reason_check" CHECK (btrim("reason") <> ''),
   CONSTRAINT "PacePolicyOverride_expiry_check" CHECK ("expiresAt" > "createdAt"),
   CONSTRAINT "PacePolicyOverride_id_tenantId_key" UNIQUE ("id", "tenantId"),
+  CONSTRAINT "PacePolicyOverride_id_tenantId_childId_subjectId_key"
+    UNIQUE ("id", "tenantId", "childId", "subjectId"),
   CONSTRAINT "PacePolicyOverride_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "PacePolicyOverride_childId_tenantId_fkey"
@@ -154,6 +156,8 @@ CREATE TABLE "PaceAssessment" (
   CONSTRAINT "PaceAssessment_not_self_correction_check"
     CHECK ("correctsAssessmentId" IS NULL OR "correctsAssessmentId" <> "id"),
   CONSTRAINT "PaceAssessment_id_tenantId_key" UNIQUE ("id", "tenantId"),
+  CONSTRAINT "PaceAssessment_id_tenantId_childId_subjectId_key"
+    UNIQUE ("id", "tenantId", "childId", "subjectId"),
   CONSTRAINT "PaceAssessment_correctsAssessmentId_tenantId_key"
     UNIQUE ("correctsAssessmentId", "tenantId"),
   CONSTRAINT "PaceAssessment_policyOverrideId_tenantId_key"
@@ -166,8 +170,9 @@ CREATE TABLE "PaceAssessment" (
     FOREIGN KEY ("subjectId", "tenantId") REFERENCES "Subject"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "PaceAssessment_recordedByUserId_fkey"
     FOREIGN KEY ("recordedByUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "PaceAssessment_policyOverrideId_tenantId_fkey"
-    FOREIGN KEY ("policyOverrideId", "tenantId") REFERENCES "PacePolicyOverride"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT "PaceAssessment_policyOverrideId_tenantId_childId_subjectId_fkey"
+    FOREIGN KEY ("policyOverrideId", "tenantId", "childId", "subjectId")
+    REFERENCES "PacePolicyOverride"("id", "tenantId", "childId", "subjectId") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "PaceAssessment_correctsAssessmentId_tenantId_fkey"
     FOREIGN KEY ("correctsAssessmentId", "tenantId") REFERENCES "PaceAssessment"("id", "tenantId") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
@@ -200,8 +205,9 @@ CREATE TABLE "PaceProgress" (
     FOREIGN KEY ("childId", "tenantId") REFERENCES "Child"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "PaceProgress_subjectId_tenantId_fkey"
     FOREIGN KEY ("subjectId", "tenantId") REFERENCES "Subject"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "PaceProgress_lastAssessmentId_tenantId_fkey"
-    FOREIGN KEY ("lastAssessmentId", "tenantId") REFERENCES "PaceAssessment"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE
+  CONSTRAINT "PaceProgress_lastAssessmentId_tenantId_childId_subjectId_fkey"
+    FOREIGN KEY ("lastAssessmentId", "tenantId", "childId", "subjectId")
+    REFERENCES "PaceAssessment"("id", "tenantId", "childId", "subjectId") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE TABLE "BehaviourEntry" (
@@ -303,6 +309,27 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION app.require_ace_record_actor_membership() FROM PUBLIC;
+
+-- Override expiry is measured from the database statement, not caller input.
+CREATE FUNCTION app.set_ace_override_created_at()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+BEGIN
+  NEW."createdAt" := pg_catalog.statement_timestamp();
+  RETURN NEW;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION app.set_ace_override_created_at() FROM PUBLIC;
+
+CREATE TRIGGER "PacePolicyOverride_set_created_at"
+BEFORE INSERT ON "PacePolicyOverride"
+FOR EACH ROW EXECUTE FUNCTION app.set_ace_override_created_at();
+CREATE TRIGGER "DemeritStageOverride_set_created_at"
+BEFORE INSERT ON "DemeritStageOverride"
+FOR EACH ROW EXECUTE FUNCTION app.set_ace_override_created_at();
 
 CREATE TRIGGER "PaceAssessment_require_actor_membership"
 BEFORE INSERT OR UPDATE OF "tenantId", "recordedByUserId" ON "PaceAssessment"
