@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Executing PR4 (Plan 02 — fidelity harness + phone baselines)
+**Current phase:** Between plans — Plan 03 needs a product/design decision before implementation starts (see "Next action")
 
 ---
 
@@ -25,8 +25,9 @@ continue.
 | 1 | 00 — series docs | **merged** | `docs/nexsteps-home-build-plan-series` | [#265](https://github.com/FSS-Ltd/pathway/pull/265) | squash-merged, branch deleted |
 | 2 | 01 — app scaffolding | **merged** | `feat/nexsteps-home-app-scaffolding` | [#267](https://github.com/FSS-Ltd/pathway/pull/267) | squash-merged, branch deleted; `apps/nexsteps-home` now exists on `master` |
 | 3 | ledger update | **merged** | `docs/nexsteps-home-progress-update` | [#268](https://github.com/FSS-Ltd/pathway/pull/268) | squash-merged, branch deleted |
-| 4 | 02 — fidelity harness + phone baselines | in progress | `feat/nexsteps-home-fidelity-harness` | not yet opened | code complete, verified locally, about to push |
-| 5-16 | 03-14 | not started | — | — | — |
+| 4 | 02 — fidelity harness + phone baselines | **merged** | `feat/nexsteps-home-fidelity-harness` | [#271](https://github.com/FSS-Ltd/pathway/pull/271) | squash-merged, branch deleted; 76 approved screens now have committed baselines |
+| 5 | 03 — tablet design pass + tablet baselines | **blocked on product/design input** | — | — | not a pure-engineering plan — see "Next action" |
+| 6-16 | 04-14 | not started | — | — | — |
 
 ## Environment
 
@@ -356,11 +357,31 @@ pnpm test:fidelity (temporarily non-empty checklist)  # proven functional, see a
 
 ## Next action
 
-Push `feat/nexsteps-home-fidelity-harness`, open the PR against `fss`,
-confirm CI green, merge. Then start Plan 03 (tablet design pass + tablet
-baselines) from a fresh `fss/master` — no approved tablet wireframes exist
-yet, so this plan extends the prototype with a tablet device preset and
-gets two-pane layouts approved before any tablet screen is built.
+**Plan 03 needs a product/design decision this series has not made
+autonomously up to this point.** Plans 00-02 were execution against an
+already-approved handoff (screen inventory, design system, the user's own
+architecture answers from the plan-mode session). Plan 03 is different in
+kind: it designs *new*, previously-nonexistent tablet layouts for the flows
+that get two-pane treatment (week/day, progress/detail, evidence
+gallery/detail, correspondence, channels/threads, moderation queue/report
+were the plan's candidate list) and asks for product approval before any
+tablet screen is built — that approval step is explicit in the plan
+document, not a formality to skip.
+
+Before starting Plan 03, get from the user (or whoever owns product
+sign-off for this series):
+1. Confirmation of which flows actually get two-pane tablet treatment —
+   the candidate list above is a starting proposal, not a decision.
+2. Whatever visual direction is needed to design those layouts
+   consistently with the approved phone wireframes (the existing
+   `docs/NexStepsV2/nexsteps-home/design-system.md` covers phone only).
+
+Once that's settled, the mechanical steps are unchanged from the pattern
+used so far: extend `prototypes/nexsteps-home/src/mobile/geometry.ts` with
+a tablet device preset, design the two-pane screens in the prototype, add
+them to `screen-inventory.json` (extending `validate-handoff.mjs`), capture
+tablet baselines with the Plan 02 harness, and only then implement
+`src/responsive/TwoPane.tsx` consumers in `apps/nexsteps-home`.
 
 ---
 
@@ -431,4 +452,11 @@ gets two-pane layouts approved before any tablet screen is built.
   before trusting it — reverted both temporary states (a running dev
   server, a non-empty checklist) before committing.
 - Ran the full local verification suite listed above; everything green.
-- About to push and open PR4.
+- Pushed and opened PR4 ([#271](https://github.com/FSS-Ltd/pathway/pull/271));
+  all 5 CI checks passed; squash-merged; deleted the branch and its worktree.
+- This entry: recorded PR4's merge and paused the series here rather than
+  starting Plan 03 unilaterally — it requires a product/design decision
+  (which flows get two-pane tablet treatment, and visual direction for
+  designing them) that Plans 00-02 did not need, since those executed
+  against an already-approved handoff plus the user's own answers from the
+  original plan-mode session. Reported status to the user; awaiting reply.
