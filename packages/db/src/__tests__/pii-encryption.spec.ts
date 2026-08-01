@@ -1,7 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { encryptField, isEncryptedField } from "@pathway/util";
-import type { PrismaClient } from "@prisma/client";
-import { withPiiEncryption } from "../pii-encryption";
+import type { Prisma, PrismaClient } from "@prisma/client";
+import {
+  withPiiEncryption,
+  withPiiEncryptionTransaction,
+} from "../pii-encryption";
 
 type AllOperationsHandler = (params: {
   model?: string;
@@ -171,5 +174,35 @@ describe("withPiiEncryption", () => {
     );
 
     expect(capturedArgs?.data.allergies).toBe(already);
+  });
+});
+
+describe("withPiiEncryptionTransaction", () => {
+  it("encrypts writes and decrypts reads issued by a transaction delegate", async () => {
+    let storedText = "";
+    const childNote = {
+      async create(args: { data: { text: string } }) {
+        storedText = args.data.text;
+        return { id: "note-1", text: storedText };
+      },
+      async findUnique() {
+        return { id: "note-1", text: storedText };
+      },
+    };
+    const transaction = {
+      childNote,
+    } as unknown as Prisma.TransactionClient;
+    const encryptedTransaction = withPiiEncryptionTransaction(transaction) as unknown as {
+      childNote: typeof childNote;
+    };
+
+    const created = await encryptedTransaction.childNote.create({
+      data: { text: "Private note" },
+    });
+    const read = await encryptedTransaction.childNote.findUnique();
+
+    expect(isEncryptedField(storedText)).toBe(true);
+    expect(created.text).toBe("Private note");
+    expect(read.text).toBe("Private note");
   });
 });

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Prisma, Role, withTenantRlsContext } from "@pathway/db";
+import { isEncryptedField } from "@pathway/util";
 import {
   requireDatabase,
   isDatabaseAvailable,
@@ -416,6 +417,46 @@ describe("Postgres RLS policies", () => {
 
     expect(result.childIds).toEqual(expect.arrayContaining([childId]));
     expect(result.noteIds).toEqual(expect.arrayContaining([noteId]));
+  });
+
+  it("encrypts and decrypts ChildNote text through a tenant-scoped transaction", async () => {
+    if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
+    const { noteId, orgId } = fixtures[TENANT_A];
+    const result = await withEnforcedTenantRlsContext(
+      TENANT_A,
+      orgId,
+      async (tx) => {
+        const [stored] = await tx.$queryRaw<Array<{ text: string }>>`
+          SELECT "text" FROM "ChildNote" WHERE "id" = ${noteId}
+        `;
+        const note = await tx.childNote.findUnique({
+          where: { id: noteId },
+          select: { text: true },
+        });
+        return { storedText: stored?.text, returnedText: note?.text };
+      },
+    );
+
+    expect(result.storedText).toBeDefined();
+    expect(isEncryptedField(result.storedText!)).toBe(true);
+    expect(result.returnedText).toBe("Note A");
+  });
+
+  it("preserves fluent ChildNote relation reads in tenant-scoped transactions", async () => {
+    if (!isDatabaseAvailable() || !fixtures[TENANT_A]) return;
+    const { childId, noteId, orgId } = fixtures[TENANT_A];
+    const notes = await withEnforcedTenantRlsContext(
+      TENANT_A,
+      orgId,
+      async (tx) =>
+        tx.child
+          .findUnique({ where: { id: childId } })
+          .childNotes({ select: { id: true, text: true } }),
+    );
+
+    expect(notes).toEqual(
+      expect.arrayContaining([{ id: noteId, text: "Note A" }]),
+    );
   });
 
   it("blocks cross-tenant note lookups silently", async () => {
