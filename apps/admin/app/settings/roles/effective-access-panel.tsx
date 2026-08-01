@@ -74,11 +74,6 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
       title="Effective access preview"
       description="What a person can actually do, and which role granted it"
     >
-      <div className="rounded-md border border-border-subtle bg-muted px-3 py-2 text-xs text-text-muted">
-        Reflects granted roles; some entries may not appear until platform feature
-        availability is fully configured for this environment.
-      </div>
-
       <div className="mt-4 max-w-sm">
         <Label htmlFor="effective-access-person">Person</Label>
         <Select

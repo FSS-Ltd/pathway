@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import type { Prisma } from "@pathway/db";
-import type { PermissionKey } from "@pathway/platform";
 import {
   AuditAction,
   AuditEntityType,
@@ -9,8 +8,6 @@ import {
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { AccessCacheService } from "./access-cache.service";
-import { AccessShadowService } from "./access-shadow.service";
-import { assertPlatformAccessRouteAccessWithShadow } from "./assert-platform-access";
 import { decodeCreatedAtIdCursor, encodeCreatedAtIdCursor } from "./cursor";
 import { roleApiError } from "./role-api-error";
 import { RoleSafetyService } from "./role-safety.service";
@@ -59,8 +56,6 @@ export class AssignmentsService {
     private readonly cache: AccessCacheService,
     @Inject(RoleSafetyService)
     private readonly roleSafety: RoleSafetyService,
-    @Inject(AccessShadowService)
-    private readonly shadow: AccessShadowService,
   ) {}
 
   async list(
@@ -72,7 +67,6 @@ export class AssignmentsService {
       ? parseAssignmentCursor(input.cursor, actor)
       : undefined;
     return this.transaction.run(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "read", "GET /access/assignments");
       await tx.$queryRawUnsafe(
         "SELECT set_config('app.assignment_org_read', 'on', true)",
       );
@@ -117,7 +111,6 @@ export class AssignmentsService {
     actor: RoleActorContext,
   ) {
     const assignments = await this.transaction.run(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage", "POST /access/assignments");
       const prepared = [];
       for (const [inputIndex, command] of commands.entries()) {
         prepared.push(
@@ -146,12 +139,6 @@ export class AssignmentsService {
 
   async revoke(assignmentId: string, actor: RoleActorContext) {
     const assignment = await this.transaction.run(actor, async (tx) => {
-      await this.assertRouteAccess(
-        tx,
-        actor,
-        "manage",
-        "DELETE /access/assignments/:assignmentId",
-      );
       const existing = await tx.userRoleAssignment.findFirst({
         where: { id: assignmentId, orgId: actor.orgId },
       });
@@ -385,23 +372,6 @@ export class AssignmentsService {
     });
   }
 
-  private async assertRouteAccess(
-    tx: Prisma.TransactionClient,
-    actor: RoleActorContext,
-    access: "read" | "manage",
-    route: string,
-  ): Promise<void> {
-    const permissionKey =
-      `platform.access.assignments.${access}` as PermissionKey;
-    await assertPlatformAccessRouteAccessWithShadow(
-      tx,
-      actor,
-      permissionKey,
-      "ASSIGNMENT_API_ACCESS_DENIED",
-      route,
-      this.shadow,
-    );
-  }
 
   private async invalidateUsers(
     userIds: readonly string[],

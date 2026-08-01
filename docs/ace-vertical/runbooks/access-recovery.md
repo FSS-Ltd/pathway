@@ -21,8 +21,8 @@ post-mutation state:
   two permissions may come from different active roles.
 
 Active means the assignment is not revoked, has started, and has no expiry or
-an expiry later than the database transaction time. Temporary legacy
-`ORG_ADMIN` bootstrap authority does not satisfy either invariant.
+an expiry later than the database transaction time. A legacy `ORG_ADMIN`
+membership does not satisfy either invariant.
 
 A rejected request is rolled back with its audit and outbox writes. No cache
 flush is needed for the rejected change because no access mutation commits.
@@ -58,7 +58,8 @@ customer role APIs. System-role mutation protection remains authoritative.
    remain organisation-scoped under forced RLS.
 
 Never bypass the invariant by editing a system role, counting an inactive
-assignment, or granting authority only through the temporary legacy bootstrap.
+assignment, or treating a legacy `ORG_ADMIN` membership as sufficient
+authority.
 
 ## MFA and step-up deferral
 

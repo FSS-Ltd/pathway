@@ -1,6 +1,11 @@
 import { Module } from "@nestjs/common";
-import { prisma, withOrgRlsContext } from "@pathway/db";
-import { getOrgCapabilities, type PermissionKey } from "@pathway/platform";
+import { prisma, withOrgRlsContext, withTenantRlsContext } from "@pathway/db";
+import {
+  CAPABILITY_DEFINITIONS,
+  getOrgCapabilities,
+  type CapabilityDefinition,
+  type PermissionKey,
+} from "@pathway/platform";
 import { CommonModule } from "../common/common.module";
 import { AuthModule } from "../auth/auth.module";
 import { LoggingService } from "../common/logging/logging.service";
@@ -105,23 +110,25 @@ const orgCapabilitiesReader: OrgCapabilitiesReader = {
   get: getOrgCapabilities,
 };
 
-// ponytail: fails closed until a real feature-availability source is wired
-// (see a405683, "fail closed until feature availability is configured").
-// Every EffectivePermissionsService.resolve()/listForUser*() call returns
-// empty until then; the effective-access-preview admin UI documents this gap
-// rather than working around it. Upgrade: implement isAvailable against the
-// real feature-rollout source once it exists.
+// Only ace.student_community declares a FeatureToggle today, and no route
+// using it exists yet (lands in ACE-F15+). A key with no toggle is not
+// subject to this layer at all; a key with one stays denied until a real
+// per-org rollout source is wired. Unknown keys fail closed.
 const featureAvailabilityReader: FeatureAvailabilityReader = {
-  async isAvailable() {
-    return false;
+  async isAvailable(_orgId, permission) {
+    const definition = (
+      CAPABILITY_DEFINITIONS as Record<string, CapabilityDefinition>
+    )[permission];
+    if (!definition) return false;
+    return definition.featureToggle === undefined;
   },
 };
 
 const effectivePermissionsContext: EffectivePermissionsContext = {
   async run(orgId, tenantId, operation) {
-    return tenantId === undefined
-      ? withOrgRlsContext(orgId, operation)
-      : operation();
+    return tenantId
+      ? withTenantRlsContext(tenantId, orgId, () => operation())
+      : withOrgRlsContext(orgId, () => operation());
   },
 };
 

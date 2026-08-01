@@ -27,12 +27,6 @@ describe("access-users effective-permissions endpoint", () => {
     legacyOrgRoles: ["org:admin"],
     requestId: "access-users-request-1",
   };
-  const actorNonAdminA: RoleActorContext = {
-    orgId: orgA,
-    userId: nonAdminA,
-    legacyOrgRoles: [],
-    requestId: "access-users-request-2",
-  };
 
   let alwaysAvailableModuleRef: TestingModule | undefined;
   let failClosedModuleRef: TestingModule | undefined;
@@ -112,18 +106,7 @@ describe("access-users effective-permissions endpoint", () => {
     await failClosedModuleRef?.close();
   });
 
-  it("denies an actor without organisation-admin authority", async () => {
-    if (!isDatabaseAvailable()) return;
-
-    const service = failClosedModuleRef!.get(AccessUsersService);
-    await expect(
-      service.getEffectivePermissions(targetUserA, actorNonAdminA),
-    ).rejects.toMatchObject({
-      response: { statusCode: 403, code: "EFFECTIVE_ACCESS_API_ACCESS_DENIED" },
-    });
-  });
-
-  it("returns no permissions today because the feature-availability gate fails closed by default", async () => {
+  it("resolves the real granted permission using the default feature-availability reader, since ace.pace.read declares no toggle", async () => {
     if (!isDatabaseAvailable()) return;
 
     const service = failClosedModuleRef!.get(AccessUsersService);
@@ -133,7 +116,7 @@ describe("access-users effective-permissions endpoint", () => {
       userId: targetUserA,
       orgId: orgA,
       tenantId: null,
-      permissions: [],
+      permissions: [{ permissionKey: "ace.pace.read", sourceRoleIds: [roleId] }],
     });
   });
 

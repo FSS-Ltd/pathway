@@ -30,54 +30,11 @@ export interface AccessShadowComparison {
   request: EffectiveAccessRequest;
 }
 
+// R01-R14 (the /access/* family) no longer call compare(): ACE-F14 cut them
+// over to PermissionGuard directly and removed the legacy bootstrap they were
+// shadowed against. Empty until a future route migration (e.g. ACE-F15+)
+// needs this instrument again for its own bounded route set.
 export const ACCESS_SHADOW_ALLOW_LIST = [
-  { route: "GET /access/roles", permission: "platform.access.roles.read" },
-  { route: "POST /access/roles", permission: "platform.access.roles.manage" },
-  {
-    route: "GET /access/roles/:roleId",
-    permission: "platform.access.roles.read",
-  },
-  {
-    route: "PATCH /access/roles/:roleId",
-    permission: "platform.access.roles.manage",
-  },
-  {
-    route: "POST /access/roles/:roleId/clone",
-    permission: "platform.access.roles.manage",
-  },
-  {
-    route: "PUT /access/roles/:roleId/permissions",
-    permission: "platform.access.roles.manage",
-  },
-  {
-    route: "POST /access/roles/:roleId/retire",
-    permission: "platform.access.roles.manage",
-  },
-  {
-    route: "GET /access/permissions",
-    permission: "platform.access.permissions.read",
-  },
-  {
-    route: "GET /access/assignments",
-    permission: "platform.access.assignments.read",
-  },
-  {
-    route: "POST /access/assignments",
-    permission: "platform.access.assignments.manage",
-  },
-  {
-    route: "DELETE /access/assignments/:assignmentId",
-    permission: "platform.access.assignments.manage",
-  },
-  {
-    route: "GET /access/users/:userId/effective-permissions",
-    permission: "platform.access.users.read",
-  },
-  {
-    route: "GET /access/users/:userId/access-summary",
-    permission: "platform.access.users.read",
-  },
-  { route: "GET /access/audit", permission: "platform.access.audit.read" },
 ] as const satisfies readonly AccessShadowAllowListEntry[];
 
 export function accessShadowConfigFromEnvironment(): AccessShadowConfig {

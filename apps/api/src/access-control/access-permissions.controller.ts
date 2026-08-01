@@ -2,6 +2,8 @@ import { Controller, Get, Inject, Req, UseGuards } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { AccessPermissionsService } from "./access-permissions.service";
+import { PermissionGuard } from "./permission.guard";
+import { RequirePermission } from "./require-permission.decorator";
 import { roleApiError } from "./role-api-error";
 import type { RoleActorContext } from "./roles.service";
 import {
@@ -9,7 +11,7 @@ import {
   type RequestWithRequestId,
 } from "./request-id";
 
-@UseGuards(AuthUserGuard)
+@UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("access/permissions")
 export class AccessPermissionsController {
   constructor(
@@ -20,6 +22,7 @@ export class AccessPermissionsController {
   ) {}
 
   @Get()
+  @RequirePermission("platform.access.permissions.read")
   async listDelegable(@Req() request: RequestWithRequestId) {
     const requestId = getOrCreateRequestId(request);
     const delegableKeys = await this.permissions.listDelegableKeys(

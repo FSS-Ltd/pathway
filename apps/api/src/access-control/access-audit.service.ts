@@ -1,7 +1,5 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { AuditEntityType } from "../audit/audit.types";
-import { assertPlatformAccessRouteAccessWithShadow } from "./assert-platform-access";
-import { AccessShadowService } from "./access-shadow.service";
 import { decodeCreatedAtIdCursor, encodeCreatedAtIdCursor } from "./cursor";
 import { roleApiError } from "./role-api-error";
 import {
@@ -29,8 +27,6 @@ export class AccessAuditService {
   constructor(
     @Inject(ROLES_TRANSACTION_BOUNDARY)
     private readonly transaction: RolesTransactionBoundary,
-    @Inject(AccessShadowService)
-    private readonly shadow: AccessShadowService,
   ) {}
 
   async list(actor: RoleActorContext, query: AuditListQuery = {}) {
@@ -43,15 +39,6 @@ export class AccessAuditService {
       : AUDIT_ENTITY_TYPES;
 
     return this.transaction.run(actor, async (tx) => {
-      await assertPlatformAccessRouteAccessWithShadow(
-        tx,
-        actor,
-        "platform.access.audit.read",
-        "AUDIT_API_ACCESS_DENIED",
-        "GET /access/audit",
-        this.shadow,
-      );
-
       const rows = await tx.auditEvent.findMany({
         where: {
           orgId: actor.orgId,

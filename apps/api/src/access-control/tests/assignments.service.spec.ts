@@ -1,6 +1,5 @@
 import type { Prisma } from "@pathway/db";
 import { AccessCacheService, MAX_ACCESS_CACHE_TTL_MS } from "../access-cache.service";
-import type { AccessShadowService } from "../access-shadow.service";
 import {
   AssignmentsService,
   type AssignRoleCommand,
@@ -38,9 +37,6 @@ const passThroughRoleSafety = {
     await safetyCommand.mutate();
   },
 } as RoleSafetyService;
-const shadow = {
-  compare: jest.fn().mockResolvedValue(true),
-} as unknown as AccessShadowService;
 
 function buildHarness(options: {
   actorMembership?: { role: string } | null;
@@ -138,7 +134,6 @@ function buildHarness(options: {
       new OutboxService(),
       cache,
       passThroughRoleSafety,
-      shadow,
     ),
   };
 }
@@ -164,7 +159,6 @@ describe("AssignmentsService", () => {
       new OutboxService(),
       base.cache,
       passThroughRoleSafety,
-      shadow,
     );
 
     await expect(service.assign([command], actor)).resolves.toEqual([
@@ -272,7 +266,6 @@ describe("AssignmentsService", () => {
       new OutboxService(),
       base.cache,
       passThroughRoleSafety,
-      shadow,
     );
 
     await expect(
@@ -652,17 +645,6 @@ describe("AssignmentsService", () => {
     expect(tx.userRoleAssignment.findMany).not.toHaveBeenCalled();
   });
 
-  it("requires active database ORG_ADMIN, trusted org:admin, capability, metadata, and template authority", async () => {
-    const deniedActor = { ...actor, legacyOrgRoles: [] };
-    const { service, tx } = buildHarness();
-
-    await expect(service.list(deniedActor)).rejects.toMatchObject({
-      response: { statusCode: 403, code: "ASSIGNMENT_API_ACCESS_DENIED" },
-    });
-    expect(tx.$queryRawUnsafe).not.toHaveBeenCalled();
-    expect(tx.userRoleAssignment.findMany).not.toHaveBeenCalled();
-  });
-
   it("keeps successful assignment durable when direct invalidation fails and lets the cache fall back within 60 seconds", async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date("2026-07-29T12:00:00.000Z"));
@@ -686,7 +668,6 @@ describe("AssignmentsService", () => {
         new OutboxService(),
         cache,
         passThroughRoleSafety,
-        shadow,
       );
 
       await expect(service.assign([command], actor)).resolves.toHaveLength(1);
