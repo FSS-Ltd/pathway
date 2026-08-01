@@ -3,6 +3,7 @@ import { AnnouncementsController } from "../announcements.controller";
 import { AnnouncementsService } from "../announcements.service";
 import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
+import { PermissionGuard } from "../../access-control/permission.guard";
 import {
   Av30HardCapExceededError,
   EntitlementsEnforcementService,
@@ -84,6 +85,8 @@ describe("AnnouncementsController", () => {
       .overrideGuard(PathwayAuthGuard)
       .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(PermissionGuard)
       .useValue({ canActivate: () => true })
       .compile();
 
