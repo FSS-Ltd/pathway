@@ -11,6 +11,24 @@ import {
 } from "../../../test-helpers.e2e";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
+const F18_TABLES = [
+  "AceTermReport",
+  "AceReportCompilation",
+  "AceReportDraft",
+  "AceReportReview",
+  "AceTermReportVersion",
+  "FaithAgeBand",
+  "FaithContent",
+  "FaithContentDraft",
+  "FaithContentVersion",
+  "FaithContentAudience",
+  "FaithReadReceipt",
+  "FaithReflection",
+] as const;
+
+interface CountRow {
+  count: number;
+}
 
 interface ReportsFixture {
   orgAId: string;
@@ -2028,8 +2046,9 @@ describe("ACE report publication storage", () => {
     }
   });
 
-  it("fails closed for every Faith table under forced tenant RLS", async () => {
+  it("fails closed for every F18 table under forced tenant RLS", async () => {
     if (!isDatabaseAvailable()) return;
+    await publishReport(fixture);
     const tenantAAgeBand: FaithAgeBandFixture = {
       id: randomUUID(),
       tenantId: fixture.tenantAId,
@@ -2052,41 +2071,18 @@ describe("ACE report publication storage", () => {
     );
     expect(publication.versionId).toEqual(expect.any(String));
 
-    const tenantBCounts = await withReportsRlsContext(
+    await withReportsRlsContext(
       fixture.tenantBId,
       fixture.orgBId,
-      (tx) => tx.$queryRaw<
-        Array<{
-          ageBands: bigint;
-          contents: bigint;
-          drafts: bigint;
-          versions: bigint;
-          audiences: bigint;
-          receipts: bigint;
-          reflections: bigint;
-        }>
-      >`
-        SELECT
-          (SELECT count(*) FROM "FaithAgeBand") AS "ageBands",
-          (SELECT count(*) FROM "FaithContent") AS "contents",
-          (SELECT count(*) FROM "FaithContentDraft") AS "drafts",
-          (SELECT count(*) FROM "FaithContentVersion") AS "versions",
-          (SELECT count(*) FROM "FaithContentAudience") AS "audiences",
-          (SELECT count(*) FROM "FaithReadReceipt") AS "receipts",
-          (SELECT count(*) FROM "FaithReflection") AS "reflections"
-      `,
-    );
-    expect(tenantBCounts).toEqual([
-      {
-        ageBands: 0n,
-        contents: 0n,
-        drafts: 0n,
-        versions: 0n,
-        audiences: 0n,
-        receipts: 0n,
-        reflections: 0n,
+      async (tx) => {
+        for (const tableName of F18_TABLES) {
+          const [{ count }] = await tx.$queryRawUnsafe<CountRow[]>(
+            `SELECT count(*)::int AS count FROM "${tableName}"`,
+          );
+          expect(count).toBe(0);
+        }
       },
-    ]);
+    );
   });
 
   it("enables and forces RLS and revokes broad table grants for every Faith table", async () => {
@@ -2181,8 +2177,9 @@ describe("ACE report publication storage", () => {
     ]);
   });
 
-  it("fails closed for Faith reads without tenant context", async () => {
+  it("fails closed for every F18 table without tenant context", async () => {
     if (!isDatabaseAvailable()) return;
+    await publishReport(fixture);
     const ageBand: FaithAgeBandFixture = {
       id: randomUUID(),
       tenantId: fixture.tenantAId,
@@ -2203,42 +2200,21 @@ describe("ACE report publication storage", () => {
       },
     );
 
-    const [counts] = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (noContext) => {
       if (useTenantRlsRole()) {
-        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${TENANT_RLS_ROLE}"`);
+        await noContext.$executeRawUnsafe(
+          `SET LOCAL ROLE "${TENANT_RLS_ROLE}"`,
+        );
       }
-      await tx.$executeRawUnsafe(
+      await noContext.$executeRawUnsafe(
         "SELECT pg_catalog.set_config('app.tenant_id', '', true)",
       );
-      return tx.$queryRaw<
-        Array<{
-          ageBands: bigint;
-          contents: bigint;
-          drafts: bigint;
-          versions: bigint;
-          audiences: bigint;
-          receipts: bigint;
-          reflections: bigint;
-        }>
-      >`
-        SELECT
-          (SELECT count(*) FROM "FaithAgeBand") AS "ageBands",
-          (SELECT count(*) FROM "FaithContent") AS "contents",
-          (SELECT count(*) FROM "FaithContentDraft") AS "drafts",
-          (SELECT count(*) FROM "FaithContentVersion") AS "versions",
-          (SELECT count(*) FROM "FaithContentAudience") AS "audiences",
-          (SELECT count(*) FROM "FaithReadReceipt") AS "receipts",
-          (SELECT count(*) FROM "FaithReflection") AS "reflections"
-      `;
-    });
-    expect(counts).toEqual({
-      ageBands: 0n,
-      contents: 0n,
-      drafts: 0n,
-      versions: 0n,
-      audiences: 0n,
-      receipts: 0n,
-      reflections: 0n,
+      for (const tableName of F18_TABLES) {
+        const [{ count }] = await noContext.$queryRawUnsafe<CountRow[]>(
+          `SELECT count(*)::int AS count FROM "${tableName}"`,
+        );
+        expect(count).toBe(0);
+      }
     });
   });
 });
