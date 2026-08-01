@@ -176,6 +176,42 @@ CREATE INDEX "AceReportReview_tenant_reviewer_idx"
 CREATE INDEX "AceTermReportVersion_tenant_report_guardian_idx"
   ON "AceTermReportVersion"("tenantId", "reportId", "guardianVisibleAt");
 
+-- Global user foreign keys establish identity. This guard additionally proves
+-- that every report actor belongs to the row's tenant through the current or
+-- equivalent legacy membership model, independently of caller row visibility.
+CREATE FUNCTION app.require_ace_report_actor_membership()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  actor_user_id TEXT;
+BEGIN
+  actor_user_id := pg_catalog.to_jsonb(NEW) ->> TG_ARGV[0];
+
+  IF actor_user_id IS NULL OR NOT (
+    EXISTS (
+      SELECT 1
+      FROM app."SiteMembership"
+      WHERE "tenantId" = NEW."tenantId"
+        AND "userId" = actor_user_id
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM app."UserTenantRole"
+      WHERE "tenantId" = NEW."tenantId"
+        AND "userId" = actor_user_id
+    )
+  ) THEN
+    RAISE EXCEPTION 'ACE report actor must belong to the tenant'
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
 CREATE FUNCTION app.reject_ace_term_report_target_mutation()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -232,7 +268,18 @@ BEGIN
       USING ERRCODE = 'object_not_in_prerequisite_state';
   END IF;
 
-  IF NEW."status" = 'APPROVED' AND pg_trigger_depth() < 2 THEN
+  -- Only the effective owner of the security-definer publication function may
+  -- perform its nested approval update. Trigger nesting alone is not authority.
+  IF NEW."status" = 'APPROVED' AND NOT (
+    pg_trigger_depth() = 2
+    AND CURRENT_USER = pg_catalog.pg_get_userbyid(
+      (
+        SELECT "proowner"
+        FROM pg_catalog."pg_proc"
+        WHERE "oid" = 'app.publish_approved_ace_report()'::pg_catalog.regprocedure
+      )
+    )
+  ) THEN
     RAISE EXCEPTION 'ACE report drafts can be approved only by a review decision'
       USING ERRCODE = 'check_violation';
   END IF;
@@ -258,7 +305,16 @@ SET search_path = ''
 AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    IF pg_trigger_depth() < 2 THEN
+    IF NOT (
+      pg_trigger_depth() = 2
+      AND CURRENT_USER = pg_catalog.pg_get_userbyid(
+        (
+          SELECT "proowner"
+          FROM pg_catalog."pg_proc"
+          WHERE "oid" = 'app.publish_approved_ace_report()'::pg_catalog.regprocedure
+        )
+      )
+    ) THEN
       RAISE EXCEPTION 'ACE report versions can be created only by approval'
         USING ERRCODE = 'object_not_in_prerequisite_state';
     END IF;
@@ -367,6 +423,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION app.reject_ace_term_report_target_mutation() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.require_ace_report_actor_membership() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_ace_report_compilation_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.guard_ace_report_draft_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_ace_report_review_mutation() FROM PUBLIC;
@@ -377,6 +434,21 @@ CREATE TRIGGER "AceTermReport_reject_target_mutation"
 BEFORE UPDATE OF "tenantId", "childId", "academicPeriodId"
 ON "AceTermReport"
 FOR EACH ROW EXECUTE FUNCTION app.reject_ace_term_report_target_mutation();
+
+CREATE TRIGGER "AceReportCompilation_require_actor_membership"
+BEFORE INSERT OR UPDATE OF "tenantId", "compiledByUserId"
+ON "AceReportCompilation"
+FOR EACH ROW EXECUTE FUNCTION app.require_ace_report_actor_membership('compiledByUserId');
+
+CREATE TRIGGER "AceReportDraft_require_actor_membership"
+BEFORE INSERT OR UPDATE OF "tenantId", "authorUserId"
+ON "AceReportDraft"
+FOR EACH ROW EXECUTE FUNCTION app.require_ace_report_actor_membership('authorUserId');
+
+CREATE TRIGGER "AceReportReview_require_actor_membership"
+BEFORE INSERT OR UPDATE OF "tenantId", "reviewerUserId"
+ON "AceReportReview"
+FOR EACH ROW EXECUTE FUNCTION app.require_ace_report_actor_membership('reviewerUserId');
 
 CREATE TRIGGER "AceReportCompilation_reject_update_delete"
 BEFORE UPDATE OR DELETE ON "AceReportCompilation"

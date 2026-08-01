@@ -1416,6 +1416,7 @@ model AceReportCompilation {
   tenantId         String
   reportId         String
   sourceEncrypted  String   @db.Text
+  /// Must belong to tenantId through SiteMembership or UserTenantRole.
   compiledByUserId String
   compiledAt       DateTime @default(now())
   createdAt        DateTime @default(now())
@@ -1438,6 +1439,7 @@ model AceReportDraft {
   familyPayload       Json
   staffNotesEncrypted String?              @db.Text
   status              AceReportDraftStatus @default(DRAFT)
+  /// Must belong to tenantId through SiteMembership or UserTenantRole.
   authorUserId        String
   submittedAt         DateTime?
   approvedAt          DateTime?
@@ -1461,6 +1463,7 @@ model AceReportReview {
   id                   String                  @id @default(uuid())
   tenantId             String
   draftId              String
+  /// Must belong to tenantId through SiteMembership or UserTenantRole.
   reviewerUserId       String
   decision             AceReportReviewDecision
   reviewNotesEncrypted String?                 @db.Text

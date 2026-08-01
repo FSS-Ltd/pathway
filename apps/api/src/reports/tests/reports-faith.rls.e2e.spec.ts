@@ -254,6 +254,13 @@ describe("ACE report publication storage", () => {
         fixture.unrelatedUserId,
       ].map((id) => ({ id, email: `${id}@example.test` })),
     });
+    await prisma.siteMembership.createMany({
+      data: [fixture.authorUserId, fixture.reviewerUserId].map((userId) => ({
+        id: randomUUID(),
+        tenantId: fixture.tenantAId,
+        userId,
+      })),
+    });
 
     await withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
       await tx.child.createMany({
@@ -356,6 +363,7 @@ describe("ACE report publication storage", () => {
     await prisma.academicPeriod.deleteMany({ where: { id: { in: [fixture.periodAId, fixture.periodBId] } } });
     await prisma.academicYear.deleteMany({ where: { tenantId: { in: [fixture.tenantAId, fixture.tenantBId] } } });
     await prisma.child.deleteMany({ where: { id: { in: [fixture.childAId, fixture.childA2Id, fixture.childBId] } } });
+    await prisma.siteMembership.deleteMany({ where: { tenantId: fixture.tenantAId } });
     await prisma.user.deleteMany({ where: { id: { in: [fixture.authorUserId, fixture.reviewerUserId, fixture.fullGuardianUserId, fixture.limitedGuardianUserId, fixture.studentUserId, fixture.unrelatedUserId] } } });
     await prisma.tenant.deleteMany({ where: { id: { in: [fixture.tenantAId, fixture.tenantBId] } } });
     await prisma.org.deleteMany({ where: { id: { in: [fixture.orgAId, fixture.orgBId] } } });
@@ -385,6 +393,136 @@ describe("ACE report publication storage", () => {
       ),
       "23514",
     );
+  });
+
+  it("rejects a report compiler outside the tenant", async () => {
+    if (!isDatabaseAvailable()) return;
+    await expectDatabaseRejection(
+      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+        const reportId = randomUUID();
+        await tx.$executeRaw`
+          INSERT INTO "AceTermReport" ("id", "tenantId", "childId", "academicPeriodId")
+          VALUES (${reportId}, ${fixture.tenantAId}, ${fixture.childAId}, ${fixture.periodAId})
+        `;
+        await tx.$executeRaw`
+          INSERT INTO "AceReportCompilation" (
+            "id", "tenantId", "reportId", "sourceEncrypted", "compiledByUserId"
+          ) VALUES (
+            ${randomUUID()}, ${fixture.tenantAId}, ${reportId},
+            ${"enc:source"}, ${fixture.unrelatedUserId}
+          )
+        `;
+      }),
+      "23503",
+    );
+  });
+
+  it("rejects a report author outside the tenant", async () => {
+    if (!isDatabaseAvailable()) return;
+    const source = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createDraftFixture(tx, fixture),
+    );
+    await expectDatabaseRejection(
+      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+        INSERT INTO "AceReportDraft" (
+          "id", "tenantId", "reportId", "compilationId", "familyPayload",
+          "status", "authorUserId"
+        ) VALUES (
+          ${randomUUID()}, ${fixture.tenantAId}, ${source.reportId},
+          ${source.compilationId}, ${JSON.stringify({ summary: "Bypass" })}::jsonb,
+          'DRAFT', ${fixture.unrelatedUserId}
+        )
+      `),
+      "23503",
+    );
+  });
+
+  it("rejects a report reviewer outside the tenant", async () => {
+    if (!isDatabaseAvailable()) return;
+    const draft = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createDraftFixture(tx, fixture, "IN_REVIEW"),
+    );
+    await expectDatabaseRejection(
+      () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        approveReport(tx, {
+          tenantId: fixture.tenantAId,
+          draftId: draft.draftId,
+          reviewerUserId: fixture.unrelatedUserId,
+        }),
+      ),
+      "23503",
+    );
+  });
+
+  it("rejects approval and publication attempted from an unrelated nested trigger", async () => {
+    if (!isDatabaseAvailable()) return;
+    const draft = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createDraftFixture(tx, fixture, "IN_REVIEW"),
+    );
+    const versionId = randomUUID();
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE app."AceReportPublicationBypassProbe" (
+        "draftId" TEXT NOT NULL,
+        "versionId" TEXT NOT NULL
+      )
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE FUNCTION app.attempt_ace_report_publication_bypass()
+      RETURNS trigger
+      LANGUAGE plpgsql
+      SET search_path = ''
+      AS $probe$
+      BEGIN
+        UPDATE app."AceReportDraft"
+        SET "status" = 'APPROVED', "approvedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = NEW."draftId";
+
+        INSERT INTO app."AceTermReportVersion" (
+          "id", "tenantId", "reportId", "sourceDraftId", "versionNumber",
+          "familyPayload", "privateDocumentKey", "guardianVisibleAt"
+        )
+        SELECT
+          NEW."versionId", "tenantId", "reportId", "id", 99,
+          "familyPayload",
+          'tenants/' || "tenantId" || '/reports/' || NEW."versionId" || '.pdf',
+          CURRENT_TIMESTAMP
+        FROM app."AceReportDraft"
+        WHERE "id" = NEW."draftId";
+        RETURN NEW;
+      END;
+      $probe$
+    `);
+    await prisma.$executeRawUnsafe(`
+      CREATE TRIGGER "AceReportPublicationBypassProbe_attempt"
+      AFTER INSERT ON app."AceReportPublicationBypassProbe"
+      FOR EACH ROW EXECUTE FUNCTION app.attempt_ace_report_publication_bypass()
+    `);
+    await prisma.$executeRawUnsafe(`
+      GRANT INSERT ON app."AceReportPublicationBypassProbe" TO "${TENANT_RLS_ROLE}"
+    `);
+
+    try {
+      await expectDatabaseRejection(
+        () => withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) => tx.$executeRaw`
+          INSERT INTO "AceReportPublicationBypassProbe" ("draftId", "versionId")
+          VALUES (${draft.draftId}, ${versionId})
+        `),
+        "23514",
+      );
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TABLE IF EXISTS app."AceReportPublicationBypassProbe"',
+      );
+      await prisma.$executeRawUnsafe(
+        "DROP FUNCTION IF EXISTS app.attempt_ace_report_publication_bypass()",
+      );
+    }
   });
 
   it("publishes one guardian-visible version with no student release", async () => {
@@ -491,6 +629,52 @@ describe("ACE report publication storage", () => {
       versionNumber: 2,
       supersedesVersionId: first.version.id,
     });
+  });
+
+  it("serializes concurrent correction approvals into one supersession chain", async () => {
+    if (!isDatabaseAvailable()) return;
+    const first = await publishReport(fixture);
+    const corrections = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const drafts = await Promise.all([
+          createDraftFixture(tx, fixture, "DRAFT", first.draft.reportId),
+          createDraftFixture(tx, fixture, "DRAFT", first.draft.reportId),
+        ]);
+        for (const draft of drafts) await submitDraft(tx, draft.draftId);
+        return drafts;
+      },
+    );
+
+    await Promise.all(
+      corrections.map((draft) =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          approveReport(tx, {
+            tenantId: fixture.tenantAId,
+            draftId: draft.draftId,
+            reviewerUserId: fixture.reviewerUserId,
+          }),
+        ),
+      ),
+    );
+
+    const versions = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$queryRaw<Array<Pick<ReportVersionRow, "id" | "sourceDraftId" | "versionNumber" | "supersedesVersionId">>>`
+        SELECT "id", "sourceDraftId", "versionNumber", "supersedesVersionId"
+        FROM "AceTermReportVersion"
+        WHERE "reportId" = ${first.draft.reportId}
+        ORDER BY "versionNumber"
+      `,
+    );
+    expect(versions.map((version) => version.versionNumber)).toEqual([1, 2, 3]);
+    expect(versions[1]?.supersedesVersionId).toBe(versions[0]?.id);
+    expect(versions[2]?.supersedesVersionId).toBe(versions[1]?.id);
+    expect(new Set(versions.slice(1).map((version) => version.sourceDraftId))).toEqual(
+      new Set(corrections.map((draft) => draft.draftId)),
+    );
   });
 
   it("allows one explicit student release without opening published content", async () => {
