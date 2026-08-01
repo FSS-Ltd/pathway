@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   Prisma,
+  PrismaClient,
   prisma,
   withTenantRlsContext,
   type PrismaClientType,
@@ -218,11 +219,12 @@ async function approveReport(
 }
 
 async function waitForBlockedApprovalSessions(
+  observer: PrismaClient,
   applicationNames: string[],
 ): Promise<void> {
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
-    const blocked = await prisma.$queryRaw<BlockedApprovalSession[]>`
+    const blocked = await observer.$queryRaw<BlockedApprovalSession[]>`
       SELECT "application_name" AS "applicationName"
       FROM pg_catalog.pg_stat_activity
       WHERE "application_name" LIKE 'ace-report-approval-%'
@@ -535,10 +537,12 @@ async function countGuardianVisibleReflections(
 }
 
 describe("ACE report publication storage", () => {
+  const lockObserver = new PrismaClient();
   let fixture: ReportsFixture;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
+    await lockObserver.$connect();
     fixture = {
       orgAId: randomUUID(),
       orgBId: randomUUID(),
@@ -839,6 +843,10 @@ describe("ACE report publication storage", () => {
     await prisma.org.deleteMany({
       where: { id: { in: [fixture.orgAId, fixture.orgBId] } },
     });
+  });
+
+  afterAll(async () => {
+    await lockObserver.$disconnect();
   });
 
   it("rejects approval by the report author", async () => {
@@ -1464,7 +1472,7 @@ describe("ACE report publication storage", () => {
 
     let lockObservationError: unknown;
     try {
-      await waitForBlockedApprovalSessions(applicationNames);
+      await waitForBlockedApprovalSessions(lockObserver, applicationNames);
     } catch (error) {
       lockObservationError = error;
     } finally {
