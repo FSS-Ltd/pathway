@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
   Prisma,
-  PrismaClient,
   prisma,
   withTenantRlsContext,
   type PrismaClientType,
@@ -11,7 +10,6 @@ import {
   requireDatabase,
 } from "../../../test-helpers.e2e";
 import { isEncryptedField } from "@pathway/util";
-import { withPiiEncryption } from "../../../../../packages/db/src/pii-encryption";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 
@@ -110,6 +108,7 @@ async function insertBehaviourEntry(
   fixture: PaceBehaviourFixture,
   options: {
     id?: string;
+    childId?: string;
     correctsBehaviourEntryId?: string | null;
     note?: string | null;
   } = {},
@@ -123,7 +122,7 @@ async function insertBehaviourEntry(
     ) VALUES (
       ${id},
       ${fixture.tenantAId},
-      ${fixture.childAId},
+      ${options.childId ?? fixture.childAId},
       'DEMERIT',
       'SENSITIVE',
       'conduct',
@@ -878,13 +877,16 @@ describe("ACE PACE and behaviour fact storage", () => {
     }
   });
 
-  it("rejects child, correction, and actor swaps across tenants", async () => {
+  it("rejects cross-tenant and cross-subject correction swaps", async () => {
     if (!isDatabaseAvailable()) return;
 
-    const originalId = await withPaceRlsContext(
+    const { assessmentId, behaviourEntryId } = await withPaceRlsContext(
       fixture.tenantAId,
       fixture.orgAId,
-      (tx) => insertPaceAssessment(tx, fixture),
+      async (tx) => ({
+        assessmentId: await insertPaceAssessment(tx, fixture),
+        behaviourEntryId: await insertBehaviourEntry(tx, fixture),
+      }),
     );
 
     await expectDatabaseRejection(
@@ -902,7 +904,7 @@ describe("ACE PACE and behaviour fact storage", () => {
             childId: fixture.childBId,
             subjectId: fixture.subjectBId,
             actorId: fixture.actorBId,
-            correctsAssessmentId: originalId,
+            correctsAssessmentId: assessmentId,
           }),
         ),
       "23503",
@@ -914,45 +916,73 @@ describe("ACE PACE and behaviour fact storage", () => {
         ),
       "23503",
     );
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertPaceAssessment(tx, fixture, {
+            childId: fixture.childA2Id,
+            correctsAssessmentId: assessmentId,
+          }),
+        ),
+      "23503",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertPaceAssessment(tx, fixture, {
+            subjectId: fixture.subjectA2Id,
+            correctsAssessmentId: assessmentId,
+          }),
+        ),
+      "23503",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertBehaviourEntry(tx, fixture, {
+            childId: fixture.childA2Id,
+            correctsBehaviourEntryId: behaviourEntryId,
+          }),
+        ),
+      "23503",
+    );
   });
 
   it("stores BehaviourEntry.note encrypted at rest and decrypts it through Prisma", async () => {
     if (!isDatabaseAvailable()) return;
 
     const plaintext = "Sensitive pastoral context";
-    const encryptedClient = withPiiEncryption(new PrismaClient());
-    let atRest = "";
-    let throughClient: string | null = null;
-    try {
-      const created = await encryptedClient.behaviourEntry.create({
-        data: {
-          tenantId: fixture.tenantAId,
-          childId: fixture.childAId,
-          type: "GENERAL",
-          visibility: "SENSITIVE",
-          category: "pastoral",
-          pointsDelta: 0,
-          occurredAt: new Date("2026-09-16T09:30:00.000Z"),
-          recordedByUserId: fixture.actorAId,
-          reason: "Recorded sensitive context",
-          note: plaintext,
-        },
-      });
-      const [stored] = await encryptedClient.$queryRaw<Array<{ note: string }>>`
-        SELECT "note" FROM "BehaviourEntry" WHERE "id" = ${created.id}
-      `;
-      const read = await encryptedClient.behaviourEntry.findUniqueOrThrow({
-        where: { id: created.id },
-      });
-      atRest = stored.note;
-      throughClient = read.note;
-    } finally {
-      await encryptedClient.$disconnect();
-    }
+    const result = await withPaceRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const created = await tx.behaviourEntry.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            childId: fixture.childAId,
+            type: "GENERAL",
+            visibility: "SENSITIVE",
+            category: "pastoral",
+            pointsDelta: 0,
+            occurredAt: new Date("2026-09-16T09:30:00.000Z"),
+            recordedByUserId: fixture.actorAId,
+            reason: "Recorded sensitive context",
+            note: plaintext,
+          },
+        });
+        const [stored] = await tx.$queryRaw<Array<{ note: string }>>`
+          SELECT "note" FROM "BehaviourEntry" WHERE "id" = ${created.id}
+        `;
+        const read = await tx.behaviourEntry.findUniqueOrThrow({
+          where: { id: created.id },
+        });
+        return { atRest: stored.note, throughClient: read.note };
+      },
+    );
 
-    expect(atRest).not.toBe(plaintext);
-    expect(isEncryptedField(atRest)).toBe(true);
-    expect(throughClient).toBe(plaintext);
+    expect(result.atRest).not.toBe(plaintext);
+    expect(isEncryptedField(result.atRest)).toBe(true);
+    expect(result.throughClient).toBe(plaintext);
   });
 
   it("isolates all PACE and behaviour tables with forced tenant RLS", async () => {

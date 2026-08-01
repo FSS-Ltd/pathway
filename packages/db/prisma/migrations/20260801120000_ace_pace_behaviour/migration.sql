@@ -160,8 +160,8 @@ CREATE TABLE "PaceAssessment" (
   CONSTRAINT "PaceAssessment_id_tenantId_key" UNIQUE ("id", "tenantId"),
   CONSTRAINT "PaceAssessment_id_tenantId_childId_subjectId_key"
     UNIQUE ("id", "tenantId", "childId", "subjectId"),
-  CONSTRAINT "PaceAssessment_correctsAssessmentId_tenantId_key"
-    UNIQUE ("correctsAssessmentId", "tenantId"),
+  CONSTRAINT "PaceAssessment_correction_target_key"
+    UNIQUE ("correctsAssessmentId", "tenantId", "childId", "subjectId"),
   CONSTRAINT "PaceAssessment_policyOverrideId_tenantId_key"
     UNIQUE ("policyOverrideId", "tenantId"),
   CONSTRAINT "PaceAssessment_tenantId_fkey"
@@ -175,8 +175,9 @@ CREATE TABLE "PaceAssessment" (
   CONSTRAINT "PaceAssessment_policyOverrideId_tenantId_childId_subjectId_fkey"
     FOREIGN KEY ("policyOverrideId", "tenantId", "childId", "subjectId")
     REFERENCES "PacePolicyOverride"("id", "tenantId", "childId", "subjectId") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "PaceAssessment_correctsAssessmentId_tenantId_fkey"
-    FOREIGN KEY ("correctsAssessmentId", "tenantId") REFERENCES "PaceAssessment"("id", "tenantId") ON DELETE RESTRICT ON UPDATE RESTRICT
+  CONSTRAINT "PaceAssessment_correction_target_fkey"
+    FOREIGN KEY ("correctsAssessmentId", "tenantId", "childId", "subjectId")
+    REFERENCES "PaceAssessment"("id", "tenantId", "childId", "subjectId") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 CREATE TABLE "PaceProgress" (
@@ -238,16 +239,18 @@ CREATE TABLE "BehaviourEntry" (
   CONSTRAINT "BehaviourEntry_not_self_correction_check"
     CHECK ("correctsBehaviourEntryId" IS NULL OR "correctsBehaviourEntryId" <> "id"),
   CONSTRAINT "BehaviourEntry_id_tenantId_key" UNIQUE ("id", "tenantId"),
-  CONSTRAINT "BehaviourEntry_correctsBehaviourEntryId_tenantId_key"
-    UNIQUE ("correctsBehaviourEntryId", "tenantId"),
+  CONSTRAINT "BehaviourEntry_id_tenantId_childId_key" UNIQUE ("id", "tenantId", "childId"),
+  CONSTRAINT "BehaviourEntry_correction_target_key"
+    UNIQUE ("correctsBehaviourEntryId", "tenantId", "childId"),
   CONSTRAINT "BehaviourEntry_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "BehaviourEntry_childId_tenantId_fkey"
     FOREIGN KEY ("childId", "tenantId") REFERENCES "Child"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT "BehaviourEntry_recordedByUserId_fkey"
     FOREIGN KEY ("recordedByUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT "BehaviourEntry_correctsBehaviourEntryId_tenantId_fkey"
-    FOREIGN KEY ("correctsBehaviourEntryId", "tenantId") REFERENCES "BehaviourEntry"("id", "tenantId") ON DELETE RESTRICT ON UPDATE RESTRICT
+  CONSTRAINT "BehaviourEntry_correction_target_fkey"
+    FOREIGN KEY ("correctsBehaviourEntryId", "tenantId", "childId")
+    REFERENCES "BehaviourEntry"("id", "tenantId", "childId") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 CREATE INDEX "PacePolicy_tenantId_effectiveFrom_idx"

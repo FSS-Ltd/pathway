@@ -1256,14 +1256,14 @@ model PaceAssessment {
   policyOverrideId      String?
   policyOverride        PacePolicyOverride?  @relation(fields: [policyOverrideId, tenantId, childId, subjectId], references: [id, tenantId, childId, subjectId], onDelete: Restrict)
   correctsAssessmentId  String?
-  correctsAssessment    PaceAssessment?      @relation("PaceAssessmentCorrections", fields: [correctsAssessmentId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  correctsAssessment    PaceAssessment?      @relation("PaceAssessmentCorrections", fields: [correctsAssessmentId, tenantId, childId, subjectId], references: [id, tenantId, childId, subjectId], onDelete: Restrict, onUpdate: Restrict, map: "PaceAssessment_correction_target_fkey")
   correction            PaceAssessment?      @relation("PaceAssessmentCorrections")
   progressUsingAsLatest PaceProgress[]
   createdAt             DateTime             @default(now())
 
   @@unique([id, tenantId])
   @@unique([id, tenantId, childId, subjectId])
-  @@unique([correctsAssessmentId, tenantId])
+  @@unique([correctsAssessmentId, tenantId, childId, subjectId], map: "PaceAssessment_correction_target_key")
   @@unique([policyOverrideId, tenantId])
   @@index([tenantId, childId, subjectId, assessedOn])
   @@index([tenantId, correctsAssessmentId])
@@ -1361,12 +1361,13 @@ model BehaviourEntry {
   reason                   String              @db.Text
   note                     String?             @db.Text
   correctsBehaviourEntryId String?
-  correctsBehaviourEntry   BehaviourEntry?     @relation("BehaviourEntryCorrections", fields: [correctsBehaviourEntryId, tenantId], references: [id, tenantId], onDelete: Restrict, onUpdate: Restrict)
+  correctsBehaviourEntry   BehaviourEntry?     @relation("BehaviourEntryCorrections", fields: [correctsBehaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict, map: "BehaviourEntry_correction_target_fkey")
   correction               BehaviourEntry?     @relation("BehaviourEntryCorrections")
   createdAt                DateTime            @default(now())
 
   @@unique([id, tenantId])
-  @@unique([correctsBehaviourEntryId, tenantId])
+  @@unique([id, tenantId, childId])
+  @@unique([correctsBehaviourEntryId, tenantId, childId], map: "BehaviourEntry_correction_target_key")
   @@index([tenantId, childId, occurredAt])
   @@index([tenantId, type, occurredAt])
   @@index([tenantId, correctsBehaviourEntryId])
