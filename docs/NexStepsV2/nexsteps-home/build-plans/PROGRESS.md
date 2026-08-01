@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Executing PR2 (Plan 01 — app scaffolding)
+**Current phase:** Starting Plan 02 (fidelity harness + phone baselines)
 
 ---
 
@@ -23,8 +23,9 @@ continue.
 | # | Plan | Status | Branch | PR | Notes |
 |---|---|---|---|---|---|
 | 1 | 00 — series docs | **merged** | `docs/nexsteps-home-build-plan-series` | [#265](https://github.com/FSS-Ltd/pathway/pull/265) | squash-merged, branch deleted |
-| 2 | 01 — app scaffolding | in progress | `feat/nexsteps-home-app-scaffolding` | not yet opened | code complete, verified locally, about to push |
-| 3-15 | 02-14 | not started | — | — | — |
+| 2 | 01 — app scaffolding | **merged** | `feat/nexsteps-home-app-scaffolding` | [#267](https://github.com/FSS-Ltd/pathway/pull/267) | squash-merged, branch deleted; `apps/nexsteps-home` now exists on `master` |
+| 3 | 02 — fidelity harness + phone baselines | not started | — | — | next up |
+| 4-15 | 03-14 | not started | — | — | — |
 
 ## Environment
 
@@ -228,12 +229,13 @@ to click through once, or for Plan 02's automated harness.
 
 ## Next action
 
-Push `feat/nexsteps-home-app-scaffolding`, open the PR against `fss`,
-confirm CI green (watch specifically for anything `apps/nexsteps-home`
-might disturb in the wider `pnpm -r` runs, though local reproduction found
-none), merge. Then start Plan 02 (fidelity harness + phone baselines) from
-a fresh `fss/master` — its first job is fixing the prototype font mismatch
-(blocker 1) before any baseline is captured.
+Start Plan 02 (fidelity harness + phone baselines) from a fresh
+`fss/master`. First job: fix the prototype font mismatch (blocker 1) in
+`prototypes/nexsteps-home` before capturing any baseline — a baseline
+captured against the wrong fallback font would be worthless. Then add the
+Playwright/pixelmatch tooling deferred out of Plan 01's `package.json`,
+capture all 76 screens × {iPhone, Pixel} from the prototype, and wire the
+`apps/nexsteps-home` web-export side of the diff.
 
 ---
 
@@ -275,4 +277,11 @@ a fresh `fss/master` — its first job is fixing the prototype font mismatch
   the `web` script would otherwise be dead on arrival (an existing,
   unfixed gap in `apps/mobile` this app doesn't want to inherit).
 - Ran the full local verification suite listed above; everything green.
-- About to push and open PR2.
+- Pushed and opened PR2
+  ([#267](https://github.com/FSS-Ltd/pathway/pull/267)); confirmed
+  concurrent PR #266 (`fix/tenant-transaction-pii-encryption`, a
+  `packages/db` security fix) had no file overlap; all 5 CI checks passed;
+  squash-merged; deleted the branch and its worktree.
+- This entry: a small docs-only PR to keep this ledger truthful the moment
+  each plan lands, rather than letting it drift stale until the next
+  plan's PR closes it out.
