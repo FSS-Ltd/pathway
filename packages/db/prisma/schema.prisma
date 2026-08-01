@@ -160,6 +160,21 @@ enum ReportBundleStatus {
   FAILED
 }
 
+enum AcademicYearStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AcademicPeriodStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum StudentSubjectEnrollmentStatus {
+  ACTIVE
+  ENDED
+}
+
 enum PermissionScope {
   organisation
   site
@@ -514,6 +529,9 @@ model Tenant {
   learningLogs           LearningLog[]
   evidence               Evidence[]
   reportBundles          ReportBundle[]
+  academicYears          AcademicYear[]
+  academicPeriods        AcademicPeriod[]
+  subjectEnrollments     StudentSubjectEnrollment[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
@@ -607,6 +625,7 @@ model User {
   loggedLearningLogs      LearningLog[]           @relation("LearningLogLoggedBy")
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
+  recordedSubjectEnrollments StudentSubjectEnrollment[] @relation("StudentSubjectEnrollmentRecordedBy")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
@@ -837,6 +856,7 @@ model Child {
   attendance          Attendance[]
   childNotes          ChildNote[]
   learningLogs        LearningLog[]
+  subjectEnrollments  StudentSubjectEnrollment[]
   evidence            Evidence[]
   reportBundles       ReportBundle[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
@@ -1097,12 +1117,72 @@ model Subject {
   isActive     Boolean       @default(true)
   sortOrder    Int?
   learningLogs LearningLog[]
+  subjectEnrollments StudentSubjectEnrollment[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
   @@unique([tenantId, name])
   @@unique([id, tenantId])
   @@index([tenantId])
+}
+
+model AcademicYear {
+  id        String             @id @default(uuid())
+  tenantId  String
+  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  name      String
+  startsOn  DateTime           @db.Date
+  endsOn    DateTime           @db.Date
+  status    AcademicYearStatus @default(ACTIVE)
+  periods   AcademicPeriod[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @default(now()) @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, name])
+  @@index([tenantId, status, startsOn])
+}
+
+model AcademicPeriod {
+  id             String               @id @default(uuid())
+  tenantId       String
+  tenant         Tenant               @relation(fields: [tenantId], references: [id])
+  academicYearId String
+  academicYear   AcademicYear         @relation(fields: [academicYearId, tenantId], references: [id, tenantId])
+  name           String
+  startsOn       DateTime             @db.Date
+  endsOn         DateTime             @db.Date
+  status         AcademicPeriodStatus @default(ACTIVE)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @default(now()) @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, academicYearId, name])
+  @@index([tenantId, status, startsOn])
+}
+
+model StudentSubjectEnrollment {
+  id               String                         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                         @relation(fields: [tenantId], references: [id])
+  childId          String
+  child            Child                          @relation(fields: [childId, tenantId], references: [id, tenantId])
+  subjectId        String
+  subject          Subject                        @relation(fields: [subjectId, tenantId], references: [id, tenantId])
+  startsOn         DateTime                       @db.Date
+  endsOn           DateTime?                      @db.Date
+  status           StudentSubjectEnrollmentStatus @default(ACTIVE)
+  startingPace     Int
+  currentPace      Int
+  targetPace       Int
+  recordedByUserId String
+  recordedBy       User                           @relation("StudentSubjectEnrollmentRecordedBy", fields: [recordedByUserId], references: [id])
+  reason           String                         @db.Text
+  createdAt        DateTime                       @default(now())
+  updatedAt        DateTime                       @default(now()) @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, status, subjectId, childId])
 }
 
 model LearningLog {
