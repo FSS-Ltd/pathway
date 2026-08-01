@@ -1,7 +1,8 @@
 /**
  * Screen ID -> route path contract, generated from
- * docs/NexStepsV2/nexsteps-home/screen-inventory.json (76 approved screens,
- * 28 July 2026). Route filenames may change as each plan lands; screen IDs
+ * docs/NexStepsV2/nexsteps-home/screen-inventory.json (81 approved screens,
+ * 28 July 2026, +5 tablet-two-pane composites added by Plan 03). Route
+ * filenames may change as each plan lands; screen IDs
  * do not (implementation-map.md: "Candidate route names must follow the
  * current Expo Router tree when each slice starts. The screen IDs remain
  * stable even when a route filename changes.")
@@ -103,6 +104,15 @@ export const screenRoutes = {
   "moderation-report": "/(moderation)/moderation-report",
   "member-history": "/(moderation)/member-history",
   "moderation-resolution": "/(moderation)/moderation-resolution",
+
+  // Tablet-two-pane composites (Plan 03): not separate routes. Each renders
+  // its listScreenId's phone route via <TwoPane>, adapting at tablet width -
+  // the route is shared with the list screen; only the viewport differs.
+  "tablet-week-day": "/(home)/(tabs)/week",
+  "tablet-progress-detail": "/(home)/(tabs)/progress/learning-history",
+  "tablet-correspondence": "/(home)/(tabs)/family/regulations-correspondence",
+  "tablet-conversations": "/(home)/(tabs)/community/thread-list",
+  "tablet-moderation": "/(moderation)/moderation-queue",
 } as const;
 
 export type ScreenId = keyof typeof screenRoutes;

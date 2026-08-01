@@ -105,6 +105,14 @@ export const VERTICAL_CAPABILITIES = {
     "members.manage",
     "calendar.read",
   ],
+  HOME_EDUCATION: [
+    ...PLATFORM_CORE_CAPABILITIES,
+    "learning.log.read",
+    "learning.log.write",
+    "learning.evidence.read",
+    "learning.evidence.write",
+    "learning.reports.generate",
+  ],
 } as const satisfies Record<Vertical, readonly Capability[]>;
 
 export const MODULE_CAPABILITIES = {

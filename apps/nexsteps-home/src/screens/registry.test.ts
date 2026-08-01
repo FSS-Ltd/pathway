@@ -18,9 +18,9 @@ describe("screenRoutes", () => {
     expect(registryIds.sort()).toEqual([...inventoryIds].sort());
   });
 
-  it("has exactly 76 entries, matching the approved inventory", () => {
-    expect(registryIds).toHaveLength(76);
-    expect(inventoryIds).toHaveLength(76);
+  it("has exactly 81 entries, matching the approved inventory", () => {
+    expect(registryIds).toHaveLength(81);
+    expect(inventoryIds).toHaveLength(81);
   });
 
   it("every route path starts with a known top-level group", () => {

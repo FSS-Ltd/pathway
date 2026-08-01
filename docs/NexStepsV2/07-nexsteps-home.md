@@ -67,9 +67,11 @@ patterns. The merge-safe slice order is defined in
 
 **Scope:** Add a plan/price tier for NexSteps Home households, following the exact same catalogue + `STRIPE_PRICE_MAP` pattern established in Phase 0.
 
-**Open decision (blocks this PR, not a default to pick silently):** pricing — a light family tier or free. Not decided anywhere in the source material. Flag for product/commercial before implementing.
+**Decision (resolved 1 Aug 2026, product):** two tiers, Free and Paid. Paid unlocks the ability to create Community groups, expanded AI feature usage, and further capabilities to be specified as they're built. No in-app checkout — upgrade is an external link to https://nexsteps.dev; entitlement flips by whatever mechanism that surface uses (webhook or manual), not a Buy Now flow in this app. Price point for the Paid tier is not yet set.
 
-**Key files:** the same four catalogue files touched in Phase 0 PR 0.2 (`packages/pricing/src/{types,catalog}.ts`, `apps/api/src/billing/billing-plans.ts`, `apps/admin/lib/plan-info.ts`), plus the `STRIPE_PRICE_MAP` operational step, once pricing is decided.
+**Scope note:** the institutional `PLAN_CATALOGUE`/`PLANS` catalogue (`packages/pricing/src/catalog.ts`, `apps/api/src/billing/billing-plans.ts`) is shaped around church/school Buy Now self-serve (`av30Included`, `maxSitesIncluded`, feature bullet lists for that audience) and doesn't fit a household product. Implementing NexSteps Home's Free/Paid catalogue entries there would force an ill-fitting shape for no consumer yet — deferred to whichever plan actually builds the upgrade link and entitlement flip (expected around Plan 08, Family/settings/billing), when the real UI reveals what a household plan record needs to carry.
+
+**Key files:** deferred — see scope note above.
 
 **Failing test first:** same shape as Phase 0 PR 0.2's tests, for the new plan code.
 
@@ -95,7 +97,7 @@ patterns. The merge-safe slice order is defined in
 
 **Scope:** Decide and implement how a homeschooling family maps onto `Org`/`Tenant`.
 
-**Open decision (inherited from the CEE package, not resolved by this doc set):** one `Org` with many household `Tenant`s (all home-ed families under one umbrella Org, each household a `Tenant`), vs. one lightweight `Org` per household (each family is its own fully independent Org, billing boundary and all). The CEE docs left this open (`02-multi-tenancy-and-scalability.md:16-17`, `07-delivery-roadmap-and-decisions.md:97`); nothing in this phase's grounding resolves it either — it's a product/billing decision (does a household have its own Stripe subscription, or is there an aggregator), not a technical one this doc set can default silently.
+**Decision (resolved 1 Aug 2026, product):** one lightweight `Org` per household — each family is its own independent Org with a single `Tenant`, matching how every other vertical works today. No new tenancy concept needed: a `HOME_EDUCATION`-vertical `Org` is created with one `Tenant`, same as any other single-site vertical's org creation. This resolves the open question inherited from the CEE package (`02-multi-tenancy-and-scalability.md:16-17`, `07-delivery-roadmap-and-decisions.md:97`).
 
 **Key files:** depends entirely on which option is chosen — deferred until Open Decision 2 resolves. If "one Org per household" (matching how every other vertical works today — one Org per customer), no new tenancy concept is needed at all, just a `HOME_EDUCATION`-vertical `Org` with a single `Tenant`, which is the simplest option and the one that requires zero new modelling beyond PR 7.1. Recommend this as the default unless a concrete reason for the umbrella-Org model surfaces (e.g. a co-op of home-ed families wanting shared oversight, which is closer to what Phase 8's Community module is for anyway, not a tenancy concern).
 

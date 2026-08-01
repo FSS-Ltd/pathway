@@ -10,7 +10,8 @@ export type Vertical =
   | "STATE_SCHOOL"
   | "NURSERY"
   | "CHARITY"
-  | "CLUB";
+  | "CLUB"
+  | "HOME_EDUCATION";
 
 export const VERTICAL_LABELS: Record<Vertical, string> = {
   CHURCH: "Church",
@@ -20,6 +21,7 @@ export const VERTICAL_LABELS: Record<Vertical, string> = {
   NURSERY: "Nursery",
   CHARITY: "Charity",
   CLUB: "Club",
+  HOME_EDUCATION: "Home Education",
 };
 
 export const VERTICAL_OPTIONS: { value: Vertical; label: string }[] = (

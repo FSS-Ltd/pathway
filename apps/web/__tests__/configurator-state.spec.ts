@@ -60,8 +60,13 @@ describe("configurator state", () => {
     ][]) {
       expect(verticalsForOrgType(orgType)).toEqual(verticals);
     }
+    // HOME_EDUCATION is intentionally excluded: it's never selectable through
+    // this institutional configurator — NexSteps Home has its own onboarding
+    // (docs/NexStepsV2/07-nexsteps-home.md).
     expect(Object.values(ORG_VERTICALS).flat().sort()).toEqual(
-      VERTICAL_OPTIONS.map(({ value }) => value).sort(),
+      VERTICAL_OPTIONS.map(({ value }) => value)
+        .filter((value) => value !== "HOME_EDUCATION")
+        .sort(),
     );
   });
 
