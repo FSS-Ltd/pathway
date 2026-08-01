@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Plan 04 (H1 platform foundations) — decisions resolved, implemented, verified locally; PR about to open
+**Current phase:** Between plans — Plan 05 (Setup flow, H2, 9 screens) not yet started
 
 ---
 
@@ -28,8 +28,9 @@ continue.
 | 4 | 02 — fidelity harness + phone baselines | **merged** | `feat/nexsteps-home-fidelity-harness` | [#271](https://github.com/FSS-Ltd/pathway/pull/271) | squash-merged, branch deleted; 76 approved screens now have committed baselines |
 | 5 | ledger update | **merged** | `docs/nexsteps-home-progress-update-2` | [#272](https://github.com/FSS-Ltd/pathway/pull/272) | squash-merged, branch deleted; recorded the Plan 03 product/design blocker |
 | 6 | 03 — tablet design pass + tablet baselines | **merged** | `feat/nexsteps-home-tablet-design` | [#273](https://github.com/FSS-Ltd/pathway/pull/273) | squash-merged, branch deleted; 5 tablet composites, 81 screens / 10 groups in the inventory |
-| 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | in progress | `feat/nexsteps-home-h1-foundations` | not yet opened | both product decisions resolved by user; code complete, verified locally, about to push |
-| 8-16 | 05-14 | not started | — | — | — |
+| 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | **merged** | `feat/nexsteps-home-h1-foundations` | [#277](https://github.com/FSS-Ltd/pathway/pull/277) | squash-merged, branch deleted; also fixed a pre-existing Plan 03 registry gap (5 tablet screens) found during verification |
+| 8 | ledger update | in progress | `docs/nexsteps-home-progress-update-3` | not yet opened | this entry |
+| 9-16 | 05-14 | not started | — | — | — |
 
 ## Environment
 
@@ -468,80 +469,14 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-**Plan 04's two open product decisions are resolved** (user, 2026-08-01,
-via a targeted question this session asked before proceeding — see
-`07-nexsteps-home.md` PR 7.2/7.4 sections for the recorded decisions in
-full):
-
-1. **Household-to-Org/Tenant modelling:** one lightweight `Org` per
-   household, single `Tenant` — the phase plan's recommended default,
-   confirmed. No new tenancy concept needed.
-2. **NexSteps Home pricing:** two tiers, Free and Paid. Paid unlocks
-   Community group creation, expanded AI feature usage, and more to be
-   specified later. No in-app checkout — an external link to
-   https://nexsteps.dev. Price point not yet set.
-
-**Implemented in this PR** (worktree `.worktrees/feat-nexsteps-home-h1-foundations`,
-branch `feat/nexsteps-home-h1-foundations`):
-
-- `Vertical.HOME_EDUCATION` added to `packages/db/prisma/schema.prisma`
-  (migration `20260801140000_add_home_education_vertical`), `packages/types/src/vertical.ts`,
-  and granted its Learning capabilities (read/write/evidence/reports) at
-  vertical level in `packages/platform/src/capability-maps.ts`, matching
-  `ACE_SCHOOL`'s precedent (`packages/platform/src/__tests__/capability-maps.spec.ts`'s
-  completeness tests cover it automatically via `Object.values(Vertical)`).
-- **Pricing catalogue deliberately deferred**, not implemented — see the
-  scope note added to `07-nexsteps-home.md` PR 7.2: the institutional
-  `PLAN_CATALOGUE`/`PLANS` catalogue is shaped for church/school Buy Now
-  (av30/sites/feature-bullet-lists) and doesn't fit a household product.
-  Forcing an entry in now would invent unused structure. Revisit when
-  Plan 08 (Family/settings/billing) builds the real upgrade link.
-- Fixed a real, pre-existing gap found during verification, unrelated to
-  this plan's own scope: Plan 03 (PR #273) added 5 tablet-composite screen
-  IDs to `screen-inventory.json` but never updated
-  `apps/nexsteps-home/src/screens/registry.ts` or its test's hardcoded
-  "76 entries" assertion to match — `registry.test.ts` was failing (2
-  tests) on a clean local run despite PR #273's own CI showing green,
-  almost certainly because turbo's cached `nexsteps-home#test:unit` result
-  wasn't invalidated by a change to a doc file outside `apps/nexsteps-home/`
-  that the test reads live at runtime. Added the 5 composite entries
-  (each reusing its `listScreenId`'s route — a tablet composite isn't a
-  separate route, it's the same screen rendered via `<TwoPane>` at tablet
-  width) and updated the count assertions to 81. Confirmed via
-  `git diff --stat fss/master` that zero files under `apps/nexsteps-home/`
-  were touched before this fix, ruling out this session's own changes as
-  the cause.
-- Ripple effects from adding a new `Vertical` member, all fixed and
-  verified (each is a real, necessary consequence of the type being used
-  exhaustively elsewhere, not scope creep):
-  - `apps/web/lib/configurator-checkout.ts`'s `verticalToSector` switch
-    needed a `HOME_EDUCATION` case — throws, since Home Education orgs
-    never go through this institutional checkout flow (confirmed:
-    `apps/web/app/configure/state.ts`'s `VERTICALS_BY_ORG_TYPE` doesn't
-    include it, so it can never reach this function via real UI). Added a
-    test asserting the throw.
-  - `apps/web/lib/module-catalog.ts`'s `VERTICAL_FEATURES` (an exhaustive
-    `Record<Vertical, string[]>`) needed an entry — added, marked as
-    unreachable through this configurator in a comment.
-  - `apps/web/lib/module-catalog.ts`'s `CONFIGURATOR_IMAGE_PATHS` (asset
-    preload list, tested for exact asset presence/uniqueness) would have
-    grown a 20th path with no real asset file — excluded `HOME_EDUCATION`
-    explicitly at the source rather than adding a placeholder image.
-  - Three `apps/web` tests asserting completeness/exactness over
-    `VERTICAL_OPTIONS` updated to exclude `HOME_EDUCATION` with an
-    explanatory comment, matching the production-code exclusion:
-    `configurator-assets.spec.ts` (2 assertions),
-    `configurator-state.spec.ts` (1 assertion).
-- Ran the full verification suite: `pnpm -r typecheck`, `pnpm -r lint`,
-  `pnpm test:unit` (root, via turbo — all 22 tasks, including the 734-test
-  `apps/api` suite) — all green.
-- About to push and open the PR against `fss/master`. **These are exactly
-  the files "Conflict watch" flagged as shared with concurrent ACE-vertical
-  work** - diff against fresh `fss/master` immediately before pushing, not
-  just at series start; ACE branches were still active as of this ledger's
-  last check.
-
-Once merged: Plan 05 (Setup flow, H2, 9 screens) is next in the series.
+Plan 04 is merged ([#277](https://github.com/FSS-Ltd/pathway/pull/277)).
+**Plan 05 (Setup flow, H2, 9 screens) is next in the series** — no open
+product decisions flagged for it. Endpoints available today for it:
+`GET /auth/me`, `GET /auth/active-site`, `GET /auth/active-site/roles`,
+`POST /auth/active-site`, `GET /platform/capabilities`,
+`GET /platform/modules`, `GET /health` (per the original plan's section 1.8);
+confirm whether household/child creation needs new endpoints or reuses
+existing org-creation flows before assuming either.
 
 ---
 
@@ -660,3 +595,108 @@ Once merged: Plan 05 (Setup flow, H2, 9 screens) is next in the series.
   decisions (pricing, household modelling) that carry real commercial and
   migration-cost consequences if defaulted silently, unlike Plan 03's
   design-direction question. Reporting to the user; awaiting reply.
+- User resumed the series ("continue on nexsteps home") without yet
+  answering the two open decisions; asked both as one targeted question
+  before proceeding (not a re-litigation - Plan 04 was already blocked on
+  exactly these, per the previous entry). User resolved both: household
+  model is one Org per household (matches the phase plan's recommended
+  default); pricing is a Free/Paid two-tier model, Paid unlocking Community
+  group creation, expanded AI feature usage, and more to be specified
+  later, with no in-app checkout - an external link to nexsteps.dev only.
+  Recorded both in `07-nexsteps-home.md`'s PR 7.2/7.4 sections and the
+  Decisions table above.
+- Created worktree `.worktrees/feat-nexsteps-home-h1-foundations` off fresh
+  `fss/master`; confirmed via `git log fss/master --oneline` that Plan 04's
+  target files (`schema.prisma`, `capability-maps.ts`) had no concurrent
+  ACE-vertical changes since PR6 merged.
+- Implemented Plan 04's mechanical scope: `Vertical.HOME_EDUCATION` in
+  `packages/db/prisma/schema.prisma` (+ migration
+  `20260801140000_add_home_education_vertical`) and
+  `packages/types/src/vertical.ts`; granted its Learning capabilities
+  (read/write/evidence/reports) at vertical level in
+  `packages/platform/src/capability-maps.ts`, matching `ACE_SCHOOL`'s
+  precedent - checked `learning.*`'s capability definitions first to
+  confirm none carry a `requiredVertical` restriction that would silently
+  block the grant (unlike `children.manage`, which is hardcoded to
+  `NURSERY` only - deliberately left untouched, out of Plan 04's stated
+  scope).
+- Deliberately did **not** implement the pricing catalogue itself: read
+  `packages/pricing/src/catalog.ts` and `apps/api/src/billing/billing-plans.ts`
+  in full and found both shaped entirely around institutional Buy Now
+  self-serve (`av30Included`, `maxSitesIncluded`, church/school feature
+  bullet lists) - forcing a household Free/Paid entry into that shape
+  would invent structure no real consumer needs yet, especially with the
+  user's own "others I will clarify later" on the paid-tier feature list.
+  Recorded as a deferred scope note in `07-nexsteps-home.md` rather than
+  silently building the wrong shape or silently skipping the decision
+  record.
+- Ran `pnpm install` (fresh worktree), then `pnpm --filter @pathway/platform test`
+  and `typecheck` - green immediately, confirming the completeness tests in
+  `capability-maps.spec.ts` cover new vertical entries automatically via
+  `Object.values(Vertical)`/`Object.keys(VERTICAL_CAPABILITIES)`.
+- Ran `pnpm -r typecheck` across all 15 packages and found two real,
+  necessary breaks from the new exhaustive `Vertical` member - not
+  optional, not scope creep: `apps/web/lib/module-catalog.ts`'s
+  `VERTICAL_FEATURES: Record<Vertical, string[]>` was missing an entry,
+  and `apps/web/lib/configurator-checkout.ts`'s `verticalToSector` switch
+  had no ending return for the new case. Traced whether `HOME_EDUCATION`
+  could ever actually reach this institutional configurator before fixing
+  either - confirmed via `apps/web/app/configure/state.ts`'s
+  `VERTICALS_BY_ORG_TYPE` (a fixed, explicit map) that it never can - so
+  `verticalToSector` throws for it rather than inventing a false legacy
+  `Sector` mapping, and `VERTICAL_FEATURES` gets a real but unreachable
+  entry (TypeScript requires the key to exist; the UI never renders it).
+- Ran `pnpm -r lint` (clean) then `pnpm test:unit` (root, via turbo) and
+  found two further real breaks the typecheck pass didn't catch, both in
+  `apps/web`'s test suite: `configurator-assets.spec.ts` asserted an exact
+  19-asset, 7-vertical configurator image manifest (now would be 20/8 with
+  no real artwork for the 8th), and `configurator-state.spec.ts` asserted
+  every `Vertical` is reachable through some org type in the configurator
+  (now false by design). Fixed `CONFIGURATOR_IMAGE_PATHS` to exclude
+  `HOME_EDUCATION` at the source (no configurator artwork exists for it,
+  and it will never render there) rather than adding a placeholder asset;
+  updated both tests plus `configurator-checkout.spec.ts`'s vertical-sector
+  test to reflect the same intentional exclusion, and added a new test
+  asserting `verticalToSector("HOME_EDUCATION")` throws.
+- Same `test:unit` run surfaced a third failure with a different root
+  cause: `apps/nexsteps-home/src/screens/registry.test.ts` failing on 2
+  assertions, in a package this session's diff never touched. Confirmed
+  via `git diff --stat fss/master` that zero files under
+  `apps/nexsteps-home/` were part of this branch before investigating -
+  ruling out this session's own change as the cause before looking
+  further. Found the real cause: Plan 03 (PR #273) added 5
+  tablet-two-pane composite screen IDs to
+  `docs/NexStepsV2/nexsteps-home/screen-inventory.json` but never updated
+  `apps/nexsteps-home/src/screens/registry.ts` or the test's hardcoded
+  76-entry count to match - and PR #273's own CI had shown this exact test
+  suite green, despite the mismatch already existing at that PR's merge
+  (confirmed via `gh pr view 273 --json files`, which shows
+  `screen-inventory.json` changed but `registry.ts` did not). Root cause:
+  `registry.test.ts` reads `screen-inventory.json` live via `readFileSync`
+  at test time, but that file lives outside `apps/nexsteps-home/` - if
+  turbo's cache inputs for `nexsteps-home#test:unit` don't track it, a
+  stale cached PASS from before Plan 03 could keep being served. Fixed by
+  adding the 5 composite entries to `registry.ts` (each reusing its
+  `listScreenId`'s phone route, since a tablet composite is the same
+  screen rendered via `<TwoPane>` at tablet width, not a separate route)
+  and updating both count assertions to 81. Flagged the turbo-cache-input
+  gap itself as a candidate follow-up, not fixed here - separate concern
+  from this plan, and no evidence yet of it masking anything else.
+- Ran the full verification suite one more time after all fixes:
+  `pnpm -r typecheck`, `pnpm -r lint`, `pnpm test:unit` (all 22 turbo
+  tasks, including the 734-test `apps/api` suite) - everything green.
+- Split the work into two commits (Plan 04's actual scope; the unrelated
+  registry.ts fix), reviewed `git status --short` before staging, and
+  reverted two incidentally-modified `.turbo/*.log` cache files (pre-existing
+  tracked build-cache logs that only changed because this worktree's
+  absolute path differs from whoever last committed them - not a real
+  content change).
+- Fetched fresh `fss/master` immediately before pushing; no drift, no
+  conflicts with concurrent ACE work despite touching shared files.
+  Pushed and opened PR7 ([#277](https://github.com/FSS-Ltd/pathway/pull/277));
+  all 5 CI checks passed, including the three Postgres-backed jobs that
+  specifically exercise the schema change (Organisation Role RLS,
+  Permission Definition Database, System Role Seed Database Identity);
+  squash-merged; deleted the branch and its worktree.
+- This entry: recorded PR7's merge. Plan 05 (Setup flow) is next; no open
+  product decisions flagged for it yet.
