@@ -164,7 +164,30 @@ Added by ACE-F14 to give the admin nav a source for the caller's own effective p
 
 | ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| R69 | GET | `/access/users/me/permissions` | `none` | `none` | any authenticated user | active organisation membership | self only; not a delegation-boundary read | current-effective-assignments-only | `none` | `standard` | trusted organisation/site context; organisation-scoped RLS |
+| R69 | GET | `/access/users/me/permissions` | `none` | `none` | any authenticated user | active organisation membership | self only; not a delegation-boundary read | current-effective-assignments-only | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+
+## NexSteps legacy surface (Batch A)
+
+Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cutover, using `platform.access.*`-family keys already active in `PLATFORM_CORE_CAPABILITIES` for every vertical. Not part of the 68 exact ACE routes; recorded separately so that count stays accurate. Migration is bounded to the two controllers that authorised from no role check at all (announcements, attendance) - see the ACE-F14 build plan for the controllers still blocked on a missing permission key or a commercial-entitlement decision (children, classes, parents, lessons, orgs, staff, session assignments, learning).
+
+`staff` narrows from "any tenant member can create/delete announcements" to `notices.read` only (no `manage`); `organisationHead` and `siteLead` hold `notices.manage`. This is a deliberate tightening, not an incidental side effect.
+
+| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N01 | GET | `/announcements` | `notices.read` | `notices.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N02 | GET | `/announcements/:id` | `notices.read` | `notices.read` | organisation-head, site-lead, staff | active site membership | announcement belongs to active tenant | `none` | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N03 | POST | `/announcements` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | `none` | AV30 hard-cap enforcement | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N04 | PATCH | `/announcements/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | announcement belongs to active tenant | AV30 hard-cap enforcement on publish | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N05 | DELETE | `/announcements/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | announcement belongs to active tenant | `none` | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N06 | GET | `/attendance` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N07 | GET | `/attendance/session-summaries` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N08 | GET | `/attendance/session/:sessionId` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | session belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N09 | GET | `/attendance/:id` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | record belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N10 | PUT | `/attendance/session/:sessionId` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active site membership | session belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N11 | POST | `/attendance` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N12 | PATCH | `/attendance/:id` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active site membership | record belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+
+`notices.publish` has no dedicated route today (publication is folded into `PATCH /announcements/:id`); left unmapped rather than inventing one.
 
 ## Unresolved section 8.5 API contracts
 

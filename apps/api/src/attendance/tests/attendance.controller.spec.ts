@@ -6,6 +6,7 @@ import { CreateAttendanceDto } from "../dto/create-attendance.dto";
 import { UpdateAttendanceDto } from "../dto/update-attendance.dto";
 import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
+import { PermissionGuard } from "../../access-control/permission.guard";
 
 // Shared row type for clear expectations
 interface AttendanceRow {
@@ -62,6 +63,8 @@ describe("AttendanceController", () => {
       .overrideGuard(PathwayAuthGuard)
       .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(PermissionGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

@@ -5,8 +5,10 @@ import { AppModule } from "../../app.module";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import {
   clearE2eAuthAccess,
+  clearE2eTypedRole,
   requireDatabase,
   seedE2eAuthUser,
+  seedE2eTypedRole,
 } from "../../../test-helpers.e2e";
 
 // Types to keep the spec strongly typed (no any)
@@ -30,6 +32,8 @@ describe("Announcements (e2e)", () => {
   let authHeader: string;
   let authUserId: string;
   let otherAnnouncementId: string;
+  let typedRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
+  let createdOrgVertical = false;
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -46,6 +50,20 @@ describe("Announcements (e2e)", () => {
       throw new Error("E2E_ORG_ID / E2E_TENANT_ID / E2E_TENANT2_ID missing");
     }
 
+    // notices.read/manage are org-capability-gated (PLATFORM_CORE_CAPABILITIES,
+    // granted by any vertical); the shared E2E_ORG_ID fixture has no OrgVertical
+    // row by default, so PermissionGuard would deny every request with
+    // capability-missing regardless of the typed assignment below.
+    const existingVertical = await prisma.orgVertical.findUnique({
+      where: { orgId },
+    });
+    if (!existingVertical) {
+      await prisma.orgVertical.create({
+        data: { orgId, vertical: "ACE_SCHOOL" },
+      });
+      createdOrgVertical = true;
+    }
+
     const auth = await seedE2eAuthUser({
       subject: "announcements-e2e",
       tenantId,
@@ -55,6 +73,13 @@ describe("Announcements (e2e)", () => {
     });
     authUserId = auth.userId;
     authHeader = auth.authorization;
+    typedRole = await seedE2eTypedRole({
+      orgId,
+      tenantId,
+      userId: authUserId,
+      scope: "site",
+      permissionKeys: ["notices.read", "notices.manage"],
+    });
 
     // seed announcement in other tenant
     await withTenantRlsContext(otherTenantId, orgId, async (tx) => {
@@ -76,6 +101,12 @@ describe("Announcements (e2e)", () => {
       await prisma.announcement
         .deleteMany({ where: { tenantId: { in: [tenantId, otherTenantId] } } })
         .catch(() => undefined);
+      if (typedRole) {
+        await clearE2eTypedRole(typedRole, orgId);
+      }
+      if (createdOrgVertical) {
+        await prisma.orgVertical.deleteMany({ where: { orgId } });
+      }
       await clearE2eAuthAccess(authUserId);
       await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
