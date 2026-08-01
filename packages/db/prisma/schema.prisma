@@ -204,6 +204,17 @@ enum BehaviourVisibility {
   SENSITIVE
 }
 
+enum GuardianLegalAccess {
+  FULL
+  LIMITED
+  NONE
+}
+
+enum FamilyIdentityTarget {
+  GUARDIAN
+  STUDENT
+}
+
 enum PermissionScope {
   organisation
   site
@@ -568,6 +579,12 @@ model Tenant {
   behaviourEntries       BehaviourEntry[]
   demeritPolicies        DemeritPolicy[]
   demeritStageOverrides  DemeritStageOverride[]
+  studentPortalPolicy    StudentPortalPolicy?
+  guardianIdentities     GuardianIdentity[]
+  studentIdentities      StudentIdentity[]
+  studentIdentityLinks   StudentIdentityLink[]
+  guardianChildRelationships GuardianChildRelationship[]
+  familyIdentityInvites  FamilyIdentityInvite[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
@@ -645,6 +662,13 @@ model User {
   orgRoles         UserOrgRole[]
   staffActivities      StaffActivity[]
   identities           UserIdentity[]
+  guardianIdentities   GuardianIdentity[]
+  studentIdentities    StudentIdentity[]
+  revokedStudentIdentityLinks StudentIdentityLink[] @relation("StudentIdentityLinkRevokedBy")
+  revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
+  familyIdentityInvites FamilyIdentityInvite[] @relation("FamilyIdentityInviteUser")
+  familyIdentityInvitesCreated FamilyIdentityInvite[] @relation("FamilyIdentityInviteCreatedBy")
+  familyIdentityInvitesRevoked FamilyIdentityInvite[] @relation("FamilyIdentityInviteRevokedBy")
   invitesCreated          Invite[]                  @relation("InviteCreatedBy")
   publicSignupLinksCreated PublicSignupLink[]       @relation("PublicSignupLinkCreatedBy")
   orgDeletionRecords    OrgDeletedUser[]          @relation("OrgDeletedUserTarget")
@@ -688,6 +712,138 @@ model UserIdentity {
 
   @@unique([provider, providerSubject])
   @@index([userId])
+}
+
+// A global user may be a guardian in more than one tenant. The identity does
+// not itself grant data access; GuardianChildRelationship is the access fact.
+model GuardianIdentity {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user         User                         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  relationships GuardianChildRelationship[]
+  acceptedInvites FamilyIdentityInvite[]    @relation("FamilyIdentityInviteAcceptedGuardian")
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, userId])
+  @@unique([id, tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+// A global user may represent a student only inside a tenant. Student access
+// additionally requires an active StudentIdentityLink and enabled tenant policy.
+model StudentIdentity {
+  id        String   @id @default(uuid())
+  tenantId  String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  links           StudentIdentityLink[]
+  acceptedInvites FamilyIdentityInvite[] @relation("FamilyIdentityInviteAcceptedStudent")
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, userId])
+  @@unique([id, tenantId, userId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+// One tenant-owned portal setting controls whether new active student links can
+// be created. It is intentionally one row per tenant rather than an id record.
+model StudentPortalPolicy {
+  tenantId             String   @id
+  studentPortalEnabled Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model StudentIdentityLink {
+  id                String   @id @default(uuid())
+  tenantId          String
+  studentIdentityId String
+  childId           String
+  linkedAt          DateTime @default(now())
+  endedAt           DateTime?
+  revokedAt         DateTime?
+  revokedByUserId   String?
+  revocationReason  String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  studentIdentity StudentIdentity @relation(fields: [studentIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  child           Child           @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  revokedBy       User?           @relation("StudentIdentityLinkRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, childId])
+  @@index([tenantId, studentIdentityId])
+}
+
+model GuardianChildRelationship {
+  id                 String              @id @default(uuid())
+  tenantId           String
+  guardianIdentityId String
+  childId            String
+  legalAccess        GuardianLegalAccess @default(FULL)
+  startsAt           DateTime            @default(now())
+  endedAt            DateTime?
+  revokedAt          DateTime?
+  revokedByUserId    String?
+  revocationReason   String?             @db.Text
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  guardianIdentity GuardianIdentity @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  child            Child            @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  revokedBy        User?            @relation("GuardianChildRelationshipRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, childId])
+  @@index([tenantId, guardianIdentityId])
+}
+
+// Invitation lifecycle only. A later command service delivers the invite and
+// creates the separate guardian relationship or student link after acceptance.
+model FamilyIdentityInvite {
+  id                         String               @id @default(uuid())
+  tenantId                   String
+  invitedUserId              String
+  target                     FamilyIdentityTarget
+  childId                    String?
+  createdByUserId            String
+  expiresAt                  DateTime
+  acceptedAt                 DateTime?
+  acceptedGuardianIdentityId String?
+  acceptedStudentIdentityId  String?
+  revokedAt                  DateTime?
+  revokedByUserId            String?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+
+  tenant                   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  invitedUser              User              @relation("FamilyIdentityInviteUser", fields: [invitedUserId], references: [id], onDelete: Restrict)
+  child                    Child?            @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  createdBy                User              @relation("FamilyIdentityInviteCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  revokedBy                User?             @relation("FamilyIdentityInviteRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  acceptedGuardianIdentity GuardianIdentity? @relation("FamilyIdentityInviteAcceptedGuardian", fields: [acceptedGuardianIdentityId, tenantId, invitedUserId], references: [id, tenantId, userId], onDelete: Restrict)
+  acceptedStudentIdentity  StudentIdentity?  @relation("FamilyIdentityInviteAcceptedStudent", fields: [acceptedStudentIdentityId, tenantId, invitedUserId], references: [id, tenantId, userId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, invitedUserId, createdAt])
+  @@index([tenantId, childId])
+  @@index([expiresAt])
 }
 
 // Membership of a user to an Org (suite-level). Useful for listing sites the user can manage.
@@ -904,6 +1060,9 @@ model Child {
   pacePolicyOverrides PacePolicyOverride[]
   behaviourEntries    BehaviourEntry[]
   demeritStageOverrides DemeritStageOverride[]
+  studentIdentityLinks StudentIdentityLink[]
+  guardianChildRelationships GuardianChildRelationship[]
+  familyIdentityInvites FamilyIdentityInvite[]
   evidence            Evidence[]
   reportBundles       ReportBundle[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
