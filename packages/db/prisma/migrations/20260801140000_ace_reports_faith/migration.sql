@@ -539,7 +539,7 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 DECLARE
-  draft_row app."FaithContentDraft"%ROWTYPE;
+  draft_row RECORD;
   previous_version_id TEXT;
   next_version_number INTEGER;
 BEGIN
@@ -991,7 +991,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  draft_row app."AceReportDraft"%ROWTYPE;
+  draft_row RECORD;
   previous_version_id TEXT;
   next_version_number INTEGER;
   version_id TEXT := gen_random_uuid()::text;
@@ -1114,17 +1114,25 @@ REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA app
   FROM pathway_ace_report_publisher;
 
 GRANT USAGE ON SCHEMA app TO pathway_ace_report_publisher;
-GRANT SELECT ON TABLE
-  app."AceTermReport",
-  app."AceReportDraft",
-  app."AceTermReportVersion"
-TO pathway_ace_report_publisher;
--- PostgreSQL requires UPDATE privilege for both FOR UPDATE locks.
-GRANT UPDATE ON TABLE
-  app."AceTermReport",
-  app."AceReportDraft"
-TO pathway_ace_report_publisher;
-GRANT INSERT ON TABLE app."AceTermReportVersion" TO pathway_ace_report_publisher;
+DO $$
+DECLARE
+  data_schema TEXT := pg_catalog.current_schema();
+BEGIN
+  EXECUTE pg_catalog.format(
+    'GRANT SELECT ON TABLE %I."AceTermReport", %I."AceReportDraft", %I."AceTermReportVersion" TO pathway_ace_report_publisher;',
+    data_schema, data_schema, data_schema
+  );
+  -- PostgreSQL requires UPDATE privilege for both FOR UPDATE locks.
+  EXECUTE pg_catalog.format(
+    'GRANT UPDATE ON TABLE %I."AceTermReport", %I."AceReportDraft" TO pathway_ace_report_publisher;',
+    data_schema, data_schema
+  );
+  EXECUTE pg_catalog.format(
+    'GRANT INSERT ON TABLE %I."AceTermReportVersion" TO pathway_ace_report_publisher;',
+    data_schema
+  );
+END;
+$$;
 
 REVOKE ALL ON FUNCTION app.reject_ace_term_report_target_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.require_ace_report_actor_membership() FROM PUBLIC;
