@@ -763,6 +763,27 @@ export async function fetchOrgCapabilities(
   return json.capabilities ?? [];
 }
 
+export async function fetchMyPermissions(
+  accessToken?: string | null,
+): Promise<string[]> {
+  if (isUsingMockApi()) {
+    return [];
+  }
+  const response = await fetch(`${API_BASE_URL}/access/users/me/permissions`, {
+    headers: buildAuthHeaders(accessToken),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch effective permissions: ${response.status} ${body}`,
+    );
+  }
+  const json = (await response.json()) as { permissions: string[] };
+  return json.permissions ?? [];
+}
+
 /**
  * Debug endpoint: returns resolved auth context (siteRole, tenantId, cookies, DB memberships).
  * Use when debugging staff attendance 403 or role resolution issues.

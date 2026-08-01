@@ -7,13 +7,13 @@ import type { AdminRoleInfo } from "./access";
 import {
   canAccessAdminSection,
   canAccessBilling,
-  canAccessRolesAdmin,
   canAccessSafeguardingAdmin,
+  hasPermission,
   isSiteAdminOrHigher,
 } from "./access";
 
-/** Paths restricted to legacy ORG_ADMIN only (Roles & Access), narrower than admin-only. */
-const ORG_ADMIN_ONLY_PREFIXES = ["/settings/roles"];
+/** Paths gated on platform.access.roles.read (Roles & Access), narrower than admin-only. */
+const ROLES_ADMIN_PREFIXES = ["/settings/roles"];
 
 /** Paths restricted to ORG_ADMIN or SITE_ADMIN (admin-only). */
 const ADMIN_ONLY_PATHS = [
@@ -45,6 +45,7 @@ const CREATE_CONCERN_PATH = "/safeguarding/concerns/new";
 export function canAccessRoute(
   pathname: string,
   role: AdminRoleInfo,
+  permissions?: string[] | null,
 ): boolean {
   const path = pathname.replace(/\/$/, "") || "/";
 
@@ -55,11 +56,9 @@ export function canAccessRoute(
     return true; // Any authenticated staff can create concerns
   }
   if (
-    ORG_ADMIN_ONLY_PREFIXES.some(
-      (p) => path === p || path.startsWith(p + "/"),
-    )
+    ROLES_ADMIN_PREFIXES.some((p) => path === p || path.startsWith(p + "/"))
   ) {
-    return canAccessRolesAdmin(role);
+    return hasPermission(permissions ?? null, "platform.access.roles.read");
   }
   if (path === "/safeguarding" || path.startsWith("/safeguarding/")) {
     return canAccessSafeguardingAdmin(role);
@@ -108,6 +107,7 @@ export type AdminAction =
 export function canPerform(
   action: AdminAction,
   role: AdminRoleInfo,
+  permissions?: string[] | null,
 ): boolean {
   switch (action) {
     case "people:invite":
@@ -132,8 +132,12 @@ export function canPerform(
     case "safeguarding:create":
       return true; // Any staff can create concerns
     case "roles:manage":
+      return hasPermission(permissions ?? null, "platform.access.roles.manage");
     case "assignments:manage":
-      return canAccessRolesAdmin(role);
+      return hasPermission(
+        permissions ?? null,
+        "platform.access.assignments.manage",
+      );
     default:
       return false;
   }

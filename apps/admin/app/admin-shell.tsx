@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Menu, X, LifeBuoy } from "lucide-react";
-import type { Capability } from "@pathway/platform";
+import type { Capability, PermissionKey } from "@pathway/platform";
 import { APP_VERSION } from "@pathway/util/version";
 import { TopBarActions } from "@/components/topbar-actions";
 import {
@@ -18,6 +18,7 @@ import {
 import { useAdminAccess } from "@/lib/use-admin-access";
 import {
   hasCapability,
+  hasPermission,
   meetsAccessRequirement,
   type AccessRequirement,
 } from "@/lib/access";
@@ -47,6 +48,7 @@ const getDevRuntimeState = () => {
 const navItemsWithAccess: (SidebarNavItem & {
   access?: AccessRequirement;
   capability?: Capability;
+  permission?: PermissionKey;
 })[] = [
   { ...defaultSidebarItems[0], access: "staff-or-admin" }, // Dashboard
   { label: "Profile", href: "/staff/profile", iconIndex: 14, access: "staff-only", group: "People" }, // Staff only (replaces People)
@@ -69,7 +71,7 @@ const navItemsWithAccess: (SidebarNavItem & {
   { label: "Blog", href: "/admin/blog", iconIndex: 19, access: "super-user", group: "Communication" },
   { ...defaultSidebarItems[12], access: "admin-only", group: "Admin" }, // Reports
   { ...defaultSidebarItems[13], access: "admin-only", group: "Admin" }, // Settings
-  { label: "Roles & Access", href: "/settings/roles", iconIndex: 21, access: "org-admin-only", group: "Admin" },
+  { label: "Roles & Access", href: "/settings/roles", iconIndex: 21, capability: "platform.access.roles.read", permission: "platform.access.roles.read", group: "Admin" },
 ];
 
 const titleMap: Record<string, string> = {
@@ -229,6 +231,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
     role,
     currentOrgIsMasterOrg,
     capabilities,
+    permissions,
     error: accessError,
     warning: accessWarning,
   } = useAdminAccess();
@@ -294,10 +297,12 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           (item) =>
             meetsAccessRequirement(role, item.access, {
               currentOrgIsMasterOrg,
-            }) && hasCapability(capabilities, item.capability),
+            }) &&
+            hasCapability(capabilities, item.capability) &&
+            hasPermission(permissions, item.permission),
         )
         .map((item) => ({ ...item, label: orgLabel(ui, item.href, item.label) })),
-    [role, currentOrgIsMasterOrg, capabilities, ui],
+    [role, currentOrgIsMasterOrg, capabilities, permissions, ui],
   );
 
   if (isAuthRoute) {
