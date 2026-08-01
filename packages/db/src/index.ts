@@ -1,7 +1,10 @@
 // Canonical Prisma bootstrap (ESM/CJS/Jest-safe)
 import { PrismaClient, Prisma } from "@prisma/client";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { withPiiEncryption } from "./pii-encryption";
+import {
+  withPiiEncryption,
+  withPiiEncryptionTransaction,
+} from "./pii-encryption";
 
 export * from "./permission-definition-sync";
 export * from "./seed-system-roles";
@@ -19,7 +22,8 @@ const rawPrismaClient: PrismaClient =
   globalForPrisma.__prisma ?? new PrismaClient({ transactionOptions });
 
 // Transparent field-level encryption for sensitive PII columns (see pii-encryption.ts).
-// Applied to the base client so it also covers $transaction/withTenantRlsContext.
+// Interactive transactions are wrapped separately because Prisma does not expose
+// `$extends` on their transaction client.
 const basePrismaClient: PrismaClient = withPiiEncryption(rawPrismaClient);
 
 const prismaProxy = new Proxy(basePrismaClient, {
@@ -201,15 +205,18 @@ export async function applyTenantContext(
 export async function runTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  return basePrismaClient.$transaction(fn);
+  return basePrismaClient.$transaction((tx) =>
+    fn(withPiiEncryptionTransaction(tx)),
+  );
 }
 
 export async function runReadOnlyTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   return basePrismaClient.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
-    return fn(tx);
+    const encryptedTx = withPiiEncryptionTransaction(tx);
+    await encryptedTx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+    return fn(encryptedTx);
   });
 }
 
@@ -223,8 +230,9 @@ export async function withTenantRlsContext<T>(
   }
 
   return basePrismaClient.$transaction(async (tx) => {
-    await applyTenantContext(tx, tenantId, orgId);
-    return prismaContext.run(tx, () => callback(tx));
+    const encryptedTx = withPiiEncryptionTransaction(tx);
+    await applyTenantContext(encryptedTx, tenantId, orgId);
+    return prismaContext.run(encryptedTx, () => callback(encryptedTx));
   });
 }
 
@@ -237,8 +245,9 @@ export async function withOrgRlsContext<T>(
   }
 
   return basePrismaClient.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
-    await applyTenantContext(tx, "", orgId);
-    return prismaContext.run(tx, () => callback(tx));
+    const encryptedTx = withPiiEncryptionTransaction(tx);
+    await encryptedTx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
+    await applyTenantContext(encryptedTx, "", orgId);
+    return prismaContext.run(encryptedTx, () => callback(encryptedTx));
   });
 }

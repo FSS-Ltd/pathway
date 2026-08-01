@@ -1,5 +1,5 @@
 import { decryptField, encryptField, isEncryptedField } from "@pathway/util";
-import type { PrismaClient } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * Prisma model name (as used in $allOperations' `model` arg, PascalCase) -> the
@@ -51,7 +51,13 @@ function isJsonEnvelope(value: unknown): value is JsonEnvelope {
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
   const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+  // Prisma can return records created in another JavaScript realm (notably in
+  // Jest), whose Object prototype is distinct from this module's Object.prototype.
+  return (
+    proto === Object.prototype ||
+    proto === null ||
+    proto?.constructor?.name === "Object"
+  );
 }
 
 function encryptDataObject(
@@ -150,6 +156,112 @@ export function withPiiEncryption<T extends PrismaClient>(client: T): T {
       },
     },
   }) as unknown as T;
+}
+
+/**
+ * Prisma does not expose `$extends` on its interactive transaction client.
+ * Wrap its model delegates instead so tenant-scoped transactions preserve the
+ * same encryption-at-rest contract as the canonical Prisma client.
+ */
+export function withPiiEncryptionTransaction<T extends Prisma.TransactionClient>(
+  client: T,
+): T {
+  return new Proxy<T>(client, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (
+        typeof property !== "string" ||
+        property.startsWith("$") ||
+        typeof value !== "object" ||
+        value === null
+      ) {
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+
+      return withPiiEncryptionDelegate(
+        `${property[0].toUpperCase()}${property.slice(1)}`,
+        value,
+      );
+    },
+  });
+}
+
+function withPiiEncryptionDelegate(model: string, delegate: object): object {
+  return new Proxy(delegate, {
+    get(target, property, receiver) {
+      const operation = Reflect.get(target, property, receiver);
+      if (typeof operation !== "function") return operation;
+
+      return (...args: unknown[]) => {
+        const [firstArg, ...remainingArgs] = args;
+        const encryptedArgs =
+          (ENCRYPTED_STRING_FIELDS[model] || ENCRYPTED_JSON_FIELDS[model]) &&
+          isPlainObject(firstArg)
+            ? encryptWriteArgs(model, firstArg)
+            : firstArg;
+
+        const result = Reflect.apply(operation, target, [
+          encryptedArgs,
+          ...remainingArgs,
+        ]);
+        return isPromiseLike(result) ? withPiiDecryption(result) : result;
+      };
+    },
+  });
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> & object {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as PromiseLike<unknown>).then === "function"
+  );
+}
+
+/**
+ * Decrypts query results without replacing PrismaPromise. Prisma's generated
+ * fluent relation methods live on that promise, so converting it to Promise
+ * would make calls such as `findUnique(...).childNotes()` unavailable.
+ */
+function withPiiDecryption<T extends PromiseLike<unknown> & object>(
+  promise: T,
+): T {
+  return new Proxy(promise, {
+    get(target, property, receiver) {
+      const operation = Reflect.get(target, property, receiver);
+      if (typeof operation !== "function") return operation;
+
+      if (property === "then") {
+        return (...args: unknown[]) => {
+          const [onFulfilled, onRejected, transaction] = args;
+          return Reflect.apply(operation, target, [
+            (result: unknown) => {
+              const decrypted = decryptDeep(result);
+              return typeof onFulfilled === "function"
+                ? onFulfilled(decrypted)
+                : decrypted;
+            },
+            onRejected,
+            transaction,
+          ]);
+        };
+      }
+
+      if (property === "catch" || property === "finally") {
+        return (...args: unknown[]) => {
+          const result = Reflect.apply(operation, target, args);
+          return isPromiseLike(result)
+            ? Promise.resolve(result).then((value) => decryptDeep(value))
+            : result;
+        };
+      }
+
+      return (...args: unknown[]) => {
+        const result = Reflect.apply(operation, target, args);
+        return isPromiseLike(result) ? withPiiDecryption(result) : result;
+      };
+    },
+  }) as T;
 }
 
 function encryptWriteArgs(
