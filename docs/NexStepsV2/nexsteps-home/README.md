@@ -134,3 +134,14 @@ When implementation reveals a necessary change to an approved flow:
 3. Preserve security and safeguarding rules even when the visual flow changes.
 4. Regenerate affected screenshots only after product review.
 5. Re-run the handoff validator and Graphify update.
+
+### Log
+
+- **2026-08-01 — Production target moved from `apps/mobile` to a new
+  `apps/nexsteps-home`.** Reason: a clean 5-tab shell with no legacy Family
+  Space migration constraint and no inherited portrait lock. Cost accepted:
+  duplicated auth/API-client/build wiring versus `apps/mobile` until a
+  shared-package extraction is warranted. No screen IDs affected — this is
+  an architecture decision, not a screen change. No security or
+  safeguarding rule changes. Full build-plan series, decision rationale and
+  live progress tracking: [`build-plans/`](build-plans/README.md).
