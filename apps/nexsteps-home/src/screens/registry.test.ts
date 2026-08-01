@@ -11,7 +11,7 @@ describe("screenRoutes", () => {
   const inventory = JSON.parse(readFileSync(inventoryPath, "utf-8")) as {
     screens: Array<{ id: string }>;
   };
-  const inventoryIds = inventory.screens.map((screen) => screen.id);
+  const inventoryIds = inventory.screens.map((s) => s.id);
   const registryIds = Object.keys(screenRoutes);
 
   it("covers every approved screen ID and no others", () => {
