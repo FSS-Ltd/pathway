@@ -127,9 +127,5 @@ runs:
       run: |
         export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
         command -v sh >/dev/null
-        # --force: Vercel's incrementally-cached node_modules from a prior deployment
-        # served a stale @types/react version to admin's build (18.x pinned locally,
-        # 19.x leaked in from the cache) even though a cold install resolves correctly.
-        # Bypass the cache once to reset it; revert after the next deploy succeeds.
-        url="$(pnpm dlx vercel@54.13.0 deploy --prod --force --archive=tgz --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
+        url="$(pnpm dlx vercel@54.13.0 deploy --prod --archive=tgz --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
         echo "Deployed ${{ inputs.app }} to $url"
