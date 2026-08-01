@@ -21,6 +21,17 @@ export class AccessUsersController {
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
+  @Get("me/permissions")
+  async getMyPermissions(@Req() request: RequestWithRequestId) {
+    const requestId = getOrCreateRequestId(request);
+    const actor = this.actor(request, requestId);
+    return {
+      orgId: actor.orgId,
+      tenantId: actor.tenantId ?? null,
+      permissions: await this.accessUsers.listOwnPermissions(actor),
+    };
+  }
+
   @Get(":userId/effective-permissions")
   async getEffectivePermissions(
     @Param() params: unknown,

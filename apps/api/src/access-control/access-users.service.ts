@@ -140,4 +140,19 @@ export class AccessUsersService {
       };
     });
   }
+
+  /**
+   * Reading your own effective permissions is not a delegation-boundary
+   * read (unlike getEffectivePermissions, which reads another user's), so
+   * this carries no platform.access.* bootstrap check - gating it would
+   * make it unreachable for exactly the users (staff, parents, students)
+   * who need it to render navigation.
+   */
+  async listOwnPermissions(actor: RoleActorContext): Promise<string[]> {
+    return this.effectivePermissions.listForUser(
+      actor.userId,
+      actor.orgId,
+      actor.tenantId,
+    );
+  }
 }
