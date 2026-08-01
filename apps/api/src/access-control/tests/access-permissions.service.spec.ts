@@ -1,4 +1,5 @@
 import { AccessPermissionsService } from "../access-permissions.service";
+import type { AccessShadowService } from "../access-shadow.service";
 import type { RoleActorContext, RolesTransactionBoundary } from "../roles.service";
 
 const actor: RoleActorContext = {
@@ -9,11 +10,15 @@ const actor: RoleActorContext = {
   requestId: "access-permissions-request-1",
 };
 
+const shadow = {
+  compare: jest.fn().mockResolvedValue(true),
+} as unknown as AccessShadowService;
+
 function serviceWith(tx: object) {
   const transaction: RolesTransactionBoundary = {
     run: async (_actor, operation) => operation(tx as never),
   };
-  return new AccessPermissionsService(transaction);
+  return new AccessPermissionsService(transaction, shadow);
 }
 
 describe("AccessPermissionsService", () => {

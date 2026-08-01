@@ -1,8 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { prisma, runTransaction } from "@pathway/db";
 import { AccessCacheService } from "../access-cache.service";
+import type { AccessShadowService } from "../access-shadow.service";
 import { RoleSafetyService } from "../role-safety.service";
 import { AssignmentsService } from "../assignments.service";
+
+const noopShadow = {
+  compare: async ({ legacyAllowed }: { legacyAllowed: boolean }) => legacyAllowed,
+} as unknown as AccessShadowService;
 import {
   createRolesTransactionBoundary,
   type RoleActorContext,
@@ -79,6 +84,7 @@ describe("assignment API transaction and forced-RLS integration", () => {
     outbox,
     new AccessCacheService(),
     new RoleSafetyService(),
+    noopShadow,
   );
 
   beforeAll(async () => {
@@ -322,6 +328,7 @@ describe("assignment API transaction and forced-RLS integration", () => {
       outbox,
       new AccessCacheService(),
       new RoleSafetyService(),
+      noopShadow,
     );
     await expectDatabaseRejection(
       () =>

@@ -1,5 +1,6 @@
 import type { Prisma } from "@pathway/db";
 import { AccessCacheService, MAX_ACCESS_CACHE_TTL_MS } from "../access-cache.service";
+import type { AccessShadowService } from "../access-shadow.service";
 import {
   AssignmentsService,
   type AssignRoleCommand,
@@ -37,6 +38,9 @@ const passThroughRoleSafety = {
     await safetyCommand.mutate();
   },
 } as RoleSafetyService;
+const shadow = {
+  compare: jest.fn().mockResolvedValue(true),
+} as unknown as AccessShadowService;
 
 function buildHarness(options: {
   actorMembership?: { role: string } | null;
@@ -134,6 +138,7 @@ function buildHarness(options: {
       new OutboxService(),
       cache,
       passThroughRoleSafety,
+      shadow,
     ),
   };
 }
@@ -159,6 +164,7 @@ describe("AssignmentsService", () => {
       new OutboxService(),
       base.cache,
       passThroughRoleSafety,
+      shadow,
     );
 
     await expect(service.assign([command], actor)).resolves.toEqual([
@@ -266,6 +272,7 @@ describe("AssignmentsService", () => {
       new OutboxService(),
       base.cache,
       passThroughRoleSafety,
+      shadow,
     );
 
     await expect(
@@ -679,6 +686,7 @@ describe("AssignmentsService", () => {
         new OutboxService(),
         cache,
         passThroughRoleSafety,
+        shadow,
       );
 
       await expect(service.assign([command], actor)).resolves.toHaveLength(1);

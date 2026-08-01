@@ -1,6 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { getOrgCapabilities } from "@pathway/platform";
-import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
+import { assertPlatformAccessRouteAccessWithShadow } from "./assert-platform-access";
 import { AccessShadowService } from "./access-shadow.service";
 import {
   EffectivePermissionsService,
@@ -55,11 +55,13 @@ export class AccessUsersService {
     actor: RoleActorContext,
   ): Promise<EffectivePermissionsResult> {
     await this.transaction.run(actor, (tx) =>
-      assertPlatformAccessRouteAccess(
+      assertPlatformAccessRouteAccessWithShadow(
         tx,
         actor,
         "platform.access.users.read",
         "EFFECTIVE_ACCESS_API_ACCESS_DENIED",
+        "GET /access/users/:userId/effective-permissions",
+        this.shadow,
       ),
     );
 
@@ -68,18 +70,6 @@ export class AccessUsersService {
       actor.orgId,
       actor.tenantId,
     );
-
-    await this.shadow.compare({
-      route: "GET /access/users/:userId/effective-permissions",
-      legacyAllowed: true,
-      request: {
-        userId: targetUserId,
-        orgId: actor.orgId,
-        tenantId: actor.tenantId,
-        permission: "platform.access.users.read",
-        now: new Date(),
-      },
-    });
 
     return {
       userId: targetUserId,
@@ -94,11 +84,13 @@ export class AccessUsersService {
     actor: RoleActorContext,
   ): Promise<AccessSummaryResult> {
     return this.transaction.run(actor, async (tx) => {
-      await assertPlatformAccessRouteAccess(
+      await assertPlatformAccessRouteAccessWithShadow(
         tx,
         actor,
         "platform.access.users.read",
         "ACCESS_SUMMARY_API_ACCESS_DENIED",
+        "GET /access/users/:userId/access-summary",
+        this.shadow,
       );
 
       const [membership, assignments, capabilities] = await Promise.all([

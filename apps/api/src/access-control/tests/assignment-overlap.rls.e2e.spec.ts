@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { prisma, runTransaction } from "@pathway/db";
 import { AccessCacheService } from "../access-cache.service";
+import type { AccessShadowService } from "../access-shadow.service";
 import { AssignmentsService } from "../assignments.service";
+
+const noopShadow = {
+  compare: async ({ legacyAllowed }: { legacyAllowed: boolean }) => legacyAllowed,
+} as unknown as AccessShadowService;
 import {
   createRolesTransactionBoundary,
   type RoleActorContext,
@@ -84,6 +89,7 @@ describe("assignment overlap integration", () => {
     new OutboxService(),
     new AccessCacheService(),
     passThroughRoleSafety,
+    noopShadow,
   );
 
   beforeAll(async () => {

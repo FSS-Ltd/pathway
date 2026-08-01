@@ -1,4 +1,3 @@
-import type { PermissionKey } from "@pathway/platform";
 import type { StructuredLogger } from "../../common/logging/logging.service";
 import type { AccessDecision } from "../access-decision.types";
 import {
@@ -84,6 +83,9 @@ describe("AccessShadowService", () => {
 
   it("does not evaluate or emit when an allow-listed route has a different permission", async () => {
     const service = createService();
+    const mismatchedPermission = ACCESS_SHADOW_ALLOW_LIST.find(
+      (entry) => entry.permission !== PERMISSION,
+    )!.permission;
 
     await expect(
       service.compare({
@@ -93,7 +95,7 @@ describe("AccessShadowService", () => {
           userId: "user-should-not-be-logged",
           orgId: "org-should-not-be-logged",
           tenantId: "site-should-not-be-logged",
-          permission: "platform.access.roles.read" as PermissionKey,
+          permission: mismatchedPermission,
           now: new Date("2026-07-28T12:00:00.000Z"),
         },
       }),

@@ -14,7 +14,8 @@ import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AccessCacheService } from "./access-cache.service";
-import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
+import { AccessShadowService } from "./access-shadow.service";
+import { assertPlatformAccessRouteAccessWithShadow } from "./assert-platform-access";
 import { roleApiError } from "./role-api-error";
 import { RoleSafetyService } from "./role-safety.service";
 import type {
@@ -136,11 +137,13 @@ export class RolesService {
     private readonly cache: AccessCacheService,
     @Inject(RoleSafetyService)
     private readonly roleSafety: RoleSafetyService,
+    @Inject(AccessShadowService)
+    private readonly shadow: AccessShadowService,
   ) {}
 
   async list(actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "read");
+      await this.assertRouteAccess(tx, actor, "read", "GET /access/roles");
       return tx.orgRoleDefinition.findMany({
         where: { orgId: actor.orgId },
         include: { permissions: { select: { permissionKey: true } } },
@@ -151,14 +154,14 @@ export class RolesService {
 
   async get(roleId: string, actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "read");
+      await this.assertRouteAccess(tx, actor, "read", "GET /access/roles/:roleId");
       return this.requireRoleInTransaction(tx, roleId, actor);
     });
   }
 
   async create(command: CreateRoleDto, actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
+      await this.assertRouteAccess(tx, actor, "manage", "POST /access/roles");
       if (command.scope === "site" && !actor.tenantId) {
         throw roleApiError(
           HttpStatus.BAD_REQUEST,
@@ -196,7 +199,12 @@ export class RolesService {
 
   async clone(roleId: string, command: CloneRoleDto, actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
+      await this.assertRouteAccess(
+        tx,
+        actor,
+        "manage",
+        "POST /access/roles/:roleId/clone",
+      );
       const source = await this.requireRoleInTransaction(tx, roleId, actor);
       const permissionKeys = await this.resolveClonePermissionKeys(
         tx, source.permissions.map((permission) => permission.permissionKey), source.scope, actor,
@@ -233,7 +241,12 @@ export class RolesService {
 
   async retire(roleId: string, command: RetireRoleDto, actor: RoleActorContext) {
     const result = await this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
+      await this.assertRouteAccess(
+        tx,
+        actor,
+        "manage",
+        "POST /access/roles/:roleId/retire",
+      );
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
       await this.roleSafety.assertHeadAndSelfLockoutSafe({
@@ -276,7 +289,7 @@ export class RolesService {
     roleId: string, expectedVersion: number, command: UpdateRoleDto, actor: RoleActorContext, mutation: RoleMutation,
   ) {
     const result = await this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
+      await this.assertRouteAccess(tx, actor, "manage", "PATCH /access/roles/:roleId");
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
       const permissionKeys = await this.validatePermissionKeys(tx, command.permissionKeys, role.scope, actor);
@@ -526,13 +539,16 @@ export class RolesService {
     tx: Prisma.TransactionClient,
     actor: RoleActorContext,
     access: "read" | "manage",
+    route: string,
   ): Promise<void> {
     const permissionKey = `platform.access.roles.${access}` as PermissionKey;
-    await assertPlatformAccessRouteAccess(
+    await assertPlatformAccessRouteAccessWithShadow(
       tx,
       actor,
       permissionKey,
       "ROLE_API_ACCESS_DENIED",
+      route,
+      this.shadow,
     );
   }
 
