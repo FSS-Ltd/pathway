@@ -16,6 +16,7 @@
     "test:e2e": "pnpm test:integration",
     "storage:backfill": "tsx scripts/backfill-supabase-storage.ts",
     "pii:backfill": "tsx scripts/backfill-pii-encryption.ts",
+    "access:backfill": "tsx scripts/backfill-org-head-assignments.ts",
     "stripe:provision:phase0": "tsx scripts/stripe-provision-phase0-plans.ts",
     "stripe:provision:learning": "tsx scripts/stripe-provision-learning-module.ts",
     "db:generate": "pnpm --filter @pathway/db run prisma:generate",

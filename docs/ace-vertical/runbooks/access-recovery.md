@@ -79,3 +79,66 @@ If the safety path is unavailable, disable custom role mutations and assignment
 writes while keeping role and assignment reads available. Do not disable the
 database system-role protection, forced RLS, audit, outbox, or cache expiry
 controls.
+
+## ACE-F14 legacy ORG_ADMIN backfill
+
+Before ACE-F14 removes the temporary route bootstrap in
+`apps/api/src/access-control/assert-platform-access.ts`, every organisation
+with an active legacy `ORG_ADMIN` membership needs an active typed assignment
+to that organisation's seeded "Organisation Head" system role, or that
+organisation loses access administration with no API-level recovery path.
+
+`pnpm --filter @pathway/api access:backfill` grants exactly that, for
+organisations whose system role has already been seeded (`pnpm db:seed`). It
+is idempotent: an existing active assignment is left untouched, and a rerun
+is a no-op. Run it in dry-run mode first (no flag), review the output, then
+rerun with `--apply`.
+
+Run these four checks in order, against the environment being backfilled,
+before and after `--apply`:
+
+```sql
+-- 1. Orgs with ORG_ADMINs but no seeded Organisation Head.
+-- MUST be 0 before --apply, or those orgs need pnpm db:seed run first.
+SELECT m."orgId", COUNT(*) FROM "OrgMembership" m
+LEFT JOIN "OrgRoleDefinition" r
+  ON r."id" = 'system-role:' || m."orgId" || ':organisation:organisationHead'
+ AND r."isActive" AND r."isSystem"
+WHERE m."role" = 'ORG_ADMIN' AND r."id" IS NULL GROUP BY m."orgId";
+
+-- 2. Legacy ORG_ADMIN with no active typed head assignment.
+-- MUST be 0 after --apply.
+SELECT m."orgId", m."userId" FROM "OrgMembership" m
+WHERE m."role" = 'ORG_ADMIN' AND NOT EXISTS (
+  SELECT 1 FROM "UserRoleAssignment" a
+  JOIN "OrgRoleDefinition" r ON r."id" = a."roleDefinitionId"
+  WHERE a."orgId" = m."orgId" AND a."userId" = m."userId"
+    AND a."revokedAt" IS NULL AND a."startsAt" <= NOW()
+    AND (a."expiresAt" IS NULL OR a."expiresAt" > NOW())
+    AND r."isSystem" AND r."isActive" AND r."scope" = 'organisation'
+    AND r."tenantId" IS NULL AND r."name" = 'Organisation Head');
+
+-- 3. Tripwire: ORG_ADMIN granted only via the legacy UserOrgRole table, not
+-- OrgMembership. The backfill iterates OrgMembership only, so any row here
+-- is out of scope by construction; decide explicitly if non-zero.
+SELECT r."orgId", r."userId" FROM "UserOrgRole" r
+WHERE r."role" = 'ORG_ADMIN' AND NOT EXISTS (
+  SELECT 1 FROM "OrgMembership" m WHERE m."orgId" = r."orgId" AND m."userId" = r."userId");
+
+-- 4. Highest-risk check: orgs with memberships but no OrgVertical row.
+-- getOrgCapabilities returns [] with no vertical, so these 403 on every
+-- capability-checked route regardless of the backfill. MUST be 0 before
+-- the ACE-F14 route cutover ships.
+SELECT o."id" FROM "Org" o
+WHERE EXISTS (SELECT 1 FROM "OrgMembership" m WHERE m."orgId" = o."id")
+  AND NOT EXISTS (SELECT 1 FROM "OrgVertical" v WHERE v."orgId" = o."id");
+```
+
+Assignments this backfill creates carry `assignedById` set to the platform
+actor (`SYSTEM_ACTOR_ID`, backed by a durable `User` row created in migration
+`20260731090000_system_actor_user`) and an audit event with
+`metadata.source = "ACE-F14 legacy ORG_ADMIN backfill"`. While the legacy
+bootstrap is still in place, rollback is to do nothing - legacy authority
+remains authoritative until ACE-F14 removes it. Assignments are one-way
+revocable, never deletable, matching the rest of this system's history
+guarantees.
