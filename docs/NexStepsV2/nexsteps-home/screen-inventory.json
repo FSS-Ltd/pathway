@@ -147,6 +147,18 @@
         "member-history",
         "moderation-resolution"
       ]
+    },
+    {
+      "id": "tablet-two-pane",
+      "label": "Tablet · two-pane composites",
+      "summary": "Approved list+detail flows shown side by side on iPad - same content as the phone screens, recomposed for the wider canvas.",
+      "screenIds": [
+        "tablet-week-day",
+        "tablet-progress-detail",
+        "tablet-correspondence",
+        "tablet-conversations",
+        "tablet-moderation"
+      ]
     }
   ],
   "screens": [
@@ -724,7 +736,9 @@
       "primaryAction": "Open Maya",
       "primaryTarget": "child-details",
       "secondaryAction": null,
-      "targets": ["regulations-overview"]
+      "targets": [
+        "regulations-overview"
+      ]
     },
     {
       "id": "child-details",
@@ -851,7 +865,9 @@
       "primaryAction": "Open item needing review",
       "primaryTarget": "regulations-requirement-detail",
       "secondaryAction": null,
-      "targets": ["regulations-requirement-detail"]
+      "targets": [
+        "regulations-requirement-detail"
+      ]
     },
     {
       "id": "regulations-requirement-detail",
@@ -863,7 +879,9 @@
       "primaryAction": "Link evidence",
       "primaryTarget": "regulations-evidence",
       "secondaryAction": "All requirements",
-      "targets": ["regulations-evidence"]
+      "targets": [
+        "regulations-evidence"
+      ]
     },
     {
       "id": "regulations-evidence",
@@ -902,7 +920,9 @@
       "primaryAction": "Open latest update",
       "primaryTarget": "regulations-update-detail",
       "secondaryAction": null,
-      "targets": ["regulations-update-detail"]
+      "targets": [
+        "regulations-update-detail"
+      ]
     },
     {
       "id": "regulations-update-detail",
@@ -914,7 +934,10 @@
       "primaryAction": "Review affected requirement",
       "primaryTarget": "regulations-requirement-detail",
       "secondaryAction": "All updates",
-      "targets": ["regulations-requirement-detail", "regulations-evidence"]
+      "targets": [
+        "regulations-requirement-detail",
+        "regulations-evidence"
+      ]
     },
     {
       "id": "regulations-correspondence",
@@ -926,7 +949,9 @@
       "primaryAction": "Add correspondence",
       "primaryTarget": "regulations-correspondence-add",
       "secondaryAction": null,
-      "targets": ["regulations-correspondence-detail"]
+      "targets": [
+        "regulations-correspondence-detail"
+      ]
     },
     {
       "id": "regulations-correspondence-detail",
@@ -938,7 +963,9 @@
       "primaryAction": "Prepare evidence pack",
       "primaryTarget": "regulations-pack-scope",
       "secondaryAction": "All correspondence",
-      "targets": ["regulations-pack-scope"]
+      "targets": [
+        "regulations-pack-scope"
+      ]
     },
     {
       "id": "regulations-correspondence-add",
@@ -974,7 +1001,9 @@
       "primaryAction": "Preview evidence pack",
       "primaryTarget": "regulations-pack-preview",
       "secondaryAction": "Change scope",
-      "targets": ["regulations-evidence"]
+      "targets": [
+        "regulations-evidence"
+      ]
     },
     {
       "id": "regulations-pack-preview",
@@ -1010,7 +1039,9 @@
       "primaryAction": "View access activity",
       "primaryTarget": "regulations-share-activity",
       "secondaryAction": "Change sharing",
-      "targets": ["regulations-share-activity"]
+      "targets": [
+        "regulations-share-activity"
+      ]
     },
     {
       "id": "regulations-share-activity",
@@ -1071,6 +1102,91 @@
       "primaryTarget": "moderation-queue",
       "secondaryAction": "Request second review",
       "targets": []
+    },
+    {
+      "id": "tablet-week-day",
+      "group": "tablet-two-pane",
+      "title": "Week and day, side by side",
+      "eyebrow": "Week · iPad",
+      "description": "The week list and the day plan share the screen - no tapping back and forth to see whats next.",
+      "tab": null,
+      "primaryAction": null,
+      "primaryTarget": null,
+      "secondaryAction": null,
+      "targets": [
+        "week-home",
+        "day-detail"
+      ],
+      "listScreenId": "week-home",
+      "detailScreenId": "day-detail"
+    },
+    {
+      "id": "tablet-progress-detail",
+      "group": "tablet-two-pane",
+      "title": "Learning history and detail, side by side",
+      "eyebrow": "Progress · iPad",
+      "description": "Browse the record on the left, read one entry in full on the right. The same pattern covers Evidence and Reports.",
+      "tab": null,
+      "primaryAction": null,
+      "primaryTarget": null,
+      "secondaryAction": null,
+      "targets": [
+        "learning-history",
+        "log-detail"
+      ],
+      "listScreenId": "learning-history",
+      "detailScreenId": "log-detail"
+    },
+    {
+      "id": "tablet-correspondence",
+      "group": "tablet-two-pane",
+      "title": "Correspondence, side by side",
+      "eyebrow": "Family · Correspondence · iPad",
+      "description": "Every letter on the left, the one you are preparing a response to on the right.",
+      "tab": null,
+      "primaryAction": null,
+      "primaryTarget": null,
+      "secondaryAction": null,
+      "targets": [
+        "regulations-correspondence",
+        "regulations-correspondence-detail"
+      ],
+      "listScreenId": "regulations-correspondence",
+      "detailScreenId": "regulations-correspondence-detail"
+    },
+    {
+      "id": "tablet-conversations",
+      "group": "tablet-two-pane",
+      "title": "Discussions, side by side",
+      "eyebrow": "Community · iPad",
+      "description": "Skim what other families are discussing on the left, read and reply without losing your place on the right.",
+      "tab": null,
+      "primaryAction": null,
+      "primaryTarget": null,
+      "secondaryAction": null,
+      "targets": [
+        "thread-list",
+        "thread-detail"
+      ],
+      "listScreenId": "thread-list",
+      "detailScreenId": "thread-detail"
+    },
+    {
+      "id": "tablet-moderation",
+      "group": "tablet-two-pane",
+      "title": "Reports, side by side",
+      "eyebrow": "Moderation · iPad",
+      "description": "The queue on the left, the report a moderator is actually deciding on the right.",
+      "tab": null,
+      "primaryAction": null,
+      "primaryTarget": null,
+      "secondaryAction": null,
+      "targets": [
+        "moderation-queue",
+        "moderation-report"
+      ],
+      "listScreenId": "moderation-queue",
+      "detailScreenId": "moderation-report"
     }
   ]
 }

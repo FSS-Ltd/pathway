@@ -16,7 +16,7 @@ import {
   LockClosedIcon,
   PersonIcon,
 } from "@radix-ui/react-icons";
-import { MobileScroll } from "./mobile";
+import { MobileScroll, useMobileDevice } from "./mobile";
 import {
   firstScreenByTab,
   flowGroups,
@@ -27,6 +27,8 @@ import {
   type WireframeBlock,
   type WireframeScreen,
 } from "./wireframes-data";
+import { firstTabletScreenId, tabletScreens } from "./tablet-wireframes";
+import type { TabletTwoPaneScreen } from "./wireframe-types";
 
 const tabIcons: Record<AppTab, ComponentType> = {
   Week: CalendarIcon,
@@ -75,11 +77,19 @@ function goToTop() {
 }
 
 export default function Prototype() {
+  const { deviceId } = useMobileDevice();
   const [activeId, setActiveId] = useState("welcome");
   const [showIndex, setShowIndex] = useState(false);
+  const [activeTabletId, setActiveTabletId] = useState(firstTabletScreenId);
   const activeScreen = screensById.get(activeId) ?? wireframeScreens[0];
   const activeIndex = wireframeScreens.findIndex(
     (screen) => screen.id === activeScreen.id,
+  );
+  const activeTabletScreen =
+    tabletScreens.find((screen) => screen.id === activeTabletId) ??
+    tabletScreens[0];
+  const activeTabletIndex = tabletScreens.findIndex(
+    (screen) => screen.id === activeTabletScreen.id,
   );
 
   const navigate = (id: string) => {
@@ -97,6 +107,37 @@ export default function Prototype() {
       ];
     navigate(target.id);
   };
+
+  const moveTablet = (direction: -1 | 1) => {
+    const target =
+      tabletScreens[
+        (activeTabletIndex + direction + tabletScreens.length) %
+          tabletScreens.length
+      ];
+    setActiveTabletId(target.id);
+    goToTop();
+  };
+
+  // The tablet device browses only the 5 approved two-pane composites, not
+  // the 76-screen phone set - a list+detail composite has no meaningful
+  // single-pane rendering, and none of the phone screens are designed for
+  // the wider canvas. Switching devices does not disturb `activeId`; phone
+  // browsing resumes where it was on switching back.
+  if (deviceId === "tablet") {
+    return (
+      <div className="prototype-shell">
+        <MobileScroll className="app-screen">
+          <TwoPaneScreen
+            screen={activeTabletScreen}
+            current={activeTabletIndex + 1}
+            total={tabletScreens.length}
+            onBack={() => moveTablet(-1)}
+            onNext={() => moveTablet(1)}
+          />
+        </MobileScroll>
+      </div>
+    );
+  }
 
   return (
     <div className="prototype-shell">
@@ -151,6 +192,92 @@ export default function Prototype() {
           onNavigate={(tab) => navigate(firstScreenByTab[tab])}
         />
       ) : null}
+    </div>
+  );
+}
+
+function TwoPaneScreen({
+  screen,
+  current,
+  total,
+  onBack,
+  onNext,
+}: {
+  screen: TabletTwoPaneScreen;
+  current: number;
+  total: number;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  const listScreen = screensById.get(screen.listScreenId);
+  const detailScreen = screensById.get(screen.detailScreenId);
+
+  // Within the two-pane view, list rows and detail actions are inert - this
+  // is an approved static composite of two already-approved phone screens,
+  // not a new drill-down prototype. Next/Previous, cycling the 5
+  // composites, is the only navigation tablet needs for this design pass.
+  const inert = () => {};
+
+  // ponytail: both panes share the outer MobileScroll (see Prototype()),
+  // so they scroll together rather than independently, unlike a real
+  // master-detail split view. Upgrade path: apps/nexsteps-home's TwoPane
+  // (src/responsive/TwoPane.tsx) gets its own ScrollView per pane trivially
+  // in React Native when a real screen implements it - not worth adding
+  // nested custom-momentum scroll regions to this DOM prototype for a
+  // static design-approval pass.
+
+  if (!listScreen || !detailScreen) return null;
+
+  return (
+    <main
+      className="screen-content tablet-two-pane"
+      data-testid="wireframe-screen"
+      data-screen-id={screen.id}
+      aria-label={`${screen.title} wireframe`}
+    >
+      <ReviewBar
+        current={current}
+        total={total}
+        onBack={onBack}
+        onNext={onNext}
+        onIndex={inert}
+      />
+      <ScreenHeader
+        screen={{
+          ...listScreen,
+          eyebrow: screen.eyebrow,
+          title: screen.title,
+          description: screen.description,
+        }}
+      />
+      <div className="two-pane-body">
+        <section className="two-pane-list" aria-label={`${listScreen.title} list`}>
+          <PaneHeading eyebrow={listScreen.eyebrow} title={listScreen.title} />
+          <section className="screen-blocks">
+            {listScreen.blocks.map((block, index) => (
+              <Block key={`list-${listScreen.id}-${index}`} block={block} onNavigate={inert} />
+            ))}
+          </section>
+        </section>
+        <section className="two-pane-detail" aria-label={`${detailScreen.title} detail`}>
+          <PaneHeading eyebrow={detailScreen.eyebrow} title={detailScreen.title} />
+          <section className="screen-blocks">
+            {detailScreen.blocks.map((block, index) => (
+              <Block key={`detail-${detailScreen.id}-${index}`} block={block} onNavigate={inert} />
+            ))}
+          </section>
+          <ScreenActions screen={detailScreen} onPrimary={inert} onSecondary={inert} />
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function PaneHeading({ eyebrow, title }: { eyebrow: string; title: string }) {
+  return (
+    <div className="pane-heading">
+      <p className="screen-eyebrow">{eyebrow}</p>
+      <h2>{title}</h2>
     </div>
   );
 }

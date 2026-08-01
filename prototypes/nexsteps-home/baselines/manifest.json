@@ -154,5 +154,12 @@
     "moderation-report",
     "member-history",
     "moderation-resolution"
+  ],
+  "tablet": [
+    "tablet-week-day",
+    "tablet-progress-detail",
+    "tablet-correspondence",
+    "tablet-conversations",
+    "tablet-moderation"
   ]
 }

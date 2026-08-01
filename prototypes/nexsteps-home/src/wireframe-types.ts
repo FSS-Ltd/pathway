@@ -11,7 +11,8 @@ export type FlowGroupId =
   | "community-meetups"
   | "family-settings"
   | "regulations-evidence"
-  | "moderation";
+  | "moderation"
+  | "tablet-two-pane";
 
 export type WireframeBlock =
   | {
@@ -77,4 +78,20 @@ export interface WireframeScreen {
   primaryAction?: string;
   primaryTarget?: string;
   secondaryAction?: string;
+}
+
+/**
+ * A tablet two-pane composite reuses an existing approved phone screen's
+ * blocks verbatim as each pane's content - same copy, same tone, same
+ * primitives - rather than authoring new content for tablet. `listScreenId`
+ * and `detailScreenId` must both resolve via screensById.
+ */
+export interface TabletTwoPaneScreen {
+  id: string;
+  group: "tablet-two-pane";
+  eyebrow: string;
+  title: string;
+  description: string;
+  listScreenId: string;
+  detailScreenId: string;
 }

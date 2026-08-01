@@ -92,14 +92,16 @@ export function PhoneFrame({ children }: PropsWithChildren) {
               transform: `scale(${scale})`,
             }}
           >
-            <img
-              className="phone-bezel"
-              src={device.bezel}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              style={{ zIndex: device.bezelLayer === "above-screen" ? 2 : 1 }}
-            />
+            {device.bezel ? (
+              <img
+                className="phone-bezel"
+                src={device.bezel}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                style={{ zIndex: device.bezelLayer === "above-screen" ? 2 : 1 }}
+              />
+            ) : null}
             <div
               ref={screenRef}
               className="device-screen"
