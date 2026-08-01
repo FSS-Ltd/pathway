@@ -41,6 +41,18 @@ const REQUIRED_RLS_TABLES = [
   "StudentIdentityLink",
   "GuardianChildRelationship",
   "FamilyIdentityInvite",
+  "AceTermReport",
+  "AceReportCompilation",
+  "AceReportDraft",
+  "AceReportReview",
+  "AceTermReportVersion",
+  "FaithAgeBand",
+  "FaithContent",
+  "FaithContentDraft",
+  "FaithContentVersion",
+  "FaithContentAudience",
+  "FaithReadReceipt",
+  "FaithReflection",
 ];
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
@@ -83,7 +95,7 @@ async function main() {
       WHERE n.nspname = $1
         AND c.relkind IN ('r', 'p')
         AND c.relforcerowsecurity = false
-        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent', 'AcademicYear', 'AcademicPeriod', 'StudentSubjectEnrollment', 'PaceAssessment', 'PaceProgress', 'PacePolicy', 'PacePolicyOverride', 'BehaviourEntry', 'DemeritPolicy', 'DemeritStageOverride', 'StudentPortalPolicy', 'GuardianIdentity', 'StudentIdentity', 'StudentIdentityLink', 'GuardianChildRelationship', 'FamilyIdentityInvite')
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent', 'AcademicYear', 'AcademicPeriod', 'StudentSubjectEnrollment', 'PaceAssessment', 'PaceProgress', 'PacePolicy', 'PacePolicyOverride', 'BehaviourEntry', 'DemeritPolicy', 'DemeritStageOverride', 'StudentPortalPolicy', 'GuardianIdentity', 'StudentIdentity', 'StudentIdentityLink', 'GuardianChildRelationship', 'FamilyIdentityInvite', 'AceTermReport', 'AceReportCompilation', 'AceReportDraft', 'AceReportReview', 'AceTermReportVersion', 'FaithAgeBand', 'FaithContent', 'FaithContentDraft', 'FaithContentVersion', 'FaithContentAudience', 'FaithReadReceipt', 'FaithReflection')
       ORDER BY c.relname
     `, databaseSchema),
       prisma.$queryRawUnsafe(`
