@@ -123,7 +123,7 @@ describe("access-users effective-permissions endpoint", () => {
     });
   });
 
-  it("returns no permissions today because the feature-availability gate fails closed by default", async () => {
+  it("resolves a permission with no featureToggle using the default reader", async () => {
     if (!isDatabaseAvailable()) return;
 
     const service = failClosedModuleRef!.get(AccessUsersService);
@@ -133,7 +133,7 @@ describe("access-users effective-permissions endpoint", () => {
       userId: targetUserA,
       orgId: orgA,
       tenantId: null,
-      permissions: [],
+      permissions: [{ permissionKey: "ace.pace.read", sourceRoleIds: [roleId] }],
     });
   });
 
