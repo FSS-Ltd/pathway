@@ -17,7 +17,7 @@ const env = { ...fileEnv, ...process.env };
 const databaseUrl = firstPresent(env.E2E_DATABASE_URL, env.DIRECT_URL, env.DATABASE_URL);
 const databaseSchema = databaseUrl ? schemaFromDatabaseUrl(databaseUrl) : undefined;
 const accepted = isTrue(env.SUPABASE_RLS_GATE_ACCEPTED);
-const REVIEWED_ROLE_POLICY_TABLES = [
+const REQUIRED_RLS_TABLES = [
   "PermissionDefinition",
   "OrgRoleDefinition",
   "OrgRolePermission",
@@ -25,19 +25,10 @@ const REVIEWED_ROLE_POLICY_TABLES = [
   "UserRoleAssignment",
   "AuditEvent",
   "OutboxEvent",
-];
-const REQUIRED_RLS_TABLES = [
-  ...REVIEWED_ROLE_POLICY_TABLES,
   "AcademicYear",
   "AcademicPeriod",
   "StudentSubjectEnrollment",
 ];
-const requiredRlsTableNames = REQUIRED_RLS_TABLES.map(
-  (tableName) => `'${tableName}'`,
-).join(", ");
-const reviewedRolePolicyTableNames = REVIEWED_ROLE_POLICY_TABLES.map(
-  (tableName) => `'${tableName}'`,
-).join(", ");
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`[supabase-rls] ${message}`);
@@ -79,7 +70,7 @@ async function main() {
       WHERE n.nspname = $1
         AND c.relkind IN ('r', 'p')
         AND c.relforcerowsecurity = false
-        AND c.relname IN (${requiredRlsTableNames})
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent', 'AcademicYear', 'AcademicPeriod', 'StudentSubjectEnrollment')
       ORDER BY c.relname
     `, databaseSchema),
       prisma.$queryRawUnsafe(`
@@ -128,7 +119,7 @@ async function main() {
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = $1
-        AND c.relname IN (${reviewedRolePolicyTableNames})
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent')
       ORDER BY c.relname, p.polname
     `, databaseSchema),
     ]);
