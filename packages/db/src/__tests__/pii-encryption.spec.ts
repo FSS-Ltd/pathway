@@ -79,6 +79,33 @@ describe("withPiiEncryption", () => {
     });
   });
 
+  it("encrypts sensitive behaviour notes without changing non-sensitive fields", async () => {
+    const { fakeClient, invoke } = makeFakeClient();
+    withPiiEncryption(fakeClient);
+
+    let capturedArgs: { data: Record<string, unknown> } | undefined;
+    const result = (await invoke(
+      "BehaviourEntry",
+      "create",
+      {
+        data: {
+          category: "pastoral",
+          reason: "Recorded sensitive context",
+          note: "Sensitive pastoral context",
+        },
+      },
+      (args) => {
+        capturedArgs = args as typeof capturedArgs;
+        return { id: "b1", ...(args as { data: Record<string, unknown> }).data };
+      },
+    )) as Record<string, unknown>;
+
+    expect(capturedArgs?.data.category).toBe("pastoral");
+    expect(capturedArgs?.data.reason).toBe("Recorded sensitive context");
+    expect(isEncryptedField(capturedArgs?.data.note as string)).toBe(true);
+    expect(result.note).toBe("Sensitive pastoral context");
+  });
+
   it("leaves models with no registered fields untouched", async () => {
     const { fakeClient, invoke } = makeFakeClient();
     withPiiEncryption(fakeClient);

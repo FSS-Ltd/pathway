@@ -175,6 +175,35 @@ enum StudentSubjectEnrollmentStatus {
   ENDED
 }
 
+enum PaceAssessmentType {
+  SELF_TEST
+  PACE_TEST
+}
+
+enum PaceAssessmentResult {
+  PASSED
+  FAILED
+}
+
+enum PaceTrackStatus {
+  AHEAD
+  ON_TRACK
+  AT_RISK
+  BEHIND
+  BLOCKED
+}
+
+enum BehaviourType {
+  MERIT
+  DEMERIT
+  GENERAL
+}
+
+enum BehaviourVisibility {
+  GENERAL
+  SENSITIVE
+}
+
 enum PermissionScope {
   organisation
   site
@@ -532,6 +561,13 @@ model Tenant {
   academicYears          AcademicYear[]
   academicPeriods        AcademicPeriod[]
   subjectEnrollments     StudentSubjectEnrollment[]
+  paceAssessments        PaceAssessment[]
+  paceProgress           PaceProgress[]
+  pacePolicies           PacePolicy[]
+  pacePolicyOverrides    PacePolicyOverride[]
+  behaviourEntries       BehaviourEntry[]
+  demeritPolicies        DemeritPolicy[]
+  demeritStageOverrides  DemeritStageOverride[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
@@ -626,6 +662,12 @@ model User {
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
   recordedSubjectEnrollments StudentSubjectEnrollment[] @relation("StudentSubjectEnrollmentRecordedBy")
+  recordedPaceAssessments    PaceAssessment[]            @relation("PaceAssessmentRecordedBy")
+  createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
+  authorisedPaceOverrides    PacePolicyOverride[]        @relation("PacePolicyOverrideAuthorisedBy")
+  recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
+  createdDemeritPolicies     DemeritPolicy[]             @relation("DemeritPolicyCreatedBy")
+  authorisedDemeritOverrides DemeritStageOverride[]      @relation("DemeritStageOverrideAuthorisedBy")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
@@ -857,6 +899,11 @@ model Child {
   childNotes          ChildNote[]
   learningLogs        LearningLog[]
   subjectEnrollments  StudentSubjectEnrollment[]
+  paceAssessments     PaceAssessment[]
+  paceProgress        PaceProgress[]
+  pacePolicyOverrides PacePolicyOverride[]
+  behaviourEntries    BehaviourEntry[]
+  demeritStageOverrides DemeritStageOverride[]
   evidence            Evidence[]
   reportBundles       ReportBundle[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
@@ -1118,6 +1165,9 @@ model Subject {
   sortOrder    Int?
   learningLogs LearningLog[]
   subjectEnrollments StudentSubjectEnrollment[]
+  paceAssessments PaceAssessment[]
+  paceProgress PaceProgress[]
+  pacePolicyOverrides PacePolicyOverride[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -1183,6 +1233,186 @@ model StudentSubjectEnrollment {
 
   @@unique([id, tenantId])
   @@index([tenantId, status, subjectId, childId])
+}
+
+// Immutable assessment facts. Corrections are complete successor facts linked
+// to the immediately preceding fact; database constraints prevent forks.
+model PaceAssessment {
+  id                    String               @id @default(uuid())
+  tenantId              String
+  tenant                Tenant               @relation(fields: [tenantId], references: [id])
+  childId               String
+  child                 Child                @relation(fields: [childId, tenantId], references: [id, tenantId])
+  subjectId             String
+  subject               Subject              @relation(fields: [subjectId, tenantId], references: [id, tenantId])
+  paceNumber            Int
+  assessmentType        PaceAssessmentType
+  score                 Int
+  result                PaceAssessmentResult
+  assessedOn            DateTime             @db.Date
+  recordedByUserId      String
+  recordedBy            User                 @relation("PaceAssessmentRecordedBy", fields: [recordedByUserId], references: [id])
+  reason                String               @db.Text
+  policyOverrideId      String?
+  policyOverride        PacePolicyOverride?  @relation(fields: [policyOverrideId, tenantId, childId, subjectId], references: [id, tenantId, childId, subjectId], onDelete: Restrict)
+  correctsAssessmentId  String?
+  correctsAssessment    PaceAssessment?      @relation("PaceAssessmentCorrections", fields: [correctsAssessmentId, tenantId, childId, subjectId], references: [id, tenantId, childId, subjectId], onDelete: Restrict, onUpdate: Restrict, map: "PaceAssessment_correction_target_fkey")
+  correction            PaceAssessment?      @relation("PaceAssessmentCorrections")
+  progressUsingAsLatest PaceProgress[]
+  createdAt             DateTime             @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, childId, subjectId])
+  @@unique([correctsAssessmentId, tenantId, childId, subjectId], map: "PaceAssessment_correction_target_key")
+  @@unique([policyOverrideId, tenantId])
+  @@index([tenantId, childId, subjectId, assessedOn])
+  @@index([tenantId, correctsAssessmentId])
+}
+
+// Mutable, disposable projection rebuilt from the current (not superseded)
+// PaceAssessment facts.
+model PaceProgress {
+  id               String          @id @default(uuid())
+  tenantId         String
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
+  childId          String
+  child            Child           @relation(fields: [childId, tenantId], references: [id, tenantId])
+  subjectId        String
+  subject          Subject         @relation(fields: [subjectId, tenantId], references: [id, tenantId])
+  currentPace      Int
+  targetPace       Int
+  completedPaces   Int             @default(0)
+  trackStatus      PaceTrackStatus
+  blockCode        String?
+  lastAssessmentId String?
+  lastAssessment   PaceAssessment? @relation(fields: [lastAssessmentId, tenantId, childId, subjectId], references: [id, tenantId, childId, subjectId], onDelete: Restrict)
+  rebuiltAt        DateTime
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, childId, subjectId])
+  @@index([tenantId, childId])
+  @@index([tenantId, trackStatus])
+}
+
+// Append-only policy versions. The effective version is selected by time.
+model PacePolicy {
+  id                   String               @id @default(uuid())
+  tenantId             String
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  version              Int
+  selfTestPassingScore Int
+  paceTestPassingScore Int
+  maxAssessmentsPerDay Int
+  allowSamePaceSameDay Boolean              @default(false)
+  effectiveFrom        DateTime
+  effectiveTo          DateTime?
+  createdByUserId      String
+  createdBy            User                 @relation("PacePolicyCreatedBy", fields: [createdByUserId], references: [id])
+  reason               String               @db.Text
+  overrides            PacePolicyOverride[]
+  createdAt            DateTime             @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, version])
+  @@index([tenantId, effectiveFrom])
+}
+
+model PacePolicyOverride {
+  id                 String           @id @default(uuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id])
+  childId            String
+  child              Child            @relation(fields: [childId, tenantId], references: [id, tenantId])
+  subjectId          String
+  subject            Subject          @relation(fields: [subjectId, tenantId], references: [id, tenantId])
+  pacePolicyId       String
+  pacePolicy         PacePolicy       @relation(fields: [pacePolicyId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  policyCode         String
+  authorisedByUserId String
+  authorisedBy       User             @relation("PacePolicyOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
+  reason             String           @db.Text
+  expiresAt          DateTime         // PostgreSQL also rejects non-finite timestamps.
+  assessments        PaceAssessment[]
+  createdAt          DateTime         @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, childId, subjectId])
+  @@index([tenantId, childId, expiresAt])
+  @@index([tenantId, subjectId, expiresAt])
+}
+
+// note is sensitive free text encrypted transparently by packages/db/src/pii-encryption.ts.
+// Corrections use the same complete-fact successor pattern as PaceAssessment.
+model BehaviourEntry {
+  id                       String              @id @default(uuid())
+  tenantId                 String
+  tenant                   Tenant              @relation(fields: [tenantId], references: [id])
+  childId                  String
+  child                    Child               @relation(fields: [childId, tenantId], references: [id, tenantId])
+  type                     BehaviourType
+  visibility               BehaviourVisibility @default(GENERAL)
+  category                 String
+  pointsDelta              Int                 @default(0)
+  occurredAt               DateTime
+  recordedByUserId         String
+  recordedBy               User                @relation("BehaviourEntryRecordedBy", fields: [recordedByUserId], references: [id])
+  reason                   String              @db.Text
+  note                     String?             @db.Text
+  correctsBehaviourEntryId String?
+  correctsBehaviourEntry   BehaviourEntry?     @relation("BehaviourEntryCorrections", fields: [correctsBehaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict, map: "BehaviourEntry_correction_target_fkey")
+  correction               BehaviourEntry?     @relation("BehaviourEntryCorrections")
+  createdAt                DateTime            @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, childId])
+  @@unique([correctsBehaviourEntryId, tenantId, childId], map: "BehaviourEntry_correction_target_key")
+  @@index([tenantId, childId, occurredAt])
+  @@index([tenantId, type, occurredAt])
+  @@index([tenantId, correctsBehaviourEntryId])
+}
+
+model DemeritPolicy {
+  id                     String                 @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant                 @relation(fields: [tenantId], references: [id])
+  version                Int
+  windowDays             Int
+  stageOneThreshold      Int
+  stageTwoThreshold      Int
+  stageThreeThreshold    Int
+  seriousMisconductStage Int
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  createdByUserId        String
+  createdBy              User                   @relation("DemeritPolicyCreatedBy", fields: [createdByUserId], references: [id])
+  reason                 String                 @db.Text
+  stageOverrides         DemeritStageOverride[]
+  createdAt              DateTime               @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, version])
+  @@index([tenantId, effectiveFrom])
+}
+
+model DemeritStageOverride {
+  id                 String        @id @default(uuid())
+  tenantId           String
+  tenant             Tenant        @relation(fields: [tenantId], references: [id])
+  childId            String
+  child              Child         @relation(fields: [childId, tenantId], references: [id, tenantId])
+  demeritPolicyId    String
+  demeritPolicy      DemeritPolicy @relation(fields: [demeritPolicyId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  stage              Int
+  authorisedByUserId String
+  authorisedBy       User          @relation("DemeritStageOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
+  reason             String        @db.Text
+  expiresAt          DateTime        // PostgreSQL also rejects non-finite timestamps.
+  createdAt          DateTime      @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, childId, expiresAt])
 }
 
 model LearningLog {
