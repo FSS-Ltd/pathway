@@ -53,8 +53,10 @@ const styles = StyleSheet.create({
     gap: homeTokens.spacing.xs,
   },
   label: {
-    fontFamily: homeTokens.typography.fontFamily.body,
-    fontWeight: homeTokens.typography.weight.extraBold,
+    // Quicksand's real cuts stop at 700; extraBold (800) has no matching
+    // loaded weight, so bold (700) is the closest achievable match.
+    fontFamily: homeTokens.typography.bodyFamily.bold,
+    fontWeight: homeTokens.typography.weight.bold,
     fontSize: 11,
     letterSpacing: homeTokens.typography.wireframe.eyebrow.letterSpacing,
     textTransform: "uppercase",
@@ -80,7 +82,7 @@ const styles = StyleSheet.create({
     marginRight: homeTokens.spacing.xxxs,
   },
   chipText: {
-    fontFamily: homeTokens.typography.fontFamily.body,
+    fontFamily: homeTokens.typography.bodyFamily.bold,
     fontWeight: homeTokens.typography.weight.bold,
     fontSize: 11,
     color: homeTokens.colors.text.primary,

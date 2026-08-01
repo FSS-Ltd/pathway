@@ -16,6 +16,7 @@ const requiredFlowGroups = new Map([
   ["family-settings", 8],
   ["regulations-evidence", 17],
   ["moderation", 4],
+  ["tablet-two-pane", 5],
 ]);
 
 const requiredScreenIds = [
@@ -34,6 +35,7 @@ const requiredScreenIds = [
   "regulations-pack-preview",
   "regulations-share-activity",
   "moderation-queue",
+  "tablet-week-day",
 ];
 
 const requiredHandoffFiles = [
@@ -119,8 +121,8 @@ if (existsSync(inventoryPath)) {
         );
       }
 
-      if (inventory.screens.length !== 76) {
-        errors.push(`Expected 76 screens, found ${inventory.screens.length}.`);
+      if (inventory.screens.length !== 81) {
+        errors.push(`Expected 81 screens, found ${inventory.screens.length}.`);
       }
 
       const screenIds = inventory.screens.map((screen) => screen.id);
@@ -244,5 +246,5 @@ if (errors.length > 0) {
 }
 
 console.log(
-  "Validated NexSteps Home handoff: 76 screens across 9 flow groups.",
+  "Validated NexSteps Home handoff: 81 screens across 10 flow groups.",
 );

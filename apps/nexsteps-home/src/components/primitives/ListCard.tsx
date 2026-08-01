@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     gap: homeTokens.spacing.xs,
   },
   title: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.headingFamily.bold,
     fontWeight: homeTokens.typography.weight.bold,
     fontSize: homeTokens.typography.body.md.size,
     lineHeight: homeTokens.typography.body.md.lineHeight,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     gap: homeTokens.spacing.xxxs,
   },
   rowTitle: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.bodyFamily.semibold,
     fontWeight: homeTokens.typography.weight.semibold,
     fontSize: homeTokens.typography.body.sm.size,
     lineHeight: homeTokens.typography.body.sm.lineHeight,

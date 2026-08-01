@@ -193,7 +193,8 @@ button:disabled {
 .flow-group h2,
 .content-card h2,
 .notice-card h2,
-.list-card h2 {
+.list-card h2,
+.pane-heading h2 {
   font-family: "Nunito", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
 }
 
@@ -216,6 +217,49 @@ button:disabled {
 .screen-blocks {
   display: grid;
   gap: 12px;
+}
+
+/* Tablet two-pane composites (Plan 03) - reuses .screen-content's own
+   padding/header/block styling above; only what genuinely differs at the
+   wider canvas is overridden here. */
+.tablet-two-pane {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tablet-two-pane .screen-header h1,
+.tablet-two-pane .screen-description {
+  max-width: none;
+}
+
+.two-pane-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.two-pane-list {
+  flex: 0 0 360px;
+  box-sizing: border-box;
+  padding-right: 28px;
+  border-right: 1px solid var(--nsh-line);
+}
+
+.two-pane-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pane-heading {
+  margin-bottom: 14px;
+}
+
+.pane-heading h2 {
+  margin: 4px 0 0;
+  color: var(--nsh-ink);
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .notice-card,
