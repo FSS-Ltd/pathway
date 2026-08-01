@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Between plans — Plan 03 needs a product/design decision before implementation starts (see "Next action")
+**Current phase:** Executing PR6 (Plan 03 — tablet design pass + tablet baselines)
 
 ---
 
@@ -26,8 +26,9 @@ continue.
 | 2 | 01 — app scaffolding | **merged** | `feat/nexsteps-home-app-scaffolding` | [#267](https://github.com/FSS-Ltd/pathway/pull/267) | squash-merged, branch deleted; `apps/nexsteps-home` now exists on `master` |
 | 3 | ledger update | **merged** | `docs/nexsteps-home-progress-update` | [#268](https://github.com/FSS-Ltd/pathway/pull/268) | squash-merged, branch deleted |
 | 4 | 02 — fidelity harness + phone baselines | **merged** | `feat/nexsteps-home-fidelity-harness` | [#271](https://github.com/FSS-Ltd/pathway/pull/271) | squash-merged, branch deleted; 76 approved screens now have committed baselines |
-| 5 | 03 — tablet design pass + tablet baselines | **blocked on product/design input** | — | — | not a pure-engineering plan — see "Next action" |
-| 6-16 | 04-14 | not started | — | — | — |
+| 5 | ledger update | **merged** | `docs/nexsteps-home-progress-update-2` | [#272](https://github.com/FSS-Ltd/pathway/pull/272) | squash-merged, branch deleted; recorded the Plan 03 product/design blocker |
+| 6 | 03 — tablet design pass + tablet baselines | in progress | `feat/nexsteps-home-tablet-design` | not yet opened | user approved the candidate list and gave design direction; code complete, verified locally, about to push |
+| 7-16 | 04-14 | not started | — | — | — |
 
 ## Environment
 
@@ -83,6 +84,9 @@ gh pr checks <pr-number> --repo FSS-Ltd/pathway
 | Series scope | Full 76 screens, H1-H11 | user, same session |
 | Worktree base ref | `fss/master`, not the native EnterWorktree tool's `origin/master` default | this session, reasoned in-line: `fss` is the PR remote, `origin` is a personal fork that can lag |
 | Data fetching library | TanStack Query, added in Plan 01 | plan file — `apps/mobile` hand-rolls fetch+useState, insufficient for the loading/empty/error/offline/retry states 76 screens require |
+| Plan 03 candidate list | Approved as originally proposed: week/day, progress/detail (also covers evidence gallery/detail), correspondence, channels/threads, moderation queue/report | user, 2026-08-01, in response to this session's explicit question |
+| Plan 03 visual direction | "Keep the same feel... simple and functional so families do not have to be very techy and get the most out of the app functionality" | user, 2026-08-01 — interpreted as: reuse existing approved phone content verbatim rather than author new copy, one dominant layout pattern (list left, detail right) applied consistently, no new interaction model beyond Next/Previous between the 5 composites |
+| Tablet device target | Single iPad-class preset (1194×834 landscape, no photographed bezel asset) | this session — the approved candidate flows don't need distinct iOS/Android tablet chrome the way phone screens do (platform-specific status bar/home-indicator/nav-bar rendering matters for pixel fidelity on phone; a tablet mockup's own device chrome is cosmetic, not something being fidelity-gated) |
 
 ## Open blockers
 
@@ -355,33 +359,121 @@ node scripts/capture-baselines.mjs      # 76+76 screens captured, dimensions ver
 pnpm test:fidelity (temporarily non-empty checklist)  # proven functional, see above
 ```
 
+## What Plan 03 built (PR6 content, for the reviewer / next agent)
+
+**Design approach**: every tablet composite reuses an existing approved
+phone screen's blocks verbatim as each pane's content - literally the same
+`card()`/`list()`/`notice()` data, same copy, same colours, same
+primitives - recomposed side by side rather than authored fresh. This is
+the direct, deliberate execution of "keep the same feel... simple and
+functional": a family member who only ever uses the phone will find nothing
+unfamiliar on the iPad.
+
+**5 tablet two-pane composites** (`prototypes/nexsteps-home/src/tablet-wireframes.ts`,
+new, unprotected):
+- `tablet-week-day` = `week-home` (list) + `day-detail` (detail)
+- `tablet-progress-detail` = `learning-history` + `log-detail` - this one
+  pattern also covers `evidence-gallery`/`evidence-detail-upload` and
+  `reports-list`/`report-detail-download` verbatim; no separate mockup for
+  a layout shape already proven. The approved candidate list's "progress/
+  detail" and "evidence gallery/detail" entries are this same pattern.
+- `tablet-correspondence` = `regulations-correspondence` + `regulations-correspondence-detail`
+- `tablet-conversations` = `thread-list` + `thread-detail`
+- `tablet-moderation` = `moderation-queue` + `moderation-report`
+
+**Tablet device preset** (`geometry.ts`, `Device.tsx`, `PhoneFrame.tsx` -
+all protected, lock regenerated): 1194×834 (iPad 11" landscape logical
+points), no photographed bezel asset - `MobileDevicePreset.bezel` is now
+optional, `PhoneFrame` skips the `<img>` when absent, and the pre-existing
+`.device-screen` default styling (inset border, inline `border-radius`
+from geometry) already gives a clean flat device edge with zero new CSS.
+Reuses `platform: "ios"` - iPadOS shares iPhone's status-bar icons and
+centred home-indicator pill, and the home-indicator SVG's existing
+`width:100%` + default `preserveAspectRatio="xMidYMid meet"` already
+renders it at correct native size, centred, on the much wider canvas with
+no code change (verified in-browser before assuming it, not asserted).
+
+**Rendering** (`Prototype.tsx`, unprotected): the tablet device browses
+only the 5 composites (a separate `activeTabletId` cycle), not the
+76-screen phone set - none of the phone screens are designed for the wider
+canvas, and a list+detail composite has no meaningful single-pane
+rendering. `TwoPaneScreen` reuses the exact same `ScreenHeader`/`Block`/
+`ScreenActions` components the phone renderer uses - one combined header
+at the top (composite's own title), a lightweight `PaneHeading` (eyebrow +
+h2, no duplicate brand chrome) per pane. In-pane list rows and detail
+actions are inert - a static approved-design snapshot, not a new
+drill-down prototype; Next/Previous cycling the 5 composites is the only
+navigation tablet needs for this pass.
+
+**Known, documented simplification**: both panes share one outer
+`MobileScroll`, so they scroll together rather than independently (a real
+master-detail view scrolls each column on its own). Marked with a
+`ponytail:` comment at the point of implementation - not worth nested
+custom-momentum scroll regions in this DOM prototype for a static
+design-approval pass; trivial to fix properly once a real
+`apps/nexsteps-home` screen implements `TwoPane` with RN `ScrollView` per
+pane.
+
+**Handoff contract updated to 81 screens / 10 flow groups**:
+`docs/NexStepsV2/nexsteps-home/screen-inventory.json` gained the 5 tablet
+entries under a new `tablet-two-pane` group (each carries `listScreenId`/
+`detailScreenId` plus `targets: [listScreenId, detailScreenId]` so
+`validate-handoff.mjs`'s existing target-resolution check validates them
+for free); `validate-handoff.mjs` updated for the new counts.
+**Deliberately not** added to the prototype's own `flowGroups`/`FlowIndex`
+array (`wireframes-data.ts`) - that index lists phone screens for the "All
+screens" browsing UI, and an entry with zero matching `wireframeScreens`
+would render an empty, broken-looking section; tablet composites are
+reached by switching the device picker, not the index.
+
+**Baselines**: `capture-baselines.mjs` extended with a third device entry
+(`totalScreens: 5` for tablet, vs. 76 for phone) and a wider viewport
+(1300×1150, up from 900×1200) so all three devices hit `PhoneFrame`'s
+scale-1 threshold. 5 new PNGs at `prototypes/nexsteps-home/baselines/tablet/`,
+each exactly 1194×834 (no subpixel-rounding artifact, unlike the iPhone
+preset's known 1px quirk - the tablet has no bezel-inset math to round).
+**The 152 existing phone baselines were regenerated by the same run but
+reverted before committing** - the capture script's `rmSync` wipes and
+redoes the whole `baselines/` directory every run, and the live status-bar
+clock (`components.tsx`'s `new Date()`) bakes a different time into every
+PNG on every run; diffed one file to confirm the ~200-byte difference was
+exactly that, not a real regression, then `git checkout`'d the 152 phone
+files and `manifest.json` back to Plan 02's committed versions, hand-adding
+just the new `"tablet"` manifest key. Nothing about this plan's changes
+alters phone rendering.
+
+### Verification performed
+
+```
+npx tsc --noEmit                          # prototype: clean (after npm install in this fresh worktree)
+node scripts/check-mobile-runtime.mjs      # 28 protected files, clean (lock regenerated first)
+node scripts/check-wireframes.mjs          # 17 regulations screens, clean (unaffected)
+node docs/NexStepsV2/nexsteps-home/validate-handoff.mjs   # 81 screens across 10 flow groups
+npx playwright test                        # prototype's own 8 interaction tests, all pass
+node scripts/capture-baselines.mjs         # 76+76+5 captured; tablet dimensions verified exactly 1194x834
+```
+
+Visually verified in the Browser pane against a live dev server (not just
+assumed from code): all 5 tablet composites, confirming layout, colour,
+type and the "Adults only"/"Family private" privacy chip both render
+correctly on the wider canvas, before capturing anything as a baseline.
+
+This plan touches only `prototypes/nexsteps-home/` and
+`docs/NexStepsV2/nexsteps-home/` - zero files in the pnpm workspace, so the
+full `pnpm -r typecheck`/`lint`/`test:unit` suite that gated Plans 01-02 is
+unaffected by construction, not just unrun.
+
 ## Next action
 
-**Plan 03 needs a product/design decision this series has not made
-autonomously up to this point.** Plans 00-02 were execution against an
-already-approved handoff (screen inventory, design system, the user's own
-architecture answers from the plan-mode session). Plan 03 is different in
-kind: it designs *new*, previously-nonexistent tablet layouts for the flows
-that get two-pane treatment (week/day, progress/detail, evidence
-gallery/detail, correspondence, channels/threads, moderation queue/report
-were the plan's candidate list) and asks for product approval before any
-tablet screen is built — that approval step is explicit in the plan
-document, not a formality to skip.
-
-Before starting Plan 03, get from the user (or whoever owns product
-sign-off for this series):
-1. Confirmation of which flows actually get two-pane tablet treatment —
-   the candidate list above is a starting proposal, not a decision.
-2. Whatever visual direction is needed to design those layouts
-   consistently with the approved phone wireframes (the existing
-   `docs/NexStepsV2/nexsteps-home/design-system.md` covers phone only).
-
-Once that's settled, the mechanical steps are unchanged from the pattern
-used so far: extend `prototypes/nexsteps-home/src/mobile/geometry.ts` with
-a tablet device preset, design the two-pane screens in the prototype, add
-them to `screen-inventory.json` (extending `validate-handoff.mjs`), capture
-tablet baselines with the Plan 02 harness, and only then implement
-`src/responsive/TwoPane.tsx` consumers in `apps/nexsteps-home`.
+Push `feat/nexsteps-home-tablet-design`, open the PR against `fss`, confirm
+CI green, merge. Then start Plan 04 (`HOME_EDUCATION` vertical,
+capabilities, household model, plan) - the first plan to touch
+`packages/db/prisma/schema.prisma` and `packages/platform/src/capability-maps.ts`,
+exactly the files flagged in "Conflict watch" as shared with concurrent ACE
+work. Diff against fresh `fss/master` immediately before opening that PR,
+not just at series start. Plan 04 is also blocked on two open product
+decisions (NexSteps Home pricing, household-to-Org/Tenant modelling) per
+blocker 5 - raise those before or alongside starting the engineering.
 
 ---
 
@@ -460,3 +552,36 @@ tablet baselines with the Plan 02 harness, and only then implement
   designing them) that Plans 00-02 did not need, since those executed
   against an already-approved handoff plus the user's own answers from the
   original plan-mode session. Reported status to the user; awaiting reply.
+- Opened PR5 ([#272](https://github.com/FSS-Ltd/pathway/pull/272)) to
+  record PR4's merge; all 5 CI checks passed; a scheduled fallback wakeup
+  merged it and cleaned up its worktree/branch while this session was
+  between turns.
+- User approved the Plan 03 candidate list as proposed and gave design
+  direction: "keep the same feel... simple and functional so families do
+  not have to be very techy and get the most out of the app functionality."
+  Interpreted as: reuse approved phone content verbatim, one consistent
+  layout pattern, no new interaction model (see Decisions table).
+- Created worktree `.worktrees/feat-nexsteps-home-tablet-design` off fresh
+  `fss/master`; ran `npm install` in the prototype (a fresh worktree has no
+  `node_modules` of its own - this is a per-worktree step every plan
+  touching the prototype needs, not a one-time setup).
+- Read the exact block content of every master/detail screen pair needed
+  (`week-home`/`day-detail`, `learning-history`/`log-detail`,
+  `regulations-correspondence`/`-detail`, `thread-list`/`thread-detail`,
+  `moderation-queue`/`moderation-report`) directly from
+  `wireframes-data.ts`/`regulations-wireframes.ts` rather than
+  reconstructing from memory, to reuse it verbatim as designed.
+- Built the full Plan 03 tablet design pass (file list above). Verified the
+  home-indicator SVG's existing responsive sizing would work at tablet
+  width by checking its CSS and default SVG `preserveAspectRatio` behaviour
+  before assuming it needed a code change - it didn't.
+- Visually verified all 5 composites in the Browser pane against a live
+  dev server before capturing any baseline. Noticed and fixed a design gap
+  the reviewer would have caught: the review bar and fake cursor showing
+  up as page furniture inside the first capture attempt (same class of
+  issue Plan 02 already solved for phone, applied to the new device).
+- Ran the full local verification suite; everything green. Reverted 152
+  incidentally-regenerated phone baseline PNGs (clock-timestamp drift only,
+  confirmed via diff, not a real change) back to their Plan 02 committed
+  versions before staging.
+- About to push and open PR6.

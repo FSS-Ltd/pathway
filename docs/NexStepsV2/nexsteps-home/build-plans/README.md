@@ -50,7 +50,7 @@ process:
 | 00 | This README + progress ledger + change-control record | — | 0 | see PROGRESS.md |
 | 01 | App scaffolding | — | 0 | see PROGRESS.md |
 | 02 | Fidelity harness + phone baselines | — | 0 | see PROGRESS.md |
-| 03 | Tablet design pass + tablet baselines | — | 0 | not started |
+| 03 | Tablet design pass + tablet baselines | — | 5 | see PROGRESS.md |
 | 04 | `HOME_EDUCATION` vertical, capabilities, household model, plan | H1 | 0 | not started |
 | 05 | Setup flow | H2 | 9 | not started |
 | 06 | Week, Today, tasks, calendar | H3 | 8 | not started |
@@ -63,7 +63,12 @@ process:
 | 13 | Meetups + safety | H10 | 8 | not started |
 | 14 | Moderation | H11 | 4 | not started |
 
-Screen totals sum to 76 and match `../screen-inventory.json` group counts.
+Screen totals sum to 76 approved phone/moderation screens, matching
+`../screen-inventory.json`'s original group counts. Plan 03 added 5 tablet
+two-pane composites under their own `tablet-two-pane` group (81 screens,
+10 groups total in the inventory) - each composite reuses an existing
+phone screen's content rather than adding new product surface, so it is
+not counted against the phone/moderation total above.
 
 Every plan 04-14 follows the PR handoff template in
 `../implementation-map.md:155-185` and is gated by `../acceptance-criteria.md`.

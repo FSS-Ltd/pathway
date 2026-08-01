@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Captures every approved wireframe screen at both device presets as PNG
- * baselines for the NexSteps Home fidelity gate (build-plan Plan 02).
+ * Captures every approved wireframe screen at each device preset as PNG
+ * baselines for the NexSteps Home fidelity gate (build-plan Plans 02-03).
  *
  * Navigates the prototype's own review controls (Next/Previous arrows,
  * ReviewBar) rather than any URL-based deep link - the prototype has none,
@@ -10,13 +10,16 @@
  * (added alongside this script, in Prototype.tsx - an unprotected file)
  * is read after every navigation so a screen never gets captured under
  * the wrong filename, even if the click-through ever desyncs from the
- * expected array order.
+ * expected array order. The tablet device reuses the same ReviewBar and
+ * data-screen-id plumbing - Prototype.tsx swaps in a 5-screen tablet-only
+ * navigation loop when the tablet device is selected (see "totalScreens"
+ * below), so this same capture loop works for it unchanged.
  *
- * The browser viewport (900x1200) is sized so PhoneFrame's scale factor
- * (see src/mobile/PhoneFrame.tsx) computes to exactly 1 for both device
- * presets - device.width/height (511x968 iPhone, 566x1022 Pixel) each fit
- * with the 48px stage margin to spare, so `[data-testid="device-screen"]`
- * renders at its literal geometry size (393x852 iPhone, 427x952 Pixel),
+ * The browser viewport (1300x1150) is sized so PhoneFrame's scale factor
+ * (see src/mobile/PhoneFrame.tsx) computes to exactly 1 for every device
+ * preset - device.width/height (511x968 iPhone, 566x1022 Pixel, 1194x834
+ * tablet) each fit with the 48px stage margin to spare, so
+ * `[data-testid="device-screen"]` renders at its literal geometry size,
  * not a downscaled fit.
  */
 import { chromium } from "@playwright/test";
@@ -27,11 +30,11 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "baselines");
 const BASE_URL = process.env.CAPTURE_BASE_URL ?? "http://localhost:5183";
-const TOTAL_SCREENS = 76;
 
 const devices = [
-  { id: "iphone", testId: "device-option-iphone" },
-  { id: "pixel-10", testId: "device-option-pixel-10" },
+  { id: "iphone", testId: "device-option-iphone", totalScreens: 76 },
+  { id: "pixel-10", testId: "device-option-pixel-10", totalScreens: 76 },
+  { id: "tablet", testId: "device-option-tablet", totalScreens: 5 },
 ];
 
 async function selectDevice(page, device) {
@@ -63,7 +66,7 @@ async function captureDevice(page, device) {
   const captured = [];
   const seen = new Set();
 
-  for (let i = 0; i < TOTAL_SCREENS; i += 1) {
+  for (let i = 0; i < device.totalScreens; i += 1) {
     const screenId = await page.getAttribute('[data-testid="wireframe-screen"]', "data-screen-id");
     if (!screenId) throw new Error(`Screen ${i} on ${device.id} has no data-screen-id.`);
     if (seen.has(screenId)) {
@@ -94,7 +97,7 @@ async function captureDevice(page, device) {
     });
     captured.push(screenId);
 
-    if (i < TOTAL_SCREENS - 1) {
+    if (i < device.totalScreens - 1) {
       await page.click('[aria-label="Next wireframe"]');
       await page.waitForFunction(
         (previousId) =>
@@ -112,11 +115,11 @@ async function run() {
   mkdirSync(outDir, { recursive: true });
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 900, height: 1200 } });
+  const page = await browser.newPage({ viewport: { width: 1300, height: 1150 } });
 
   const manifest = {};
   for (const device of devices) {
-    console.log(`Capturing ${TOTAL_SCREENS} screens for ${device.id}...`);
+    console.log(`Capturing ${device.totalScreens} screens for ${device.id}...`);
     manifest[device.id] = await captureDevice(page, device);
     console.log(`  ${manifest[device.id].length} screens captured.`);
   }
@@ -124,9 +127,9 @@ async function run() {
   await browser.close();
 
   for (const device of devices) {
-    if (manifest[device.id].length !== TOTAL_SCREENS) {
+    if (manifest[device.id].length !== device.totalScreens) {
       throw new Error(
-        `Expected ${TOTAL_SCREENS} screens for ${device.id}, captured ${manifest[device.id].length}.`,
+        `Expected ${device.totalScreens} screens for ${device.id}, captured ${manifest[device.id].length}.`,
       );
     }
   }

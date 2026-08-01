@@ -65,4 +65,31 @@ export const pixelGeometry = {
   },
 } as const satisfies MobileDeviceGeometry;
 
+export const tabletGeometry = {
+  // No bezel asset for this preset (see Device.tsx) - the device canvas IS
+  // the screen, at iPad 11" landscape logical points (1194 x 834). safeArea
+  // approximates iPadOS's status bar and centred home-indicator regions;
+  // exactness matters less here since there is no photographed hardware
+  // bezel establishing a real pixel grid to match, unlike the iPhone/Pixel
+  // presets.
+  device: {
+    width: 1194,
+    height: 834,
+  },
+  screen: {
+    x: 0,
+    y: 0,
+    width: 1194,
+    height: 834,
+    radius: 24,
+  },
+  safeArea: {
+    top: 24,
+    bottom: 20,
+  },
+  keyboard: {
+    height: 380,
+  },
+} as const satisfies MobileDeviceGeometry;
+
 export type IPhoneGeometry = typeof iphoneGeometry;

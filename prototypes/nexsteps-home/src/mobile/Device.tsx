@@ -2,15 +2,23 @@ import { createContext, type PropsWithChildren, useContext, useMemo, useState } 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { CheckIcon, ChevronDownIcon } from "@radix-ui/react-icons";
 import { mobileAssets } from "./assets";
-import { iphoneGeometry, pixelGeometry, type MobileDeviceGeometry } from "./geometry";
+import {
+  iphoneGeometry,
+  pixelGeometry,
+  tabletGeometry,
+  type MobileDeviceGeometry,
+} from "./geometry";
 
-export type MobileDeviceId = "iphone" | "pixel-10";
+export type MobileDeviceId = "iphone" | "pixel-10" | "tablet";
 
 type MobileDevicePreset = {
   id: MobileDeviceId;
   label: string;
   platform: "ios" | "android";
-  bezel: string;
+  // Optional: the tablet preset has no photographed hardware bezel asset -
+  // PhoneFrame falls back to a plain CSS device edge (see prototype's
+  // styles.css [data-device="tablet"] rule) rather than an <img>.
+  bezel?: string;
   bezelLayer: "above-screen" | "below-screen";
   geometry: MobileDeviceGeometry;
   camera?: {
@@ -39,6 +47,16 @@ export const mobileDevices: Record<MobileDeviceId, MobileDevicePreset> = {
       size: 32,
       top: 23,
     },
+  },
+  tablet: {
+    id: "tablet",
+    label: "iPad",
+    // iPadOS shares iPhone's status-bar icon set and centred home
+    // indicator; reusing "ios" here needs no new StatusBar/HomeIndicator
+    // platform branch.
+    platform: "ios",
+    bezelLayer: "above-screen",
+    geometry: tabletGeometry,
   },
 };
 

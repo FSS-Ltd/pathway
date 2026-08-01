@@ -10,7 +10,10 @@
 
 This standalone Vite/React prototype contains the 76 approved NexSteps Home
 wireframe screens across setup, Week/Today, Progress, Community, Family,
-Regulations & Evidence, and moderation.
+Regulations & Evidence, and moderation - plus 5 tablet two-pane composites
+(Plan 03) that recompose an existing approved list screen and its detail
+screen side by side for the iPad device preset. The composites reuse their
+source screens' blocks verbatim; they are not new content.
 
 It is deliberately outside `pnpm-workspace.yaml`. It must not affect Pathway
 builds, dependencies or ACE vertical work.
