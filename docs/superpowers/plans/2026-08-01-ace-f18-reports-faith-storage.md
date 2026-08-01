@@ -13,7 +13,7 @@
 - Add no dependencies.
 - Every new table has `tenantId`, `@@unique([id, tenantId])`, tenant indexes, and composite foreign keys for tenant-scoped relations.
 - Enable and force RLS on every new table; revoke `PUBLIC`, `anon`, and `authenticated` table access.
-- Authentication and tenant context alone grant no child data. Family visibility requires current active `FULL` guardian-child relationships or active student identity links.
+- F18 tenant RLS prevents cross-tenant access and does not introduce authenticated-user context. A later API layer must resolve family visibility through current active `FULL` guardian-child relationships or active student identity links.
 - Published report versions, Faith versions, and Faith audience snapshots are immutable. Corrections create later versions.
 - Store private object keys only. Report PDFs use `tenants/<tenant-id>/reports/<report-version-id>.pdf`.
 - Encrypt report compilations, staff notes, reviewer notes, and Faith reflections through `packages/db/src/pii-encryption.ts`.
@@ -142,7 +142,7 @@ $$;
 
 - [ ] **Step 7: Add report RLS and make report tests green**
 
-Enable and force RLS for all five report tables using the F17 tenant-policy pattern. Add private helper functions for future family queries, limited to current active `FULL` guardian relationships and active student links with explicit student release. Validate and generate Prisma, then rerun the focused E2E command until the report cases pass.
+Enable and force RLS for all five report tables using the F17 tenant-policy pattern. Do not add authenticated-user context or family-specific RLS policies in this schema-only PR. Cover report release timestamps and the linked guardian/student facts in the E2E fixture; a later API service will apply the approved relationship predicates. Validate and generate Prisma, then rerun the focused E2E command until the report cases pass.
 
 ```bash
 pnpm --filter @pathway/db exec dotenv -e ../../.env.test -- prisma validate
@@ -229,9 +229,9 @@ DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION app.validate_faith_content_audience();
 ```
 
-- [ ] **Step 6: Add Faith RLS and access-query helpers**
+- [ ] **Step 6: Add Faith RLS and release-data coverage**
 
-Enable and force RLS for every Faith table. Add private helpers for later family reads that require an active F17 student link to an age-eligible child, or a current active `FULL` guardian relationship to that child. Calculate age from `Child.dateOfBirth` in the tenant timezone and return false for missing dates of birth, ended links, revoked links, or a `LIMITED` relationship.
+Enable and force RLS for every Faith table. Do not add authenticated-user context or family-specific RLS policies in this schema-only PR. Cover age eligibility inputs, F17 relationship state, and reflection-release data in the fixture; a later API service will evaluate the approved current-user, relationship, age, and capability predicates.
 
 - [ ] **Step 7: Validate and make the complete focused suite green**
 

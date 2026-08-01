@@ -77,7 +77,7 @@ The document key must match `tenants/<tenant-id>/reports/<report-version-id>.pdf
 1. A staff service creates a report compilation and draft under tenant RLS context.
 2. The author submits the draft for review. A different staff member approves it.
 3. The approval transaction appends the review decision, creates the immutable published report version, and sets guardian visibility immediately.
-4. Guardian reads resolve the child through a current active `GuardianChildRelationship` with `FULL` legal access. Student reads additionally require the active `StudentIdentityLink` and an explicit student release timestamp.
+4. A later API service will resolve guardian reads through a current active `GuardianChildRelationship` with `FULL` legal access. Student reads will additionally require the active `StudentIdentityLink` and an explicit student release timestamp. F18 stores and validates those release facts but does not add authenticated-user context or family-specific RLS policies.
 5. Staff define or archive tenant age bands. A Faith draft selects all students or several active bands.
 6. Publication creates an immutable Faith version and audience snapshot rows. Student and guardian reads resolve target eligibility from the active F17 identity and relationship records. Child age is calculated from `Child.dateOfBirth` in the tenant timezone.
 7. A student may create one encrypted reflection per Faith version. Staff can release it to guardians explicitly; no guardian receives it by default.
