@@ -48,6 +48,10 @@ interface ReportVersionRow {
   supersedesVersionId: string | null;
 }
 
+interface BlockedApprovalSession {
+  applicationName: string;
+}
+
 function useTenantRlsRole(): boolean {
   return process.env.E2E_USE_GLOBAL_SETUP === "true";
 }
@@ -145,6 +149,30 @@ async function approveReport(
       ${options.reviewerUserId}, 'APPROVED', ${"enc:approved"}
     )
   `;
+}
+
+async function waitForBlockedApprovalSessions(
+  applicationNames: string[],
+): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const blocked = await prisma.$queryRaw<BlockedApprovalSession[]>`
+      SELECT "application_name" AS "applicationName"
+      FROM pg_catalog.pg_stat_activity
+      WHERE "application_name" LIKE 'ace-report-approval-%'
+        AND "wait_event_type" = 'Lock'
+    `;
+    const blockedApplicationNames = new Set(
+      blocked.map(({ applicationName }) => applicationName),
+    );
+    if (applicationNames.every((name) => blockedApplicationNames.has(name))) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(
+    "Both approval transactions did not block on the report serialization lock",
+  );
 }
 
 async function getReportVersion(
@@ -476,6 +504,7 @@ describe("ACE report publication storage", () => {
       CREATE FUNCTION app.attempt_ace_report_publication_bypass()
       RETURNS trigger
       LANGUAGE plpgsql
+      SECURITY DEFINER
       SET search_path = ''
       AS $probe$
       BEGIN
@@ -647,17 +676,64 @@ describe("ACE report publication storage", () => {
       },
     );
 
-    await Promise.all(
-      corrections.map((draft) =>
-        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
-          approveReport(tx, {
-            tenantId: fixture.tenantAId,
-            draftId: draft.draftId,
-            reviewerUserId: fixture.reviewerUserId,
-          }),
-        ),
-      ),
+    let releaseReportLock = (): void => undefined;
+    let reportLockAcquired = (): void => undefined;
+    const releaseReportLockPromise = new Promise<void>((resolve) => {
+      releaseReportLock = resolve;
+    });
+    const reportLockAcquiredPromise = new Promise<void>((resolve) => {
+      reportLockAcquired = resolve;
+    });
+    const reportLock = withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await tx.$queryRaw`
+          SELECT "id"
+          FROM "AceTermReport"
+          WHERE "id" = ${first.draft.reportId}
+          FOR NO KEY UPDATE
+        `;
+        reportLockAcquired();
+        await releaseReportLockPromise;
+      },
     );
+    await reportLockAcquiredPromise;
+
+    const applicationNames = corrections.map(
+      () => `ace-report-approval-${randomUUID()}`,
+    );
+    const approvals = corrections.map((draft, index) =>
+      withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+        await tx.$executeRaw`
+          SELECT pg_catalog.set_config(
+            'application_name', ${applicationNames[index] ?? ""}, true
+          )
+        `;
+        await approveReport(tx, {
+          tenantId: fixture.tenantAId,
+          draftId: draft.draftId,
+          reviewerUserId: fixture.reviewerUserId,
+        });
+      }),
+    );
+    const approvalResultsPromise = Promise.allSettled(approvals);
+
+    let lockObservationError: unknown;
+    try {
+      await waitForBlockedApprovalSessions(applicationNames);
+    } catch (error) {
+      lockObservationError = error;
+    } finally {
+      releaseReportLock();
+      await reportLock;
+    }
+    const approvalResults = await approvalResultsPromise;
+    if (lockObservationError) throw lockObservationError;
+    const failedApproval = approvalResults.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    if (failedApproval) throw failedApproval.reason;
 
     const versions = await withReportsRlsContext(
       fixture.tenantAId,

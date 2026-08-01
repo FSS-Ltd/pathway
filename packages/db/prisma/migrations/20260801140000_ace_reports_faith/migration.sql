@@ -422,6 +422,78 @@ BEGIN
 END;
 $$;
 
+-- Publication uses a database execution identity that no application login
+-- can assume. The migration role is a member only long enough to transfer
+-- ownership, then loses that membership before the migration completes.
+DO $$
+DECLARE
+  publisher_role_oid OID;
+BEGIN
+  SELECT "oid" INTO publisher_role_oid
+  FROM pg_catalog."pg_roles"
+  WHERE "rolname" = 'pathway_ace_report_publisher';
+
+  IF publisher_role_oid IS NULL THEN
+    CREATE ROLE pathway_ace_report_publisher
+      NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT
+      NOCREATEDB NOCREATEROLE NOREPLICATION;
+  ELSIF EXISTS (
+    SELECT 1
+    FROM pg_catalog."pg_roles"
+    WHERE "oid" = publisher_role_oid
+      AND (
+        "rolcanlogin" OR "rolsuper" OR "rolbypassrls" OR "rolinherit"
+        OR "rolcreatedb" OR "rolcreaterole" OR "rolreplication"
+      )
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_catalog."pg_auth_members"
+    WHERE "member" = publisher_role_oid OR "roleid" = publisher_role_oid
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_catalog."pg_proc"
+    WHERE "proowner" = publisher_role_oid
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_catalog."pg_class"
+    WHERE "relowner" = publisher_role_oid
+  ) OR EXISTS (
+    SELECT 1
+    FROM pg_catalog."pg_namespace"
+    WHERE "nspowner" = publisher_role_oid
+  ) THEN
+    RAISE EXCEPTION 'Existing ACE report publisher role is not an isolated capability role'
+      USING ERRCODE = 'invalid_authorization_specification';
+  END IF;
+END;
+$$;
+
+REVOKE ALL PRIVILEGES ON SCHEMA app FROM pathway_ace_report_publisher;
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA app
+  FROM pathway_ace_report_publisher;
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA app
+  FROM pathway_ace_report_publisher;
+REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA app
+  FROM pathway_ace_report_publisher;
+
+GRANT pathway_ace_report_publisher TO CURRENT_USER;
+ALTER FUNCTION app.publish_approved_ace_report()
+  OWNER TO pathway_ace_report_publisher;
+REVOKE pathway_ace_report_publisher FROM CURRENT_USER;
+
+GRANT USAGE ON SCHEMA app TO pathway_ace_report_publisher;
+GRANT SELECT ON TABLE
+  app."AceTermReport",
+  app."AceReportDraft",
+  app."AceTermReportVersion"
+TO pathway_ace_report_publisher;
+-- PostgreSQL requires UPDATE privilege for both FOR UPDATE locks.
+GRANT UPDATE ON TABLE
+  app."AceTermReport",
+  app."AceReportDraft"
+TO pathway_ace_report_publisher;
+GRANT INSERT ON TABLE app."AceTermReportVersion" TO pathway_ace_report_publisher;
+
 REVOKE ALL ON FUNCTION app.reject_ace_term_report_target_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.require_ace_report_actor_membership() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_ace_report_compilation_mutation() FROM PUBLIC;
