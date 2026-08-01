@@ -27,6 +27,7 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
   Concern: ["summary", "details"],
   ChildNote: ["text"],
   BehaviourEntry: ["note"],
+  FaithReflection: ["reflectionEncrypted"],
 };
 
 /**

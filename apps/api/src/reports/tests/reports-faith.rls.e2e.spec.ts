@@ -304,6 +304,7 @@ async function createFaithAgeBand(
 async function createFaithDraft(
   tx: Prisma.TransactionClient,
   fixture: ReportsFixture,
+  authorUserId = fixture.authorUserId,
 ): Promise<Omit<FaithContentFixture, "versionId">> {
   const contentId = randomUUID();
   const draftId = randomUUID();
@@ -318,7 +319,7 @@ async function createFaithDraft(
     ) VALUES (
       ${draftId}, ${fixture.tenantAId}, ${contentId}, ${"Walking in wisdom"},
       ${JSON.stringify({ body: "Choose wisdom today" })}::jsonb,
-      'DRAFT', ${fixture.authorUserId}
+      'DRAFT', ${authorUserId}
     )
   `;
   return { contentId, draftId };
@@ -1513,6 +1514,56 @@ describe("ACE report publication storage", () => {
     );
   });
 
+  it("rejects an archived age band at publication", async () => {
+    if (!isDatabaseAvailable()) return;
+    const archivedBand: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "Archived Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await createFaithAgeBand(tx, archivedBand);
+        await tx.$executeRaw`
+          UPDATE "FaithAgeBand"
+          SET "archivedAt" = ${new Date("2026-07-31T12:00:00.000Z")}
+          WHERE "id" = ${archivedBand.id}
+        `;
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+          const draft = await createFaithDraft(tx, fixture);
+          const versionId = await insertFaithVersion(tx, fixture, draft);
+          await insertFaithAudience(tx, {
+            fixture,
+            versionId,
+            type: "AGE_BAND",
+            ageBand: archivedBand,
+          });
+          await validateFaithAudience(tx);
+        }),
+      "23514",
+    );
+  });
+
+  it("rejects a Faith draft authored by a non-tenant member", async () => {
+    if (!isDatabaseAvailable()) return;
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          createFaithDraft(tx, fixture, fixture.unrelatedUserId),
+        ),
+      "23503",
+    );
+  });
+
   it("rejects duplicate and mixed all-student audiences", async () => {
     if (!isDatabaseAvailable()) return;
     await expectDatabaseRejection(
@@ -1792,7 +1843,83 @@ describe("ACE report publication storage", () => {
     }
   });
 
-  it("stores encrypted reflections and releases them once to eligible guardians", async () => {
+  it("encrypts ordinary Prisma reflection writes at rest and decrypts application reads", async () => {
+    if (!isDatabaseAvailable()) return;
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        publishFaithContent(tx, fixture, [{ type: "ALL_ACTIVE_STUDENTS" }]),
+    );
+    const plaintext = "I prayed for wisdom today.";
+    const created = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.faithReflection.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            faithContentVersionId: publication.versionId,
+            studentIdentityId: fixture.studentIdentityId,
+            reflectionEncrypted: plaintext,
+            submittedAt: new Date("2026-08-01T10:05:00.000Z"),
+          },
+        }),
+    );
+    expect(created.reflectionEncrypted).toBe(plaintext);
+
+    const persisted = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const [raw] = await tx.$queryRaw<
+          Array<{ reflectionEncrypted: string }>
+        >`
+          SELECT "reflectionEncrypted"
+          FROM "FaithReflection"
+          WHERE "id" = ${created.id}
+        `;
+        const application = await tx.faithReflection.findUniqueOrThrow({
+          where: { id: created.id },
+        });
+        return { raw, application };
+      },
+    );
+    expect(persisted.raw?.reflectionEncrypted).not.toBe(plaintext);
+    expect(persisted.raw?.reflectionEncrypted.startsWith("v1:")).toBe(true);
+    expect(persisted.application.reflectionEncrypted).toBe(plaintext);
+  });
+
+  it("rejects reflection release by a non-tenant member", async () => {
+    if (!isDatabaseAvailable()) return;
+    const publication = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        publishFaithContent(tx, fixture, [{ type: "ALL_ACTIVE_STUDENTS" }]),
+    );
+    const reflectionId = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertFaithReflection(tx, fixture, publication.versionId),
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            UPDATE "FaithReflection"
+            SET
+              "guardianReleasedAt" = ${new Date("2026-08-01T11:00:00.000Z")},
+              "releasedByUserId" = ${fixture.unrelatedUserId}
+            WHERE "id" = ${reflectionId}
+          `,
+        ),
+      "23503",
+    );
+  });
+
+  it("releases reflections once to eligible guardians", async () => {
     if (!isDatabaseAvailable()) return;
     const juniors: FaithAgeBandFixture = {
       id: randomUUID(),
@@ -1831,11 +1958,10 @@ describe("ACE report publication storage", () => {
       fixture.tenantAId,
       fixture.orgAId,
       async (tx) => {
-        await tx.$executeRaw`
-          UPDATE "FaithReflection"
-          SET "reflectionEncrypted" = ${"enc:edited-before-release"}
-          WHERE "id" = ${reflectionId}
-        `;
+        await tx.faithReflection.update({
+          where: { id: reflectionId },
+          data: { reflectionEncrypted: "Edited before release" },
+        });
         await tx.$executeRaw`
           UPDATE "FaithReflection"
           SET
@@ -1866,21 +1992,14 @@ describe("ACE report publication storage", () => {
           versionId: publication.versionId,
           guardianUserId: fixture.unrelatedUserId,
         }),
-        reflection: (
-          await tx.$queryRaw<
-            Array<{
-              reflectionEncrypted: string;
-              guardianReleasedAt: Date | null;
-              releasedByUserId: string | null;
-            }>
-          >`
-            SELECT
-              "reflectionEncrypted", "guardianReleasedAt",
-              "releasedByUserId"
-            FROM "FaithReflection"
-            WHERE "id" = ${reflectionId}
-          `
-        )[0],
+        reflection: await tx.faithReflection.findUniqueOrThrow({
+          where: { id: reflectionId },
+          select: {
+            reflectionEncrypted: true,
+            guardianReleasedAt: true,
+            releasedByUserId: true,
+          },
+        }),
       }),
     );
     expect(visibility).toMatchObject({
@@ -1889,7 +2008,7 @@ describe("ACE report publication storage", () => {
       ended: 0n,
       unrelated: 0n,
       reflection: {
-        reflectionEncrypted: "enc:edited-before-release",
+        reflectionEncrypted: "Edited before release",
         guardianReleasedAt: new Date("2026-08-01T11:00:00.000Z"),
         releasedByUserId: fixture.reviewerUserId,
       },
@@ -1960,5 +2079,158 @@ describe("ACE report publication storage", () => {
         reflections: 0n,
       },
     ]);
+  });
+
+  it("enables and forces RLS and revokes broad table grants for every Faith table", async () => {
+    if (!isDatabaseAvailable()) return;
+    const catalog = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$queryRaw<
+        Array<{
+          tableName: string;
+          rlsEnabled: boolean;
+          rlsForced: boolean;
+          broadRolePrivilegesRevoked: boolean;
+        }>
+      >`
+        SELECT
+          relation.relname AS "tableName",
+          relation.relrowsecurity AS "rlsEnabled",
+          relation.relforcerowsecurity AS "rlsForced",
+          NOT EXISTS (
+            SELECT 1
+            FROM aclexplode(
+              COALESCE(
+                relation.relacl,
+                acldefault('r', relation.relowner)
+              )
+            ) AS privilege
+            LEFT JOIN pg_roles AS grantee
+              ON grantee.oid = privilege.grantee
+            WHERE privilege.grantee = 0
+              OR grantee.rolname IN ('anon', 'authenticated')
+          ) AS "broadRolePrivilegesRevoked"
+        FROM pg_class AS relation
+        JOIN pg_namespace AS namespace
+          ON namespace.oid = relation.relnamespace
+        WHERE namespace.nspname = current_schema()
+          AND relation.relname IN (
+            'FaithAgeBand',
+            'FaithContent',
+            'FaithContentDraft',
+            'FaithContentVersion',
+            'FaithContentAudience',
+            'FaithReadReceipt',
+            'FaithReflection'
+          )
+        ORDER BY relation.relname
+      `,
+    );
+    expect(catalog).toEqual([
+      {
+        tableName: "FaithAgeBand",
+        rlsEnabled: true,
+        rlsForced: true,
+        broadRolePrivilegesRevoked: true,
+      },
+      {
+        tableName: "FaithContent",
+        rlsEnabled: true,
+        rlsForced: true,
+        broadRolePrivilegesRevoked: true,
+      },
+      {
+        tableName: "FaithContentAudience",
+        rlsEnabled: true,
+        rlsForced: true,
+        broadRolePrivilegesRevoked: true,
+      },
+      {
+        tableName: "FaithContentDraft",
+        rlsEnabled: true,
+        rlsForced: true,
+        broadRolePrivilegesRevoked: true,
+      },
+      {
+        tableName: "FaithContentVersion",
+        rlsEnabled: true,
+        rlsForced: true,
+        broadRolePrivilegesRevoked: true,
+      },
+      {
+        tableName: "FaithReadReceipt",
+        rlsEnabled: true,
+        rlsForced: true,
+        broadRolePrivilegesRevoked: true,
+      },
+      {
+        tableName: "FaithReflection",
+        rlsEnabled: true,
+        rlsForced: true,
+        broadRolePrivilegesRevoked: true,
+      },
+    ]);
+  });
+
+  it("fails closed for Faith reads without tenant context", async () => {
+    if (!isDatabaseAvailable()) return;
+    const ageBand: FaithAgeBandFixture = {
+      id: randomUUID(),
+      tenantId: fixture.tenantAId,
+      name: "No-context Juniors",
+      minimumAge: 8,
+      maximumAge: 12,
+    };
+    await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await createFaithAgeBand(tx, ageBand);
+        const publication = await publishFaithContent(tx, fixture, [
+          { type: "AGE_BAND", ageBand },
+        ]);
+        await insertFaithReadReceipt(tx, fixture, publication.versionId);
+        await insertFaithReflection(tx, fixture, publication.versionId);
+      },
+    );
+
+    const [counts] = await prisma.$transaction(async (tx) => {
+      if (useTenantRlsRole()) {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${TENANT_RLS_ROLE}"`);
+      }
+      await tx.$executeRawUnsafe(
+        "SELECT pg_catalog.set_config('app.tenant_id', '', true)",
+      );
+      return tx.$queryRaw<
+        Array<{
+          ageBands: bigint;
+          contents: bigint;
+          drafts: bigint;
+          versions: bigint;
+          audiences: bigint;
+          receipts: bigint;
+          reflections: bigint;
+        }>
+      >`
+        SELECT
+          (SELECT count(*) FROM "FaithAgeBand") AS "ageBands",
+          (SELECT count(*) FROM "FaithContent") AS "contents",
+          (SELECT count(*) FROM "FaithContentDraft") AS "drafts",
+          (SELECT count(*) FROM "FaithContentVersion") AS "versions",
+          (SELECT count(*) FROM "FaithContentAudience") AS "audiences",
+          (SELECT count(*) FROM "FaithReadReceipt") AS "receipts",
+          (SELECT count(*) FROM "FaithReflection") AS "reflections"
+      `;
+    });
+    expect(counts).toEqual({
+      ageBands: 0n,
+      contents: 0n,
+      drafts: 0n,
+      versions: 0n,
+      audiences: 0n,
+      receipts: 0n,
+      reflections: 0n,
+    });
   });
 });
