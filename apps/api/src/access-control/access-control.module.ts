@@ -191,6 +191,11 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
     AccessShadowService,
     EffectivePermissionsService,
     PermissionGuard,
+    // PermissionGuard's own dependency: a consuming module (e.g.
+    // AnnouncementsModule) that only imports AccessControlModule to use the
+    // guard needs this resolvable too, or Nest can't construct the guard
+    // outside AccessControlModule's own controllers.
+    AccessDecisionLogger,
   ],
 })
 export class AccessControlModule {}

@@ -260,12 +260,6 @@ describe("assignment API transaction and forced-RLS integration", () => {
         }),
       ).resolves.toHaveLength(0);
     });
-
-    await expect(
-      service.list({ ...actor, legacyOrgRoles: [] }),
-    ).rejects.toMatchObject({
-      response: { code: "ASSIGNMENT_API_ACCESS_DENIED" },
-    });
   });
 
   it("preserves immutable assignment creation timestamps", async () => {

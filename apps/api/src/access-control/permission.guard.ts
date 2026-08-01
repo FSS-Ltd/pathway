@@ -45,9 +45,9 @@ export class PermissionGuard implements CanActivate {
 
     const metadata = requestMetadata(context);
     const requestContext = this.requestContext.getContext();
-    if (!requestContext) {
+    if (!requestContext || !requestContext.org.orgId || !requestContext.user.userId) {
       this.recordDecision(
-        null,
+        requestContext ?? null,
         permission,
         { allowed: false, reason: "tenant-denied", sourceRoleIds: [] },
         metadata,

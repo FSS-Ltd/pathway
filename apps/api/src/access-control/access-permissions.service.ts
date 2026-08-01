@@ -1,8 +1,8 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { getOrgCapabilities } from "@pathway/platform";
-import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
+import { EffectivePermissionsService } from "./effective-permissions.service";
 import {
-  resolveTemporaryRoleApiBootstrap,
+  resolveDelegableCeiling,
   ROLES_TRANSACTION_BOUNDARY,
   type RoleActorContext,
   type RolesTransactionBoundary,
@@ -13,26 +13,26 @@ export class AccessPermissionsService {
   constructor(
     @Inject(ROLES_TRANSACTION_BOUNDARY)
     private readonly transaction: RolesTransactionBoundary,
+    @Inject(EffectivePermissionsService)
+    private readonly effectivePermissions: EffectivePermissionsService,
   ) {}
 
   async listDelegableKeys(actor: RoleActorContext): Promise<string[]> {
     return this.transaction.run(actor, async (tx) => {
-      await assertPlatformAccessRouteAccess(
-        tx,
-        actor,
-        "platform.access.permissions.read",
-        "PERMISSIONS_API_ACCESS_DENIED",
-      );
-
-      const [metadata, capabilities] = await Promise.all([
+      const [metadata, capabilities, actorPermissionKeys] = await Promise.all([
         tx.permissionDefinition.findMany({
           select: { key: true, delegable: true, isActive: true },
         }),
         getOrgCapabilities(actor.orgId, tx),
+        this.effectivePermissions.listForUser(
+          actor.userId,
+          actor.orgId,
+          actor.tenantId,
+        ),
       ]);
 
-      return resolveTemporaryRoleApiBootstrap({
-        ...actor,
+      return resolveDelegableCeiling({
+        actorPermissionKeys,
         activeCapabilities: capabilities,
         activePermissionDefinitions: metadata,
       });

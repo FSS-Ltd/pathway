@@ -2,13 +2,21 @@ import type { PermissionKey } from "@pathway/platform";
 import type { StructuredLogger } from "../../common/logging/logging.service";
 import type { AccessDecision } from "../access-decision.types";
 import {
-  ACCESS_SHADOW_ALLOW_LIST,
   AccessShadowService,
+  type AccessShadowAllowListEntry,
   type AccessShadowConfig,
 } from "../access-shadow.service";
 import type { EffectivePermissionsService } from "../effective-permissions.service";
 
-const { route: ROUTE, permission: PERMISSION } = ACCESS_SHADOW_ALLOW_LIST[0];
+// Test-local fixture: exercises the comparator mechanism in isolation, not
+// the real ACCESS_SHADOW_ALLOW_LIST content (which is empty until a route
+// migration needs it - see access-shadow.service.ts).
+const ROUTE = "GET /fixture/allow-listed-route";
+const PERMISSION = "platform.access.roles.read" as PermissionKey;
+const OTHER_PERMISSION = "platform.access.audit.read" as PermissionKey;
+const FIXTURE_ALLOW_LIST: readonly AccessShadowAllowListEntry[] = [
+  { route: ROUTE, permission: PERMISSION },
+];
 
 describe("AccessShadowService", () => {
   const resolve = jest.fn<Promise<AccessDecision>, []>();
@@ -30,7 +38,7 @@ describe("AccessShadowService", () => {
       logger,
       {
         enabled: true,
-        allowList: ACCESS_SHADOW_ALLOW_LIST,
+        allowList: FIXTURE_ALLOW_LIST,
         ...config,
       },
     );
@@ -93,7 +101,7 @@ describe("AccessShadowService", () => {
           userId: "user-should-not-be-logged",
           orgId: "org-should-not-be-logged",
           tenantId: "site-should-not-be-logged",
-          permission: "platform.access.roles.read" as PermissionKey,
+          permission: OTHER_PERMISSION,
           now: new Date("2026-07-28T12:00:00.000Z"),
         },
       }),

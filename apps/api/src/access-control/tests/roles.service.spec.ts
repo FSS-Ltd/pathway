@@ -2,7 +2,7 @@ import { CAPABILITY_DEFINITIONS, VERTICAL_CAPABILITIES } from "@pathway/platform
 import type { Prisma } from "@pathway/db";
 import {
   createRolesTransactionBoundary,
-  resolveTemporaryRoleApiBootstrap,
+  resolveDelegableCeiling,
   roleScopeAcceptsPermissionScope,
   RolesService,
   type RoleActorContext,
@@ -27,12 +27,18 @@ const passThroughRoleSafety = {
   },
 } as RoleSafetyService;
 
-describe("temporary role API bootstrap", () => {
-  it("permits only an authenticated legacy organisation admin to bootstrap delegable keys the organisation has active", () => {
-    const result = resolveTemporaryRoleApiBootstrap({
-      orgId,
-      userId: "user-1",
-      legacyOrgRoles: ["org:admin"],
+function effectivePermissionsWith(
+  keys: readonly string[],
+): EffectivePermissionsService {
+  return {
+    listForUser: jest.fn().mockResolvedValue(keys),
+  } as unknown as EffectivePermissionsService;
+}
+
+describe("delegable ceiling", () => {
+  it("returns capabilities the actor holds, that are active, delegable, and org-enabled", () => {
+    const result = resolveDelegableCeiling({
+      actorPermissionKeys: ["ace.pace.read", "ace.pace.record"],
       activeCapabilities: ["ace.pace.read", "ace.pace.record"],
       activePermissionDefinitions: [
         { key: "ace.pace.read", delegable: true, isActive: true },
@@ -43,11 +49,9 @@ describe("temporary role API bootstrap", () => {
     expect(result).toEqual(["ace.pace.read", "ace.pace.record"]);
   });
 
-  it("does not let a display role, inactive metadata, non-delegable metadata, or inactive capabilities authorise a grant", () => {
-    const result = resolveTemporaryRoleApiBootstrap({
-      orgId,
-      userId: "user-1",
-      legacyOrgRoles: ["Organisation Head"],
+  it("excludes a key the actor doesn't hold, inactive metadata, non-delegable metadata, or inactive capabilities", () => {
+    const result = resolveDelegableCeiling({
+      actorPermissionKeys: ["ace.pace.record"],
       activeCapabilities: ["ace.pace.read"],
       activePermissionDefinitions: [
         { key: "ace.pace.read", delegable: false, isActive: true },
@@ -61,10 +65,8 @@ describe("temporary role API bootstrap", () => {
 
   it("grants a non-ACE vertical its own delegable capabilities, never platform-access or safeguarding-case keys", () => {
     const churchCapabilities = VERTICAL_CAPABILITIES.CHURCH;
-    const result = resolveTemporaryRoleApiBootstrap({
-      orgId,
-      userId: "user-1",
-      legacyOrgRoles: ["org:admin"],
+    const result = resolveDelegableCeiling({
+      actorPermissionKeys: churchCapabilities,
       activeCapabilities: churchCapabilities,
       activePermissionDefinitions: churchCapabilities.map((key) => ({
         key,
@@ -80,10 +82,8 @@ describe("temporary role API bootstrap", () => {
   });
 
   it("excludes a delegable, active key the organisation has not purchased", () => {
-    const result = resolveTemporaryRoleApiBootstrap({
-      orgId,
-      userId: "user-1",
-      legacyOrgRoles: ["org:admin"],
+    const result = resolveDelegableCeiling({
+      actorPermissionKeys: ["notices.manage", "ace.pace.read"],
       activeCapabilities: ["notices.manage"],
       activePermissionDefinitions: [
         { key: "notices.manage", delegable: true, isActive: true },
@@ -109,7 +109,7 @@ describe("role permission scope compatibility", () => {
   });
 });
 
-describe("RolesService route authority", () => {
+describe("RolesService", () => {
   const actor = {
     orgId,
     tenantId: "site-1",
@@ -124,16 +124,6 @@ describe("RolesService route authority", () => {
     version: 1, permissions: [{ permissionKey: "ace.pace.read" }],
   };
 
-  function serviceWith(tx: object): RolesService {
-    const transaction: RolesTransactionBoundary = {
-      run: async (_actor, operation) => operation(tx as never),
-    };
-    const cache = {
-      invalidateUser: jest.fn().mockResolvedValue(undefined),
-    } as unknown as AccessCacheService;
-    return new RolesService(transaction, cache, passThroughRoleSafety);
-  }
-
   function allowedService(options: {
     metadata?: Array<{ key: string; delegable: boolean; isActive: boolean; scope: "organisation" | "site" | "relationship" | "assignment" }>;
     role?: typeof role;
@@ -142,6 +132,7 @@ describe("RolesService route authority", () => {
     roleUpdateMany?: jest.Mock;
     transaction?: RolesTransactionBoundary;
     cache?: AccessCacheService;
+    actorPermissionKeys?: readonly string[];
   } = {}) {
     const tx = {
       orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "ORG_ADMIN" }) },
@@ -190,37 +181,21 @@ describe("RolesService route authority", () => {
           invalidateUser: jest.fn().mockResolvedValue(undefined),
         } as unknown as AccessCacheService,
         passThroughRoleSafety,
+        effectivePermissionsWith(options.actorPermissionKeys ?? ["ace.pace.read"]),
       ),
       tx,
     };
   }
 
-  it("rechecks active database membership before allowing a read route", async () => {
-    const service = serviceWith({
-      orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "ORG_MEMBER" }) },
-    });
-
-    await expect(service.list(actor)).rejects.toMatchObject({
-      response: {
-        statusCode: 403,
-        code: "ROLE_API_ACCESS_DENIED",
-        message: "You are not allowed to manage roles.",
-      },
-    });
-  });
-
   it("returns the exact safe conflict contract when a version check loses the race", async () => {
     const role = {
       id: "role-1", orgId, tenantId: "site-1", name: "PACE Staff",
-      description: null, scope: "site", isSystem: false, isActive: true,
+      description: null, scope: "site" as const, isSystem: false, isActive: true,
       version: 1, permissions: [],
     };
-    const service = serviceWith({
-      orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "ORG_ADMIN" }) },
-      permissionDefinition: { findUnique: jest.fn().mockResolvedValue({ isActive: true }) },
-      orgVertical: { findUnique: jest.fn().mockResolvedValue({ vertical: "ACE_SCHOOL" }) },
-      orgModule: { findMany: jest.fn().mockResolvedValue([]) },
-      orgRoleDefinition: { findFirst: jest.fn().mockResolvedValue(role), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    const { service } = allowedService({
+      role,
+      roleUpdateMany: jest.fn().mockResolvedValue({ count: 0 }),
     });
 
     await expect(service.retire("role-1", { expectedVersion: 1 }, actor)).rejects.toMatchObject({
@@ -230,23 +205,6 @@ describe("RolesService route authority", () => {
         message: "The role was changed by another request.",
         requestId: "role-service-request-1",
       },
-    });
-  });
-
-  it.each([
-    ["list", (service: RolesService) => service.list(actor)],
-    ["get", (service: RolesService) => service.get("role-1", actor)],
-    ["create", (service: RolesService) => service.create({ name: "PACE Staff", scope: "site", permissionKeys: ["ace.pace.read"] }, actor)],
-    ["clone", (service: RolesService) => service.clone("role-1", { name: "PACE Staff Copy" }, actor)],
-    ["update", (service: RolesService) => service.update({ roleId: "role-1", expectedVersion: 1, name: "PACE Staff", permissionKeys: ["ace.pace.read"] }, actor)],
-    ["retire", (service: RolesService) => service.retire("role-1", { expectedVersion: 1 }, actor)],
-  ])("checks database role authority before %s", async (_method, invoke) => {
-    const service = serviceWith({
-      orgMembership: { findUnique: jest.fn().mockResolvedValue(null) },
-    });
-
-    await expect(invoke(service)).rejects.toMatchObject({
-      response: { statusCode: 403, code: "ROLE_API_ACCESS_DENIED" },
     });
   });
 
@@ -308,6 +266,7 @@ describe("RolesService route authority", () => {
       transaction,
       cache,
       passThroughRoleSafety,
+      effectivePermissionsWith(["ace.pace.read"]),
     );
 
     await service.update({
@@ -451,6 +410,7 @@ describe("RolesService route authority", () => {
   it("allows a key the org actively holds and can delegate, even outside the old organisation-head template", async () => {
     const { service } = allowedService({
       metadata: [{ key: "ace.reports.compile", delegable: true, isActive: true, scope: "site" }],
+      actorPermissionKeys: ["ace.reports.compile"],
     });
 
     await expect(

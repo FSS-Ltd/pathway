@@ -3,6 +3,8 @@ import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { AccessUsersService } from "./access-users.service";
+import { PermissionGuard } from "./permission.guard";
+import { RequirePermission } from "./require-permission.decorator";
 import { roleApiError } from "./role-api-error";
 import type { RoleActorContext } from "./roles.service";
 import {
@@ -12,7 +14,7 @@ import {
 
 const targetUserParam = z.object({ userId: z.string().uuid() }).strict();
 
-@UseGuards(AuthUserGuard)
+@UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("access/users")
 export class AccessUsersController {
   constructor(
@@ -21,7 +23,19 @@ export class AccessUsersController {
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
+  @Get("me/permissions")
+  async getMyPermissions(@Req() request: RequestWithRequestId) {
+    const requestId = getOrCreateRequestId(request);
+    const actor = this.actor(request, requestId);
+    return {
+      orgId: actor.orgId,
+      tenantId: actor.tenantId ?? null,
+      permissions: await this.accessUsers.listOwnPermissions(actor),
+    };
+  }
+
   @Get(":userId/effective-permissions")
+  @RequirePermission("platform.access.users.read")
   async getEffectivePermissions(
     @Param() params: unknown,
     @Req() request: RequestWithRequestId,
@@ -35,6 +49,7 @@ export class AccessUsersController {
   }
 
   @Get(":userId/access-summary")
+  @RequirePermission("platform.access.users.read")
   async getAccessSummary(
     @Param() params: unknown,
     @Req() request: RequestWithRequestId,

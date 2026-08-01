@@ -3,6 +3,8 @@ import { PathwayRequestContext } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { AccessAuditService } from "./access-audit.service";
 import { auditListQueryDto } from "./dto/audit.dto";
+import { PermissionGuard } from "./permission.guard";
+import { RequirePermission } from "./require-permission.decorator";
 import { roleApiError } from "./role-api-error";
 import type { RoleActorContext } from "./roles.service";
 import {
@@ -10,7 +12,7 @@ import {
   type RequestWithRequestId,
 } from "./request-id";
 
-@UseGuards(AuthUserGuard)
+@UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("access/audit")
 export class AccessAuditController {
   constructor(
@@ -20,6 +22,7 @@ export class AccessAuditController {
   ) {}
 
   @Get()
+  @RequirePermission("platform.access.audit.read")
   async list(@Query() query: unknown, @Req() request: RequestWithRequestId) {
     const requestId = getOrCreateRequestId(request);
     const parsed = parseAuditListQuery(query, requestId);

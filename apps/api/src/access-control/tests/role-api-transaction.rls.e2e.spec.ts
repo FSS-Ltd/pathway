@@ -9,6 +9,7 @@ import {
   type RoleActorContext,
 } from "../roles.service";
 import { AccessCacheService } from "../access-cache.service";
+import type { EffectivePermissionsService } from "../effective-permissions.service";
 import {
   RoleSafetyService,
   type RoleMutationCommand,
@@ -24,6 +25,9 @@ const passThroughRoleSafety = {
     await command.mutate();
   },
 } as RoleSafetyService;
+const actorHoldsEveryTestedKey = {
+  listForUser: async () => ["ace.pace.read"],
+} as unknown as EffectivePermissionsService;
 
 function testTransactionBoundary(roleName = RLS_ROLE) {
   return createRolesTransactionBoundary(async (operation) =>
@@ -163,6 +167,7 @@ describe("role API transaction and forced-RLS integration", () => {
       testTransactionBoundary(),
       new AccessCacheService(),
       passThroughRoleSafety,
+      actorHoldsEveryTestedKey,
     );
   });
 
@@ -221,6 +226,7 @@ describe("role API transaction and forced-RLS integration", () => {
       testTransactionBoundary(AUDIT_DENIED_ROLE),
       new AccessCacheService(),
       passThroughRoleSafety,
+      actorHoldsEveryTestedKey,
     );
     await expectDatabaseRejection(
       () =>

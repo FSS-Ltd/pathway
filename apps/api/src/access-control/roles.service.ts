@@ -1,4 +1,3 @@
-import { UserOrgRole } from "@pathway/auth";
 import {
   Prisma,
   runTransaction,
@@ -14,7 +13,7 @@ import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AccessCacheService } from "./access-cache.service";
-import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
+import { EffectivePermissionsService } from "./effective-permissions.service";
 import { roleApiError } from "./role-api-error";
 import { RoleSafetyService } from "./role-safety.service";
 import type {
@@ -24,10 +23,8 @@ import type {
   UpdateRoleDto,
 } from "./dto/role.dto";
 
-export interface TemporaryRoleApiBootstrapInput {
-  orgId: string;
-  userId: string;
-  legacyOrgRoles: readonly string[];
+export interface DelegableCeilingInput {
+  actorPermissionKeys: readonly PermissionKey[];
   activeCapabilities: readonly PermissionKey[];
   activePermissionDefinitions: readonly {
     key: string;
@@ -37,31 +34,28 @@ export interface TemporaryRoleApiBootstrapInput {
 }
 
 /**
- * Transitional authority for ACE-F10 routes only. It is intentionally isolated
- * so ACE-F14 can remove it without affecting the typed access resolver.
- *
- * The delegable ceiling is the org's own active capabilities (what it has
- * purchased, via vertical + modules), intersected with the registry and the
- * static `delegable` flag. `delegable: false` is what keeps platform-access
- * and safeguarding-case keys ungrantable, regardless of vertical.
+ * The delegable ceiling is the intersection of what the actor themself
+ * effectively holds, what the org's active capabilities include (vertical +
+ * modules), and the registry's static `delegable` flag. `delegable: false`
+ * is what keeps platform-access and safeguarding-case keys ungrantable,
+ * regardless of vertical or actor grants.
  */
-export function resolveTemporaryRoleApiBootstrap(
-  input: TemporaryRoleApiBootstrapInput,
+export function resolveDelegableCeiling(
+  input: DelegableCeilingInput,
 ): PermissionKey[] {
-  if (!input.legacyOrgRoles.includes(UserOrgRole.ORG_ADMIN)) {
-    return [];
-  }
-
   const activeDelegableMetadata = new Set(
     input.activePermissionDefinitions
       .filter((definition) => definition.isActive && definition.delegable)
       .map((definition) => definition.key),
   );
+  const actorHeld = new Set(input.actorPermissionKeys);
 
   return [...new Set(input.activeCapabilities)]
     .filter(
       (key) =>
-        key in CAPABILITY_DEFINITIONS && activeDelegableMetadata.has(key),
+        key in CAPABILITY_DEFINITIONS &&
+        activeDelegableMetadata.has(key) &&
+        actorHeld.has(key),
     )
     .sort();
 }
@@ -136,11 +130,12 @@ export class RolesService {
     private readonly cache: AccessCacheService,
     @Inject(RoleSafetyService)
     private readonly roleSafety: RoleSafetyService,
+    @Inject(EffectivePermissionsService)
+    private readonly effectivePermissions: EffectivePermissionsService,
   ) {}
 
   async list(actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "read");
       return tx.orgRoleDefinition.findMany({
         where: { orgId: actor.orgId },
         include: { permissions: { select: { permissionKey: true } } },
@@ -151,14 +146,12 @@ export class RolesService {
 
   async get(roleId: string, actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "read");
       return this.requireRoleInTransaction(tx, roleId, actor);
     });
   }
 
   async create(command: CreateRoleDto, actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
       if (command.scope === "site" && !actor.tenantId) {
         throw roleApiError(
           HttpStatus.BAD_REQUEST,
@@ -196,7 +189,6 @@ export class RolesService {
 
   async clone(roleId: string, command: CloneRoleDto, actor: RoleActorContext) {
     return this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
       const source = await this.requireRoleInTransaction(tx, roleId, actor);
       const permissionKeys = await this.resolveClonePermissionKeys(
         tx, source.permissions.map((permission) => permission.permissionKey), source.scope, actor,
@@ -233,7 +225,6 @@ export class RolesService {
 
   async retire(roleId: string, command: RetireRoleDto, actor: RoleActorContext) {
     const result = await this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
       await this.roleSafety.assertHeadAndSelfLockoutSafe({
@@ -276,7 +267,6 @@ export class RolesService {
     roleId: string, expectedVersion: number, command: UpdateRoleDto, actor: RoleActorContext, mutation: RoleMutation,
   ) {
     const result = await this.inOrganisationContext(actor, async (tx) => {
-      await this.assertRouteAccess(tx, actor, "manage");
       const role = await this.requireRoleInTransaction(tx, roleId, actor);
       this.assertCustomRole(role, actor);
       const permissionKeys = await this.validatePermissionKeys(tx, command.permissionKeys, role.scope, actor);
@@ -372,8 +362,11 @@ export class RolesService {
       where: { key: { in: distinct } }, select: { key: true, delegable: true, isActive: true, scope: true },
     });
     const capabilities = await getOrgCapabilities(actor.orgId, tx);
-    const bootstrapKeys = new Set(resolveTemporaryRoleApiBootstrap({
-      ...actor, activeCapabilities: capabilities, activePermissionDefinitions: metadata,
+    const actorPermissionKeys = await this.effectivePermissions.listForUser(
+      actor.userId, actor.orgId, actor.tenantId,
+    );
+    const ceilingKeys = new Set(resolveDelegableCeiling({
+      actorPermissionKeys, activeCapabilities: capabilities, activePermissionDefinitions: metadata,
     }));
     for (const key of distinct) {
       const definition = metadata.find((entry) => entry.key === key);
@@ -401,7 +394,7 @@ export class RolesService {
           { key, scope },
         );
       }
-      if (!bootstrapKeys.has(key as PermissionKey)) {
+      if (!ceilingKeys.has(key as PermissionKey)) {
         throw roleApiError(
           HttpStatus.FORBIDDEN,
           "ACTOR_CANNOT_DELEGATE",
@@ -432,9 +425,12 @@ export class RolesService {
       },
     });
     const capabilities = await getOrgCapabilities(actor.orgId, tx);
-    const bootstrapKeys = new Set(
-      resolveTemporaryRoleApiBootstrap({
-        ...actor,
+    const actorPermissionKeys = await this.effectivePermissions.listForUser(
+      actor.userId, actor.orgId, actor.tenantId,
+    );
+    const ceilingKeys = new Set(
+      resolveDelegableCeiling({
+        actorPermissionKeys,
         activeCapabilities: capabilities,
         activePermissionDefinitions: metadata,
       }),
@@ -449,7 +445,7 @@ export class RolesService {
         definition?.isActive === true &&
         definition.delegable &&
         capabilities.includes(key) &&
-        bootstrapKeys.has(key) &&
+        ceilingKeys.has(key) &&
         roleScopeAcceptsPermissionScope(scope, definition.scope)
       );
     });
@@ -520,20 +516,6 @@ export class RolesService {
       }
       throw error;
     }
-  }
-
-  private async assertRouteAccess(
-    tx: Prisma.TransactionClient,
-    actor: RoleActorContext,
-    access: "read" | "manage",
-  ): Promise<void> {
-    const permissionKey = `platform.access.roles.${access}` as PermissionKey;
-    await assertPlatformAccessRouteAccess(
-      tx,
-      actor,
-      permissionKey,
-      "ROLE_API_ACCESS_DENIED",
-    );
   }
 
   private async inOrganisationContext<T>(
