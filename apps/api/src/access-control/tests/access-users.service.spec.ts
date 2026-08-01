@@ -35,6 +35,7 @@ const allowedTx = {
   permissionDefinition: { findUnique: jest.fn().mockResolvedValue({ isActive: true }) },
   orgVertical: { findUnique: jest.fn().mockResolvedValue({ vertical: "ACE_SCHOOL" }) },
   orgModule: { findMany: jest.fn().mockResolvedValue([]) },
+  userRoleAssignment: { findMany: jest.fn().mockResolvedValue([]) },
 };
 
 describe("AccessUsersService", () => {
@@ -95,6 +96,68 @@ describe("AccessUsersService", () => {
       service.getEffectivePermissions("target-user", actor),
     ).rejects.toMatchObject({
       response: { statusCode: 403, code: "EFFECTIVE_ACCESS_API_ACCESS_DENIED" },
+    });
+  });
+
+  it("returns the target user's membership, active assignments, and organisation capabilities", async () => {
+    const now = new Date("2026-07-31T12:00:00.000Z");
+    const tx = {
+      ...allowedTx,
+      userRoleAssignment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "assignment-1",
+            tenantId: null,
+            startsAt: new Date("2026-07-01T00:00:00.000Z"),
+            expiresAt: null,
+            roleDefinition: {
+              id: "role-1",
+              name: "Organisation Head",
+              scope: "organisation",
+            },
+          },
+        ]),
+      },
+    };
+    const { service } = serviceWith(tx);
+    jest.useFakeTimers().setSystemTime(now);
+
+    try {
+      await expect(
+        service.getAccessSummary("target-user", actor),
+      ).resolves.toEqual({
+        userId: "target-user",
+        orgId: "org-1",
+        tenantId: "site-1",
+        organisationMembership: { role: "ORG_ADMIN" },
+        assignments: [
+          {
+            id: "assignment-1",
+            roleDefinitionId: "role-1",
+            roleName: "Organisation Head",
+            scope: "organisation",
+            tenantId: null,
+            startsAt: new Date("2026-07-01T00:00:00.000Z"),
+            expiresAt: null,
+            isActive: true,
+          },
+        ],
+        organisationCapabilities: expect.arrayContaining(["ace.pace.read"]),
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("denies an actor who is not a legacy organisation admin on access summary", async () => {
+    const { service } = serviceWith({
+      orgMembership: { findUnique: jest.fn().mockResolvedValue({ role: "STAFF" }) },
+    });
+
+    await expect(
+      service.getAccessSummary("target-user", actor),
+    ).rejects.toMatchObject({
+      response: { statusCode: 403, code: "ACCESS_SUMMARY_API_ACCESS_DENIED" },
     });
   });
 });

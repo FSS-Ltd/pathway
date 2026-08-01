@@ -10,6 +10,14 @@ function createController() {
       tenantId: "site-1",
       permissions: [],
     }),
+    getAccessSummary: jest.fn().mockResolvedValue({
+      userId: "target-user",
+      orgId: "org-1",
+      tenantId: "site-1",
+      organisationMembership: null,
+      assignments: [],
+      organisationCapabilities: [],
+    }),
   } as unknown as AccessUsersService;
   const requestContext = {
     requireContext: () => ({
@@ -64,5 +72,44 @@ describe("AccessUsersController", () => {
       },
     });
     expect(accessUsers.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
+  it("threads the trusted actor context and target user through to the access summary service", async () => {
+    const { accessUsers, controller } = createController();
+    const request = { headers: { "x-request-id": "access-summary-request-1" } };
+
+    await controller.getAccessSummary(
+      { userId: "5d7a71ba-7335-4aeb-a941-c8d350439f42" },
+      request,
+    );
+
+    expect(accessUsers.getAccessSummary).toHaveBeenCalledWith(
+      "5d7a71ba-7335-4aeb-a941-c8d350439f42",
+      {
+        orgId: "org-1",
+        tenantId: "site-1",
+        userId: "actor-1",
+        legacyOrgRoles: ["org:admin"],
+        requestId: "access-summary-request-1",
+      },
+    );
+  });
+
+  it("returns a safe validation envelope for a non-uuid target user id on access summary", async () => {
+    const { accessUsers, controller } = createController();
+
+    await expect(
+      controller.getAccessSummary(
+        { userId: "not-a-uuid" },
+        { headers: { "x-request-id": "access-summary-request-invalid" } },
+      ),
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 400,
+        code: "INVALID_EFFECTIVE_ACCESS_REQUEST",
+        requestId: "access-summary-request-invalid",
+      },
+    });
+    expect(accessUsers.getAccessSummary).not.toHaveBeenCalled();
   });
 });

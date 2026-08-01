@@ -34,6 +34,19 @@ export class AccessUsersController {
     );
   }
 
+  @Get(":userId/access-summary")
+  async getAccessSummary(
+    @Param() params: unknown,
+    @Req() request: RequestWithRequestId,
+  ) {
+    const requestId = getOrCreateRequestId(request);
+    const { userId } = parse(targetUserParam, params, requestId);
+    return this.accessUsers.getAccessSummary(
+      userId,
+      this.actor(request, requestId),
+    );
+  }
+
   private actor(
     request: RequestWithRequestId,
     requestId = getOrCreateRequestId(request),
