@@ -656,6 +656,60 @@ describe("ACE PACE and behaviour fact storage", () => {
     );
   });
 
+  it("rejects an infinite PACE policy override expiry", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const { pacePolicyId } = await withPaceRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertPolicies(tx, fixture),
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            INSERT INTO "PacePolicyOverride" (
+              "id", "tenantId", "childId", "subjectId", "pacePolicyId",
+              "policyCode", "authorisedByUserId", "reason", "expiresAt"
+            ) VALUES (
+              ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
+              ${fixture.subjectAId}, ${pacePolicyId}, 'daily-limit',
+              ${fixture.actorAId}, 'Unbounded exception', TIMESTAMP 'infinity'
+            )
+          `,
+        ),
+      "23514",
+    );
+  });
+
+  it("rejects an infinite demerit stage override expiry", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const { demeritPolicyId } = await withPaceRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertPolicies(tx, fixture),
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withPaceRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            INSERT INTO "DemeritStageOverride" (
+              "id", "tenantId", "childId", "demeritPolicyId", "stage",
+              "authorisedByUserId", "reason", "expiresAt"
+            ) VALUES (
+              ${randomUUID()}, ${fixture.tenantAId}, ${fixture.childAId},
+              ${demeritPolicyId}, 2, ${fixture.actorAId}, 'Unbounded stage',
+              TIMESTAMP 'infinity'
+            )
+          `,
+        ),
+      "23514",
+    );
+  });
+
   it("rejects PACE overrides for another child or subject in the same tenant", async () => {
     if (!isDatabaseAvailable()) return;
 

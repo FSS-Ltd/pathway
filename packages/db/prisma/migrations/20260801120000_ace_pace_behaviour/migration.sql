@@ -91,7 +91,8 @@ CREATE TABLE "PacePolicyOverride" (
   CONSTRAINT "PacePolicyOverride_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "PacePolicyOverride_policyCode_check" CHECK (btrim("policyCode") <> ''),
   CONSTRAINT "PacePolicyOverride_reason_check" CHECK (btrim("reason") <> ''),
-  CONSTRAINT "PacePolicyOverride_expiry_check" CHECK ("expiresAt" > "createdAt"),
+  CONSTRAINT "PacePolicyOverride_expiry_check"
+    CHECK (pg_catalog.isfinite("expiresAt") AND "expiresAt" > "createdAt"),
   CONSTRAINT "PacePolicyOverride_id_tenantId_key" UNIQUE ("id", "tenantId"),
   CONSTRAINT "PacePolicyOverride_id_tenantId_childId_subjectId_key"
     UNIQUE ("id", "tenantId", "childId", "subjectId"),
@@ -121,7 +122,8 @@ CREATE TABLE "DemeritStageOverride" (
   CONSTRAINT "DemeritStageOverride_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "DemeritStageOverride_stage_check" CHECK ("stage" BETWEEN 1 AND 3),
   CONSTRAINT "DemeritStageOverride_reason_check" CHECK (btrim("reason") <> ''),
-  CONSTRAINT "DemeritStageOverride_expiry_check" CHECK ("expiresAt" > "createdAt"),
+  CONSTRAINT "DemeritStageOverride_expiry_check"
+    CHECK (pg_catalog.isfinite("expiresAt") AND "expiresAt" > "createdAt"),
   CONSTRAINT "DemeritStageOverride_id_tenantId_key" UNIQUE ("id", "tenantId"),
   CONSTRAINT "DemeritStageOverride_tenantId_fkey"
     FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE,

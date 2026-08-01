@@ -1333,7 +1333,7 @@ model PacePolicyOverride {
   authorisedByUserId String
   authorisedBy       User             @relation("PacePolicyOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
   reason             String           @db.Text
-  expiresAt          DateTime
+  expiresAt          DateTime         // PostgreSQL also rejects non-finite timestamps.
   assessments        PaceAssessment[]
   createdAt          DateTime         @default(now())
 
@@ -1407,7 +1407,7 @@ model DemeritStageOverride {
   authorisedByUserId String
   authorisedBy       User          @relation("DemeritStageOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
   reason             String        @db.Text
-  expiresAt          DateTime
+  expiresAt          DateTime        // PostgreSQL also rejects non-finite timestamps.
   createdAt          DateTime      @default(now())
 
   @@unique([id, tenantId])
