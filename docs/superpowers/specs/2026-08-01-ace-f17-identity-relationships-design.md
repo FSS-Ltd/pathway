@@ -117,8 +117,10 @@ to stand in for a tenant or child relationship.
 
 ## Integrity and RLS rules
 
-- Every new table has a direct `tenantId`, `@@unique([id, tenantId])`, and
-  tenant-inclusive foreign keys to tenant-scoped records.
+- Every relationship table has a direct `tenantId`, `@@unique([id, tenantId])`,
+  and tenant-inclusive foreign keys to tenant-scoped records.
+  `StudentPortalPolicy` is the one-row-per-tenant exception and uses `tenantId`
+  as its primary key.
 - Cross-tenant joins are rejected by composite foreign keys before application
   code can interpret them.
 - RLS is enabled and forced for each new tenant-owned table. The policy uses
