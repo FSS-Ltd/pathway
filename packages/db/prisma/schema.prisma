@@ -215,6 +215,17 @@ enum FamilyIdentityTarget {
   STUDENT
 }
 
+enum AceReportDraftStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+}
+
+enum AceReportReviewDecision {
+  APPROVED
+  REJECTED
+}
+
 enum PermissionScope {
   organisation
   site
@@ -585,6 +596,11 @@ model Tenant {
   studentIdentityLinks   StudentIdentityLink[]
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites  FamilyIdentityInvite[]
+  aceTermReports         AceTermReport[]
+  aceReportCompilations  AceReportCompilation[]
+  aceReportDrafts        AceReportDraft[]
+  aceReportReviews       AceReportReview[]
+  aceTermReportVersions  AceTermReportVersion[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
@@ -692,6 +708,9 @@ model User {
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
   createdDemeritPolicies     DemeritPolicy[]             @relation("DemeritPolicyCreatedBy")
   authorisedDemeritOverrides DemeritStageOverride[]      @relation("DemeritStageOverrideAuthorisedBy")
+  compiledAceReports          AceReportCompilation[]      @relation("AceReportCompilationCompiledBy")
+  authoredAceReportDrafts     AceReportDraft[]            @relation("AceReportDraftAuthor")
+  reviewedAceReports          AceReportReview[]           @relation("AceReportReviewReviewer")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
@@ -1063,6 +1082,7 @@ model Child {
   studentIdentityLinks StudentIdentityLink[]
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites FamilyIdentityInvite[]
+  aceTermReports        AceTermReport[]
   evidence            Evidence[]
   reportBundles       ReportBundle[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
@@ -1362,12 +1382,124 @@ model AcademicPeriod {
   startsOn       DateTime             @db.Date
   endsOn         DateTime             @db.Date
   status         AcademicPeriodStatus @default(ACTIVE)
+  aceTermReports AceTermReport[]
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @default(now()) @updatedAt
 
   @@unique([id, tenantId])
   @@unique([tenantId, academicYearId, name])
   @@index([tenantId, status, startsOn])
+}
+
+model AceTermReport {
+  id               String   @id @default(uuid())
+  tenantId         String
+  childId          String
+  academicPeriodId String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant         Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  child          Child                  @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  academicPeriod AcademicPeriod         @relation(fields: [academicPeriodId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  compilations   AceReportCompilation[]
+  drafts         AceReportDraft[]
+  versions       AceTermReportVersion[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, childId, academicPeriodId])
+  @@index([tenantId, academicPeriodId, childId])
+}
+
+model AceReportCompilation {
+  id               String   @id @default(uuid())
+  tenantId         String
+  reportId         String
+  sourceEncrypted  String   @db.Text
+  compiledByUserId String
+  compiledAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  report     AceTermReport    @relation(fields: [reportId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  compiledBy User             @relation("AceReportCompilationCompiledBy", fields: [compiledByUserId], references: [id], onDelete: Restrict)
+  drafts     AceReportDraft[]
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, reportId])
+  @@index([tenantId, reportId, compiledAt])
+}
+
+model AceReportDraft {
+  id                  String               @id @default(uuid())
+  tenantId            String
+  reportId            String
+  compilationId       String
+  familyPayload       Json
+  staffNotesEncrypted String?              @db.Text
+  status              AceReportDraftStatus @default(DRAFT)
+  authorUserId        String
+  submittedAt         DateTime?
+  approvedAt          DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  report           AceTermReport         @relation(fields: [reportId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  compilation      AceReportCompilation  @relation(fields: [compilationId, tenantId, reportId], references: [id, tenantId, reportId], onDelete: Restrict)
+  author           User                  @relation("AceReportDraftAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  reviews          AceReportReview[]
+  publishedVersion AceTermReportVersion? @relation("AceReportVersionSourceDraft")
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, reportId])
+  @@index([tenantId, reportId, status, createdAt])
+  @@index([tenantId, authorUserId])
+}
+
+model AceReportReview {
+  id                   String                  @id @default(uuid())
+  tenantId             String
+  draftId              String
+  reviewerUserId       String
+  decision             AceReportReviewDecision
+  reviewNotesEncrypted String?                 @db.Text
+  createdAt            DateTime                @default(now())
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  draft    AceReportDraft @relation(fields: [draftId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reviewer User           @relation("AceReportReviewReviewer", fields: [reviewerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, draftId, createdAt])
+  @@index([tenantId, reviewerUserId])
+}
+
+model AceTermReportVersion {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  reportId            String
+  sourceDraftId       String
+  versionNumber       Int
+  familyPayload       Json
+  privateDocumentKey  String?
+  guardianVisibleAt   DateTime
+  studentVisibleAt    DateTime?
+  supersedesVersionId String?
+  createdAt           DateTime @default(now())
+
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  report            AceTermReport         @relation(fields: [reportId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sourceDraft       AceReportDraft         @relation("AceReportVersionSourceDraft", fields: [sourceDraftId, tenantId, reportId], references: [id, tenantId, reportId], onDelete: Restrict)
+  supersedesVersion AceTermReportVersion?  @relation("AceReportVersionSupersession", fields: [supersedesVersionId, tenantId, reportId], references: [id, tenantId, reportId], onDelete: Restrict)
+  supersededBy      AceTermReportVersion? @relation("AceReportVersionSupersession")
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, reportId])
+  @@unique([sourceDraftId, tenantId, reportId])
+  @@unique([supersedesVersionId, tenantId, reportId])
+  @@unique([reportId, versionNumber])
+  @@index([tenantId, reportId, guardianVisibleAt])
 }
 
 model StudentSubjectEnrollment {
