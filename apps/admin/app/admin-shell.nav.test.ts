@@ -50,6 +50,20 @@ assert.ok(
   "Learning navigation iconIndex must be covered by iconComponents",
 );
 
+// ACE-F14: Roles & Access must be gated by the typed permission, not a role
+// display name - no `access:` string on this entry.
+const rolesAccessNavEntry = shellSource.match(
+  /label:\s*"Roles & Access"[\s\S]*?href:\s*"\/settings\/roles"[\s\S]*?capability:\s*"platform\.access\.roles\.read"[\s\S]*?permission:\s*"platform\.access\.roles\.read"[\s\S]*?group:\s*"Admin"\s*\},/,
+);
+assert.ok(
+  rolesAccessNavEntry,
+  "expected Roles & Access navigation to require the platform.access.roles.read capability and permission",
+);
+assert.ok(
+  !rolesAccessNavEntry![0].includes("access:"),
+  "Roles & Access must not authorise from a role-name access requirement",
+);
+
 // Grouped items render as accordion sections; Dashboard stays top-level.
 const groupLabels = [...shellSource.matchAll(/group:\s*"([^"]+)"/g)].map((m) => m[1]);
 assert.ok(groupLabels.length > 0, "expected nav items to declare accordion groups");

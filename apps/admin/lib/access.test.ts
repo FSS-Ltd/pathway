@@ -6,6 +6,7 @@
 import {
   getAdminRoleInfoFromApiResponse,
   hasCapability,
+  hasPermission,
   meetsAccessRequirement,
 } from "./access";
 
@@ -65,6 +66,24 @@ function runTests() {
   assert(
     hasCapability([], undefined),
     "items without a capability requirement stay visible",
+  );
+
+  console.log("hasPermission");
+  assert(
+    hasPermission(["platform.access.roles.read"], "platform.access.roles.read"),
+    "required permission is visible when the actor holds it",
+  );
+  assert(
+    !hasPermission([], "platform.access.roles.read"),
+    "required permission is hidden when the actor does not hold it",
+  );
+  assert(
+    hasPermission([], undefined),
+    "items without a permission requirement stay visible",
+  );
+  assert(
+    hasPermission(null, "platform.access.roles.read"),
+    "not-yet-loaded permissions (null) keep nav advisory rather than hiding it",
   );
 
   console.log("meetsAccessRequirement");
