@@ -29,6 +29,29 @@ export const homeTokens = {
   },
   typography: {
     ...mobileTokens.typography,
+    /**
+     * React Native does not synthesize font-weight on a custom font loaded
+     * under a fixed PostScript name - setting `fontWeight` on text styled
+     * with `fontFamily: "Nunito_700Bold"` has no visual effect. Every
+     * weight actually used must be loaded under its own name (app/_layout.tsx)
+     * and selected here directly, not requested via `fontWeight` alone.
+     * `mobileTokens.typography.fontFamily.{heading,body}` are single,
+     * fixed names for exactly this reason - they are not weight-aware.
+     */
+    headingFamily: {
+      bold: "Nunito_700Bold",
+      extraBold: "Nunito_800ExtraBold",
+      black: "Nunito_900Black",
+    },
+    bodyFamily: {
+      regular: "Quicksand_400Regular",
+      medium: "Quicksand_500Medium",
+      semibold: "Quicksand_600SemiBold",
+      // Quicksand's real cuts stop at 700 - wireframe CSS values above
+      // that (750, 800) rely on browser font-weight synthesis with no
+      // matching RN weight; "bold" is the closest achievable match.
+      bold: "Quicksand_700Bold",
+    },
     wireframe: {
       screenTitle: { size: 29, lineHeight: 30, weight: "900", letterSpacing: -1 },
       flowIndexTitle: { size: 30, lineHeight: 31, weight: "900", letterSpacing: -1 },

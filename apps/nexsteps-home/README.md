@@ -1,8 +1,8 @@
 # NexSteps Home
 
 Mobile and tablet Expo app for the NexSteps Home product. Backed by the
-existing `apps/api`. Ships zero product screens today - this is Plan 01
-(app scaffolding) of the [NexSteps Home build-plan series](../../docs/NexStepsV2/nexsteps-home/build-plans/README.md).
+existing `apps/api`. Ships zero product screens today - this is Plans 01-02
+(app scaffolding, fidelity harness) of the [NexSteps Home build-plan series](../../docs/NexStepsV2/nexsteps-home/build-plans/README.md).
 
 Read the series' [PROGRESS.md](../../docs/NexStepsV2/nexsteps-home/build-plans/PROGRESS.md)
 before making changes here - it is the live handoff ledger for this work.
@@ -54,3 +54,15 @@ can be installed side by side without a deep-link collision.
 ```bash
 pnpm --filter @pathway/nexsteps-home test:unit
 ```
+
+## Fidelity gate
+
+`fidelity/run.ts` (`pnpm --filter @pathway/nexsteps-home test:fidelity`)
+exports the web build, serves it locally, and pixel-diffs each screen in
+`fidelity/checklist.json` against the matching baseline captured from
+`prototypes/nexsteps-home` (`npm run capture:baselines` there). Only screens
+listed in `checklist.json` are asserted — it starts empty because Plan 01's
+screens are placeholders, not wireframe-matched implementations; each later
+plan adds its screen IDs once the real layout lands. Not yet wired into
+`.github/workflows/ci.yml` — deliberately deferred to whichever plan adds the
+first entry, since there is nothing to gate yet.

@@ -49,7 +49,7 @@ process:
 |---|---|---|---|---|
 | 00 | This README + progress ledger + change-control record | — | 0 | see PROGRESS.md |
 | 01 | App scaffolding | — | 0 | see PROGRESS.md |
-| 02 | Fidelity harness + phone baselines | — | 0 | not started |
+| 02 | Fidelity harness + phone baselines | — | 0 | see PROGRESS.md |
 | 03 | Tablet design pass + tablet baselines | — | 0 | not started |
 | 04 | `HOME_EDUCATION` vertical, capabilities, household model, plan | H1 | 0 | not started |
 | 05 | Setup flow | H2 | 9 | not started |

@@ -42,9 +42,9 @@ const styles = StyleSheet.create({
     color: homeTokens.colors.text.subtle,
   },
   value: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
-    // Wireframe spec is font-weight: 650; React Native's typed fontWeight
-    // only supports steps of 100, so this rounds to the nearest token.
+    // Wireframe spec is font-weight: 650 on the inherited body (Quicksand)
+    // family; semibold (600) is the nearest real loaded cut.
+    fontFamily: homeTokens.typography.bodyFamily.semibold,
     fontWeight: homeTokens.typography.weight.semibold,
     fontSize: homeTokens.typography.body.sm.size,
     lineHeight: homeTokens.typography.body.sm.lineHeight,

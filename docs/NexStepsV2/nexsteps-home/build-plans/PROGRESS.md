@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Starting Plan 02 (fidelity harness + phone baselines)
+**Current phase:** Executing PR4 (Plan 02 — fidelity harness + phone baselines)
 
 ---
 
@@ -24,8 +24,9 @@ continue.
 |---|---|---|---|---|---|
 | 1 | 00 — series docs | **merged** | `docs/nexsteps-home-build-plan-series` | [#265](https://github.com/FSS-Ltd/pathway/pull/265) | squash-merged, branch deleted |
 | 2 | 01 — app scaffolding | **merged** | `feat/nexsteps-home-app-scaffolding` | [#267](https://github.com/FSS-Ltd/pathway/pull/267) | squash-merged, branch deleted; `apps/nexsteps-home` now exists on `master` |
-| 3 | 02 — fidelity harness + phone baselines | not started | — | — | next up |
-| 4-15 | 03-14 | not started | — | — | — |
+| 3 | ledger update | **merged** | `docs/nexsteps-home-progress-update` | [#268](https://github.com/FSS-Ltd/pathway/pull/268) | squash-merged, branch deleted |
+| 4 | 02 — fidelity harness + phone baselines | in progress | `feat/nexsteps-home-fidelity-harness` | not yet opened | code complete, verified locally, about to push |
+| 5-16 | 03-14 | not started | — | — | — |
 
 ## Environment
 
@@ -86,13 +87,15 @@ gh pr checks <pr-number> --repo FSS-Ltd/pathway
 
 See `README.md` "Known blockers" for the full list with sources. Summary:
 
-1. Prototype font mismatch — fix before Plan 02 captures baselines.
-2. Token scale gap — resolved by Plan 01's app-local token layer.
+1. ~~Prototype font mismatch~~ — **fixed in Plan 02** (see below).
+2. Token scale gap — resolved by Plan 01's app-local token layer; extended
+   in Plan 02 with `headingFamily`/`bodyFamily` (see below).
 3. `apps/api` JWT signature not verified — inherited, flagged, not this series' fix.
 4. Mobile clients don't send the active-site cookie — rely on
    `User.lastActiveTenantId` fallback.
 5. Two open product decisions (pricing, household modelling) block Plan 04.
-6. **Graphify pre-change gate could not be satisfied for PR1.**
+6. **Graphify pre-change gate could not be satisfied for PR1, PR2, or PR4** —
+   same reason each time, not re-litigated per PR:
    `graphify-out/manifest.json` is empty and `graphify-out/cost.json` shows
    zero tokens ever spent, so no prior `--update` run ever completed. From
    this state `graphify --update .` would not behave as an incremental
@@ -107,6 +110,21 @@ See `README.md` "Known blockers" for the full list with sources. Summary:
    equivalently invoke the `graphify` skill with `--update` from a session
    with headroom for a multi-subagent dispatch. Flagged for the user /
    whoever owns repo maintenance, not silently deferred.
+7. ~~React Native does not synthesize font-weight on a custom named font~~
+   — **discovered and fixed in Plan 02**. Every primitive Plan 01 built
+   paired a fixed-name font (`fontFamily.heading`/`.body`) with a
+   `fontWeight` that didn't match the name's baked-in weight, which
+   silently renders at the wrong weight on-device. See "What Plan 02
+   built" below and `src/design/token-conflicts.md`'s new section.
+8. **Fidelity gate has an empty checklist and is not wired into CI yet.**
+   `apps/nexsteps-home/fidelity/checklist.json` starts empty on purpose —
+   Plan 01's screens are placeholders, not wireframe-matched
+   implementations, so there is nothing to assert a match on yet. Each
+   later plan (05+) must add its screen IDs to the checklist once it ships
+   the real, approved layout. Wiring `test:fidelity` into
+   `.github/workflows/ci.yml` is deliberately deferred to whichever plan
+   adds the first entry — see `apps/nexsteps-home/README.md`'s "Fidelity
+   gate" section.
 
 ## Conflict watch
 
@@ -114,8 +132,12 @@ See `README.md` "Conflict watch" section. At series start, `fss/master` had
 multiple active `feat/ace-*` branches with recent force-pushes
 (`feat/ace-access-me-permissions`, `feat/ace-nav-typed-permissions`,
 `feat/ace-nexsteps-notices-attendance`, `feat/ace-permission-cutover`).
-Plans 01-03 do not touch any file ACE work touches. **Before opening any PR
-from Plan 04 onward**, diff the branch against fresh `fss/master` and check
+Plans 01-03 do not touch any file ACE work touches, with one narrow
+exception: Plan 02 adds a one-line `files` entry to the shared
+`eslint.config.mjs` (Node-globals block) — purely additive, scoped to
+`apps/nexsteps-home/fidelity/**`, verified against fresh `fss/master`
+immediately before opening PR4, no conflict. **Before opening any PR from
+Plan 04 onward**, diff the branch against fresh `fss/master` and check
 specifically: `packages/db/prisma/schema.prisma`,
 `packages/platform/src/capability-maps.ts`,
 `packages/types/src/vertical.ts`.
@@ -227,15 +249,118 @@ constructs without runtime error; it does not prove the live auth
 round-trip. That remains open for whoever has real Auth0 dev credentials
 to click through once, or for Plan 02's automated harness.
 
+## What Plan 02 built (PR4 content, for the reviewer / next agent)
+
+**Prototype font fix** (`prototypes/nexsteps-home/`):
+- Added `@fontsource/quicksand` and `@fontsource/nunito` (5.3.0 — 5.2.10
+  doesn't exist for either package; only `@fontsource/roboto` happened to
+  have that patch), imported the exact weights `prototype.css` uses
+  (Quicksand 400/500/600/700, Nunito 700/800/900) in `src/main.tsx`.
+- `src/main.tsx` is SHA-locked (`mobile-runtime.lock.json`) — ran
+  `npm run update:runtime-lock` after editing it.
+- Verified in-browser, not just by reading CSS: `document.fonts` showed
+  Quicksand/Nunito genuinely loaded and computed `fontFamily` on real DOM
+  nodes resolved to them (not the `ui-rounded`/`SF Pro Rounded` fallback
+  blocker 1 described). Screenshot evidence was in this session's chat.
+
+**RN font-weight-synthesis bug** (`apps/nexsteps-home/`, discovered while
+fixing the above — see blocker 7): React Native does not synthesize
+font-weight on a custom font loaded under a fixed name. Every Plan 01
+primitive that paired a fixed `fontFamily.heading`/`.body` token with a
+mismatched `fontWeight` was silently rendering at the wrong weight. Fixed
+by adding `homeTokens.typography.headingFamily`/`.bodyFamily` (weight-keyed
+maps to the actually-loaded font name) and auditing every primitive:
+`ChipRow`, `ContentCard`, `FieldGroup`, `ListCard`, `MessageBubble`,
+`NoticeCard`, `ScreenActions`, `ScreenHeader`, `StatRow`, `WeekStrip`. Also
+added `Nunito_900Black` to `app/_layout.tsx`'s `useFonts` call — Plan 01
+only loaded up to 800, but the wireframe's largest headings are weight 900.
+Full derivation table in `src/design/token-conflicts.md`.
+
+**Baseline capture** (`prototypes/nexsteps-home/scripts/capture-baselines.mjs`,
+`npm run capture:baselines`): drives the prototype's own Next/Previous
+review controls (no URL-based deep link exists or was worth adding for a
+one-off script) through all 76 screens at both device presets, screenshotting
+`[data-testid="device-screen"]`. Two prototype-only chrome elements had to be
+excluded or they'd have poisoned every diff:
+- The review bar (Previous/All screens/Next) — `display:none` around each
+  screenshot only, then restored before the next click (toggling
+  `visibility` instead breaks nothing visually but leaves the collapsed
+  space in place, which is wrong; toggling `display` while the button is
+  still needed for the *next* click broke Playwright's click entirely —
+  first attempt hung for this reason, fixed by sequencing hide → shoot →
+  show → click).
+- The fake fingertip cursor (`src/mobile/MobileCursor.tsx`) — turns visible
+  on first pointer move and never leaves (Playwright fires `pointermove`
+  without `pointerleave`), so it parked at the last click position in every
+  screenshot after the first. Hidden once per device pass via
+  `page.addStyleTag` — it has no role in hit-testing.
+- `Prototype.tsx` (unprotected — not SHA-locked) gained a
+  `data-screen-id={activeScreen.id}` attribute so the script always knows
+  which screen it just captured, rather than trusting click-count/array
+  order.
+- 152 PNGs committed to `prototypes/nexsteps-home/baselines/{iphone,pixel-10}/<id>.png`
+  (~10MB). iPhone baselines capture at 394px wide, not the documented
+  393 — a 1px browser subpixel-rounding artifact in the capture tool
+  itself, tolerated (not treated as a real mismatch) by the diff harness
+  below.
+
+**Diff harness** (`apps/nexsteps-home/fidelity/`):
+- `checklist.json` — screen IDs currently asserted to pixel-match. **Starts
+  empty** — see blocker 8. Ships with a `note` field explaining why.
+- `serve-export.mjs` — a ~40-line static file server with SPA fallback for
+  the `expo export -p web` output (Node's built-in `http`/`fs`; no new
+  dependency for a handful of static files). Originally had a top-level
+  `await` self-execution guard for standalone use; removed after it broke
+  `tsx`'s CJS transform of the importing file and nothing actually needed
+  standalone execution — YAGNI.
+- `run.ts` (`pnpm --filter @pathway/nexsteps-home test:fidelity`) — for
+  each checklist screen × {iPhone, Pixel}: exports the web build once,
+  serves it, navigates to the registry-mapped route at the exact device
+  viewport, screenshots, and diffs against the matching prototype baseline
+  with `pixelmatch` (new devDependency, along with `pngjs`, `tsx`, and this
+  app's own `@playwright/test` — the prototype already had its own copy).
+  Threshold: 0.1 pixelmatch sensitivity, fails if >2% of pixels differ.
+  Skips the entire export/serve/browser sequence when the checklist is
+  empty (true today) so it stays fast.
+- Dimension tolerance: baselines can be up to 2px off in either axis
+  (covers the 394-vs-393 iPhone artifact above) before a size mismatch
+  hard-fails; within tolerance, both images are cropped to their common
+  region (`PNG.bitblt`) before diffing, rather than the exact-equality
+  check the first version had (which is what surfaced the 1px issue).
+- **Proven functional, not just written**: temporarily added `"welcome"`
+  to `checklist.json`, ran `test:fidelity` for real — it correctly
+  exported the web build, served it, screenshotted both devices, and
+  reported ~16-17% pixel difference (expected: `welcome` is Plan 01's
+  placeholder, not the real wireframe layout) with a saved diff image
+  clearly highlighting the mismatched regions. Reverted the checklist to
+  empty before committing.
+- Not yet wired into `.github/workflows/ci.yml` — see blocker 8.
+
+**Shared-file touch**: one line added to the Node-globals `files` array in
+the root `eslint.config.mjs` (needed because `serve-export.mjs`, a plain
+`.mjs` file, uses `process`; TypeScript files don't need this — confirmed
+by testing). Purely additive, scoped to `apps/nexsteps-home/fidelity/**`.
+
+### Verification performed
+
+Same full suite as Plan 01 (`pnpm --filter @pathway/nexsteps-home
+{typecheck,lint,test:unit}`, `pnpm -r typecheck`, `pnpm -r lint`, `pnpm
+test:unit`) — all clean, plus:
+```
+node scripts/check-mobile-runtime.mjs   # prototype: 28 protected files, clean
+node scripts/check-wireframes.mjs       # prototype: 17 regulations screens, clean
+npx playwright test                     # prototype's own 8 interaction tests, all pass
+node scripts/capture-baselines.mjs      # 76+76 screens captured, dimensions verified
+pnpm test:fidelity (temporarily non-empty checklist)  # proven functional, see above
+```
+
 ## Next action
 
-Start Plan 02 (fidelity harness + phone baselines) from a fresh
-`fss/master`. First job: fix the prototype font mismatch (blocker 1) in
-`prototypes/nexsteps-home` before capturing any baseline — a baseline
-captured against the wrong fallback font would be worthless. Then add the
-Playwright/pixelmatch tooling deferred out of Plan 01's `package.json`,
-capture all 76 screens × {iPhone, Pixel} from the prototype, and wire the
-`apps/nexsteps-home` web-export side of the diff.
+Push `feat/nexsteps-home-fidelity-harness`, open the PR against `fss`,
+confirm CI green, merge. Then start Plan 03 (tablet design pass + tablet
+baselines) from a fresh `fss/master` — no approved tablet wireframes exist
+yet, so this plan extends the prototype with a tablet device preset and
+gets two-pane layouts approved before any tablet screen is built.
 
 ---
 
@@ -285,3 +410,25 @@ capture all 76 screens × {iPhone, Pixel} from the prototype, and wire the
 - This entry: a small docs-only PR to keep this ledger truthful the moment
   each plan lands, rather than letting it drift stale until the next
   plan's PR closes it out.
+- Opened PR3 ([#268](https://github.com/FSS-Ltd/pathway/pull/268)); all 5
+  CI checks passed; a scheduled fallback wakeup squash-merged it and
+  cleaned up its worktree/branch while this session was between turns.
+- Created worktree `.worktrees/feat-nexsteps-home-fidelity-harness` off
+  fresh `fss/master`; installed the pnpm workspace there for the first time
+  (fresh worktree, no prior `node_modules`).
+- Built Plan 02 in full: prototype font fix, the RN font-weight-synthesis
+  bug found and fixed while doing that, the baseline capture script, and
+  the diff harness (file-by-file detail in "What Plan 02 built" above).
+- Hit and fixed three real bugs during local verification, not just typos:
+  the review-bar-hides-its-own-Next-button hang, the top-level-await
+  breaking `tsx`'s CJS transform of an imported module, and the exact-size
+  pixelmatch check failing on a real 1px capture-tool artifact. Each is
+  recorded above with the fix and why the fix is correct, not just that it
+  stopped the immediate error.
+- Verified the font fix visually in the Browser pane against a real dev
+  server (`document.fonts` inspection, not just reading CSS) before trusting
+  it, and verified the diff harness against a real mismatching screen
+  before trusting it — reverted both temporary states (a running dev
+  server, a non-empty checklist) before committing.
+- Ran the full local verification suite listed above; everything green.
+- About to push and open PR4.

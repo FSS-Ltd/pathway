@@ -1,0 +1,4 @@
+{
+  "note": "Screen IDs in this array are asserted to pixel-match their prototype baseline within the tuned threshold in run.mjs. Empty until a plan ships a real, wireframe-matched implementation of a screen - the 5 tab landings and 'welcome' built in Plan 01 are placeholders (ScreenHeader only) and must not be added here until Plan 05+ replaces them with the real approved layout.",
+  "screenIds": []
+}

@@ -65,13 +65,13 @@ const styles = StyleSheet.create({
     backgroundColor: homeTokens.colors.accent.primary,
   },
   dayLabel: {
-    fontFamily: homeTokens.typography.fontFamily.body,
+    fontFamily: homeTokens.typography.bodyFamily.semibold,
     fontWeight: homeTokens.typography.weight.semibold,
     fontSize: homeTokens.typography.body.xs.size,
     color: homeTokens.colors.text.muted,
   },
   dateLabel: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.headingFamily.bold,
     fontWeight: homeTokens.typography.weight.bold,
     fontSize: homeTokens.typography.body.md.size,
     color: homeTokens.colors.text.primary,

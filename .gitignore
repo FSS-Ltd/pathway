@@ -18,6 +18,9 @@ dist
 .expo
 .expo-shared
 
+# fidelity gate diff artifacts (ephemeral - see apps/nexsteps-home/fidelity/)
+apps/nexsteps-home/fidelity/.diffs/
+
 # Compiled JavaScript files in source directories (should be in dist/ only)
 apps/*/src/**/*.js
 apps/*/src/**/*.js.map

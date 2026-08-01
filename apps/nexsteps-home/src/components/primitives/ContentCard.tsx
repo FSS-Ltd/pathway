@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     color: homeTokens.colors.text.subtle,
   },
   title: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.headingFamily.bold,
     fontWeight: homeTokens.typography.weight.bold,
     fontSize: homeTokens.typography.body.md.size,
     lineHeight: homeTokens.typography.body.md.lineHeight,
@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     marginTop: homeTokens.spacing.xxxs,
   },
   actionLabel: {
-    fontFamily: homeTokens.typography.fontFamily.body,
+    fontFamily: homeTokens.typography.bodyFamily.semibold,
     fontWeight: homeTokens.typography.weight.semibold,
     fontSize: homeTokens.typography.body.sm.size,
     lineHeight: homeTokens.typography.body.sm.lineHeight,

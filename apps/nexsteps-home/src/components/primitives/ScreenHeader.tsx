@@ -25,7 +25,9 @@ const styles = StyleSheet.create({
     gap: homeTokens.spacing.xxs,
   },
   eyebrow: {
-    fontFamily: homeTokens.typography.fontFamily.body,
+    // Quicksand's real cuts stop at 700; the wireframe's 800 has no
+    // matching loaded weight, so bold (700) is the closest achievable.
+    fontFamily: homeTokens.typography.bodyFamily.bold,
     fontWeight: homeTokens.typography.wireframe.eyebrow.weight,
     fontSize: homeTokens.typography.wireframe.eyebrow.size,
     letterSpacing: homeTokens.typography.wireframe.eyebrow.letterSpacing,
@@ -33,7 +35,7 @@ const styles = StyleSheet.create({
     color: homeTokens.colors.wireframe.eyebrow,
   },
   title: {
-    fontFamily: homeTokens.typography.fontFamily.heading,
+    fontFamily: homeTokens.typography.headingFamily.black,
     fontWeight: homeTokens.typography.wireframe.screenTitle.weight,
     fontSize: homeTokens.typography.wireframe.screenTitle.size,
     lineHeight: homeTokens.typography.wireframe.screenTitle.lineHeight,

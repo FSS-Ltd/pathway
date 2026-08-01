@@ -4,7 +4,9 @@
 
 **Snapshot date:** 28 July 2026
 
-**Production target:** `apps/mobile`
+**Production target:** `apps/nexsteps-home` (updated from the original
+`apps/mobile` target — see the change-control entry in
+[`docs/NexStepsV2/nexsteps-home/README.md`](../../docs/NexStepsV2/nexsteps-home/README.md#change-control))
 
 This standalone Vite/React prototype contains the 76 approved NexSteps Home
 wireframe screens across setup, Week/Today, Progress, Community, Family,
@@ -29,6 +31,20 @@ Open the local URL printed by Vite. The flow index provides access to every
 screen; primary buttons and approved card/list targets navigate between the
 core states.
 
+## Fidelity baselines
+
+```bash
+npm run dev            # in one terminal, leave running
+npm run capture:baselines   # in another
+```
+
+Captures all 76 screens at both device presets (iPhone, Pixel 10) into
+`baselines/<device>/<screen-id>.png`, committed as the reference
+`apps/nexsteps-home`'s fidelity gate (`apps/nexsteps-home/fidelity/run.ts`)
+diffs against. Re-run and commit the updated PNGs whenever an approved
+screen's visual treatment changes. Requires Node 20.19+/22.12+ for Vite —
+Playwright itself has no stricter requirement than the rest of this project.
+
 ## Boundary
 
 This is reference code, not a production package.
@@ -50,6 +66,8 @@ This is reference code, not a production package.
 - `src/Prototype.tsx` — navigation and renderer.
 - `src/prototype.css` — approved visual treatment.
 - `scripts/check-wireframes.mjs` — regulations/navigation contract.
+- `scripts/capture-baselines.mjs` — fidelity baseline capture (see above).
+- `baselines/` — committed fidelity baseline PNGs, one per screen per device.
 - `mobile-runtime.lock.json` — protected prototype runtime integrity record.
 
 The sample family, dates, correspondence and evidence are fictional. Official
