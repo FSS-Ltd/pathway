@@ -75,6 +75,23 @@ interface ReportVersionRow {
   supersedesVersionId: string | null;
 }
 
+interface ReportPiiRow {
+  sourceEncrypted: string;
+  staffNotesEncrypted: string | null;
+  reviewNotesEncrypted: string | null;
+}
+
+interface ReportPublisherSecurityRow {
+  functionOwner: string;
+  securityDefiner: boolean;
+  broadExecuteRevoked: boolean;
+  legitimateTriggerInstalled: boolean;
+  schemaUsageGranted: boolean;
+  schemaCreateRevoked: boolean;
+  minimalTablePrivileges: boolean;
+  isolatedRole: boolean;
+}
+
 interface BlockedApprovalSession {
   applicationName: string;
 }
@@ -1005,6 +1022,256 @@ describe("ACE report publication storage", () => {
         "DROP FUNCTION IF EXISTS app.attempt_ace_report_publication_bypass()",
       );
     }
+  });
+
+  it("denies a crafted temporary trigger access to report publication", async () => {
+    if (!isDatabaseAvailable()) return;
+    const draft = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createDraftFixture(tx, fixture, "IN_REVIEW"),
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withReportsRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          async (tx) => {
+            await tx.$executeRawUnsafe(`
+              CREATE TEMP TABLE "AceReportPublicationTriggerProbe" (
+                "tenantId" TEXT NOT NULL,
+                "draftId" TEXT NOT NULL,
+                "reviewerUserId" TEXT NOT NULL,
+                "decision" app."AceReportReviewDecision" NOT NULL
+              ) ON COMMIT DROP
+            `);
+            await tx.$executeRawUnsafe(`
+              CREATE TRIGGER "AceReportPublicationTriggerProbe_publish"
+              AFTER INSERT ON "AceReportPublicationTriggerProbe"
+              FOR EACH ROW
+              EXECUTE FUNCTION app.publish_approved_ace_report()
+            `);
+            await tx.$executeRaw`
+              INSERT INTO "AceReportPublicationTriggerProbe" (
+                "tenantId", "draftId", "reviewerUserId", "decision"
+              ) VALUES (
+                ${fixture.tenantAId}, ${draft.draftId},
+                ${fixture.reviewerUserId}, 'APPROVED'
+              )
+            `;
+          },
+        ),
+      "42501",
+    );
+
+    const [facts] = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => tx.$queryRaw<Array<{ status: string; versionCount: bigint }>>`
+        SELECT
+          draft."status"::text AS "status",
+          (
+            SELECT count(*)
+            FROM "AceTermReportVersion" AS version
+            WHERE version."sourceDraftId" = draft."id"
+          ) AS "versionCount"
+        FROM "AceReportDraft" AS draft
+        WHERE draft."id" = ${draft.draftId}
+      `,
+    );
+    expect(facts).toEqual({ status: "IN_REVIEW", versionCount: 0n });
+  });
+
+  it("keeps report publication executable only through its isolated trigger owner", async () => {
+    if (!isDatabaseAvailable()) return;
+    const [security] = await prisma.$queryRaw<ReportPublisherSecurityRow[]>`
+      SELECT
+        owner."rolname" AS "functionOwner",
+        routine."prosecdef" AS "securityDefiner",
+        NOT EXISTS (
+          SELECT 1
+          FROM pg_catalog.aclexplode(
+            COALESCE(
+              routine."proacl",
+              pg_catalog.acldefault('f', routine."proowner")
+            )
+          ) AS privilege
+          LEFT JOIN pg_catalog."pg_roles" AS grantee
+            ON grantee."oid" = privilege."grantee"
+          WHERE privilege."privilege_type" = 'EXECUTE'
+            AND (
+              privilege."grantee" = 0
+              OR grantee."rolname" IN ('anon', 'authenticated')
+            )
+        ) AS "broadExecuteRevoked",
+        EXISTS (
+          SELECT 1
+          FROM pg_catalog."pg_trigger" AS report_trigger
+          WHERE report_trigger."tgrelid" = 'app."AceReportReview"'::regclass
+            AND report_trigger."tgname" = 'AceReportReview_publish_approval'
+            AND report_trigger."tgfoid" = routine."oid"
+            AND NOT report_trigger."tgisinternal"
+        ) AS "legitimateTriggerInstalled",
+        pg_catalog.has_schema_privilege(
+          owner."rolname", 'app', 'USAGE'
+        ) AS "schemaUsageGranted",
+        NOT pg_catalog.has_schema_privilege(
+          owner."rolname", 'app', 'CREATE'
+        ) AS "schemaCreateRevoked",
+        COALESCE(
+          (
+            SELECT array_agg(
+              relation."relname" || ':' || privilege."privilege_type"
+              ORDER BY relation."relname", privilege."privilege_type"
+            )
+            FROM pg_catalog."pg_class" AS relation
+            JOIN pg_catalog."pg_namespace" AS namespace
+              ON namespace."oid" = relation."relnamespace"
+            CROSS JOIN LATERAL pg_catalog.aclexplode(
+              COALESCE(
+                relation."relacl",
+                pg_catalog.acldefault('r', relation."relowner")
+              )
+            ) AS privilege
+            WHERE namespace."nspname" = 'app'
+              AND relation."relkind" IN ('r', 'p')
+              AND privilege."grantee" = owner."oid"
+          ),
+          ARRAY[]::text[]
+        ) = ARRAY[
+          'AceReportDraft:SELECT',
+          'AceReportDraft:UPDATE',
+          'AceTermReport:SELECT',
+          'AceTermReport:UPDATE',
+          'AceTermReportVersion:INSERT',
+          'AceTermReportVersion:SELECT'
+        ]::text[] AS "minimalTablePrivileges",
+        (
+          NOT owner."rolcanlogin"
+          AND NOT owner."rolsuper"
+          AND NOT owner."rolbypassrls"
+          AND NOT owner."rolinherit"
+          AND NOT owner."rolcreatedb"
+          AND NOT owner."rolcreaterole"
+          AND NOT owner."rolreplication"
+          AND NOT EXISTS (
+            SELECT 1
+            FROM pg_catalog."pg_auth_members" AS membership
+            WHERE membership."roleid" = owner."oid"
+              OR membership."member" = owner."oid"
+          )
+        ) AS "isolatedRole"
+      FROM pg_catalog."pg_proc" AS routine
+      JOIN pg_catalog."pg_roles" AS owner
+        ON owner."oid" = routine."proowner"
+      WHERE routine."oid" =
+        'app.publish_approved_ace_report()'::pg_catalog.regprocedure
+    `;
+    expect(security).toEqual({
+      functionOwner: "pathway_ace_report_publisher",
+      securityDefiner: true,
+      broadExecuteRevoked: true,
+      legitimateTriggerInstalled: true,
+      schemaUsageGranted: true,
+      schemaCreateRevoked: true,
+      minimalTablePrivileges: true,
+      isolatedRole: true,
+    });
+  });
+
+  it("encrypts ordinary Prisma report source and note fields at rest", async () => {
+    if (!isDatabaseAvailable()) return;
+    const plaintext = {
+      source: "Sensitive compiled assessment evidence",
+      staffNotes: "Sensitive staff-only report context",
+      reviewNotes: "Sensitive reviewer rationale",
+    };
+    const persisted = await withReportsRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const report = await tx.aceTermReport.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            childId: fixture.childAId,
+            academicPeriodId: fixture.periodAId,
+          },
+        });
+        const compilation = await tx.aceReportCompilation.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            reportId: report.id,
+            sourceEncrypted: plaintext.source,
+            compiledByUserId: fixture.authorUserId,
+          },
+        });
+        const draft = await tx.aceReportDraft.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            reportId: report.id,
+            compilationId: compilation.id,
+            familyPayload: { summary: "Family-safe summary" },
+            staffNotesEncrypted: plaintext.staffNotes,
+            authorUserId: fixture.authorUserId,
+          },
+        });
+        const review = await tx.aceReportReview.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            draftId: draft.id,
+            reviewerUserId: fixture.reviewerUserId,
+            decision: "REJECTED",
+            reviewNotesEncrypted: plaintext.reviewNotes,
+          },
+        });
+        const [raw] = await tx.$queryRaw<ReportPiiRow[]>`
+          SELECT
+            compilation."sourceEncrypted" AS "sourceEncrypted",
+            draft."staffNotesEncrypted" AS "staffNotesEncrypted",
+            review."reviewNotesEncrypted" AS "reviewNotesEncrypted"
+          FROM "AceReportCompilation" AS compilation
+          JOIN "AceReportDraft" AS draft
+            ON draft."compilationId" = compilation."id"
+          JOIN "AceReportReview" AS review
+            ON review."draftId" = draft."id"
+          WHERE review."id" = ${review.id}
+        `;
+        const application = {
+          compilation: await tx.aceReportCompilation.findUniqueOrThrow({
+            where: { id: compilation.id },
+            select: { sourceEncrypted: true },
+          }),
+          draft: await tx.aceReportDraft.findUniqueOrThrow({
+            where: { id: draft.id },
+            select: { staffNotesEncrypted: true },
+          }),
+          review: await tx.aceReportReview.findUniqueOrThrow({
+            where: { id: review.id },
+            select: { reviewNotesEncrypted: true },
+          }),
+        };
+        return { raw, application };
+      },
+    );
+
+    expect(persisted.raw).toEqual({
+      sourceEncrypted: expect.stringMatching(/^v1:/),
+      staffNotesEncrypted: expect.stringMatching(/^v1:/),
+      reviewNotesEncrypted: expect.stringMatching(/^v1:/),
+    });
+    expect(persisted.raw).not.toEqual(
+      expect.objectContaining({
+        sourceEncrypted: plaintext.source,
+        staffNotesEncrypted: plaintext.staffNotes,
+        reviewNotesEncrypted: plaintext.reviewNotes,
+      }),
+    );
+    expect(persisted.application).toEqual({
+      compilation: { sourceEncrypted: plaintext.source },
+      draft: { staffNotesEncrypted: plaintext.staffNotes },
+      review: { reviewNotesEncrypted: plaintext.reviewNotes },
+    });
   });
 
   it("publishes one guardian-visible version with no student release", async () => {

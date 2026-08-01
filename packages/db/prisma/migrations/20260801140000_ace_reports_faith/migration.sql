@@ -1060,8 +1060,8 @@ END;
 $$;
 
 -- Publication uses a database execution identity that no application login
--- can assume. The migration role is a member only long enough to transfer
--- ownership, then loses that membership before the migration completes.
+-- can assume. Keep the function migration-owned until its public execution
+-- paths are revoked and its one legitimate trigger is installed.
 DO $$
 DECLARE
   publisher_role_oid OID;
@@ -1113,11 +1113,6 @@ REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA app
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA app
   FROM pathway_ace_report_publisher;
 
-GRANT pathway_ace_report_publisher TO CURRENT_USER;
-ALTER FUNCTION app.publish_approved_ace_report()
-  OWNER TO pathway_ace_report_publisher;
-REVOKE pathway_ace_report_publisher FROM CURRENT_USER;
-
 GRANT USAGE ON SCHEMA app TO pathway_ace_report_publisher;
 GRANT SELECT ON TABLE
   app."AceTermReport",
@@ -1138,6 +1133,16 @@ REVOKE ALL ON FUNCTION app.guard_ace_report_draft_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_ace_report_review_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.guard_ace_term_report_version_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.publish_approved_ace_report() FROM PUBLIC;
+DO $$
+BEGIN
+  IF to_regrole('anon') IS NOT NULL THEN
+    REVOKE ALL ON FUNCTION app.publish_approved_ace_report() FROM anon;
+  END IF;
+  IF to_regrole('authenticated') IS NOT NULL THEN
+    REVOKE ALL ON FUNCTION app.publish_approved_ace_report() FROM authenticated;
+  END IF;
+END;
+$$;
 
 CREATE TRIGGER "AceTermReport_reject_target_mutation"
 BEFORE UPDATE OF "tenantId", "childId", "academicPeriodId"
@@ -1178,6 +1183,16 @@ FOR EACH ROW EXECUTE FUNCTION app.guard_ace_term_report_version_mutation();
 CREATE TRIGGER "AceReportReview_publish_approval"
 AFTER INSERT ON "AceReportReview"
 FOR EACH ROW EXECUTE FUNCTION app.publish_approved_ace_report();
+
+-- ALTER FUNCTION OWNER requires the recipient to have CREATE on the function's
+-- schema. Grant it only for the transfer, then leave the isolated owner with
+-- schema USAGE and the minimal table privileges declared above.
+GRANT pathway_ace_report_publisher TO CURRENT_USER;
+GRANT CREATE ON SCHEMA app TO pathway_ace_report_publisher;
+ALTER FUNCTION app.publish_approved_ace_report()
+  OWNER TO pathway_ace_report_publisher;
+REVOKE CREATE ON SCHEMA app FROM pathway_ace_report_publisher;
+REVOKE pathway_ace_report_publisher FROM CURRENT_USER;
 
 DO $$
 DECLARE
