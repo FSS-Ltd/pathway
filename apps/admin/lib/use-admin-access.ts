@@ -14,6 +14,7 @@ import {
   getAdminRoleInfoFromApiResponse,
 } from "./access";
 import {
+  fetchMyPermissions,
   fetchOrgCapabilities,
   fetchUserRoles,
   type UserRolesResponse,
@@ -29,6 +30,8 @@ export type UseAdminAccessResult = {
   /** True when current org is a master/internal org (no billing, unlimited). */
   currentOrgIsMasterOrg: boolean;
   capabilities: string[];
+  /** The actor's own effective permissions; null while not yet loaded (nav stays advisory until then). */
+  permissions: string[] | null;
   isLoading: boolean;
   error?: string | null;
   warning?: string | null;
@@ -55,6 +58,7 @@ export function useAdminAccess(): UseAdminAccessResult {
   const { data: session, status: sessionStatus } = useSession();
   const [rolesResponse, setRolesResponse] = useState<UserRolesResponse | null>(null);
   const [capabilities, setCapabilities] = useState<string[]>([]);
+  const [permissions, setPermissions] = useState<string[] | null>(null);
   const [activeSiteRevision, setActiveSiteRevision] = useState(0);
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +82,7 @@ export function useAdminAccess(): UseAdminAccessResult {
     if (sessionStatus !== "authenticated" || !session) {
       setRolesResponse(null);
       setCapabilities([]);
+      setPermissions(null);
       setError(null);
       setWarning(null);
       setIsLoadingRoles(false);
@@ -87,6 +92,7 @@ export function useAdminAccess(): UseAdminAccessResult {
     if (!accessToken) {
       setRolesResponse(null);
       setCapabilities([]);
+      setPermissions(null);
       setIsLoadingRoles(false);
       if (!sessionRoles) {
         setError("Missing API access token for role lookup.");
@@ -108,9 +114,11 @@ export function useAdminAccess(): UseAdminAccessResult {
         setError(null);
         setWarning(null);
         setCapabilities([]);
+        setPermissions(null);
         await loadAdminAccessIndependently({
           loadRoles: () => fetchUserRoles(accessToken),
           loadCapabilities: () => fetchOrgCapabilities(accessToken),
+          loadPermissions: () => fetchMyPermissions(accessToken),
           onRolesLoaded: (response) => {
             if (!cancelled) {
               setRolesResponse(response);
@@ -121,6 +129,11 @@ export function useAdminAccess(): UseAdminAccessResult {
               setCapabilities(resolvedCapabilities);
             }
           },
+          onPermissionsLoaded: (resolvedPermissions) => {
+            if (!cancelled) {
+              setPermissions(resolvedPermissions);
+            }
+          },
         });
       } catch (err) {
         if (!cancelled) {
@@ -129,6 +142,7 @@ export function useAdminAccess(): UseAdminAccessResult {
           setWarning(status.warning);
           setRolesResponse(null);
           setCapabilities([]);
+          setPermissions(null);
         }
       } finally {
         if (!cancelled) {
@@ -166,6 +180,7 @@ export function useAdminAccess(): UseAdminAccessResult {
     userId,
     currentOrgIsMasterOrg,
     capabilities,
+    permissions,
     isLoading,
     error,
     warning,

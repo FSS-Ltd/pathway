@@ -18,6 +18,7 @@ function createController() {
       assignments: [],
       organisationCapabilities: [],
     }),
+    listOwnPermissions: jest.fn().mockResolvedValue(["ace.pace.read"]),
   } as unknown as AccessUsersService;
   const requestContext = {
     requireContext: () => ({
@@ -111,5 +112,24 @@ describe("AccessUsersController", () => {
       },
     });
     expect(accessUsers.getAccessSummary).not.toHaveBeenCalled();
+  });
+
+  it("returns the actor's own effective permissions with no target user id", async () => {
+    const { accessUsers, controller } = createController();
+    const request = { headers: { "x-request-id": "access-me-request-1" } };
+
+    await expect(controller.getMyPermissions(request)).resolves.toEqual({
+      orgId: "org-1",
+      tenantId: "site-1",
+      permissions: ["ace.pace.read"],
+    });
+
+    expect(accessUsers.listOwnPermissions).toHaveBeenCalledWith({
+      orgId: "org-1",
+      tenantId: "site-1",
+      userId: "actor-1",
+      legacyOrgRoles: ["org:admin"],
+      requestId: "access-me-request-1",
+    });
   });
 });

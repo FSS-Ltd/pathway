@@ -121,6 +121,22 @@ describe("PermissionGuard", () => {
     ]);
   });
 
+  // Break caught: a context with no active organisation reached resolve() with an
+  // empty orgId, which crashed withOrgRlsContext with an uncaught 500 instead of a 403.
+  it("denies a required permission when the context has no active organisation, without calling resolve", async () => {
+    (reflector.getAllAndOverride as jest.Mock).mockReturnValue(permission);
+    (requestContext.getContext as jest.Mock).mockReturnValue({
+      user: { userId: "actor-789" },
+      org: { orgId: "" },
+      tenant: { tenantId: "" },
+    });
+
+    await expect(guard.canActivate(buildExecutionContext())).rejects.toThrow(
+      ForbiddenException,
+    );
+    expect(permissions.resolve).not.toHaveBeenCalled();
+  });
+
   // Break caught: a positive resolver decision that is not honoured blocks authorised staff actions.
   it("continues when the effective permission decision allows the request", async () => {
     (reflector.getAllAndOverride as jest.Mock).mockReturnValue(permission);

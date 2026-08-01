@@ -30,11 +30,11 @@ export interface AccessShadowComparison {
   request: EffectiveAccessRequest;
 }
 
+// R01-R14 (the /access/* family) no longer call compare(): ACE-F14 cut them
+// over to PermissionGuard directly and removed the legacy bootstrap they were
+// shadowed against. Empty until a future route migration (e.g. ACE-F15+)
+// needs this instrument again for its own bounded route set.
 export const ACCESS_SHADOW_ALLOW_LIST = [
-  {
-    route: "GET /access/users/:userId/effective-permissions",
-    permission: "platform.access.users.read",
-  },
 ] as const satisfies readonly AccessShadowAllowListEntry[];
 
 export function accessShadowConfigFromEnvironment(): AccessShadowConfig {

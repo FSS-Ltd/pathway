@@ -1,4 +1,11 @@
-import { OrgRole, prisma, SiteRole } from "@pathway/db";
+import {
+  applyTenantContext,
+  OrgRole,
+  prisma,
+  runTransaction,
+  SiteRole,
+  withTenantRlsContext,
+} from "@pathway/db";
 import { randomUUID } from "node:crypto";
 
 interface SeedE2eAuthUserOptions {
@@ -96,6 +103,100 @@ export async function clearE2eAuthAccess(userId: string): Promise<void> {
   await prisma.userIdentity.deleteMany({ where: { userId } });
   await prisma.siteMembership.deleteMany({ where: { userId } });
   await prisma.orgMembership.deleteMany({ where: { userId } });
+}
+
+interface SeedE2eTypedRoleOptions {
+  orgId: string;
+  /** Omit for organisation scope. */
+  tenantId?: string;
+  userId: string;
+  scope: "organisation" | "site";
+  permissionKeys: readonly string[];
+  name?: string;
+}
+
+interface E2eTypedRole {
+  roleDefinitionId: string;
+  assignmentId: string;
+}
+
+/**
+ * Seeds a custom (non-system) typed role and an active assignment granting
+ * it to userId, for e2e tests exercising PermissionGuard/EffectivePermissionsService
+ * against real RLS rather than mocking the resolver. The assignee must already
+ * have an OrgMembership row (see seedE2eAuthUser) - app.enforce_user_role_assignment_scope
+ * requires it.
+ */
+export async function seedE2eTypedRole(
+  options: SeedE2eTypedRoleOptions,
+): Promise<E2eTypedRole> {
+  const roleDefinitionId = randomUUID();
+  const assignmentId = randomUUID();
+  const tenantId = options.scope === "site" ? options.tenantId : null;
+  if (options.scope === "site" && !tenantId) {
+    throw new Error("tenantId is required when seeding a site-scoped role");
+  }
+
+  const seed = async (
+    tx: Parameters<Parameters<typeof withTenantRlsContext>[2]>[0],
+  ) => {
+    await tx.orgRoleDefinition.create({
+      data: {
+        id: roleDefinitionId,
+        orgId: options.orgId,
+        tenantId,
+        name: options.name ?? `E2E test role ${roleDefinitionId}`,
+        scope: options.scope,
+        isSystem: false,
+        createdById: options.userId,
+        updatedById: options.userId,
+        permissions: {
+          create: options.permissionKeys.map((permissionKey) => ({
+            permissionKey,
+            grantedById: options.userId,
+          })),
+        },
+      },
+    });
+    await tx.userRoleAssignment.create({
+      data: {
+        id: assignmentId,
+        orgId: options.orgId,
+        tenantId,
+        userId: options.userId,
+        roleDefinitionId,
+        assignedById: options.userId,
+        startsAt: new Date(),
+      },
+    });
+  };
+
+  // withTenantRlsContext/withOrgRlsContext both establish the RLS context
+  // fine for reads, but withOrgRlsContext also sets the transaction
+  // READ ONLY - wrong for a write. Use the writable runTransaction +
+  // applyTenantContext pair (same sequence roles.service.ts's transaction
+  // boundary uses) for both scopes instead.
+  await runTransaction(async (tx) => {
+    await applyTenantContext(tx, tenantId ?? "", options.orgId);
+    await seed(tx);
+  });
+
+  return { roleDefinitionId, assignmentId };
+}
+
+export async function clearE2eTypedRole(
+  role: E2eTypedRole,
+  orgId: string,
+): Promise<void> {
+  await prisma.userRoleAssignment.deleteMany({
+    where: { id: role.assignmentId },
+  });
+  await prisma.orgRolePermission.deleteMany({
+    where: { roleDefinitionId: role.roleDefinitionId },
+  });
+  await prisma.orgRoleDefinition.deleteMany({
+    where: { id: role.roleDefinitionId, orgId },
+  });
 }
 
 /**

@@ -12,7 +12,7 @@ import {
   type PersonRow,
 } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
-import { canAccessRolesAdmin } from "@/lib/access";
+import { hasPermission } from "@/lib/access";
 import { NoAccessCard } from "@/components/no-access-card";
 import { RoleListTable } from "./role-list-table";
 import { AssignmentPanel } from "./assignment-panel";
@@ -23,7 +23,8 @@ type Tab = "roles" | "assignments" | "effective-access" | "audit";
 
 export default function RolesAdminPage() {
   const { data: session, status: sessionStatus } = useSession();
-  const { role, isLoading: isLoadingAccess } = useAdminAccess();
+  const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
+  const canAccess = hasPermission(permissions, "platform.access.roles.read");
   const [orgId, setOrgId] = React.useState<string | null>(null);
   const [roles, setRoles] = React.useState<AdminRoleDefinition[]>([]);
   const [people, setPeople] = React.useState<PersonRow[]>([]);
@@ -59,9 +60,9 @@ export default function RolesAdminPage() {
 
   React.useEffect(() => {
     if (sessionStatus !== "authenticated" || !session) return;
-    if (isLoadingAccess || !canAccessRolesAdmin(role)) return;
+    if (isLoadingAccess || !canAccess) return;
     void load();
-  }, [sessionStatus, session, isLoadingAccess, role, load]);
+  }, [sessionStatus, session, isLoadingAccess, canAccess, load]);
 
   if (isLoadingAccess) {
     return (
@@ -72,7 +73,7 @@ export default function RolesAdminPage() {
     );
   }
 
-  if (!canAccessRolesAdmin(role)) {
+  if (!canAccess) {
     return (
       <NoAccessCard
         title="You don't have access to roles & access"

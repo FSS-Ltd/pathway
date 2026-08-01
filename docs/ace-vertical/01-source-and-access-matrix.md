@@ -27,49 +27,46 @@ AND tenant/RLS policy
 
 ## ACE-F09 inactive shadow comparison
 
-`ACE_ACCESS_SHADOW_ENABLED=true` permits comparison only for the approved matrix entry below. This is an inactive migration instrument until a later route-migration PR introduces an explicit call site that supplies the authoritative legacy decision. It does not register a route, change a live decision, or authorise from typed permissions.
+`ACE_ACCESS_SHADOW_ENABLED=true` gates comparison entirely on
+`ACCESS_SHADOW_ALLOW_LIST`, which is empty: R01 through R14 observed shadow
+agreement, then ACE-F14 cut them over to `PermissionGuard` directly and
+deleted the legacy bootstrap they were compared against, so there is nothing
+left for them to compare. The instrument remains available, unpopulated,
+for a future bounded route migration (ACE-F15+) that needs the same
+inactive-until-populated observation step before its own cutover.
 
-| Exact matrix route | Matrix permission (`PermissionKey`) | Matrix ID | Activation boundary |
-| --- | --- | --- | --- |
-| `GET /access/users/:userId/effective-permissions` | `platform.access.users.read` | R12 | No current call site. A future explicit route migration may call the comparator with the legacy result; the comparator must return that same legacy result. |
+## ACE-F14 typed permission cutover
 
-The comparator allow-list repeats this approved route and compile-time `PermissionKey` pair only. It is not a fixed-role-to-capability mapping, resolver output, or executable permission registry.
+R01 through R14 are enforced by `PermissionGuard` reading
+`@RequirePermission(<matrix permission>)` directly off each handler. No
+route asserts a legacy role name, and no bootstrap remains: the full formula
+(membership, capability, and typed permission) is evaluated by
+`EffectivePermissionsService.resolve()` in one pass, matching every route's
+matrix row above where the `capability` and `permission` columns are the
+same key.
 
-## ACE-F10 to ACE-F14 temporary access-administration bootstrap
+For create, clone, update, and permission replacement, grantable keys are
+the intersection of the acting user's own effective permissions, the
+organisation's active capabilities, and active delegable permission
+metadata (`resolveDelegableCeiling`, `apps/api/src/access-control/roles.service.ts`).
+R05 may use a protected system template as a read-only clone source. It
+never mutates that template, and the clone still passes source
+organisation/site and grantable-key checks. R04, R06, and R07 continue to
+reject mutation or retirement of system roles. R09 is organisation-scoped
+and returns an opaque `{ items, nextCursor }` creation-order page with a
+default and maximum of 50 rows. R10 derives organisation and selected-site
+scope from trusted context for one assignment or an atomic bulk request of
+1 through 50 assignments, and R11 records one-way revocation without
+deleting assignment history. Successful writes enqueue an invalidation
+intent transactionally and invalidate every local user-and-organisation
+cache variant after commit; the route decision itself is therefore fresh at
+write time but can lag up to the hard 60-second cache TTL for a
+just-revoked actor's next read. Other processes and failed direct
+invalidations converge through that same TTL.
 
-R01 through R07 and R09 through R11 keep the approved capability and permission contract while
-the route-by-route cutover remains incomplete. Until ACE-F14 removes this
-bootstrap, each role or assignment endpoint requires all of the following:
-
-- authenticated trusted request context;
-- an active `ORG_ADMIN` organisation membership confirmed from the database;
-- the matching active legacy `org:admin` request-context role;
-- the route's active `platform.access.roles.*` or
-  `platform.access.assignments.*` capability and active permission metadata;
-- inclusion of that route permission in the protected Organisation Head
-  system template; and
-- organisation/site ownership checks and forced RLS.
-
-For create, clone, update, and permission replacement, grantable keys are the
-intersection of the protected Organisation Head template, active organisation
-capabilities, and active delegable permission metadata. R05 may use a protected
-system template as a read-only clone source. It never mutates that template,
-and the clone still passes source organisation/site and grantable-key checks.
-R04, R06, and R07 continue to reject mutation or retirement of system roles.
-R09 is organisation-scoped and returns an opaque `{ items, nextCursor }`
-creation-order page with a default and maximum of 50 rows. R10 derives
-organisation and selected-site scope from trusted context for one assignment or
-an atomic bulk request of 1 through 50 assignments, and R11 records one-way
-revocation without deleting assignment history. Successful writes
-enqueue an invalidation intent transactionally and invalidate every local
-user-and-organisation cache variant after commit. Other processes and failed
-direct invalidations converge through the hard 60-second cache TTL.
-
-ACE-F12 owns transactional last-organisation-head and same-request
-self-lockout enforcement. Those controls remain required for the approved
-R04, R06, R07, R10, and R11 contract, but ACE-F10 does not claim to implement
-them early. ACE-F14 removes the legacy bootstrap after shadow comparison and
-bounded route migration prove parity.
+ACE-F12's transactional last-organisation-head and same-request
+self-lockout enforcement remains required for R04, R06, R07, R10, and R11
+and is unaffected by this cutover.
 
 `none` means the layer is genuinely inapplicable to that route. It never means undecided.
 
@@ -160,6 +157,37 @@ Edge cases follow the action and data, not the URL prefix. Report drafting and a
 | R66 | GET | `/student/me/ace-summary` | `ace.student.self.read` | `ace.student.self.read` | student | active student portal context | student-self-identity | released-to-student | `none` | `sensitive` | trusted StudentIdentity; tenantId/childId RLS |
 | R67 | GET | `/student/me/faith` | `ace.faith.read` | `ace.faith.read` | student | active student portal context | student-self-identity | released-to-student; published active-version and audience policy | `none` | `sensitive` | trusted StudentIdentity and content scope; tenantId/childId RLS |
 | R68 | GET | `/student/me/community` | `ace.community.read` | `ace.community.read` | student | active student portal and selected-site context | student-self-identity and derived-community-membership | community-moderation-policy | `ace.student_community` | `sensitive` | trusted StudentIdentity, tenant, and derived membership; tenantId/childId RLS |
+
+## Self-scoped access route
+
+Added by ACE-F14 to give the admin nav a source for the caller's own effective permissions, since every `/access/*` route above requires `platform.access.users.read`, which staff, parents, and students never hold. Not one of the 68 exact routes; recorded separately so that count stays accurate.
+
+| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R69 | GET | `/access/users/me/permissions` | `none` | `none` | any authenticated user | active organisation membership | self only; not a delegation-boundary read | current-effective-assignments-only | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+
+## NexSteps legacy surface (Batch A)
+
+Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cutover, using `platform.access.*`-family keys already active in `PLATFORM_CORE_CAPABILITIES` for every vertical. Not part of the 68 exact ACE routes; recorded separately so that count stays accurate. Migration is bounded to the two controllers that authorised from no role check at all (announcements, attendance) - see the ACE-F14 build plan for the controllers still blocked on a missing permission key or a commercial-entitlement decision (children, classes, parents, lessons, orgs, staff, session assignments, learning).
+
+`staff` narrows from "any tenant member can create/delete announcements" to `notices.read` only (no `manage`); `organisationHead` and `siteLead` hold `notices.manage`. This is a deliberate tightening, not an incidental side effect.
+
+| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N01 | GET | `/announcements` | `notices.read` | `notices.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N02 | GET | `/announcements/:id` | `notices.read` | `notices.read` | organisation-head, site-lead, staff | active site membership | announcement belongs to active tenant | `none` | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N03 | POST | `/announcements` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | `none` | AV30 hard-cap enforcement | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N04 | PATCH | `/announcements/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | announcement belongs to active tenant | AV30 hard-cap enforcement on publish | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N05 | DELETE | `/announcements/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | announcement belongs to active tenant | `none` | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
+| N06 | GET | `/attendance` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N07 | GET | `/attendance/session-summaries` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N08 | GET | `/attendance/session/:sessionId` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | session belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N09 | GET | `/attendance/:id` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | record belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N10 | PUT | `/attendance/session/:sessionId` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active site membership | session belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N11 | POST | `/attendance` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+| N12 | PATCH | `/attendance/:id` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active site membership | record belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
+
+`notices.publish` has no dedicated route today (publication is folded into `PATCH /announcements/:id`); left unmapped rather than inventing one.
 
 ## Unresolved section 8.5 API contracts
 

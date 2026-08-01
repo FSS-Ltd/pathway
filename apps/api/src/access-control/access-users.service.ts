@@ -1,7 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { getOrgCapabilities } from "@pathway/platform";
-import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
-import { AccessShadowService } from "./access-shadow.service";
 import {
   EffectivePermissionsService,
   type EffectivePermissionWithSources,
@@ -46,40 +44,21 @@ export class AccessUsersService {
     private readonly transaction: RolesTransactionBoundary,
     @Inject(EffectivePermissionsService)
     private readonly effectivePermissions: EffectivePermissionsService,
-    @Inject(AccessShadowService)
-    private readonly shadow: AccessShadowService,
   ) {}
 
   async getEffectivePermissions(
     targetUserId: string,
     actor: RoleActorContext,
   ): Promise<EffectivePermissionsResult> {
-    await this.transaction.run(actor, (tx) =>
-      assertPlatformAccessRouteAccess(
-        tx,
-        actor,
-        "platform.access.users.read",
-        "EFFECTIVE_ACCESS_API_ACCESS_DENIED",
-      ),
-    );
+    // Validates the selected site belongs to the actor's organisation
+    // (INVALID_SELECTED_SITE) before resolving anything.
+    await this.transaction.run(actor, async () => {});
 
     const permissions = await this.effectivePermissions.listForUserWithSources(
       targetUserId,
       actor.orgId,
       actor.tenantId,
     );
-
-    await this.shadow.compare({
-      route: "GET /access/users/:userId/effective-permissions",
-      legacyAllowed: true,
-      request: {
-        userId: targetUserId,
-        orgId: actor.orgId,
-        tenantId: actor.tenantId,
-        permission: "platform.access.users.read",
-        now: new Date(),
-      },
-    });
 
     return {
       userId: targetUserId,
@@ -94,13 +73,6 @@ export class AccessUsersService {
     actor: RoleActorContext,
   ): Promise<AccessSummaryResult> {
     return this.transaction.run(actor, async (tx) => {
-      await assertPlatformAccessRouteAccess(
-        tx,
-        actor,
-        "platform.access.users.read",
-        "ACCESS_SUMMARY_API_ACCESS_DENIED",
-      );
-
       const [membership, assignments, capabilities] = await Promise.all([
         tx.orgMembership.findUnique({
           where: {
@@ -147,5 +119,20 @@ export class AccessUsersService {
         organisationCapabilities: capabilities,
       };
     });
+  }
+
+  /**
+   * Reading your own effective permissions is not a delegation-boundary
+   * read (unlike getEffectivePermissions, which reads another user's), so
+   * this carries no platform.access.* bootstrap check - gating it would
+   * make it unreachable for exactly the users (staff, parents, students)
+   * who need it to render navigation.
+   */
+  async listOwnPermissions(actor: RoleActorContext): Promise<string[]> {
+    return this.effectivePermissions.listForUser(
+      actor.userId,
+      actor.orgId,
+      actor.tenantId,
+    );
   }
 }

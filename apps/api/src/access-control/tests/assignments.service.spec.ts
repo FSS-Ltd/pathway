@@ -645,17 +645,6 @@ describe("AssignmentsService", () => {
     expect(tx.userRoleAssignment.findMany).not.toHaveBeenCalled();
   });
 
-  it("requires active database ORG_ADMIN, trusted org:admin, capability, metadata, and template authority", async () => {
-    const deniedActor = { ...actor, legacyOrgRoles: [] };
-    const { service, tx } = buildHarness();
-
-    await expect(service.list(deniedActor)).rejects.toMatchObject({
-      response: { statusCode: 403, code: "ASSIGNMENT_API_ACCESS_DENIED" },
-    });
-    expect(tx.$queryRawUnsafe).not.toHaveBeenCalled();
-    expect(tx.userRoleAssignment.findMany).not.toHaveBeenCalled();
-  });
-
   it("keeps successful assignment durable when direct invalidation fails and lets the cache fall back within 60 seconds", async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date("2026-07-29T12:00:00.000Z"));

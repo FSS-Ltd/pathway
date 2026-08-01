@@ -16,6 +16,8 @@ import { AnnouncementsService, type Audience } from "./announcements.service";
 import { createAnnouncementDto, updateAnnouncementDto } from "./dto";
 import { CurrentTenant, CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
+import { PermissionGuard } from "../access-control/permission.guard";
+import { RequirePermission } from "../access-control/require-permission.decorator";
 import { EntitlementsEnforcementService } from "../billing/entitlements-enforcement.service";
 import { stripVercelRoutingQueryParam } from "../config/vercel-request-url";
 
@@ -28,6 +30,7 @@ const listQuery = z
 
 const idParam = z.object({ id: z.string().uuid("id must be a valid UUID") });
 
+@UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("announcements")
 export class AnnouncementsController {
   constructor(
@@ -36,7 +39,7 @@ export class AnnouncementsController {
   ) {}
 
   @Post()
-  @UseGuards(AuthUserGuard)
+  @RequirePermission("notices.manage")
   async create(
     @Body() body: unknown,
     @CurrentTenant("tenantId") tenantId: string,
@@ -54,7 +57,7 @@ export class AnnouncementsController {
   }
 
   @Get()
-  @UseGuards(AuthUserGuard)
+  @RequirePermission("notices.read")
   async findAll(
     @Query() query: unknown,
     @CurrentTenant("tenantId") tenantId: string,
@@ -69,7 +72,7 @@ export class AnnouncementsController {
   }
 
   @Get(":id")
-  @UseGuards(AuthUserGuard)
+  @RequirePermission("notices.read")
   async findOne(
     @Param() params: unknown,
     @CurrentTenant("tenantId") tenantId: string,
@@ -79,7 +82,7 @@ export class AnnouncementsController {
   }
 
   @Patch(":id")
-  @UseGuards(AuthUserGuard)
+  @RequirePermission("notices.manage")
   async update(
     @Param() params: unknown,
     @Body() body: unknown,
@@ -98,7 +101,7 @@ export class AnnouncementsController {
   }
 
   @Delete(":id")
-  @UseGuards(AuthUserGuard)
+  @RequirePermission("notices.manage")
   async remove(
     @Param() params: unknown,
     @CurrentTenant("tenantId") tenantId: string,

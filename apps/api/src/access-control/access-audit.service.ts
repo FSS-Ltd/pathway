@@ -1,6 +1,5 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { AuditEntityType } from "../audit/audit.types";
-import { assertPlatformAccessRouteAccess } from "./assert-platform-access";
 import { decodeCreatedAtIdCursor, encodeCreatedAtIdCursor } from "./cursor";
 import { roleApiError } from "./role-api-error";
 import {
@@ -40,13 +39,6 @@ export class AccessAuditService {
       : AUDIT_ENTITY_TYPES;
 
     return this.transaction.run(actor, async (tx) => {
-      await assertPlatformAccessRouteAccess(
-        tx,
-        actor,
-        "platform.access.audit.read",
-        "AUDIT_API_ACCESS_DENIED",
-      );
-
       const rows = await tx.auditEvent.findMany({
         where: {
           orgId: actor.orgId,

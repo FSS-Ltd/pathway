@@ -6,9 +6,11 @@ import request from "supertest";
 import { AppModule } from "../../app.module";
 import {
   clearE2eAuthAccess,
+  clearE2eTypedRole,
   isDatabaseAvailable,
   requireDatabase,
   seedE2eAuthUser,
+  seedE2eTypedRole,
 } from "../../../test-helpers.e2e";
 
 const ids = {
@@ -33,6 +35,8 @@ describe("Attendance (e2e)", () => {
   let createdId: string;
   let authHeader: string;
   let authUserId: string;
+  let typedRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
+  let createdOrgVertical = false;
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -96,6 +100,20 @@ describe("Attendance (e2e)", () => {
       });
     });
 
+    // attendance.read/manage are org-capability-gated (PLATFORM_CORE_CAPABILITIES,
+    // granted by any vertical); the shared E2E_ORG_ID fixture has no OrgVertical
+    // row by default, so PermissionGuard would deny every request with
+    // capability-missing regardless of the typed assignment below.
+    const existingVertical = await prisma.orgVertical.findUnique({
+      where: { orgId: ORG_ID },
+    });
+    if (!existingVertical) {
+      await prisma.orgVertical.create({
+        data: { orgId: ORG_ID, vertical: "ACE_SCHOOL" },
+      });
+      createdOrgVertical = true;
+    }
+
     const auth = await seedE2eAuthUser({
       subject: "attendance-e2e",
       tenantId: TENANT_A_ID,
@@ -105,6 +123,13 @@ describe("Attendance (e2e)", () => {
     });
     authUserId = auth.userId;
     authHeader = auth.authorization;
+    typedRole = await seedE2eTypedRole({
+      orgId: ORG_ID,
+      tenantId: TENANT_A_ID,
+      userId: authUserId,
+      scope: "site",
+      permissionKeys: ["attendance.read", "attendance.manage"],
+    });
   });
 
   afterAll(async () => {
@@ -126,6 +151,12 @@ describe("Attendance (e2e)", () => {
       await prisma.group.deleteMany({
         where: { id: { in: [ids.group, ids.group2] } },
       });
+      if (typedRole) {
+        await clearE2eTypedRole(typedRole, ORG_ID);
+      }
+      if (createdOrgVertical) {
+        await prisma.orgVertical.deleteMany({ where: { orgId: ORG_ID } });
+      }
       await clearE2eAuthAccess(authUserId);
       await prisma.user.deleteMany({ where: { id: authUserId } });
       await app.close();
