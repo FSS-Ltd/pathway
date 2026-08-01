@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Inject,
   Optional,
 } from "@nestjs/common";
@@ -760,6 +761,11 @@ export class StaffService {
     }
 
     if (dto.role !== undefined) {
+      if (!isCallerOrgAdmin) {
+        throw new ForbiddenException(
+          "Only an Organisation admin can change a staff member's site role",
+        );
+      }
       await prisma.siteMembership.upsert({
         where: { tenantId_userId: { tenantId, userId } },
         create: { tenantId, userId, role: dto.role },
