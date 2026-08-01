@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Between plans — Plan 04 needs product decisions (pricing, household modelling) before implementation starts (see "Next action")
+**Current phase:** Plan 04 (H1 platform foundations) — decisions resolved, implemented, verified locally; PR about to open
 
 ---
 
@@ -28,10 +28,8 @@ continue.
 | 4 | 02 — fidelity harness + phone baselines | **merged** | `feat/nexsteps-home-fidelity-harness` | [#271](https://github.com/FSS-Ltd/pathway/pull/271) | squash-merged, branch deleted; 76 approved screens now have committed baselines |
 | 5 | ledger update | **merged** | `docs/nexsteps-home-progress-update-2` | [#272](https://github.com/FSS-Ltd/pathway/pull/272) | squash-merged, branch deleted; recorded the Plan 03 product/design blocker |
 | 6 | 03 — tablet design pass + tablet baselines | **merged** | `feat/nexsteps-home-tablet-design` | [#273](https://github.com/FSS-Ltd/pathway/pull/273) | squash-merged, branch deleted; 5 tablet composites, 81 screens / 10 groups in the inventory |
-| 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | **blocked on product decisions** | — | — | pricing + household modelling — see "Next action" |
+| 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | in progress | `feat/nexsteps-home-h1-foundations` | not yet opened | both product decisions resolved by user; code complete, verified locally, about to push |
 | 8-16 | 05-14 | not started | — | — | — |
-| 6 | 03 — tablet design pass + tablet baselines | in progress | `feat/nexsteps-home-tablet-design` | not yet opened | user approved the candidate list and gave design direction; code complete, verified locally, about to push |
-| 7-16 | 04-14 | not started | — | — | — |
 
 ## Environment
 
@@ -88,6 +86,8 @@ gh pr checks <pr-number> --repo FSS-Ltd/pathway
 | Worktree base ref | `fss/master`, not the native EnterWorktree tool's `origin/master` default | this session, reasoned in-line: `fss` is the PR remote, `origin` is a personal fork that can lag |
 | Data fetching library | TanStack Query, added in Plan 01 | plan file — `apps/mobile` hand-rolls fetch+useState, insufficient for the loading/empty/error/offline/retry states 76 screens require |
 | Plan 03 candidate list | Approved as originally proposed: week/day, progress/detail (also covers evidence gallery/detail), correspondence, channels/threads, moderation queue/report | user, 2026-08-01, in response to this session's explicit question |
+| Household-to-Org/Tenant modelling | One lightweight `Org` per household, single `Tenant` | user, 2026-08-01, in response to this session's explicit question |
+| NexSteps Home pricing | Two tiers, Free and Paid. Paid unlocks Community group creation, expanded AI features, more TBD. No in-app checkout — external link to nexsteps.dev | user, 2026-08-01, in response to this session's explicit question |
 | Plan 03 visual direction | "Keep the same feel... simple and functional so families do not have to be very techy and get the most out of the app functionality" | user, 2026-08-01 — interpreted as: reuse existing approved phone content verbatim rather than author new copy, one dominant layout pattern (list left, detail right) applied consistently, no new interaction model beyond Next/Previous between the 5 composites |
 | Tablet device target | Single iPad-class preset (1194×834 landscape, no photographed bezel asset) | this session — the approved candidate flows don't need distinct iOS/Android tablet chrome the way phone screens do (platform-specific status bar/home-indicator/nav-bar rendering matters for pixel fidelity on phone; a tablet mockup's own device chrome is cosmetic, not something being fidelity-gated) |
 
@@ -468,35 +468,80 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-**Plan 04 is blocked on two open product decisions this series has flagged
-since it started (blocker 5) but not yet asked the user to resolve:**
+**Plan 04's two open product decisions are resolved** (user, 2026-08-01,
+via a targeted question this session asked before proceeding — see
+`07-nexsteps-home.md` PR 7.2/7.4 sections for the recorded decisions in
+full):
 
-1. **NexSteps Home pricing** (`docs/NexStepsV2/07-nexsteps-home.md:70`) - a
-   light family tier or free. Not decided anywhere in the source material.
-2. **Household-to-Org/Tenant modelling** (`07-nexsteps-home.md:96-100`) -
-   one `Org` with many household `Tenant`s, vs. one lightweight `Org` per
-   household. The phase plan recommends the latter as the default absent a
-   concrete reason otherwise (matches every other vertical's existing
-   one-Org-per-customer shape, needs zero new tenancy concept), but this
-   has not been put to the user as a decision to confirm or override.
+1. **Household-to-Org/Tenant modelling:** one lightweight `Org` per
+   household, single `Tenant` — the phase plan's recommended default,
+   confirmed. No new tenancy concept needed.
+2. **NexSteps Home pricing:** two tiers, Free and Paid. Paid unlocks
+   Community group creation, expanded AI feature usage, and more to be
+   specified later. No in-app checkout — an external link to
+   https://nexsteps.dev. Price point not yet set.
 
-Unlike Plan 03's blocker (a design-direction question this session could
-put a candidate answer in front of the user for), these are commercial/
-architecture decisions with real consequences (a wrong pricing default
-affects real billing; a wrong tenancy model is expensive to migrate later)
-that should not be defaulted to silently even though the phase plan states
-a recommendation.
+**Implemented in this PR** (worktree `.worktrees/feat-nexsteps-home-h1-foundations`,
+branch `feat/nexsteps-home-h1-foundations`):
 
-Once resolved, Plan 04's mechanical scope is: add `Vertical.HOME_EDUCATION`
-to `packages/db/prisma/schema.prisma`, the matching capability grant in
-`packages/platform/src/capability-maps.ts`, the vertical label in
-`packages/types/src/vertical.ts`, and the pricing catalogue entry once (1)
-is settled - see `implementation-map.md`'s H1 slice and
-`07-nexsteps-home.md`'s PR 7.1/7.2/7.4. **These are exactly the files
-"Conflict watch" flagged as shared with concurrent ACE-vertical work** -
-diff against fresh `fss/master` immediately before opening that PR, not
-just at series start; ACE branches were still active as of this ledger's
-last check.
+- `Vertical.HOME_EDUCATION` added to `packages/db/prisma/schema.prisma`
+  (migration `20260801140000_add_home_education_vertical`), `packages/types/src/vertical.ts`,
+  and granted its Learning capabilities (read/write/evidence/reports) at
+  vertical level in `packages/platform/src/capability-maps.ts`, matching
+  `ACE_SCHOOL`'s precedent (`packages/platform/src/__tests__/capability-maps.spec.ts`'s
+  completeness tests cover it automatically via `Object.values(Vertical)`).
+- **Pricing catalogue deliberately deferred**, not implemented — see the
+  scope note added to `07-nexsteps-home.md` PR 7.2: the institutional
+  `PLAN_CATALOGUE`/`PLANS` catalogue is shaped for church/school Buy Now
+  (av30/sites/feature-bullet-lists) and doesn't fit a household product.
+  Forcing an entry in now would invent unused structure. Revisit when
+  Plan 08 (Family/settings/billing) builds the real upgrade link.
+- Fixed a real, pre-existing gap found during verification, unrelated to
+  this plan's own scope: Plan 03 (PR #273) added 5 tablet-composite screen
+  IDs to `screen-inventory.json` but never updated
+  `apps/nexsteps-home/src/screens/registry.ts` or its test's hardcoded
+  "76 entries" assertion to match — `registry.test.ts` was failing (2
+  tests) on a clean local run despite PR #273's own CI showing green,
+  almost certainly because turbo's cached `nexsteps-home#test:unit` result
+  wasn't invalidated by a change to a doc file outside `apps/nexsteps-home/`
+  that the test reads live at runtime. Added the 5 composite entries
+  (each reusing its `listScreenId`'s route — a tablet composite isn't a
+  separate route, it's the same screen rendered via `<TwoPane>` at tablet
+  width) and updated the count assertions to 81. Confirmed via
+  `git diff --stat fss/master` that zero files under `apps/nexsteps-home/`
+  were touched before this fix, ruling out this session's own changes as
+  the cause.
+- Ripple effects from adding a new `Vertical` member, all fixed and
+  verified (each is a real, necessary consequence of the type being used
+  exhaustively elsewhere, not scope creep):
+  - `apps/web/lib/configurator-checkout.ts`'s `verticalToSector` switch
+    needed a `HOME_EDUCATION` case — throws, since Home Education orgs
+    never go through this institutional checkout flow (confirmed:
+    `apps/web/app/configure/state.ts`'s `VERTICALS_BY_ORG_TYPE` doesn't
+    include it, so it can never reach this function via real UI). Added a
+    test asserting the throw.
+  - `apps/web/lib/module-catalog.ts`'s `VERTICAL_FEATURES` (an exhaustive
+    `Record<Vertical, string[]>`) needed an entry — added, marked as
+    unreachable through this configurator in a comment.
+  - `apps/web/lib/module-catalog.ts`'s `CONFIGURATOR_IMAGE_PATHS` (asset
+    preload list, tested for exact asset presence/uniqueness) would have
+    grown a 20th path with no real asset file — excluded `HOME_EDUCATION`
+    explicitly at the source rather than adding a placeholder image.
+  - Three `apps/web` tests asserting completeness/exactness over
+    `VERTICAL_OPTIONS` updated to exclude `HOME_EDUCATION` with an
+    explanatory comment, matching the production-code exclusion:
+    `configurator-assets.spec.ts` (2 assertions),
+    `configurator-state.spec.ts` (1 assertion).
+- Ran the full verification suite: `pnpm -r typecheck`, `pnpm -r lint`,
+  `pnpm test:unit` (root, via turbo — all 22 tasks, including the 734-test
+  `apps/api` suite) — all green.
+- About to push and open the PR against `fss/master`. **These are exactly
+  the files "Conflict watch" flagged as shared with concurrent ACE-vertical
+  work** - diff against fresh `fss/master` immediately before pushing, not
+  just at series start; ACE branches were still active as of this ledger's
+  last check.
+
+Once merged: Plan 05 (Setup flow, H2, 9 screens) is next in the series.
 
 ---
 

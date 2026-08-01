@@ -118,10 +118,11 @@ describe("configurator checkout payload", () => {
     expect(buildCheckoutPayload(state, organisation)).toEqual(expectedPayload);
   });
 
-  it("maps all seven verticals into the legacy sector union", () => {
+  it("maps all seven institutional verticals into the legacy sector union", () => {
     const expectedSectors = new Set(["CHURCH", "CLUB", "SCHOOL", "CHARITY"]);
 
     for (const { value } of VERTICAL_OPTIONS) {
+      if (value === "HOME_EDUCATION") continue;
       expect(expectedSectors).toContain(verticalToSector(value));
     }
 
@@ -136,6 +137,12 @@ describe("configurator checkout payload", () => {
     ] as Vertical[]) {
       expect(verticalToSector(vertical)).toBe("SCHOOL");
     }
+  });
+
+  it("refuses to map Home Education into the institutional checkout flow", () => {
+    expect(() => verticalToSector("HOME_EDUCATION")).toThrow(
+      "Home Education does not use the institutional checkout flow.",
+    );
   });
 
   it.each([

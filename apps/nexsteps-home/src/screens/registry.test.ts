@@ -9,24 +9,18 @@ describe("screenRoutes", () => {
     "../../../../docs/NexStepsV2/nexsteps-home/screen-inventory.json",
   );
   const inventory = JSON.parse(readFileSync(inventoryPath, "utf-8")) as {
-    screens: Array<{ group: string; id: string }>;
+    screens: Array<{ id: string }>;
   };
-  const phoneInventoryIds = inventory.screens
-    .filter((screen) => screen.group !== "tablet-two-pane")
-    .map((screen) => screen.id);
-  const tabletCompositeIds = inventory.screens
-    .filter((screen) => screen.group === "tablet-two-pane")
-    .map((screen) => screen.id);
+  const inventoryIds = inventory.screens.map((screen) => screen.id);
   const registryIds = Object.keys(screenRoutes);
 
-  it("covers every approved phone screen ID and no others", () => {
-    expect(registryIds.sort()).toEqual([...phoneInventoryIds].sort());
+  it("covers every approved screen ID and no others", () => {
+    expect(registryIds.sort()).toEqual([...inventoryIds].sort());
   });
 
-  it("keeps the five tablet composites out of the phone route registry", () => {
-    expect(registryIds).toHaveLength(76);
-    expect(phoneInventoryIds).toHaveLength(76);
-    expect(tabletCompositeIds).toHaveLength(5);
+  it("has exactly 81 entries, matching the approved inventory", () => {
+    expect(registryIds).toHaveLength(81);
+    expect(inventoryIds).toHaveLength(81);
   });
 
   it("every route path starts with a known top-level group", () => {
