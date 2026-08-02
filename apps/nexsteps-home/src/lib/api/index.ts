@@ -2,3 +2,6 @@ export { apiClient, ApiError } from "./http";
 export * as authApi from "./auth";
 export * as platformApi from "./platform";
 export * as healthApi from "./health";
+export * as familyPlannerApi from "./family-planner";
+export * as childrenApi from "./children";
+export * as learningApi from "./learning";

@@ -17,6 +17,8 @@ export const createLearningLogSchema = z
   .object({
     childId: uuid,
     subjectId: uuid.optional(),
+    // NexSteps Home: the planned Activity this log completes, if any.
+    activityId: uuid.optional(),
     activityDate: date,
     minutes: z.number().int().positive().max(24 * 60).optional(),
     title: z.string().trim().min(1).max(240),

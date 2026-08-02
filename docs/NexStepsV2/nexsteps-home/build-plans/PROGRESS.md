@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Plan 06 backend foundations (Activity/Task/CalendarItem schema, capabilities, `family-planner` API) implemented, verified locally; PR about to open. Plan 06 screens (RN UI) are next after this merges
+**Current phase:** Plan 06's 8 screens (Week, Today, tasks, calendar) implemented, verified locally and visually in the Browser pane; PR about to open. This closes out Plan 06 - Plan 05's remaining 8 Setup screens are next
 
 ---
 
@@ -31,8 +31,8 @@ continue.
 | 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | **merged** | `feat/nexsteps-home-h1-foundations` | [#277](https://github.com/FSS-Ltd/pathway/pull/277) | squash-merged, branch deleted; also fixed a pre-existing Plan 03 registry gap (5 tablet screens) found during verification |
 | 8 | ledger update | **merged** | `docs/nexsteps-home-progress-update-3` | [#279](https://github.com/FSS-Ltd/pathway/pull/279) | squash-merged, branch deleted |
 | 9 | household signup endpoint (Setup's `account-create` backend) | **merged** | `feat/nexsteps-home-signup` | [#280](https://github.com/FSS-Ltd/pathway/pull/280) | squash-merged, branch deleted |
-| 10 | 06 backend foundations — Activity/Task/CalendarItem schema, capabilities, `family-planner` API | in progress | `feat/nexsteps-home-week-today-schema` | not yet opened | code complete, verified locally, about to push |
-| 11 | 06 screens (Week/Today/tasks/calendar UI, 8 screens) | not started | — | — | — |
+| 10 | 06 backend foundations — Activity/Task/CalendarItem schema, capabilities, `family-planner` API | **merged** | `feat/nexsteps-home-week-today-schema` | [#283](https://github.com/FSS-Ltd/pathway/pull/283) | squash-merged, branch deleted |
+| 11 | 06 screens — Week, Today, tasks, calendar (8 screens) | in progress | `feat/nexsteps-home-week-today-screens` | not yet opened | code complete, verified locally and visually, about to push |
 | 12-18 | 05 (remaining 8), then 07-14 | not started | — | — | — |
 
 ## Environment
@@ -472,13 +472,30 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-Plan 06's backend foundations are implemented and verified (branch
-`feat/nexsteps-home-week-today-schema`, not yet pushed): `Activity`,
-`Task`, `CalendarItem` schema + capabilities + the `family-planner` API.
-**Next: Plan 06's 8 RN screens** (Week, Today, tasks, calendar), built
-against this real API — no mocked/local-only state, per this series'
-standing principle. After that: the remaining 8 Setup screens (Plan 05),
-then Plan 07 onward.
+Plan 06 is complete (backend #283 + screens, this entry): Week, Today,
+tasks and calendar all wired to real data, no mocked/local-only state.
+**Next: the remaining 8 Setup screens (Plan 05)** — no longer blocked,
+since `learning-days`/`first-activity` can now use the real backend Plan
+06 just built. After that: Plan 07 (Progress) onward.
+
+**Two known, deliberate scope reductions in Plan 06's screens** (not
+oversights — flagged here so a future session doesn't rebuild what's
+already been decided against):
+- **No assignee picker on Task.** The wireframe shows "Assigned to: Sam",
+  but there's no household-members API yet (that's Plan 08/H5's
+  territory). Every task is created unassigned for now rather than
+  building a fake picker against an endpoint that doesn't exist.
+- **No date/time native picker.** Chips (Today/Tomorrow/weekday + a
+  handful of preset times) instead of `@react-native-community/datetimepicker`
+  - avoids a new native dependency with inconsistent react-native-web
+    support, and matches the chip-based pattern the approved wireframe
+    itself already uses on the adjacent first-activity setup screen.
+- **No edit flows.** None of the 8 screens show an edit affordance for an
+  existing Activity/Task/CalendarItem, only create and (for tasks)
+  complete — so none were built. Evidence upload on quick-log was
+  similarly dropped (file handling is a real, separate piece of work);
+  showing a non-functional "Add evidence" button would have been worse
+  than omitting it.
 
 ---
 
@@ -870,3 +887,79 @@ then Plan 07 onward.
 - Ran the full verification suite: `pnpm -r typecheck`, `pnpm -r lint`,
   `pnpm test:unit` (all 22 turbo tasks, 759 `apps/api` tests including the
   16 new ones) - all green. About to push and open the PR.
+- Pushed and opened PR10 ([#283](https://github.com/FSS-Ltd/pathway/pull/283));
+  all 5 CI checks passed, including the Postgres-backed jobs exercising
+  the new migration/RLS triggers; squash-merged; deleted the branch and
+  its worktree. Confirmed the resulting production deploy (including the
+  real database migration) succeeded before moving on.
+- Started Plan 06's screens. Read every current route file and primitive
+  before writing anything: only tab-landing placeholders existed
+  (`week/index.tsx`, `today/index.tsx`), nothing else - no sub-routes, no
+  `children`/`learning` API domain modules in `apps/nexsteps-home` yet,
+  and `FieldGroup` (the only "fields" primitive from Plan 01) turned out
+  to be display-only (label/value text, no `TextInput`) - fine for
+  detail screens, useless for the 4 create-form screens this plan
+  actually needs. Built `FieldInput` as its editable counterpart (same
+  visual container, real `TextInput`) rather than repurposing `FieldGroup`
+  incorrectly or duplicating its styles ad hoc per screen.
+- Deliberately chose chip-based date/time selection over a native date
+  picker (`upcomingDayOptions`/`TIME_OPTIONS`/`combineDateAndTime` in the
+  new `src/lib/date-options.ts`) - no native dependency with the
+  react-native-web compatibility risk that category of package carries,
+  and the approved wireframe already uses exactly this chip pattern on
+  the adjacent (Plan 05) first-activity screen, so it's not an invented
+  interaction, just reused from elsewhere in the same design.
+- Found, while wiring `quick-log`'s "Save learning log" primary action to
+  the real `POST /learning/logs` endpoint, that `LearningLog` had no way
+  to link back to the `Activity` it completes even though the H3 migration
+  added the `activityId` column - Plan 06's backend PR added the schema
+  column but never wired the API's DTO/service to accept or return it.
+  Extended `apps/api/src/learning/dto/index.ts` and `learning.service.ts`
+  (added `activityId` to the create schema, the select projection, and the
+  create call) - a small, necessary extension of an existing module, not
+  scope creep, since without it the new FK is structurally present but
+  functionally dead.
+- Built all 8 screens (`week-home`, `day-detail`, `activity-plan`,
+  `activity-detail`, `today`, `quick-log`, `task-editor`,
+  `calendar-editor`) against real TanStack Query hooks
+  (`src/lib/queries/family-planner.ts`) wired to the real API - no
+  hardcoded/mocked screen content, matching this series' standing
+  principle. Every screen distinguishes loading/empty/error states
+  explicitly (design-system.md's mandated states), reusing `NoticeCard`
+  for both empty and error rather than inventing new primitives for
+  either.
+- Verified visually in the Browser pane, not just by typecheck/lint/test.
+  `preview_start` operates on the main checkout's fixed working directory,
+  not this session's worktree, and git refuses to check out a branch
+  that's already checked out elsewhere - so with the branch already live
+  in this worktree, temporarily copied just the frontend files into the
+  main checkout for visual inspection only (no git operations there,
+  nothing committed), reviewed every screen at 393×852, then removed the
+  copies and confirmed `git status` was clean again before finishing.
+  Full authenticated data-flow (real activities loading) isn't practical
+  to verify this way - no Auth0 session exists in that browser context -
+  but this did verify structure, primitives, and, concretely, the
+  loading/error/empty state rendering, since an unauthenticated session
+  reliably exercises the error path.
+- That verification pass caught two real bugs no test would have caught,
+  since nothing had exercised these components against a real (or
+  really-failing) query before: `quick-log` and `activity-plan`'s
+  children-picker logic showed "No children yet" for a genuine API
+  *error* (401, network failure) exactly the same as a real empty list -
+  misleading, and a real violation of design-system.md's distinct
+  loading/empty/error states. `activity-detail` and `day-detail` had the
+  same class of bug (an error silently read as "not found" / "nothing
+  planned"). Fixed all four by explicitly checking `isError` before
+  falling through to the empty-state branch, and re-verified each fix
+  live before considering it done.
+- Added `src/lib/date-options.test.ts` (10 tests) for the date arithmetic
+  helpers - the highest-risk pure logic in this change, and the one class
+  of bug (off-by-one days, timezone slips) unit tests catch far more
+  reliably than a screenshot. Left the new API domain modules
+  (`family-planner.ts`, `children.ts`, `learning.ts`) untested, matching
+  this app's existing convention - `auth.ts`/`platform.ts`/`health.ts`
+  don't have dedicated tests either; they're thin pass-throughs exercised
+  indirectly via the screens and `bootstrap.test.ts`.
+- Ran the full verification suite one more time after all fixes:
+  `pnpm -r typecheck`, `pnpm -r lint`, `pnpm test:unit` (all 22 turbo
+  tasks) - all green. About to push and open the PR.
