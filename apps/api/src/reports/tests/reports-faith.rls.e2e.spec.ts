@@ -791,6 +791,7 @@ describe("ACE report publication storage", () => {
       TRUNCATE TABLE
         "FaithReflection",
         "FaithReadReceipt",
+        "PermissionSlipResponse",
         "StudentIdentityLink",
         "GuardianChildRelationship",
         "FamilyIdentityInvite",
