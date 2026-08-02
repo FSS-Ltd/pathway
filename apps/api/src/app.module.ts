@@ -33,6 +33,7 @@ import { MailerModule } from "./mailer/mailer.module";
 import { LeadsModule } from "./leads/leads.module";
 import { StaffModule } from "./staff/staff.module";
 import { PublicSignupModule } from "./public-signup/public-signup.module";
+import { NexstepsHomeSignupModule } from "./nexsteps-home-signup/nexsteps-home-signup.module";
 import { ExportsModule } from "./exports/exports.module";
 import { BlogModule } from "./blog/blog.module";
 import { HandoverModule } from "./handover/handover.module";
@@ -70,6 +71,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     LeadsModule,
     StaffModule,
     PublicSignupModule,
+    NexstepsHomeSignupModule,
     ExportsModule,
     BlogModule,
     HandoverModule,

@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Between plans — Plan 05 (Setup flow, H2, 9 screens) not yet started
+**Current phase:** Household signup endpoint (Setup's `account-create` backend) implemented, verified locally; PR about to open. Sequencing changed: Plan 06 (Week/Today/tasks/calendar) now comes before the rest of Plan 05 — see README.md's sequencing note
 
 ---
 
@@ -29,8 +29,9 @@ continue.
 | 5 | ledger update | **merged** | `docs/nexsteps-home-progress-update-2` | [#272](https://github.com/FSS-Ltd/pathway/pull/272) | squash-merged, branch deleted; recorded the Plan 03 product/design blocker |
 | 6 | 03 — tablet design pass + tablet baselines | **merged** | `feat/nexsteps-home-tablet-design` | [#273](https://github.com/FSS-Ltd/pathway/pull/273) | squash-merged, branch deleted; 5 tablet composites, 81 screens / 10 groups in the inventory |
 | 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | **merged** | `feat/nexsteps-home-h1-foundations` | [#277](https://github.com/FSS-Ltd/pathway/pull/277) | squash-merged, branch deleted; also fixed a pre-existing Plan 03 registry gap (5 tablet screens) found during verification |
-| 8 | ledger update | in progress | `docs/nexsteps-home-progress-update-3` | not yet opened | this entry |
-| 9-16 | 05-14 | not started | — | — | — |
+| 8 | ledger update | **merged** | `docs/nexsteps-home-progress-update-3` | [#279](https://github.com/FSS-Ltd/pathway/pull/279) | squash-merged, branch deleted |
+| 9 | household signup endpoint (Setup's `account-create` backend) | in progress | `feat/nexsteps-home-signup` | not yet opened | code complete, verified locally, about to push |
+| 10-17 | 06, then 05 (remaining 8), then 07-14 | not started | — | — | — |
 
 ## Environment
 
@@ -469,14 +470,40 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-Plan 04 is merged ([#277](https://github.com/FSS-Ltd/pathway/pull/277)).
-**Plan 05 (Setup flow, H2, 9 screens) is next in the series** — no open
-product decisions flagged for it. Endpoints available today for it:
-`GET /auth/me`, `GET /auth/active-site`, `GET /auth/active-site/roles`,
-`POST /auth/active-site`, `GET /platform/capabilities`,
-`GET /platform/modules`, `GET /health` (per the original plan's section 1.8);
-confirm whether household/child creation needs new endpoints or reuses
-existing org-creation flows before assuming either.
+Investigating Plan 05 (Setup flow, H2) surfaced that it isn't just 9
+screens of UI: `account-create` needs a real signup endpoint (no existing
+one fits — the only "create an Org from scratch" path is
+`BuyNowService.checkout`, tightly coupled to Stripe/GoCardless payment,
+which doesn't fit a free-by-default household with no in-app checkout),
+and `learning-days`/`first-activity` depend on task/calendar backend that
+doesn't exist yet and is actually Plan 06's scope, not Plan 05's. Put both
+findings to the user before building anything:
+
+- **Sequencing:** build Plan 06 (Week/Today/tasks/calendar) before the
+  rest of Plan 05, rather than building `learning-days`/`first-activity`
+  against local-only state now and redoing them once Plan 06 lands.
+- **Signup endpoint:** build it now, since it's independent of the Plan
+  06/05 reordering — `account-create` cannot function without it either
+  way.
+
+**Household signup endpoint is implemented and verified** (branch
+`feat/nexsteps-home-signup`): `POST /public/nexsteps-home/signup` creates
+the Auth0 user, then transactionally creates a `HOME_EDUCATION` Org, a
+single Tenant, and the parent's `ORG_ADMIN`/`ADMIN`/`SITE_ADMIN` role rows
+— mirrors `apps/api/src/billing/webhook.controller.ts`'s
+`createOrgFromPendingDetails` (the codebase's existing org+user+role
+creation pattern) minus the payment-deferral wrapper that pattern needs
+and this endpoint doesn't. No session is issued by this endpoint — the
+client logs in afterwards through the existing Auth0 flow already ported
+in Plan 01 (`passwordRealm` via the Auth0 SDK, not a hosted-redirect
+webview, so the UX stays fully in-app). Household name defaults from the
+email's local part (e.g. "sarah@..." → "Sarah's Family"; editable later in
+Family settings) since the wireframe collects only email + password, no
+org-name field. Plan code defaults to a literal `"HOME_FREE"` string (the
+real pricing catalogue is still deferred, per Plan 04's PR).
+
+**Next: Plan 06** (Week, Today, tasks, calendar — H3, 8 screens), now
+ahead of the remaining 8 Setup screens in build order.
 
 ---
 
@@ -700,3 +727,62 @@ existing org-creation flows before assuming either.
   squash-merged; deleted the branch and its worktree.
 - This entry: recorded PR7's merge. Plan 05 (Setup flow) is next; no open
   product decisions flagged for it yet.
+- Opened PR8 (ledger update) to record PR7's merge; all 5 CI checks passed;
+  squash-merged; deleted the branch and its worktree.
+- Started Plan 05. Before writing any screen, read every setup screen's
+  full wireframe content (`prototypes/nexsteps-home/src/wireframes-data.ts`)
+  and checked what backend each of the 9 screens actually needs, rather
+  than assuming "9 screens" meant "9 UI files": `POST /children` already
+  exists (covers `child-add`); Auth0's `createUser`/`verifyPassword`
+  already exist server-side and match the wireframe's native email/password
+  fields (not a hosted-redirect signup); but no endpoint creates an Org
+  from scratch without a payment provider attached
+  (`BuyNowService.checkout` defers org/user/tenant creation until a
+  Stripe/GoCardless webhook confirms payment - wrong shape for a
+  free-by-default household with no in-app checkout), and there is no
+  task/activity/calendar API anywhere yet, which `learning-days` and
+  `first-activity` both need.
+- Put both findings to the user rather than improvising three new backend
+  subsystems under the Plan 05 banner. Resolved: reorder Plan 06 (task/
+  calendar) ahead of the rest of Plan 05, since building those two screens
+  against local-only state now would mean redoing them once Plan 06 lands
+  - the exact "hardcoded mockup" pattern this series has avoided
+  throughout; and build the signup endpoint immediately regardless, since
+  it doesn't depend on the reordering.
+- Read `apps/api/src/billing/webhook.controller.ts`'s
+  `createOrgFromPendingDetails` in full - the codebase's one existing
+  "create Org + Tenant + User + roles from scratch" implementation - to
+  reuse its exact pattern (transaction shape, model relationships, role
+  assignments: `UserTenantRole: Role.ADMIN`, `UserOrgRole`/`OrgMembership`:
+  `OrgRole.ORG_ADMIN`, `SiteMembership: SITE_ADMIN`) rather than inventing
+  a new one. Confirmed `Auth0ManagementService.verifyPassword` only
+  extracts the JWT `sub` for verification and doesn't return a usable
+  session token, so this endpoint issues no session - the client logs in
+  afterwards via the Auth0 SDK's `passwordRealm` grant (already enabled,
+  per that same method's doc comment), reusing 100% of Plan 01's existing
+  bootstrap/session machinery instead of building a parallel one.
+- Created worktree `.worktrees/feat-nexsteps-home-signup` off fresh
+  `fss/master`. Built `apps/api/src/nexsteps-home-signup/` (DTO, service,
+  controller, module) implementing `POST /public/nexsteps-home/signup`;
+  registered it in `app.module.ts`. Confirmed the global `ValidationPipe`
+  (`whitelist`/`forbidNonWhitelisted`/`transform`, set in
+  `config/api-bootstrap.ts`, not `main.ts`) enforces the DTO's
+  `class-validator` decorators automatically - matched `SignupPreflightDto`'s
+  existing pattern rather than second-guessing it.
+- Deliberately made two choices differ from the webhook pattern rather than
+  copying it blindly: Auth0 failure is fatal here (throws, rolling back the
+  whole transaction) since interactive signup has no reason to tolerate a
+  silent failure the way an async post-payment webhook does; and an
+  `OrgVertical` row is created (the webhook pattern only sets the legacy
+  `sector` field, which the schema's own comment says `Vertical` supersedes).
+- Wrote service and controller tests mirroring `public-signup`'s existing
+  jest-mock-the-whole-prisma-client pattern (9 new tests: happy path,
+  duplicate-email conflict, Auth0-failure-is-fatal, slug-collision retry,
+  and the controller's validation/whitelist/conflict-propagation behaviour).
+- Ran the full verification suite: `pnpm -r typecheck`, `pnpm -r lint`,
+  `pnpm test:unit` (all 22 turbo tasks, 743 `apps/api` tests including the
+  9 new ones) - all green.
+- Updated `README.md`'s series table and blocker list to reflect the
+  reordering and the two resolved decisions (it had drifted - Plan 04's
+  row still said "not started" after merging), and this ledger's status
+  table/Next action. About to push and open the PR.
