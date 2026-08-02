@@ -112,6 +112,12 @@ export const VERTICAL_CAPABILITIES = {
     "learning.evidence.read",
     "learning.evidence.write",
     "learning.reports.generate",
+    "family.activities.read",
+    "family.activities.write",
+    "family.tasks.read",
+    "family.tasks.write",
+    "family.calendar.read",
+    "family.calendar.write",
   ],
 } as const satisfies Record<Vertical, readonly Capability[]>;
 
