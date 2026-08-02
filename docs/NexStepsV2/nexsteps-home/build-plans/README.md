@@ -51,9 +51,10 @@ process:
 | 01 | App scaffolding | — | 0 | see PROGRESS.md |
 | 02 | Fidelity harness + phone baselines | — | 0 | see PROGRESS.md |
 | 03 | Tablet design pass + tablet baselines | — | 5 | see PROGRESS.md |
-| 04 | `HOME_EDUCATION` vertical, capabilities, household model, plan | H1 | 0 | not started |
-| 05 | Setup flow | H2 | 9 | not started |
-| 06 | Week, Today, tasks, calendar | H3 | 8 | not started |
+| 04 | `HOME_EDUCATION` vertical, capabilities, household model, plan | H1 | 0 | see PROGRESS.md |
+| — | NexSteps Home household signup endpoint (Setup's `account-create`) | H2 (partial) | 0 | see PROGRESS.md |
+| 06 | Week, Today, tasks, calendar (built before 05 — see sequencing note) | H3 | 8 | not started |
+| 05 | Setup flow (remaining 8 screens) | H2 | 9 | not started |
 | 07 | Progress | H4 | 9 | not started |
 | 08 | Family, people, permissions, privacy | H5 | 8 | not started |
 | 09 | Regulations data + API foundations | H6 | 0 | not started |
@@ -72,6 +73,15 @@ not counted against the phone/moderation total above.
 
 Every plan 04-14 follows the PR handoff template in
 `../implementation-map.md:155-185` and is gated by `../acceptance-criteria.md`.
+
+**Sequencing note (decided with the user, 2 Aug 2026):** Plan 06 is now
+built before Plan 05. Two of Setup's 9 screens (`learning-days`,
+`first-activity`) need the task/calendar backend that Plan 06 actually
+owns — building them first against local-only state would mean redoing
+them once Plan 06 lands, which conflicts with this series' no-hardcoded-
+mockup principle. The household signup endpoint (`account-create`'s
+backend) doesn't depend on Plan 06 at all, so it was built immediately
+rather than waiting for the reordering to resolve.
 
 ## Known blockers, tracked from the start
 
@@ -92,10 +102,12 @@ Every plan 04-14 follows the PR handoff template in
    `AuthUserGuard` uses to resolve tenant. Resolution falls back to
    `User.lastActiveTenantId`. `apps/nexsteps-home` must rely on that
    fallback or a new explicit header, not assume cookie state.
-5. **Two open product decisions block Plan 04:** NexSteps Home pricing
-   (`../../07-nexsteps-home.md:70`) and household-to-Org/Tenant modelling
-   (`../../07-nexsteps-home.md:96-100`). The phase plan's default is one
-   lightweight Org per household absent a concrete reason otherwise.
+5. **Resolved:** NexSteps Home pricing and household-to-Org/Tenant
+   modelling, the two decisions that blocked Plan 04
+   (`../../07-nexsteps-home.md:70`, `:96-100`). One lightweight Org per
+   household (the phase plan's default); Free/Paid two-tier pricing, Paid
+   unlocking Community group creation and expanded AI features (more TBD),
+   no in-app checkout.
 
 ## Conflict watch — concurrent ACE-vertical work
 
