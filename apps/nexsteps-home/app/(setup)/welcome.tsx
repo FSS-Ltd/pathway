@@ -1,29 +1,54 @@
-import { StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
-import { ScreenActions, ScreenHeader } from "@/components/primitives";
+import { ContentCard, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks";
 
-/**
- * Placeholder for the approved "welcome" screen (screen-inventory.json id
- * "welcome"). This scaffolding plan builds zero product screens - the real
- * implementation, matched pixel-for-pixel against the wireframe, lands in
- * Plan 05 (setup flow). This exists only so the unauthenticated bootstrap
- * route resolves to something real and sign-in is exercisable end to end.
- */
 export default function WelcomeScreen() {
   const { signIn } = useAppReady();
 
+  const handleSignIn = async () => {
+    const state = await signIn();
+    if (state.status === "ready") {
+      router.replace(state.route);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
           eyebrow="Welcome"
           title="Bring structure to home learning"
           description="A calm week plan, trusted records and a community of families - all in one place."
         />
-        <ScreenActions primaryLabel="Sign in" onPrimaryPress={() => void signIn()} />
+
+        <NoticeCard
+          title="Know what to do next"
+          body="Start with three small setup steps. Your family week is ready straight afterwards."
+        />
+        <ContentCard
+          title="Your week, organised"
+          body="Learning, tasks and appointments are visible without turning home into school."
+          meta="1 place"
+        />
+        <ContentCard
+          title="Your people, nearby"
+          body="Community is optional, adult-only and designed around mutual introductions."
+          meta="Private"
+          tone="yellow"
+        />
+      </ScrollView>
+
+      <View style={styles.actions}>
+        <ScreenActions
+          primaryLabel="Set up my family"
+          onPrimaryPress={() => router.push("/(setup)/account-create")}
+          secondaryLabel="I already have an account"
+          onSecondaryPress={() => void handleSignIn()}
+        />
       </View>
     </SafeAreaView>
   );
@@ -35,10 +60,17 @@ const styles = StyleSheet.create({
     backgroundColor: homeTokens.colors.bg.shell,
   },
   content: {
-    flex: 1,
-    justifyContent: "flex-end",
     paddingHorizontal: homeTokens.layout.screenHorizontalPadding,
-    paddingBottom: homeTokens.metrics.screenBottomPadding,
+    paddingTop: homeTokens.metrics.screenContentTop,
+    paddingBottom: homeTokens.metrics.tabBarAwareBottomPadding,
     gap: homeTokens.metrics.blockGap,
+  },
+  actions: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: homeTokens.layout.screenHorizontalPadding,
+    paddingBottom: homeTokens.metrics.blockGap,
   },
 });

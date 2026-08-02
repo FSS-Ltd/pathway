@@ -10,6 +10,9 @@ export type EditableField = {
   placeholder?: string;
   helper?: string;
   multiline?: boolean;
+  secureTextEntry?: boolean;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  keyboardType?: "default" | "email-address" | "numeric";
 };
 
 /**
@@ -29,6 +32,9 @@ export function FieldInput({ fields }: { fields: EditableField[] }) {
             placeholder={field.placeholder}
             placeholderTextColor={homeTokens.colors.text.subtle}
             multiline={field.multiline}
+            secureTextEntry={field.secureTextEntry}
+            autoCapitalize={field.autoCapitalize}
+            keyboardType={field.keyboardType}
             style={styles.input}
             accessibilityLabel={field.label}
           />

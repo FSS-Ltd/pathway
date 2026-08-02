@@ -5,3 +5,5 @@ export * as healthApi from "./health";
 export * as familyPlannerApi from "./family-planner";
 export * as childrenApi from "./children";
 export * as learningApi from "./learning";
+export * as householdSetupApi from "./household-setup";
+export * as signupApi from "./signup";

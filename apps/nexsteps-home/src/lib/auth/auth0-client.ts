@@ -33,8 +33,20 @@ type Auth0Client = {
       audience?: string;
       scope?: string;
     }) => Promise<Auth0Credentials>;
+    passwordRealm: (options: {
+      username: string;
+      password: string;
+      realm: string;
+      audience?: string;
+      scope?: string;
+    }) => Promise<Auth0Credentials>;
+    resetPassword: (options: { email: string; connection: string }) => Promise<void>;
   };
 };
+
+// Same connection nexsteps-home-signup.service.ts uses server-side to
+// create the Auth0 user - password login/reset must target the same one.
+const PASSWORD_CONNECTION = "Username-Password-Authentication";
 
 async function getAuth0Client(): Promise<Auth0Client> {
   let moduleRef: unknown;
@@ -102,6 +114,38 @@ export async function loginWithAuth0UniversalLogin() {
   });
 
   return credentials;
+}
+
+/**
+ * Password-realm login, used right after account-create's signup call -
+ * nexsteps-home-signup.service.ts creates the Auth0 user but issues no
+ * session (see its controller doc comment), so the client logs in with the
+ * same credentials the user just chose rather than a second universal-login
+ * round trip.
+ */
+export async function loginWithPassword(username: string, password: string) {
+  const auth0 = await getAuth0Client();
+  const credentials = await auth0.auth.passwordRealm({
+    username,
+    password,
+    realm: PASSWORD_CONNECTION,
+    audience: env.auth0.audience || undefined,
+    scope: env.auth0.scope,
+  });
+
+  await setSessionSnapshot({
+    accessToken: credentials.accessToken,
+    idToken: credentials.idToken,
+    refreshToken: credentials.refreshToken,
+    expiresAt: toIsoFromSeconds(credentials.expiresIn),
+  });
+
+  return credentials;
+}
+
+export async function resetPasswordWithAuth0(email: string) {
+  const auth0 = await getAuth0Client();
+  await auth0.auth.resetPassword({ email, connection: PASSWORD_CONNECTION });
 }
 
 export async function refreshAccessTokenIfNeeded(
