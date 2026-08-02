@@ -1,4 +1,4 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 
 const activityFindMany = jest.fn();
 const activityCreate = jest.fn();
@@ -8,6 +8,8 @@ const taskFindFirst = jest.fn();
 const taskUpdate = jest.fn();
 const calendarItemFindMany = jest.fn();
 const calendarItemCreate = jest.fn();
+const siteMembershipFindUnique = jest.fn();
+const userTenantRoleFindFirst = jest.fn();
 
 jest.mock("@pathway/db", () => ({
   prisma: {
@@ -19,6 +21,8 @@ jest.mock("@pathway/db", () => ({
       update: taskUpdate,
     },
     calendarItem: { findMany: calendarItemFindMany, create: calendarItemCreate },
+    siteMembership: { findUnique: siteMembershipFindUnique },
+    userTenantRole: { findFirst: userTenantRoleFindFirst },
   },
 }));
 
@@ -100,6 +104,29 @@ describe("FamilyPlannerService", () => {
         }),
       }),
     );
+  });
+
+  it("rejects a task assigned to a user outside the current tenant", async () => {
+    siteMembershipFindUnique.mockResolvedValueOnce(null);
+    userTenantRoleFindFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.createTask(
+        { title: "Book transport", assignedToUserId: "other-user" },
+        tenantId,
+        userId,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(siteMembershipFindUnique).toHaveBeenCalledWith({
+      where: { tenantId_userId: { tenantId, userId: "other-user" } },
+      select: { id: true },
+    });
+    expect(userTenantRoleFindFirst).toHaveBeenCalledWith({
+      where: { tenantId, userId: "other-user" },
+      select: { id: true },
+    });
+    expect(taskCreate).not.toHaveBeenCalled();
   });
 
   it("completes a task that exists in the tenant", async () => {

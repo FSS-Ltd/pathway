@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { prisma } from "@pathway/db";
 import type {
   CreateActivityDto,
@@ -82,6 +82,10 @@ export class FamilyPlannerService {
   }
 
   async createTask(dto: CreateTaskDto, tenantId: string, createdByUserId: string) {
+    if (dto.assignedToUserId) {
+      await this.assertUserBelongsToTenant(dto.assignedToUserId, tenantId);
+    }
+
     return prisma.task.create({
       data: {
         tenantId,
@@ -129,5 +133,21 @@ export class FamilyPlannerService {
       },
       select: calendarItemSelect,
     });
+  }
+
+  private async assertUserBelongsToTenant(userId: string, tenantId: string): Promise<void> {
+    const siteMembership = await prisma.siteMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { id: true },
+    });
+    if (siteMembership) return;
+
+    const tenantRole = await prisma.userTenantRole.findFirst({
+      where: { tenantId, userId },
+      select: { id: true },
+    });
+    if (tenantRole) return;
+
+    throw new BadRequestException("Assigned user must belong to the current tenant");
   }
 }
