@@ -127,5 +127,15 @@ runs:
       run: |
         export PATH="${VERCEL_CLI_SYSTEM_PATH}:${PATH}"
         command -v sh >/dev/null
-        url="$(pnpm dlx vercel@54.13.0 deploy --prod --archive=tgz --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
+        # --force: Vercel's incrementally-restored build cache has repeatedly served a
+        # stale @types/react to admin's build (18.x pinned locally, 19.x leaked in from
+        # the cache - apps/nexsteps-home and apps/mobile pin React 19) even though a
+        # cold install always resolves correctly. A one-off forced rebuild (see PR #275)
+        # fixed it temporarily but the cache drifted back to a bad state within a few
+        # more deploys (see PR #281's "Deploy admin" failure) - this is a recurring
+        # class of failure, not a fluke, so the bypass is now permanent rather than a
+        # revert-after-one-clean-deploy cycle. apps/web pins the same React 18 line and
+        # carries the identical latent exposure even though it hasn't failed yet, so all
+        # three apps sharing this action are forced, not just admin.
+        url="$(pnpm dlx vercel@54.13.0 deploy --prod --force --archive=tgz --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
         echo "Deployed ${{ inputs.app }} to $url"
