@@ -62,6 +62,16 @@ const REQUIRED_RLS_TABLES = [
   "PermissionSlipResponse",
   "PermissionSlipException",
   "PermissionSlipReminder",
+  "AceCommunityPolicy",
+  "AceCommunityGroup",
+  "AceCommunityGroupChildMember",
+  "AceCommunityGroupStaffMember",
+  "AceCommunityPost",
+  "AceCommunityReply",
+  "AceCommunityReadCursor",
+  "AceCommunityReport",
+  "AceCommunityModerationAction",
+  "AceCommunitySafeguardingReference",
 ];
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);

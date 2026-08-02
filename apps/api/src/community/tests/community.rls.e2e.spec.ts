@@ -374,7 +374,7 @@ describe("ACE school Community storage", () => {
       ],
     });
 
-    await withCommunityRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, async (tx) => {
       await tx.user.createMany({
         data: [
           fixture.staffAId,
@@ -405,7 +405,7 @@ describe("ACE school Community storage", () => {
       await insertStudentIdentityLink(tx, fixture.tenantAId, fixture.studentPastUpperBoundaryUserId, fixture.childPastUpperBoundaryId);
     });
 
-    await withCommunityRlsContext(fixture.tenantBId, fixture.orgBId, async (tx) => {
+    await withTenantRlsContext(fixture.tenantBId, fixture.orgBId, async (tx) => {
       await tx.user.create({
         data: { id: fixture.staffBId, email: `${fixture.staffBId}@example.test`, tenantId: fixture.tenantBId },
       });
@@ -433,6 +433,10 @@ describe("ACE school Community storage", () => {
   afterEach(async () => {
     if (!isDatabaseAvailable()) return;
     await deleteCommunityRowsIfPresent(prisma);
+    await prisma.studentIdentityLink.updateMany({
+      where: { tenantId: fixture.tenantAId, childId: fixture.childManualId },
+      data: { endedAt: null, revokedAt: null, revokedByUserId: null, revocationReason: null },
+    });
   });
 
   afterAll(async () => {
@@ -600,6 +604,29 @@ describe("ACE school Community storage", () => {
       await expectDatabaseRejection(
         tx,
         () => tx.$executeRaw`DELETE FROM "AceCommunityModerationAction" WHERE "id" = ${actionId}`,
+        "55000",
+      );
+      const safeguardingReferenceId = randomUUID();
+      await tx.$executeRaw`
+        INSERT INTO "AceCommunitySafeguardingReference" (
+          "id", "tenantId", "reportId", "concernId"
+        ) VALUES (
+          ${safeguardingReferenceId}, ${fixture.tenantAId}, ${reportId}, ${fixture.concernAId}
+        )
+      `;
+      await expectDatabaseRejection(
+        tx,
+        () => tx.$executeRaw`
+          UPDATE "AceCommunitySafeguardingReference" SET "concernId" = ${fixture.concernAId}
+          WHERE "id" = ${safeguardingReferenceId}
+        `,
+        "55000",
+      );
+      await expectDatabaseRejection(
+        tx,
+        () => tx.$executeRaw`
+          DELETE FROM "AceCommunitySafeguardingReference" WHERE "id" = ${safeguardingReferenceId}
+        `,
         "55000",
       );
     });
