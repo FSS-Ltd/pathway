@@ -25,6 +25,22 @@ enum AssignmentStatus {
   DECLINED
 }
 
+enum PermissionSlipChangeClassification {
+  INITIAL
+  MATERIAL
+  NON_MATERIAL
+}
+
+enum PermissionSlipResponseDecision {
+  ACCEPTED
+  DECLINED
+}
+
+enum PermissionSlipExceptionSource {
+  PHYSICAL
+  TELEPHONE
+}
+
 enum SwapStatus {
   REQUESTED
   ACCEPTED
@@ -297,8 +313,8 @@ model OrgRoleDefinition {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  org         Org      @relation(fields: [orgId], references: [id])
-  tenant      Tenant?  @relation(fields: [tenantId, orgId], references: [id, orgId])
+  org         Org                  @relation(fields: [orgId], references: [id])
+  tenant      Tenant?              @relation(fields: [tenantId, orgId], references: [id, orgId])
   permissions OrgRolePermission[]
   revisions   OrgRoleRevision[]
   assignments UserRoleAssignment[]
@@ -332,11 +348,11 @@ model OrgRoleRevision {
 
 model OrgRolePermission {
   roleDefinitionId String
-  permissionKey     String
-  grantedById       String
-  grantedAt         DateTime          @default(now())
+  permissionKey    String
+  grantedById      String
+  grantedAt        DateTime @default(now())
 
-  roleDefinition OrgRoleDefinition @relation(fields: [roleDefinitionId], references: [id], onDelete: Cascade)
+  roleDefinition OrgRoleDefinition    @relation(fields: [roleDefinitionId], references: [id], onDelete: Cascade)
   permission     PermissionDefinition @relation(fields: [permissionKey], references: [key])
 
   @@id([roleDefinitionId, permissionKey])
@@ -381,9 +397,9 @@ model OutboxEvent {
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Restrict)
 
+  @@unique([orgId, idempotencyKey])
   @@index([orgId, createdAt])
   @@index([aggregateType, aggregateId, createdAt])
-  @@unique([orgId, idempotencyKey])
 }
 
 model OrgVertical {
@@ -432,55 +448,55 @@ enum BlogAssetStorage {
 }
 
 model BlogAsset {
-  id        String           @id @default(uuid())
-  type      BlogAssetType
-  storage   BlogAssetStorage  @default(POSTGRES)
-  mimeType  String
-  byteSize  Int
-  sha256    String           @unique
-  width     Int?
-  height    Int?
-  bytes     Bytes?
+  id            String           @id @default(uuid())
+  type          BlogAssetType
+  storage       BlogAssetStorage @default(POSTGRES)
+  mimeType      String
+  byteSize      Int
+  sha256        String           @unique
+  width         Int?
+  height        Int?
+  bytes         Bytes?
   storageBucket String?
   storageKey    String?
-  createdAt DateTime         @default(now())
+  createdAt     DateTime         @default(now())
 
   @@index([sha256])
   @@index([storageBucket, storageKey])
 }
 
 model BlogPost {
-  id                 String         @id @default(uuid())
-  title              String
-  slug               String         @unique
-  excerpt            String?        @db.Text
-  contentJson        Json
-  contentHtml        String         @db.Text
-  seoTitle           String?
-  seoDescription     String?        @db.Text
-  thumbnailImageId   String?
-  headerImageId      String?
-  status             BlogPostStatus @default(DRAFT)
-  publishedAt        DateTime?
-  tags               String[]       @default([])
-  authorName         String?        // Set at publish from publishing user
-  authorAvatarId     String?        // BlogAsset id if avatar stored at publish
-  readTimeMinutes    Int?           // Calculated from content at publish
-  isFeatured         Boolean        @default(false) // Shown in featured slot on blog index
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  id               String         @id @default(uuid())
+  title            String
+  slug             String         @unique
+  excerpt          String?        @db.Text
+  contentJson      Json
+  contentHtml      String         @db.Text
+  seoTitle         String?
+  seoDescription   String?        @db.Text
+  thumbnailImageId String?
+  headerImageId    String?
+  status           BlogPostStatus @default(DRAFT)
+  publishedAt      DateTime?
+  tags             String[]       @default([])
+  authorName       String? // Set at publish from publishing user
+  authorAvatarId   String? // BlogAsset id if avatar stored at publish
+  readTimeMinutes  Int? // Calculated from content at publish
+  isFeatured       Boolean        @default(false) // Shown in featured slot on blog index
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   @@index([status, publishedAt])
   @@index([slug])
 }
 
 model AutomationApiToken {
-  id        String   @id @default(uuid())
-  name      String
-  tokenHash String   @unique
-  createdAt DateTime @default(now())
-  expiresAt DateTime?
-  revokedAt DateTime?
+  id         String    @id @default(uuid())
+  name       String
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime?
+  revokedAt  DateTime?
   lastUsedAt DateTime?
 
   publishAudits AutomationBlogPublishAudit[]
@@ -520,43 +536,43 @@ enum HandoverLogStatus {
 
 // NEW: Org (Suite) — business/billing owner; may contain multiple Tenants (sites)
 model Org {
-  id               String                   @id @default(uuid())
-  name             String
-  slug             String                   @unique
-  planCode         String // e.g., trial|starter|standard|pro|suite_*
-  isSuite          Boolean                  @default(false)
-  isMasterOrg      Boolean                  @default(false) // Internal/platform org: no Stripe, unlimited, non-billable
+  id                  String                   @id @default(uuid())
+  name                String
+  slug                String                   @unique
+  planCode            String // e.g., trial|starter|standard|pro|suite_*
+  isSuite             Boolean                  @default(false)
+  isMasterOrg         Boolean                  @default(false) // Internal/platform org: no Stripe, unlimited, non-billable
   parentPortalEnabled Boolean                  @default(true)
   // Selected once at initial plan purchase. Nullable so orgs created before this field
   // existed remain valid; new orgs should always set it at purchase time.
-  sector           OrgSector?
+  sector              OrgSector?
   // Org-level white-label logo, stored in the public Supabase bucket. Nullable — falls
   // back to the NexSteps mark. See docs/design/per-org-logo.md.
-  logoStorageKey   String?
-  logoContentType  String?
-  stripeCustomerId String?                  @unique
-  tenants          Tenant[]
-  subscriptions    Subscription[]
-  entitlements     OrgEntitlementSnapshot[]
-  retentionPolicy  OrgRetentionPolicy?
-  usageCounters    UsageCounters[]
-  billingEvents    BillingEvent[]
-  userOrgRoles     UserOrgRole[]
-  orgMemberships   OrgMembership[]
-  auditEvents       AuditEvent[]
-  staffActivities   StaffActivity[]
-  pendingOrders     PendingOrder[]
-  invites           Invite[]
-  publicSignupLinks PublicSignupLink[]
-  deletedUsers      OrgDeletedUser[]
-  orgVertical       OrgVertical?
-  orgModules        OrgModule[]
-  roleDefinitions   OrgRoleDefinition[]
-  roleRevisions     OrgRoleRevision[]
-  roleAssignments   UserRoleAssignment[]
-  outboxEvents      OutboxEvent[]
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
+  logoStorageKey      String?
+  logoContentType     String?
+  stripeCustomerId    String?                  @unique
+  tenants             Tenant[]
+  subscriptions       Subscription[]
+  entitlements        OrgEntitlementSnapshot[]
+  retentionPolicy     OrgRetentionPolicy?
+  usageCounters       UsageCounters[]
+  billingEvents       BillingEvent[]
+  userOrgRoles        UserOrgRole[]
+  orgMemberships      OrgMembership[]
+  auditEvents         AuditEvent[]
+  staffActivities     StaffActivity[]
+  pendingOrders       PendingOrder[]
+  invites             Invite[]
+  publicSignupLinks   PublicSignupLink[]
+  deletedUsers        OrgDeletedUser[]
+  orgVertical         OrgVertical?
+  orgModules          OrgModule[]
+  roleDefinitions     OrgRoleDefinition[]
+  roleRevisions       OrgRoleRevision[]
+  roleAssignments     UserRoleAssignment[]
+  outboxEvents        OutboxEvent[]
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
 }
 
 // NOTE: Tenant == Site (true isolation boundary / RLS). Admin UI “Site selector”
@@ -628,13 +644,22 @@ model Tenant {
   faithContentAudiences  FaithContentAudience[]
   faithReadReceipts      FaithReadReceipt[]
   faithReflections       FaithReflection[]
+  trips                  Trip[]
+  tripCheckpoints        TripCheckpoint[]
+  tripCheckpointAttendance TripCheckpointAttendance[]
+  permissionSlips        PermissionSlip[]
+  permissionSlipVersions PermissionSlipVersion[]
+  permissionSlipRecipients PermissionSlipRecipient[]
+  permissionSlipResponses PermissionSlipResponse[]
+  permissionSlipExceptions PermissionSlipException[]
+  permissionSlipReminders PermissionSlipReminder[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
-  @@index([orgId])
   @@unique([id, orgId])
+  @@index([orgId])
 }
 
 model UserTenantRole {
@@ -664,19 +689,19 @@ model UserOrgRole {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  email       String?   @unique
-  name        String?
-  displayName String?
-  firstName   String?
-  lastName    String?
-  dateOfBirth        DateTime? @db.Date
-  avatarUrl          String?   // External URL fallback (e.g. Auth0)
-  avatarKey          String?   // Supabase Storage key for uploaded avatar
-  avatarBytes        Bytes?    // Inline fallback until storage backfill
-  avatarContentType  String?   // e.g. image/jpeg
-  isActive           Boolean   @default(true)
-  superUser          Boolean   @default(false) // Nexsteps staff only (e.g. blog admin)
+  id                String    @id @default(uuid())
+  email             String?   @unique
+  name              String?
+  displayName       String?
+  firstName         String?
+  lastName          String?
+  dateOfBirth       DateTime? @db.Date
+  avatarUrl         String? // External URL fallback (e.g. Auth0)
+  avatarKey         String? // Supabase Storage key for uploaded avatar
+  avatarBytes       Bytes? // Inline fallback until storage backfill
+  avatarContentType String? // e.g. image/jpeg
+  isActive          Boolean   @default(true)
+  superUser         Boolean   @default(false) // Nexsteps staff only (e.g. blog admin)
 
   // NOTE: kept for backward compatibility (single-tenant user). For suites, prefer UserTenantRole.
   tenantId String?
@@ -686,28 +711,28 @@ model User {
   lastActiveTenantId String?
   lastActiveTenant   Tenant? @relation("UserLastActiveTenant", fields: [lastActiveTenantId], references: [id])
 
-  children         Child[]               @relation("ParentChildren")
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  firstLoginAt     DateTime?                // Track when user first logs in (for onboarding)
-  hasServeAccess   Boolean               @default(false)
-  hasFamilyAccess  Boolean               @default(false)
-  roles            UserTenantRole[]
-  siteMemberships  SiteMembership[]
-  orgMemberships   OrgMembership[]
-  assignments      Assignment[]
-  preferences      VolunteerPreference[]
-  notes            ChildNote[]           @relation("ChildNoteAuthor")
-  approvedNotes    ChildNote[]           @relation("ChildNoteApprovedBy")
-  auditEvents      AuditEvent[]          @relation("AuditActor")
-  swapRequestsFrom SwapRequest[]         @relation("SwapFromUser")
-  swapRequestsTo   SwapRequest[]         @relation("SwapToUser")
-  orgRoles         UserOrgRole[]
-  staffActivities      StaffActivity[]
-  identities           UserIdentity[]
-  guardianIdentities   GuardianIdentity[]
-  studentIdentities    StudentIdentity[]
-  revokedStudentIdentityLinks StudentIdentityLink[] @relation("StudentIdentityLinkRevokedBy")
+  children                          Child[]                     @relation("ParentChildren")
+  createdAt                         DateTime                    @default(now())
+  updatedAt                         DateTime                    @updatedAt
+  firstLoginAt                      DateTime? // Track when user first logs in (for onboarding)
+  hasServeAccess                    Boolean                     @default(false)
+  hasFamilyAccess                   Boolean                     @default(false)
+  roles                             UserTenantRole[]
+  siteMemberships                   SiteMembership[]
+  orgMemberships                    OrgMembership[]
+  assignments                       Assignment[]
+  preferences                       VolunteerPreference[]
+  notes                             ChildNote[]                 @relation("ChildNoteAuthor")
+  approvedNotes                     ChildNote[]                 @relation("ChildNoteApprovedBy")
+  auditEvents                       AuditEvent[]                @relation("AuditActor")
+  swapRequestsFrom                  SwapRequest[]               @relation("SwapFromUser")
+  swapRequestsTo                    SwapRequest[]               @relation("SwapToUser")
+  orgRoles                          UserOrgRole[]
+  staffActivities                   StaffActivity[]
+  identities                        UserIdentity[]
+  guardianIdentities                GuardianIdentity[]
+  studentIdentities                 StudentIdentity[]
+  revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
   familyIdentityInvites FamilyIdentityInvite[] @relation("FamilyIdentityInviteUser")
   familyIdentityInvitesCreated FamilyIdentityInvite[] @relation("FamilyIdentityInviteCreatedBy")
@@ -744,6 +769,15 @@ model User {
   reviewedAceReports          AceReportReview[]           @relation("AceReportReviewReviewer")
   authoredFaithContentDrafts  FaithContentDraft[]          @relation("FaithContentDraftAuthor")
   releasedFaithReflections    FaithReflection[]            @relation("FaithReflectionReleasedBy")
+  tripsCreated                Trip[]                       @relation("TripCreatedBy")
+  tripsCancelled              Trip[]                       @relation("TripCancelledBy")
+  tripCheckpointsCreated      TripCheckpoint[]             @relation("TripCheckpointCreatedBy")
+  tripAttendanceMarked        TripCheckpointAttendance[]   @relation("TripCheckpointAttendanceMarkedBy")
+  permissionSlipsCreated      PermissionSlip[]             @relation("PermissionSlipCreatedBy")
+  permissionSlipVersionsCreated PermissionSlipVersion[]     @relation("PermissionSlipVersionCreatedBy")
+  permissionSlipVersionsPublished PermissionSlipVersion[]   @relation("PermissionSlipVersionPublishedBy")
+  permissionSlipExceptionsRecorded PermissionSlipException[] @relation("PermissionSlipExceptionRecordedBy")
+  permissionSlipExceptionsWitnessed PermissionSlipException[] @relation("PermissionSlipExceptionWitness")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
@@ -775,10 +809,10 @@ model GuardianIdentity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant       Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user         User                         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  relationships GuardianChildRelationship[]
-  acceptedInvites FamilyIdentityInvite[]    @relation("FamilyIdentityInviteAcceptedGuardian")
+  tenant          Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user            User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  relationships   GuardianChildRelationship[]
+  acceptedInvites FamilyIdentityInvite[]      @relation("FamilyIdentityInviteAcceptedGuardian")
 
   @@unique([id, tenantId])
   @@unique([tenantId, userId])
@@ -796,8 +830,8 @@ model StudentIdentity {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  user            User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
   links           StudentIdentityLink[]
   acceptedInvites FamilyIdentityInvite[] @relation("FamilyIdentityInviteAcceptedStudent")
   faithReadReceipts FaithReadReceipt[]
@@ -822,17 +856,17 @@ model StudentPortalPolicy {
 }
 
 model StudentIdentityLink {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   tenantId          String
   studentIdentityId String
   childId           String
-  linkedAt          DateTime @default(now())
+  linkedAt          DateTime  @default(now())
   endedAt           DateTime?
   revokedAt         DateTime?
   revokedByUserId   String?
-  revocationReason  String?  @db.Text
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  revocationReason  String?   @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   studentIdentity StudentIdentity @relation(fields: [studentIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
@@ -858,12 +892,14 @@ model GuardianChildRelationship {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
-  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  guardianIdentity GuardianIdentity @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  child            Child            @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  revokedBy        User?            @relation("GuardianChildRelationshipRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  guardianIdentity        GuardianIdentity         @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  child                   Child                    @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  revokedBy               User?                    @relation("GuardianChildRelationshipRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  permissionSlipResponses PermissionSlipResponse[]
 
   @@unique([id, tenantId])
+  @@unique([id, tenantId, childId, guardianIdentityId])
   @@index([tenantId, childId])
   @@index([tenantId, guardianIdentityId])
 }
@@ -935,11 +971,11 @@ model SiteMembership {
 
 // Invite model for onboarding new users to Orgs and Sites
 model Invite {
-  id              String @id @default(uuid())
+  id              String  @id @default(uuid())
   orgId           String
-  org             Org    @relation(fields: [orgId], references: [id])
+  org             Org     @relation(fields: [orgId], references: [id])
   createdByUserId String
-  createdBy       User   @relation("InviteCreatedBy", fields: [createdByUserId], references: [id])
+  createdBy       User    @relation("InviteCreatedBy", fields: [createdByUserId], references: [id])
   email           String // normalized to lowercase
   name            String? // Optional name for the invitee
 
@@ -995,7 +1031,7 @@ model PublicSignupLink {
   orgId           String
   tenantId        String
   tokenHash       String
-  tokenForDisplay String?   // For returning same signup URL to admin; never log or expose outside admin response
+  tokenForDisplay String? // For returning same signup URL to admin; never log or expose outside admin response
   createdByUserId String?
   createdBy       User?     @relation("PublicSignupLinkCreatedBy", fields: [createdByUserId], references: [id])
   expiresAt       DateTime?
@@ -1015,14 +1051,14 @@ model PublicSignupLink {
 // Emergency contact for a parent (guardian) in a tenant.
 // name/phone/relationship are encrypted at rest — see packages/db/src/pii-encryption.ts.
 model EmergencyContact {
-  id          String   @id @default(uuid())
-  userId      String
-  tenantId    String
-  name        String
-  phone       String
+  id           String   @id @default(uuid())
+  userId       String
+  tenantId     String
+  name         String
+  phone        String
   relationship String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1034,15 +1070,15 @@ model EmergencyContact {
 // Consent record for parent signup (timestamps + consenting adult identity).
 // consentingAdultName/consentingAdultRelationship are encrypted at rest — see packages/db/src/pii-encryption.ts.
 model ParentSignupConsent {
-  id                        String    @id @default(uuid())
-  userId                    String
-  tenantId                  String
-  dataProcessingConsentAt   DateTime
-  firstAidConsentAt        DateTime?
-  consentingAdultName       String
+  id                          String    @id @default(uuid())
+  userId                      String
+  tenantId                    String
+  dataProcessingConsentAt     DateTime
+  firstAidConsentAt           DateTime?
+  consentingAdultName         String
   consentingAdultRelationship String?
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1053,18 +1089,18 @@ model ParentSignupConsent {
 
 // fullName/phone/relationshipToChild are encrypted at rest — see packages/db/src/pii-encryption.ts.
 model ChildGuardianContact {
-  id                         String                   @id @default(uuid())
-  childId                    String
-  tenantId                   String
-  fullName                   String
-  email                      String?
-  phone                      String?
-  relationshipToChild        String?
-  contactType                ChildGuardianContactType @default(PRIMARY_GUARDIAN)
-  dataProcessingConsentAt    DateTime?
-  firstAidConsentAt          DateTime?
-  createdAt                  DateTime                 @default(now())
-  updatedAt                  DateTime                 @updatedAt
+  id                      String                   @id @default(uuid())
+  childId                 String
+  tenantId                String
+  fullName                String
+  email                   String?
+  phone                   String?
+  relationshipToChild     String?
+  contactType             ChildGuardianContactType @default(PRIMARY_GUARDIAN)
+  dataProcessingConsentAt DateTime?
+  firstAidConsentAt       DateTime?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
 
   child  Child  @relation(fields: [childId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1078,102 +1114,107 @@ model ChildGuardianContact {
 // at rest — see packages/db/src/pii-encryption.ts. dateOfBirth is NOT yet encrypted
 // (would require a DateTime -> String column change; tracked as a follow-up).
 model Child {
-  id                  String       @id @default(uuid())
-  firstName           String
-  lastName            String
-  preferredName       String?
-  dateOfBirth         DateTime?
-  allergies           String       @default("unknown")
-  additionalNeedsNotes String?
+  id                         String                      @id @default(uuid())
+  firstName                  String
+  lastName                   String
+  preferredName              String?
+  dateOfBirth                DateTime?
+  allergies                  String                      @default("unknown")
+  additionalNeedsNotes       String?
   // Safeguarding-relevant info from public signup
-  schoolName          String?
-  yearGroup           String?
-  gpName              String?
-  gpPhone             String?
-  specialNeedsType    String?      // e.g. none, sen_support, ehcp, other
-  specialNeedsOther   String?     // Free text when specialNeedsType is "other"
-  photoConsent        Boolean      @default(false)
-  photoKey            String?
-  photoBytes          Bytes?       // Inline fallback until storage backfill
-  photoContentType    String?      // e.g. image/jpeg
-  notes               String?
-  tenantId            String
-  tenant              Tenant       @relation(fields: [tenantId], references: [id])
-  guardians           User[]       @relation("ParentChildren")
-  guardianContacts    ChildGuardianContact[]
-  groupId             String?
-  group               Group?       @relation(fields: [groupId], references: [id])
-  disabilities        String[]     @default([])
-  concerns            Concern[]
-  attendance          Attendance[]
-  childNotes          ChildNote[]
-  learningLogs        LearningLog[]
-  subjectEnrollments  StudentSubjectEnrollment[]
-  paceAssessments     PaceAssessment[]
-  paceProgress        PaceProgress[]
-  pacePolicyOverrides PacePolicyOverride[]
-  behaviourEntries    BehaviourEntry[]
-  demeritStageOverrides DemeritStageOverride[]
-  studentIdentityLinks StudentIdentityLink[]
+  schoolName                 String?
+  yearGroup                  String?
+  gpName                     String?
+  gpPhone                    String?
+  specialNeedsType           String? // e.g. none, sen_support, ehcp, other
+  specialNeedsOther          String? // Free text when specialNeedsType is "other"
+  photoConsent               Boolean                     @default(false)
+  photoKey                   String?
+  photoBytes                 Bytes? // Inline fallback until storage backfill
+  photoContentType           String? // e.g. image/jpeg
+  notes                      String?
+  tenantId                   String
+  tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
+  guardians                  User[]                      @relation("ParentChildren")
+  guardianContacts           ChildGuardianContact[]
+  groupId                    String?
+  group                      Group?                      @relation(fields: [groupId], references: [id])
+  disabilities               String[]                    @default([])
+  concerns                   Concern[]
+  attendance                 Attendance[]
+  childNotes                 ChildNote[]
+  learningLogs               LearningLog[]
+  subjectEnrollments         StudentSubjectEnrollment[]
+  paceAssessments            PaceAssessment[]
+  paceProgress               PaceProgress[]
+  pacePolicyOverrides        PacePolicyOverride[]
+  behaviourEntries           BehaviourEntry[]
+  demeritStageOverrides      DemeritStageOverride[]
+  studentIdentityLinks       StudentIdentityLink[]
   guardianChildRelationships GuardianChildRelationship[]
-  familyIdentityInvites FamilyIdentityInvite[]
-  aceTermReports        AceTermReport[]
-  evidence            Evidence[]
-  reportBundles       ReportBundle[]
-  activities          Activity[]
+  familyIdentityInvites      FamilyIdentityInvite[]
+  aceTermReports             AceTermReport[]
+  evidence                   Evidence[]
+  reportBundles              ReportBundle[]
+  activities                 Activity[]
+  tripCheckpointAttendance   TripCheckpointAttendance[]
+  permissionSlipRecipients   PermissionSlipRecipient[]
+  permissionSlipResponses    PermissionSlipResponse[]
+  permissionSlipExceptions   PermissionSlipException[]
+  permissionSlipReminders    PermissionSlipReminder[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
   // ~1h after guestExpiresAt. See docs/design/guest-pass-24h.md.
-  isGuest             Boolean      @default(false)
-  guestExpiresAt      DateTime?
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  isGuest                    Boolean                     @default(false)
+  guestExpiresAt             DateTime?
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([isGuest, guestExpiresAt])
-  @@unique([id, tenantId])
 }
 
 model Group {
-  id          String       @id @default(uuid())
-  name        String
-  minAge      Int?
-  maxAge      Int?
-  description String?
-  color       String?      // Hex color for rota/schedule cards (e.g. #0ec2a2)
-  isActive    Boolean      @default(true)
-  sortOrder   Int?
-  tenantId    String
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  children              Child[]
-  attendances           Attendance[]
-  sessions              Session[]   // many-to-many with Session
-  lessons               Lesson[]
-  staffPreferredGroups  StaffPreferredGroup[]
-  handoverLogs          HandoverLog[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                   String                @id @default(uuid())
+  name                 String
+  minAge               Int?
+  maxAge               Int?
+  description          String?
+  color                String? // Hex color for rota/schedule cards (e.g. #0ec2a2)
+  isActive             Boolean               @default(true)
+  sortOrder            Int?
+  tenantId             String
+  tenant               Tenant                @relation(fields: [tenantId], references: [id])
+  children             Child[]
+  attendances          Attendance[]
+  sessions             Session[] // many-to-many with Session
+  lessons              Lesson[]
+  staffPreferredGroups StaffPreferredGroup[]
+  handoverLogs         HandoverLog[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
 
   @@unique([tenantId, name])
   @@index([tenantId])
 }
 
 model HandoverLog {
-  id               String            @id @default(uuid())
-  tenantId         String
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
-  groupId          String
-  group            Group             @relation(fields: [groupId], references: [id])
-  handoverDate     DateTime          @db.Date
-  status           HandoverLogStatus @default(DRAFT)
+  id                 String               @id @default(uuid())
+  tenantId           String
+  tenant             Tenant               @relation(fields: [tenantId], references: [id])
+  groupId            String
+  group              Group                @relation(fields: [groupId], references: [id])
+  handoverDate       DateTime             @db.Date
+  status             HandoverLogStatus    @default(DRAFT)
   currentContentJson Json
-  createdByUserId  String
-  createdByUser    User              @relation("HandoverLogCreatedBy", fields: [createdByUserId], references: [id])
-  approvedByUserId String?
-  approvedByUser   User?             @relation("HandoverLogApprovedBy", fields: [approvedByUserId], references: [id])
-  approvedAt       DateTime?
-  versions         HandoverLogVersion[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdByUserId    String
+  createdByUser      User                 @relation("HandoverLogCreatedBy", fields: [createdByUserId], references: [id])
+  approvedByUserId   String?
+  approvedByUser     User?                @relation("HandoverLogApprovedBy", fields: [approvedByUserId], references: [id])
+  approvedAt         DateTime?
+  versions           HandoverLogVersion[]
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
 
   @@unique([tenantId, groupId, handoverDate])
   @@index([tenantId, handoverDate])
@@ -1182,18 +1223,241 @@ model HandoverLog {
 }
 
 model HandoverLogVersion {
-  id                  String       @id @default(uuid())
+  id                  String      @id @default(uuid())
   handoverLogId       String
-  handoverLog         HandoverLog  @relation(fields: [handoverLogId], references: [id], onDelete: Cascade)
+  handoverLog         HandoverLog @relation(fields: [handoverLogId], references: [id], onDelete: Cascade)
   versionNumber       Int
   contentSnapshotJson Json
   editedByUserId      String
-  editedByUser        User         @relation("HandoverLogVersionEditedBy", fields: [editedByUserId], references: [id])
-  editedAt            DateTime     @default(now())
+  editedByUser        User        @relation("HandoverLogVersionEditedBy", fields: [editedByUserId], references: [id])
+  editedAt            DateTime    @default(now())
   changeSummary       String?
   diffJson            Json?
 
   @@index([handoverLogId, versionNumber])
+}
+
+// A planned trip is site-scoped. Checkpoint attendance is deliberately separate
+// from session attendance because staff may add or reorder checkpoints during
+// the day without changing the trip's core itinerary.
+model Trip {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  title              String
+  destination        String
+  startsAt           DateTime
+  endsAt             DateTime
+  cancelledAt        DateTime?
+  cancelledByUserId  String?
+  cancellationReason String?   @db.Text
+  createdByUserId    String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy      User             @relation("TripCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  cancelledBy    User?            @relation("TripCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  checkpoints    TripCheckpoint[]
+  permissionSlip PermissionSlip?
+
+  @@unique([id, tenantId])
+  @@index([tenantId, startsAt])
+}
+
+// A staff-configurable, ordered moment at which children are accounted for.
+// It intentionally has no staff attendance relation.
+model TripCheckpoint {
+  id              String    @id @default(uuid())
+  tenantId        String
+  tripId          String
+  label           String    @db.Text
+  position        Int
+  plannedAt       DateTime?
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tenant     Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  trip       Trip                       @relation(fields: [tripId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  createdBy  User                       @relation("TripCheckpointCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  attendance TripCheckpointAttendance[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, tripId, position])
+  @@index([tenantId, tripId])
+}
+
+model TripCheckpointAttendance {
+  id               String   @id @default(uuid())
+  tenantId         String
+  tripCheckpointId String
+  childId          String
+  present          Boolean
+  markedByUserId   String
+  markedAt         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  tripCheckpoint TripCheckpoint @relation(fields: [tripCheckpointId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  child          Child          @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  markedBy       User           @relation("TripCheckpointAttendanceMarkedBy", fields: [markedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, tripCheckpointId, childId])
+  @@index([tenantId, childId])
+}
+
+// A trip has at most one permission-slip workflow. Published wording lives in
+// PermissionSlipVersion so changing consent wording cannot rewrite history.
+model PermissionSlip {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tripId          String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant    Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  trip      Trip                    @relation(fields: [tripId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  createdBy User                    @relation("PermissionSlipCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions  PermissionSlipVersion[]
+
+  @@unique([id, tenantId])
+  @@unique([tripId, tenantId])
+}
+
+model PermissionSlipVersion {
+  id                   String                             @id @default(uuid())
+  tenantId             String
+  permissionSlipId     String
+  version              Int
+  contentSnapshot      Json
+  versionHash          String?
+  changeClassification PermissionSlipChangeClassification @default(INITIAL)
+  requiresReconsent    Boolean                            @default(false)
+  publishedAt          DateTime?
+  publishedByUserId    String?
+  supersedesVersionId  String?
+  createdByUserId      String
+  createdAt            DateTime                           @default(now())
+  updatedAt            DateTime                           @updatedAt
+
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  permissionSlip    PermissionSlip            @relation(fields: [permissionSlipId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  createdBy         User                      @relation("PermissionSlipVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  publishedBy       User?                     @relation("PermissionSlipVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  supersedesVersion PermissionSlipVersion?    @relation("PermissionSlipVersionSupersession", fields: [supersedesVersionId, tenantId, permissionSlipId], references: [id, tenantId, permissionSlipId], onDelete: Restrict)
+  supersededBy      PermissionSlipVersion[]   @relation("PermissionSlipVersionSupersession")
+  recipients        PermissionSlipRecipient[]
+  responses         PermissionSlipResponse[]
+  exceptions        PermissionSlipException[]
+  reminders         PermissionSlipReminder[]
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, permissionSlipId])
+  @@unique([id, tenantId, versionHash])
+  @@unique([tenantId, permissionSlipId, version])
+  @@index([tenantId, permissionSlipId, publishedAt])
+}
+
+// A recipient is a child snapshot for a particular version. It makes later
+// changes to a trip's participant list unable to change who was asked.
+model PermissionSlipRecipient {
+  id                      String   @id @default(uuid())
+  tenantId                String
+  permissionSlipVersionId String
+  childId                 String
+  createdAt               DateTime @default(now())
+
+  tenant                Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  permissionSlipVersion PermissionSlipVersion     @relation(fields: [permissionSlipVersionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  child                 Child                     @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  responses             PermissionSlipResponse[]
+  exceptions            PermissionSlipException[]
+  reminders             PermissionSlipReminder[]
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, childId, permissionSlipVersionId])
+  @@unique([tenantId, permissionSlipVersionId, childId])
+  @@index([tenantId, childId])
+}
+
+// responsePayload is encrypted at rest; it can contain guardian-provided
+// special arrangements or supporting details.
+model PermissionSlipResponse {
+  id                          String                         @id @default(uuid())
+  tenantId                    String
+  permissionSlipVersionId     String
+  permissionSlipRecipientId   String
+  childId                     String
+  guardianChildRelationshipId String
+  guardianIdentityId          String
+  versionHash                 String
+  decision                    PermissionSlipResponseDecision
+  responsePayload             String                         @db.Text
+  idempotencyKey              String
+  respondedAt                 DateTime                       @default(now())
+  createdAt                   DateTime                       @default(now())
+
+  tenant                    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  permissionSlipVersion     PermissionSlipVersion     @relation(fields: [permissionSlipVersionId, tenantId, versionHash], references: [id, tenantId, versionHash], onDelete: Restrict)
+  permissionSlipRecipient   PermissionSlipRecipient   @relation(fields: [permissionSlipRecipientId, tenantId, childId, permissionSlipVersionId], references: [id, tenantId, childId, permissionSlipVersionId], onDelete: Restrict)
+  child                     Child                     @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  guardianChildRelationship GuardianChildRelationship @relation(fields: [guardianChildRelationshipId, tenantId, childId, guardianIdentityId], references: [id, tenantId, childId, guardianIdentityId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, permissionSlipVersionId, guardianChildRelationshipId, idempotencyKey])
+  @@index([tenantId, permissionSlipRecipientId])
+}
+
+// reason is encrypted at rest. These rows preserve an accountable record when
+// a signed physical form or telephone confirmation is accepted instead of an
+// in-portal guardian response.
+model PermissionSlipException {
+  id                        String                         @id @default(uuid())
+  tenantId                  String
+  permissionSlipVersionId   String
+  permissionSlipRecipientId String
+  childId                   String
+  versionHash               String
+  source                    PermissionSlipExceptionSource
+  decision                  PermissionSlipResponseDecision
+  recordedByUserId          String
+  witnessUserId             String
+  reason                    String                         @db.Text
+  recordedAt                DateTime                       @default(now())
+  createdAt                 DateTime                       @default(now())
+
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  permissionSlipVersion   PermissionSlipVersion   @relation(fields: [permissionSlipVersionId, tenantId, versionHash], references: [id, tenantId, versionHash], onDelete: Restrict)
+  permissionSlipRecipient PermissionSlipRecipient @relation(fields: [permissionSlipRecipientId, tenantId, childId, permissionSlipVersionId], references: [id, tenantId, childId, permissionSlipVersionId], onDelete: Restrict)
+  child                   Child                   @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recordedBy              User                    @relation("PermissionSlipExceptionRecordedBy", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  witness                 User                    @relation("PermissionSlipExceptionWitness", fields: [witnessUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, permissionSlipRecipientId])
+}
+
+model PermissionSlipReminder {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  permissionSlipVersionId   String
+  permissionSlipRecipientId String
+  childId                   String
+  scheduledFor              DateTime
+  sentAt                    DateTime?
+  cancelledAt               DateTime?
+  createdAt                 DateTime  @default(now())
+
+  tenant                  Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  permissionSlipVersion   PermissionSlipVersion   @relation(fields: [permissionSlipVersionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  permissionSlipRecipient PermissionSlipRecipient @relation(fields: [permissionSlipRecipientId, tenantId, childId, permissionSlipVersionId], references: [id, tenantId, childId, permissionSlipVersionId], onDelete: Restrict)
+  child                   Child                   @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, scheduledFor])
 }
 
 model Attendance {
@@ -1227,19 +1491,19 @@ model Concern {
 }
 
 model Session {
-  id                    String                   @id @default(uuid())
-  tenantId              String
-  tenant                Tenant                   @relation(fields: [tenantId], references: [id])
-  groups                Group[]                  // many-to-many: session can be for multiple classes
-  startsAt              DateTime
-  endsAt                DateTime
-  title                 String?
-  assignments           Assignment[]
-  attendances           Attendance[]
-  lessons               Lesson[]                 // lessons linked to this session
+  id                     String                   @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant                   @relation(fields: [tenantId], references: [id])
+  groups                 Group[] // many-to-many: session can be for multiple classes
+  startsAt               DateTime
+  endsAt                 DateTime
+  title                  String?
+  assignments            Assignment[]
+  attendances            Attendance[]
+  lessons                Lesson[] // lessons linked to this session
   sessionStaffAttendance SessionStaffAttendance[]
-  createdAt             DateTime                 @default(now())
-  updatedAt             DateTime                 @updatedAt
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
 
   @@index([tenantId])
   @@index([startsAt])
@@ -1347,21 +1611,21 @@ model SwapRequest {
 }
 
 model Lesson {
-  id                 String    @id @default(uuid())
-  tenantId           String
-  tenant             Tenant    @relation(fields: [tenantId], references: [id])
-  groupId            String?
-  group              Group?    @relation(fields: [groupId], references: [id])
-  sessionId          String?   // optional link to a session (replaces date-only association)
-  session            Session?  @relation(fields: [sessionId], references: [id])
-  title              String
-  description        String?
-  fileKey            String?   // Supabase Storage key / label for resource
-  resourceFileBytes  Bytes?    // Inline fallback until storage backfill
-  resourceFileName   String?   // original filename for download
-  weekOf             DateTime  // e.g., Monday of the week (kept for backward compatibility)
-  createdAt          DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id                String   @id @default(uuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  groupId           String?
+  group             Group?   @relation(fields: [groupId], references: [id])
+  sessionId         String? // optional link to a session (replaces date-only association)
+  session           Session? @relation(fields: [sessionId], references: [id])
+  title             String
+  description       String?
+  fileKey           String? // Supabase Storage key / label for resource
+  resourceFileBytes Bytes? // Inline fallback until storage backfill
+  resourceFileName  String? // original filename for download
+  weekOf            DateTime // e.g., Monday of the week (kept for backward compatibility)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([tenantId])
   @@index([groupId])
@@ -1370,21 +1634,21 @@ model Lesson {
 }
 
 model Subject {
-  id           String        @id @default(uuid())
-  tenantId     String
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  name         String
-  category     String?
-  color        String?
-  isActive     Boolean       @default(true)
-  sortOrder    Int?
-  learningLogs LearningLog[]
-  subjectEnrollments StudentSubjectEnrollment[]
-  paceAssessments PaceAssessment[]
-  paceProgress PaceProgress[]
+  id                  String                     @id @default(uuid())
+  tenantId            String
+  tenant              Tenant                     @relation(fields: [tenantId], references: [id])
+  name                String
+  category            String?
+  color               String?
+  isActive            Boolean                    @default(true)
+  sortOrder           Int?
+  learningLogs        LearningLog[]
+  subjectEnrollments  StudentSubjectEnrollment[]
+  paceAssessments     PaceAssessment[]
+  paceProgress        PaceProgress[]
   pacePolicyOverrides PacePolicyOverride[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
 
   @@unique([tenantId, name])
   @@unique([id, tenantId])
@@ -1809,7 +2073,7 @@ model PacePolicyOverride {
   authorisedByUserId String
   authorisedBy       User             @relation("PacePolicyOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
   reason             String           @db.Text
-  expiresAt          DateTime         // PostgreSQL also rejects non-finite timestamps.
+  expiresAt          DateTime // PostgreSQL also rejects non-finite timestamps.
   assessments        PaceAssessment[]
   createdAt          DateTime         @default(now())
 
@@ -1884,7 +2148,7 @@ model DemeritStageOverride {
   authorisedByUserId String
   authorisedBy       User          @relation("DemeritStageOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
   reason             String        @db.Text
-  expiresAt          DateTime        // PostgreSQL also rejects non-finite timestamps.
+  expiresAt          DateTime // PostgreSQL also rejects non-finite timestamps.
   createdAt          DateTime      @default(now())
 
   @@unique([id, tenantId])
@@ -1913,11 +2177,11 @@ model LearningLog {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
+  @@unique([id, tenantId])
   @@index([tenantId, activityDate])
   @@index([tenantId, childId, activityDate])
   @@index([subjectId])
   @@index([activityId])
-  @@unique([id, tenantId])
 }
 
 // NexSteps Home week/today planning (H3). A planned learning activity for one
@@ -2167,11 +2431,11 @@ model PendingOrder {
   createdAt              DateTime           @default(now())
   completedAt            DateTime?
   updatedAt              DateTime           @updatedAt
-  
+
   // For public checkout: store org/user details until payment confirmed.
   // Encrypted as a whole (may carry a plaintext password transiently) — see
   // packages/db/src/pii-encryption.ts. { orgName, slug, contactName, contactEmail, password }
-  pendingOrgDetails      Json?
+  pendingOrgDetails Json?
 
   @@index([tenantId, orgId, provider, providerCheckoutId])
   @@index([provider, providerSubscriptionId])
@@ -2207,21 +2471,21 @@ model StaffActivity {
 }
 
 model Lead {
-  id             String    @id @default(uuid())
+  id             String          @id @default(uuid())
   kind           LeadKind
   email          String
   name           String?
   organisation   String?
   role           String?
   sector         String?
-  message        String?   @db.Text
+  message        String?         @db.Text
   utmSource      String?
   utmMedium      String?
   utmCampaign    String?
   metadataJson   Json?
   downloadedAt   DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   downloadTokens DownloadToken[]
 
   @@index([email, kind, createdAt])
