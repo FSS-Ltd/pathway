@@ -336,6 +336,28 @@ BEGIN
 END;
 $$;
 
+-- A group cannot be converted to automatic age-range membership while it
+-- retains the named children that are valid only for a MANUAL group.
+CREATE FUNCTION app.assert_ace_community_group_membership_mode_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW."membershipMode" = 'AGE_RANGE' AND EXISTS (
+    SELECT 1
+    FROM app."AceCommunityGroupChildMember"
+    WHERE "tenantId" = NEW."tenantId" AND "groupId" = NEW."id"
+  ) THEN
+    RAISE EXCEPTION 'Age-range Community groups cannot retain explicit child members'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
 -- Staff participate only when they remain current site members.
 CREATE FUNCTION app.assert_ace_community_staff_member()
 RETURNS trigger
@@ -523,6 +545,7 @@ END;
 $$;
 
 REVOKE ALL ON FUNCTION app.assert_ace_community_child_member_mode() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.assert_ace_community_group_membership_mode_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_community_staff_member() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_community_author() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_community_safeguarding_reference() FROM PUBLIC;
@@ -532,6 +555,10 @@ REVOKE ALL ON FUNCTION app.reject_ace_community_content_mutation() FROM PUBLIC;
 CREATE TRIGGER "AceCommunityGroupChildMember_manual_group_only"
 BEFORE INSERT OR UPDATE OF "tenantId", "groupId", "childId" ON "AceCommunityGroupChildMember"
 FOR EACH ROW EXECUTE FUNCTION app.assert_ace_community_child_member_mode();
+
+CREATE TRIGGER "AceCommunityGroup_age_range_has_no_child_projection"
+BEFORE UPDATE OF "membershipMode", "tenantId" ON "AceCommunityGroup"
+FOR EACH ROW EXECUTE FUNCTION app.assert_ace_community_group_membership_mode_mutation();
 
 CREATE TRIGGER "AceCommunityGroupStaffMember_require_site_membership"
 BEFORE INSERT OR UPDATE OF "tenantId", "staffUserId" ON "AceCommunityGroupStaffMember"

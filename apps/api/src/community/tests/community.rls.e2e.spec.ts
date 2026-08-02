@@ -494,6 +494,17 @@ describe("ACE school Community storage", () => {
 
       await tx.$executeRaw`UPDATE "AceCommunityPolicy" SET "communityEnabled" = true WHERE "tenantId" = ${fixture.tenantAId}`;
       await insertPost(tx, fixture, { groupId });
+      await expectDatabaseRejection(
+        tx,
+        () => tx.$executeRaw`
+          UPDATE "AceCommunityGroup"
+          SET "membershipMode" = 'AGE_RANGE'::"AceCommunityGroupMembershipMode",
+              "minimumAge" = 10,
+              "maximumAge" = 12
+          WHERE "id" = ${groupId}
+        `,
+        "23514",
+      );
       await tx.$executeRaw`
         DELETE FROM "AceCommunityGroupChildMember"
         WHERE "groupId" = ${groupId} AND "childId" = ${fixture.childManualId}

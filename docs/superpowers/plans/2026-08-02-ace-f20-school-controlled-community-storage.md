@@ -453,4 +453,3 @@ git commit -m "docs: record ACE Community storage verification"
 ~~~
 
 Do not include ignored Graphify files in the commit if repository policy excludes them; retain the command output in pull-request verification notes instead.
-

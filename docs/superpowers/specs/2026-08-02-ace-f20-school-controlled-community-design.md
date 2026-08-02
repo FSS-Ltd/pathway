@@ -1,8 +1,8 @@
 # ACE-F20 School-Controlled Community Storage
 
-**Owner:** Technical Agent  
-**Status:** Under Review  
-**Created:** 2026-08-02  
+**Owner:** Technical Agent
+**Status:** Implemented
+**Created:** 2026-08-02
 **Related docs:** `docs/superpowers/plans/2026-07-25-ace-core-foundation-access.md`, `docs/superpowers/plans/2026-07-25-ace-core-learning-faith-trips-reports-community.md`, `docs/NexSteps-ACE-Vertical-Build-Plan.md`
 
 ## Problem statement
@@ -124,3 +124,10 @@ The ACE-F20 integration tests will prove that:
 
 ACE-F20 changes only the Prisma schema, additive migration, strict RLS inventory, and Community storage integration tests. It deliberately does not add the API or user experience that exposes this data. The immediately following Community slices must use this model and enforce school-owned enablement, typed capabilities, group eligibility, moderation, and the absence of student DMs.
 
+## Implementation record
+
+- Applied the ACE school Community migration to the isolated local E2E database.
+- Prisma client generation passed.
+- The focused Community integration suite passed under the non-bypass RLS role, covering all seven storage contracts.
+- The strict RLS gate passed for required tables with the repository's accepted public-table exposure setting. Its unaccepted form continues to report the existing unrelated ChildGuardianContact and OrgDeletedUser RLS debt; all ten Community tables are enabled, forced, carry one tenant policy each, and have no PUBLIC, anon, or authenticated grant.
+- The repository structural Graphify graph was refreshed after the implementation.
