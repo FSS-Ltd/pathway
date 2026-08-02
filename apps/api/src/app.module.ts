@@ -13,6 +13,7 @@ import { ChildrenModule } from "./children/children.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { LessonsModule } from "./lessons/lessons.module";
 import { LearningModule } from "./learning/learning.module";
+import { FamilyPlannerModule } from "./family-planner/family-planner.module";
 
 // // Scheduling / Rota
 import { SessionsModule } from "./sessions/sessions.module";
@@ -54,6 +55,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     AttendanceModule,
     LessonsModule,
     LearningModule,
+    FamilyPlannerModule,
     SessionsModule,
     AssignmentsModule,
     PreferencesModule,

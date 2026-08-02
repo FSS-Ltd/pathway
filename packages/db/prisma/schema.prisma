@@ -32,6 +32,12 @@ enum SwapStatus {
   CANCELLED
 }
 
+enum TaskPriority {
+  LOW
+  NORMAL
+  IMPORTANT
+}
+
 enum Weekday {
   SUN
   MON
@@ -591,6 +597,9 @@ model Tenant {
   learningLogs           LearningLog[]
   evidence               Evidence[]
   reportBundles          ReportBundle[]
+  activities             Activity[]
+  tasks                  Task[]
+  calendarItems          CalendarItem[]
   academicYears          AcademicYear[]
   academicPeriods        AcademicPeriod[]
   subjectEnrollments     StudentSubjectEnrollment[]
@@ -719,6 +728,10 @@ model User {
   loggedLearningLogs      LearningLog[]           @relation("LearningLogLoggedBy")
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
+  createdActivities       Activity[]              @relation("ActivityCreatedBy")
+  assignedTasks           Task[]                  @relation("TaskAssignedTo")
+  createdTasks            Task[]                  @relation("TaskCreatedBy")
+  createdCalendarItems    CalendarItem[]          @relation("CalendarItemCreatedBy")
   recordedSubjectEnrollments StudentSubjectEnrollment[] @relation("StudentSubjectEnrollmentRecordedBy")
   recordedPaceAssessments    PaceAssessment[]            @relation("PaceAssessmentRecordedBy")
   createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
@@ -1107,6 +1120,7 @@ model Child {
   aceTermReports        AceTermReport[]
   evidence            Evidence[]
   reportBundles       ReportBundle[]
+  activities          Activity[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
   // ~1h after guestExpiresAt. See docs/design/guest-pass-24h.md.
   isGuest             Boolean      @default(false)
@@ -1891,6 +1905,10 @@ model LearningLog {
   minutes        Int?
   title          String
   description    String?    @db.Text
+  // NexSteps Home: the planned Activity this log completes, if any. Nullable -
+  // every other vertical logs without a planned activity, and still can.
+  activityId     String?
+  activity       Activity?  @relation(fields: [activityId, tenantId], references: [id, tenantId])
   evidence       Evidence[]
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
@@ -1898,7 +1916,75 @@ model LearningLog {
   @@index([tenantId, activityDate])
   @@index([tenantId, childId, activityDate])
   @@index([subjectId])
+  @@index([activityId])
   @@unique([id, tenantId])
+}
+
+// NexSteps Home week/today planning (H3). A planned learning activity for one
+// child; subjectIds is a loose tag list (not a DB relation - validated
+// against Subject at the service layer) since a household activity can span
+// multiple subjects, unlike LearningLog's single subjectId.
+model Activity {
+  id              String        @id @default(uuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id])
+  childId         String
+  child           Child         @relation(fields: [childId, tenantId], references: [id, tenantId])
+  title           String
+  scheduledAt     DateTime
+  durationMinutes Int?
+  subjectIds      String[]      @default([])
+  planNotes       String?       @db.Text
+  resourcesNote   String?       @db.Text
+  createdByUserId String
+  createdBy       User          @relation("ActivityCreatedBy", fields: [createdByUserId], references: [id])
+  learningLogs    LearningLog[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([tenantId, scheduledAt])
+  @@index([tenantId, childId, scheduledAt])
+  @@unique([id, tenantId])
+}
+
+// NexSteps Home week/today planning (H3). A household task, distinct from a
+// learning Activity - "renew library books", not learning itself.
+model Task {
+  id               String       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant       @relation(fields: [tenantId], references: [id])
+  title            String
+  assignedToUserId String?
+  assignedTo       User?        @relation("TaskAssignedTo", fields: [assignedToUserId], references: [id])
+  dueAt            DateTime?
+  priority         TaskPriority @default(NORMAL)
+  completedAt      DateTime?
+  createdByUserId  String
+  createdBy        User         @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([tenantId, dueAt])
+  @@index([tenantId, completedAt])
+}
+
+// NexSteps Home week/today planning (H3). A private family calendar item
+// (an appointment, a visit) - never exposed to Community, by design; not a
+// per-item flag, an architectural invariant of this model.
+model CalendarItem {
+  id              String   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  title           String
+  who             String?
+  scheduledAt     DateTime
+  location        String?
+  createdByUserId String
+  createdBy       User     @relation("CalendarItemCreatedBy", fields: [createdByUserId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, scheduledAt])
 }
 
 model Evidence {

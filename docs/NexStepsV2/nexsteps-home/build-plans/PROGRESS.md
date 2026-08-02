@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-01
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Household signup endpoint (Setup's `account-create` backend) implemented, verified locally; PR about to open. Sequencing changed: Plan 06 (Week/Today/tasks/calendar) now comes before the rest of Plan 05 — see README.md's sequencing note
+**Current phase:** Plan 06 backend foundations (Activity/Task/CalendarItem schema, capabilities, `family-planner` API) implemented, verified locally; PR about to open. Plan 06 screens (RN UI) are next after this merges
 
 ---
 
@@ -30,8 +30,10 @@ continue.
 | 6 | 03 — tablet design pass + tablet baselines | **merged** | `feat/nexsteps-home-tablet-design` | [#273](https://github.com/FSS-Ltd/pathway/pull/273) | squash-merged, branch deleted; 5 tablet composites, 81 screens / 10 groups in the inventory |
 | 7 | 04 — `HOME_EDUCATION` vertical, capabilities, household model, plan | **merged** | `feat/nexsteps-home-h1-foundations` | [#277](https://github.com/FSS-Ltd/pathway/pull/277) | squash-merged, branch deleted; also fixed a pre-existing Plan 03 registry gap (5 tablet screens) found during verification |
 | 8 | ledger update | **merged** | `docs/nexsteps-home-progress-update-3` | [#279](https://github.com/FSS-Ltd/pathway/pull/279) | squash-merged, branch deleted |
-| 9 | household signup endpoint (Setup's `account-create` backend) | in progress | `feat/nexsteps-home-signup` | not yet opened | code complete, verified locally, about to push |
-| 10-17 | 06, then 05 (remaining 8), then 07-14 | not started | — | — | — |
+| 9 | household signup endpoint (Setup's `account-create` backend) | **merged** | `feat/nexsteps-home-signup` | [#280](https://github.com/FSS-Ltd/pathway/pull/280) | squash-merged, branch deleted |
+| 10 | 06 backend foundations — Activity/Task/CalendarItem schema, capabilities, `family-planner` API | in progress | `feat/nexsteps-home-week-today-schema` | not yet opened | code complete, verified locally, about to push |
+| 11 | 06 screens (Week/Today/tasks/calendar UI, 8 screens) | not started | — | — | — |
+| 12-18 | 05 (remaining 8), then 07-14 | not started | — | — | — |
 
 ## Environment
 
@@ -470,40 +472,13 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-Investigating Plan 05 (Setup flow, H2) surfaced that it isn't just 9
-screens of UI: `account-create` needs a real signup endpoint (no existing
-one fits — the only "create an Org from scratch" path is
-`BuyNowService.checkout`, tightly coupled to Stripe/GoCardless payment,
-which doesn't fit a free-by-default household with no in-app checkout),
-and `learning-days`/`first-activity` depend on task/calendar backend that
-doesn't exist yet and is actually Plan 06's scope, not Plan 05's. Put both
-findings to the user before building anything:
-
-- **Sequencing:** build Plan 06 (Week/Today/tasks/calendar) before the
-  rest of Plan 05, rather than building `learning-days`/`first-activity`
-  against local-only state now and redoing them once Plan 06 lands.
-- **Signup endpoint:** build it now, since it's independent of the Plan
-  06/05 reordering — `account-create` cannot function without it either
-  way.
-
-**Household signup endpoint is implemented and verified** (branch
-`feat/nexsteps-home-signup`): `POST /public/nexsteps-home/signup` creates
-the Auth0 user, then transactionally creates a `HOME_EDUCATION` Org, a
-single Tenant, and the parent's `ORG_ADMIN`/`ADMIN`/`SITE_ADMIN` role rows
-— mirrors `apps/api/src/billing/webhook.controller.ts`'s
-`createOrgFromPendingDetails` (the codebase's existing org+user+role
-creation pattern) minus the payment-deferral wrapper that pattern needs
-and this endpoint doesn't. No session is issued by this endpoint — the
-client logs in afterwards through the existing Auth0 flow already ported
-in Plan 01 (`passwordRealm` via the Auth0 SDK, not a hosted-redirect
-webview, so the UX stays fully in-app). Household name defaults from the
-email's local part (e.g. "sarah@..." → "Sarah's Family"; editable later in
-Family settings) since the wireframe collects only email + password, no
-org-name field. Plan code defaults to a literal `"HOME_FREE"` string (the
-real pricing catalogue is still deferred, per Plan 04's PR).
-
-**Next: Plan 06** (Week, Today, tasks, calendar — H3, 8 screens), now
-ahead of the remaining 8 Setup screens in build order.
+Plan 06's backend foundations are implemented and verified (branch
+`feat/nexsteps-home-week-today-schema`, not yet pushed): `Activity`,
+`Task`, `CalendarItem` schema + capabilities + the `family-planner` API.
+**Next: Plan 06's 8 RN screens** (Week, Today, tasks, calendar), built
+against this real API — no mocked/local-only state, per this series'
+standing principle. After that: the remaining 8 Setup screens (Plan 05),
+then Plan 07 onward.
 
 ---
 
@@ -786,3 +761,112 @@ ahead of the remaining 8 Setup screens in build order.
   reordering and the two resolved decisions (it had drifted - Plan 04's
   row still said "not started" after merging), and this ledger's status
   table/Next action. About to push and open the PR.
+- Pushed and opened PR9 ([#280](https://github.com/FSS-Ltd/pathway/pull/280));
+  all 5 CI checks passed; squash-merged; deleted the branch and its worktree.
+- User asked to see the app running. Started `apps/nexsteps-home` via
+  `expo start --web` in the Browser pane - first time this app's own web
+  build (not the prototype) had been loaded with its real auth bootstrap
+  running, and it crashed immediately:
+  `ExpoSecureStore.default.getValueWithKeyAsync is not a function`.
+  Root-caused it properly rather than papering over it: `expo-secure-store`
+  has no web implementation at all (Keychain/Keystore have no web
+  equivalent - confirmed via the package's own docs), and `apps/mobile` has
+  the identical unguarded `SecureStore` calls (this file was ported from it
+  verbatim in Plan 01) but never hit this because its own web target was
+  already known broken before this series started - nothing had ever
+  exercised this code path on web until now. Fixed with a
+  `Platform.OS === "web"` branch falling back to `localStorage`; native
+  behaviour unchanged. Also found and fixed a second, smaller Plan 01 gap
+  while in there: `apps/nexsteps-home` never got its own `.gitignore`
+  (unlike `apps/mobile`'s). Added 3 regression tests, a `launch.json` entry
+  so the app can be previewed via the dev-server tooling going forward, ran
+  the full verification suite (all green), opened and merged PR10
+  ([#281](https://github.com/FSS-Ltd/pathway/pull/281)) - all 5 CI checks
+  passed.
+- Confirmed live in the Browser pane at 393×852 after the fix: the Welcome
+  screen renders correctly (title/eyebrow/description matching the
+  approved wireframe) on top of the real design tokens and primitives.
+- Separately, this same push triggered two failures unrelated to NexSteps
+  Home content but on the shared `master` branch: a transient Docker Hub
+  registry timeout on a Postgres-backed CI job (re-ran it, passed), and a
+  recurrence of an admin Vercel deploy failure from earlier the same day
+  (`@types/react` version leaking from Vercel's incrementally-cached
+  `node_modules` - the first occurrence had been fixed with a one-off
+  forced rebuild, reverted after one clean deploy; this recurrence proved
+  that was only a temporary fix, so `--force` was made permanent for
+  admin/web/api's deploys instead). Both fixed and merged
+  ([#282](https://github.com/FSS-Ltd/pathway/pull/282)); not NexSteps-Home
+  work, recorded here only because it happened mid-session and blocked
+  forward progress until resolved - full detail lives in that PR, not this
+  ledger.
+- Resumed Plan 06. Read all 8 screens' full wireframe content
+  (`week-home`, `day-detail`, `activity-plan`, `activity-detail`, `today`,
+  `quick-log`, `task-editor`, `calendar-editor`) to derive the data model
+  precisely rather than guessing: three new concepts (a planned learning
+  Activity, a household Task, a private CalendarItem), plus a link from
+  the existing `LearningLog` back to the Activity it completes. Noticed a
+  real, pre-existing schema gap while doing this: `LearningLog.subjectId`
+  is singular, but both `quick-log` and `activity-plan`'s wireframes show
+  multi-select subject chips - accepted as a known, pre-existing
+  limitation (not fixed; `LearningLog` is shared with ACE/institutional
+  verticals, well outside this series' scope) and used a scalar
+  `subjectIds String[]` on the new `Activity` model instead, validated
+  against `Subject` at the service layer rather than a DB relation, so the
+  new model isn't forced into the same limitation.
+- Found, while writing the migration, that every existing tenant-scoped
+  table in this schema is protected by Row-Level Security *and* an
+  actor-membership trigger (`app.require_learning_actor_membership`,
+  checked against `SiteMembership`/`UserTenantRole`) - not just
+  application-level `tenantId` filtering. Read `20251201173000_core_tenant_rls`
+  and `20260720100000_add_learning_models` in full to understand exactly
+  how `app.current_tenant_id()` gets set (a generic `set_config` call in
+  `packages/db/src/index.ts`, applying automatically to any table with RLS
+  enabled - no new application code needed) before deciding this was a
+  hard requirement, not optional, for the three new tables to carry the
+  same security guarantee as everything around them.
+- Hand-wrote the migration SQL rather than using `prisma migrate diff`
+  against a live database, specifically to avoid connecting a shadow-DB
+  diff operation to the local Postgres containers already running on this
+  shared machine (unclear ownership - other concurrent sessions may depend
+  on them). Instead validated it the safe way: started a fully isolated,
+  throwaway `postgres:16-alpine` container on an unused port, applied the
+  *entire* migration history (including the new one) against it from
+  scratch - succeeded - then ran `prisma migrate diff` between that
+  now-migrated database and `schema.prisma` to confirm zero drift. Caught
+  one real bug this way: `Task.assignedToUserId` is optional, so Prisma
+  expects `ON DELETE SET NULL`, not the `RESTRICT` every other FK in the
+  migration correctly uses (required fields) - fixed, re-validated clean.
+  Tore down the throwaway container immediately after.
+- Added 6 new capabilities (`family.activities.{read,write}`,
+  `family.tasks.{read,write}`, `family.calendar.{read,write}`), granted at
+  vertical level to `HOME_EDUCATION` alongside the existing `learning.*`
+  grant. Found and updated a deliberate governance test
+  (`capability-definitions.spec.ts`'s "exactly the 100 approved registry
+  keys") that exists specifically to force new capabilities through an
+  explicit, reviewed list rather than letting the registry drift silently
+  - now 106.
+- Built `apps/api/src/family-planner/` (DTOs, service, controller, module)
+  mirroring `apps/api/src/learning/`'s established pattern exactly (zod
+  validation, `CapabilityGuard`/`RequireCapability`, `CurrentTenant`,
+  actor-id-from-request) rather than inventing a new one. Endpoints:
+  `GET/POST /family-planner/activities`, `GET/POST /family-planner/tasks`,
+  `POST /family-planner/tasks/:id/complete`,
+  `GET/POST /family-planner/calendar-items`. No PATCH/edit endpoints yet -
+  none of the 8 screens show an edit flow for an existing item, only
+  create and complete, so none were built (YAGNI, not an oversight - add
+  when a screen actually needs it).
+- Wrote service tests (mirroring `learning.service.spec.ts`'s
+  mock-the-whole-prisma-client pattern) and controller tests (mirroring
+  `attendance.controller.spec.ts`'s direct-method-invocation + guard-
+  override pattern, lighter than the full e2e/DB-backed style used for
+  security-sensitive public endpoints like the signup one - this endpoint
+  is authenticated and capability-guarded, e2e coverage can follow if a
+  later plan finds a gap, not before). Found and fixed a real bug in my
+  own first draft of these tests, not the source: the controller's
+  `create*`/`completeTask` methods aren't `async`, so a validation failure
+  throws synchronously rather than rejecting a promise - `expect(...).rejects`
+  silently doesn't catch that; switched those 4 assertions to
+  `expect(() => ...).toThrow(...)`.
+- Ran the full verification suite: `pnpm -r typecheck`, `pnpm -r lint`,
+  `pnpm test:unit` (all 22 turbo tasks, 759 `apps/api` tests including the
+  16 new ones) - all green. About to push and open the PR.

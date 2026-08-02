@@ -284,6 +284,42 @@ export const CAPABILITY_DEFINITIONS = {
     "site",
     "sensitive",
   ),
+  "family.activities.read": defineCapability(
+    "View planned activities",
+    "View the household's planned learning activities",
+    "site",
+    "sensitive",
+  ),
+  "family.activities.write": defineCapability(
+    "Plan activities",
+    "Create and edit the household's planned learning activities",
+    "site",
+    "sensitive",
+  ),
+  "family.tasks.read": defineCapability(
+    "View family tasks",
+    "View the household's tasks",
+    "site",
+    "sensitive",
+  ),
+  "family.tasks.write": defineCapability(
+    "Manage family tasks",
+    "Create, assign and complete the household's tasks",
+    "site",
+    "sensitive",
+  ),
+  "family.calendar.read": defineCapability(
+    "View family calendar",
+    "View the household's private calendar items",
+    "site",
+    "sensitive",
+  ),
+  "family.calendar.write": defineCapability(
+    "Manage family calendar",
+    "Create and edit the household's private calendar items",
+    "site",
+    "sensitive",
+  ),
   "platform.access.roles.read": defineCapability(
     "View roles",
     "View organisation role definitions",
