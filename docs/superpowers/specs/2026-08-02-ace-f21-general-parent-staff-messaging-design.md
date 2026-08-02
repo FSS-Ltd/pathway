@@ -3,7 +3,7 @@
 **Owner:** Technical Agent  
 **Status:** Approved  
 **Created:** 2026-08-02  
-**Related docs:** `docs/superpowers/plans/2026-07-25-ace-core-foundation-access.md`, `docs/NexSteps-ACE-Vertical-Build-Plan.md`, `docs/superpowers/specs/2026-08-02-ace-f20-school-controlled-community-design.md`
+**Related docs:** `docs/superpowers/plans/2026-07-25-ace-core-foundation-access.md`, `docs/NexSteps-ACE-Vertical-Build-Plan.md`
 
 ## Problem statement
 
@@ -44,12 +44,14 @@ The implementation represents this as exactly one `PARENT_STAFF` conversation pe
 
 There is no `STUDENT_DIRECT`, `STUDENT`, `PARENT_GROUP`, or generic public/private kind. `MessageConversation` does not include `childId`, a topic key, or a title intended to create topic threads for parents.
 
-`MessageParticipant` stores the tenant, conversation, user, participant kind (`GUARDIAN` or `STAFF`), joined time, and nullable `removedAt`. A tenant-local guardian identity is recorded for guardian participants. A database trigger enforces the topology:
+`MessageParticipant` stores the tenant, conversation, user, participant kind (`GUARDIAN` or `STAFF`), joined time, and nullable `removedAt`. A tenant-local guardian identity is recorded for guardian participants. A database trigger enforces the participant facts, and a deferred constraint trigger enforces the completed conversation topology at transaction commit:
 
 - a parent/staff conversation has the conversation's one guardian as its only guardian participant;
 - that guardian has a current relationship to at least one child in the tenant when added or restored;
 - every staff participant has a current `SiteMembership` in the tenant; and
 - staff-direct and staff-room conversations have staff participants only.
+
+At commit, a parent/staff conversation must have one active guardian and at least one active staff participant; a staff-direct conversation has exactly two active staff participants; and a staff room has at least two active staff participants. Creating, replacing, or removing participants therefore happens atomically without leaving a usable invalid conversation.
 
 The participant record is retained after removal for accountability, but `removedAt` blocks subsequent authoring, delivery, and cursor advancement. The later messaging command service will also restrict reads and writes to active participants and typed permissions. Tenant RLS cannot replace that actor-level service check because the existing database RLS context is tenant-based rather than user-based.
 
@@ -71,7 +73,7 @@ ACE notices use a dedicated `AceNotice` model rather than extending `Announcemen
 
 Publishing an `AceNotice` creates immutable `AceNoticeAudienceMember` rows. Each row stores the tenant, notice, recipient user, recipient kind, and, for a guardian recipient, the guardian identity that justified inclusion at publication. It is a snapshot: later staff membership, guardian relationship, or role changes never rewrite the original recipient set.
 
-`AceNoticeReceipt` belongs to one frozen audience member and records delivery and read timestamps. Notice audience membership and receipts are append-only once the notice is published. Any later delivery event again references identifiers only, never notice body or attachment content.
+`AceNoticeReceipt` belongs to one frozen audience member and records delivery and read timestamps. Notice audience membership is immutable once the notice is published. Receipt state is forward-only: delivery and read timestamps may be added as delivery progresses, but cannot be cleared or moved backwards. Any later delivery event again references identifiers only, never notice body or attachment content.
 
 `AceNoticeAttachment` follows the same private-key rule as message attachments. Student notice recipients are deliberately out of scope for this parent/staff foundation.
 
@@ -82,7 +84,7 @@ Publishing an `AceNotice` creates immutable `AceNoticeAudienceMember` rows. Each
 3. An active participant creates an idempotent message. The database validates the sender's active participant record and assigns the next immutable sequence.
 4. Recipient delivery records and content-free outbox references let later realtime or push delivery notify the appropriate active participants.
 5. An authorised staff member creates and publishes an ACE notice. Publication resolves the intended parent/staff audience once and persists the frozen recipient rows.
-6. Later changes to guardian relationships, staff membership, or notice targeting do not alter historic recipient or receipt records.
+6. Later changes to guardian relationships, staff membership, or notice targeting do not alter historic recipient records or reverse a recorded receipt state.
 
 ## Security and privacy
 
@@ -97,12 +99,12 @@ Publishing an `AceNotice` creates immutable `AceNoticeAudienceMember` rows. Each
 
 ## Failure modes and recovery
 
-- A duplicate client message request returns the existing message instead of adding a second message or delivery set.
+- A duplicate client message request is identified by its unique idempotency key rather than adding a second message or delivery set. The later command service resolves that unique-key conflict by returning the original message.
 - A stale cursor write is rejected rather than marking a participant unread again; a cursor beyond the latest sequence is also rejected.
 - A guardian whose relationship has ended cannot be newly added or restored as an active parent participant. The later service removes access promptly while retaining history.
 - A removed participant cannot send, receive new delivery rows, or update a read cursor.
 - A parent/staff conversation cannot fragment into per-child or per-topic threads because no such foreign key or uniqueness dimension exists.
-- A notice keeps the original audience even if a family moves site, a guardian relationship changes, or a staff membership is revoked later.
+- A notice keeps the original audience even if a family moves site, a guardian relationship changes, or a staff membership is revoked later. Receipt timestamps remain forward-only as delivery progresses.
 - The migration is additive. Rollback disables new messaging/notice writes and leaves retained history intact for school audit and retention policy.
 
 ## Verification
@@ -115,7 +117,7 @@ The ACE-F21 integration contract will prove that:
 - removed participants cannot create a message, delivery, or cursor update;
 - message idempotency and monotonic sequence/cursor rules hold under valid and invalid writes;
 - messages are encrypted at rest through ordinary Prisma and tenant-scoped transaction paths;
-- notice audience rows are frozen at publication and receipt state is tenant-safe and immutable;
+- notice audience rows are frozen at publication and receipt state is tenant-safe and forward-only;
 - every F21 table fails closed with missing tenant context and across tenant contexts; and
 - strict RLS inventory checks include all F21 storage tables with no public access grants.
 
