@@ -181,6 +181,7 @@ async function deleteIdentityRowsIfPresent(
     TRUNCATE TABLE
       "FaithReflection",
       "FaithReadReceipt",
+      "PermissionSlipResponse",
       "StudentIdentityLink",
       "GuardianChildRelationship",
       "FamilyIdentityInvite",

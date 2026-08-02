@@ -53,6 +53,15 @@ const REQUIRED_RLS_TABLES = [
   "FaithContentAudience",
   "FaithReadReceipt",
   "FaithReflection",
+  "Trip",
+  "TripCheckpoint",
+  "TripCheckpointAttendance",
+  "PermissionSlip",
+  "PermissionSlipVersion",
+  "PermissionSlipRecipient",
+  "PermissionSlipResponse",
+  "PermissionSlipException",
+  "PermissionSlipReminder",
 ];
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
@@ -95,9 +104,9 @@ async function main() {
       WHERE n.nspname = $1
         AND c.relkind IN ('r', 'p')
         AND c.relforcerowsecurity = false
-        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent', 'AcademicYear', 'AcademicPeriod', 'StudentSubjectEnrollment', 'PaceAssessment', 'PaceProgress', 'PacePolicy', 'PacePolicyOverride', 'BehaviourEntry', 'DemeritPolicy', 'DemeritStageOverride', 'StudentPortalPolicy', 'GuardianIdentity', 'StudentIdentity', 'StudentIdentityLink', 'GuardianChildRelationship', 'FamilyIdentityInvite', 'AceTermReport', 'AceReportCompilation', 'AceReportDraft', 'AceReportReview', 'AceTermReportVersion', 'FaithAgeBand', 'FaithContent', 'FaithContentDraft', 'FaithContentVersion', 'FaithContentAudience', 'FaithReadReceipt', 'FaithReflection')
+        AND c.relname = ANY($2::text[])
       ORDER BY c.relname
-    `, databaseSchema),
+    `, databaseSchema, REQUIRED_RLS_TABLES),
       prisma.$queryRawUnsafe(`
       SELECT n.nspname AS schema_name, c.relname AS table_name
       FROM pg_class c

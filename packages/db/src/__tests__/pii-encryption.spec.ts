@@ -106,6 +106,51 @@ describe("withPiiEncryption", () => {
     expect(result.note).toBe("Sensitive pastoral context");
   });
 
+  it("encrypts permission-slip response payloads and exception reasons", async () => {
+    const { fakeClient, invoke } = makeFakeClient();
+    withPiiEncryption(fakeClient);
+
+    let responseArgs: { data: Record<string, unknown> } | undefined;
+    const response = (await invoke(
+      "PermissionSlipResponse",
+      "create",
+      {
+        data: {
+          decision: "ACCEPTED",
+          responsePayload: "Guardian confirmed medical details by phone.",
+        },
+      },
+      (args) => {
+        responseArgs = args as typeof responseArgs;
+        return { id: "response-1", ...(args as { data: Record<string, unknown> }).data };
+      },
+    )) as Record<string, unknown>;
+
+    expect(isEncryptedField(responseArgs?.data.responsePayload as string)).toBe(true);
+    expect(response.responsePayload).toBe(
+      "Guardian confirmed medical details by phone.",
+    );
+
+    let exceptionArgs: { data: Record<string, unknown> } | undefined;
+    const exception = (await invoke(
+      "PermissionSlipException",
+      "create",
+      {
+        data: {
+          source: "TELEPHONE",
+          reason: "Guardian gave verbal consent while travelling.",
+        },
+      },
+      (args) => {
+        exceptionArgs = args as typeof exceptionArgs;
+        return { id: "exception-1", ...(args as { data: Record<string, unknown> }).data };
+      },
+    )) as Record<string, unknown>;
+
+    expect(isEncryptedField(exceptionArgs?.data.reason as string)).toBe(true);
+    expect(exception.reason).toBe("Guardian gave verbal consent while travelling.");
+  });
+
   it("leaves models with no registered fields untouched", async () => {
     const { fakeClient, invoke } = makeFakeClient();
     withPiiEncryption(fakeClient);

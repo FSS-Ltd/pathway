@@ -31,6 +31,8 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
   AceReportDraft: ["staffNotesEncrypted"],
   AceReportReview: ["reviewNotesEncrypted"],
   FaithReflection: ["reflectionEncrypted"],
+  PermissionSlipResponse: ["responsePayload"],
+  PermissionSlipException: ["reason"],
 };
 
 /**
