@@ -80,7 +80,11 @@ export function useCreateCalendarItem() {
 }
 
 export function useCreateLearningLog() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateLearningLogInput) => learningApi.createLearningLog(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["learning-logs"] });
+    },
   });
 }

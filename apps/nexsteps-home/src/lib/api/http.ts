@@ -44,6 +44,20 @@ class HomeApiClient {
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const response = await this.fetchChecked(path, options);
+    if (response.status === 204) {
+      return undefined as T;
+    }
+    return (await response.json()) as T;
+  }
+
+  /** Like request(), but for non-JSON responses (e.g. a downloaded CSV report). */
+  async requestText(path: string, options: RequestOptions = {}): Promise<string> {
+    const response = await this.fetchChecked(path, options);
+    return response.text();
+  }
+
+  private async fetchChecked(path: string, options: RequestOptions): Promise<Response> {
     const { token, headers, ...rest } = options;
     const bearerToken = token ?? this.accessToken;
     const url = `${env.apiUrl}${path}`;
@@ -75,11 +89,7 @@ class HomeApiClient {
       );
     }
 
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
+    return response;
   }
 
   private async fetchWithDevFallback(url: string, init: RequestInit): Promise<Response> {
