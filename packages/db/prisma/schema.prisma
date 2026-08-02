@@ -259,6 +259,35 @@ enum FaithContentAudienceType {
   AGE_BAND
 }
 
+enum AceCommunityGroupMembershipMode {
+  MANUAL
+  AGE_RANGE
+}
+
+enum AceCommunityGroupStaffRole {
+  MEMBER
+  MODERATOR
+}
+
+enum AceCommunityContentVisibility {
+  VISIBLE
+  HIDDEN
+  REMOVED
+}
+
+enum AceCommunityReportReason {
+  GUIDELINE_BREACH
+  BULLYING
+  SAFETY
+  OTHER
+}
+
+enum AceCommunityModerationActionType {
+  HIDE
+  RESTORE
+  REMOVE
+}
+
 enum PermissionScope {
   organisation
   site
@@ -653,6 +682,16 @@ model Tenant {
   permissionSlipResponses PermissionSlipResponse[]
   permissionSlipExceptions PermissionSlipException[]
   permissionSlipReminders PermissionSlipReminder[]
+  aceCommunityPolicy              AceCommunityPolicy?
+  aceCommunityGroups              AceCommunityGroup[]
+  aceCommunityGroupChildMembers   AceCommunityGroupChildMember[]
+  aceCommunityGroupStaffMembers   AceCommunityGroupStaffMember[]
+  aceCommunityPosts               AceCommunityPost[]
+  aceCommunityReplies             AceCommunityReply[]
+  aceCommunityReadCursors         AceCommunityReadCursor[]
+  aceCommunityReports             AceCommunityReport[]
+  aceCommunityModerationActions   AceCommunityModerationAction[]
+  aceCommunitySafeguardingReferences AceCommunitySafeguardingReference[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
 
@@ -784,6 +823,13 @@ model User {
   permissionSlipVersionsPublished PermissionSlipVersion[]   @relation("PermissionSlipVersionPublishedBy")
   permissionSlipExceptionsRecorded PermissionSlipException[] @relation("PermissionSlipExceptionRecordedBy")
   permissionSlipExceptionsWitnessed PermissionSlipException[] @relation("PermissionSlipExceptionWitness")
+  aceCommunityGroupsCreated       AceCommunityGroup[]              @relation("AceCommunityGroupCreatedBy")
+  aceCommunityGroupStaffMemberships AceCommunityGroupStaffMember[] @relation("AceCommunityGroupStaffMember")
+  aceCommunityPosts               AceCommunityPost[]               @relation("AceCommunityPostAuthor")
+  aceCommunityReplies             AceCommunityReply[]              @relation("AceCommunityReplyAuthor")
+  aceCommunityReadCursors         AceCommunityReadCursor[]         @relation("AceCommunityReadCursorUser")
+  aceCommunityReports             AceCommunityReport[]             @relation("AceCommunityReportReporter")
+  aceCommunityModerationActions   AceCommunityModerationAction[]   @relation("AceCommunityModerationActionModerator")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
@@ -1168,6 +1214,7 @@ model Child {
   permissionSlipResponses    PermissionSlipResponse[]
   permissionSlipExceptions   PermissionSlipException[]
   permissionSlipReminders    PermissionSlipReminder[]
+  aceCommunityGroupMemberships AceCommunityGroupChildMember[]
   // Guest pass (day visitor): auto-deleted by the workers guest-pass-cleanup sweep
   // ~1h after guestExpiresAt. See docs/design/guest-pass-24h.md.
   isGuest                    Boolean                     @default(false)
@@ -1202,6 +1249,210 @@ model Group {
 
   @@unique([tenantId, name])
   @@index([tenantId])
+}
+
+// ACE Student Community is school-owned and intentionally separate from both
+// academic groups and NexSteps Home Community.
+model AceCommunityPolicy {
+  tenantId         String   @id
+  communityEnabled Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model AceCommunityGroup {
+  id             String                          @id @default(uuid())
+  tenantId       String
+  name           String
+  description    String?                         @db.Text
+  membershipMode AceCommunityGroupMembershipMode
+  minimumAge     Int?
+  maximumAge     Int?
+  isActive       Boolean                         @default(true)
+  createdByUserId String
+  createdAt      DateTime                        @default(now())
+  updatedAt      DateTime                        @updatedAt
+
+  tenant            Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy         User                            @relation("AceCommunityGroupCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  childMembers      AceCommunityGroupChildMember[]
+  staffMembers      AceCommunityGroupStaffMember[]
+  posts             AceCommunityPost[]
+  replies           AceCommunityReply[]
+  readCursors       AceCommunityReadCursor[]
+  reports           AceCommunityReport[]
+  moderationActions AceCommunityModerationAction[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([tenantId, membershipMode])
+}
+
+model AceCommunityGroupChildMember {
+  id        String   @id @default(uuid())
+  tenantId  String
+  groupId   String
+  childId   String
+  createdAt DateTime @default(now())
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group  AceCommunityGroup @relation(fields: [groupId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  child  Child             @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([groupId, childId])
+  @@index([tenantId, childId])
+}
+
+model AceCommunityGroupStaffMember {
+  id          String                     @id @default(uuid())
+  tenantId    String
+  groupId     String
+  staffUserId String
+  role        AceCommunityGroupStaffRole @default(MEMBER)
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group     AceCommunityGroup @relation(fields: [groupId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  staffUser User              @relation("AceCommunityGroupStaffMember", fields: [staffUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([groupId, staffUserId])
+  @@index([tenantId, staffUserId])
+}
+
+model AceCommunityPost {
+  id                  String                        @id @default(uuid())
+  tenantId            String
+  groupId             String
+  authorUserId        String
+  body                String                        @db.Text
+  visibility          AceCommunityContentVisibility @default(VISIBLE)
+  visibilityUpdatedAt DateTime?
+  createdAt           DateTime                      @default(now())
+
+  tenant  Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group   AceCommunityGroup @relation(fields: [groupId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  author  User              @relation("AceCommunityPostAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  replies AceCommunityReply[]
+  reports AceCommunityReport[] @relation("AceCommunityReportPost")
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, groupId])
+  @@index([tenantId, groupId, createdAt])
+  @@index([tenantId, authorUserId, createdAt])
+}
+
+model AceCommunityReply {
+  id                  String                        @id @default(uuid())
+  tenantId            String
+  groupId             String
+  postId              String
+  authorUserId        String
+  body                String                        @db.Text
+  visibility          AceCommunityContentVisibility @default(VISIBLE)
+  visibilityUpdatedAt DateTime?
+  createdAt           DateTime                      @default(now())
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group  AceCommunityGroup @relation(fields: [groupId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  post   AceCommunityPost  @relation(fields: [postId, tenantId, groupId], references: [id, tenantId, groupId], onDelete: Restrict)
+  author User              @relation("AceCommunityReplyAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  reports AceCommunityReport[] @relation("AceCommunityReportReply")
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, groupId])
+  @@index([tenantId, groupId, postId, createdAt])
+  @@index([tenantId, authorUserId, createdAt])
+}
+
+model AceCommunityReadCursor {
+  id         String   @id @default(uuid())
+  tenantId   String
+  groupId    String
+  userId     String
+  lastReadAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group  AceCommunityGroup @relation(fields: [groupId, tenantId], references: [id, tenantId], onDelete: Cascade)
+  user   User              @relation("AceCommunityReadCursorUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, groupId, userId])
+  @@index([tenantId, userId, lastReadAt])
+}
+
+model AceCommunityReport {
+  id               String                   @id @default(uuid())
+  tenantId         String
+  groupId          String
+  postId           String?
+  replyId          String?
+  reportedByUserId String
+  reason           AceCommunityReportReason
+  evidenceSnapshot String                   @db.Text
+  createdAt        DateTime                 @default(now())
+
+  tenant          Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group           AceCommunityGroup               @relation(fields: [groupId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  post            AceCommunityPost?               @relation("AceCommunityReportPost", fields: [postId, tenantId, groupId], references: [id, tenantId, groupId], onDelete: Restrict)
+  reply           AceCommunityReply?              @relation("AceCommunityReportReply", fields: [replyId, tenantId, groupId], references: [id, tenantId, groupId], onDelete: Restrict)
+  reportedBy      User                            @relation("AceCommunityReportReporter", fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  moderationActions AceCommunityModerationAction[]
+  safeguardingReferences AceCommunitySafeguardingReference[] @relation("AceCommunitySafeguardingReferenceReport")
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, groupId])
+  @@index([tenantId, postId])
+  @@index([tenantId, replyId])
+  @@index([tenantId, groupId, createdAt])
+}
+
+model AceCommunityModerationAction {
+  id               String                           @id @default(uuid())
+  tenantId         String
+  groupId          String
+  reportId         String
+  moderatorUserId  String
+  actionType       AceCommunityModerationActionType
+  reason           String                           @db.Text
+  evidenceSnapshot String                           @db.Text
+  createdAt        DateTime                         @default(now())
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  group     AceCommunityGroup  @relation(fields: [groupId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  report    AceCommunityReport @relation(fields: [reportId, tenantId, groupId], references: [id, tenantId, groupId], onDelete: Restrict)
+  moderator User               @relation("AceCommunityModerationActionModerator", fields: [moderatorUserId], references: [id], onDelete: Restrict)
+  safeguardingReferences AceCommunitySafeguardingReference[] @relation("AceCommunitySafeguardingReferenceModerationAction")
+
+  @@unique([id, tenantId])
+  @@index([tenantId, reportId, createdAt])
+  @@index([tenantId, groupId, createdAt])
+}
+
+model AceCommunitySafeguardingReference {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  reportId           String?
+  moderationActionId String?
+  concernId          String
+  createdAt          DateTime @default(now())
+
+  tenant           Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  report           AceCommunityReport?            @relation("AceCommunitySafeguardingReferenceReport", fields: [reportId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  moderationAction AceCommunityModerationAction? @relation("AceCommunitySafeguardingReferenceModerationAction", fields: [moderationActionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  concern          Concern                        @relation(fields: [concernId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, reportId])
+  @@index([tenantId, moderationActionId])
+  @@index([concernId])
 }
 
 model HandoverLog {
@@ -1487,6 +1738,7 @@ model Concern {
   id        String    @id @default(uuid())
   childId   String
   child     Child     @relation(fields: [childId], references: [id])
+  aceCommunitySafeguardingReferences AceCommunitySafeguardingReference[]
   summary   String
   details   String?
   deletedAt DateTime?
