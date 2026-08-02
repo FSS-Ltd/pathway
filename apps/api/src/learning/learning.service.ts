@@ -1,4 +1,11 @@
-import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { prisma } from "@pathway/db";
 import type {
   CreateEvidenceDto,
@@ -7,6 +14,7 @@ import type {
   CreateSubjectDto,
 } from "./dto";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { reportBundleKey } from "../common/storage/storage-key.util";
 
 const subjectSelect = {
   id: true,
@@ -107,6 +115,15 @@ export class LearningService {
     });
   }
 
+  async getLog(id: string, tenantId: string) {
+    const log = await prisma.learningLog.findFirst({
+      where: { id, tenantId },
+      select: learningLogSelect,
+    });
+    if (!log) throw new NotFoundException("Learning log not found");
+    return log;
+  }
+
   async createLog(
     dto: CreateLearningLogDto,
     tenantId: string,
@@ -136,6 +153,15 @@ export class LearningService {
       orderBy: { createdAt: "desc" },
       select: evidenceSelect,
     });
+  }
+
+  async getEvidenceById(id: string, tenantId: string) {
+    const evidence = await prisma.evidence.findFirst({
+      where: { id, tenantId },
+      select: evidenceSelect,
+    });
+    if (!evidence) throw new NotFoundException("Evidence not found");
+    return evidence;
   }
 
   async createEvidence(
@@ -169,13 +195,55 @@ export class LearningService {
     });
   }
 
+  async getReportBundle(id: string, tenantId: string) {
+    const bundle = await prisma.reportBundle.findFirst({
+      where: { id, tenantId },
+      select: reportBundleSelect,
+    });
+    if (!bundle) throw new NotFoundException("Report bundle not found");
+    return bundle;
+  }
+
+  /**
+   * No async job/worker exists anywhere in this codebase to turn a PENDING
+   * bundle into a READY one (confirmed by search before writing this) - and
+   * building a real PDF-rendering pipeline is well outside this plan's
+   * scope. Generates a CSV summary synchronously instead: a real, useful,
+   * immediately-downloadable report from real data, rather than a bundle
+   * that sits at PENDING forever. Documented as a deliberate wireframe
+   * adaptation (the design says "PDF") in the build-plan ledger.
+   */
   async createReportBundle(
     dto: CreateReportBundleDto,
     tenantId: string,
     requestedByUserId: string,
   ) {
-    return this.create(() =>
-      prisma.reportBundle.create({
+    return this.create(async () => {
+      const [logs, child] = await Promise.all([
+        prisma.learningLog.findMany({
+          where: {
+            tenantId,
+            childId: dto.childId,
+            activityDate: { gte: dto.periodStart, lte: dto.periodEnd },
+          },
+          orderBy: { activityDate: "asc" },
+          select: {
+            activityDate: true,
+            title: true,
+            minutes: true,
+            description: true,
+            subject: { select: { name: true } },
+          },
+        }),
+        dto.childId
+          ? prisma.child.findFirst({
+              where: { id: dto.childId, tenantId },
+              select: { firstName: true, preferredName: true },
+            })
+          : null,
+      ]);
+
+      const bundle = await prisma.reportBundle.create({
         data: {
           tenantId,
           childId: dto.childId ?? null,
@@ -184,8 +252,68 @@ export class LearningService {
           periodEnd: dto.periodEnd,
         },
         select: reportBundleSelect,
-      }),
-    );
+      });
+
+      const csv = this.buildReportCsv({
+        childName: child?.preferredName ?? child?.firstName ?? null,
+        periodStart: dto.periodStart,
+        periodEnd: dto.periodEnd,
+        logs,
+      });
+
+      const key = reportBundleKey(tenantId, bundle.id);
+      const uploaded = await this.storage.uploadObject({
+        bucket: "private",
+        key,
+        body: Buffer.from(csv, "utf-8"),
+        contentType: "text/csv",
+      });
+      if (!uploaded) {
+        throw new ServiceUnavailableException(
+          "Could not generate the report. Please try again.",
+        );
+      }
+
+      return prisma.reportBundle.update({
+        where: { id: bundle.id },
+        data: { status: "READY", storageKey: key, completedAt: new Date() },
+        select: reportBundleSelect,
+      });
+    });
+  }
+
+  private buildReportCsv(input: {
+    childName: string | null;
+    periodStart: Date;
+    periodEnd: Date;
+    logs: {
+      activityDate: Date;
+      title: string;
+      minutes: number | null;
+      description: string | null;
+      subject: { name: string } | null;
+    }[];
+  }): string {
+    const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const rows = [
+      [
+        `Learning report${input.childName ? ` for ${input.childName}` : ""}`,
+      ],
+      [
+        `${input.periodStart.toISOString().slice(0, 10)} to ${input.periodEnd.toISOString().slice(0, 10)}`,
+      ],
+      [`${input.logs.length} learning logs`],
+      [],
+      ["Date", "Subject", "Title", "Minutes", "Description"],
+      ...input.logs.map((log) => [
+        log.activityDate.toISOString().slice(0, 10),
+        log.subject?.name ?? "",
+        log.title,
+        log.minutes?.toString() ?? "",
+        log.description ?? "",
+      ]),
+    ];
+    return rows.map((row) => row.map(escape).join(",")).join("\n");
   }
 
   async getBundleFile(id: string, tenantId: string) {

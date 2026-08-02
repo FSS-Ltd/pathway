@@ -55,6 +55,12 @@ export class LearningController {
     return this.service.listLogs(tenantId);
   }
 
+  @Get("logs/:id")
+  @RequireCapability("learning.log.read")
+  getLog(@Param("id") rawId: string, @CurrentTenant("tenantId") tenantId: string) {
+    return this.service.getLog(this.parseId(rawId), tenantId);
+  }
+
   @Post("logs")
   @RequireCapability("learning.log.write")
   createLog(
@@ -75,6 +81,12 @@ export class LearningController {
     return this.service.listEvidence(tenantId);
   }
 
+  @Get("evidence/:id")
+  @RequireCapability("learning.evidence.read")
+  getEvidence(@Param("id") rawId: string, @CurrentTenant("tenantId") tenantId: string) {
+    return this.service.getEvidenceById(this.parseId(rawId), tenantId);
+  }
+
   @Post("evidence")
   @RequireCapability("learning.evidence.write")
   createEvidence(
@@ -93,6 +105,12 @@ export class LearningController {
   @RequireCapability("learning.reports.generate")
   listReportBundles(@CurrentTenant("tenantId") tenantId: string) {
     return this.service.listReportBundles(tenantId);
+  }
+
+  @Get("report-bundles/:id")
+  @RequireCapability("learning.reports.generate")
+  getReportBundle(@Param("id") rawId: string, @CurrentTenant("tenantId") tenantId: string) {
+    return this.service.getReportBundle(this.parseId(rawId), tenantId);
   }
 
   @Post("report-bundles")

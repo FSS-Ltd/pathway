@@ -14,7 +14,7 @@ continue.
 
 **Last updated:** 2026-08-02
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Plan 05's 9 Setup screens implemented (welcome, account-create, email-verify, account-recover, children-list, child-add, learning-days, first-activity, setup-complete), plus the small backend it needed (household-setup module, Tenant.learningDays/setupCompletedAt, Auth0 password-realm login/reset, a relaxed Child.lastName). Verified locally and visually in the Browser pane; PR about to open. This closes out the Setup flow (H2) - Plan 07 (Progress) is next.
+**Current phase:** Plan 07's 9 Progress screens implemented (progress-overview, learning-history, log-detail, evidence-gallery, evidence-detail-upload, subjects, reports-list, report-request, report-detail-download), plus real single-record GET endpoints and a synchronous CSV report-generation pipeline the `/learning/*` API was missing. Verified locally and visually in the Browser pane; PR about to open. This closes out the Progress flow (H4) - Plan 08 (Family, people, permissions, privacy) is next.
 
 ---
 
@@ -33,8 +33,9 @@ continue.
 | 9 | household signup endpoint (Setup's `account-create` backend) | **merged** | `feat/nexsteps-home-signup` | [#280](https://github.com/FSS-Ltd/pathway/pull/280) | squash-merged, branch deleted |
 | 10 | 06 backend foundations — Activity/Task/CalendarItem schema, capabilities, `family-planner` API | **merged** | `feat/nexsteps-home-week-today-schema` | [#283](https://github.com/FSS-Ltd/pathway/pull/283) | squash-merged, branch deleted |
 | 11 | 06 screens — Week, Today, tasks, calendar (8 screens) | **merged** | `feat/nexsteps-home-week-today-screens` | [#285](https://github.com/FSS-Ltd/pathway/pull/285) | squash-merged, branch deleted |
-| 12 | 05 — Setup flow (9 screens) + household-setup backend | in progress | `feat/nexsteps-home-setup-screens` | not yet opened | code complete, verified locally and visually, about to push |
-| 13-19 | 07-14 | not started | — | — | — |
+| 12 | 05 — Setup flow (9 screens) + household-setup backend | **merged** | `feat/nexsteps-home-setup-screens` | [#287](https://github.com/FSS-Ltd/pathway/pull/287) | squash-merged, branch deleted |
+| 13 | 07 — Progress flow (9 screens) + learning-API additions | in progress | `feat/nexsteps-home-progress-screens` | not yet opened | code complete, verified locally and visually, about to push |
+| 14-19 | 08-14 | not started | — | — | — |
 
 ## Environment
 
@@ -473,14 +474,146 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-Plan 05 is complete: all 9 Setup screens (welcome, account-create,
-email-verify, account-recover, children-list, child-add, learning-days,
-first-activity, setup-complete), a new `household-setup` API module
-(learning-days preference + setup-complete signal), `Tenant.learningDays`/
-`setupCompletedAt`, Auth0 password-realm login and password-reset wired
-into the client, and a relaxed `Child.lastName` (now optional - see
-"What Plan 05 built" below for why). **Next: Plan 07 (Progress), against
-the existing `/learning/*` endpoints.**
+Plan 07 is complete: all 9 Progress screens, against a `/learning/*` API
+that turned out to need real additions first (see "What Plan 07 built"
+below - the plan text's assumption that this could be built purely
+against "the existing endpoints" didn't hold once the screens were
+actually specced out). **Next: Plan 08 (Family, people, permissions,
+privacy).**
+
+**What Plan 07 built (PR13 content, for the reviewer / next agent)**
+
+- **`apps/api/src/learning/`**: added `GET /learning/logs/:id`,
+  `GET /learning/evidence/:id`, `GET /learning/report-bundles/:id` (none
+  existed - every list endpoint had no single-record counterpart).
+  Rewrote `createReportBundle` to generate synchronously instead of
+  inserting a `PENDING` row and stopping: repo-wide search before writing
+  confirmed **no worker/job/queue anywhere in this codebase** ever
+  transitions a bundle to `READY` - it would have sat `PENDING` forever.
+  Building a real async job pipeline was judged out of scope (a
+  multi-day project, same category of decision as Plan 05's email-verify
+  OTP adaptation); instead `createReportBundle` now aggregates the
+  child's learning logs for the requested period, builds a CSV summary
+  (date/subject/title/minutes/description per log, via the new
+  `buildReportCsv` private method), uploads it through the existing
+  `SupabaseStorageService`/`reportBundleKey()` (both already used by the
+  never-implemented download path - `getBundleFile` was already reading
+  from exactly this key shape, just nothing ever wrote to it), and marks
+  the bundle `READY` in the same request. Throws
+  `ServiceUnavailableException` if the upload fails (e.g. storage not
+  configured) rather than leaving a silently-broken row.
+- **Deliberately not built: a PDF pipeline.** The approved wireframe's
+  copy says "Download PDF" / "PDF" - adapted throughout the UI to "CSV
+  summary" / "View report", matching Plan 05's established pattern of
+  adapting wireframe copy to what the backend can actually, honestly do
+  rather than building a fake affordance or a disproportionate new
+  subsystem.
+- **Deliberately not built: evidence upload.** `evidence-detail-upload`
+  is view-only (existing item detail: type, size, captured date) - no
+  image-picker/document-picker/audio-recording dependency exists
+  anywhere in this monorepo (checked `apps/mobile` too, which has its
+  own child-photo-upload feature and still doesn't have one), and adding
+  one is real, separate native-capability work across iOS/Android/web
+  permissions, not something to build speculatively inside a screens
+  plan. `evidence-gallery`'s "Add evidence" action was dropped entirely
+  rather than pointing at a dead end - the exact precedent Plan 06 set
+  for quick-log's evidence upload.
+- **Tests**: `apps/api/src/learning/tests/learning.service.spec.ts`
+  updated for the new `createReportBundle` shape (mocks
+  `learningLog.findMany`, `child.findFirst`, `reportBundle.update`, and
+  `storage.uploadObject`) and extended with tests for all 3 new
+  single-record getters plus the CSV-generation and
+  storage-failure paths. No new controller spec file - this module never
+  had one (only an e2e capability-guard spec), so none was added,
+  matching the existing convention rather than introducing a new one.
+- **Client**: `src/lib/api/learning.ts` extended with `listLearningLogs`,
+  `getLearningLog`, `Evidence`/`listEvidence`/`getEvidence`,
+  `ReportBundle`/`listReportBundles`/`getReportBundle`/
+  `createReportBundle`/`downloadReportBundleText`, and `createSubject`
+  (the backend endpoint already existed, just no client wrapper). New
+  `src/lib/queries/learning.ts` for the corresponding React Query hooks.
+  `src/lib/api/http.ts` gained `requestText()` (a `request()` sibling
+  that resolves the body as text instead of JSON) - needed because a
+  downloaded CSV report isn't JSON; refactored the shared
+  fetch/error-handling into a private `fetchChecked()` both methods call,
+  rather than duplicating it.
+- **Found and fixed a real, small pre-existing bug while in this file**:
+  `useCreateLearningLog` (`src/lib/queries/family-planner.ts`) had no
+  `onSuccess` cache invalidation, unlike every other mutation hook in
+  that file - a log created from Today's quick-log would never appear in
+  Progress's `learning-history` until an unrelated refetch happened to
+  occur. Added the missing `invalidateQueries(["learning-logs"])`.
+- **9 screens** (`apps/nexsteps-home/app/(home)/(tabs)/progress/`), each
+  built from the wireframe content read directly out of
+  `prototypes/nexsteps-home/src/wireframes-data.ts`, against real data:
+  - `index.tsx` (`progress-overview`) - full rebuild of the placeholder.
+    Real stats (log/evidence/subject counts), a real "this week" count.
+    **Dropped the wireframe's "Strongest thread" insight card** -
+    generating a real cross-subject pattern insight is analytics/ML
+    scope this plan doesn't do; showing a fabricated one would violate
+    this series' no-mocked-data principle throughout.
+  - `learning-history.tsx` - real `listLearningLogs`, subject `ChipRow`
+    filter (client-side - a household's total log count is small, no
+    server-side filtering/pagination needed at this scale), tap a row →
+    `log-detail`.
+  - `log-detail.tsx` - real single-log fetch. **Dropped the wireframe's
+    "Confident" mood chip and "Reflection" parent-note card** - no
+    matching field exists on `LearningLog` for either (checked the
+    schema before deciding, not guessed); showing them as static/fake
+    would misrepresent the record. Evidence count is real (client-side
+    filter of the evidence list by `learningLogId`).
+  - `evidence-gallery.tsx` / `evidence-detail-upload.tsx` - real
+    `listEvidence`/`getEvidence`. The wireframe's "Photos/Files/Voice"
+    filter chips are **derived from the real `mimeType` on each item**
+    (`image/*`/`audio/*`/else), not a fabricated field.
+  - `subjects.tsx` - real per-subject log/evidence counts (computed
+    client-side from the already-fetched logs/evidence lists). "Add
+    subject" is a real, working inline form (no separate route) against
+    the already-existing `POST /learning/subjects` - confirmed working
+    live in the Browser pane.
+  - `reports-list.tsx` / `report-request.tsx` /
+    `report-detail-download.tsx` - real report bundle list/create/detail.
+    `report-request` replaced the wireframe's "Overview/Subjects/
+    Selected evidence/Attendance" section-toggle chips (the backend has
+    no concept of selective report sections - it's a fixed CSV of every
+    log in the period) with period-length chips (Last 30/90 days, This
+    year) computed from `new Date()`, and an honest notice describing
+    what's actually generated. `report-detail-download`'s "Download PDF"
+    became "View report": fetches the CSV via `requestText` and renders
+    it as `selectable` `Text` in-app - deliberately not a native
+    file-save/share flow (would need `expo-file-system`/`expo-sharing`,
+    new dependencies with the same risk profile this series has avoided
+    elsewhere), but a genuine, functional way to get the real data out
+    (select and copy).
+
+### Verification performed
+
+```
+pnpm --filter @pathway/nexsteps-home typecheck   # clean
+pnpm --filter @pathway/nexsteps-home lint         # clean
+pnpm --filter @pathway/nexsteps-home test:unit    # clean, 35 tests
+pnpm --filter @pathway/api typecheck/lint         # clean
+apps/api learning.service.spec.ts (direct)        # 16 tests, all pass
+pnpm -r typecheck                                 # all 15 workspace projects, clean
+pnpm -r lint                                       # all 15 workspace projects, clean
+pnpm test:unit                                     # all 22 turbo tasks, clean (apps/api: 774 tests)
+```
+
+Visually verified in the Browser pane against a live dev server (main-
+checkout-copy technique, same as Plans 05/06 - this branch lives in an
+isolated worktree, git refuses a double checkout): `learning-history`
+(empty state + subject chip renders), `subjects` (the inline "Add
+subject" form opens/closes correctly - confirmed the FieldInput/
+Save/Cancel swap works), `report-request` (period chips default to
+"Last 30 days", correctly toggle), `reports-list` (empty state + "You
+stay in control" notice render correctly). All render inside the real 5-
+tab shell with no crashes. Full authenticated data-flow (real logs/
+evidence loading) isn't practical to verify this way - no Auth0 session
+exists in that browser context, and this session's embedded preview
+harness has a known, already-documented limitation (Plan 05's ledger
+entry) where `document.visibilityState` never leaves `"hidden"`, which
+stalls TanStack Query's retry mechanism regardless of `networkMode` -
+not re-investigated here, already root-caused previously.
 
 **What Plan 05 built (PR12 content, for the reviewer / next agent)**
 
