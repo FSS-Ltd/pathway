@@ -12,9 +12,9 @@ merges. If that plan file is unavailable, this ledger plus `README.md` plus
 the source handoff at `docs/NexStepsV2/nexsteps-home/` is sufficient to
 continue.
 
-**Last updated:** 2026-08-01
+**Last updated:** 2026-08-02
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Plan 06's 8 screens (Week, Today, tasks, calendar) implemented, verified locally and visually in the Browser pane; PR about to open. This closes out Plan 06 - Plan 05's remaining 8 Setup screens are next
+**Current phase:** Plan 05's 9 Setup screens implemented (welcome, account-create, email-verify, account-recover, children-list, child-add, learning-days, first-activity, setup-complete), plus the small backend it needed (household-setup module, Tenant.learningDays/setupCompletedAt, Auth0 password-realm login/reset, a relaxed Child.lastName). Verified locally and visually in the Browser pane; PR about to open. This closes out the Setup flow (H2) - Plan 07 (Progress) is next.
 
 ---
 
@@ -32,8 +32,9 @@ continue.
 | 8 | ledger update | **merged** | `docs/nexsteps-home-progress-update-3` | [#279](https://github.com/FSS-Ltd/pathway/pull/279) | squash-merged, branch deleted |
 | 9 | household signup endpoint (Setup's `account-create` backend) | **merged** | `feat/nexsteps-home-signup` | [#280](https://github.com/FSS-Ltd/pathway/pull/280) | squash-merged, branch deleted |
 | 10 | 06 backend foundations — Activity/Task/CalendarItem schema, capabilities, `family-planner` API | **merged** | `feat/nexsteps-home-week-today-schema` | [#283](https://github.com/FSS-Ltd/pathway/pull/283) | squash-merged, branch deleted |
-| 11 | 06 screens — Week, Today, tasks, calendar (8 screens) | in progress | `feat/nexsteps-home-week-today-screens` | not yet opened | code complete, verified locally and visually, about to push |
-| 12-18 | 05 (remaining 8), then 07-14 | not started | — | — | — |
+| 11 | 06 screens — Week, Today, tasks, calendar (8 screens) | **merged** | `feat/nexsteps-home-week-today-screens` | [#285](https://github.com/FSS-Ltd/pathway/pull/285) | squash-merged, branch deleted |
+| 12 | 05 — Setup flow (9 screens) + household-setup backend | in progress | `feat/nexsteps-home-setup-screens` | not yet opened | code complete, verified locally and visually, about to push |
+| 13-19 | 07-14 | not started | — | — | — |
 
 ## Environment
 
@@ -472,11 +473,187 @@ unaffected by construction, not just unrun.
 
 ## Next action
 
-Plan 06 is complete (backend #283 + screens, this entry): Week, Today,
-tasks and calendar all wired to real data, no mocked/local-only state.
-**Next: the remaining 8 Setup screens (Plan 05)** — no longer blocked,
-since `learning-days`/`first-activity` can now use the real backend Plan
-06 just built. After that: Plan 07 (Progress) onward.
+Plan 05 is complete: all 9 Setup screens (welcome, account-create,
+email-verify, account-recover, children-list, child-add, learning-days,
+first-activity, setup-complete), a new `household-setup` API module
+(learning-days preference + setup-complete signal), `Tenant.learningDays`/
+`setupCompletedAt`, Auth0 password-realm login and password-reset wired
+into the client, and a relaxed `Child.lastName` (now optional - see
+"What Plan 05 built" below for why). **Next: Plan 07 (Progress), against
+the existing `/learning/*` endpoints.**
+
+**What Plan 05 built (PR12 content, for the reviewer / next agent)**
+
+- **Schema** (`packages/db/prisma/schema.prisma`,
+  `packages/db/prisma/migrations/20260802130000_add_household_setup_fields/`):
+  `Tenant.learningDays String[] @default([])` and
+  `Tenant.setupCompletedAt DateTime?`. Validated with the same throwaway-
+  Docker-container + `prisma migrate diff` technique Plan 06 established -
+  zero drift on `Tenant`, confirmed against a clean apply of the full
+  migration history. The two shared local dev Postgres databases
+  (`pathway` on 5433 and `pathway_test_e2e`) were both several migrations
+  behind (not just this one - `ace_reports_faith`,
+  `add_home_education_vertical`, `add_week_today_planning` were pending
+  too) and were brought current with `prisma migrate deploy` (additive
+  only, never reset) so `pnpm test:unit` would pass locally; this is
+  expected upkeep for whoever next touches schema-adjacent tests, not a
+  one-off fix.
+- **`apps/api/src/household-setup/`** (new module, mirrors
+  `family-planner`'s shape): `GET /household-setup/status`,
+  `PATCH /household-setup/learning-days` (zod-validated weekday enum,
+  max 7), `POST /household-setup/complete`. Plain `AuthUserGuard`, no
+  `CapabilityGuard` - matches `children.controller.ts`'s precedent that
+  basic household config isn't capability-gated.
+- **`apps/api/src/children/dto/create-child.dto.ts`**: `lastName` changed
+  from required to optional (defaults to `""`, mirroring the existing
+  `allergies` default-transform pattern in the same file). Necessary
+  because `child-add`'s approved wireframe only collects "First name or
+  nickname" - no surname field exists in the design, and the DB column
+  (`String`, not nullable) already accepts `""` as a valid value. Scoped
+  narrowly: this loosens validation only, doesn't change behaviour for
+  any existing caller that still sends a real `lastName`.
+- **`apps/nexsteps-home/src/lib/auth/auth0-client.ts`**: added
+  `loginWithPassword` (Auth0 `passwordRealm` grant, same
+  `Username-Password-Authentication` connection the signup endpoint
+  creates users on) and `resetPasswordWithAuth0` (Auth0 `resetPassword`
+  call) - both confirmed against the installed `react-native-auth0@5.4.0`
+  SDK's actual TypeScript definitions before use, not assumed from memory.
+- **`apps/nexsteps-home/src/providers/app-providers.tsx`**: two real
+  fixes, found only by live-verifying this plan's screens in the Browser
+  pane, not by reading code:
+  1. `signIn`/`refreshBootstrap` now return the resolved `BootstrapState`
+     (previously `void`) - Plan 01's `welcome.tsx` called
+     `void signIn()` and relied on nothing to navigate afterward, which
+     never worked (no navigation-on-bootstrap-change guard exists
+     anywhere in the app); screens now explicitly `router.replace` using
+     the returned state. Added `signInWithPassword` alongside `signIn`
+     for the same reason, used right after account-create's signup call.
+  2. `QueryClient` now sets `networkMode: "always"` for queries and
+     mutations. Default `networkMode: "online"` pauses fetches based on
+     browser online/offline events, which don't reflect real connectivity
+     in React Native (no NetInfo integration exists in this app) - found
+     because a query stuck at `fetchStatus: "paused"` with both
+     `isError`/`isLoading` false renders identically to a real empty
+     state, silently defeating this series' loading/error/empty
+     distinction on every screen using `useQuery`, not just Plan 05's.
+     `"always"` is the officially documented fix for apps without
+     NetInfo wiring. Root-caused via direct inspection of the installed
+     `@tanstack/query-core@5.101.4` source (`retryer.js`'s `canFetch`),
+     not guessed.
+- **9 screens** (`apps/nexsteps-home/app/(setup)/`), each built from the
+  wireframe content read directly out of
+  `prototypes/nexsteps-home/src/wireframes-data.ts`, against real backend
+  calls - no mocked/local-only state, matching this series' standing
+  principle:
+  - `welcome.tsx` - full rebuild of Plan 01's placeholder (which only had
+    a "Sign in" button, none of the wireframe's notice/card blocks or
+    `account-create` routing).
+  - `account-create.tsx` - email/password form, calls
+    `POST /public/nexsteps-home/signup` then `signInWithPassword` to
+    establish a session (the signup endpoint issues none - see PR9/#280),
+    then routes to `email-verify`.
+  - `email-verify.tsx` - **deliberately adapted from the wireframe**: the
+    approved design shows a 6-digit code entry field, but nothing backs
+    it. Auth0 (`Username-Password-Authentication` connection via
+    `react-native-auth0`) sends a verification *link*, not an OTP code,
+    and this SDK version exposes no resend method either - confirmed by
+    reading its actual type definitions, not assumed. Building a real
+    custom OTP system was judged out of scope for this plan (a
+    multi-day project in its own right). The screen instead shows an
+    honest "check your inbox" state with no non-functional code field or
+    resend button, and doesn't block continuing - verification isn't
+    gated anywhere downstream yet.
+  - `account-recover.tsx` - matches the wireframe closely: email field,
+    `resetPasswordWithAuth0`, and a generic "if that address matches..."
+    confirmation shown unconditionally (success or failure both show the
+    same message, deliberately, for the privacy reason the wireframe's
+    own copy states).
+  - `children-list.tsx` / `child-add.tsx` - **one flow adjustment from
+    the static wireframe**: the wireframe's own demo data shows a child
+    already added on `children-list` with "Continue with 1 child" routing
+    to `child-add` (i.e., forward to add a child *after* already having
+    one) - an artifact of the prototype's own linear Next/Previous
+    review order, not real conditional logic. Real implementation:
+    `children-list` shows the true empty/loaded state from
+    `GET /children`, "Add another child" routes to `child-add`, and
+    `child-add`'s save returns to `children-list` (not straight to
+    `learning-days`) so a household can add more than one child before
+    continuing. `child-add` collects age (not date of birth, per the
+    wireframe) and converts it to an approximate 1-January birthdate via
+    the new `src/lib/child-age.ts` (`ageToDateOfBirth`, unit-tested) -
+    the exact day is unknowable from an age alone and isn't asked for.
+  - `learning-days.tsx` - `ChipRow` multi-select (Mon-Thu pre-selected,
+    matching the wireframe's "Suggested" copy), `PATCH
+    /household-setup/learning-days` on continue; "Choose later" skips the
+    save and moves on without persisting a preference.
+  - `first-activity.tsx` - child picker (`ChipRow`, from real
+    `GET /children`) + day/time/duration chips reusing Plan 06's
+    `date-options.ts` (same defaults the wireframe shows: Tomorrow,
+    10:00, 45 min) - `POST /family-planner/activities` then
+    `POST /household-setup/complete`, then routes to `setup-complete`.
+    Confirmed `family.activities.write` resolves for a fresh household
+    without further wiring: capability grants are vertical-based, and
+    signup already creates an `OrgVertical` row for `HOME_EDUCATION`.
+  - `setup-complete.tsx` - **deliberately simpler than the wireframe**:
+    the approved design mocks a week strip and an upcoming-activity card
+    with fixed demo data. This series has avoided hardcoded/mocked screen
+    content throughout (Plan 06's explicit precedent); the real week and
+    activity the user just created are one tap away on the Week tab, so
+    duplicating them here with fabricated data would be worse than a
+    plain confirmation notice.
+- **`FieldInput`** (`apps/nexsteps-home/src/components/primitives/FieldInput.tsx`):
+  extended with `secureTextEntry`/`autoCapitalize`/`keyboardType` - real,
+  necessary gaps for password masking (account-create) and correct
+  keyboard behaviour (email fields, numeric age), not speculative.
+- **`apps/nexsteps-home/src/lib/api/`**: new `signup.ts` (public signup
+  client) and `household-setup.ts` domain modules, `createChild` added to
+  `children.ts`, all following the established thin-wrapper-per-domain
+  pattern.
+
+### Verification performed
+
+```
+pnpm --filter @pathway/nexsteps-home typecheck   # clean
+pnpm --filter @pathway/nexsteps-home lint         # clean
+pnpm --filter @pathway/nexsteps-home test:unit    # clean, includes 2 new child-age.ts tests
+pnpm -r typecheck                                 # all 15 workspace projects, clean
+pnpm -r lint                                       # all 15 workspace projects, clean
+pnpm test:unit                                     # all 22 turbo tasks, clean (apps/api: 767 tests)
+```
+
+Visually verified in the Browser pane against a live dev server (not just
+assumed from code), using the same main-checkout-copy technique Plan 06
+established (this branch is checked out in an isolated worktree; git
+refuses to check out the same branch twice, so frontend files were
+temporarily copied into the main checkout for inspection only, then fully
+removed - `git status` confirmed clean there afterward):
+- `welcome` - notice/card blocks render correctly; "Set up my family"
+  routes to `account-create`.
+- `account-create` - filled and submitted a real form; the signup POST
+  correctly targeted `/public/nexsteps-home/signup` and failed with
+  `ERR_CONNECTION_REFUSED` (no API server running in this environment),
+  which the screen correctly rendered as a danger `NoticeCard` - proves
+  the request wiring, password masking (confirmed `type="password"` on
+  the live DOM node), and error-state rendering all work.
+- `learning-days` - confirmed the Mon-Thu suggested default renders
+  correctly, and that tapping a chip (Fri) toggles it live.
+- `first-activity` - confirmed the Tomorrow/10:00/45 min defaults render
+  correctly.
+- `setup-complete` - confirmed the yellow-tone notice card and primary
+  action render correctly.
+- **Found and fixed a real bug this way**: `children-list`'s
+  loading/error/empty distinction appeared to always show "empty" no
+  matter what. Root-caused (not guessed) via direct query-state
+  inspection to the `networkMode`/`focusManager` issue described above,
+  specific to this embedded preview harness never reporting
+  `document.visibilityState` as anything but `"hidden"` - confirmed via
+  `@tanstack/query-core`'s own source that this blocks the underlying
+  retry mechanism regardless of network mode, a harness limitation (real
+  devices/browsers don't have this problem), not a defect in the
+  shipped code. The `networkMode: "always"` fix itself is real and
+  correct regardless - it removes a genuine failure mode (silent
+  pause-forever on any query) that would otherwise affect every screen
+  in the app, not just Plan 05's.
 
 **Two known, deliberate scope reductions in Plan 06's screens** (not
 oversights — flagged here so a future session doesn't rebuild what's

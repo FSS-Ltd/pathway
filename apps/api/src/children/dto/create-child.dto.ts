@@ -9,7 +9,15 @@ const specialNeedsType = z.enum(["none", "sen_support", "ehcp", "other"]);
 
 export const createChildSchema = z.object({
   firstName: z.string().trim().min(1, "firstName is required").max(100),
-  lastName: z.string().trim().min(1, "lastName is required").max(100),
+  // Optional: some households (e.g. NexSteps Home) only collect a first
+  // name/nickname at setup time. Defaults to "" rather than requiring a
+  // placeholder value - "" is a valid non-null value for the DB column.
+  lastName: z
+    .string()
+    .trim()
+    .max(100)
+    .optional()
+    .transform((s) => s ?? ""),
   allergies: z
     .string()
     .trim()

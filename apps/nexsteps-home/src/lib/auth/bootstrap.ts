@@ -1,6 +1,6 @@
 import type { ActiveSiteState } from "@pathway/mobile-core";
 
-import { apiClient, ApiError, authApi } from "@/lib/api";
+import { apiClient, ApiError, authApi, householdSetupApi } from "@/lib/api";
 import { getValidSessionSnapshot } from "@/lib/auth/auth0-client";
 import {
   clearSessionSnapshot,
@@ -18,14 +18,17 @@ import {
  * if a household genuinely has more than one and none stored, activeSiteId
  * stays null rather than fabricating a picker screen that isn't approved.
  */
-export type BootstrapRoute = "/(setup)/welcome" | "/(home)/(tabs)/week";
+export type BootstrapRoute =
+  | "/(setup)/welcome"
+  | "/(setup)/children-list"
+  | "/(home)/(tabs)/week";
 
 export type BootstrapState =
   | { status: "loading" }
   | { status: "unauthenticated"; route: "/(setup)/welcome" }
   | {
       status: "ready";
-      route: "/(home)/(tabs)/week";
+      route: "/(setup)/children-list" | "/(home)/(tabs)/week";
       session: SessionSnapshot;
       activeSiteState: ActiveSiteState;
     }
@@ -34,6 +37,24 @@ export type BootstrapState =
       route: "/(setup)/welcome";
       message: string;
     };
+
+/**
+ * A signed-in household that hasn't finished the guided setup flow (H2/Plan
+ * 05) lands back on children-list, the first per-household step, rather
+ * than the Week tab. Best-effort: if the check itself fails (network,
+ * non-household org), fail open to Week rather than blocking bootstrap on a
+ * secondary call.
+ */
+async function resolveSetupRoute(
+  accessToken: string,
+): Promise<"/(setup)/children-list" | "/(home)/(tabs)/week"> {
+  try {
+    const status = await householdSetupApi.getStatus(accessToken);
+    return status.setupCompletedAt ? "/(home)/(tabs)/week" : "/(setup)/children-list";
+  } catch {
+    return "/(home)/(tabs)/week";
+  }
+}
 
 async function resolveActiveSite(session: SessionSnapshot): Promise<ActiveSiteState> {
   const state = await authApi.getActiveSiteState(session.accessToken);
@@ -81,9 +102,11 @@ export async function bootstrapAuthState(): Promise<BootstrapState> {
       return { status: "unauthenticated", route: "/(setup)/welcome" };
     }
 
+    const route = await resolveSetupRoute(updatedSession.accessToken);
+
     return {
       status: "ready",
-      route: "/(home)/(tabs)/week",
+      route,
       session: updatedSession,
       activeSiteState,
     };
