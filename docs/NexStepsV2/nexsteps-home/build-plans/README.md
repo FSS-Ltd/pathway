@@ -54,7 +54,7 @@ process:
 | 04 | `HOME_EDUCATION` vertical, capabilities, household model, plan | H1 | 0 | see PROGRESS.md |
 | — | NexSteps Home household signup endpoint (Setup's `account-create`) | H2 (partial) | 0 | see PROGRESS.md |
 | — | 06 backend foundations — Activity/Task/CalendarItem schema, capabilities, `family-planner` API | H3 (partial) | 0 | see PROGRESS.md |
-| 06 | Week, Today, tasks, calendar screens (built before 05 — see sequencing note) | H3 | 8 | not started |
+| 06 | Week, Today, tasks, calendar screens (built before 05 — see sequencing note) | H3 | 8 | see PROGRESS.md |
 | 05 | Setup flow (remaining 8 screens) | H2 | 9 | not started |
 | 07 | Progress | H4 | 9 | not started |
 | 08 | Family, people, permissions, privacy | H5 | 8 | not started |
