@@ -878,8 +878,14 @@ SET search_path = ''
 AS $$
 DECLARE
   locked_notice_published_at timestamp(3);
-  previous_notice_published_at timestamp(3);
 BEGIN
+  IF TG_OP = 'UPDATE'
+    AND NEW."noticeId" IS DISTINCT FROM OLD."noticeId"
+  THEN
+    RAISE EXCEPTION 'ACE notice audience members cannot move between notices'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+
   IF TG_OP = 'DELETE' THEN
     SELECT notice."publishedAt"
     INTO locked_notice_published_at
@@ -899,23 +905,6 @@ BEGIN
   IF locked_notice_published_at IS NOT NULL THEN
     RAISE EXCEPTION 'Published notice audience is immutable'
       USING ERRCODE = 'object_not_in_prerequisite_state';
-  END IF;
-
-  IF TG_OP = 'UPDATE' AND (
-    NEW."noticeId" IS DISTINCT FROM OLD."noticeId"
-    OR NEW."tenantId" IS DISTINCT FROM OLD."tenantId"
-  ) THEN
-    SELECT notice."publishedAt"
-    INTO previous_notice_published_at
-    FROM app."AceNotice" notice
-    WHERE notice."id" = OLD."noticeId"
-      AND notice."tenantId" = OLD."tenantId"
-    FOR UPDATE;
-
-    IF previous_notice_published_at IS NOT NULL THEN
-      RAISE EXCEPTION 'Published notice audience is immutable'
-        USING ERRCODE = 'object_not_in_prerequisite_state';
-    END IF;
   END IF;
 
   IF TG_OP = 'DELETE' THEN
