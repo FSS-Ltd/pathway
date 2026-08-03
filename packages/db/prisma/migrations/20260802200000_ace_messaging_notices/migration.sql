@@ -876,36 +876,46 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  locked_notice_published_at timestamp(3);
+  previous_notice_published_at timestamp(3);
 BEGIN
-  IF TG_OP = 'INSERT' AND EXISTS (
-    SELECT 1
-    FROM app."AceNotice" notice
-    WHERE notice."id" = NEW."noticeId"
-      AND notice."tenantId" = NEW."tenantId"
-      AND notice."publishedAt" IS NOT NULL
-  ) THEN
-    RAISE EXCEPTION 'Published notice audience is immutable'
-      USING ERRCODE = 'object_not_in_prerequisite_state';
-  ELSIF TG_OP = 'UPDATE' AND EXISTS (
-    SELECT 1
-    FROM app."AceNotice" notice
-    WHERE notice."publishedAt" IS NOT NULL
-      AND (
-        (notice."id" = OLD."noticeId" AND notice."tenantId" = OLD."tenantId")
-        OR (notice."id" = NEW."noticeId" AND notice."tenantId" = NEW."tenantId")
-      )
-  ) THEN
-    RAISE EXCEPTION 'Published notice audience is immutable'
-      USING ERRCODE = 'object_not_in_prerequisite_state';
-  ELSIF TG_OP = 'DELETE' AND EXISTS (
-    SELECT 1
+  IF TG_OP = 'DELETE' THEN
+    SELECT notice."publishedAt"
+    INTO locked_notice_published_at
     FROM app."AceNotice" notice
     WHERE notice."id" = OLD."noticeId"
       AND notice."tenantId" = OLD."tenantId"
-      AND notice."publishedAt" IS NOT NULL
-  ) THEN
+    FOR UPDATE;
+  ELSE
+    SELECT notice."publishedAt"
+    INTO locked_notice_published_at
+    FROM app."AceNotice" notice
+    WHERE notice."id" = NEW."noticeId"
+      AND notice."tenantId" = NEW."tenantId"
+    FOR UPDATE;
+  END IF;
+
+  IF locked_notice_published_at IS NOT NULL THEN
     RAISE EXCEPTION 'Published notice audience is immutable'
       USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND (
+    NEW."noticeId" IS DISTINCT FROM OLD."noticeId"
+    OR NEW."tenantId" IS DISTINCT FROM OLD."tenantId"
+  ) THEN
+    SELECT notice."publishedAt"
+    INTO previous_notice_published_at
+    FROM app."AceNotice" notice
+    WHERE notice."id" = OLD."noticeId"
+      AND notice."tenantId" = OLD."tenantId"
+    FOR UPDATE;
+
+    IF previous_notice_published_at IS NOT NULL THEN
+      RAISE EXCEPTION 'Published notice audience is immutable'
+        USING ERRCODE = 'object_not_in_prerequisite_state';
+    END IF;
   END IF;
 
   IF TG_OP = 'DELETE' THEN
