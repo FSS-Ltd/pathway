@@ -45,8 +45,8 @@ export function combineDateAndTime(date: Date, time: TimeOption): Date {
   return combined;
 }
 
-export function formatDayLabel(date: Date): string {
-  const today = new Date();
+export function formatDayLabel(date: Date, now = new Date()): string {
+  const today = new Date(now);
   today.setHours(0, 0, 0, 0);
   const compareDate = new Date(date);
   compareDate.setHours(0, 0, 0, 0);

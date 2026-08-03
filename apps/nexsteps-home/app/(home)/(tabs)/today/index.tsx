@@ -5,7 +5,8 @@ import { router } from "expo-router";
 import { ContentCard, NoticeCard, ScreenActions, ScreenHeader, StatRow } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
 import { formatTimeLabel, isSameDay } from "@/lib/date-options";
-import { useActivities, useCalendarItems, useChildren, useTasks } from "@/lib/queries/family-planner";
+import { useActivities, useCalendarItems, useTasks } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 
 export default function TodayScreen() {
   const today = new Date();

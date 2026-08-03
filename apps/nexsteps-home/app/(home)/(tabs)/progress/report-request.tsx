@@ -5,7 +5,7 @@ import { router } from "expo-router";
 
 import { ChipRow, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
-import { useChildren } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 import { useCreateReportBundle } from "@/lib/queries/learning";
 
 type PeriodOption = { label: string; days: number };

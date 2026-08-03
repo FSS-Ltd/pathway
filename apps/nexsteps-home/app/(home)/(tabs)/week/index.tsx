@@ -6,7 +6,8 @@ import { router } from "expo-router";
 import { ContentCard, NoticeCard, ScreenActions, ScreenHeader, WeekStrip } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
 import { formatDayLabel, formatTimeLabel, isSameDay, upcomingDayOptions } from "@/lib/date-options";
-import { useActivities, useCalendarItems, useChildren, useTasks } from "@/lib/queries/family-planner";
+import { useActivities, useCalendarItems, useTasks } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 
 export default function WeekScreen() {
   const days = useMemo(() => upcomingDayOptions(5), []);
