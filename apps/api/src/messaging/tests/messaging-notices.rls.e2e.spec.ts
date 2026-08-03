@@ -1603,6 +1603,54 @@ describe("ACE parent/staff messaging and notices storage", () => {
     );
   });
 
+  it("keeps draft audience members attached to their originating notice", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const seeded = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const sourceNoticeId = await insertNotice(tx, fixture);
+        const destinationNoticeId = await insertNotice(tx, fixture);
+        const audienceMemberId = await insertNoticeAudienceMember(tx, fixture, {
+          noticeId: sourceNoticeId,
+          recipientUserId: fixture.staffAId,
+          recipientKind: "STAFF",
+        });
+        return { audienceMemberId, destinationNoticeId, sourceNoticeId };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
+            UPDATE "AceNoticeAudienceMember"
+            SET "noticeId" = ${seeded.destinationNoticeId}
+            WHERE "id" = ${seeded.audienceMemberId}
+          `,
+        ),
+      "55000",
+    );
+
+    const [audienceMember] = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<Array<{ noticeId: string; recipientUserId: string }>>`
+          SELECT "noticeId", "recipientUserId"
+          FROM "AceNoticeAudienceMember"
+          WHERE "id" = ${seeded.audienceMemberId}
+        `,
+    );
+    expect(audienceMember).toEqual({
+      noticeId: seeded.sourceNoticeId,
+      recipientUserId: fixture.staffAId,
+    });
+  });
+
   it("serializes draft audience inserts before publication", async () => {
     if (!isDatabaseAvailable()) return;
 
