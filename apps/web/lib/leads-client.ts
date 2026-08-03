@@ -41,6 +41,32 @@ export type CreateTrialLeadPayload = {
   };
 };
 
+export type HomeschoolRegion =
+  | "england"
+  | "wales"
+  | "scotland"
+  | "northern-ireland"
+  | "outside-uk";
+
+export type HomeschoolStage =
+  | "exploring"
+  | "preparing"
+  | "home-educating"
+  | "returning";
+
+export type CreateHomeschoolLeadPayload = {
+  firstName: string;
+  email: string;
+  region: HomeschoolRegion;
+  stage: HomeschoolStage;
+  consentMarketing: true;
+  utm?: {
+    source?: string;
+    medium?: string;
+    campaign?: string;
+  };
+};
+
 export type CreateReadinessLeadPayload = {
   name: string;
   email: string;
@@ -131,6 +157,23 @@ export async function createTrialLead(
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || "Unable to join waitlist");
+  }
+
+  return (await res.json()) as { success: boolean; id: string };
+}
+
+export async function createHomeschoolLead(
+  payload: CreateHomeschoolLeadPayload,
+): Promise<{ success: boolean; id: string }> {
+  const res = await fetch(`${API_BASE_URL}/leads/homeschool`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error("Unable to join the NexSteps Home waitlist");
   }
 
   return (await res.json()) as { success: boolean; id: string };

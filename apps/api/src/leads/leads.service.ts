@@ -9,6 +9,7 @@ import { LeadKind } from "@prisma/client";
 import { MailerService } from "../mailer/mailer.service";
 import {
   type CreateDemoLeadDto,
+  type CreateHomeschoolLeadDto,
   type CreateToolkitLeadDto,
   type CreateTrialLeadDto,
   type CreateReadinessLeadDto,
@@ -51,6 +52,7 @@ export class LeadsService {
   private async findRecentLead(
     email: string,
     kind: LeadKind,
+    sector?: string,
   ): Promise<{ id: string; metadataJson: Prisma.JsonValue | null } | null> {
     const windowStart = new Date();
     windowStart.setHours(windowStart.getHours() - this.IDEMPOTENCY_WINDOW_HOURS);
@@ -59,6 +61,7 @@ export class LeadsService {
       where: {
         email: email.toLowerCase(),
         kind,
+        ...(sector ? { sector } : {}),
         createdAt: {
           gte: windowStart,
         },
@@ -480,6 +483,46 @@ export class LeadsService {
         utmSource: dto.utm?.source?.trim() || null,
         utmMedium: dto.utm?.medium?.trim() || null,
         utmCampaign: dto.utm?.campaign?.trim() || null,
+      },
+      select: { id: true, kind: true, createdAt: true },
+    });
+  }
+
+  async createHomeschoolLead(dto: CreateHomeschoolLeadDto) {
+    const normalizedEmail = dto.email.toLowerCase().trim();
+    const existing = await this.findRecentLead(
+      normalizedEmail,
+      LeadKind.TRIAL,
+      "homeschool",
+    );
+    const metadataJson: Prisma.InputJsonObject = {
+      campaign: "nexsteps-home-waitlist",
+      homeschoolRegion: dto.region,
+      homeschoolStage: dto.stage,
+      homeschoolMarketingConsentAt: new Date().toISOString(),
+    };
+    const data = {
+      name: dto.firstName.trim(),
+      sector: "homeschool",
+      utmSource: dto.utm?.source?.trim() || null,
+      utmMedium: dto.utm?.medium?.trim() || null,
+      utmCampaign: dto.utm?.campaign?.trim() || null,
+      metadataJson,
+    };
+
+    if (existing) {
+      return prisma.lead.update({
+        where: { id: existing.id },
+        data: { ...data, updatedAt: new Date() },
+        select: { id: true, kind: true, createdAt: true },
+      });
+    }
+
+    return prisma.lead.create({
+      data: {
+        ...data,
+        kind: LeadKind.TRIAL,
+        email: normalizedEmail,
       },
       select: { id: true, kind: true, createdAt: true },
     });

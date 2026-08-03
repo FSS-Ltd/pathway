@@ -28,6 +28,7 @@ const footerSections: FooterSection[] = [
   {
     title: "Who It's For",
     links: [
+      { label: "Homeschool", href: "/homeschool" },
       { label: "Schools", href: "/schools" },
       { label: "Clubs", href: "/clubs" },
       { label: "Churches", href: "/churches" },

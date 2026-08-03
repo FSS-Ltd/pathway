@@ -89,6 +89,34 @@ export const createTrialLeadDto = z.object({
 
 export type CreateTrialLeadDto = z.infer<typeof createTrialLeadDto>;
 
+const homeschoolRegions = [
+  "england",
+  "wales",
+  "scotland",
+  "northern-ireland",
+  "outside-uk",
+] as const;
+
+const homeschoolStages = [
+  "exploring",
+  "preparing",
+  "home-educating",
+  "returning",
+] as const;
+
+export const createHomeschoolLeadDto = z.object({
+  firstName: z.string().trim().min(1, "First name is required").max(100),
+  email: z.string().email("Invalid email address"),
+  region: z.enum(homeschoolRegions),
+  stage: z.enum(homeschoolStages),
+  consentMarketing: z.literal(true, {
+    errorMap: () => ({ message: "Consent to be contacted is required" }),
+  }),
+  utm: utmSchema,
+});
+
+export type CreateHomeschoolLeadDto = z.infer<typeof createHomeschoolLeadDto>;
+
 const riskAreaSchema = z.object({
   area: z.string(),
   severity: z.string(),

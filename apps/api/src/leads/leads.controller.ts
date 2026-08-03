@@ -10,12 +10,14 @@ import {
 import { LeadsService } from "./leads.service";
 import {
   createDemoLeadDto,
+  createHomeschoolLeadDto,
   createToolkitLeadDto,
   createTrialLeadDto,
   createReadinessLeadDto,
   createTeamTrackerLeadDto,
   unsubscribeTeamTrackerDto,
   type CreateDemoLeadDto,
+  type CreateHomeschoolLeadDto,
   type CreateToolkitLeadDto,
   type CreateTrialLeadDto,
   type CreateReadinessLeadDto,
@@ -99,6 +101,18 @@ export class LeadsController {
     }
 
     const lead = await this.leadsService.createTrialLead(parsed.data);
+    return { success: true, id: lead.id };
+  }
+
+  @Post("homeschool")
+  @HttpCode(HttpStatus.OK)
+  async createHomeschoolLead(@Body() dto: CreateHomeschoolLeadDto) {
+    const parsed = createHomeschoolLeadDto.safeParse(dto);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.errors);
+    }
+
+    const lead = await this.leadsService.createHomeschoolLead(parsed.data);
     return { success: true, id: lead.id };
   }
 
