@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
@@ -17,9 +17,15 @@ export default function ChildDetailsScreen() {
 
   const [firstName, setFirstName] = useState("");
   const [preferredName, setPreferredName] = useState("");
+  // Hydrate local edit state from the fetched child once, not on every
+  // refetch - the app's QueryClient default is staleTime: 0
+  // (src/providers/app-providers.tsx), so a background refetch while the
+  // user is mid-edit would otherwise silently overwrite unsaved keystrokes.
+  const hasHydrated = useRef(false);
 
   useEffect(() => {
-    if (childQuery.data) {
+    if (childQuery.data && !hasHydrated.current) {
+      hasHydrated.current = true;
       setFirstName(childQuery.data.firstName);
       setPreferredName(childQuery.data.preferredName ?? "");
     }
