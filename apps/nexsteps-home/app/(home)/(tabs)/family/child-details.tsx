@@ -17,19 +17,22 @@ export default function ChildDetailsScreen() {
 
   const [firstName, setFirstName] = useState("");
   const [preferredName, setPreferredName] = useState("");
-  // Hydrate local edit state from the fetched child once, not on every
-  // refetch - the app's QueryClient default is staleTime: 0
+  // Hydrate local edit state from the fetched child once per childId, not
+  // on every refetch - the app's QueryClient default is staleTime: 0
   // (src/providers/app-providers.tsx), so a background refetch while the
   // user is mid-edit would otherwise silently overwrite unsaved keystrokes.
-  const hasHydrated = useRef(false);
+  // Keyed on childId (not just a bare boolean) so this stays correct if
+  // this screen instance is ever reused for a different child (setParams,
+  // between-children navigation) instead of fully remounting.
+  const hydratedFor = useRef<string | null>(null);
 
   useEffect(() => {
-    if (childQuery.data && !hasHydrated.current) {
-      hasHydrated.current = true;
+    if (childQuery.data && hydratedFor.current !== childId) {
+      hydratedFor.current = childId ?? null;
       setFirstName(childQuery.data.firstName);
       setPreferredName(childQuery.data.preferredName ?? "");
     }
-  }, [childQuery.data]);
+  }, [childQuery.data, childId]);
 
   if (!childId || childQuery.isError) {
     return (
@@ -61,7 +64,7 @@ export default function ChildDetailsScreen() {
     if (!canSave) return;
     updateChild.mutate(
       { id: child.id, input: { firstName: firstName.trim(), preferredName: preferredName.trim() || null } },
-      { onSuccess: () => router.push("/(home)/(tabs)/family") },
+      { onSuccess: () => router.replace("/(home)/(tabs)/family") },
     );
   };
 

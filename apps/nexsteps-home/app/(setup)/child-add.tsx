@@ -30,7 +30,20 @@ export default function ChildAddScreen() {
         dateOfBirth: ageToDateOfBirth(parsedAge),
         yearGroup: yearGroup.trim() || undefined,
       },
-      { onSuccess: () => router.replace("/(setup)/children-list") },
+      {
+        onSuccess: () => {
+          // Reached from an already-onboarded household's Family tab (both
+          // callers got here via push, never replace) - go back there
+          // instead of dropping them into the rest of the first-run setup
+          // wizard. Falls back to the setup flow's own next step when
+          // there's no back stack (e.g. a future direct/deep link entry).
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace("/(setup)/children-list");
+          }
+        },
+      },
     );
   };
 

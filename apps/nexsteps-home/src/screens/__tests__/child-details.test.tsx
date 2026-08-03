@@ -3,10 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import * as childrenApi from "@/lib/api/children";
 import type { Child } from "@/lib/api/children";
-import ChildDetailsScreen from "./child-details";
+import ChildDetailsScreen from "../../../app/(home)/(tabs)/family/child-details";
 
 jest.mock("expo-router", () => ({
-  router: { push: jest.fn() },
+  router: { push: jest.fn(), replace: jest.fn(), canGoBack: () => false, back: jest.fn() },
   useLocalSearchParams: () => ({ childId: "c1" }),
 }));
 
@@ -28,6 +28,12 @@ jest.mock("@/lib/queries/family-planner", () => ({
  * queryClient.invalidateQueries with different server data queued up, and
  * asserts the typed value survives - rather than only asserting a guard
  * exists structurally.
+ *
+ * Lives under src/, not colocated with child-details.tsx in app/ - a test
+ * file inside app/ registers as a live expo-router route (confirmed via
+ * expo-router's own getRoutes(), which only excludes +html/+native-intent/
+ * +api/+middleware, not .test files), pulling @testing-library/react-native
+ * into the production bundle graph.
  */
 describe("ChildDetailsScreen background refetch", () => {
   it("keeps unsaved local edits when the child query refetches with different server data", async () => {
