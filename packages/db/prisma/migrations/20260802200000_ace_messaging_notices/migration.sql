@@ -467,6 +467,47 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION app.assert_active_message_participant(
+  checked_tenant_id text,
+  checked_participant_id text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  participant_user_id text;
+  participant_removed_at timestamp(3);
+BEGIN
+  SELECT participant."userId", participant."removedAt"
+  INTO participant_user_id, participant_removed_at
+  FROM app."MessageParticipant" participant
+  WHERE participant."id" = checked_participant_id
+    AND participant."tenantId" = checked_tenant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Message participant does not belong to tenant'
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  IF participant_removed_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Message participant must be active'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM app."StudentIdentity" student_identity
+    WHERE student_identity."tenantId" = checked_tenant_id
+      AND student_identity."userId" = participant_user_id
+  ) THEN
+    RAISE EXCEPTION 'Students cannot participate in messaging'
+      USING ERRCODE = 'check_violation';
+  END IF;
+END;
+$$;
+
 CREATE FUNCTION app.assert_message_conversation_topology_values(
   checked_tenant_id text,
   checked_conversation_id text
@@ -615,7 +656,6 @@ AS $$
 DECLARE
   requested_sequence integer := NEW."sequence";
   sender_conversation_id text;
-  sender_removed_at timestamp(3);
 BEGIN
   UPDATE app."MessageConversation"
   SET "lastMessageSequence" = "lastMessageSequence" + 1
@@ -633,20 +673,18 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  SELECT participant."conversationId", participant."removedAt"
-  INTO sender_conversation_id, sender_removed_at
+  PERFORM app.assert_active_message_participant(
+    NEW."tenantId",
+    NEW."senderParticipantId"
+  );
+
+  SELECT participant."conversationId"
+  INTO sender_conversation_id
   FROM app."MessageParticipant" participant
   WHERE participant."id" = NEW."senderParticipantId"
     AND participant."tenantId" = NEW."tenantId";
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Message sender does not belong to tenant'
-      USING ERRCODE = 'foreign_key_violation';
-  END IF;
-
-  IF sender_conversation_id IS DISTINCT FROM NEW."conversationId"
-    OR sender_removed_at IS NOT NULL
-  THEN
+  IF sender_conversation_id IS DISTINCT FROM NEW."conversationId" THEN
     RAISE EXCEPTION 'Message sender must be an active conversation participant'
       USING ERRCODE = 'check_violation';
   END IF;
@@ -677,7 +715,6 @@ DECLARE
   message_conversation_id text;
   message_sender_participant_id text;
   recipient_conversation_id text;
-  recipient_removed_at timestamp(3);
   old_status_rank integer;
   new_status_rank integer;
 BEGIN
@@ -692,19 +729,18 @@ BEGIN
       USING ERRCODE = 'foreign_key_violation';
   END IF;
 
-  SELECT participant."conversationId", participant."removedAt"
-  INTO recipient_conversation_id, recipient_removed_at
+  PERFORM app.assert_active_message_participant(
+    NEW."tenantId",
+    NEW."recipientParticipantId"
+  );
+
+  SELECT participant."conversationId"
+  INTO recipient_conversation_id
   FROM app."MessageParticipant" participant
   WHERE participant."id" = NEW."recipientParticipantId"
     AND participant."tenantId" = NEW."tenantId";
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Message delivery recipient does not belong to tenant'
-      USING ERRCODE = 'foreign_key_violation';
-  END IF;
-
   IF recipient_conversation_id IS DISTINCT FROM message_conversation_id
-    OR recipient_removed_at IS NOT NULL
     OR NEW."recipientParticipantId" = message_sender_participant_id
   THEN
     RAISE EXCEPTION 'Message delivery recipient must be a different active conversation participant'
@@ -774,7 +810,6 @@ AS $$
 DECLARE
   conversation_last_sequence integer;
   participant_conversation_id text;
-  participant_removed_at timestamp(3);
 BEGIN
   SELECT conversation."lastMessageSequence"
   INTO conversation_last_sequence
@@ -787,20 +822,18 @@ BEGIN
       USING ERRCODE = 'foreign_key_violation';
   END IF;
 
-  SELECT participant."conversationId", participant."removedAt"
-  INTO participant_conversation_id, participant_removed_at
+  PERFORM app.assert_active_message_participant(
+    NEW."tenantId",
+    NEW."participantId"
+  );
+
+  SELECT participant."conversationId"
+  INTO participant_conversation_id
   FROM app."MessageParticipant" participant
   WHERE participant."id" = NEW."participantId"
     AND participant."tenantId" = NEW."tenantId";
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Read cursor participant does not belong to tenant'
-      USING ERRCODE = 'foreign_key_violation';
-  END IF;
-
-  IF participant_conversation_id IS DISTINCT FROM NEW."conversationId"
-    OR participant_removed_at IS NOT NULL
-  THEN
+  IF participant_conversation_id IS DISTINCT FROM NEW."conversationId" THEN
     RAISE EXCEPTION 'Read cursor requires an active participant in its conversation'
       USING ERRCODE = 'check_violation';
   END IF;
@@ -1134,6 +1167,7 @@ $$;
 
 REVOKE ALL ON FUNCTION app.assert_message_conversation_creator() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_participant() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.assert_active_message_participant(text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology_values(text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_sequence_update() FROM PUBLIC;
@@ -1182,6 +1216,14 @@ FOR EACH ROW EXECUTE FUNCTION app.allocate_message_sequence();
 CREATE TRIGGER "Message_reject_update"
 BEFORE UPDATE ON "Message"
 FOR EACH ROW EXECUTE FUNCTION app.reject_message_update();
+
+CREATE TRIGGER "Message_reject_delete"
+BEFORE DELETE ON "Message"
+FOR EACH ROW EXECUTE FUNCTION app.reject_forward_state_delete();
+
+CREATE TRIGGER "MessageParticipant_reject_delete"
+BEFORE DELETE ON "MessageParticipant"
+FOR EACH ROW EXECUTE FUNCTION app.reject_forward_state_delete();
 
 CREATE TRIGGER "MessageDelivery_validate"
 BEFORE INSERT OR UPDATE ON "MessageDelivery"
