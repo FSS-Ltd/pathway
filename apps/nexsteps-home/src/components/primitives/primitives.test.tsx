@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react-native";
+import { fireEvent, render } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 
 import { homeTokens } from "@/design/tokens";
@@ -12,6 +12,7 @@ import {
   ScreenActions,
   ScreenHeader,
   StatRow,
+  ToggleRow,
   WeekStrip,
 } from ".";
 
@@ -127,6 +128,21 @@ describe("ScreenHeader", () => {
     expect(flatStyle(title.props.style).fontSize).toBe(
       homeTokens.typography.wireframe.screenTitle.size,
     );
+  });
+});
+
+describe("ToggleRow", () => {
+  it("renders the label, detail, and reflects the switch's checked state", () => {
+    const onValueChange = jest.fn();
+    const { getByLabelText, getByText } = render(
+      <ToggleRow label="Today summary" detail="08:00 on learning days" value onValueChange={onValueChange} />,
+    );
+    expect(getByText("Today summary")).toBeTruthy();
+    expect(getByText("08:00 on learning days")).toBeTruthy();
+    const toggle = getByLabelText("Today summary");
+    expect(toggle.props.accessibilityState.checked).toBe(true);
+    fireEvent(toggle, "valueChange", false);
+    expect(onValueChange).toHaveBeenCalledWith(false);
   });
 });
 

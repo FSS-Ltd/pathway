@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Inject, Patch, Post, UseGuards } from "@nestjs/common";
 import { CurrentTenant } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { learningDaysSchema } from "./dto";
+import { learningDaysSchema, notificationPreferencesSchema, planningPreferencesSchema } from "./dto";
 import { HouseholdSetupService } from "./household-setup.service";
 
 /**
@@ -36,5 +36,33 @@ export class HouseholdSetupController {
   @Post("complete")
   completeSetup(@CurrentTenant("tenantId") tenantId: string) {
     return this.service.completeSetup(tenantId);
+  }
+
+  @Get("planning-preferences")
+  getPlanningPreferences(@CurrentTenant("tenantId") tenantId: string) {
+    return this.service.getPlanningPreferences(tenantId);
+  }
+
+  @Patch("planning-preferences")
+  updatePlanningPreferences(@Body() body: unknown, @CurrentTenant("tenantId") tenantId: string) {
+    const parsed = planningPreferencesSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.format());
+    }
+    return this.service.updatePlanningPreferences(parsed.data, tenantId);
+  }
+
+  @Get("notification-preferences")
+  getNotificationPreferences(@CurrentTenant("tenantId") tenantId: string) {
+    return this.service.getNotificationPreferences(tenantId);
+  }
+
+  @Patch("notification-preferences")
+  updateNotificationPreferences(@Body() body: unknown, @CurrentTenant("tenantId") tenantId: string) {
+    const parsed = notificationPreferencesSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.format());
+    }
+    return this.service.updateNotificationPreferences(parsed.data, tenantId);
   }
 }

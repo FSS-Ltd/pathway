@@ -7,3 +7,5 @@ export const learningDaysSchema = z
   .strict();
 
 export type LearningDaysDto = z.infer<typeof learningDaysSchema>;
+
+export * from "./preferences.dto";
