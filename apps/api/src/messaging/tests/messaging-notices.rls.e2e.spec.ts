@@ -1998,6 +1998,282 @@ describe("ACE parent/staff messaging and notices storage", () => {
     });
   });
 
+  it("retains unreferenced messages and their client idempotency history", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const seeded = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createParentStaffConversation(tx, fixture);
+        const clientRequestId = randomUUID();
+        const message = await insertMessage(tx, fixture, {
+          conversationId: conversation.conversationId,
+          senderParticipantId: conversation.staffParticipantIds[0],
+          clientRequestId,
+        });
+        return {
+          clientRequestId,
+          conversationId: conversation.conversationId,
+          messageId: message.id,
+          senderParticipantId: conversation.staffParticipantIds[0],
+        };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`
+              DELETE FROM "Message"
+              WHERE "id" = ${seeded.messageId}
+            `,
+        ),
+      "55000",
+    );
+
+    const [message] = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<
+          Array<{
+            attachmentCount: number;
+            clientRequestId: string;
+            deliveryCount: number;
+            id: string;
+          }>
+        >`
+          SELECT
+            message."id",
+            message."clientRequestId",
+            count(DISTINCT attachment."id")::int AS "attachmentCount",
+            count(DISTINCT delivery."id")::int AS "deliveryCount"
+          FROM "Message" message
+          LEFT JOIN "MessageAttachment" attachment
+            ON attachment."messageId" = message."id"
+          LEFT JOIN "MessageDelivery" delivery
+            ON delivery."messageId" = message."id"
+          WHERE message."id" = ${seeded.messageId}
+          GROUP BY message."id", message."clientRequestId"
+        `,
+    );
+    expect(message).toEqual({
+      attachmentCount: 0,
+      clientRequestId: seeded.clientRequestId,
+      deliveryCount: 0,
+      id: seeded.messageId,
+    });
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertMessage(tx, fixture, {
+            conversationId: seeded.conversationId,
+            senderParticipantId: seeded.senderParticipantId,
+            clientRequestId: seeded.clientRequestId,
+          }),
+        ),
+      "23505",
+    );
+  });
+
+  it("retains unreferenced participants without changing the explicit removal lifecycle", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const seeded = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createParentStaffConversation(tx, fixture);
+        const unreferencedParticipantId = await insertParticipant(tx, fixture, {
+          conversationId: conversation.conversationId,
+          userId: fixture.staffBId,
+          kind: "STAFF",
+        });
+        return { unreferencedParticipantId };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`
+              DELETE FROM "MessageParticipant"
+              WHERE "id" = ${seeded.unreferencedParticipantId}
+            `,
+        ),
+      "55000",
+    );
+
+    const [participant] = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<Array<{ id: string; removedAt: Date | null }>>`
+          SELECT "id", "removedAt"
+          FROM "MessageParticipant"
+          WHERE "id" = ${seeded.unreferencedParticipantId}
+        `,
+    );
+    expect(participant).toEqual({
+      id: seeded.unreferencedParticipantId,
+      removedAt: null,
+    });
+  });
+
+  it("rechecks later student identity assignment for message, delivery, and cursor writes", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const studentIdentityId = randomUUID();
+    const studentIdentityLinkId = randomUUID();
+    const studentChildId = randomUUID();
+    const seeded = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createParentStaffConversation(tx, fixture);
+        const participantId = await insertParticipant(tx, fixture, {
+          conversationId: conversation.conversationId,
+          userId: fixture.staffCId,
+          kind: "STAFF",
+        });
+        const message = await insertMessage(tx, fixture, {
+          conversationId: conversation.conversationId,
+          senderParticipantId: conversation.staffParticipantIds[0],
+          clientRequestId: randomUUID(),
+        });
+        const existingCursorId = await insertReadCursor(
+          tx,
+          fixture,
+          conversation.conversationId,
+          participantId,
+        );
+        const cursorCreationConversation = await createStaffConversation(
+          tx,
+          fixture,
+          "STAFF_ROOM",
+        );
+        const cursorCreationParticipantId = await insertParticipant(
+          tx,
+          fixture,
+          {
+            conversationId: cursorCreationConversation.conversationId,
+            userId: fixture.staffCId,
+            kind: "STAFF",
+          },
+        );
+
+        return {
+          conversationId: conversation.conversationId,
+          cursorCreationConversationId:
+            cursorCreationConversation.conversationId,
+          cursorCreationParticipantId,
+          existingCursorId,
+          messageId: message.id,
+          messageSequence: message.sequence,
+          participantId,
+        };
+      },
+    );
+
+    try {
+      await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        async (tx) => {
+          await tx.child.create({
+            data: {
+              id: studentChildId,
+              firstName: "Messaging",
+              lastName: "Post-participant student",
+              tenantId: fixture.tenantAId,
+            },
+          });
+          await tx.$executeRaw`
+            INSERT INTO "StudentIdentity" ("id", "tenantId", "userId")
+            VALUES (${studentIdentityId}, ${fixture.tenantAId}, ${fixture.staffCId})
+          `;
+          await tx.$executeRaw`
+            INSERT INTO "StudentIdentityLink" (
+              "id", "tenantId", "studentIdentityId", "childId"
+            ) VALUES (
+              ${studentIdentityLinkId}, ${fixture.tenantAId},
+              ${studentIdentityId}, ${studentChildId}
+            )
+          `;
+        },
+      );
+
+      const postIdentityWrites = await Promise.allSettled([
+        expectDatabaseRejection(
+          () =>
+            withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+              insertMessage(tx, fixture, {
+                conversationId: seeded.conversationId,
+                senderParticipantId: seeded.participantId,
+                clientRequestId: randomUUID(),
+              }),
+            ),
+          "23514",
+        ),
+        expectDatabaseRejection(
+          () =>
+            withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+              insertDelivery(
+                tx,
+                fixture,
+                seeded.messageId,
+                seeded.participantId,
+              ),
+            ),
+          "23514",
+        ),
+        expectDatabaseRejection(
+          () =>
+            withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+              insertReadCursor(
+                tx,
+                fixture,
+                seeded.cursorCreationConversationId,
+                seeded.cursorCreationParticipantId,
+              ),
+            ),
+          "23514",
+        ),
+        expectDatabaseRejection(
+          () =>
+            withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+              setReadCursor(
+                tx,
+                seeded.existingCursorId,
+                seeded.messageSequence,
+              ),
+            ),
+          "23514",
+        ),
+      ]);
+      expect(postIdentityWrites).toEqual([
+        { status: "fulfilled", value: undefined },
+        { status: "fulfilled", value: undefined },
+        { status: "fulfilled", value: undefined },
+        { status: "fulfilled", value: undefined },
+      ]);
+    } finally {
+      await prisma.studentIdentityLink.delete({
+        where: { id: studentIdentityLinkId },
+      });
+      await prisma.studentIdentity.delete({ where: { id: studentIdentityId } });
+      await prisma.child.delete({ where: { id: studentChildId } });
+    }
+  });
+
   it("encrypts message bodies through Prisma and keeps attachment storage keys private", async () => {
     if (!isDatabaseAvailable()) return;
 
