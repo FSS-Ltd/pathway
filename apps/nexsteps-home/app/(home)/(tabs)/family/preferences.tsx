@@ -30,7 +30,13 @@ export default function PreferencesScreen() {
 
   const [weekStartsOnIndex, setWeekStartsOnIndex] = useState(0);
   const [timeFormatIndex, setTimeFormatIndex] = useState(0);
-  const [languageIndex, setLanguageIndex] = useState(0);
+  // -1 means "no chip matches the stored value" (a language outside the two
+  // shown options - the DTO only constrains this to a 2-10 char string, not
+  // a true enum, unlike weekStartsOn/timeFormat). Left un-highlighted
+  // rather than defaulted to index 0, and excluded from the save payload
+  // unless the user actually picks a chip - see languageTouched below.
+  const [languageIndex, setLanguageIndex] = useState(-1);
+  const [languageTouched, setLanguageTouched] = useState(false);
   const [durationText, setDurationText] = useState("");
   const [dailyLimitText, setDailyLimitText] = useState("");
 
@@ -46,8 +52,7 @@ export default function PreferencesScreen() {
       const data = preferencesQuery.data;
       setWeekStartsOnIndex(WEEK_STARTS_ON_OPTIONS.findIndex((o) => o.value === data.weekStartsOn));
       setTimeFormatIndex(TIME_FORMAT_OPTIONS.findIndex((o) => o.value === data.timeFormat));
-      const languageMatch = LANGUAGE_OPTIONS.findIndex((o) => o.value === data.language);
-      setLanguageIndex(languageMatch === -1 ? 0 : languageMatch);
+      setLanguageIndex(LANGUAGE_OPTIONS.findIndex((o) => o.value === data.language));
       setDurationText(String(data.defaultActivityDurationMinutes));
       setDailyLimitText(String(data.dailyPlanningLimit));
     }
@@ -58,11 +63,20 @@ export default function PreferencesScreen() {
     updatePreferences.error instanceof ApiError &&
     updatePreferences.error.status === 403;
 
+  const handleLanguagePress = (index: number) => {
+    setLanguageIndex(index);
+    setLanguageTouched(true);
+  };
+
   const handleSave = () => {
     updatePreferences.mutate({
       weekStartsOn: WEEK_STARTS_ON_OPTIONS[weekStartsOnIndex].value,
       timeFormat: TIME_FORMAT_OPTIONS[timeFormatIndex].value,
-      language: LANGUAGE_OPTIONS[languageIndex].value,
+      // Only send language if the user actually picked a chip this
+      // session - an untouched, unrecognized stored value (outside the
+      // two shown options) must pass through unmodified rather than being
+      // silently overwritten with whatever chip index 0 happens to be.
+      ...(languageTouched ? { language: LANGUAGE_OPTIONS[languageIndex].value } : {}),
       defaultActivityDurationMinutes: Number(durationText),
       dailyPlanningLimit: Number(dailyLimitText),
     });
@@ -135,7 +149,7 @@ export default function PreferencesScreen() {
           label="Language"
           items={LANGUAGE_OPTIONS.map((o) => o.label)}
           active={LANGUAGE_OPTIONS.map((_, index) => index === languageIndex)}
-          onPress={setLanguageIndex}
+          onPress={handleLanguagePress}
         />
 
         <NoticeCard
