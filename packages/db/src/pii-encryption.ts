@@ -33,6 +33,7 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
   FaithReflection: ["reflectionEncrypted"],
   PermissionSlipResponse: ["responsePayload"],
   PermissionSlipException: ["reason"],
+  Message: ["bodyEncrypted"],
 };
 
 /**

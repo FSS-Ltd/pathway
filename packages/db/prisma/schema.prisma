@@ -300,6 +300,34 @@ enum AceCommunityModerationActionType {
   REMOVE
 }
 
+enum MessageConversationKind {
+  PARENT_STAFF
+  STAFF_DIRECT
+  STAFF_ROOM
+}
+
+enum MessageParticipantKind {
+  GUARDIAN
+  STAFF
+}
+
+enum MessageDeliveryStatus {
+  PENDING
+  DELIVERED
+  READ
+}
+
+enum AceNoticeAudience {
+  PARENTS
+  STAFF
+  PARENTS_AND_STAFF
+}
+
+enum AceNoticeAudienceMemberKind {
+  GUARDIAN
+  STAFF
+}
+
 enum PermissionScope {
   organisation
   site
@@ -706,6 +734,16 @@ model Tenant {
   aceCommunityReports             AceCommunityReport[]
   aceCommunityModerationActions   AceCommunityModerationAction[]
   aceCommunitySafeguardingReferences AceCommunitySafeguardingReference[]
+  messageConversations               MessageConversation[]
+  messageParticipants                MessageParticipant[]
+  messages                           Message[]
+  messageParticipantReadCursors      MessageParticipantReadCursor[]
+  messageDeliveries                  MessageDelivery[]
+  messageAttachments                 MessageAttachment[]
+  aceNotices                         AceNotice[]
+  aceNoticeAudienceMembers           AceNoticeAudienceMember[]
+  aceNoticeReceipts                  AceNoticeReceipt[]
+  aceNoticeAttachments               AceNoticeAttachment[]
   roleDefinitions        OrgRoleDefinition[]
   roleAssignments        UserRoleAssignment[]
 
@@ -853,6 +891,10 @@ model User {
   aceCommunityReadCursors         AceCommunityReadCursor[]         @relation("AceCommunityReadCursorUser")
   aceCommunityReports             AceCommunityReport[]             @relation("AceCommunityReportReporter")
   aceCommunityModerationActions   AceCommunityModerationAction[]   @relation("AceCommunityModerationActionModerator")
+  createdMessageConversations       MessageConversation[]          @relation("MessageConversationCreatedBy")
+  messageParticipants               MessageParticipant[]           @relation("MessageParticipantUser")
+  createdAceNotices                 AceNotice[]                    @relation("AceNoticeCreatedBy")
+  aceNoticeAudienceMemberships      AceNoticeAudienceMember[]      @relation("AceNoticeAudienceRecipient")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
@@ -888,6 +930,9 @@ model GuardianIdentity {
   user            User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
   relationships   GuardianChildRelationship[]
   acceptedInvites FamilyIdentityInvite[]      @relation("FamilyIdentityInviteAcceptedGuardian")
+  messageConversations     MessageConversation[]
+  messageParticipants      MessageParticipant[]
+  aceNoticeAudienceMembers AceNoticeAudienceMember[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, userId])
@@ -1476,6 +1521,202 @@ model AceCommunitySafeguardingReference {
   @@index([tenantId, reportId])
   @@index([tenantId, moderationActionId])
   @@index([concernId])
+}
+
+model MessageConversation {
+  id                  String                  @id @default(uuid())
+  tenantId            String
+  kind                MessageConversationKind
+  guardianIdentityId  String?
+  createdByUserId     String
+  lastMessageSequence Int                     @default(0)
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  tenant           Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  guardianIdentity GuardianIdentity?              @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  createdBy        User                           @relation("MessageConversationCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  participants     MessageParticipant[]
+  messages         Message[]
+  readCursors      MessageParticipantReadCursor[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, kind, guardianIdentityId])
+}
+
+model MessageParticipant {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  conversationId     String
+  userId             String
+  kind               MessageParticipantKind
+  guardianIdentityId String?
+  joinedAt           DateTime               @default(now())
+  removedAt          DateTime?
+
+  tenant           Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation     MessageConversation            @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  user             User                           @relation("MessageParticipantUser", fields: [userId], references: [id], onDelete: Restrict)
+  guardianIdentity GuardianIdentity?              @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sentMessages     Message[]
+  readCursors      MessageParticipantReadCursor[]
+  deliveries       MessageDelivery[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, conversationId, userId])
+  @@index([tenantId, userId, removedAt])
+  @@index([tenantId, conversationId, removedAt])
+}
+
+model Message {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  conversationId      String
+  senderParticipantId String
+  sequence            Int
+  clientRequestId     String
+  bodyEncrypted       String   @db.Text
+  createdAt           DateTime @default(now())
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation MessageConversation @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sender       MessageParticipant  @relation(fields: [senderParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  deliveries   MessageDelivery[]
+  attachments  MessageAttachment[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, conversationId, sequence])
+  @@unique([tenantId, conversationId, senderParticipantId, clientRequestId])
+  @@index([tenantId, conversationId, createdAt])
+}
+
+model MessageParticipantReadCursor {
+  id               String   @id @default(uuid())
+  tenantId         String
+  conversationId   String
+  participantId    String
+  lastReadSequence Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation MessageConversation @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  participant  MessageParticipant  @relation(fields: [participantId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, conversationId, participantId])
+  @@index([tenantId, participantId])
+}
+
+model MessageDelivery {
+  id                     String                @id @default(uuid())
+  tenantId               String
+  messageId              String
+  recipientParticipantId String
+  status                 MessageDeliveryStatus @default(PENDING)
+  deliveredAt            DateTime?
+  readAt                 DateTime?
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  message              Message            @relation(fields: [messageId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recipientParticipant MessageParticipant @relation(fields: [recipientParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, messageId, recipientParticipantId])
+  @@index([tenantId, recipientParticipantId, status, createdAt])
+}
+
+model MessageAttachment {
+  id          String   @id @default(uuid())
+  tenantId    String
+  messageId   String
+  storageKey  String
+  contentType String
+  byteSize    Int
+  sha256      String
+  createdAt   DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  message Message @relation(fields: [messageId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, messageId])
+}
+
+model AceNotice {
+  id              String            @id @default(uuid())
+  tenantId        String
+  createdByUserId String
+  title           String
+  body            String            @db.Text
+  audience        AceNoticeAudience
+  publishedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  createdBy       User                      @relation("AceNoticeCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  audienceMembers AceNoticeAudienceMember[]
+  attachments     AceNoticeAttachment[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, publishedAt])
+}
+
+model AceNoticeAudienceMember {
+  id                 String                      @id @default(uuid())
+  tenantId           String
+  noticeId           String
+  recipientUserId    String
+  recipientKind      AceNoticeAudienceMemberKind
+  guardianIdentityId String?
+  createdAt          DateTime                    @default(now())
+
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  notice           AceNotice         @relation(fields: [noticeId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  recipient        User              @relation("AceNoticeAudienceRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+  guardianIdentity GuardianIdentity? @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  receipt          AceNoticeReceipt?
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, noticeId, recipientUserId])
+  @@index([tenantId, recipientUserId, createdAt])
+}
+
+model AceNoticeReceipt {
+  id               String    @id @default(uuid())
+  tenantId         String
+  audienceMemberId String
+  deliveredAt      DateTime?
+  readAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  audienceMember AceNoticeAudienceMember @relation(fields: [audienceMemberId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@unique([audienceMemberId, tenantId])
+  @@index([tenantId, deliveredAt, readAt])
+}
+
+model AceNoticeAttachment {
+  id          String   @id @default(uuid())
+  tenantId    String
+  noticeId    String
+  storageKey  String
+  contentType String
+  byteSize    Int
+  sha256      String
+  createdAt   DateTime @default(now())
+
+  tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  notice AceNotice @relation(fields: [noticeId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([id, tenantId])
+  @@index([tenantId, noticeId])
 }
 
 model HandoverLog {

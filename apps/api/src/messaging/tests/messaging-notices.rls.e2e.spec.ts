@@ -142,7 +142,7 @@ function getMessageDelegate(tx: Prisma.TransactionClient): MessageDelegate {
 
   // Task 1 intentionally precedes Prisma generation. This test-only bridge
   // lets the encryption contract exercise the eventual transaction delegate.
-  return delegate as MessageDelegate;
+  return delegate as unknown as MessageDelegate;
 }
 
 async function insertConversation(
