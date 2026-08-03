@@ -110,7 +110,7 @@ Publishing an `AceNotice` creates immutable `AceNoticeAudienceMember` rows. Each
 
 ## Verification
 
-The ACE-F21 integration contract will prove that:
+The ACE-F21 integration contract proves that:
 
 - `PARENT_STAFF`, `STAFF_DIRECT`, and `STAFF_ROOM` are the only conversation kinds, and `StudentDirect` cannot be represented;
 - a `PARENT_STAFF` conversation is general, contains no child relation, and is unique for a tenant guardian identity;
@@ -125,7 +125,7 @@ The ACE-F21 integration contract will prove that:
 ## Verification evidence
 
 - `pnpm db:generate` passed.
-- `pnpm --filter @pathway/api test:integration -- --runInBand messaging-notices.rls` passed: 1 suite, 25 tests.
+- `pnpm --filter @pathway/api test:integration -- --runInBand messaging-notices.rls` passed: 1 suite, 28 tests.
 - `pnpm --filter @pathway/db test:unit` passed: 7 suites, 46 tests; 4 suites and 19 tests were pre-existing skips.
 - `pnpm supabase:rls:check -- --strict` exited before database access because this worktree has no `env.production`, `.env.production`, or `.env.prod` file.
 - `ENV_FILE=.env.test pnpm supabase:rls:check -- --strict` exited 1 only because the existing `app.ChildGuardianContact` and `app.OrgDeletedUser` tables have RLS disabled.
