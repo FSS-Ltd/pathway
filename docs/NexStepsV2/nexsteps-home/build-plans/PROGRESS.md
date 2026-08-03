@@ -12,9 +12,9 @@ merges. If that plan file is unavailable, this ledger plus `README.md` plus
 the source handoff at `docs/NexStepsV2/nexsteps-home/` is sufficient to
 continue.
 
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-03
 **Updated by:** Technical Agent (Claude), this session
-**Current phase:** Plan 07 (Progress flow, H4) merged as [#288](https://github.com/FSS-Ltd/pathway/pull/288). Plan 08 (Family, people, permissions, privacy, H5) is starting: researched what backend already exists to reuse (`children`, `orgs`/`invites`, `billing/entitlements`) versus what's genuinely missing (device-session tracking, password change, 2FA, self-serve GDPR export/deletion), took two product decisions on the missing pieces with the user, and wrote the full build plan at `docs/superpowers/plans/2026-08-02-nexsteps-home-plan08-family-people-permissions.md`. That plan splits H5 into six independently-mergeable sub-plans (08a-08f, easiest/most-reuse first) rather than one PR, since the 8 screens span six materially different backend surfaces. Branch `feat/nexsteps-home-family-people-permissions` created off up-to-date `master`; no code written yet.
+**Current phase:** Plan 08a (Children screens: `family-children`, `child-details`) implemented via subagent-driven-development on `feat/nexsteps-home-family-people-permissions`, off the plan at `docs/superpowers/plans/2026-08-02-nexsteps-home-plan08-family-people-permissions.md`. Reused the existing `apps/api/src/children/` backend with zero backend changes; extracted `children.ts` query hooks out of `queries/family-planner.ts`. Went through a full per-task review (1 fix round: mid-edit state clobber on background refetch) and a final whole-branch review (1 fix wave: a colocated test file inside `app/` was registering as a live Expo Router route, a setup-wizard navigation trap when adding a child from Family, a `push`/`replace` convention miss, and the hydration guard not being keyed to `childId`) — both clean after their fix rounds. Full monorepo `typecheck`/`lint`/`test:unit` all green (one pre-existing, unrelated `date-options.test.ts` failure, already flagged separately). Opened [#292](https://github.com/FSS-Ltd/pathway/pull/292). Sub-plans 08b-08f are next, resuming from the SDD ledger at `.superpowers/sdd/2026-08-02-nexsteps-home-plan08-family-people-permissions/progress.md` in the worktree (kept in place, not deleted, since it's shared across all six sub-plans).
 
 ---
 
@@ -35,7 +35,7 @@ continue.
 | 11 | 06 screens — Week, Today, tasks, calendar (8 screens) | **merged** | `feat/nexsteps-home-week-today-screens` | [#285](https://github.com/FSS-Ltd/pathway/pull/285) | squash-merged, branch deleted |
 | 12 | 05 — Setup flow (9 screens) + household-setup backend | **merged** | `feat/nexsteps-home-setup-screens` | [#287](https://github.com/FSS-Ltd/pathway/pull/287) | squash-merged, branch deleted |
 | 13 | 07 — Progress flow (9 screens) + learning-API additions | **merged** | `feat/nexsteps-home-progress-screens` | [#288](https://github.com/FSS-Ltd/pathway/pull/288) | squash-merged, branch deleted |
-| 14 | 08a — Children screens (`family-children`, `child-details`) | not started | `feat/nexsteps-home-family-people-permissions` | not yet opened | plan written, see `docs/superpowers/plans/2026-08-02-nexsteps-home-plan08-family-people-permissions.md` |
+| 14 | 08a — Children screens (`family-children`, `child-details`) | in progress | `feat/nexsteps-home-family-people-permissions` | [#292](https://github.com/FSS-Ltd/pathway/pull/292) | implemented + reviewed, verification green, PR open, branch/worktree kept for review iteration |
 | 15 | 08b — Preferences + notifications | not started | — | — | new `Tenant.planningPreferences`/`notificationPreferences` JSON fields, plain `AuthUserGuard` (household-setup pattern) |
 | 16 | 08c — People & permissions | not started | — | — | no new backend - reuses `GET /:orgId/people` + existing `invites` module |
 | 17 | 08d — Membership | not started | — | — | reuses `GET /billing/entitlements`; adds one new Stripe Billing Portal endpoint |
