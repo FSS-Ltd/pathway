@@ -307,6 +307,59 @@ CREATE INDEX "AceNoticeReceipt_tenantId_deliveredAt_readAt_idx"
 CREATE INDEX "AceNoticeAttachment_tenantId_noticeId_idx"
   ON "AceNoticeAttachment"("tenantId", "noticeId");
 
+CREATE FUNCTION app.assert_message_conversation_creator()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  guardian_user_id text;
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM app."StudentIdentity" student_identity
+    WHERE student_identity."tenantId" = NEW."tenantId"
+      AND student_identity."userId" = NEW."createdByUserId"
+  ) THEN
+    RAISE EXCEPTION 'Students cannot create messaging conversations'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW."kind" = 'PARENT_STAFF' THEN
+    SELECT guardian_identity."userId"
+    INTO guardian_user_id
+    FROM app."GuardianIdentity" guardian_identity
+    WHERE guardian_identity."id" = NEW."guardianIdentityId"
+      AND guardian_identity."tenantId" = NEW."tenantId";
+
+    IF guardian_user_id = NEW."createdByUserId" OR EXISTS (
+      SELECT 1
+      FROM app."SiteMembership" site_membership
+      WHERE site_membership."tenantId" = NEW."tenantId"
+        AND site_membership."userId" = NEW."createdByUserId"
+    ) THEN
+      RETURN NEW;
+    END IF;
+
+    RAISE EXCEPTION 'Parent/staff conversations require their guardian or current tenant staff creator'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM app."SiteMembership" site_membership
+    WHERE site_membership."tenantId" = NEW."tenantId"
+      AND site_membership."userId" = NEW."createdByUserId"
+  ) THEN
+    RAISE EXCEPTION 'Staff conversations require a current tenant staff creator'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
 CREATE FUNCTION app.assert_message_participant()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -526,6 +579,26 @@ BEGIN
     AND pg_trigger_depth() <> 2
   THEN
     RAISE EXCEPTION 'Message conversation sequence is allocated by message insertion only'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION app.assert_message_conversation_identity_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW."tenantId" IS DISTINCT FROM OLD."tenantId"
+    OR NEW."kind" IS DISTINCT FROM OLD."kind"
+    OR NEW."guardianIdentityId" IS DISTINCT FROM OLD."guardianIdentityId"
+    OR NEW."createdByUserId" IS DISTINCT FROM OLD."createdByUserId"
+  THEN
+    RAISE EXCEPTION 'Message conversation identity is immutable'
       USING ERRCODE = 'object_not_in_prerequisite_state';
   END IF;
 
@@ -848,6 +921,14 @@ DECLARE
   audience_member record;
   audience_member_count integer;
 BEGIN
+  IF TG_OP = 'UPDATE' AND (
+    NEW."tenantId" IS DISTINCT FROM OLD."tenantId"
+    OR NEW."createdByUserId" IS DISTINCT FROM OLD."createdByUserId"
+  ) THEN
+    RAISE EXCEPTION 'ACE notice ownership is immutable'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+
   IF TG_OP = 'UPDATE'
     AND OLD."publishedAt" IS NOT NULL
     AND (
@@ -866,6 +947,16 @@ BEGIN
       AND site_membership."userId" = NEW."createdByUserId"
   ) THEN
     RAISE EXCEPTION 'ACE notice authors require a current site membership'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM app."StudentIdentity" student_identity
+    WHERE student_identity."tenantId" = NEW."tenantId"
+      AND student_identity."userId" = NEW."createdByUserId"
+  ) THEN
+    RAISE EXCEPTION 'Students cannot author ACE notices'
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -1001,8 +1092,30 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  notice_published_at timestamp(3);
 BEGIN
-  IF NEW."tenantId" IS DISTINCT FROM OLD."tenantId"
+  SELECT notice."publishedAt"
+  INTO notice_published_at
+  FROM app."AceNoticeAudienceMember" audience_member
+  INNER JOIN app."AceNotice" notice
+    ON notice."id" = audience_member."noticeId"
+    AND notice."tenantId" = audience_member."tenantId"
+  WHERE audience_member."id" = NEW."audienceMemberId"
+    AND audience_member."tenantId" = NEW."tenantId";
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'ACE notice receipt audience member does not belong to tenant'
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+
+  IF notice_published_at IS NULL THEN
+    RAISE EXCEPTION 'ACE notice receipts require a published notice'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND (
+    NEW."tenantId" IS DISTINCT FROM OLD."tenantId"
     OR NEW."audienceMemberId" IS DISTINCT FROM OLD."audienceMemberId"
     OR (OLD."deliveredAt" IS NOT NULL AND NEW."deliveredAt" IS NULL)
     OR (OLD."deliveredAt" IS NOT NULL AND NEW."deliveredAt" < OLD."deliveredAt")
@@ -1010,7 +1123,7 @@ BEGIN
     OR (OLD."readAt" IS NOT NULL AND NEW."readAt" < OLD."readAt")
     OR (NEW."readAt" IS NOT NULL AND NEW."deliveredAt" IS NULL)
     OR (NEW."readAt" IS NOT NULL AND NEW."readAt" < NEW."deliveredAt")
-  THEN
+  ) THEN
     RAISE EXCEPTION 'ACE notice receipt state can only move forward'
       USING ERRCODE = 'check_violation';
   END IF;
@@ -1019,10 +1132,12 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION app.assert_message_conversation_creator() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_participant() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology_values(text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_sequence_update() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.assert_message_conversation_identity_update() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.allocate_message_sequence() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_message_update() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_delivery() FROM PUBLIC;
@@ -1033,6 +1148,10 @@ REVOKE ALL ON FUNCTION app.assert_ace_notice_author() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_notice_audience_member() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_published_ace_notice_audience_mutation() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_notice_receipt_progress() FROM PUBLIC;
+
+CREATE TRIGGER "MessageConversation_validate_creator"
+BEFORE INSERT ON "MessageConversation"
+FOR EACH ROW EXECUTE FUNCTION app.assert_message_conversation_creator();
 
 CREATE TRIGGER "MessageParticipant_validate"
 BEFORE INSERT OR UPDATE ON "MessageParticipant"
@@ -1051,6 +1170,10 @@ FOR EACH ROW EXECUTE FUNCTION app.assert_message_conversation_topology();
 CREATE TRIGGER "MessageConversation_validate_sequence_update"
 BEFORE UPDATE ON "MessageConversation"
 FOR EACH ROW EXECUTE FUNCTION app.assert_message_conversation_sequence_update();
+
+CREATE TRIGGER "MessageConversation_validate_identity_update"
+BEFORE UPDATE ON "MessageConversation"
+FOR EACH ROW EXECUTE FUNCTION app.assert_message_conversation_identity_update();
 
 CREATE TRIGGER "Message_allocate_sequence"
 BEFORE INSERT ON "Message"
@@ -1089,7 +1212,7 @@ BEFORE INSERT OR UPDATE ON "AceNoticeAudienceMember"
 FOR EACH ROW EXECUTE FUNCTION app.assert_ace_notice_audience_member();
 
 CREATE TRIGGER "AceNoticeReceipt_validate_progress"
-BEFORE UPDATE ON "AceNoticeReceipt"
+BEFORE INSERT OR UPDATE ON "AceNoticeReceipt"
 FOR EACH ROW EXECUTE FUNCTION app.assert_ace_notice_receipt_progress();
 
 CREATE TRIGGER "AceNoticeReceipt_reject_delete"
