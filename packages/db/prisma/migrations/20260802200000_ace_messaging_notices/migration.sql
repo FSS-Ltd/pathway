@@ -542,6 +542,18 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION app.reject_message_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Message rows are immutable after insertion'
+    USING ERRCODE = 'object_not_in_prerequisite_state';
+END;
+$$;
+
 CREATE FUNCTION app.assert_message_delivery()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -699,13 +711,91 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION app.assert_ace_notice_audience_member_eligibility(
+  checked_tenant_id text,
+  checked_recipient_user_id text,
+  checked_recipient_kind app."AceNoticeAudienceMemberKind",
+  checked_guardian_identity_id text,
+  selected_audience app."AceNoticeAudience"
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF (selected_audience = 'PARENTS' AND checked_recipient_kind <> 'GUARDIAN')
+    OR (selected_audience = 'STAFF' AND checked_recipient_kind <> 'STAFF')
+  THEN
+    RAISE EXCEPTION 'ACE notice recipient kind is outside the selected audience'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF checked_recipient_kind = 'GUARDIAN' THEN
+    IF checked_guardian_identity_id IS NULL OR NOT EXISTS (
+      SELECT 1
+      FROM app."GuardianIdentity" guardian_identity
+      WHERE guardian_identity."id" = checked_guardian_identity_id
+        AND guardian_identity."tenantId" = checked_tenant_id
+        AND guardian_identity."userId" = checked_recipient_user_id
+    ) THEN
+      RAISE EXCEPTION 'Guardian notice recipients require their tenant identity'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM app."GuardianChildRelationship" relationship
+      WHERE relationship."tenantId" = checked_tenant_id
+        AND relationship."guardianIdentityId" = checked_guardian_identity_id
+        AND relationship."legalAccess" <> 'NONE'
+        AND relationship."startsAt" <= CURRENT_TIMESTAMP
+        AND relationship."endedAt" IS NULL
+        AND relationship."revokedAt" IS NULL
+    ) THEN
+      RAISE EXCEPTION 'Guardian notice recipients require a current guardian-child relationship'
+        USING ERRCODE = 'check_violation';
+    END IF;
+  ELSIF checked_guardian_identity_id IS NOT NULL
+    OR NOT EXISTS (
+      SELECT 1
+      FROM app."SiteMembership" site_membership
+      WHERE site_membership."tenantId" = checked_tenant_id
+        AND site_membership."userId" = checked_recipient_user_id
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM app."StudentIdentity" student_identity
+      WHERE student_identity."tenantId" = checked_tenant_id
+        AND student_identity."userId" = checked_recipient_user_id
+    )
+  THEN
+    RAISE EXCEPTION 'Staff notice recipients require a current site membership'
+      USING ERRCODE = 'check_violation';
+  END IF;
+END;
+$$;
+
 CREATE FUNCTION app.assert_ace_notice_author()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  audience_member record;
 BEGIN
+  IF TG_OP = 'UPDATE'
+    AND OLD."publishedAt" IS NOT NULL
+    AND (
+      NEW."publishedAt" IS DISTINCT FROM OLD."publishedAt"
+      OR NEW."audience" IS DISTINCT FROM OLD."audience"
+    )
+  THEN
+    RAISE EXCEPTION 'Published notice publication metadata is immutable'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM app."SiteMembership" site_membership
@@ -714,6 +804,28 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'ACE notice authors require a current site membership'
       USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW."publishedAt" IS NOT NULL
+    AND (TG_OP = 'INSERT' OR OLD."publishedAt" IS NULL)
+  THEN
+    FOR audience_member IN
+      SELECT
+        audience."recipientUserId",
+        audience."recipientKind",
+        audience."guardianIdentityId"
+      FROM app."AceNoticeAudienceMember" audience
+      WHERE audience."tenantId" = NEW."tenantId"
+        AND audience."noticeId" = NEW."id"
+    LOOP
+      PERFORM app.assert_ace_notice_audience_member_eligibility(
+        NEW."tenantId",
+        audience_member."recipientUserId",
+        audience_member."recipientKind",
+        audience_member."guardianIdentityId",
+        NEW."audience"
+      );
+    END LOOP;
   END IF;
 
   RETURN NEW;
@@ -728,9 +840,10 @@ SET search_path = ''
 AS $$
 DECLARE
   notice_audience app."AceNoticeAudience";
+  notice_published_at timestamp(3);
 BEGIN
-  SELECT notice."audience"
-  INTO notice_audience
+  SELECT notice."audience", notice."publishedAt"
+  INTO notice_audience, notice_published_at
   FROM app."AceNotice" notice
   WHERE notice."id" = NEW."noticeId"
     AND notice."tenantId" = NEW."tenantId";
@@ -740,57 +853,18 @@ BEGIN
       USING ERRCODE = 'foreign_key_violation';
   END IF;
 
-  IF (notice_audience = 'PARENTS' AND NEW."recipientKind" <> 'GUARDIAN')
-    OR (notice_audience = 'STAFF' AND NEW."recipientKind" <> 'STAFF')
-  THEN
-    RAISE EXCEPTION 'ACE notice recipient kind is outside the selected audience'
-      USING ERRCODE = 'check_violation';
+  IF notice_published_at IS NOT NULL THEN
+    RAISE EXCEPTION 'Published notice audience is immutable'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
   END IF;
 
-  IF NEW."recipientKind" = 'GUARDIAN' THEN
-    IF NEW."guardianIdentityId" IS NULL OR NOT EXISTS (
-      SELECT 1
-      FROM app."GuardianIdentity" guardian_identity
-      WHERE guardian_identity."id" = NEW."guardianIdentityId"
-        AND guardian_identity."tenantId" = NEW."tenantId"
-        AND guardian_identity."userId" = NEW."recipientUserId"
-    ) THEN
-      RAISE EXCEPTION 'Guardian notice recipients require their tenant identity'
-        USING ERRCODE = 'check_violation';
-    END IF;
-
-    IF NOT EXISTS (
-      SELECT 1
-      FROM app."GuardianChildRelationship" relationship
-      WHERE relationship."tenantId" = NEW."tenantId"
-        AND relationship."guardianIdentityId" = NEW."guardianIdentityId"
-        AND relationship."legalAccess" <> 'NONE'
-        AND relationship."startsAt" <= CURRENT_TIMESTAMP
-        AND relationship."endedAt" IS NULL
-        AND relationship."revokedAt" IS NULL
-    ) THEN
-      RAISE EXCEPTION 'Guardian notice recipients require a current guardian-child relationship'
-        USING ERRCODE = 'check_violation';
-    END IF;
-  ELSE
-    IF NEW."guardianIdentityId" IS NOT NULL
-      OR NOT EXISTS (
-        SELECT 1
-        FROM app."SiteMembership" site_membership
-        WHERE site_membership."tenantId" = NEW."tenantId"
-          AND site_membership."userId" = NEW."recipientUserId"
-      )
-      OR EXISTS (
-        SELECT 1
-        FROM app."StudentIdentity" student_identity
-        WHERE student_identity."tenantId" = NEW."tenantId"
-          AND student_identity."userId" = NEW."recipientUserId"
-      )
-    THEN
-      RAISE EXCEPTION 'Staff notice recipients require a current site membership'
-        USING ERRCODE = 'check_violation';
-    END IF;
-  END IF;
+  PERFORM app.assert_ace_notice_audience_member_eligibility(
+    NEW."tenantId",
+    NEW."recipientUserId",
+    NEW."recipientKind",
+    NEW."guardianIdentityId",
+    notice_audience
+  );
 
   RETURN NEW;
 END;
@@ -803,7 +877,27 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  IF EXISTS (
+  IF TG_OP = 'INSERT' AND EXISTS (
+    SELECT 1
+    FROM app."AceNotice" notice
+    WHERE notice."id" = NEW."noticeId"
+      AND notice."tenantId" = NEW."tenantId"
+      AND notice."publishedAt" IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'Published notice audience is immutable'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  ELSIF TG_OP = 'UPDATE' AND EXISTS (
+    SELECT 1
+    FROM app."AceNotice" notice
+    WHERE notice."publishedAt" IS NOT NULL
+      AND (
+        (notice."id" = OLD."noticeId" AND notice."tenantId" = OLD."tenantId")
+        OR (notice."id" = NEW."noticeId" AND notice."tenantId" = NEW."tenantId")
+      )
+  ) THEN
+    RAISE EXCEPTION 'Published notice audience is immutable'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  ELSIF TG_OP = 'DELETE' AND EXISTS (
     SELECT 1
     FROM app."AceNotice" notice
     WHERE notice."id" = OLD."noticeId"
@@ -850,8 +944,10 @@ REVOKE ALL ON FUNCTION app.assert_message_participant() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology_values(text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.allocate_message_sequence() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.reject_message_update() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_delivery() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_read_cursor() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.assert_ace_notice_audience_member_eligibility(text, text, app."AceNoticeAudienceMemberKind", text, app."AceNoticeAudience") FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_notice_author() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_notice_audience_member() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_published_ace_notice_audience_mutation() FROM PUBLIC;
@@ -875,6 +971,10 @@ CREATE TRIGGER "Message_allocate_sequence"
 BEFORE INSERT ON "Message"
 FOR EACH ROW EXECUTE FUNCTION app.allocate_message_sequence();
 
+CREATE TRIGGER "Message_reject_update"
+BEFORE UPDATE ON "Message"
+FOR EACH ROW EXECUTE FUNCTION app.reject_message_update();
+
 CREATE TRIGGER "MessageDelivery_validate"
 BEFORE INSERT OR UPDATE ON "MessageDelivery"
 FOR EACH ROW EXECUTE FUNCTION app.assert_message_delivery();
@@ -888,7 +988,7 @@ BEFORE INSERT OR UPDATE ON "AceNotice"
 FOR EACH ROW EXECUTE FUNCTION app.assert_ace_notice_author();
 
 CREATE TRIGGER "AceNoticeAudienceMember_freeze_published"
-BEFORE UPDATE OR DELETE ON "AceNoticeAudienceMember"
+BEFORE INSERT OR UPDATE OR DELETE ON "AceNoticeAudienceMember"
 FOR EACH ROW EXECUTE FUNCTION app.reject_published_ace_notice_audience_mutation();
 
 CREATE TRIGGER "AceNoticeAudienceMember_validate"
