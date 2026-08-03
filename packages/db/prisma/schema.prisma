@@ -1573,7 +1573,7 @@ model Message {
   tenantId            String
   conversationId      String
   senderParticipantId String
-  sequence            Int
+  sequence            Int      @default(0)
   clientRequestId     String
   bodyEncrypted       String   @db.Text
   createdAt           DateTime @default(now())
