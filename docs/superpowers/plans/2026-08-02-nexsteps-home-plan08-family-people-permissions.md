@@ -497,8 +497,8 @@ describe("planning preferences", () => {
 cd packages/db && pnpm prisma migrate dev --name add_household_preferences --create-only
 ```
 
-  Then hand-verify the generated SQL only adds the two nullable-with-default
-  JSON columns to `Tenant` — no other drift. Follow the exact throwaway-DB
+  Then hand-verify the generated SQL only adds the two non-nullable,
+  default-valued (`Json @default("{}")`) columns to `Tenant` — no other drift. Follow the exact throwaway-DB
   verification method Plan 06 used (spin up an isolated `postgres:16-alpine`
   container, apply full migration history, diff with `prisma migrate diff`,
   tear down) rather than running against a shared local Postgres — see
@@ -685,10 +685,16 @@ export function ToggleRow({ label, detail, value, onValueChange, disabled }: Tog
   Read `prototypes/nexsteps-home/src/wireframes-data.ts:1569-1616` for exact
   copy. `preferences` uses `list()` blocks with an "Edit" trailing action per
   row (these open an inline editor or a small picker — for the fixed-choice
-  rows `weekStartsOn`/`timeFormat`/`language`, use `ChipRow` for
-  single-select rather than free text, since these are closed enumerations,
-  not open text). `notifications` uses `ToggleRow` per boolean row plus one
-  `ContentCard` for "Quiet hours" (its own start/end + enabled toggle).
+  rows `weekStartsOn`/`timeFormat`, use `ChipRow` for single-select rather
+  than free text, since these are closed enumerations, not open text).
+  `language` is shown as a chip row in the wireframe too, but its DTO
+  (Step 4) is a free `z.string()`, not a real enum — a UI that presents it
+  as closed-choice while the backend accepts anything is a contradiction:
+  make the DTO an actual `z.enum([...])` of the shipped locale options
+  before wiring the screen to it, not just an illustrative two-chip UI over
+  an open string field. `notifications` uses `ToggleRow` per boolean row
+  plus one `ContentCard` for "Quiet hours" (its own start/end + enabled
+  toggle).
 
 - [ ] **Step 12: Add unit tests for the query hooks and an E2E toggle test**
 
