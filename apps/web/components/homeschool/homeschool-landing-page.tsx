@@ -35,7 +35,7 @@ export default function HomeschoolLandingPage({ directAnswer }: HomeschoolLandin
   return (
     <div className="overflow-clip bg-[#f4f1e8] text-[#263531]">
       <section className="relative isolate min-h-[calc(100svh-5rem)] overflow-hidden bg-[#173d36] text-[#fffdf5]">
-        <div className="mx-auto grid min-h-[calc(100svh-5rem)] max-w-[90rem] items-center gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.02fr_0.98fr] lg:px-12 lg:py-16">
+        <div className="mx-auto grid min-h-[calc(100svh-5rem)] max-w-[90rem] items-center gap-12 px-5 py-20 sm:px-8 lg:px-12 lg:py-16 xl:grid-cols-[1.02fr_0.98fr]">
           <div className="relative z-10 max-w-4xl">
             <p className="mb-7 text-xs font-bold uppercase tracking-[0.24em] text-[#8de0cf]">
               NexSteps Home · Early access
@@ -70,7 +70,7 @@ export default function HomeschoolLandingPage({ directAnswer }: HomeschoolLandin
             </p>
           </div>
 
-          <div className="relative mx-auto min-h-[38rem] w-full max-w-[38rem] lg:min-h-[48rem]">
+          <div className="relative mx-auto min-h-[38rem] w-full max-w-[38rem] sm:min-h-[60rem] xl:min-h-[52rem]">
             <div className="absolute left-0 top-16 w-[64%] -rotate-6 overflow-hidden rounded-[2.7rem] border border-white/15 bg-white shadow-[0_40px_100px_rgba(0,0,0,0.35)] sm:left-4 lg:top-20">
               <Image
                 src="/images/homeschool/today.png"
@@ -195,8 +195,8 @@ export default function HomeschoolLandingPage({ directAnswer }: HomeschoolLandin
       </section>
 
       <section id="waitlist" className="scroll-mt-28 bg-[#263531] px-5 py-24 text-white sm:px-8 lg:py-32">
-        <div className="mx-auto grid max-w-7xl items-start gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
-          <div className="lg:sticky lg:top-32">
+        <div className="mx-auto grid max-w-7xl items-start gap-14 xl:grid-cols-[0.9fr_1.1fr] xl:gap-20">
+          <div className="xl:sticky xl:top-32">
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#8de0cf]">
               Early access
             </p>
@@ -208,7 +208,9 @@ export default function HomeschoolLandingPage({ directAnswer }: HomeschoolLandin
               journey, and we will keep you close to early access.
             </p>
           </div>
-          <WaitlistForm />
+          <div className="w-full max-w-3xl justify-self-center xl:max-w-none">
+            <WaitlistForm />
+          </div>
         </div>
       </section>
 

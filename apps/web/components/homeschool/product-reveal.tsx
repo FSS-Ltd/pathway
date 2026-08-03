@@ -39,12 +39,12 @@ export default function ProductReveal({ chapter, index }: ProductRevealProps) {
     <section
       ref={sectionRef}
       id={chapter.id}
-      className={`${chapterColors[chapter.accent]} relative min-h-[115vh] overflow-hidden lg:min-h-[155vh]`}
+      className={`${chapterColors[chapter.accent]} relative min-h-[115vh] overflow-hidden xl:min-h-[155vh]`}
     >
-      <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 sm:px-8 lg:sticky lg:top-20 lg:min-h-[calc(100vh-5rem)] lg:grid-cols-[0.85fr_1.15fr] lg:px-12 lg:py-16">
+      <div className="mx-auto grid max-w-7xl items-center gap-12 px-5 py-24 sm:px-8 xl:sticky xl:top-20 xl:min-h-[calc(100vh-5rem)] xl:grid-cols-[0.85fr_1.15fr] xl:px-12 xl:py-16">
         <motion.div
           style={prefersReducedMotion ? undefined : { y: copyY, opacity: copyOpacity }}
-          className={`relative z-10 max-w-xl ${imageFirst ? "lg:order-2 lg:pl-10" : ""}`}
+          className={`relative z-10 max-w-xl ${imageFirst ? "xl:order-2 xl:pl-10" : ""}`}
         >
           <div className="mb-9 flex items-center gap-5 text-xs font-bold uppercase tracking-[0.22em] text-[#305d55]">
             <span>{chapter.number}</span>
@@ -73,8 +73,8 @@ export default function ProductReveal({ chapter, index }: ProductRevealProps) {
                   opacity: screenOpacity,
                 }
           }
-          className={`relative mx-auto w-full max-w-[29rem] lg:max-w-[34rem] ${
-            imageFirst ? "lg:order-1" : ""
+          className={`relative mx-auto w-full max-w-[29rem] xl:max-w-[34rem] ${
+            imageFirst ? "xl:order-1" : ""
           }`}
         >
           <div className="overflow-hidden rounded-[3.25rem] border border-white/80 bg-white shadow-[0_45px_110px_rgba(20,45,40,0.22)]">
@@ -83,7 +83,7 @@ export default function ProductReveal({ chapter, index }: ProductRevealProps) {
               alt={chapter.imageAlt}
               width={430}
               height={932}
-              sizes="(max-width: 1024px) 88vw, 34rem"
+              sizes="(max-width: 1279px) 88vw, 34rem"
               className="h-auto w-full"
             />
           </div>

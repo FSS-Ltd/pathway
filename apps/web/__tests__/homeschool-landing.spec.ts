@@ -55,4 +55,22 @@ describe("NexSteps Home landing page", () => {
     expect(footer).toContain('{ label: "Homeschool", href: "/homeschool" }');
     expect(sitemap).toContain('url: `${baseUrl}/homeschool`');
   });
+
+  it("keeps split-screen layouts for wide viewports where copy and imagery do not collide", () => {
+    const landing = readSource(
+      "components",
+      "homeschool",
+      "homeschool-landing-page.tsx",
+    );
+    const reveal = readSource(
+      "components",
+      "homeschool",
+      "product-reveal.tsx",
+    );
+
+    expect(landing).toContain("xl:grid-cols-[1.02fr_0.98fr]");
+    expect(landing).toContain("sm:min-h-[60rem]");
+    expect(landing).toContain("xl:grid-cols-[0.9fr_1.1fr]");
+    expect(reveal).toContain("xl:grid-cols-[0.85fr_1.15fr]");
+  });
 });
