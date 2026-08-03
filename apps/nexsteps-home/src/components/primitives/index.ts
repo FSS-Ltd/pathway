@@ -3,6 +3,7 @@ export { ContentCard } from "./ContentCard";
 export { FieldGroup, type Field } from "./FieldGroup";
 export { FieldInput, type EditableField } from "./FieldInput";
 export { ChipRow } from "./ChipRow";
+export { ToggleRow, type ToggleRowProps } from "./ToggleRow";
 export { ListCard, type ListCardItem } from "./ListCard";
 export { StatRow, type StatItem } from "./StatRow";
 export { MessageBubble } from "./MessageBubble";
