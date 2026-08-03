@@ -1458,15 +1458,17 @@ describe("ACE parent/staff messaging and notices storage", () => {
             recipientKind: "STAFF",
           },
         );
-        await tx.$executeRaw`
+        const draftAudienceMemberUpdateCount = await tx.$executeRaw`
           UPDATE "AceNoticeAudienceMember"
           SET "recipientUserId" = ${fixture.staffBId}
           WHERE "id" = ${draftAudienceMemberId}
         `;
-        await tx.$executeRaw`
+        expect(draftAudienceMemberUpdateCount).toBe(1);
+        const draftAudienceMemberDeleteCount = await tx.$executeRaw`
           DELETE FROM "AceNoticeAudienceMember"
           WHERE "id" = ${draftAudienceMemberId}
         `;
+        expect(draftAudienceMemberDeleteCount).toBe(1);
         await publishNotice(tx, noticeId);
         const receiptId = await insertNoticeReceipt(
           tx,
@@ -1478,6 +1480,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
         return {
           noticeId,
           guardianAudienceMemberId,
+          staffAudienceMemberId,
           receiptId,
         };
       },
@@ -1504,8 +1507,8 @@ describe("ACE parent/staff messaging and notices storage", () => {
           fixture.orgAId,
           (tx) => tx.$executeRaw`
             UPDATE "AceNoticeAudienceMember"
-            SET "recipientKind" = 'STAFF'::"AceNoticeAudienceMemberKind"
-            WHERE "id" = ${seeded.guardianAudienceMemberId}
+            SET "recipientUserId" = ${fixture.staffBId}
+            WHERE "id" = ${seeded.staffAudienceMemberId}
           `,
         ),
       "55000",
