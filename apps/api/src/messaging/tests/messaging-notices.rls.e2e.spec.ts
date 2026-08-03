@@ -349,10 +349,21 @@ async function insertNotice(
       "id", "tenantId", "createdByUserId", "title", "body", "audience", "publishedAt"
     ) VALUES (
       ${id}, ${fixture.tenantAId}, ${fixture.staffAId}, 'Transport update',
-      'Notice body for parents and staff.', 'PARENTS_AND_STAFF'::"AceNoticeAudience", CURRENT_TIMESTAMP
+      'Notice body for parents and staff.', 'PARENTS_AND_STAFF'::"AceNoticeAudience", NULL
     )
   `;
   return id;
+}
+
+async function publishNotice(
+  tx: Prisma.TransactionClient,
+  noticeId: string,
+): Promise<void> {
+  await tx.$executeRaw`
+    UPDATE "AceNotice"
+    SET "publishedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${noticeId}
+  `;
 }
 
 async function insertNoticeAudienceMember(
@@ -502,6 +513,7 @@ async function seedTenantAF21Rows(
     recipientKind: "GUARDIAN",
     guardianIdentityId: fixture.guardianAIdentityId,
   });
+  await publishNotice(tx, noticeId);
   await insertNoticeReceipt(tx, fixture, audienceMemberId);
   await insertNoticeAttachment(tx, fixture, noticeId);
   return {
@@ -572,7 +584,7 @@ async function seedTenantBF21References(
       "id", "tenantId", "createdByUserId", "title", "body", "audience", "publishedAt"
     ) VALUES (
       ${noticeId}, ${fixture.tenantBId}, ${fixture.staffCId}, 'Tenant B notice',
-      'Tenant B notice body.', 'PARENTS'::"AceNoticeAudience", CURRENT_TIMESTAMP
+      'Tenant B notice body.', 'PARENTS'::"AceNoticeAudience", NULL
     )
   `;
   await tx.$executeRaw`
@@ -582,6 +594,11 @@ async function seedTenantBF21References(
       ${audienceMemberId}, ${fixture.tenantBId}, ${noticeId}, ${fixture.guardianBUserId},
       'GUARDIAN'::"AceNoticeAudienceMemberKind", ${fixture.guardianBTenantBIdentityId}
     )
+  `;
+  await tx.$executeRaw`
+    UPDATE "AceNotice"
+    SET "publishedAt" = CURRENT_TIMESTAMP
+    WHERE "id" = ${noticeId}
   `;
   return {
     conversationId,
@@ -1291,6 +1308,17 @@ describe("ACE parent/staff messaging and notices storage", () => {
     await expectDatabaseRejection(
       () =>
         withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            UPDATE "Message"
+            SET "bodyEncrypted" = 'Altered post-send message body.'
+            WHERE "id" = ${seeded.firstMessage.id}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
           insertMessage(tx, fixture, {
             conversationId: seeded.conversationId,
             senderParticipantId: seeded.guardianParticipantId,
@@ -1394,7 +1422,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
     );
   });
 
-  it("keeps published notice audiences frozen while receipts progress forward", async () => {
+  it("freezes published notice audiences and metadata while receipts progress forward", async () => {
     if (!isDatabaseAvailable()) return;
 
     const seeded = await withMessagingRlsContext(
@@ -1421,6 +1449,25 @@ describe("ACE parent/staff messaging and notices storage", () => {
             recipientKind: "STAFF",
           },
         );
+        const draftAudienceMemberId = await insertNoticeAudienceMember(
+          tx,
+          fixture,
+          {
+            noticeId,
+            recipientUserId: fixture.staffCId,
+            recipientKind: "STAFF",
+          },
+        );
+        await tx.$executeRaw`
+          UPDATE "AceNoticeAudienceMember"
+          SET "recipientUserId" = ${fixture.staffBId}
+          WHERE "id" = ${draftAudienceMemberId}
+        `;
+        await tx.$executeRaw`
+          DELETE FROM "AceNoticeAudienceMember"
+          WHERE "id" = ${draftAudienceMemberId}
+        `;
+        await publishNotice(tx, noticeId);
         const receiptId = await insertNoticeReceipt(
           tx,
           fixture,
@@ -1428,11 +1475,102 @@ describe("ACE parent/staff messaging and notices storage", () => {
         );
         await insertNoticeReceipt(tx, fixture, staffAudienceMemberId);
         await insertNoticeAttachment(tx, fixture, noticeId);
+        return {
+          noticeId,
+          guardianAudienceMemberId,
+          receiptId,
+        };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            insertNoticeAudienceMember(tx, fixture, {
+              noticeId: seeded.noticeId,
+              recipientUserId: fixture.staffCId,
+              recipientKind: "STAFF",
+            }),
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
+            UPDATE "AceNoticeAudienceMember"
+            SET "recipientKind" = 'STAFF'::"AceNoticeAudienceMemberKind"
+            WHERE "id" = ${seeded.guardianAudienceMemberId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
+            DELETE FROM "AceNoticeAudienceMember"
+            WHERE "id" = ${seeded.guardianAudienceMemberId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
+            UPDATE "AceNotice"
+            SET "publishedAt" = NULL
+            WHERE "id" = ${seeded.noticeId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
+            UPDATE "AceNotice"
+            SET "publishedAt" = CURRENT_TIMESTAMP + INTERVAL '1 minute'
+            WHERE "id" = ${seeded.noticeId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => tx.$executeRaw`
+            UPDATE "AceNotice"
+            SET "audience" = 'STAFF'::"AceNoticeAudience"
+            WHERE "id" = ${seeded.noticeId}
+          `,
+        ),
+      "55000",
+    );
+
+    const audienceCount = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
         await tx.$executeRaw`
-        UPDATE "GuardianChildRelationship"
-        SET "endedAt" = CURRENT_TIMESTAMP
-        WHERE "id" = ${fixture.guardianARelationshipId}
-      `;
+          UPDATE "GuardianChildRelationship"
+          SET "endedAt" = CURRENT_TIMESTAMP
+          WHERE "id" = ${fixture.guardianARelationshipId}
+        `;
         await tx.siteMembership.delete({
           where: {
             tenantId_userId: {
@@ -1443,44 +1581,15 @@ describe("ACE parent/staff messaging and notices storage", () => {
         });
         const [audienceCount] = await tx.$queryRaw<Array<{ count: number }>>`
         SELECT count(*)::int AS "count" FROM "AceNoticeAudienceMember"
-        WHERE "noticeId" = ${noticeId}
+        WHERE "noticeId" = ${seeded.noticeId}
       `;
-        await setNoticeReceiptState(tx, receiptId, new Date(), null);
-        await setNoticeReceiptState(tx, receiptId, new Date(), new Date());
-        return {
-          noticeId,
-          guardianAudienceMemberId,
-          receiptId,
-          audienceCount: audienceCount.count,
-        };
+        await setNoticeReceiptState(tx, seeded.receiptId, new Date(), null);
+        await setNoticeReceiptState(tx, seeded.receiptId, new Date(), new Date());
+        return audienceCount.count;
       },
     );
 
-    expect(seeded.audienceCount).toBe(2);
-    await expectDatabaseRejection(
-      () =>
-        withMessagingRlsContext(
-          fixture.tenantAId,
-          fixture.orgAId,
-          (tx) => tx.$executeRaw`
-        UPDATE "AceNoticeAudienceMember"
-        SET "recipientKind" = 'STAFF'::"AceNoticeAudienceMemberKind"
-        WHERE "id" = ${seeded.guardianAudienceMemberId}
-      `,
-        ),
-      "55000",
-    );
-    await expectDatabaseRejection(
-      () =>
-        withMessagingRlsContext(
-          fixture.tenantAId,
-          fixture.orgAId,
-          (tx) => tx.$executeRaw`
-        DELETE FROM "AceNoticeAudienceMember" WHERE "id" = ${seeded.guardianAudienceMemberId}
-      `,
-        ),
-      "55000",
-    );
+    expect(audienceCount).toBe(2);
     await expectDatabaseRejection(
       () =>
         withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
@@ -1512,6 +1621,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
 
   it("fails closed for every F21 table under another tenant and no tenant context", async () => {
     if (!isDatabaseAvailable()) return;
+    if (!useTenantRlsRole()) return;
 
     const tenantARows = await withMessagingRlsContext(
       fixture.tenantAId,
@@ -1530,7 +1640,6 @@ describe("ACE parent/staff messaging and notices storage", () => {
         "42501",
       );
     }
-    if (!useTenantRlsRole()) return;
     for (const table of f21Tables) {
       await expect(countRowsWithoutTenant(table)).resolves.toBe(0);
       await expectDatabaseRejection(
