@@ -52,15 +52,21 @@ interface MessagingFixture {
   guardianAUserId: string;
   guardianBUserId: string;
   studentUserId: string;
+  dualIdentityUserId: string;
   childAId: string;
   childBId: string;
+  dualIdentityChildId: string;
   guardianAIdentityId: string;
   guardianBIdentityId: string;
   guardianBTenantBIdentityId: string;
+  dualGuardianIdentityId: string;
   guardianARelationshipId: string;
   guardianBRelationshipId: string;
+  dualGuardianRelationshipId: string;
   studentIdentityId: string;
   studentIdentityLinkId: string;
+  dualStudentIdentityId: string;
+  dualStudentIdentityLinkId: string;
 }
 
 interface ConversationParticipants {
@@ -904,15 +910,21 @@ describe("ACE parent/staff messaging and notices storage", () => {
       guardianAUserId: randomUUID(),
       guardianBUserId: randomUUID(),
       studentUserId: randomUUID(),
+      dualIdentityUserId: randomUUID(),
       childAId: randomUUID(),
       childBId: randomUUID(),
+      dualIdentityChildId: randomUUID(),
       guardianAIdentityId: randomUUID(),
       guardianBIdentityId: randomUUID(),
       guardianBTenantBIdentityId: randomUUID(),
+      dualGuardianIdentityId: randomUUID(),
       guardianARelationshipId: randomUUID(),
       guardianBRelationshipId: randomUUID(),
+      dualGuardianRelationshipId: randomUUID(),
       studentIdentityId: randomUUID(),
       studentIdentityLinkId: randomUUID(),
+      dualStudentIdentityId: randomUUID(),
+      dualStudentIdentityLinkId: randomUUID(),
     };
 
     await prisma.org.createMany({
@@ -959,6 +971,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
             fixture.guardianAUserId,
             fixture.guardianBUserId,
             fixture.studentUserId,
+            fixture.dualIdentityUserId,
           ].map((id) => ({
             id,
             email: `${id}@example.test`,
@@ -986,19 +999,33 @@ describe("ACE parent/staff messaging and notices storage", () => {
             tenantId: fixture.tenantAId,
           },
         });
+        await tx.child.create({
+          data: {
+            id: fixture.dualIdentityChildId,
+            firstName: "Messaging",
+            lastName: "Dual Identity Child",
+            tenantId: fixture.tenantAId,
+          },
+        });
         await tx.$executeRaw`
         INSERT INTO "GuardianIdentity" ("id", "tenantId", "userId")
         VALUES
           (${fixture.guardianAIdentityId}, ${fixture.tenantAId}, ${fixture.guardianAUserId}),
-          (${fixture.guardianBIdentityId}, ${fixture.tenantAId}, ${fixture.guardianBUserId})
+          (${fixture.guardianBIdentityId}, ${fixture.tenantAId}, ${fixture.guardianBUserId}),
+          (${fixture.dualGuardianIdentityId}, ${fixture.tenantAId}, ${fixture.dualIdentityUserId})
       `;
         await tx.$executeRaw`
         INSERT INTO "GuardianChildRelationship" (
           "id", "tenantId", "guardianIdentityId", "childId", "legalAccess"
-        ) VALUES (
-          ${fixture.guardianARelationshipId}, ${fixture.tenantAId},
-          ${fixture.guardianAIdentityId}, ${fixture.childAId}, 'FULL'::"GuardianLegalAccess"
-        )
+        ) VALUES
+          (
+            ${fixture.guardianARelationshipId}, ${fixture.tenantAId},
+            ${fixture.guardianAIdentityId}, ${fixture.childAId}, 'FULL'::"GuardianLegalAccess"
+          ),
+          (
+            ${fixture.dualGuardianRelationshipId}, ${fixture.tenantAId},
+            ${fixture.dualGuardianIdentityId}, ${fixture.dualIdentityChildId}, 'FULL'::"GuardianLegalAccess"
+          )
       `;
         await tx.$executeRaw`
         INSERT INTO "StudentPortalPolicy" ("tenantId", "studentPortalEnabled")
@@ -1006,15 +1033,22 @@ describe("ACE parent/staff messaging and notices storage", () => {
       `;
         await tx.$executeRaw`
         INSERT INTO "StudentIdentity" ("id", "tenantId", "userId")
-        VALUES (${fixture.studentIdentityId}, ${fixture.tenantAId}, ${fixture.studentUserId})
+        VALUES
+          (${fixture.studentIdentityId}, ${fixture.tenantAId}, ${fixture.studentUserId}),
+          (${fixture.dualStudentIdentityId}, ${fixture.tenantAId}, ${fixture.dualIdentityUserId})
       `;
         await tx.$executeRaw`
         INSERT INTO "StudentIdentityLink" (
           "id", "tenantId", "studentIdentityId", "childId"
-        ) VALUES (
-          ${fixture.studentIdentityLinkId}, ${fixture.tenantAId},
-          ${fixture.studentIdentityId}, ${fixture.childAId}
-        )
+        ) VALUES
+          (
+            ${fixture.studentIdentityLinkId}, ${fixture.tenantAId},
+            ${fixture.studentIdentityId}, ${fixture.childAId}
+          ),
+          (
+            ${fixture.dualStudentIdentityLinkId}, ${fixture.tenantAId},
+            ${fixture.dualStudentIdentityId}, ${fixture.dualIdentityChildId}
+          )
       `;
       },
     );
@@ -1081,10 +1115,18 @@ describe("ACE parent/staff messaging and notices storage", () => {
     if (!isDatabaseAvailable() || !fixture) return;
     await deleteMessagingRowsIfPresent(prisma);
     await prisma.studentIdentityLink.deleteMany({
-      where: { id: fixture.studentIdentityLinkId },
+      where: {
+        id: {
+          in: [fixture.studentIdentityLinkId, fixture.dualStudentIdentityLinkId],
+        },
+      },
     });
     await prisma.studentIdentity.deleteMany({
-      where: { id: fixture.studentIdentityId },
+      where: {
+        id: {
+          in: [fixture.studentIdentityId, fixture.dualStudentIdentityId],
+        },
+      },
     });
     await prisma.studentPortalPolicy.deleteMany({
       where: { tenantId: fixture.tenantAId },
@@ -1095,6 +1137,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
           in: [
             fixture.guardianARelationshipId,
             fixture.guardianBRelationshipId,
+            fixture.dualGuardianRelationshipId,
           ],
         },
       },
@@ -1106,12 +1149,21 @@ describe("ACE parent/staff messaging and notices storage", () => {
             fixture.guardianAIdentityId,
             fixture.guardianBIdentityId,
             fixture.guardianBTenantBIdentityId,
+            fixture.dualGuardianIdentityId,
           ],
         },
       },
     });
     await prisma.child.deleteMany({
-      where: { id: { in: [fixture.childAId, fixture.childBId] } },
+      where: {
+        id: {
+          in: [
+            fixture.childAId,
+            fixture.childBId,
+            fixture.dualIdentityChildId,
+          ],
+        },
+      },
     });
     await prisma.siteMembership.deleteMany({
       where: {
@@ -1135,6 +1187,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
             fixture.guardianAUserId,
             fixture.guardianBUserId,
             fixture.studentUserId,
+            fixture.dualIdentityUserId,
           ],
         },
       },
@@ -1237,6 +1290,193 @@ describe("ACE parent/staff messaging and notices storage", () => {
         ),
       "23514",
     );
+  });
+
+  it("rejects guardian participants that also hold a student identity", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          async (tx) => {
+            const conversationId = await insertConversation(tx, fixture, {
+              kind: "PARENT_STAFF",
+              guardianIdentityId: fixture.dualGuardianIdentityId,
+            });
+            await insertParticipant(tx, fixture, {
+              conversationId,
+              userId: fixture.dualIdentityUserId,
+              kind: "GUARDIAN",
+              guardianIdentityId: fixture.dualGuardianIdentityId,
+            });
+            await insertParticipant(tx, fixture, {
+              conversationId,
+              userId: fixture.staffAId,
+              kind: "STAFF",
+            });
+          },
+        ),
+      "23514",
+    );
+  });
+
+  it("keeps message participant authorship bound after messages exist", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const seeded = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const source = await createParentStaffConversation(tx, fixture);
+        await insertParticipant(tx, fixture, {
+          conversationId: source.conversationId,
+          userId: fixture.staffBId,
+          kind: "STAFF",
+        });
+        const message = await insertMessage(tx, fixture, {
+          conversationId: source.conversationId,
+          senderParticipantId: source.staffParticipantIds[0],
+          clientRequestId: randomUUID(),
+        });
+        const destinationConversationId = await insertConversation(tx, fixture, {
+          kind: "STAFF_ROOM",
+        });
+        await insertParticipant(tx, fixture, {
+          conversationId: destinationConversationId,
+          userId: fixture.staffBId,
+          kind: "STAFF",
+        });
+        await insertParticipant(tx, fixture, {
+          conversationId: destinationConversationId,
+          userId: fixture.staffCId,
+          kind: "STAFF",
+        });
+        return {
+          destinationConversationId,
+          messageId: message.id,
+          sourceConversationId: source.conversationId,
+          staffParticipantId: source.staffParticipantIds[0],
+        };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            UPDATE "MessageParticipant"
+            SET "userId" = ${fixture.staffCId}
+            WHERE "id" = ${seeded.staffParticipantId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            UPDATE "MessageParticipant"
+            SET "conversationId" = ${seeded.destinationConversationId}
+            WHERE "id" = ${seeded.staffParticipantId}
+          `,
+        ),
+      "55000",
+    );
+
+    const [author] = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<
+          Array<{
+            messageConversationId: string;
+            participantConversationId: string;
+            participantUserId: string;
+            senderParticipantId: string;
+          }>
+        >`
+          SELECT
+            message."conversationId" AS "messageConversationId",
+            message."senderParticipantId",
+            participant."conversationId" AS "participantConversationId",
+            participant."userId" AS "participantUserId"
+          FROM "Message" message
+          INNER JOIN "MessageParticipant" participant
+            ON participant."id" = message."senderParticipantId"
+          WHERE message."id" = ${seeded.messageId}
+        `,
+    );
+    expect(author).toEqual({
+      messageConversationId: seeded.sourceConversationId,
+      participantConversationId: seeded.sourceConversationId,
+      participantUserId: fixture.staffAId,
+      senderParticipantId: seeded.staffParticipantId,
+    });
+  });
+
+  it("rejects direct conversation sequence updates without changing read state", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const seeded = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createParentStaffConversation(tx, fixture);
+        const message = await insertMessage(tx, fixture, {
+          conversationId: conversation.conversationId,
+          senderParticipantId: conversation.guardianParticipantId!,
+          clientRequestId: randomUUID(),
+        });
+        const cursorId = await insertReadCursor(
+          tx,
+          fixture,
+          conversation.conversationId,
+          conversation.guardianParticipantId!,
+        );
+        await setReadCursor(tx, cursorId, message.sequence);
+        return {
+          conversationId: conversation.conversationId,
+          cursorId,
+          messageSequence: message.sequence,
+        };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            UPDATE "MessageConversation"
+            SET "lastMessageSequence" = ${seeded.messageSequence + 100}
+            WHERE "id" = ${seeded.conversationId}
+          `,
+        ),
+      "55000",
+    );
+
+    const [state] = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<
+          Array<{ lastMessageSequence: number; lastReadSequence: number }>
+        >`
+          SELECT
+            conversation."lastMessageSequence",
+            cursor."lastReadSequence"
+          FROM "MessageConversation" conversation
+          INNER JOIN "MessageParticipantReadCursor" cursor
+            ON cursor."conversationId" = conversation."id"
+          WHERE conversation."id" = ${seeded.conversationId}
+            AND cursor."id" = ${seeded.cursorId}
+        `,
+    );
+    expect(state).toEqual({
+      lastMessageSequence: seeded.messageSequence,
+      lastReadSequence: seeded.messageSequence,
+    });
   });
 
   it("orders active-participant messages and rejects removed participants, duplicate retries, and invalid cursor or delivery transitions", async () => {
@@ -1385,6 +1625,135 @@ describe("ACE parent/staff messaging and notices storage", () => {
     );
   });
 
+  it("prevents deleting delivery, cursor, and receipt records to reset forward state", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const seeded = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createParentStaffConversation(tx, fixture);
+        const message = await insertMessage(tx, fixture, {
+          conversationId: conversation.conversationId,
+          senderParticipantId: conversation.guardianParticipantId!,
+          clientRequestId: randomUUID(),
+        });
+        const cursorId = await insertReadCursor(
+          tx,
+          fixture,
+          conversation.conversationId,
+          conversation.guardianParticipantId!,
+        );
+        await setReadCursor(tx, cursorId, message.sequence);
+        const deliveryId = await insertDelivery(
+          tx,
+          fixture,
+          message.id,
+          conversation.staffParticipantIds[0],
+        );
+        await setDeliveryStatus(tx, deliveryId, "DELIVERED");
+        await setDeliveryStatus(tx, deliveryId, "READ");
+
+        const noticeId = await insertNotice(tx, fixture);
+        const audienceMemberId = await insertNoticeAudienceMember(tx, fixture, {
+          noticeId,
+          recipientUserId: fixture.guardianAUserId,
+          recipientKind: "GUARDIAN",
+          guardianIdentityId: fixture.guardianAIdentityId,
+        });
+        await publishNotice(tx, noticeId);
+        const receiptId = await insertNoticeReceipt(
+          tx,
+          fixture,
+          audienceMemberId,
+        );
+        const deliveredAt = new Date("2026-08-03T09:00:00.000Z");
+        const readAt = new Date("2026-08-03T09:01:00.000Z");
+        await setNoticeReceiptState(tx, receiptId, deliveredAt, readAt);
+        return {
+          cursorId,
+          deliveryId,
+          messageSequence: message.sequence,
+          receiptId,
+        };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            DELETE FROM "MessageDelivery"
+            WHERE "id" = ${seeded.deliveryId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            DELETE FROM "MessageParticipantReadCursor"
+            WHERE "id" = ${seeded.cursorId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          tx.$executeRaw`
+            DELETE FROM "AceNoticeReceipt"
+            WHERE "id" = ${seeded.receiptId}
+          `,
+        ),
+      "55000",
+    );
+
+    const state = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const [delivery] = await tx.$queryRaw<
+          Array<{
+            deliveredAt: Date | null;
+            readAt: Date | null;
+            status: "PENDING" | "DELIVERED" | "READ";
+          }>
+        >`
+          SELECT "status", "deliveredAt", "readAt"
+          FROM "MessageDelivery"
+          WHERE "id" = ${seeded.deliveryId}
+        `;
+        const [cursor] = await tx.$queryRaw<Array<{ lastReadSequence: number }>>`
+          SELECT "lastReadSequence"
+          FROM "MessageParticipantReadCursor"
+          WHERE "id" = ${seeded.cursorId}
+        `;
+        const [receipt] = await tx.$queryRaw<
+          Array<{ deliveredAt: Date | null; readAt: Date | null }>
+        >`
+          SELECT "deliveredAt", "readAt"
+          FROM "AceNoticeReceipt"
+          WHERE "id" = ${seeded.receiptId}
+        `;
+        return { cursor, delivery, receipt };
+      },
+    );
+    expect(state.delivery).toEqual({
+      deliveredAt: expect.any(Date),
+      readAt: expect.any(Date),
+      status: "READ",
+    });
+    expect(state.cursor).toEqual({
+      lastReadSequence: seeded.messageSequence,
+    });
+    expect(state.receipt).toEqual({
+      deliveredAt: expect.any(Date),
+      readAt: expect.any(Date),
+    });
+  });
+
   it("encrypts message bodies through Prisma and keeps attachment storage keys private", async () => {
     if (!isDatabaseAvailable()) return;
 
@@ -1421,6 +1790,110 @@ describe("ACE parent/staff messaging and notices storage", () => {
     expect(attachmentFields).not.toEqual(
       expect.arrayContaining([expect.stringMatching(/url/i)]),
     );
+  });
+
+  it("rejects dual identities from guardian notice audiences", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          async (tx) => {
+            const noticeId = await insertNotice(tx, fixture);
+            await insertNoticeAudienceMember(tx, fixture, {
+              noticeId,
+              recipientUserId: fixture.dualIdentityUserId,
+              recipientKind: "GUARDIAN",
+              guardianIdentityId: fixture.dualGuardianIdentityId,
+            });
+          },
+        ),
+      "23514",
+    );
+  });
+
+  it("requires a persisted audience before notice publication", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const emptyNoticeId = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertNotice(tx, fixture),
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          publishNotice(tx, emptyNoticeId),
+        ),
+      "23514",
+    );
+    const [emptyNotice] = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<Array<{ publishedAt: Date | null }>>`
+          SELECT "publishedAt"
+          FROM "AceNotice"
+          WHERE "id" = ${emptyNoticeId}
+        `,
+    );
+    expect(emptyNotice?.publishedAt).toBeNull();
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) => {
+            const id = randomUUID();
+            return tx.$executeRaw`
+              INSERT INTO "AceNotice" (
+                "id", "tenantId", "createdByUserId", "title", "body", "audience", "publishedAt"
+              ) VALUES (
+                ${id}, ${fixture.tenantAId}, ${fixture.staffAId}, 'Initial publication',
+                'This notice bypasses the audience snapshot.',
+                'PARENTS'::"AceNoticeAudience", CURRENT_TIMESTAMP
+              )
+            `;
+          },
+        ),
+      "23514",
+    );
+
+    const publishedNotice = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const noticeId = await insertNotice(tx, fixture);
+        await insertNoticeAudienceMember(tx, fixture, {
+          noticeId,
+          recipientUserId: fixture.guardianAUserId,
+          recipientKind: "GUARDIAN",
+          guardianIdentityId: fixture.guardianAIdentityId,
+        });
+        await publishNotice(tx, noticeId);
+        const [notice] = await tx.$queryRaw<
+          Array<{ audienceMemberCount: number; publishedAt: Date | null }>
+        >`
+          SELECT
+            notice."publishedAt",
+            count(audience_member."id")::int AS "audienceMemberCount"
+          FROM "AceNotice" notice
+          LEFT JOIN "AceNoticeAudienceMember" audience_member
+            ON audience_member."noticeId" = notice."id"
+          WHERE notice."id" = ${noticeId}
+          GROUP BY notice."id", notice."publishedAt"
+        `;
+        return notice;
+      },
+    );
+    expect(publishedNotice).toEqual({
+      audienceMemberCount: 1,
+      publishedAt: expect.any(Date),
+    });
   });
 
   it("freezes published notice audiences and metadata while receipts progress forward", async () => {
