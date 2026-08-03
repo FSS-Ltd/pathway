@@ -1634,6 +1634,10 @@ describe("ACE parent/staff messaging and notices storage", () => {
       },
     );
 
+    let publicationDispatchStarted: (() => void) | undefined;
+    const publicationDispatchStartedPromise = new Promise<void>((resolve) => {
+      publicationDispatchStarted = resolve;
+    });
     let publication: Promise<void> | undefined;
     try {
       await Promise.race([
@@ -1647,8 +1651,19 @@ describe("ACE parent/staff messaging and notices storage", () => {
       publication = withMessagingRlsContext(
         fixture.tenantAId,
         fixture.orgAId,
-        (tx) => publishNotice(tx, noticeId),
+        async (tx) => {
+          publicationDispatchStarted?.();
+          await publishNotice(tx, noticeId);
+        },
       );
+      await Promise.race([
+        publicationDispatchStartedPromise,
+        publication.then(() => {
+          throw new Error(
+            "Publication transaction ended before publish was dispatched",
+          );
+        }),
+      ]);
       const publicationBeforeAudienceCommit = await Promise.race([
         publication.then(
           () => "resolved" as const,
@@ -1692,6 +1707,117 @@ describe("ACE parent/staff messaging and notices storage", () => {
       releaseAudienceMutation?.();
       await Promise.allSettled(
         publication ? [audienceMutation, publication] : [audienceMutation],
+      );
+    }
+  });
+
+  it("revalidates a committed guardian audience snapshot before publication", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const noticeId = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertNotice(tx, fixture),
+    );
+    let releaseGuardianAudienceMutation: (() => void) | undefined;
+    const guardianAudienceMutationCanCommit = new Promise<void>((resolve) => {
+      releaseGuardianAudienceMutation = resolve;
+    });
+    let guardianAudienceMutationStarted: (() => void) | undefined;
+    const guardianAudienceMutationInserted = new Promise<void>((resolve) => {
+      guardianAudienceMutationStarted = resolve;
+    });
+    const guardianAudienceMutation = withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await insertNoticeAudienceMember(tx, fixture, {
+          noticeId,
+          recipientUserId: fixture.guardianAUserId,
+          recipientKind: "GUARDIAN",
+          guardianIdentityId: fixture.guardianAIdentityId,
+        });
+        guardianAudienceMutationStarted?.();
+        await guardianAudienceMutationCanCommit;
+      },
+    );
+
+    let publicationDispatchStarted: (() => void) | undefined;
+    const publicationDispatchStartedPromise = new Promise<void>((resolve) => {
+      publicationDispatchStarted = resolve;
+    });
+    let publication: Promise<void> | undefined;
+    try {
+      await Promise.race([
+        guardianAudienceMutationInserted,
+        guardianAudienceMutation.then(() => {
+          throw new Error(
+            "Guardian audience mutation transaction ended before it could be held open",
+          );
+        }),
+      ]);
+      publication = withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        async (tx) => {
+          publicationDispatchStarted?.();
+          await publishNotice(tx, noticeId);
+        },
+      );
+      await Promise.race([
+        publicationDispatchStartedPromise,
+        publication.then(() => {
+          throw new Error(
+            "Publication transaction ended before publish was dispatched",
+          );
+        }),
+      ]);
+      const publicationBeforeGuardianAudienceCommit = await Promise.race([
+        publication.then(
+          () => "resolved" as const,
+          () => "rejected" as const,
+        ),
+        new Promise<"pending">((resolve) => {
+          setTimeout(() => resolve("pending"), CONCURRENT_PUBLICATION_WAIT_MS);
+        }),
+      ]);
+
+      await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        (tx) => tx.$executeRaw`
+          UPDATE "GuardianChildRelationship"
+          SET "endedAt" = CURRENT_TIMESTAMP
+          WHERE "id" = ${fixture.guardianARelationshipId}
+        `,
+      );
+      releaseGuardianAudienceMutation?.();
+      await guardianAudienceMutation;
+
+      expect(publicationBeforeGuardianAudienceCommit).toBe("pending");
+      const publicationTransaction = publication;
+      if (!publicationTransaction) {
+        throw new Error("Publication transaction did not start");
+      }
+      await expectDatabaseRejection(() => publicationTransaction, "23514");
+
+      const [notice] = await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        (tx) =>
+          tx.$queryRaw<Array<{ publishedAt: Date | null }>>`
+            SELECT "publishedAt"
+            FROM "AceNotice"
+            WHERE "id" = ${noticeId}
+          `,
+      );
+      expect(notice?.publishedAt).toBeNull();
+    } finally {
+      releaseGuardianAudienceMutation?.();
+      await Promise.allSettled(
+        publication
+          ? [guardianAudienceMutation, publication]
+          : [guardianAudienceMutation],
       );
     }
   });
