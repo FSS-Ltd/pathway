@@ -700,6 +700,13 @@ model Tenant {
   learningDays     String[]  @default([])
   setupCompletedAt DateTime?
 
+  // NexSteps Home household settings (Plan 08b): planning preferences
+  // (week start, activity duration, etc.) and notification preferences,
+  // each a small fixed shape validated with Zod at the API boundary, not
+  // modelled as individual columns (nothing ever queries/filters by them).
+  planningPreferences     Json @default("{}")
+  notificationPreferences Json @default("{}")
+
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
