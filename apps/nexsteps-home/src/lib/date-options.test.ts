@@ -66,7 +66,9 @@ describe("formatDayLabel / formatTimeLabel", () => {
     const days = upcomingDayOptions(2, from);
     const scheduled = combineDateAndTime(days[1].date, TIME_OPTIONS[2]);
 
-    expect(formatDayLabel(scheduled)).toBe("Tomorrow");
+    // formatDayLabel takes an explicit "now" reference so this assertion
+    // doesn't depend on the real wall-clock date staying before `from`.
+    expect(formatDayLabel(scheduled, from)).toBe("Tomorrow");
     expect(formatTimeLabel(scheduled)).toBe(TIME_OPTIONS[2].label);
   });
 
