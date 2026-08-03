@@ -62,6 +62,24 @@ export default function PreferencesScreen() {
     updatePreferences.isError &&
     updatePreferences.error instanceof ApiError &&
     updatePreferences.error.status === 403;
+  const isValidationError =
+    updatePreferences.isError &&
+    updatePreferences.error instanceof ApiError &&
+    updatePreferences.error.status === 400;
+
+  const duration = Number(durationText);
+  const dailyLimit = Number(dailyLimitText);
+  // Mirrors the Zod bounds in planningPreferencesSchema (defaultActivityDurationMinutes:
+  // int 5-240, dailyPlanningLimit: int 1-10) - matches every other screen in this app
+  // (child-add.tsx, task-editor.tsx, ...) gating Save on a canSave check rather than
+  // letting an invalid body reach the server and surface as a generic error.
+  const canSave =
+    Number.isInteger(duration) &&
+    duration >= 5 &&
+    duration <= 240 &&
+    Number.isInteger(dailyLimit) &&
+    dailyLimit >= 1 &&
+    dailyLimit <= 10;
 
   const handleLanguagePress = (index: number) => {
     setLanguageIndex(index);
@@ -69,6 +87,7 @@ export default function PreferencesScreen() {
   };
 
   const handleSave = () => {
+    if (!canSave) return;
     updatePreferences.mutate({
       weekStartsOn: WEEK_STARTS_ON_OPTIONS[weekStartsOnIndex].value,
       timeFormat: TIME_FORMAT_OPTIONS[timeFormatIndex].value,
@@ -163,6 +182,12 @@ export default function PreferencesScreen() {
             body="Only admins and linked parents can make changes."
             tone="danger"
           />
+        ) : isValidationError ? (
+          <NoticeCard
+            title="Check your preferences"
+            body="Default activity duration must be 5-240 minutes and daily planning limit 1-10 activities."
+            tone="danger"
+          />
         ) : updatePreferences.isError ? (
           <NoticeCard title="Could not save preferences" body="Check your connection and try again." tone="danger" />
         ) : null}
@@ -171,7 +196,7 @@ export default function PreferencesScreen() {
       <View style={styles.actions}>
         <ScreenActions
           primaryLabel={updatePreferences.isPending ? "Saving..." : "Save preferences"}
-          onPrimaryPress={!updatePreferences.isPending ? handleSave : undefined}
+          onPrimaryPress={canSave && !updatePreferences.isPending ? handleSave : undefined}
           secondaryLabel="Notifications"
           onSecondaryPress={() => router.push("/(home)/(tabs)/family/notifications")}
         />

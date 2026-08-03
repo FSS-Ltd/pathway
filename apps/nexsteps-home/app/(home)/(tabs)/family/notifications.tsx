@@ -46,6 +46,10 @@ export default function NotificationsScreen() {
     updatePreferences.isError &&
     updatePreferences.error instanceof ApiError &&
     updatePreferences.error.status === 403;
+  const isValidationError =
+    updatePreferences.isError &&
+    updatePreferences.error instanceof ApiError &&
+    updatePreferences.error.status === 400;
 
   const handleSave = () => {
     updatePreferences.mutate({
@@ -140,6 +144,8 @@ export default function NotificationsScreen() {
             body="Only admins and linked parents can make changes."
             tone="danger"
           />
+        ) : isValidationError ? (
+          <NoticeCard title="Check your notifications" body="One of these values isn't valid." tone="danger" />
         ) : updatePreferences.isError ? (
           <NoticeCard title="Could not save notifications" body="Check your connection and try again." tone="danger" />
         ) : null}

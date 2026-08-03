@@ -21,7 +21,13 @@ export function ToggleRow({ label, detail, value, onValueChange, disabled }: Tog
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: homeTokens.colors.bg.panel, true: homeTokens.colors.accent.primary }}
+        // Off-state track must contrast with this row's own panel
+        // background (border.strong, not bg.panel again - matching them
+        // renders as a bare thumb with no visible track). ios_backgroundColor
+        // covers the same off-state on iOS so the platform-default grey
+        // doesn't flash mid-animation.
+        trackColor={{ false: homeTokens.colors.border.strong, true: homeTokens.colors.accent.primary }}
+        ios_backgroundColor={homeTokens.colors.border.strong}
         accessibilityRole="switch"
         accessibilityLabel={label}
         accessibilityState={{ checked: value, disabled: !!disabled }}
