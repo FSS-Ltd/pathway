@@ -53,6 +53,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   const signOut = useCallback(async () => {
     await clerkSignOut();
     apiClient.setAccessToken(null);
+    apiClient.setOrgId(null);
     setBootstrapState({ status: "unauthenticated", route: "/(setup)/welcome" });
   }, [clerkSignOut]);
 
