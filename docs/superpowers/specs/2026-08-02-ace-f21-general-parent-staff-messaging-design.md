@@ -1,9 +1,10 @@
 # ACE-F21 General Parent/Staff Messaging and Notices Storage
 
-**Owner:** Technical Agent  
-**Status:** Approved  
-**Created:** 2026-08-02  
-**Related docs:** `docs/superpowers/plans/2026-07-25-ace-core-foundation-access.md`, `docs/NexSteps-ACE-Vertical-Build-Plan.md`
+- **Owner:** Technical Agent
+- **Status:** Implemented
+- **Created:** 2026-08-02
+- **Last Updated:** 2026-08-03
+- **Related docs:** `docs/superpowers/plans/2026-07-25-ace-core-foundation-access.md`, `docs/NexSteps-ACE-Vertical-Build-Plan.md`
 
 ## Problem statement
 
@@ -120,6 +121,18 @@ The ACE-F21 integration contract will prove that:
 - notice audience rows are frozen at publication and receipt state is tenant-safe and forward-only;
 - every F21 table fails closed with missing tenant context and across tenant contexts; and
 - strict RLS inventory checks include all F21 storage tables with no public access grants.
+
+## Verification evidence
+
+- `pnpm db:generate` passed.
+- `pnpm --filter @pathway/api test:integration -- --runInBand messaging-notices.rls` passed: 1 suite, 11 tests.
+- `pnpm --filter @pathway/db test:unit` passed: 7 suites, 46 tests; 4 suites and 19 tests were pre-existing skips.
+- `pnpm supabase:rls:check -- --strict` could not select a database locally because no production RLS environment file is present in the worktree.
+- `ENV_FILE=.env.test pnpm supabase:rls:check -- --strict` failed only on the pre-existing `app.ChildGuardianContact` and `app.OrgDeletedUser` tables, which have RLS disabled.
+- `ENV_FILE=.env.test SUPABASE_RLS_GATE_ACCEPTED=true pnpm supabase:rls:check -- --strict` passed while preserving strict required-table enforcement, including all ten F21 tables.
+- `pnpm --filter @pathway/db typecheck` passed.
+- `pnpm --filter @pathway/api typecheck` passed.
+- `graphify update .` completed: 3,661 nodes and 4,893 edges.
 
 ## Implementation boundary
 
