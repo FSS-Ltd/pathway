@@ -12,6 +12,7 @@ import {
 } from "../../../test-helpers.e2e";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
+const CONCURRENT_PUBLICATION_WAIT_MS = 200;
 
 const f21Tables = [
   "MessageConversation",
@@ -1600,6 +1601,99 @@ describe("ACE parent/staff messaging and notices storage", () => {
         ),
       "23514",
     );
+  });
+
+  it("serializes draft audience inserts before publication", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const noticeId = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertNotice(tx, fixture),
+    );
+    let releaseAudienceMutation: (() => void) | undefined;
+    const audienceMutationCanCommit = new Promise<void>((resolve) => {
+      releaseAudienceMutation = resolve;
+    });
+    let audienceMutationStarted: (() => void) | undefined;
+    const audienceMutationInserted = new Promise<void>((resolve) => {
+      audienceMutationStarted = resolve;
+    });
+    const audienceMutation = withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const audienceMemberId = await insertNoticeAudienceMember(tx, fixture, {
+          noticeId,
+          recipientUserId: fixture.staffCId,
+          recipientKind: "STAFF",
+        });
+        audienceMutationStarted?.();
+        await audienceMutationCanCommit;
+        return audienceMemberId;
+      },
+    );
+
+    let publication: Promise<void> | undefined;
+    try {
+      await Promise.race([
+        audienceMutationInserted,
+        audienceMutation.then(() => {
+          throw new Error(
+            "Audience mutation transaction ended before it could be held open",
+          );
+        }),
+      ]);
+      publication = withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        (tx) => publishNotice(tx, noticeId),
+      );
+      const publicationBeforeAudienceCommit = await Promise.race([
+        publication.then(
+          () => "resolved" as const,
+          () => "rejected" as const,
+        ),
+        new Promise<"pending">((resolve) => {
+          setTimeout(() => resolve("pending"), CONCURRENT_PUBLICATION_WAIT_MS);
+        }),
+      ]);
+
+      releaseAudienceMutation?.();
+      await audienceMutation;
+      await publication;
+      const [notice] = await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        (tx) =>
+          tx.$queryRaw<
+            Array<{
+              audienceMemberCount: number;
+              publishedAt: Date | null;
+            }>
+          >`
+            SELECT
+              notice."publishedAt",
+              count(audience_member."id")::int AS "audienceMemberCount"
+            FROM "AceNotice" notice
+            LEFT JOIN "AceNoticeAudienceMember" audience_member
+              ON audience_member."noticeId" = notice."id"
+            WHERE notice."id" = ${noticeId}
+            GROUP BY notice."id", notice."publishedAt"
+          `,
+      );
+
+      expect(notice).toEqual({
+        audienceMemberCount: 1,
+        publishedAt: expect.any(Date),
+      });
+      expect(publicationBeforeAudienceCommit).toBe("pending");
+    } finally {
+      releaseAudienceMutation?.();
+      await Promise.allSettled(
+        publication ? [audienceMutation, publication] : [audienceMutation],
+      );
+    }
   });
 
   it("rejects mixed-tenant references throughout the F21 table family", async () => {
