@@ -317,6 +317,18 @@ DECLARE
   conversation_kind app."MessageConversationKind";
   conversation_guardian_identity_id text;
 BEGIN
+  IF TG_OP = 'UPDATE' AND (
+    NEW."tenantId" IS DISTINCT FROM OLD."tenantId"
+    OR NEW."conversationId" IS DISTINCT FROM OLD."conversationId"
+    OR NEW."userId" IS DISTINCT FROM OLD."userId"
+    OR NEW."kind" IS DISTINCT FROM OLD."kind"
+    OR NEW."guardianIdentityId" IS DISTINCT FROM OLD."guardianIdentityId"
+    OR NEW."joinedAt" IS DISTINCT FROM OLD."joinedAt"
+  ) THEN
+    RAISE EXCEPTION 'Message participant identity is immutable'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
+  END IF;
+
   SELECT conversation."kind", conversation."guardianIdentityId"
   INTO conversation_kind, conversation_guardian_identity_id
   FROM app."MessageConversation" conversation
@@ -359,6 +371,16 @@ BEGIN
         AND relationship."revokedAt" IS NULL
     ) THEN
       RAISE EXCEPTION 'Guardian participants require a current guardian-child relationship'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
+    IF NEW."removedAt" IS NULL AND EXISTS (
+      SELECT 1
+      FROM app."StudentIdentity" student_identity
+      WHERE student_identity."tenantId" = NEW."tenantId"
+        AND student_identity."userId" = NEW."userId"
+    ) THEN
+      RAISE EXCEPTION 'Students cannot participate in messaging'
         USING ERRCODE = 'check_violation';
     END IF;
   ELSE
@@ -487,6 +509,24 @@ BEGIN
 
   IF TG_OP = 'DELETE' THEN
     RETURN OLD;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION app.assert_message_conversation_sequence_update()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF NEW."lastMessageSequence" IS DISTINCT FROM OLD."lastMessageSequence"
+    AND pg_trigger_depth() <> 2
+  THEN
+    RAISE EXCEPTION 'Message conversation sequence is allocated by message insertion only'
+      USING ERRCODE = 'object_not_in_prerequisite_state';
   END IF;
 
   RETURN NEW;
@@ -711,6 +751,18 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION app.reject_forward_state_delete()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  RAISE EXCEPTION 'Forward-only messaging and notice state cannot be deleted'
+    USING ERRCODE = 'object_not_in_prerequisite_state';
+END;
+$$;
+
 CREATE FUNCTION app.assert_ace_notice_audience_member_eligibility(
   checked_tenant_id text,
   checked_recipient_user_id text,
@@ -756,6 +808,16 @@ BEGIN
       RAISE EXCEPTION 'Guardian notice recipients require a current guardian-child relationship'
         USING ERRCODE = 'check_violation';
     END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM app."StudentIdentity" student_identity
+      WHERE student_identity."tenantId" = checked_tenant_id
+        AND student_identity."userId" = checked_recipient_user_id
+    ) THEN
+      RAISE EXCEPTION 'Students cannot receive ACE notice audiences'
+        USING ERRCODE = 'check_violation';
+    END IF;
   ELSIF checked_guardian_identity_id IS NOT NULL
     OR NOT EXISTS (
       SELECT 1
@@ -784,6 +846,7 @@ SET search_path = ''
 AS $$
 DECLARE
   audience_member record;
+  audience_member_count integer;
 BEGIN
   IF TG_OP = 'UPDATE'
     AND OLD."publishedAt" IS NOT NULL
@@ -806,9 +869,26 @@ BEGIN
       USING ERRCODE = 'check_violation';
   END IF;
 
-  IF NEW."publishedAt" IS NOT NULL
-    AND (TG_OP = 'INSERT' OR OLD."publishedAt" IS NULL)
+  IF TG_OP = 'INSERT' AND NEW."publishedAt" IS NOT NULL THEN
+    RAISE EXCEPTION 'ACE notices must be published from a draft with an audience snapshot'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+    AND OLD."publishedAt" IS NULL
+    AND NEW."publishedAt" IS NOT NULL
   THEN
+    SELECT count(*)
+    INTO audience_member_count
+    FROM app."AceNoticeAudienceMember" audience
+    WHERE audience."tenantId" = NEW."tenantId"
+      AND audience."noticeId" = NEW."id";
+
+    IF audience_member_count = 0 THEN
+      RAISE EXCEPTION 'ACE notices require at least one recipient before publication'
+        USING ERRCODE = 'check_violation';
+    END IF;
+
     FOR audience_member IN
       SELECT
         audience."recipientUserId",
@@ -942,10 +1022,12 @@ $$;
 REVOKE ALL ON FUNCTION app.assert_message_participant() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology_values(text, text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_conversation_topology() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.assert_message_conversation_sequence_update() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.allocate_message_sequence() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.reject_message_update() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_delivery() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_message_read_cursor() FROM PUBLIC;
+REVOKE ALL ON FUNCTION app.reject_forward_state_delete() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_notice_audience_member_eligibility(text, text, app."AceNoticeAudienceMemberKind", text, app."AceNoticeAudience") FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_notice_author() FROM PUBLIC;
 REVOKE ALL ON FUNCTION app.assert_ace_notice_audience_member() FROM PUBLIC;
@@ -966,6 +1048,10 @@ AFTER INSERT OR UPDATE OR DELETE ON "MessageParticipant"
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION app.assert_message_conversation_topology();
 
+CREATE TRIGGER "MessageConversation_validate_sequence_update"
+BEFORE UPDATE ON "MessageConversation"
+FOR EACH ROW EXECUTE FUNCTION app.assert_message_conversation_sequence_update();
+
 CREATE TRIGGER "Message_allocate_sequence"
 BEFORE INSERT ON "Message"
 FOR EACH ROW EXECUTE FUNCTION app.allocate_message_sequence();
@@ -978,9 +1064,17 @@ CREATE TRIGGER "MessageDelivery_validate"
 BEFORE INSERT OR UPDATE ON "MessageDelivery"
 FOR EACH ROW EXECUTE FUNCTION app.assert_message_delivery();
 
+CREATE TRIGGER "MessageDelivery_reject_delete"
+BEFORE DELETE ON "MessageDelivery"
+FOR EACH ROW EXECUTE FUNCTION app.reject_forward_state_delete();
+
 CREATE TRIGGER "MessageParticipantReadCursor_validate"
 BEFORE INSERT OR UPDATE ON "MessageParticipantReadCursor"
 FOR EACH ROW EXECUTE FUNCTION app.assert_message_read_cursor();
+
+CREATE TRIGGER "MessageParticipantReadCursor_reject_delete"
+BEFORE DELETE ON "MessageParticipantReadCursor"
+FOR EACH ROW EXECUTE FUNCTION app.reject_forward_state_delete();
 
 CREATE TRIGGER "AceNotice_validate_author"
 BEFORE INSERT OR UPDATE ON "AceNotice"
@@ -997,6 +1091,10 @@ FOR EACH ROW EXECUTE FUNCTION app.assert_ace_notice_audience_member();
 CREATE TRIGGER "AceNoticeReceipt_validate_progress"
 BEFORE UPDATE ON "AceNoticeReceipt"
 FOR EACH ROW EXECUTE FUNCTION app.assert_ace_notice_receipt_progress();
+
+CREATE TRIGGER "AceNoticeReceipt_reject_delete"
+BEFORE DELETE ON "AceNoticeReceipt"
+FOR EACH ROW EXECUTE FUNCTION app.reject_forward_state_delete();
 
 -- Every F21 table owns tenantId, forces tenant RLS, and has no NexSteps or
 -- Data API exception.
