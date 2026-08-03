@@ -4,7 +4,7 @@ import { router } from "expo-router";
 
 import { ContentCard, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
-import { useChildren } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 
 export default function ChildrenListScreen() {
   const childrenQuery = useChildren();

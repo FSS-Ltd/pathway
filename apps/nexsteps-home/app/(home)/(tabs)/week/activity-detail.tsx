@@ -5,7 +5,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import { ChipRow, ContentCard, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
 import { formatTimeLabel } from "@/lib/date-options";
-import { useActivities, useChildren, useSubjects } from "@/lib/queries/family-planner";
+import { useActivities, useSubjects } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 
 export default function ActivityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

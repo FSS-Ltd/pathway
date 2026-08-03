@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { childrenApi, familyPlannerApi, learningApi } from "@/lib/api";
+import { familyPlannerApi, learningApi } from "@/lib/api";
 import type {
   CreateActivityInput,
   CreateCalendarItemInput,
   CreateTaskInput,
 } from "@/lib/api/family-planner";
-import type { CreateChildInput } from "@/lib/api/children";
 import type { CreateLearningLogInput } from "@/lib/api/learning";
 
 export function useActivities() {
@@ -19,20 +18,6 @@ export function useTasks() {
 
 export function useCalendarItems() {
   return useQuery({ queryKey: ["calendar-items"], queryFn: familyPlannerApi.listCalendarItems });
-}
-
-export function useChildren() {
-  return useQuery({ queryKey: ["children"], queryFn: childrenApi.listChildren });
-}
-
-export function useCreateChild() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CreateChildInput) => childrenApi.createChild(input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["children"] });
-    },
-  });
 }
 
 export function useSubjects() {

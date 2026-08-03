@@ -6,7 +6,7 @@ import { router } from "expo-router";
 import { FieldInput, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
 import { ageToDateOfBirth } from "@/lib/child-age";
-import { useCreateChild } from "@/lib/queries/family-planner";
+import { useCreateChild } from "@/lib/queries/children";
 
 export default function ChildAddScreen() {
   const createChild = useCreateChild();

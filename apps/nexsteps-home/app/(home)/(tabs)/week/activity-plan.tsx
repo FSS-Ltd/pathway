@@ -12,7 +12,8 @@ import {
   TIME_OPTIONS,
   upcomingDayOptions,
 } from "@/lib/date-options";
-import { useChildren, useCreateActivity, useSubjects } from "@/lib/queries/family-planner";
+import { useCreateActivity, useSubjects } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 
 export default function ActivityPlanScreen() {
   const { date } = useLocalSearchParams<{ date?: string }>();

@@ -12,7 +12,8 @@ import {
   TIME_OPTIONS,
   upcomingDayOptions,
 } from "@/lib/date-options";
-import { useChildren, useCreateActivity } from "@/lib/queries/family-planner";
+import { useCreateActivity } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 import { useCompleteSetup } from "@/lib/queries/household-setup";
 
 const DEFAULT_DAY_INDEX = 1; // "Tomorrow"

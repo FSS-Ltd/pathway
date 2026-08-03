@@ -5,12 +5,8 @@ import { router, useLocalSearchParams } from "expo-router";
 
 import { ChipRow, FieldGroup, FieldInput, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
-import {
-  useActivities,
-  useChildren,
-  useCreateLearningLog,
-  useSubjects,
-} from "@/lib/queries/family-planner";
+import { useActivities, useCreateLearningLog, useSubjects } from "@/lib/queries/family-planner";
+import { useChildren } from "@/lib/queries/children";
 
 const OUTCOME_OPTIONS = ["Confident", "Needed help", "Try again"];
 
