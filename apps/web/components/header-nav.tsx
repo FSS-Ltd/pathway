@@ -95,6 +95,7 @@ export default function HeaderNav() {
       ],
     },
     { label: "Reporting", href: "/features/reporting" },
+    { label: "Homeschool", href: "/homeschool" },
     { label: "Pricing", href: configuratorRolloutHref("/pricing") },
     {
       label: "Toolkit",
@@ -118,7 +119,7 @@ export default function HeaderNav() {
 
   return (
     <>
-      <nav className="hidden items-center gap-6 min-[1021px]:flex">
+      <nav className="hidden items-center gap-4 min-[1180px]:flex">
         {navLinks.map((link) =>
           link.children ? (
             <div
@@ -214,7 +215,7 @@ export default function HeaderNav() {
 
       <button
         onClick={() => setIsMobileMenuOpen((open) => !open)}
-        className="flex flex-col gap-1.5 min-[1021px]:hidden"
+        className="flex flex-col gap-1.5 min-[1180px]:hidden"
         aria-expanded={isMobileMenuOpen}
         aria-label="Toggle menu"
       >
@@ -238,10 +239,10 @@ export default function HeaderNav() {
       {isMobileMenuOpen && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/20 min-[1021px]:hidden"
+            className="fixed inset-0 z-40 bg-black/20 min-[1180px]:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
           />
-          <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-subtle bg-surface p-4 shadow-lg min-[1021px]:hidden">
+          <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border-subtle bg-surface p-4 shadow-lg min-[1180px]:hidden">
             <nav className="flex flex-col gap-4">
               {navLinks.map((link) =>
                 link.children ? (

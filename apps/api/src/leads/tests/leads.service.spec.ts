@@ -2,6 +2,7 @@ import { UnauthorizedException } from "@nestjs/common";
 import { LeadKind } from "@prisma/client";
 import { LeadsService } from "../leads.service";
 import {
+  createHomeschoolLeadDto,
   createTeamTrackerLeadDto,
   createToolkitLeadDto,
 } from "../dto/create-lead.dto";
@@ -99,6 +100,79 @@ describe("LeadsService", () => {
         consentMarketing: true,
       });
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe("createHomeschoolLead", () => {
+    it("accepts only the approved privacy-safe waitlist fields", () => {
+      const valid = createHomeschoolLeadDto.safeParse({
+        firstName: "Sam",
+        email: "sam@example.com",
+        region: "england",
+        stage: "home-educating",
+        consentMarketing: true,
+      });
+      const withoutConsent = createHomeschoolLeadDto.safeParse({
+        firstName: "Sam",
+        email: "sam@example.com",
+        region: "england",
+        stage: "home-educating",
+        consentMarketing: false,
+      });
+      const unknownRegion = createHomeschoolLeadDto.safeParse({
+        firstName: "Sam",
+        email: "sam@example.com",
+        region: "unknown",
+        stage: "home-educating",
+        consentMarketing: true,
+      });
+
+      expect(valid.success).toBe(true);
+      expect(withoutConsent.success).toBe(false);
+      expect(unknownRegion.success).toBe(false);
+    });
+
+    it("stores a sector-scoped waitlist lead with launch metadata", async () => {
+      prismaMock.lead.findFirst.mockResolvedValue(null);
+      prismaMock.lead.create.mockResolvedValue({
+        id: "lead_home_1",
+        kind: LeadKind.TRIAL,
+        createdAt: new Date(),
+      });
+
+      await service.createHomeschoolLead({
+        firstName: " Sam ",
+        email: "Sam@Example.com",
+        region: "wales",
+        stage: "preparing",
+        consentMarketing: true,
+      });
+
+      expect(prismaMock.lead.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            email: "sam@example.com",
+            kind: LeadKind.TRIAL,
+            sector: "homeschool",
+          }),
+        }),
+      );
+      expect(prismaMock.lead.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            kind: LeadKind.TRIAL,
+            email: "sam@example.com",
+            name: "Sam",
+            sector: "homeschool",
+            metadataJson: expect.objectContaining({
+              campaign: "nexsteps-home-waitlist",
+              homeschoolRegion: "wales",
+              homeschoolStage: "preparing",
+              homeschoolMarketingConsentAt: expect.any(String),
+            }),
+          }),
+        }),
+      );
     });
   });
 
