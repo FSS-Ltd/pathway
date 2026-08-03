@@ -125,13 +125,14 @@ The ACE-F21 integration contract will prove that:
 ## Verification evidence
 
 - `pnpm db:generate` passed.
-- `pnpm --filter @pathway/api test:integration -- --runInBand messaging-notices.rls` passed: 1 suite, 11 tests.
+- `pnpm --filter @pathway/api test:integration -- --runInBand messaging-notices.rls` passed: 1 suite, 25 tests.
 - `pnpm --filter @pathway/db test:unit` passed: 7 suites, 46 tests; 4 suites and 19 tests were pre-existing skips.
-- `pnpm supabase:rls:check -- --strict` could not select a database locally because no production RLS environment file is present in the worktree.
-- `ENV_FILE=.env.test pnpm supabase:rls:check -- --strict` failed only on the pre-existing `app.ChildGuardianContact` and `app.OrgDeletedUser` tables, which have RLS disabled.
-- `ENV_FILE=.env.test SUPABASE_RLS_GATE_ACCEPTED=true pnpm supabase:rls:check -- --strict` passed while preserving strict required-table enforcement, including all ten F21 tables.
+- `pnpm supabase:rls:check -- --strict` exited before database access because this worktree has no `env.production`, `.env.production`, or `.env.prod` file.
+- `ENV_FILE=.env.test pnpm supabase:rls:check -- --strict` exited 1 only because the existing `app.ChildGuardianContact` and `app.OrgDeletedUser` tables have RLS disabled.
+- `ENV_FILE=.env.test SUPABASE_RLS_GATE_ACCEPTED=true pnpm supabase:rls:check -- --strict` exited 0 with that documented local acceptance; it retained strict required-role RLS enforcement, including all ten F21 tables.
 - `pnpm --filter @pathway/db typecheck` passed.
 - `pnpm --filter @pathway/api typecheck` passed.
+- `git diff --check c571726..HEAD` passed.
 - `graphify update .` completed: 3,661 nodes and 4,893 edges.
 
 ## Implementation boundary
