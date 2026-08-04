@@ -14,6 +14,7 @@ jest.mock("@pathway/db", () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
       org: {
         create: jest.fn(),
@@ -53,7 +54,7 @@ describe("NexstepsHomeSignupService", () => {
   let service: NexstepsHomeSignupService;
   const clerkMock = { setExternalId: jest.fn() };
   const mockPrisma = prisma as unknown as {
-    user: { findUnique: jest.Mock; create: jest.Mock };
+    user: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
     org: { create: jest.Mock; findUnique: jest.Mock };
     tenant: { create: jest.Mock };
     orgVertical: { create: jest.Mock };
@@ -161,6 +162,30 @@ describe("NexstepsHomeSignupService", () => {
 
     expect(result).toEqual({ success: true, orgId: "org-1", tenantId: "tenant-1" });
     expect(mockPrisma.org.create).not.toHaveBeenCalled();
+  });
+
+  it("adopts a bare, JIT-provisioned user for the same Clerk identity instead of erroring", async () => {
+    mockPrisma.userIdentity.findUnique.mockResolvedValueOnce({
+      id: "identity-1",
+      userId: "jit-user-1",
+      user: { tenant: null },
+    });
+    mockPrisma.user.update.mockResolvedValue({ id: "jit-user-1" });
+    // The bare JIT user already owns this email - findUnique-by-email
+    // must not be consulted (and must not be treated as a conflict) once
+    // an identity match is found.
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "jit-user-1" });
+
+    const result = await service.signup(principal);
+
+    expect(result).toEqual({ success: true, orgId: "org-1", tenantId: "tenant-1" });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: "jit-user-1" },
+      data: expect.objectContaining({ tenantId: "tenant-1" }),
+    });
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    expect(mockPrisma.userIdentity.create).not.toHaveBeenCalled();
+    expect(clerkMock.setExternalId).toHaveBeenCalledWith("clerk|new-user", "jit-user-1");
   });
 
   it("retries slug generation on a collision", async () => {

@@ -1,11 +1,11 @@
 import type { ActiveSiteState } from "@pathway/mobile-core";
 
 import { apiClient, ApiError, authApi, householdSetupApi } from "@/lib/api";
-import { getValidSessionSnapshot } from "@/lib/auth/auth0-client";
 import {
-  clearSessionSnapshot,
-  updateSessionSnapshot,
-  type SessionSnapshot,
+  clearAppStateSnapshot,
+  getAppStateSnapshot,
+  updateAppStateSnapshot,
+  type AppStateSnapshot,
 } from "@/lib/auth/session-store";
 
 /**
@@ -29,7 +29,7 @@ export type BootstrapState =
   | {
       status: "ready";
       route: "/(setup)/children-list" | "/(home)/(tabs)/week";
-      session: SessionSnapshot;
+      state: AppStateSnapshot;
       activeSiteState: ActiveSiteState;
     }
   | {
@@ -46,73 +46,79 @@ export type BootstrapState =
  * secondary call.
  */
 async function resolveSetupRoute(
-  accessToken: string,
+  token: string,
 ): Promise<"/(setup)/children-list" | "/(home)/(tabs)/week"> {
   try {
-    const status = await householdSetupApi.getStatus(accessToken);
+    const status = await householdSetupApi.getStatus(token);
     return status.setupCompletedAt ? "/(home)/(tabs)/week" : "/(setup)/children-list";
   } catch {
     return "/(home)/(tabs)/week";
   }
 }
 
-async function resolveActiveSite(session: SessionSnapshot): Promise<ActiveSiteState> {
-  const state = await authApi.getActiveSiteState(session.accessToken);
+async function resolveActiveSite(
+  token: string,
+  state: AppStateSnapshot,
+): Promise<ActiveSiteState> {
+  const siteState = await authApi.getActiveSiteState(token);
 
-  if (!state.activeSiteId && state.sites.length === 1) {
-    const siteId = state.sites[0]?.id;
+  if (!siteState.activeSiteId && siteState.sites.length === 1) {
+    const siteId = siteState.sites[0]?.id;
     if (siteId) {
-      const updated = await authApi.setActiveSite(siteId, session.accessToken);
-      await updateSessionSnapshot({ activeSiteId: siteId });
+      const updated = await authApi.setActiveSite(siteId, token);
+      await updateAppStateSnapshot({ activeSiteId: siteId });
       return updated;
     }
   }
 
-  if (session.activeSiteId && session.activeSiteId !== state.activeSiteId) {
-    const canUseStoredSite = state.sites.some((site) => site.id === session.activeSiteId);
+  if (state.activeSiteId && state.activeSiteId !== siteState.activeSiteId) {
+    const canUseStoredSite = siteState.sites.some((site) => site.id === state.activeSiteId);
     if (canUseStoredSite) {
-      const updated = await authApi.setActiveSite(session.activeSiteId, session.accessToken);
-      await updateSessionSnapshot({ activeSiteId: session.activeSiteId });
+      const updated = await authApi.setActiveSite(state.activeSiteId, token);
+      await updateAppStateSnapshot({ activeSiteId: state.activeSiteId });
       return updated;
     }
   }
 
-  return state;
+  return siteState;
 }
 
-export async function bootstrapAuthState(): Promise<BootstrapState> {
-  const session = await getValidSessionSnapshot();
-
-  if (!session?.accessToken) {
+/**
+ * getToken comes from Clerk's useAuth() - unlike the old stored
+ * session.accessToken, Clerk tokens are short-lived and must be fetched
+ * fresh for each call rather than cached across this whole bootstrap.
+ */
+export async function bootstrapAuthState(
+  getToken: () => Promise<string | null>,
+): Promise<BootstrapState> {
+  const token = await getToken();
+  if (!token) {
     return { status: "unauthenticated", route: "/(setup)/welcome" };
   }
 
-  apiClient.setAccessToken(session.accessToken);
+  apiClient.setAccessToken(token);
+  const state = (await getAppStateSnapshot()) ?? { updatedAt: new Date().toISOString() };
 
   try {
-    const me = await authApi.getAuthMe(session.accessToken);
-    const activeSiteState = await resolveActiveSite(session);
+    const me = await authApi.getAuthMe(token);
+    const activeSiteState = await resolveActiveSite(token, state);
 
-    const updatedSession = await updateSessionSnapshot({
+    const updatedState = await updateAppStateSnapshot({
       userId: me.userId,
-      activeSiteId: activeSiteState.activeSiteId ?? session.activeSiteId,
+      activeSiteId: activeSiteState.activeSiteId ?? state.activeSiteId,
     });
 
-    if (!updatedSession) {
-      return { status: "unauthenticated", route: "/(setup)/welcome" };
-    }
-
-    const route = await resolveSetupRoute(updatedSession.accessToken);
+    const route = await resolveSetupRoute(token);
 
     return {
       status: "ready",
       route,
-      session: updatedSession,
+      state: updatedState,
       activeSiteState,
     };
   } catch (error) {
     if (error instanceof ApiError && [401, 403].includes(error.status)) {
-      await clearSessionSnapshot();
+      await clearAppStateSnapshot();
       apiClient.setAccessToken(null);
       return { status: "unauthenticated", route: "/(setup)/welcome" };
     }

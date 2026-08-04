@@ -43,9 +43,19 @@ export class NexstepsHomeSignupService {
       };
     }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      throw new ConflictException("An account already exists for this email address.");
+    // A UserIdentity can already exist with no tenant: AuthUserGuard
+    // JIT-provisions a bare User on any authenticated request it sees for
+    // an unrecognised principal (e.g. the client's own bootstrap call,
+    // which can race this endpoint the instant Clerk's setActive() flips
+    // isSignedIn). Adopt that identity's user rather than creating a
+    // second one, which would otherwise collide on email below.
+    const adoptedUserId = existingIdentity?.userId;
+
+    if (!adoptedUserId) {
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        throw new ConflictException("An account already exists for this email address.");
+      }
     }
 
     const householdName = this.householdNameFromEmail(email);
@@ -69,18 +79,25 @@ export class NexstepsHomeSignupService {
         data: { orgId: org.id, vertical: "HOME_EDUCATION" },
       });
 
-      const user = await tx.user.create({
-        data: { email, tenantId: tenant.id, hasFamilyAccess: true },
-      });
+      const user = adoptedUserId
+        ? await tx.user.update({
+            where: { id: adoptedUserId },
+            data: { email, tenantId: tenant.id, hasFamilyAccess: true },
+          })
+        : await tx.user.create({
+            data: { email, tenantId: tenant.id, hasFamilyAccess: true },
+          });
 
-      await tx.userIdentity.create({
-        data: {
-          userId: user.id,
-          provider: "clerk",
-          providerSubject: principal.sub,
-          email,
-        },
-      });
+      if (!adoptedUserId) {
+        await tx.userIdentity.create({
+          data: {
+            userId: user.id,
+            provider: "clerk",
+            providerSubject: principal.sub,
+            email,
+          },
+        });
+      }
 
       await tx.userTenantRole.create({
         data: { userId: user.id, tenantId: tenant.id, role: Role.ADMIN },

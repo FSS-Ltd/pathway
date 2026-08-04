@@ -13,40 +13,37 @@ jest.mock("@/lib/api", () => {
   };
 });
 
-jest.mock("@/lib/auth/auth0-client", () => ({
-  getValidSessionSnapshot: jest.fn(),
-}));
-
 jest.mock("@/lib/auth/session-store", () => ({
-  clearSessionSnapshot: jest.fn(),
-  updateSessionSnapshot: jest.fn(),
+  clearAppStateSnapshot: jest.fn(),
+  getAppStateSnapshot: jest.fn(),
+  updateAppStateSnapshot: jest.fn(),
 }));
 
 import { apiClient, authApi } from "@/lib/api";
-import { getValidSessionSnapshot } from "@/lib/auth/auth0-client";
-import { clearSessionSnapshot, updateSessionSnapshot } from "@/lib/auth/session-store";
+import {
+  clearAppStateSnapshot,
+  getAppStateSnapshot,
+  updateAppStateSnapshot,
+} from "@/lib/auth/session-store";
 import { bootstrapAuthState } from "./bootstrap";
 
-const session = {
-  accessToken: "token",
+const state = {
   updatedAt: "2026-08-01T00:00:00.000Z",
 };
 
 describe("bootstrapAuthState", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (getAppStateSnapshot as jest.Mock).mockResolvedValue(state);
   });
 
-  it("returns unauthenticated when there is no stored session", async () => {
-    (getValidSessionSnapshot as jest.Mock).mockResolvedValue(null);
+  it("returns unauthenticated when getToken resolves to null", async () => {
+    const result = await bootstrapAuthState(async () => null);
 
-    const state = await bootstrapAuthState();
-
-    expect(state).toEqual({ status: "unauthenticated", route: "/(setup)/welcome" });
+    expect(result).toEqual({ status: "unauthenticated", route: "/(setup)/welcome" });
   });
 
   it("auto-selects the single site and routes to the Week tab when ready", async () => {
-    (getValidSessionSnapshot as jest.Mock).mockResolvedValue(session);
     (authApi.getAuthMe as jest.Mock).mockResolvedValue({ userId: "user-1" });
     (authApi.getActiveSiteState as jest.Mock).mockResolvedValue({
       activeSiteId: null,
@@ -56,38 +53,36 @@ describe("bootstrapAuthState", () => {
       activeSiteId: "site-1",
       sites: [{ id: "site-1", name: "Household", orgId: "org-1", orgName: "Household Org" }],
     });
-    (updateSessionSnapshot as jest.Mock).mockResolvedValue({ ...session, activeSiteId: "site-1" });
+    (updateAppStateSnapshot as jest.Mock).mockResolvedValue({ ...state, activeSiteId: "site-1" });
 
-    const state = await bootstrapAuthState();
+    const result = await bootstrapAuthState(async () => "token");
 
     expect(apiClient.setAccessToken).toHaveBeenCalledWith("token");
     expect(authApi.setActiveSite).toHaveBeenCalledWith("site-1", "token");
-    expect(state.status).toBe("ready");
-    if (state.status === "ready") {
-      expect(state.route).toBe("/(home)/(tabs)/week");
-      expect(state.activeSiteState.activeSiteId).toBe("site-1");
+    expect(result.status).toBe("ready");
+    if (result.status === "ready") {
+      expect(result.route).toBe("/(home)/(tabs)/week");
+      expect(result.activeSiteState.activeSiteId).toBe("site-1");
     }
   });
 
-  it("clears the session and returns unauthenticated on a 401", async () => {
-    (getValidSessionSnapshot as jest.Mock).mockResolvedValue(session);
+  it("clears app state and returns unauthenticated on a 401", async () => {
     (authApi.getAuthMe as jest.Mock).mockRejectedValue(
       new ApiError("API request failed (401) for /auth/me", 401, ""),
     );
 
-    const state = await bootstrapAuthState();
+    const result = await bootstrapAuthState(async () => "token");
 
-    expect(clearSessionSnapshot).toHaveBeenCalled();
-    expect(state).toEqual({ status: "unauthenticated", route: "/(setup)/welcome" });
+    expect(clearAppStateSnapshot).toHaveBeenCalled();
+    expect(result).toEqual({ status: "unauthenticated", route: "/(setup)/welcome" });
   });
 
   it("surfaces a non-auth failure as an error state with a message", async () => {
-    (getValidSessionSnapshot as jest.Mock).mockResolvedValue(session);
     (authApi.getAuthMe as jest.Mock).mockRejectedValue(new Error("Network down"));
 
-    const state = await bootstrapAuthState();
+    const result = await bootstrapAuthState(async () => "token");
 
-    expect(state).toEqual({
+    expect(result).toEqual({
       status: "error",
       route: "/(setup)/welcome",
       message: "Network down",

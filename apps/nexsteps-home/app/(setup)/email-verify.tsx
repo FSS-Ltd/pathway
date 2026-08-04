@@ -1,22 +1,79 @@
+import { isClerkAPIResponseError, useAuth, useSignUp } from "@clerk/clerk-expo";
+import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 
-import { NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
+import { FieldInput, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
+import { signupApi } from "@/lib/api";
 
 /**
- * Adapted from the approved wireframe: the six-digit code entry it shows
- * has no backing implementation. Auth0 (Username-Password-Authentication
- * connection, via react-native-auth0) issues a verification email, not an
- * OTP code, and this SDK version exposes no resend method either - so this
- * screen shows the real, honest state (an email was sent) with no
- * non-functional code field or resend button, and doesn't block continuing:
- * verification isn't gated anywhere downstream yet.
+ * The signup call to provision the household happens here, right after
+ * setActive() resolves, in the same async function - not left to
+ * AppProviders' bootstrap effect, which also fires the instant Clerk's
+ * isSignedIn flips true and would otherwise race this screen's own call
+ * to /public/nexsteps-home/signup.
  */
 export default function EmailVerifyScreen() {
   const { email } = useLocalSearchParams<{ email?: string }>();
   const address = email ?? "your email address";
+  const { isLoaded, signUp, setActive } = useSignUp();
+  const { getToken } = useAuth();
+  const [code, setCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resent, setResent] = useState(false);
+
+  const canSubmit = code.trim().length > 0 && !isSubmitting && isLoaded;
+
+  const handleVerify = async () => {
+    if (!canSubmit) return;
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const attempt = await signUp.attemptEmailAddressVerification({ code: code.trim() });
+
+      if (attempt.status !== "complete") {
+        setError("That code didn't work. Check your inbox and try again.");
+        return;
+      }
+
+      await setActive({ session: attempt.createdSessionId });
+      const token = await getToken();
+      if (!token) {
+        setError("Verified, but we couldn't start your session. Please try signing in.");
+        return;
+      }
+
+      await signupApi.signup(token);
+      router.replace("/(setup)/children-list");
+    } catch (err) {
+      setError(
+        isClerkAPIResponseError(err)
+          ? err.errors[0]?.longMessage ?? err.errors[0]?.message ?? "That code didn't work."
+          : "That code didn't work. Check your inbox and try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (isResending || !isLoaded) return;
+    setIsResending(true);
+    setError(null);
+    try {
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setResent(true);
+    } catch {
+      setError("Could not resend the code right now. Please try again shortly.");
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -24,25 +81,39 @@ export default function EmailVerifyScreen() {
         <ScreenHeader
           eyebrow="Account"
           title="Check your inbox"
-          description={`We sent a verification email to ${address}.`}
+          description={`We sent a verification code to ${address}.`}
+        />
+
+        <FieldInput
+          fields={[
+            {
+              key: "code",
+              label: "Verification code",
+              value: code,
+              onChangeText: setCode,
+              placeholder: "6-digit code",
+              keyboardType: "numeric",
+            },
+          ]}
         />
 
         <NoticeCard
-          title="Check your inbox"
-          body="You can continue now - verifying just adds extra account recovery options later."
-        />
-        <NoticeCard
           title="Why verify?"
-          body="It protects family records and lets you recover the account safely."
+          body="It protects family records and confirms you own this email address."
         />
+
+        {resent ? (
+          <NoticeCard title="Code resent" body="Check your inbox for a new code." tone="mint" />
+        ) : null}
+        {error ? <NoticeCard title="Could not verify" body={error} tone="danger" /> : null}
       </ScrollView>
 
       <View style={styles.actions}>
         <ScreenActions
-          primaryLabel="Continue"
-          onPrimaryPress={() => router.replace("/(setup)/children-list")}
-          secondaryLabel="Go back"
-          onSecondaryPress={() => router.back()}
+          primaryLabel={isSubmitting ? "Verifying..." : "Verify"}
+          onPrimaryPress={canSubmit ? () => void handleVerify() : undefined}
+          secondaryLabel={isResending ? "Resending..." : "Resend code"}
+          onSecondaryPress={isResending ? undefined : () => void handleResend()}
         />
       </View>
     </SafeAreaView>

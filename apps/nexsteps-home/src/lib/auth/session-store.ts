@@ -1,103 +1,49 @@
-import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
-// expo-secure-store has no web implementation (Keychain/Keystore have no web
-// equivalent - see the package's own docs). localStorage is the standard
-// fallback for the web target's dev/preview builds; it isn't as secure as
-// native, an accepted tradeoff every web app session store makes.
-const store = {
-  async getItem(key: string): Promise<string | null> {
-    if (Platform.OS === "web") return window.localStorage.getItem(key);
-    return SecureStore.getItemAsync(key);
-  },
-  async setItem(key: string, value: string): Promise<void> {
-    if (Platform.OS === "web") {
-      window.localStorage.setItem(key, value);
-      return;
-    }
-    await SecureStore.setItemAsync(key, value);
-  },
-  async deleteItem(key: string): Promise<void> {
-    if (Platform.OS === "web") {
-      window.localStorage.removeItem(key);
-      return;
-    }
-    await SecureStore.deleteItemAsync(key);
-  },
-};
-
-export type SessionSnapshot = {
-  accessToken: string;
-  idToken?: string;
-  refreshToken?: string;
+/**
+ * App-state only - Clerk owns the actual session token via its own
+ * tokenCache (see clerk-client.ts). This store just remembers which
+ * household state the user was last on, keyed separately from
+ * apps/mobile's "nexsteps.session" so both apps can be installed side by
+ * side.
+ */
+export type AppStateSnapshot = {
   userId?: string;
   activeSiteId?: string;
-  expiresAt?: string;
   updatedAt: string;
 };
 
-let currentSession: SessionSnapshot | null = null;
-// Namespaced separately from apps/mobile's "nexsteps.session" so both apps
-// can be installed side by side during rollout.
-const SESSION_KEY = "nexsteps.home.session";
+let currentState: AppStateSnapshot | null = null;
+const STATE_KEY = "nexsteps.home.session";
 
-function isExpired(snapshot: SessionSnapshot): boolean {
-  if (!snapshot.expiresAt) return false;
-  const expiresAt = new Date(snapshot.expiresAt).getTime();
-  if (Number.isNaN(expiresAt)) return false;
-  return expiresAt <= Date.now();
-}
-
-export async function getSessionSnapshot(): Promise<SessionSnapshot | null> {
-  if (!currentSession) {
-    const raw = await store.getItem(SESSION_KEY);
+export async function getAppStateSnapshot(): Promise<AppStateSnapshot | null> {
+  if (!currentState) {
+    const raw = await SecureStore.getItemAsync(STATE_KEY);
     if (!raw) return null;
     try {
-      currentSession = JSON.parse(raw) as SessionSnapshot;
+      currentState = JSON.parse(raw) as AppStateSnapshot;
     } catch {
-      await store.deleteItem(SESSION_KEY);
-      currentSession = null;
+      await SecureStore.deleteItemAsync(STATE_KEY);
+      currentState = null;
       return null;
     }
   }
-
-  if (!currentSession) return null;
-  if (isExpired(currentSession)) {
-    await store.deleteItem(SESSION_KEY);
-    currentSession = null;
-    return null;
-  }
-  return currentSession;
+  return currentState;
 }
 
-export async function setSessionSnapshot(
-  session: Omit<SessionSnapshot, "updatedAt">,
-): Promise<SessionSnapshot> {
-  currentSession = {
-    ...session,
-    updatedAt: new Date().toISOString(),
-  };
-  await store.setItem(SESSION_KEY, JSON.stringify(currentSession));
-  return currentSession;
-}
-
-export async function updateSessionSnapshot(
-  patch: Partial<Omit<SessionSnapshot, "updatedAt">>,
-): Promise<SessionSnapshot | null> {
-  const existing = await getSessionSnapshot();
-  if (!existing) return null;
-
-  currentSession = {
-    ...existing,
+export async function updateAppStateSnapshot(
+  patch: Partial<Omit<AppStateSnapshot, "updatedAt">>,
+): Promise<AppStateSnapshot> {
+  currentState = {
+    ...(currentState ?? {}),
     ...patch,
     updatedAt: new Date().toISOString(),
   };
-  await store.setItem(SESSION_KEY, JSON.stringify(currentSession));
-
-  return currentSession;
+  await SecureStore.setItemAsync(STATE_KEY, JSON.stringify(currentState));
+  return currentState;
 }
 
-export async function clearSessionSnapshot(): Promise<void> {
-  await store.deleteItem(SESSION_KEY);
-  currentSession = null;
+export async function clearAppStateSnapshot(): Promise<void> {
+  await SecureStore.deleteItemAsync(STATE_KEY);
+  currentState = null;
 }

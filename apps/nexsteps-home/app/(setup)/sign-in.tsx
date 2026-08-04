@@ -1,4 +1,4 @@
-import { isClerkAPIResponseError, useSignUp } from "@clerk/clerk-expo";
+import { isClerkAPIResponseError, useSignIn } from "@clerk/clerk-expo";
 import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,32 +7,42 @@ import { router } from "expo-router";
 import { FieldInput, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
 
-const MIN_PASSWORD_LENGTH = 12;
-
-export default function AccountCreateScreen() {
-  const { isLoaded, signUp } = useSignUp();
+export default function SignInScreen() {
+  const { isLoaded, signIn, setActive } = useSignIn();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSave = email.trim().length > 0 && password.length >= MIN_PASSWORD_LENGTH;
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !isSubmitting;
 
-  const handleCreate = async () => {
-    if (!canSave || isSubmitting || !isLoaded) return;
+  const handleSignIn = async () => {
+    if (!canSubmit || !isLoaded) return;
     setIsSubmitting(true);
     setError(null);
-    const trimmedEmail = email.trim();
 
     try {
-      await signUp.create({ emailAddress: trimmedEmail, password });
-      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
-      router.replace({ pathname: "/(setup)/email-verify", params: { email: trimmedEmail } });
+      const attempt = await signIn.create({
+        identifier: email.trim(),
+        password,
+      });
+
+      if (attempt.status === "complete") {
+        await setActive({ session: attempt.createdSessionId });
+        // AppProviders reacts to Clerk's isSignedIn flipping true once
+        // setActive() resolves - no need to route manually here.
+      } else {
+        setError(
+          "We've upgraded sign-in. Please reset your password to continue - check your email for a reset link, or use account recovery below.",
+        );
+      }
     } catch (err) {
       setError(
         isClerkAPIResponseError(err)
-          ? err.errors[0]?.longMessage ?? err.errors[0]?.message ?? "Could not create your account."
-          : "Could not create your account. Check your details and try again.",
+          ? err.errors[0]?.longMessage ?? err.errors[0]?.message ?? "Sign-in failed."
+          : err instanceof Error
+            ? err.message
+            : "Unable to sign in right now.",
       );
     } finally {
       setIsSubmitting(false);
@@ -44,8 +54,8 @@ export default function AccountCreateScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
           eyebrow="Account"
-          title="Create your parent account"
-          description="One secure account for your family organisation."
+          title="Sign in"
+          description="Continue with your family's account."
         />
 
         <FieldInput
@@ -64,28 +74,22 @@ export default function AccountCreateScreen() {
               label: "Password",
               value: password,
               onChangeText: setPassword,
-              placeholder: "At least 12 characters",
-              helper: "Use at least 12 characters.",
+              placeholder: "Your password",
               secureTextEntry: true,
               autoCapitalize: "none",
             },
           ]}
         />
 
-        <NoticeCard
-          title="Privacy at a glance"
-          body="Family records stay private. Community never exposes child profiles."
-        />
-
-        {error ? <NoticeCard title="Could not create account" body={error} tone="danger" /> : null}
+        {error ? <NoticeCard title="Could not sign in" body={error} tone="danger" /> : null}
       </ScrollView>
 
       <View style={styles.actions}>
         <ScreenActions
-          primaryLabel={isSubmitting ? "Creating..." : "Create account"}
-          onPrimaryPress={canSave && !isSubmitting ? () => void handleCreate() : undefined}
-          secondaryLabel="Sign in or recover account"
-          onSecondaryPress={() => router.push("/(setup)/sign-in")}
+          primaryLabel={isSubmitting ? "Signing in..." : "Sign in"}
+          onPrimaryPress={canSubmit ? () => void handleSignIn() : undefined}
+          secondaryLabel="Forgot your password?"
+          onSecondaryPress={() => router.push("/(setup)/account-recover")}
         />
       </View>
     </SafeAreaView>
