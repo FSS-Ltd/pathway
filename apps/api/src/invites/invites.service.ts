@@ -10,6 +10,8 @@ import { createHash, randomBytes } from "crypto";
 import type { CreateInviteDto } from "./dto/create-invite.dto";
 import { MailerService } from "../mailer/mailer.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { grantSystemRoleAssignment } from "../access-control/system-role-grant";
+import { OutboxService } from "../common/outbox/outbox.service";
 
 type InviteSummary = {
   id: string;
@@ -37,6 +39,8 @@ export class InvitesService {
     @Inject(MailerService) private readonly mailerService: MailerService,
     @Inject(Auth0ManagementService)
     private readonly auth0Management: Auth0ManagementService,
+    @Inject(OutboxService)
+    private readonly outbox: OutboxService,
   ) {}
 
   /**
@@ -573,6 +577,21 @@ export class InvitesService {
       }
     }
 
+    // 1c. Grant the typed "Organisation Head" assignment so this admin isn't
+    // stuck on legacy-role-only access for permission-gated routes (e.g.
+    // attendance, notices). No-ops if the org's system role isn't seeded yet.
+    if (effectiveOrgRole === OrgRole.ORG_ADMIN) {
+      await prisma.$transaction((tx) =>
+        grantSystemRoleAssignment(tx, this.outbox, {
+          orgId,
+          tenantId: null,
+          userId,
+          templateKey: "organisationHead",
+          source: "invite-accept",
+        }),
+      );
+    }
+
     // 2. Site memberships
     let siteIds: string[] = [];
     if (siteIdsJson) {
@@ -653,6 +672,20 @@ export class InvitesService {
               console.error("[INVITE-ACCEPT] Failed to create UserTenantRole:", err);
             }
           }
+        }
+
+        // Grant the typed "Site Lead" assignment for site admins, mirroring
+        // the Organisation Head grant above.
+        if (effectiveSiteRole === SiteRole.SITE_ADMIN) {
+          await prisma.$transaction((tx) =>
+            grantSystemRoleAssignment(tx, this.outbox, {
+              orgId,
+              tenantId: siteId,
+              userId,
+              templateKey: "siteLead",
+              source: "invite-accept",
+            }),
+          );
         }
       }
     } else {

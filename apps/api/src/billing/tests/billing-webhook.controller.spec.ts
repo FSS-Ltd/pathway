@@ -7,6 +7,7 @@ import {
 import { EntitlementsService } from "../entitlements.service";
 import { ModuleRef } from "@nestjs/core";
 import { LoggingService } from "../../common/logging/logging.service";
+import { OutboxService } from "../../common/outbox/outbox.service";
 import type { BillingProviderConfig } from "../billing-provider.config";
 import {
   BillingProvider,
@@ -111,11 +112,14 @@ describe("BillingWebhookController", () => {
       goCardless: {},
     };
 
+    const outbox = { enqueue: jest.fn() } as unknown as OutboxService;
+
     controller = new BillingWebhookController(
       provider as unknown as BillingWebhookProvider,
       entitlements as unknown as EntitlementsService,
       moduleRef,
       billingConfig,
+      outbox,
       logging,
     );
   });

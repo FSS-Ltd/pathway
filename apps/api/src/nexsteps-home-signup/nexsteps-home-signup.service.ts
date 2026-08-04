@@ -1,6 +1,8 @@
-import { ConflictException, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { OrgRole, Role, prisma } from "@pathway/db";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { grantSystemRoleAssignment } from "../access-control/system-role-grant";
+import { OutboxService } from "../common/outbox/outbox.service";
 import type { NexstepsHomeSignupDto } from "./dto/nexsteps-home-signup.dto";
 
 const AUTH0_CONNECTION = "Username-Password-Authentication";
@@ -20,7 +22,10 @@ const HOME_FREE_PLAN_CODE = "HOME_FREE";
  */
 @Injectable()
 export class NexstepsHomeSignupService {
-  constructor(private readonly auth0Management: Auth0ManagementService) {}
+  constructor(
+    private readonly auth0Management: Auth0ManagementService,
+    @Inject(OutboxService) private readonly outbox: OutboxService,
+  ) {}
 
   async signup(
     dto: NexstepsHomeSignupDto,
@@ -94,6 +99,27 @@ export class NexstepsHomeSignupService {
 
       await tx.siteMembership.create({
         data: { tenantId: tenant.id, userId: user.id, role: "SITE_ADMIN" },
+      });
+
+      // Best-effort: grants the typed "Organisation Head"/"Site Lead"
+      // assignment if this org's system role happens to already be seeded.
+      // For a brand-new org it never is yet (pnpm db:seed hasn't run for it
+      // - see system-role-grant.ts), so this admin stays on legacy-role-only
+      // access until the next db:seed + access:backfill pass. Not a blocker
+      // for signup either way.
+      await grantSystemRoleAssignment(tx, this.outbox, {
+        orgId: org.id,
+        tenantId: null,
+        userId: user.id,
+        templateKey: "organisationHead",
+        source: "nexsteps-home-signup",
+      });
+      await grantSystemRoleAssignment(tx, this.outbox, {
+        orgId: org.id,
+        tenantId: tenant.id,
+        userId: user.id,
+        templateKey: "siteLead",
+        source: "nexsteps-home-signup",
       });
 
       return { org, tenant };

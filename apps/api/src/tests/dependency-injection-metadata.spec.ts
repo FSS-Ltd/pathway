@@ -131,7 +131,8 @@ describe("dependency injection metadata", () => {
         { index: 1, param: EntitlementsService },
         { index: 2, param: ModuleRef },
         { index: 3, param: BILLING_PROVIDER_CONFIG },
-        { index: 4, param: LoggingService },
+        { index: 4, param: OutboxService },
+        { index: 5, param: LoggingService },
       ],
     },
     {

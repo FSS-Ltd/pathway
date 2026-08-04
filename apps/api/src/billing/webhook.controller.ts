@@ -35,6 +35,8 @@ import { getPlanDefinition } from "./billing-plans";
 import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
 import { LoggingService, StructuredLogger } from "../common/logging/logging.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { grantSystemRoleAssignment } from "../access-control/system-role-grant";
+import { OutboxService } from "../common/outbox/outbox.service";
 import Stripe from "stripe";
 import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
 
@@ -103,6 +105,7 @@ export class BillingWebhookController {
     private readonly entitlements: EntitlementsService,
     @Inject(ModuleRef) private readonly moduleRef: ModuleRef,
     @Inject(BILLING_PROVIDER_CONFIG) private readonly billingConfig: BillingProviderConfig,
+    @Inject(OutboxService) private readonly outbox: OutboxService,
     @Optional()
     @Inject(LoggingService)
     logging?: LoggingService,
@@ -896,6 +899,32 @@ export class BillingWebhookController {
         update: {},
       });
       this.logger.info("✅ Created SiteMembership");
+
+      // Best-effort: grants the typed "Organisation Head"/"Site Lead"
+      // assignment if this org's system role happens to already be seeded.
+      // For a brand-new org it never is yet (pnpm db:seed hasn't run for it
+      // - see system-role-grant.ts), so this admin stays on legacy-role-only
+      // access until the next db:seed + access:backfill pass.
+      const orgHeadGrant = await grantSystemRoleAssignment(tx, this.outbox, {
+        orgId: org.id,
+        tenantId: null,
+        userId: user.id,
+        templateKey: "organisationHead",
+        source: "billing-webhook-org-create",
+      });
+      const siteLeadGrant = await grantSystemRoleAssignment(tx, this.outbox, {
+        orgId: org.id,
+        tenantId: tenant.id,
+        userId: user.id,
+        templateKey: "siteLead",
+        source: "billing-webhook-org-create",
+      });
+      this.logger.info("Typed role grant attempted", {
+        orgId: org.id,
+        userId: user.id,
+        orgHeadGrant,
+        siteLeadGrant,
+      });
 
       this.logger.info("Successfully created org/tenant/user and linked memberships", {
         orgId: org.id,

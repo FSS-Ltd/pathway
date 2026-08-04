@@ -3,12 +3,18 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { prisma } from "@pathway/db";
 import { NexstepsHomeSignupService } from "../nexsteps-home-signup.service";
 import { Auth0ManagementService } from "../../auth/auth0-management.service";
+import { OutboxService } from "../../common/outbox/outbox.service";
 
 jest.mock("@pathway/db", () => {
   const { OrgRole, Role } = jest.requireActual("@prisma/client");
+  const { SYSTEM_ACTOR_ID, getSystemRoleId, applyTenantContext } =
+    jest.requireActual("@pathway/db");
   return {
     OrgRole,
     Role,
+    SYSTEM_ACTOR_ID,
+    getSystemRoleId,
+    applyTenantContext,
     prisma: {
       user: {
         findUnique: jest.fn(),
@@ -39,6 +45,24 @@ jest.mock("@pathway/db", () => {
       siteMembership: {
         create: jest.fn(),
       },
+      // Used by grantSystemRoleAssignment (system-role-grant.ts): a
+      // brand-new org has no seeded system role yet, so the default here is
+      // "not seeded" (findUnique -> null), matching production reality.
+      orgRoleDefinition: {
+        findUnique: jest.fn(),
+      },
+      userRoleAssignment: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      auditEvent: {
+        create: jest.fn(),
+      },
+      outboxEvent: {
+        createMany: jest.fn(),
+        findFirstOrThrow: jest.fn(),
+      },
+      $executeRawUnsafe: jest.fn(),
       $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
         const p = jest.requireMock("@pathway/db").prisma;
         return fn(p);
@@ -60,6 +84,10 @@ describe("NexstepsHomeSignupService", () => {
     userOrgRole: { create: jest.Mock };
     orgMembership: { create: jest.Mock };
     siteMembership: { create: jest.Mock };
+    orgRoleDefinition: { findUnique: jest.Mock };
+    userRoleAssignment: { findFirst: jest.Mock; create: jest.Mock };
+    auditEvent: { create: jest.Mock };
+    outboxEvent: { createMany: jest.Mock; findFirstOrThrow: jest.Mock };
   };
 
   beforeEach(async () => {
@@ -67,6 +95,7 @@ describe("NexstepsHomeSignupService", () => {
       providers: [
         NexstepsHomeSignupService,
         { provide: Auth0ManagementService, useValue: auth0Mock },
+        { provide: OutboxService, useValue: new OutboxService() },
       ],
     }).compile();
 
@@ -85,6 +114,12 @@ describe("NexstepsHomeSignupService", () => {
     mockPrisma.userOrgRole.create.mockResolvedValue({ id: "uor-1" });
     mockPrisma.orgMembership.create.mockResolvedValue({ id: "om-1" });
     mockPrisma.siteMembership.create.mockResolvedValue({ id: "sm-1" });
+    mockPrisma.orgRoleDefinition.findUnique.mockResolvedValue(null);
+    mockPrisma.userRoleAssignment.findFirst.mockResolvedValue(null);
+    mockPrisma.userRoleAssignment.create.mockResolvedValue({ id: "ura-1" });
+    mockPrisma.auditEvent.create.mockResolvedValue({ id: "audit-1" });
+    mockPrisma.outboxEvent.createMany.mockResolvedValue({ count: 1 });
+    mockPrisma.outboxEvent.findFirstOrThrow.mockResolvedValue({ id: "outbox-1" });
   });
 
   it("creates the Auth0 user, org, tenant and roles for a new household", async () => {
@@ -133,6 +168,42 @@ describe("NexstepsHomeSignupService", () => {
     });
     expect(mockPrisma.userOrgRole.create).toHaveBeenCalledWith({
       data: { userId: "user-1", orgId: "org-1", role: "ORG_ADMIN" },
+    });
+  });
+
+  it("does not fail signup when the org's system role isn't seeded yet (brand-new org)", async () => {
+    // mockPrisma.orgRoleDefinition.findUnique resolves null by default (see
+    // beforeEach) - a just-created org never has its system role seeded
+    // yet, since only the dedicated pnpm db:seed identity may create one.
+    await expect(
+      service.signup({ email: "sarah@example.com", password: "a-secure-password" }),
+    ).resolves.toEqual({ success: true, orgId: "org-1", tenantId: "tenant-1" });
+
+    expect(mockPrisma.orgRoleDefinition.findUnique).toHaveBeenCalled();
+    expect(mockPrisma.userRoleAssignment.create).not.toHaveBeenCalled();
+  });
+
+  it("grants the typed Organisation Head and Site Lead assignments when the org's system role is already seeded", async () => {
+    mockPrisma.orgRoleDefinition.findUnique.mockResolvedValue({
+      isActive: true,
+      isSystem: true,
+    });
+
+    await service.signup({ email: "sarah@example.com", password: "a-secure-password" });
+
+    expect(mockPrisma.userRoleAssignment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orgId: "org-1",
+        tenantId: null,
+        userId: "user-1",
+      }),
+    });
+    expect(mockPrisma.userRoleAssignment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orgId: "org-1",
+        tenantId: "tenant-1",
+        userId: "user-1",
+      }),
     });
   });
 
