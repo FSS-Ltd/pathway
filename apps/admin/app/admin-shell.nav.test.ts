@@ -64,6 +64,25 @@ assert.ok(
   "Roles & Access must not authorise from a role-name access requirement",
 );
 
+// Production-403 fix: Attendance and Notices are gated by their typed
+// permission too, not just the coarse role-name access requirement, so a
+// user without attendance.read/notices.read doesn't even see the link.
+const attendanceNavEntry = shellSource.match(
+  /defaultSidebarItems\[8\][\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"attendance\.read"[\s\S]*?group:\s*"Schedule"\s*\},/,
+);
+assert.ok(
+  attendanceNavEntry,
+  "expected Attendance navigation to require the attendance.read permission",
+);
+
+const noticesNavEntry = shellSource.match(
+  /defaultSidebarItems\[9\][\s\S]*?access:\s*"site-admin-or-higher"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication"\s*\},/,
+);
+assert.ok(
+  noticesNavEntry,
+  "expected Notices & Announcements navigation to require the notices.read permission",
+);
+
 // Grouped items render as accordion sections; Dashboard stays top-level.
 const groupLabels = [...shellSource.matchAll(/group:\s*"([^"]+)"/g)].map((m) => m[1]);
 assert.ok(groupLabels.length > 0, "expected nav items to declare accordion groups");
