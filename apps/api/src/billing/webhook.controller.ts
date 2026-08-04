@@ -35,6 +35,8 @@ import { getPlanDefinition } from "./billing-plans";
 import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
 import { LoggingService, StructuredLogger } from "../common/logging/logging.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { ClerkManagementService } from "../auth/clerk-management.service";
+import { getAuthProviderMode } from "../config/runtime-env";
 import Stripe from "stripe";
 import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
 
@@ -95,6 +97,7 @@ export function isOrgSector(value: string | undefined): value is OrgSector {
 export class BillingWebhookController {
   private readonly logger: StructuredLogger;
   private auth0Management: Auth0ManagementService | null = null;
+  private clerkManagement: ClerkManagementService | null = null;
 
   constructor(
     @Inject(BILLING_WEBHOOK_PROVIDER)
@@ -134,6 +137,25 @@ export class BillingWebhookController {
       }
     }
     return this.auth0Management;
+  }
+
+  /**
+   * Lazy-load ClerkManagementService to avoid module initialization order issues.
+   */
+  private getClerkService(): ClerkManagementService | null {
+    if (!this.clerkManagement) {
+      try {
+        this.clerkManagement = this.moduleRef.get(ClerkManagementService, { strict: false });
+        this.logger.info("ClerkManagementService lazy-loaded", {
+          isReady: this.clerkManagement?.isReady(),
+        });
+      } catch (error) {
+        this.logger.warn("ClerkManagementService not available", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return this.clerkManagement;
   }
 
   private createFallbackLogger(): StructuredLogger {
@@ -741,82 +763,147 @@ export class BillingWebhookController {
         this.logger.info("User already exists", { userId: user.id, email: contactEmail });
       }
 
-      // Check if user already has Auth0 identity
+      // Check if user already has an identity, on either provider
       const existingIdentity = await tx.userIdentity.findFirst({
         where: {
           userId: user.id,
-          provider: "auth0",
+          provider: { in: ["auth0", "clerk"] },
         },
       });
 
-      if (!existingIdentity && password) {
-        // Create user in Auth0 (outside transaction)
-        const auth0Service = this.getAuth0Service();
-        const isReady = auth0Service?.isReady();
-        
-        this.logger.info("Checking Auth0 service readiness", {
-          hasService: !!auth0Service,
-          isReady,
-          hasPassword: !!password,
-          hasExistingIdentity: !!existingIdentity,
-        });
-        
-        if (isReady && auth0Service) {
-          this.logger.info("Attempting to create Auth0 user", {
-            userId: user.id,
-            email: contactEmail,
-          });
-          
-          try {
-            const auth0UserId = await auth0Service.createUser({
-              email: contactEmail,
-              password,
-              name: contactName,
-              emailVerified: true, // Auto-verify for development/testing
-            });
+      const authProviderMode = getAuthProviderMode();
 
-            if (auth0UserId) {
-              await tx.userIdentity.create({
-                data: {
-                  userId: user.id,
-                  provider: "auth0",
-                  providerSubject: auth0UserId,
-                  email: contactEmail,
-                  displayName: contactName,
-                },
-              });
-              this.logger.info("✅ Created Auth0 user and linked identity", {
-                userId: user.id,
-                auth0UserId,
-              });
-            } else {
-              this.logger.warn("Auth0 createUser returned null", {
-                userId: user.id,
-                email: contactEmail,
-              });
-            }
-          } catch (error) {
-            this.logger.error("Failed to create Auth0 user", {
+      if (!existingIdentity && password) {
+        if (authProviderMode === "auth0") {
+          const auth0Service = this.getAuth0Service();
+          const isReady = auth0Service?.isReady();
+
+          this.logger.info("Checking Auth0 service readiness", {
+            hasService: !!auth0Service,
+            isReady,
+            hasPassword: !!password,
+            hasExistingIdentity: !!existingIdentity,
+          });
+
+          if (isReady && auth0Service) {
+            this.logger.info("Attempting to create Auth0 user", {
               userId: user.id,
               email: contactEmail,
-              error: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
             });
-            // Don't fail the whole transaction if Auth0 creation fails
+
+            try {
+              const auth0UserId = await auth0Service.createUser({
+                email: contactEmail,
+                password,
+                name: contactName,
+                emailVerified: true, // Auto-verify for development/testing
+              });
+
+              if (auth0UserId) {
+                await tx.userIdentity.create({
+                  data: {
+                    userId: user.id,
+                    provider: "auth0",
+                    providerSubject: auth0UserId,
+                    email: contactEmail,
+                    displayName: contactName,
+                  },
+                });
+                this.logger.info("✅ Created Auth0 user and linked identity", {
+                  userId: user.id,
+                  auth0UserId,
+                });
+              } else {
+                this.logger.warn("Auth0 createUser returned null", {
+                  userId: user.id,
+                  email: contactEmail,
+                });
+              }
+            } catch (error) {
+              this.logger.error("Failed to create Auth0 user", {
+                userId: user.id,
+                email: contactEmail,
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+              });
+              // Don't fail the whole transaction if Auth0 creation fails
+            }
+          } else {
+            this.logger.warn("Auth0ManagementService not ready (credentials missing or invalid)", {
+              userId: user.id,
+              email: contactEmail,
+            });
           }
         } else {
-          this.logger.warn("Auth0ManagementService not ready (credentials missing or invalid)", {
-            userId: user.id,
-            email: contactEmail,
+          // "dual" and "clerk": new org accounts land on Clerk.
+          const clerkService = this.getClerkService();
+          const isReady = clerkService?.isReady();
+
+          this.logger.info("Checking Clerk service readiness", {
+            hasService: !!clerkService,
+            isReady,
+            hasPassword: !!password,
+            hasExistingIdentity: !!existingIdentity,
           });
+
+          if (isReady && clerkService) {
+            this.logger.info("Attempting to create Clerk user", {
+              userId: user.id,
+              email: contactEmail,
+            });
+
+            try {
+              const clerkUserId = await clerkService.createUser({
+                email: contactEmail,
+                password,
+                name: contactName,
+                externalId: user.id,
+              });
+
+              if (clerkUserId) {
+                await tx.userIdentity.create({
+                  data: {
+                    userId: user.id,
+                    provider: "clerk",
+                    providerSubject: clerkUserId,
+                    email: contactEmail,
+                    displayName: contactName,
+                  },
+                });
+                this.logger.info("✅ Created Clerk user and linked identity", {
+                  userId: user.id,
+                  clerkUserId,
+                });
+              } else {
+                this.logger.warn("Clerk createUser returned null", {
+                  userId: user.id,
+                  email: contactEmail,
+                });
+              }
+            } catch (error) {
+              this.logger.error("Failed to create Clerk user", {
+                userId: user.id,
+                email: contactEmail,
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+              });
+              // Don't fail the whole transaction if Clerk creation fails
+            }
+          } else {
+            this.logger.warn("ClerkManagementService not ready (secret key missing)", {
+              userId: user.id,
+              email: contactEmail,
+            });
+          }
         }
       } else if (existingIdentity) {
-        this.logger.info("User already has Auth0 identity", {
+        this.logger.info("User already has an identity", {
           userId: user.id,
           identityId: existingIdentity.id,
+          provider: existingIdentity.provider,
         });
       } else if (!password) {
-        this.logger.warn("No password provided, skipping Auth0 user creation", {
+        this.logger.warn("No password provided, skipping identity provider user creation", {
           userId: user.id,
           email: contactEmail,
         });

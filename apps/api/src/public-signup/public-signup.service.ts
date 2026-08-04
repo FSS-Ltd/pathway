@@ -9,6 +9,8 @@ import { createHash } from "crypto";
 import { ChildGuardianContactType, prisma, Role } from "@pathway/db";
 import { MailerService } from "../mailer/mailer.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { ClerkManagementService } from "../auth/clerk-management.service";
+import { getAuthProviderMode } from "../config/runtime-env";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { childPhotoKey } from "../common/storage/storage-key.util";
 import type { PublicSignupConfigDto } from "./dto/public-signup-config.dto";
@@ -52,6 +54,9 @@ export class PublicSignupService {
     @Optional()
     @Inject(Auth0ManagementService)
     private readonly auth0Management: Auth0ManagementService | null,
+    @Optional()
+    @Inject(ClerkManagementService)
+    private readonly clerkManagement: ClerkManagementService | null,
     @Optional()
     @Inject(SupabaseStorageService)
     storage?: SupabaseStorageService,
@@ -417,19 +422,28 @@ export class PublicSignupService {
         },
       });
 
-      const auth0UserId = await this.auth0Management?.createUser({
-        email,
-        password: dto.parent.password,
-        name: safeName ?? fullName,
-        emailVerified: false,
-      });
+      const provider = getAuthProviderMode() === "auth0" ? "auth0" : "clerk";
+      const providerUserId =
+        provider === "auth0"
+          ? await this.auth0Management?.createUser({
+              email,
+              password: dto.parent.password,
+              name: safeName ?? fullName,
+              emailVerified: false,
+            })
+          : await this.clerkManagement?.createUser({
+              email,
+              password: dto.parent.password,
+              name: safeName ?? fullName,
+              externalId: user.id,
+            });
 
-      if (auth0UserId) {
+      if (providerUserId) {
         await prisma.userIdentity.create({
           data: {
             userId: user.id,
-            provider: "auth0",
-            providerSubject: auth0UserId,
+            provider,
+            providerSubject: providerUserId,
             email,
             displayName: safeName ?? fullName,
           },

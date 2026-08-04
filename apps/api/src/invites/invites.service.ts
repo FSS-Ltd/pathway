@@ -10,6 +10,8 @@ import { createHash, randomBytes } from "crypto";
 import type { CreateInviteDto } from "./dto/create-invite.dto";
 import { MailerService } from "../mailer/mailer.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
+import { ClerkManagementService } from "../auth/clerk-management.service";
+import { getAuthProviderMode } from "../config/runtime-env";
 
 type InviteSummary = {
   id: string;
@@ -37,6 +39,8 @@ export class InvitesService {
     @Inject(MailerService) private readonly mailerService: MailerService,
     @Inject(Auth0ManagementService)
     private readonly auth0Management: Auth0ManagementService,
+    @Inject(ClerkManagementService)
+    private readonly clerkManagement: ClerkManagementService,
   ) {}
 
   /**
@@ -144,95 +148,35 @@ export class InvitesService {
   }
 
   /**
-   * Ensure a user exists in DB and Auth0 for an invite.
-   * Creates the user if they don't exist, using a temporary password.
+   * Ensure a user exists in DB and in the active identity provider for an
+   * invite. Creates the user if they don't exist. Clerk-provisioned invites
+   * carry no password - the invitee resets on first sign-in (see the "no
+   * passwords" migration decision); Auth0 keeps its temp-password behaviour
+   * unchanged for as long as AUTH_PROVIDER_MODE=auth0.
    */
   private async ensureUserExistsForInvite(
     email: string,
     name: string | null,
   ): Promise<void> {
     try {
-      // Check if user already exists in DB
-      const existingUser = await prisma.user.findFirst({
-        where: {
-          email: { equals: email, mode: "insensitive" },
-        },
-      });
-
-      if (existingUser) {
-        // User exists in DB, check if they have Auth0 identity
-        const existingIdentity = await prisma.userIdentity.findFirst({
-          where: {
-            userId: existingUser.id,
-            provider: "auth0",
-          },
-        });
-
-        if (existingIdentity) {
-          // User already has Auth0 account, nothing to do
-          return;
-        }
-
-        // User exists in DB but no Auth0 identity - create Auth0 user
-        const safeName = name && !name.includes("@") ? name : null;
-        const tempPassword = randomBytes(32).toString("hex"); // Temporary password
-        const auth0UserId = await this.auth0Management.createUser({
-          email,
-          password: tempPassword,
-          name: safeName || email,
-          emailVerified: false, // They'll verify via password reset
-        });
-
-        if (auth0UserId) {
-          // Link Auth0 identity to existing user
-          await prisma.userIdentity.create({
-            data: {
-              userId: existingUser.id,
-              provider: "auth0",
-              providerSubject: auth0UserId,
-              email,
-              displayName: safeName,
-            },
-          });
-        }
-        return;
-      }
-
-      // User doesn't exist - create in DB first
       const safeName = name && !name.includes("@") ? name : null;
-      const newUser = await prisma.user.create({
-        data: {
-          email,
-          name: safeName,
-          displayName: safeName,
-        },
+
+      const existingUser = await prisma.user.findFirst({
+        where: { email: { equals: email, mode: "insensitive" } },
       });
 
-      // Create Auth0 user
-      const tempPassword = randomBytes(32).toString("hex"); // Temporary password
-      const auth0UserId = await this.auth0Management.createUser({
-        email,
-        password: tempPassword,
-        name: safeName || email,
-        emailVerified: false, // They'll verify via password reset
-      });
+      const user =
+        existingUser ??
+        (await prisma.user.create({
+          data: { email, name: safeName, displayName: safeName },
+        }));
 
-      if (auth0UserId) {
-        // Link Auth0 identity
-        await prisma.userIdentity.create({
-          data: {
-            userId: newUser.id,
-            provider: "auth0",
-            providerSubject: auth0UserId,
-            email,
-            displayName: safeName,
-          },
-        });
-      } else {
-        console.warn(
-          `[INVITE] ⚠️ Created user ${email} in DB but failed to create Auth0 account. User will need to sign up manually.`,
-        );
-      }
+      const existingIdentity = await prisma.userIdentity.findFirst({
+        where: { userId: user.id, provider: { in: ["auth0", "clerk"] } },
+      });
+      if (existingIdentity) return;
+
+      await this.createIdentityForInvite(user.id, email, safeName);
     } catch (error) {
       // Don't fail invite creation if user creation fails
       console.error(
@@ -240,6 +184,63 @@ export class InvitesService {
         error,
       );
     }
+  }
+
+  private async createIdentityForInvite(
+    userId: string,
+    email: string,
+    safeName: string | null,
+  ): Promise<void> {
+    const mode = getAuthProviderMode();
+
+    if (mode === "auth0") {
+      const tempPassword = randomBytes(32).toString("hex");
+      const auth0UserId = await this.auth0Management.createUser({
+        email,
+        password: tempPassword,
+        name: safeName || email,
+        emailVerified: false, // They'll verify via password reset
+      });
+      if (!auth0UserId) {
+        console.warn(
+          `[INVITE] ⚠️ Created user ${email} in DB but failed to create Auth0 account. User will need to sign up manually.`,
+        );
+        return;
+      }
+      await prisma.userIdentity.create({
+        data: {
+          userId,
+          provider: "auth0",
+          providerSubject: auth0UserId,
+          email,
+          displayName: safeName,
+        },
+      });
+      return;
+    }
+
+    // "dual" and "clerk": new invites land on Clerk. No password - the
+    // invitee sets one via Clerk's reset flow on first sign-in.
+    const clerkUserId = await this.clerkManagement.createUser({
+      email,
+      name: safeName || undefined,
+      externalId: userId,
+    });
+    if (!clerkUserId) {
+      console.warn(
+        `[INVITE] ⚠️ Created user ${email} in DB but failed to create Clerk account. User will need to sign up manually.`,
+      );
+      return;
+    }
+    await prisma.userIdentity.create({
+      data: {
+        userId,
+        provider: "clerk",
+        providerSubject: clerkUserId,
+        email,
+        displayName: safeName,
+      },
+    });
   }
 
   /**

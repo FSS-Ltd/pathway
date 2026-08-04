@@ -2770,3 +2770,16 @@ model DownloadToken {
   @@index([tokenHash])
   @@index([leadId])
 }
+
+// Idempotency ledger for identity-provider webhooks (Clerk). The id is the
+// provider's event id (e.g. Svix svix-id) - inserting it is the dedup check.
+// Also doubles as the processing audit trail for these events.
+model IdentityWebhookEvent {
+  id         String   @id
+  provider   String
+  eventType  String
+  status     String
+  receivedAt DateTime @default(now())
+
+  @@index([provider, eventType])
+}

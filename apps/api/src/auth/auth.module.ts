@@ -7,6 +7,8 @@ import { AuthMeController } from "./auth-me.controller";
 import { AuthUserGuard } from "./auth-user.guard";
 import { VerifiedPrincipalGuard } from "./verified-principal.guard";
 import { Auth0ManagementService } from "./auth0-management.service";
+import { ClerkManagementService } from "./clerk-management.service";
+import { ClerkWebhookController } from "./clerk-webhook.controller";
 import { UserRolesService } from "./user-roles.service";
 import { InvitesModule } from "../invites/invites.module";
 
@@ -17,15 +19,23 @@ import { InvitesModule } from "../invites/invites.module";
     AuthUserGuard,
     VerifiedPrincipalGuard,
     Auth0ManagementService,
+    ClerkManagementService,
     UserRolesService,
   ],
-  controllers: [AuthIdentityController, ActiveSiteController, AuthMeController],
+  controllers: [
+    AuthIdentityController,
+    ActiveSiteController,
+    AuthMeController,
+    ClerkWebhookController,
+  ],
   exports: [
     AuthIdentityService,
     AuthUserGuard,
     VerifiedPrincipalGuard,
     Auth0ManagementService,
+    ClerkManagementService,
     UserRolesService,
   ],
 })
 export class AuthModule {}
+
