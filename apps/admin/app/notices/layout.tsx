@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { canAccessRoute } from "@/lib/permissions";
+import { hasPermission } from "@/lib/access";
 import { NoAccessCard } from "@/components/no-access-card";
 
 export default function NoticesLayout({
@@ -11,8 +12,10 @@ export default function NoticesLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname() || "/notices";
-  const { role, isLoading } = useAdminAccess();
-  const canAccess = canAccessRoute(pathname, role);
+  const { role, permissions, isLoading } = useAdminAccess();
+  const canAccess =
+    canAccessRoute(pathname, role) &&
+    hasPermission(permissions, "notices.read");
 
   if (isLoading) return null;
   if (!canAccess) {

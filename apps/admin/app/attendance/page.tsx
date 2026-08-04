@@ -14,7 +14,8 @@ import {
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
 import { useAdminAccess } from "../../lib/use-admin-access";
-import { canAccessAdminSection } from "../../lib/access";
+import { canAccessAdminSection, hasPermission } from "../../lib/access";
+import { NoAccessCard } from "../../components/no-access-card";
 
 const statusCopy: Record<AdminAttendanceRow["status"], string> = {
   not_started: "Not started",
@@ -63,7 +64,8 @@ function defaultExportRange(): { from: string; to: string } {
 export default function AttendancePage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
-  const { role, isLoading: isLoadingAccess } = useAdminAccess();
+  const { role, permissions, isLoading: isLoadingAccess } = useAdminAccess();
+  const canAccess = hasPermission(permissions, "attendance.read");
   const [data, setData] = React.useState<AdminAttendanceRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -100,10 +102,11 @@ export default function AttendancePage() {
 
   React.useEffect(() => {
     if (sessionStatus !== "authenticated" || !session) return;
+    if (isLoadingAccess || !canAccess) return;
     const token = (session as { accessToken?: string })?.accessToken ?? null;
     setApiClientToken(token);
     void load();
-  }, [sessionStatus, session, load]);
+  }, [sessionStatus, session, isLoadingAccess, canAccess, load]);
 
   const filteredData = React.useMemo(() => {
     let list = data;
@@ -186,6 +189,24 @@ export default function AttendancePage() {
       day: "numeric",
       year: "numeric",
     });
+
+  if (isLoadingAccess) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-96 animate-pulse rounded bg-muted" />
+      </div>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <NoAccessCard
+        title="You don't have access to Attendance"
+        message="Attendance is only available to staff with the attendance permission for this organisation."
+      />
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">

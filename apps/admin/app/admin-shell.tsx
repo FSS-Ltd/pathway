@@ -60,8 +60,8 @@ const navItemsWithAccess: (SidebarNavItem & {
   { label: "Learning", href: "/learning", iconIndex: 20, access: "staff-or-admin", capability: "learning.log.read", group: "Teaching" },
   { ...defaultSidebarItems[6], access: "staff-or-admin", group: "Schedule" }, // Sessions & Rota
   { ...defaultSidebarItems[7], access: "staff-or-admin", group: "Schedule" }, // My schedule
-  { ...defaultSidebarItems[8], access: "staff-or-admin", group: "Schedule" }, // Attendance
-  { ...defaultSidebarItems[9], access: "site-admin-or-higher", group: "Communication" }, // Notices & Announcements (admins only)
+  { ...defaultSidebarItems[8], access: "staff-or-admin", permission: "attendance.read", group: "Schedule" }, // Attendance
+  { ...defaultSidebarItems[9], access: "site-admin-or-higher", permission: "notices.read", group: "Communication" }, // Notices & Announcements (admins only)
   { label: "Guest pass", href: "/guest-pass", iconIndex: 15, access: "staff-or-admin", group: "Guest & Handover" },
   { label: "Handover", href: "/handover", iconIndex: 16, access: "staff-or-admin", group: "Guest & Handover" },
   { label: "Handover logs", href: "/admin/handover", iconIndex: 17, access: "site-admin-or-higher", group: "Guest & Handover" },
