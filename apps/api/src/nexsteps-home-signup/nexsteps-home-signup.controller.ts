@@ -1,21 +1,25 @@
-import { Body, Controller, Post } from "@nestjs/common";
-import { NexstepsHomeSignupDto } from "./dto/nexsteps-home-signup.dto";
+import { Controller, Post, Req, UseGuards } from "@nestjs/common";
+import type { Request } from "express";
+import { VerifiedPrincipalGuard, getVerifiedPrincipal } from "../auth/verified-principal.guard";
 import { NexstepsHomeSignupService } from "./nexsteps-home-signup.service";
 
 /**
- * Public (unauthenticated) household signup for NexSteps Home. Creates the
- * Auth0 user and the household's Org/Tenant/roles; the client logs in with
- * the same credentials afterwards through the existing Auth0 flow already
- * wired in apps/nexsteps-home - this endpoint issues no session itself.
+ * Household signup for NexSteps Home. The client authenticates with Clerk
+ * first (useSignUp() + email verification) and calls this endpoint with
+ * that session's bearer token; this endpoint provisions the household's
+ * Org/Tenant/roles for the already-verified principal. Uses
+ * VerifiedPrincipalGuard rather than AuthUserGuard - the latter would
+ * JIT-provision a bare User and race the provisioning transaction below.
  */
 @Controller("public/nexsteps-home")
 export class NexstepsHomeSignupController {
   constructor(private readonly signupService: NexstepsHomeSignupService) {}
 
   @Post("signup")
+  @UseGuards(VerifiedPrincipalGuard)
   async signup(
-    @Body() body: NexstepsHomeSignupDto,
+    @Req() req: Request,
   ): Promise<{ success: true; orgId: string; tenantId: string }> {
-    return this.signupService.signup(body);
+    return this.signupService.signup(getVerifiedPrincipal(req));
   }
 }

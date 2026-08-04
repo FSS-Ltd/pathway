@@ -1,9 +1,8 @@
-import { ConflictException, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { ConflictException, ForbiddenException, Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { OrgRole, Role, prisma } from "@pathway/db";
-import { Auth0ManagementService } from "../auth/auth0-management.service";
-import type { NexstepsHomeSignupDto } from "./dto/nexsteps-home-signup.dto";
+import type { VerifiedPrincipal } from "../auth/token-verifier";
+import { ClerkManagementService } from "../auth/clerk-management.service";
 
-const AUTH0_CONNECTION = "Username-Password-Authentication";
 const HOME_FREE_PLAN_CODE = "HOME_FREE";
 
 /**
@@ -13,43 +12,46 @@ const HOME_FREE_PLAN_CODE = "HOME_FREE";
  * household starts on the Free plan; upgrading happens externally via
  * nexsteps.dev (PR 7.2), not through this endpoint.
  *
- * Mirrors apps/api/src/billing/webhook.controller.ts's
- * createOrgFromPendingDetails (the codebase's existing org+user+role creation
- * pattern), minus the payment-deferral wrapper that pattern needs and this
- * endpoint doesn't.
+ * The client authenticates with Clerk first (useSignUp() + email
+ * verification) and calls this endpoint with that session's bearer token -
+ * unlike the old Auth0 flow, there is no IdP write in this transaction at
+ * all, so a rollback can no longer orphan an IdP account.
  */
 @Injectable()
 export class NexstepsHomeSignupService {
-  constructor(private readonly auth0Management: Auth0ManagementService) {}
+  constructor(private readonly clerkManagement: ClerkManagementService) {}
 
   async signup(
-    dto: NexstepsHomeSignupDto,
+    principal: VerifiedPrincipal,
   ): Promise<{ success: true; orgId: string; tenantId: string }> {
-    const email = dto.email.toLowerCase().trim();
+    if (!principal.email || !principal.emailVerified) {
+      throw new ForbiddenException("Please verify your email before completing signup.");
+    }
+    const email = principal.email.toLowerCase().trim();
+
+    const existingIdentity = await prisma.userIdentity.findUnique({
+      where: { provider_providerSubject: { provider: "clerk", providerSubject: principal.sub } },
+      include: { user: { include: { tenant: true } } },
+    });
+    if (existingIdentity?.user.tenant) {
+      // Idempotent retry: the household was already provisioned for this
+      // Clerk account, most likely after a network failure on a prior call.
+      return {
+        success: true,
+        orgId: existingIdentity.user.tenant.orgId,
+        tenantId: existingIdentity.user.tenant.id,
+      };
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
-      throw new ConflictException(
-        "An account already exists for this email address.",
-      );
-    }
-
-    const auth0UserId = await this.auth0Management.createUser({
-      email,
-      password: dto.password,
-      connection: AUTH0_CONNECTION,
-      emailVerified: false,
-    });
-    if (!auth0UserId) {
-      throw new ServiceUnavailableException(
-        "Could not create the account. Please try again.",
-      );
+      throw new ConflictException("An account already exists for this email address.");
     }
 
     const householdName = this.householdNameFromEmail(email);
     const slug = await this.generateUniqueSlug(householdName);
 
-    const { org, tenant } = await prisma.$transaction(async (tx) => {
+    const { org, tenant, user } = await prisma.$transaction(async (tx) => {
       const org = await tx.org.create({
         data: {
           name: householdName,
@@ -74,8 +76,8 @@ export class NexstepsHomeSignupService {
       await tx.userIdentity.create({
         data: {
           userId: user.id,
-          provider: "auth0",
-          providerSubject: auth0UserId,
+          provider: "clerk",
+          providerSubject: principal.sub,
           email,
         },
       });
@@ -96,8 +98,10 @@ export class NexstepsHomeSignupService {
         data: { tenantId: tenant.id, userId: user.id, role: "SITE_ADMIN" },
       });
 
-      return { org, tenant };
+      return { org, tenant, user };
     });
+
+    await this.clerkManagement.setExternalId(principal.sub, user.id);
 
     return { success: true, orgId: org.id, tenantId: tenant.id };
   }
