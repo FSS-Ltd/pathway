@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { fetchOrgOverview } from "./api-client";
 import { subscribeToActiveSiteChanges } from "./active-site-events";
 import { resolveOrgUi, resolveOrgUiKey, orgLabel, type OrgUi, type OrgUiKey } from "./org-ui";

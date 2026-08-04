@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft, Download } from "lucide-react";
 import { Badge, Button, Card, Input, Label, Select } from "@pathway/ui";
 import { ProfileHeaderCard } from "../../../components/profile-header-card";

@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useClerk } from "@clerk/nextjs";
+import { useSession } from "@/lib/use-session-compat";
 import {
   Building2,
   Check,
@@ -125,6 +126,7 @@ function SiteMenuContent({
 
 export function TopBarActions() {
   const { data: session, status } = useSession();
+  const { redirectToSignIn, signOut } = useClerk();
   const { role } = useAdminAccess();
   const [siteState, setSiteState] = React.useState<SiteState>({
     activeSiteId: null,
@@ -256,7 +258,7 @@ export function TopBarActions() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => signIn("auth0")}
+          onClick={() => redirectToSignIn()}
           className="rounded-full bg-accent-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:ring-accent-primary"
         >
           Sign in
@@ -401,7 +403,7 @@ export function TopBarActions() {
               <div className="border-t border-border-subtle" />
               <button
                 type="button"
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={() => signOut({ redirectUrl: "/login" })}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-status-danger hover:bg-status-danger/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-status-danger"
               >
                 <LogOut className="h-4 w-4" />

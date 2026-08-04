@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { toast } from "sonner";
 import {
   Button,

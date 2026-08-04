@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Card, Button, Input, Label, Badge } from "@pathway/ui";
 import {
   fetchGroups,

@@ -619,8 +619,7 @@ export type AdminReportBundleInput = {
 };
 
 // Auth header builder with support for runtime token injection.
-// Preferred: NextAuth access token via setApiClientToken().
-// Dev fallback: NEXT_PUBLIC_DEV_BEARER_TOKEN (should be empty in prod).
+// Token comes from Clerk via setApiClientToken() (see lib/use-session-compat.tsx).
 let accessTokenOverride: string | null = null;
 export function setApiClientToken(token?: string | null) {
   accessTokenOverride = token ?? null;
@@ -634,12 +633,6 @@ function buildAuthHeaders(accessToken?: string | null): HeadersInit {
   const resolvedAccessToken = accessToken ?? accessTokenOverride;
   if (resolvedAccessToken) {
     headers["Authorization"] = `Bearer ${resolvedAccessToken}`;
-    return headers;
-  }
-
-  const devToken = process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN;
-  if (devToken) {
-    headers["Authorization"] = `Bearer ${devToken}`;
   }
 
   return headers;

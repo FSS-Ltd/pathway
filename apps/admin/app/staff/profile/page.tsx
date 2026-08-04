@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Card, Button, Input, Label } from "@pathway/ui";
 import { Plus, Trash2, Check, X, ClipboardList } from "lucide-react";
 import { getSafeDisplayName } from "@/lib/names";

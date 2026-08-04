@@ -6,7 +6,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Badge, Button, Card } from "@pathway/ui";
 import {
   AdminBillingOverview,

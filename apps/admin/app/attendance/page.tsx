@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { Badge, Button, Card, DataTable, Input, Label, type ColumnDef } from "@pathway/ui";
 import {

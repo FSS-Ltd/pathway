@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Button, Card } from "@pathway/ui";
 import { updateUserProfile } from "@/lib/api-client";
 

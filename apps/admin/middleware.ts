@@ -1,40 +1,34 @@
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
 
-// Protect all admin routes; redirect unauthenticated users to /login.
-export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+// Allow auth routes, login page, and health/static assets without a session.
+const isPublicRoute = createRouteMatcher([
+  "/login",
+  "/health",
+  "/favicon.ico",
+  "/(.*).png",
+  "/(.*).jpg",
+  "/(.*).jpeg",
+  "/(.*).svg",
+  "/(.*).css",
+  "/(.*).js",
+]);
 
-  // Allow auth routes, login page, and health check
-  if (
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/login") ||
-    pathname === "/health" ||
-    pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico" ||
-    pathname.endsWith(".png") ||
-    pathname.endsWith(".jpg") ||
-    pathname.endsWith(".jpeg") ||
-    pathname.endsWith(".svg") ||
-    pathname.endsWith(".css") ||
-    pathname.endsWith(".js")
-  ) {
+export default clerkMiddleware(async (auth, req) => {
+  if (isPublicRoute(req)) {
     return NextResponse.next();
   }
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-
-  if (!token) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.url);
-    return NextResponse.redirect(loginUrl);
+  const { userId, redirectToSignIn } = await auth();
+  if (!userId) {
+    return redirectToSignIn({ returnBackUrl: req.url });
   }
 
   return NextResponse.next();
-}
+});
 
+// API routes do their own auth() check per-handler (see app/api/**/route.ts)
+// and are excluded here, matching the previous NextAuth middleware's scope.
 export const config = {
-  matcher: ["/((?!api/auth|api|_next/static|_next/image|favicon\\.ico|login).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon\\.ico|login).*)"],
 };
-

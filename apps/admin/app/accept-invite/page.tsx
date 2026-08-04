@@ -2,7 +2,8 @@
 
 import React, { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useSession, signIn } from "next-auth/react";
+import { useClerk } from "@clerk/nextjs";
+import { useSession } from "@/lib/use-session-compat";
 import { Button, Card } from "@pathway/ui";
 import { acceptInvite, setActiveSite } from "../../lib/api-client";
 
@@ -10,6 +11,7 @@ function AcceptInviteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
+  const { redirectToSignIn, signOut } = useClerk();
 
   const [state, setState] = React.useState<
     "welcome" | "loading" | "success" | "error" | "selecting_site"
@@ -30,7 +32,7 @@ function AcceptInviteContent() {
 
     if (status === "authenticated" && token && state === "welcome") {
       // Check if user has been created in DB
-      const userId = (session as any)?.user?.id;
+      const userId = session?.user?.id;
       if (!userId) {
         console.error("[ACCEPT-INVITE] User authenticated but not in DB! Showing error.");
         setState("error");
@@ -49,10 +51,10 @@ function AcceptInviteContent() {
   const handleSignUp = () => {
     if (!token) return;
 
-    // Redirect to Auth0 for signup
-    // Auth0 handles email verification, password requirements, etc.
-    void signIn("auth0", {
-      callbackUrl: `/accept-invite?token=${token}`,
+    // Redirect to Clerk's hosted sign-in/sign-up.
+    // Clerk handles email verification, password requirements, etc.
+    void redirectToSignIn({
+      redirectUrl: `/accept-invite?token=${token}`,
     });
   };
 
@@ -168,7 +170,7 @@ function AcceptInviteContent() {
                 <Button
                   variant="ghost"
                   onClick={() => {
-                    window.location.href = `/api/auth/signout?callbackUrl=/accept-invite?token=${token}`;
+                    void signOut({ redirectUrl: `/accept-invite?token=${token}` });
                   }}
                   className="text-gray-600"
                 >
@@ -263,7 +265,7 @@ function AcceptInviteContent() {
                   variant="secondary"
                   onClick={() => {
                     // Sign out and redirect back to this invite
-                    window.location.href = `/api/auth/signout?callbackUrl=/accept-invite?token=${token}`;
+                    void signOut({ redirectUrl: `/accept-invite?token=${token}` });
                   }}
                   className="w-full"
                 >

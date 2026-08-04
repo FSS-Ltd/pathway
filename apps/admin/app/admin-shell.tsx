@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Menu, X, LifeBuoy } from "lucide-react";
 import type { Capability, PermissionKey } from "@pathway/platform";
 import { APP_VERSION } from "@pathway/util/version";
@@ -34,8 +34,7 @@ const getDevRuntimeState = () => {
     process.env.NEXT_PUBLIC_API_BASE_URL
   );
   const isMockApi = !hasApiUrl;
-  const hasDevToken = Boolean(process.env.NEXT_PUBLIC_DEV_BEARER_TOKEN);
-  return { isMockApi, hasDevToken };
+  return { isMockApi };
 };
 
 // Define access requirements for each nav item.
@@ -213,18 +212,11 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   const isAuthRoute = pathname === "/login";
   const { ui, logoUrl: orgLogoUrl } = useOrgUi();
   const title = orgLabel(ui, pathname, resolveTitle(pathname));
-  const { isMockApi, hasDevToken } = getDevRuntimeState();
+  const { isMockApi } = getDevRuntimeState();
   const { data: session } = useSession();
-  
+
   // Only show mock banner if truly in mock mode
   const showMockBanner = isMockApi;
-  
-  // Only show missing token banner in development when:
-  // - Not in mock mode
-  // - No dev token configured
-  // - No active session (would indicate NextAuth is working)
-  const isDevelopment = process.env.NODE_ENV === 'development';
-  const showMissingTokenBanner = isDevelopment && !isMockApi && !hasDevToken && !session;
 
   // Get role information for access control
   const {
@@ -365,11 +357,6 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               {showMockBanner && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
                   Running in mock API mode - some data is sample only.
-                </div>
-              )}
-              {showMissingTokenBanner && (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-                  No dev auth token configured - some API calls may fail.
                 </div>
               )}
               {accessError && (

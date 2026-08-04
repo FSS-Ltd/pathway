@@ -3,7 +3,7 @@
 import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Button, Card, Input, Label } from "@pathway/ui";
 import { Checkbox } from "../../../components/ui/checkbox";
 import { linkChildrenExistingUser } from "../../../lib/api-client";

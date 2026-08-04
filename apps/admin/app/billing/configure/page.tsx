@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { getConfiguratorPlanPolicy, PLANS } from "@pathway/pricing";
 import {
   ADDON_PRICES,
