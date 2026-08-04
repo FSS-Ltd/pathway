@@ -1,3 +1,4 @@
+import { isClerkAPIResponseError, useSignIn } from "@clerk/clerk-expo";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -6,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -18,10 +20,12 @@ import { apiClient, ApiError } from "@/lib/api/client";
 import { env } from "@/config/env";
 
 export default function SignInScreen() {
-  const { signIn, bootstrapState } = useAppReady();
+  const { isLoaded, signIn, setActive } = useSignIn();
+  const { bootstrapState } = useAppReady();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isTestingApi, setIsTestingApi] = useState(false);
-  const [attemptedSignIn, setAttemptedSignIn] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [apiDebugMessage, setApiDebugMessage] = useState<string | null>(null);
 
@@ -32,33 +36,42 @@ export default function SignInScreen() {
   }, [bootstrapState]);
 
   useEffect(() => {
-    if (bootstrapState.status === "error" && attemptedSignIn) {
+    if (bootstrapState.status === "error") {
       setErrorMessage(bootstrapState.message);
     }
-  }, [bootstrapState, attemptedSignIn]);
+  }, [bootstrapState]);
 
   async function handleSignIn() {
-    if (isSigningIn) return;
+    if (isSigningIn || !isLoaded) return;
 
-    setAttemptedSignIn(true);
     setIsSigningIn(true);
     setErrorMessage(null);
 
     try {
-      await signIn();
-    } catch (error) {
-      if (error instanceof Error) {
-        if ((error as { name?: string }).name === "WebAuthCancelled") {
-          setErrorMessage("Sign-in was cancelled.");
-        } else if ((error as { name?: string }).name === "Auth0NativeModuleUnavailable") {
-          setErrorMessage("Use a custom dev build (not Expo Go) to sign in with Auth0.");
-        } else if (error instanceof ApiError) {
-          setErrorMessage("Signed in, but workspace bootstrap failed.");
-        } else {
-          setErrorMessage(error.message);
-        }
+      const attempt = await signIn.create({
+        identifier: email.trim(),
+        password,
+      });
+
+      if (attempt.status === "complete") {
+        await setActive({ session: attempt.createdSessionId });
+        // Bootstrap re-runs automatically - AppProviders reacts to Clerk's
+        // isSignedIn flipping true once setActive() resolves.
       } else {
-        setErrorMessage("Unable to sign in right now.");
+        // Password migration users land here on their first sign-in
+        // attempt (see the "no passwords" migration decision) - Clerk
+        // requires a reset before completing sign-in.
+        setErrorMessage(
+          "We've upgraded sign-in. Please reset your password to continue - check your email for a reset link, or contact your administrator.",
+        );
+      }
+    } catch (error) {
+      if (isClerkAPIResponseError(error)) {
+        setErrorMessage(error.errors[0]?.longMessage ?? error.errors[0]?.message ?? "Sign-in failed.");
+      } else if (error instanceof ApiError) {
+        setErrorMessage("Signed in, but workspace bootstrap failed.");
+      } else {
+        setErrorMessage(error instanceof Error ? error.message : "Unable to sign in right now.");
       }
     } finally {
       setIsSigningIn(false);
@@ -86,6 +99,8 @@ export default function SignInScreen() {
       setIsTestingApi(false);
     }
   }
+
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !isSigningIn;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -126,25 +141,47 @@ export default function SignInScreen() {
         <View style={styles.formCard}>
           <View style={styles.formBlock}>
             <Text style={styles.helperText}>
-              Continue with your invited account to access Nexsteps securely through Auth0.
+              Continue with your invited account to access Nexsteps securely.
             </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Email address"
+              placeholderTextColor={mobileTokens.colors.text.subtle}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={mobileTokens.colors.text.subtle}
+              autoCapitalize="none"
+              autoComplete="password"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              onSubmitEditing={handleSignIn}
+            />
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Continue to Auth0"
+              accessibilityLabel="Sign in"
               hitSlop={6}
               onPress={handleSignIn}
-              disabled={isSigningIn}
+              disabled={!canSubmit}
               style={({ pressed }) => [
                 styles.primaryButton,
-                isSigningIn ? styles.primaryDisabled : undefined,
-                pressed && !isSigningIn ? styles.primaryPressed : undefined,
+                !canSubmit ? styles.primaryDisabled : undefined,
+                pressed && canSubmit ? styles.primaryPressed : undefined,
               ]}
             >
               {isSigningIn ? (
                 <ActivityIndicator color={mobileTokens.colors.text.primary} />
               ) : (
-                <Text style={styles.primaryButtonText}>Continue to Auth0</Text>
+                <Text style={styles.primaryButtonText}>Sign in</Text>
               )}
             </Pressable>
 
@@ -244,6 +281,17 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     color: mobileTokens.colors.text.muted,
     paddingHorizontal: 6,
+  },
+  input: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.border.strong,
+    backgroundColor: mobileTokens.colors.bg.surface,
+    paddingHorizontal: 16,
+    fontFamily: "Quicksand_500Medium",
+    fontSize: 16,
+    color: mobileTokens.colors.text.primary,
   },
   primaryButton: {
     minHeight: 60,

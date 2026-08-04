@@ -1,11 +1,11 @@
 import type { ActiveSiteState, AppSpace, RolesResponse } from "@pathway/mobile-core";
 
 import { apiClient, ApiError } from "@/lib/api/client";
-import { getValidSessionSnapshot } from "@/lib/auth/auth0-client";
 import {
-  clearSessionSnapshot,
-  updateSessionSnapshot,
-  type SessionSnapshot,
+  clearAppStateSnapshot,
+  getAppStateSnapshot,
+  updateAppStateSnapshot,
+  type AppStateSnapshot,
 } from "@/lib/auth/session-store";
 import { resolveSpaceFromRoles } from "@/lib/auth/space-resolver";
 
@@ -22,13 +22,13 @@ export type BootstrapState =
   | {
       status: "needs-site-selection";
       route: "/(auth)/site-select";
-      session: SessionSnapshot;
+      state: AppStateSnapshot;
       activeSiteState: ActiveSiteState;
     }
   | {
       status: "ready";
       route: "/(auth)/site-select";
-      session: SessionSnapshot;
+      state: AppStateSnapshot;
       roles: RolesResponse;
       activeSiteState: ActiveSiteState;
       space: AppSpace;
@@ -43,70 +43,76 @@ export type BootstrapState =
       message: string;
     };
 
-async function resolveActiveSite(session: SessionSnapshot): Promise<ActiveSiteState> {
-  const state = await apiClient.getActiveSiteState(session.accessToken);
+async function resolveActiveSite(
+  token: string,
+  state: AppStateSnapshot,
+): Promise<ActiveSiteState> {
+  const siteState = await apiClient.getActiveSiteState(token);
 
-  if (!state.activeSiteId && state.sites.length === 1) {
-    const siteId = state.sites[0]?.id;
+  if (!siteState.activeSiteId && siteState.sites.length === 1) {
+    const siteId = siteState.sites[0]?.id;
     if (siteId) {
-      const updated = await apiClient.setActiveSite(siteId, session.accessToken);
-      await updateSessionSnapshot({ activeSiteId: siteId });
+      const updated = await apiClient.setActiveSite(siteId, token);
+      await updateAppStateSnapshot({ activeSiteId: siteId });
       return updated;
     }
   }
 
-  if (session.activeSiteId && session.activeSiteId !== state.activeSiteId) {
-    const canUseStoredSite = state.sites.some((site) => site.id === session.activeSiteId);
+  if (state.activeSiteId && state.activeSiteId !== siteState.activeSiteId) {
+    const canUseStoredSite = siteState.sites.some((site) => site.id === state.activeSiteId);
     if (canUseStoredSite) {
-      const updated = await apiClient.setActiveSite(session.activeSiteId, session.accessToken);
-      await updateSessionSnapshot({ activeSiteId: session.activeSiteId });
+      const updated = await apiClient.setActiveSite(state.activeSiteId, token);
+      await updateAppStateSnapshot({ activeSiteId: state.activeSiteId });
       return updated;
     }
   }
 
-  return state;
+  return siteState;
 }
 
-export async function bootstrapAuthState(): Promise<BootstrapState> {
-  const session = await getValidSessionSnapshot();
-
-  if (!session?.accessToken) {
+/**
+ * getToken comes from Clerk's useAuth() - unlike the old stored
+ * session.accessToken, Clerk tokens are short-lived and must be fetched
+ * fresh for each call rather than cached across this whole bootstrap.
+ */
+export async function bootstrapAuthState(
+  getToken: () => Promise<string | null>,
+): Promise<BootstrapState> {
+  const token = await getToken();
+  if (!token) {
     return { status: "unauthenticated", route: "/(auth)/sign-in" };
   }
 
-  apiClient.setAccessToken(session.accessToken);
+  apiClient.setAccessToken(token);
+  const state = (await getAppStateSnapshot()) ?? { updatedAt: new Date().toISOString() };
 
   try {
-    const me = await apiClient.getAuthMe(session.accessToken);
-    const activeSiteState = await resolveActiveSite(session);
+    const me = await apiClient.getAuthMe(token);
+    const activeSiteState = await resolveActiveSite(token, state);
 
     if (!activeSiteState.activeSiteId && activeSiteState.sites.length > 1) {
       return {
         status: "needs-site-selection",
         route: "/(auth)/site-select",
-        session,
+        state,
         activeSiteState,
       };
     }
 
-    const roles = await apiClient.getRoles(session.accessToken);
-    const spaceResolution = resolveSpaceFromRoles(roles, session.preferredSpace);
+    const roles = await apiClient.getRoles(token);
+    const spaceResolution = resolveSpaceFromRoles(roles, state.preferredSpace);
     const nextSpace = spaceResolution.primarySpace;
 
-    const updatedSession = await updateSessionSnapshot({
+    const updatedState = await updateAppStateSnapshot({
       userId: me.userId,
-      activeSiteId: activeSiteState.activeSiteId ?? session.activeSiteId,
+      activeSiteId: activeSiteState.activeSiteId ?? state.activeSiteId,
       preferredSpace: nextSpace,
     });
-
-    if (!updatedSession) {
-      return { status: "unauthenticated", route: "/(auth)/sign-in" };
-    }
 
     return {
       status: "ready",
       route: "/(auth)/site-select",
-      session: updatedSession,
+      state: updatedState,
       roles,
       activeSiteState,
       space: nextSpace,
@@ -117,7 +123,7 @@ export async function bootstrapAuthState(): Promise<BootstrapState> {
     };
   } catch (error) {
     if (error instanceof ApiError && [401, 403].includes(error.status)) {
-      await clearSessionSnapshot();
+      await clearAppStateSnapshot();
       apiClient.setAccessToken(null);
       if (__DEV__) {
         const bodySnippet = error.body?.trim()
@@ -139,3 +145,4 @@ export async function bootstrapAuthState(): Promise<BootstrapState> {
     };
   }
 }
+
