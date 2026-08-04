@@ -8,11 +8,10 @@ const sampleContext: AuthContext = {
     email: "user@example.com",
     givenName: "Alex",
     familyName: "Green",
-    authProvider: "debug",
+    authProvider: "auth0",
   },
   org: {
     orgId: "org-123",
-    auth0OrgId: "auth0|org123",
     slug: "green-school",
     name: "Green Primary",
   },

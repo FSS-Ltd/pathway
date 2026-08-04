@@ -11,12 +11,10 @@ import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import { requireDatabase } from "../../../test-helpers.e2e";
+import { signTestToken } from "../../auth/token-verifier";
 
-function bearer(subject: string): string {
-  const payload = Buffer.from(JSON.stringify({ sub: subject })).toString(
-    "base64url",
-  );
-  return `Bearer test.${payload}.sig`;
+async function bearer(subject: string): Promise<string> {
+  return `Bearer ${await signTestToken({ sub: subject, emailVerified: true })}`;
 }
 
 describe("Learning capability guard chain (e2e)", () => {
@@ -120,7 +118,7 @@ describe("Learning capability guard chain (e2e)", () => {
 
     const response = await request(app.getHttpServer())
       .post("/learning/subjects")
-      .set("Authorization", bearer(activeUserId))
+      .set("Authorization", await bearer(activeUserId))
       .send({ name: activeSubject });
 
     expect(response.status).toBe(201);
@@ -136,7 +134,7 @@ describe("Learning capability guard chain (e2e)", () => {
 
     const response = await request(app.getHttpServer())
       .post("/learning/subjects")
-      .set("Authorization", bearer(inactiveUserId))
+      .set("Authorization", await bearer(inactiveUserId))
       .send({ name: "Blocked subject" });
 
     expect(response.status).toBe(403);
@@ -148,7 +146,7 @@ describe("Learning capability guard chain (e2e)", () => {
 
     const response = await request(app.getHttpServer())
       .post("/learning/subjects")
-      .set("Authorization", bearer(noOrgUserId))
+      .set("Authorization", await bearer(noOrgUserId))
       .send({ name: "No org subject" });
 
     expect(response.status).toBe(403);

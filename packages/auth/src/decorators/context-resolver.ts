@@ -10,7 +10,7 @@ export function resolveAuthContext(ctx: ExecutionContext): AuthContext {
 
   if (!request || !request[PATHWAY_CONTEXT_PROPERTY]) {
     throw new UnauthorizedException(
-      "Pathway auth context missing. Ensure PathwayAuthGuard runs before decorators.",
+      "Pathway auth context missing. Ensure AuthUserGuard runs before decorators.",
     );
   }
 

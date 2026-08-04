@@ -1,6 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException } from "@nestjs/common";
-import { PathwayAuthGuard } from "@pathway/auth";
 import { PlanPreviewController } from "../plan-preview.controller";
 import { PlanPreviewService } from "../plan-preview.service";
 import type {
@@ -17,8 +16,6 @@ describe("PlanPreviewController", () => {
       controllers: [PlanPreviewController],
       providers: [{ provide: PlanPreviewService, useValue: { preview: previewMock } }],
     })
-      .overrideGuard(PathwayAuthGuard)
-      .useValue({ canActivate: () => true })
       .compile();
 
     controller = module.get(PlanPreviewController);

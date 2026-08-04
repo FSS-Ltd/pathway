@@ -1,7 +1,6 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import {
-  PathwayAuthGuard,
   PathwayRequestContext,
   UserOrgRole,
   UserTenantRole,
@@ -67,8 +66,6 @@ describe("ParentsController", () => {
         },
       ],
     })
-      .overrideGuard(PathwayAuthGuard)
-      .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
       .useValue({ canActivate: () => true })
       .compile();

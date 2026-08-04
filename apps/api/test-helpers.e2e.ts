@@ -7,6 +7,7 @@ import {
   withTenantRlsContext,
 } from "@pathway/db";
 import { randomUUID } from "node:crypto";
+import { signTestToken } from "./src/auth/token-verifier";
 
 interface SeedE2eAuthUserOptions {
   subject: string;
@@ -89,13 +90,15 @@ export async function seedE2eAuthUser(
     });
   }
 
-  const payload = Buffer.from(
-    JSON.stringify({ sub: options.subject, email }),
-  ).toString("base64url");
+  const token = await signTestToken({
+    sub: options.subject,
+    email,
+    emailVerified: true,
+  });
 
   return {
     userId,
-    authorization: `Bearer test.${payload}.sig`,
+    authorization: `Bearer ${token}`,
   };
 }
 

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppModule } from "../../app.module";
-import type { PathwayAuthClaims } from "@pathway/auth";
+import { signTestToken } from "../../auth/token-verifier";
 import {
   Module,
   ModuleStatus,
@@ -22,7 +22,6 @@ describe("Orgs (e2e)", () => {
   const orgId = process.env.E2E_ORG_ID as string;
   const tenantId = process.env.E2E_TENANT_ID as string;
   const orgSlug = "e2e-org";
-  const tenantSlug = "e2e-tenant-a";
   const userId = randomUUID();
   const authSubject = `orgs-e2e-${userId}`;
   const userEmail = `${authSubject}@pathway.test`;
@@ -31,11 +30,6 @@ describe("Orgs (e2e)", () => {
     status: ModuleStatus;
   } | null = null;
   let authHeader: string;
-
-  const buildAuthHeader = (claims: PathwayAuthClaims) => {
-    const payload = Buffer.from(JSON.stringify(claims)).toString("base64url");
-    return `Bearer test.${payload}.sig`;
-  };
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -90,15 +84,11 @@ describe("Orgs (e2e)", () => {
       });
     });
 
-    authHeader = buildAuthHeader({
+    authHeader = `Bearer ${await signTestToken({
       sub: authSubject,
       email: userEmail,
-      "https://pathway.app/user": { id: userId, email: userEmail },
-      "https://pathway.app/org": { orgId, slug: orgSlug, name: "E2E Org" },
-      "https://pathway.app/tenant": { tenantId, orgId, slug: tenantSlug },
-      "https://pathway.app/org_roles": ["org:admin"],
-      "https://pathway.app/tenant_roles": ["tenant:admin"],
-    });
+      emailVerified: true,
+    })}`;
   });
 
   afterAll(async () => {
