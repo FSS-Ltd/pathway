@@ -13,7 +13,6 @@ export function useAppReady() {
     isReady: context.bootstrapState.status !== "loading",
     bootstrapState: context.bootstrapState,
     refreshBootstrap: context.refreshBootstrap,
-    signIn: context.signIn,
     signOut: context.signOut,
     switchSpace: context.switchSpace,
     switchActiveSite: context.switchActiveSite,

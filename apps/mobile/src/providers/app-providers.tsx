@@ -1,20 +1,16 @@
 import type { PropsWithChildren } from "react";
 import { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import type { AppSpace } from "@pathway/mobile-core";
+import { useAuth } from "@clerk/clerk-expo";
 
 import { assertEnv } from "@/config/env";
 import { apiClient } from "@/lib/api/client";
-import {
-  bootstrapAuthState,
-  type BootstrapState,
-} from "@/lib/auth/bootstrap";
-import { loginWithAuth0UniversalLogin, logoutFromAuth0 } from "@/lib/auth/auth0-client";
-import { updateSessionSnapshot } from "@/lib/auth/session-store";
+import { bootstrapAuthState, type BootstrapState } from "@/lib/auth/bootstrap";
+import { updateAppStateSnapshot } from "@/lib/auth/session-store";
 
 type AppBootstrapContextValue = {
   bootstrapState: BootstrapState;
   refreshBootstrap: () => Promise<void>;
-  signIn: () => Promise<void>;
   signOut: () => Promise<void>;
   switchSpace: (space: AppSpace) => Promise<void>;
   switchActiveSite: (siteId: string) => Promise<void>;
@@ -24,28 +20,35 @@ export const AppBootstrapContext = createContext<AppBootstrapContextValue | null
   null,
 );
 
+/**
+ * There's no signIn() here anymore - Clerk's sign-in is a hook-driven flow
+ * (useSignIn() in app/(auth)/sign-in.tsx), not an imperative call a provider
+ * can kick off. Once that screen completes sign-in and calls setActive(),
+ * Clerk's isSignedIn flips true and the effect below reacts to it.
+ */
 export function AppProviders({ children }: PropsWithChildren) {
+  const { isLoaded, isSignedIn, getToken, signOut: clerkSignOut } = useAuth();
   const [bootstrapState, setBootstrapState] = useState<BootstrapState>({
     status: "loading",
   });
 
   const refreshBootstrap = useCallback(async () => {
     setBootstrapState({ status: "loading" });
-    const nextState = await bootstrapAuthState();
+    const nextState = await bootstrapAuthState(getToken);
     setBootstrapState(nextState);
-  }, []);
+  }, [getToken]);
 
   const signOut = useCallback(async () => {
-    await logoutFromAuth0();
+    await clerkSignOut();
     setBootstrapState({ status: "unauthenticated", route: "/(auth)/sign-in" });
-  }, []);
+  }, [clerkSignOut]);
 
   const switchSpace = useCallback(
     async (space: AppSpace) => {
       if (bootstrapState.status !== "ready") return;
       if (!bootstrapState.availableSpaces.includes(space)) return;
 
-      await updateSessionSnapshot({ preferredSpace: space });
+      await updateAppStateSnapshot({ preferredSpace: space });
       await refreshBootstrap();
     },
     [bootstrapState, refreshBootstrap],
@@ -53,28 +56,21 @@ export function AppProviders({ children }: PropsWithChildren) {
 
   const switchActiveSite = useCallback(
     async (siteId: string) => {
-      const token =
-        bootstrapState.status === "ready" || bootstrapState.status === "needs-site-selection"
-          ? bootstrapState.session.accessToken
-          : null;
+      const token = await getToken();
       if (!token) return;
 
       await apiClient.setActiveSite(siteId, token);
-      await updateSessionSnapshot({ activeSiteId: siteId });
+      await updateAppStateSnapshot({ activeSiteId: siteId });
       await refreshBootstrap();
     },
-    [bootstrapState, refreshBootstrap],
+    [getToken, refreshBootstrap],
   );
 
-  const signIn = useCallback(async () => {
-    await loginWithAuth0UniversalLogin();
-    await refreshBootstrap();
-  }, [refreshBootstrap]);
-
   useEffect(() => {
+    if (!isLoaded) return;
+
     try {
       assertEnv();
-      void refreshBootstrap();
     } catch (error) {
       setBootstrapState({
         status: "error",
@@ -82,19 +78,26 @@ export function AppProviders({ children }: PropsWithChildren) {
         message:
           error instanceof Error ? error.message : "Mobile environment configuration is invalid.",
       });
+      return;
     }
-  }, [refreshBootstrap]);
+
+    if (!isSignedIn) {
+      setBootstrapState({ status: "unauthenticated", route: "/(auth)/sign-in" });
+      return;
+    }
+
+    void refreshBootstrap();
+  }, [isLoaded, isSignedIn, refreshBootstrap]);
 
   const value = useMemo(
     () => ({
       bootstrapState,
       refreshBootstrap,
-      signIn,
       signOut,
       switchSpace,
       switchActiveSite,
     }),
-    [bootstrapState, refreshBootstrap, signIn, signOut, switchSpace, switchActiveSite],
+    [bootstrapState, refreshBootstrap, signOut, switchSpace, switchActiveSite],
   );
 
   return (
