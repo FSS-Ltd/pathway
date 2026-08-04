@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Card, Badge, Button } from "@pathway/ui";
 import { API_BASE_URL } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";

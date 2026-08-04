@@ -2,11 +2,12 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
+import { useClerk } from "@clerk/nextjs";
 
 function LoginContent() {
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get("returnTo") ?? "/";
+  const { redirectToSignIn } = useClerk();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-surface">
@@ -20,7 +21,7 @@ function LoginContent() {
         </div>
         <button
           type="button"
-          onClick={() => signIn("auth0", { callbackUrl: returnTo })}
+          onClick={() => redirectToSignIn({ redirectUrl: returnTo })}
           className="mt-4 w-full rounded-md bg-accent-primary px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-primary/90"
         >
           Continue with SSO

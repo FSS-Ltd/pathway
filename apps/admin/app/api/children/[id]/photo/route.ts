@@ -1,4 +1,4 @@
-import { getToken } from "next-auth/jwt";
+import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
 
 const apiBaseUrl =
@@ -17,11 +17,8 @@ export async function GET(
     return NextResponse.json({ error: "Child ID required" }, { status: 400 });
   }
 
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-  });
-  const accessToken = (token as { accessToken?: string } | null)?.accessToken;
+  const { getToken } = await auth();
+  const accessToken = await getToken();
   if (!accessToken) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

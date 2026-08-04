@@ -4,7 +4,7 @@ import React from "react";
 import ReactDOM from "react-dom";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft, Plus, User } from "lucide-react";
 import { Badge, Button, Card, Input, Label, Select, Textarea } from "@pathway/ui";
 import { Checkbox } from "../../../components/ui/checkbox";

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import {
   Button,

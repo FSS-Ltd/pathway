@@ -3,7 +3,7 @@
 // Staff/kiosk quick-add: registers a day-pass guest child, auto-deleted ~24h later.
 
 import React from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { Button, Card, Input } from "@pathway/ui";
 import {
   createGuestPassForCurrentSite,

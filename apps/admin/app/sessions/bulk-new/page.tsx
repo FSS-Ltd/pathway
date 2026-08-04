@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft } from "lucide-react";
 import { Button, Card, Input, Label } from "@pathway/ui";
 import { Checkbox } from "../../../components/ui/checkbox";

@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft, CalendarClock, MapPin, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Label, Select } from "@pathway/ui";
 import {

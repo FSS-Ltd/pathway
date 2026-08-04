@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/lib/use-session-compat";
 import {
   type AdminRoleInfo,
   getAdminRoleInfoFromApiResponse,
