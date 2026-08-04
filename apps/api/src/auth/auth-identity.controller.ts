@@ -31,7 +31,7 @@ export class AuthIdentityController {
       throw new UnauthorizedException("Invalid internal auth secret");
     }
 
-    const result = await this.authIdentityService.upsertFromAuth0(body);
+    const result = await this.authIdentityService.upsertFromProvider(body);
     const roles = await this.userRolesService.getUserRoles(result.userId);
     return { ...result, roles };
   }

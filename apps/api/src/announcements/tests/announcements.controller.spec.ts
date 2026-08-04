@@ -1,7 +1,6 @@
 import { Test } from "@nestjs/testing";
 import { AnnouncementsController } from "../announcements.controller";
 import { AnnouncementsService } from "../announcements.service";
-import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { PermissionGuard } from "../../access-control/permission.guard";
 import {
@@ -82,8 +81,6 @@ describe("AnnouncementsController", () => {
         { provide: EntitlementsEnforcementService, useFactory: mockEnforcement },
       ],
     })
-      .overrideGuard(PathwayAuthGuard)
-      .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
       .useValue({ canActivate: () => true })
       .overrideGuard(PermissionGuard)

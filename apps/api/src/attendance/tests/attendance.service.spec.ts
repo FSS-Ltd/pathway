@@ -25,11 +25,10 @@ describe("AttendanceService", () => {
       user: {
         userId: "user-123",
         email: "staff@example.com",
-        authProvider: "debug",
+        authProvider: "auth0",
       },
       org: {
         orgId: "org-123",
-        auth0OrgId: "auth0|org123",
       },
       tenant: {
         tenantId: "tenant-123",

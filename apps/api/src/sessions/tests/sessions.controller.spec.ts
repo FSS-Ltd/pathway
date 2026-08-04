@@ -5,7 +5,6 @@ import { SessionsService } from "../sessions.service";
 import { StaffAttendanceService } from "../staff-attendance.service";
 import { CreateSessionDto } from "../dto/create-session.dto";
 import { UpdateSessionDto } from "../dto/update-session.dto";
-import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../../billing/entitlements-enforcement.service";
 
@@ -114,8 +113,6 @@ describe("SessionsController", () => {
         },
       ],
     })
-      .overrideGuard(PathwayAuthGuard)
-      .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
       .useValue({ canActivate: () => true })
       .compile();

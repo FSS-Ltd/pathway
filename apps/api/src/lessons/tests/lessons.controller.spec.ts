@@ -1,7 +1,6 @@
 import { Test } from "@nestjs/testing";
 import { LessonsController } from "../lessons.controller";
 import { LessonsService } from "../lessons.service";
-import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 
 type Lesson = {
@@ -57,8 +56,6 @@ describe("LessonsController", () => {
       controllers: [LessonsController],
       providers: [{ provide: LessonsService, useFactory: mockService }],
     })
-      .overrideGuard(PathwayAuthGuard)
-      .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
       .useValue({ canActivate: () => true })
       .compile();

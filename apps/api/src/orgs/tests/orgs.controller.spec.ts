@@ -2,7 +2,6 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { OrgsController } from "../orgs.controller";
 import { OrgsService } from "../orgs.service";
 import { OrgPeopleService } from "../org-people.service";
-import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { BadRequestException } from "@nestjs/common";
 
@@ -131,8 +130,6 @@ describe("OrgsController", () => {
         { provide: OrgPeopleService, useValue: mockOrgPeopleService },
       ],
     })
-      .overrideGuard(PathwayAuthGuard)
-      .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
       .useValue({ canActivate: () => true })
       .compile();

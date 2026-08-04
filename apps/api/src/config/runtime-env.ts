@@ -9,6 +9,9 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://api.localhost:3001",
 ] as const;
 
+const AUTH_PROVIDER_MODES = ["auth0", "dual", "clerk"] as const;
+type AuthProviderMode = (typeof AUTH_PROVIDER_MODES)[number];
+
 const PRODUCTION_REQUIRED_ENV = [
   "DATABASE_URL",
   "INTERNAL_AUTH_SECRET",
@@ -63,6 +66,29 @@ export function validateProductionEnv(): void {
       ].join(", ")}`,
     );
   }
+
+  const mode = process.env.AUTH_PROVIDER_MODE;
+  if (mode && !AUTH_PROVIDER_MODES.includes(mode as AuthProviderMode)) {
+    throw new Error(
+      `AUTH_PROVIDER_MODE must be one of ${AUTH_PROVIDER_MODES.join(", ")} (got "${mode}")`,
+    );
+  }
+}
+
+/**
+ * Never infer the provider mode from which keys happen to be present -
+ * require it explicit once set. Defaults to "auth0" (today's real
+ * production behaviour) whenever it's unset, in every environment
+ * including production - until the cutover PR adds AUTH_PROVIDER_MODE to
+ * Vercel and to PRODUCTION_REQUIRED_ENV above, no PR in this migration may
+ * make an unset var start throwing in production.
+ */
+export function getAuthProviderMode(): AuthProviderMode {
+  const mode = process.env.AUTH_PROVIDER_MODE;
+  if (mode && AUTH_PROVIDER_MODES.includes(mode as AuthProviderMode)) {
+    return mode as AuthProviderMode;
+  }
+  return "auth0";
 }
 
 function splitCsv(value: string | undefined): string[] {

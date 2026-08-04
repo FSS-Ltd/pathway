@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const filesWithoutAdHocDebugLogs = [
-  "src/auth/active-site.service.ts",
+  "src/auth/auth-user.guard.ts",
   "src/billing/billing.controller.ts",
   "src/billing/entitlements-enforcement.service.ts",
   "src/invites/invites.service.ts",

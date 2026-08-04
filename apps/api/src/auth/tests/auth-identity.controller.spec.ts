@@ -38,17 +38,17 @@ describe("AuthIdentityController", () => {
   it("returns trusted role data with the internal identity upsert result", async () => {
     process.env.INTERNAL_AUTH_SECRET = "internal-secret";
     const authIdentityService = {
-      upsertFromAuth0: jest.fn().mockResolvedValue({
+      upsertFromProvider: jest.fn().mockResolvedValue({
         userId: "user-super",
         email: "jfn@example.com",
         displayName: "Jean-Fidele",
       }),
-    } satisfies Pick<AuthIdentityService, "upsertFromAuth0">;
+    } satisfies Pick<AuthIdentityService, "upsertFromProvider">;
     const userRolesService: UserRolesServiceStub = {
       getUserRoles: jest.fn().mockResolvedValue(rolesResponse),
     };
     const Controller = AuthIdentityController as unknown as new (
-      authIdentityService: Pick<AuthIdentityService, "upsertFromAuth0">,
+      authIdentityService: Pick<AuthIdentityService, "upsertFromProvider">,
       userRolesService: UserRolesServiceStub,
     ) => AuthIdentityController;
     const controller = new Controller(authIdentityService, userRolesService);
@@ -75,13 +75,13 @@ describe("AuthIdentityController", () => {
   it("rejects requests without the internal auth secret", async () => {
     process.env.INTERNAL_AUTH_SECRET = "internal-secret";
     const authIdentityService = {
-      upsertFromAuth0: jest.fn(),
-    } satisfies Pick<AuthIdentityService, "upsertFromAuth0">;
+      upsertFromProvider: jest.fn(),
+    } satisfies Pick<AuthIdentityService, "upsertFromProvider">;
     const userRolesService: UserRolesServiceStub = {
       getUserRoles: jest.fn(),
     };
     const Controller = AuthIdentityController as unknown as new (
-      authIdentityService: Pick<AuthIdentityService, "upsertFromAuth0">,
+      authIdentityService: Pick<AuthIdentityService, "upsertFromProvider">,
       userRolesService: UserRolesServiceStub,
     ) => AuthIdentityController;
     const controller = new Controller(authIdentityService, userRolesService);
@@ -95,7 +95,7 @@ describe("AuthIdentityController", () => {
         "wrong-secret",
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
-    expect(authIdentityService.upsertFromAuth0).not.toHaveBeenCalled();
+    expect(authIdentityService.upsertFromProvider).not.toHaveBeenCalled();
     expect(userRolesService.getUserRoles).not.toHaveBeenCalled();
   });
 });

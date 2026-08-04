@@ -6,8 +6,8 @@ import {
   Logger,
   UnauthorizedException,
 } from "@nestjs/common";
-import { parseAuthTokenFromRequest } from "./auth-token.util";
-import { prisma } from "@pathway/db";
+import { verifyBearerToken, type VerifiedPrincipal } from "./token-verifier";
+import { Prisma, prisma } from "@pathway/db";
 import type { Request, Response } from "express";
 import { AuthIdentityService } from "./auth-identity.service";
 import { safeErrorDiagnostic } from "../common/logging/safe-diagnostics";
@@ -39,12 +39,21 @@ const userInclude = {
 const ACTIVE_SITE_COOKIE = "pw_active_site_id";
 const ACTIVE_ORG_COOKIE = "pw_active_org_id";
 
+type UserWithMemberships = Prisma.UserIdentityGetPayload<{
+  include: typeof userInclude;
+}>["user"];
+
 /**
  * Guard that:
- * 1. Authenticates user via Auth0 JWT (looks up UserIdentity)
- * 2. If identity missing, creates user/identity just-in-time from JWT claims
- * 3. Resolves active tenant from cookie or User.lastActiveTenantId
- * 4. Sets up full PathwayRequestContext with tenant/org for RLS
+ * 1. Verifies the bearer token's signature, issuer, audience and expiry
+ *    (Auth0 or Clerk - see token-verifier.ts), then resolves it to an
+ *    internal user via UserIdentity, in priority order:
+ *      - existing (provider, subject) link
+ *      - externalId asserted on the token -> internal User.id
+ *      - verified email match, only when exactly one User matches
+ *      - just-in-time creation
+ * 2. Resolves active tenant from cookie or User.lastActiveTenantId
+ * 3. Sets up full PathwayRequestContext with tenant/org for RLS
  */
 @Injectable()
 export class AuthUserGuard implements CanActivate {
@@ -59,74 +68,12 @@ export class AuthUserGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const res = context.switchToHttp().getResponse<Response>();
 
-    const claims = parseAuthTokenFromRequest(req);
-    
-    // Extract Auth0 subject
-    const auth0Sub = claims.sub;
-    if (!auth0Sub) {
-      throw new UnauthorizedException("Missing subject claim");
-    }
-
-    // Look up user by Auth0 identity
-    let identity = await prisma.userIdentity.findUnique({
-      where: {
-        provider_providerSubject: {
-          provider: "auth0",
-          providerSubject: auth0Sub,
-        },
-      },
-      include: userInclude,
-    });
-
-    // Just-in-time provisioning: if admin identity upsert failed at login, create user/identity from JWT claims
-    if (!identity?.user) {
-      try {
-        await this.authIdentityService.upsertFromAuth0({
-          provider: "auth0",
-          subject: auth0Sub,
-          email: claims.email,
-          name: claims.name ?? claims.given_name ?? undefined,
-        });
-      } catch (err) {
-        this.logger.warn({
-          message: "Auth user guard JIT upsert failed",
-          route: this.describeRoute(req),
-          operation: "authIdentity.upsertFromAuth0",
-          hasActiveSiteCookie: Boolean(req.cookies?.[ACTIVE_SITE_COOKIE]),
-          hasActiveOrgCookie: Boolean(req.cookies?.[ACTIVE_ORG_COOKIE]),
-          ...safeErrorDiagnostic(err),
-        });
-        const detail =
-          err instanceof Error ? err.message : "Unknown JIT upsert failure";
-        if (process.env.NODE_ENV === "production") {
-          throw new UnauthorizedException(
-            "User not found for this Auth0 identity",
-          );
-        }
-        throw new UnauthorizedException(
-          `User not found for this Auth0 identity (JIT upsert failed: ${detail})`,
-        );
-      }
-      identity = await prisma.userIdentity.findUnique({
-        where: {
-          provider_providerSubject: {
-            provider: "auth0",
-            providerSubject: auth0Sub,
-          },
-        },
-        include: userInclude,
-      });
-    }
-
-    if (!identity?.user) {
-      throw new UnauthorizedException("User not found for this Auth0 identity");
-    }
-
-    const user = identity.user;
+    const principal = await verifyBearerToken(req.headers.authorization);
+    const user = await this.resolveUser(req, principal);
 
     // Store user info on request for downstream use
     req.authUserId = user.id;
-    req.authEmail = user.email ?? identity.email ?? undefined;
+    req.authEmail = user.email ?? principal.email ?? undefined;
     req.authDisplayName = user.displayName ?? user.name ?? undefined;
 
     // Determine active tenant from cookie or user's lastActiveTenantId
@@ -268,11 +215,11 @@ export class AuthUserGuard implements CanActivate {
     const pathwayContext = {
       user: {
         userId: user.id,
-        email: user.email ?? identity.email ?? undefined,
+        email: user.email ?? principal.email ?? undefined,
         givenName: user.displayName ?? user.name ?? undefined,
         familyName: undefined,
         pictureUrl: undefined,
-        authProvider: "auth0",
+        authProvider: principal.provider,
       },
       org: {
         orgId: orgId || "",
@@ -284,13 +231,75 @@ export class AuthUserGuard implements CanActivate {
       },
       roles: { org: Array.from(orgRoles), tenant: Array.from(tenantRoles) },
       permissions: [],
-      rawClaims: claims as Record<string, unknown>,
+      rawClaims: principal as unknown as Record<string, unknown>,
       siteRole,
     };
 
     (req as Record<string, unknown>).__pathwayContext = pathwayContext;
 
     return true;
+  }
+
+  /**
+   * Resolves a verified principal to an internal user, provisioning one
+   * just-in-time if no identity is linked yet. See AuthIdentityService for
+   * the full resolution order (existing link -> externalId -> verified
+   * email -> new user).
+   */
+  private async resolveUser(
+    req: AuthenticatedRequest,
+    principal: VerifiedPrincipal,
+  ): Promise<UserWithMemberships> {
+    const identity = await prisma.userIdentity.findUnique({
+      where: {
+        provider_providerSubject: {
+          provider: principal.provider,
+          providerSubject: principal.sub,
+        },
+      },
+      include: userInclude,
+    });
+
+    if (identity?.user) {
+      return identity.user;
+    }
+
+    try {
+      await this.authIdentityService.upsertFromProvider({
+        provider: principal.provider,
+        subject: principal.sub,
+        email: principal.email,
+        emailVerified: principal.emailVerified,
+        name: principal.name,
+        externalId: principal.externalId,
+      });
+    } catch (err) {
+      this.logger.warn({
+        message: "Auth user guard JIT upsert failed",
+        route: this.describeRoute(req),
+        operation: "authIdentity.upsertFromProvider",
+        hasActiveSiteCookie: Boolean(req.cookies?.[ACTIVE_SITE_COOKIE]),
+        hasActiveOrgCookie: Boolean(req.cookies?.[ACTIVE_ORG_COOKIE]),
+        ...safeErrorDiagnostic(err),
+      });
+      throw new UnauthorizedException("User not found for this identity");
+    }
+
+    const provisioned = await prisma.userIdentity.findUnique({
+      where: {
+        provider_providerSubject: {
+          provider: principal.provider,
+          providerSubject: principal.sub,
+        },
+      },
+      include: userInclude,
+    });
+
+    if (!provisioned?.user) {
+      throw new UnauthorizedException("User not found for this identity");
+    }
+
+    return provisioned.user;
   }
 
   private describeRoute(req: AuthenticatedRequest): string {

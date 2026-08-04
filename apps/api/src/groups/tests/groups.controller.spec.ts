@@ -3,7 +3,6 @@ import { NotFoundException } from "@nestjs/common";
 import { GroupsController } from "../../groups/groups.controller";
 import { GroupsService } from "../../groups/groups.service";
 import type { UpdateGroupDto } from "../../groups/dto/update-group.dto";
-import { PathwayAuthGuard } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 
 describe("GroupsController", () => {
@@ -36,8 +35,6 @@ describe("GroupsController", () => {
       controllers: [GroupsController],
       providers: [{ provide: GroupsService, useValue: mockService }],
     })
-      .overrideGuard(PathwayAuthGuard)
-      .useValue({ canActivate: () => true })
       .overrideGuard(AuthUserGuard)
       .useValue({ canActivate: () => true })
       .compile();

@@ -12,7 +12,7 @@ const authContext: AuthContext = {
     email: "teacher@example.com",
     givenName: "Teacher",
     familyName: "One",
-    authProvider: "debug",
+    authProvider: "auth0",
   },
   org: {
     orgId: "org-abc",
