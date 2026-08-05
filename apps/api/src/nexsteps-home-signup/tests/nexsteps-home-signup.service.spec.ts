@@ -1,8 +1,9 @@
-import { ConflictException, ServiceUnavailableException } from "@nestjs/common";
+import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import { prisma } from "@pathway/db";
 import { NexstepsHomeSignupService } from "../nexsteps-home-signup.service";
-import { Auth0ManagementService } from "../../auth/auth0-management.service";
+import { ClerkManagementService } from "../../auth/clerk-management.service";
+import type { VerifiedPrincipal } from "../../auth/token-verifier";
 
 jest.mock("@pathway/db", () => {
   const { OrgRole, Role } = jest.requireActual("@prisma/client");
@@ -13,6 +14,7 @@ jest.mock("@pathway/db", () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn(),
       },
       org: {
         create: jest.fn(),
@@ -25,6 +27,7 @@ jest.mock("@pathway/db", () => {
         create: jest.fn(),
       },
       userIdentity: {
+        findUnique: jest.fn(),
         create: jest.fn(),
       },
       userTenantRole: {
@@ -49,35 +52,42 @@ jest.mock("@pathway/db", () => {
 
 describe("NexstepsHomeSignupService", () => {
   let service: NexstepsHomeSignupService;
-  const auth0Mock = { createUser: jest.fn() };
+  const clerkMock = { setExternalId: jest.fn() };
   const mockPrisma = prisma as unknown as {
-    user: { findUnique: jest.Mock; create: jest.Mock };
+    user: { findUnique: jest.Mock; create: jest.Mock; update: jest.Mock };
     org: { create: jest.Mock; findUnique: jest.Mock };
     tenant: { create: jest.Mock };
     orgVertical: { create: jest.Mock };
-    userIdentity: { create: jest.Mock };
+    userIdentity: { findUnique: jest.Mock; create: jest.Mock };
     userTenantRole: { create: jest.Mock };
     userOrgRole: { create: jest.Mock };
     orgMembership: { create: jest.Mock };
     siteMembership: { create: jest.Mock };
   };
 
+  const principal: VerifiedPrincipal = {
+    provider: "clerk",
+    sub: "clerk|new-user",
+    email: "Sarah@Example.com",
+    emailVerified: true,
+  };
+
   beforeEach(async () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         NexstepsHomeSignupService,
-        { provide: Auth0ManagementService, useValue: auth0Mock },
+        { provide: ClerkManagementService, useValue: clerkMock },
       ],
     }).compile();
 
     service = moduleRef.get(NexstepsHomeSignupService);
     jest.clearAllMocks();
 
+    mockPrisma.userIdentity.findUnique.mockResolvedValue(null);
     mockPrisma.user.findUnique.mockResolvedValue(null);
     mockPrisma.org.findUnique.mockResolvedValue(null);
-    auth0Mock.createUser.mockResolvedValue("auth0|new-user");
     mockPrisma.org.create.mockResolvedValue({ id: "org-1", slug: "sarah-family-abc123" });
-    mockPrisma.tenant.create.mockResolvedValue({ id: "tenant-1" });
+    mockPrisma.tenant.create.mockResolvedValue({ id: "tenant-1", orgId: "org-1" });
     mockPrisma.orgVertical.create.mockResolvedValue({ id: "ov-1" });
     mockPrisma.user.create.mockResolvedValue({ id: "user-1" });
     mockPrisma.userIdentity.create.mockResolvedValue({ id: "identity-1" });
@@ -87,26 +97,14 @@ describe("NexstepsHomeSignupService", () => {
     mockPrisma.siteMembership.create.mockResolvedValue({ id: "sm-1" });
   });
 
-  it("creates the Auth0 user, org, tenant and roles for a new household", async () => {
-    const result = await service.signup({
-      email: "Sarah@Example.com",
-      password: "a-secure-password",
-    });
+  it("creates the org, tenant and roles for a new household from a verified principal", async () => {
+    const result = await service.signup(principal);
 
     expect(result).toEqual({ success: true, orgId: "org-1", tenantId: "tenant-1" });
 
     expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
       where: { email: "sarah@example.com" },
     });
-
-    expect(auth0Mock.createUser).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: "sarah@example.com",
-        password: "a-secure-password",
-        connection: "Username-Password-Authentication",
-        emailVerified: false,
-      }),
-    );
 
     expect(mockPrisma.org.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -123,8 +121,8 @@ describe("NexstepsHomeSignupService", () => {
     expect(mockPrisma.userIdentity.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         userId: "user-1",
-        provider: "auth0",
-        providerSubject: "auth0|new-user",
+        provider: "clerk",
+        providerSubject: "clerk|new-user",
       }),
     });
 
@@ -134,27 +132,60 @@ describe("NexstepsHomeSignupService", () => {
     expect(mockPrisma.userOrgRole.create).toHaveBeenCalledWith({
       data: { userId: "user-1", orgId: "org-1", role: "ORG_ADMIN" },
     });
+
+    expect(clerkMock.setExternalId).toHaveBeenCalledWith("clerk|new-user", "user-1");
   });
 
-  it("rejects signup when an account already exists for the email", async () => {
+  it("rejects an unverified email", async () => {
+    await expect(
+      service.signup({ ...principal, emailVerified: false }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(mockPrisma.org.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects signup when a different user already owns the email", async () => {
     mockPrisma.user.findUnique.mockResolvedValueOnce({ id: "existing-user" });
 
-    await expect(
-      service.signup({ email: "sarah@example.com", password: "a-secure-password" }),
-    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.signup(principal)).rejects.toBeInstanceOf(ConflictException);
 
-    expect(auth0Mock.createUser).not.toHaveBeenCalled();
     expect(mockPrisma.org.create).not.toHaveBeenCalled();
   });
 
-  it("fails loudly when Auth0 user creation fails, without creating any org", async () => {
-    auth0Mock.createUser.mockResolvedValueOnce(null);
+  it("is idempotent: a retry for an already-provisioned identity returns the existing household", async () => {
+    mockPrisma.userIdentity.findUnique.mockResolvedValueOnce({
+      id: "identity-1",
+      user: { tenant: { id: "tenant-1", orgId: "org-1" } },
+    });
 
-    await expect(
-      service.signup({ email: "sarah@example.com", password: "a-secure-password" }),
-    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+    const result = await service.signup(principal);
 
+    expect(result).toEqual({ success: true, orgId: "org-1", tenantId: "tenant-1" });
     expect(mockPrisma.org.create).not.toHaveBeenCalled();
+  });
+
+  it("adopts a bare, JIT-provisioned user for the same Clerk identity instead of erroring", async () => {
+    mockPrisma.userIdentity.findUnique.mockResolvedValueOnce({
+      id: "identity-1",
+      userId: "jit-user-1",
+      user: { tenant: null },
+    });
+    mockPrisma.user.update.mockResolvedValue({ id: "jit-user-1" });
+    // The bare JIT user already owns this email - findUnique-by-email
+    // must not be consulted (and must not be treated as a conflict) once
+    // an identity match is found.
+    mockPrisma.user.findUnique.mockResolvedValue({ id: "jit-user-1" });
+
+    const result = await service.signup(principal);
+
+    expect(result).toEqual({ success: true, orgId: "org-1", tenantId: "tenant-1" });
+    expect(mockPrisma.user.update).toHaveBeenCalledWith({
+      where: { id: "jit-user-1" },
+      data: expect.objectContaining({ tenantId: "tenant-1" }),
+    });
+    expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    expect(mockPrisma.userIdentity.create).not.toHaveBeenCalled();
+    expect(clerkMock.setExternalId).toHaveBeenCalledWith("clerk|new-user", "jit-user-1");
   });
 
   it("retries slug generation on a collision", async () => {
@@ -162,7 +193,7 @@ describe("NexstepsHomeSignupService", () => {
       .mockResolvedValueOnce({ id: "clash" })
       .mockResolvedValueOnce(null);
 
-    await service.signup({ email: "sarah@example.com", password: "a-secure-password" });
+    await service.signup(principal);
 
     expect(mockPrisma.org.findUnique).toHaveBeenCalledTimes(2);
   });

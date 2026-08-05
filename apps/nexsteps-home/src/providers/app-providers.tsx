@@ -1,21 +1,15 @@
 import type { PropsWithChildren } from "react";
 import { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-expo";
 
 import { assertEnv } from "@/config/env";
 import { apiClient } from "@/lib/api";
 import { bootstrapAuthState, type BootstrapState } from "@/lib/auth/bootstrap";
-import {
-  loginWithAuth0UniversalLogin,
-  loginWithPassword,
-  logoutFromAuth0,
-} from "@/lib/auth/auth0-client";
 
 type AppBootstrapContextValue = {
   bootstrapState: BootstrapState;
   refreshBootstrap: () => Promise<BootstrapState>;
-  signIn: () => Promise<BootstrapState>;
-  signInWithPassword: (username: string, password: string) => Promise<BootstrapState>;
   signOut: () => Promise<void>;
 };
 
@@ -38,40 +32,35 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * There's no signIn()/signInWithPassword() here anymore - Clerk's sign-in
+ * and sign-up are hook-driven flows (useSignIn()/useSignUp() in the
+ * (setup) screens), not imperative calls a provider can kick off. Once a
+ * screen completes sign-in and calls setActive(), Clerk's isSignedIn flips
+ * true and the effect below reacts to it.
+ */
 export function AppProviders({ children }: PropsWithChildren) {
+  const { isLoaded, isSignedIn, getToken, signOut: clerkSignOut } = useAuth();
   const [bootstrapState, setBootstrapState] = useState<BootstrapState>({ status: "loading" });
 
   const refreshBootstrap = useCallback(async () => {
     setBootstrapState({ status: "loading" });
-    const nextState = await bootstrapAuthState();
+    const nextState = await bootstrapAuthState(getToken);
     setBootstrapState(nextState);
     return nextState;
-  }, []);
+  }, [getToken]);
 
   const signOut = useCallback(async () => {
-    await logoutFromAuth0();
+    await clerkSignOut();
     apiClient.setAccessToken(null);
-    const nextState: BootstrapState = { status: "unauthenticated", route: "/(setup)/welcome" };
-    setBootstrapState(nextState);
-  }, []);
-
-  const signIn = useCallback(async () => {
-    await loginWithAuth0UniversalLogin();
-    return refreshBootstrap();
-  }, [refreshBootstrap]);
-
-  const signInWithPassword = useCallback(
-    async (username: string, password: string) => {
-      await loginWithPassword(username, password);
-      return refreshBootstrap();
-    },
-    [refreshBootstrap],
-  );
+    setBootstrapState({ status: "unauthenticated", route: "/(setup)/welcome" });
+  }, [clerkSignOut]);
 
   useEffect(() => {
+    if (!isLoaded) return;
+
     try {
       assertEnv();
-      void refreshBootstrap();
     } catch (error) {
       setBootstrapState({
         status: "error",
@@ -79,12 +68,20 @@ export function AppProviders({ children }: PropsWithChildren) {
         message:
           error instanceof Error ? error.message : "NexSteps Home environment configuration is invalid.",
       });
+      return;
     }
-  }, [refreshBootstrap]);
+
+    if (!isSignedIn) {
+      setBootstrapState({ status: "unauthenticated", route: "/(setup)/welcome" });
+      return;
+    }
+
+    void refreshBootstrap();
+  }, [isLoaded, isSignedIn, refreshBootstrap]);
 
   const value = useMemo(
-    () => ({ bootstrapState, refreshBootstrap, signIn, signInWithPassword, signOut }),
-    [bootstrapState, refreshBootstrap, signIn, signInWithPassword, signOut],
+    () => ({ bootstrapState, refreshBootstrap, signOut }),
+    [bootstrapState, refreshBootstrap, signOut],
   );
 
   return (

@@ -1,3 +1,4 @@
+import { isClerkAPIResponseError, useSignIn } from "@clerk/clerk-expo";
 import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -5,20 +6,26 @@ import { router } from "expo-router";
 
 import { FieldInput, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
-import { resetPasswordWithAuth0 } from "@/lib/auth/auth0-client";
+
+const MIN_PASSWORD_LENGTH = 12;
 
 export default function AccountRecoverScreen() {
+  const { isLoaded, signIn, setActive } = useSignIn();
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const canSend = email.trim().length > 0 && !isSubmitting;
+  const canSend = email.trim().length > 0 && !isSubmitting && isLoaded;
+  const canReset = code.trim().length > 0 && newPassword.length >= MIN_PASSWORD_LENGTH && !isSubmitting;
 
   const handleSend = async () => {
     if (!canSend) return;
     setIsSubmitting(true);
     try {
-      await resetPasswordWithAuth0(email.trim());
+      await signIn.create({ strategy: "reset_password_email_code", identifier: email.trim() });
     } catch {
       // Deliberately silent: the confirmation below is shown either way, so
       // the response never reveals whether an account exists for this
@@ -29,13 +36,43 @@ export default function AccountRecoverScreen() {
     }
   };
 
+  const handleReset = async () => {
+    if (!canReset || !isLoaded) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const attempt = await signIn.attemptFirstFactor({
+        strategy: "reset_password_email_code",
+        code: code.trim(),
+        password: newPassword,
+      });
+
+      if (attempt.status !== "complete") {
+        setError("That code didn't work. Check your inbox and try again.");
+        return;
+      }
+
+      await setActive({ session: attempt.createdSessionId });
+      // AppProviders reacts to Clerk's isSignedIn flipping true once
+      // setActive() resolves - no need to route manually here.
+    } catch (err) {
+      setError(
+        isClerkAPIResponseError(err)
+          ? err.errors[0]?.longMessage ?? err.errors[0]?.message ?? "That code didn't work."
+          : "That code didn't work. Check your inbox and try again.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <ScreenHeader
           eyebrow="Account recovery"
           title="Get back into your account"
-          description="We will send a secure recovery link if the address matches."
+          description="We will send a recovery code if the address matches."
         />
 
         <FieldInput
@@ -58,21 +95,56 @@ export default function AccountRecoverScreen() {
         />
 
         {sent ? (
-          <NoticeCard
-            title="Check your inbox"
-            body="If that address matches an account, a recovery link is on its way."
-            tone="mint"
-          />
+          <>
+            <NoticeCard
+              title="Check your inbox"
+              body="If that address matches an account, a recovery code is on its way."
+              tone="mint"
+            />
+            <FieldInput
+              fields={[
+                {
+                  key: "code",
+                  label: "Recovery code",
+                  value: code,
+                  onChangeText: setCode,
+                  placeholder: "6-digit code",
+                  keyboardType: "numeric",
+                },
+                {
+                  key: "newPassword",
+                  label: "New password",
+                  value: newPassword,
+                  onChangeText: setNewPassword,
+                  placeholder: "At least 12 characters",
+                  helper: "Use at least 12 characters.",
+                  secureTextEntry: true,
+                  autoCapitalize: "none",
+                },
+              ]}
+            />
+          </>
         ) : null}
+
+        {error ? <NoticeCard title="Could not reset password" body={error} tone="danger" /> : null}
       </ScrollView>
 
       <View style={styles.actions}>
-        <ScreenActions
-          primaryLabel={isSubmitting ? "Sending..." : "Send recovery link"}
-          onPrimaryPress={canSend ? () => void handleSend() : undefined}
-          secondaryLabel="Back to sign in"
-          onSecondaryPress={() => router.back()}
-        />
+        {sent ? (
+          <ScreenActions
+            primaryLabel={isSubmitting ? "Resetting..." : "Reset password"}
+            onPrimaryPress={canReset ? () => void handleReset() : undefined}
+            secondaryLabel="Back to sign in"
+            onSecondaryPress={() => router.back()}
+          />
+        ) : (
+          <ScreenActions
+            primaryLabel={isSubmitting ? "Sending..." : "Send recovery code"}
+            onPrimaryPress={canSend ? () => void handleSend() : undefined}
+            secondaryLabel="Back to sign in"
+            onSecondaryPress={() => router.back()}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

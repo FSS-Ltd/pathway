@@ -12,16 +12,10 @@ function clean(value: string | undefined, fallback = ""): string {
   return trimmed;
 }
 
-function normalizeDomain(value: string | undefined): string {
-  return clean(value).replace(/^https?:\/\//, "");
-}
-
-const auth0Domain = normalizeDomain(process.env.AUTH0_MOBILE_DOMAIN ?? process.env.AUTH0_ISSUER);
-const auth0ClientId = clean(process.env.AUTH0_MOBILE_CLIENT_ID);
-const auth0Audience = clean(process.env.AUTH0_MOBILE_AUDIENCE ?? process.env.AUTH0_AUDIENCE);
-const auth0Scope = clean(process.env.AUTH0_MOBILE_SCOPE, "openid profile email offline_access");
-const auth0CustomScheme = clean(process.env.AUTH0_MOBILE_CUSTOM_SCHEME, "nexstepshome");
-const apiUrl = clean(process.env.EXPO_PUBLIC_API_URL ?? process.env.AUTH0_MOBILE_API_URL);
+const clerkPublishableKey = clean(
+  process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+);
+const apiUrl = clean(process.env.EXPO_PUBLIC_API_URL);
 const isProduction = process.env.NODE_ENV === "production";
 
 const config: ExpoConfig = {
@@ -63,26 +57,13 @@ const config: ExpoConfig = {
   android: {
     package: "com.nexsteps.home",
   },
-  plugins: [
-    "expo-router",
-    [
-      "react-native-auth0",
-      {
-        domain: auth0Domain,
-        customScheme: auth0CustomScheme,
-      },
-    ],
-  ],
+  plugins: ["expo-router"],
   experiments: {
     typedRoutes: true,
   },
   extra: {
     apiUrl,
-    auth0Domain,
-    auth0ClientId,
-    auth0Audience,
-    auth0Scope,
-    auth0CustomScheme,
+    clerkPublishableKey,
   },
 };
 

@@ -4,18 +4,8 @@ import { router } from "expo-router";
 
 import { ContentCard, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
-import { useAppReady } from "@/hooks";
 
 export default function WelcomeScreen() {
-  const { signIn } = useAppReady();
-
-  const handleSignIn = async () => {
-    const state = await signIn();
-    if (state.status === "ready") {
-      router.replace(state.route);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -47,7 +37,7 @@ export default function WelcomeScreen() {
           primaryLabel="Set up my family"
           onPrimaryPress={() => router.push("/(setup)/account-create")}
           secondaryLabel="I already have an account"
-          onSecondaryPress={() => void handleSignIn()}
+          onSecondaryPress={() => router.push("/(setup)/sign-in")}
         />
       </View>
     </SafeAreaView>
