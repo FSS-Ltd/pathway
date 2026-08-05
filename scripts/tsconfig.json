@@ -11,6 +11,6 @@
       "@pathway/db/*": ["packages/db/src/*"]
     }
   },
-  "include": ["*.ts"],
+  "include": ["*.ts", "**/*.ts"],
   "exclude": ["node_modules"]
 }

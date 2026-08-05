@@ -14,6 +14,7 @@
     "test:pdf": "tsx scripts/test-toolkit-pdf.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "6.39.6",
     "@pathway/pricing": "workspace:*",
     "@pathway/types": "workspace:*",
     "@pathway/util": "workspace:*",

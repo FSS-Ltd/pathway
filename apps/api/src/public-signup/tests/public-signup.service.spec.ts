@@ -4,6 +4,8 @@ import { prisma } from "@pathway/db";
 import { PublicSignupService } from "../public-signup.service";
 import { MailerService } from "../../mailer/mailer.service";
 import { Auth0ManagementService } from "../../auth/auth0-management.service";
+import { AuthIdentityService } from "../../auth/auth-identity.service";
+import type { VerifiedPrincipal } from "../../auth/token-verifier";
 
 jest.mock("@pathway/db", () => {
   const { ChildGuardianContactType, Role } = jest.requireActual("@prisma/client");
@@ -52,6 +54,7 @@ describe("PublicSignupService", () => {
   let service: PublicSignupService;
   const mailerMock = { sendParentSignupCompleteEmail: jest.fn() };
   const auth0Mock = { createUser: jest.fn() };
+  const authIdentityMock = { findExistingUserByPrincipal: jest.fn() };
 
   const validLink = {
     id: "link-1",
@@ -71,6 +74,7 @@ describe("PublicSignupService", () => {
         PublicSignupService,
         { provide: MailerService, useValue: mailerMock },
         { provide: Auth0ManagementService, useValue: auth0Mock },
+        { provide: AuthIdentityService, useValue: authIdentityMock },
       ],
     }).compile();
 
@@ -480,6 +484,77 @@ describe("PublicSignupService", () => {
           }),
         ]),
       });
+    });
+  });
+
+  describe("submitExistingUser", () => {
+    const principal: VerifiedPrincipal = {
+      provider: "clerk",
+      sub: "clerk|parent-1",
+      email: "sarah@example.com",
+      emailVerified: true,
+    };
+
+    const validDto = {
+      token: "a".repeat(32),
+      parent: {
+        fullName: "Sarah Doe",
+        email: "sarah@example.com",
+      },
+      emergencyContacts: [{ name: "Emergency Contact", phone: "07700900123" }],
+      children: [
+        {
+          firstName: "Child",
+          lastName: "One",
+          photoConsent: false,
+        },
+      ],
+      consents: { dataProcessingConsent: true },
+    };
+
+    it("rejects an unverified principal without consulting the database", async () => {
+      await expect(
+        service.submitExistingUser(validDto, { ...principal, emailVerified: false }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(authIdentityMock.findExistingUserByPrincipal).not.toHaveBeenCalled();
+    });
+
+    it("rejects when no existing user resolves from the principal", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      authIdentityMock.findExistingUserByPrincipal.mockResolvedValue(null);
+
+      await expect(service.submitExistingUser(validDto, principal)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("links children and completes signup for the resolved user - no password anywhere", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      authIdentityMock.findExistingUserByPrincipal.mockResolvedValue({
+        id: "user-1",
+        email: "sarah@example.com",
+        name: null,
+        displayName: null,
+      });
+      (prisma.user.update as jest.Mock).mockResolvedValue({});
+      (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.userTenantRole.create as jest.Mock).mockResolvedValue({});
+      (prisma.child.create as jest.Mock).mockResolvedValue({ id: "child-1" });
+      (prisma.emergencyContact.createMany as jest.Mock).mockResolvedValue({});
+      (prisma.parentSignupConsent.create as jest.Mock).mockResolvedValue({});
+      (prisma.publicSignupLink.update as jest.Mock).mockResolvedValue({});
+
+      const result = await service.submitExistingUser(validDto, principal);
+
+      expect(result.success).toBe(true);
+      expect(authIdentityMock.findExistingUserByPrincipal).toHaveBeenCalledWith(principal);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: expect.objectContaining({ tenantId: "tenant-1", hasFamilyAccess: true }),
+      });
+      expect(prisma.child.create).toHaveBeenCalled();
+      expect(auth0Mock.createUser).not.toHaveBeenCalled();
     });
   });
 });

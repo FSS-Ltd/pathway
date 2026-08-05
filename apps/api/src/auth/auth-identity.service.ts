@@ -1,6 +1,8 @@
 import { Inject, Injectable, UnauthorizedException, forwardRef } from "@nestjs/common";
 import { Prisma, prisma } from "@pathway/db";
+import type { User } from "@prisma/client";
 import type { UpsertIdentityDto } from "./dto/upsert-identity.dto";
+import type { VerifiedPrincipal } from "./token-verifier";
 import { InvitesService } from "../invites/invites.service";
 
 type IdentityWithUser = Prisma.UserIdentityGetPayload<{
@@ -118,6 +120,45 @@ export class AuthIdentityService {
       email: normalizedEmail ?? user.email,
       displayName: safeDisplayName,
     };
+  }
+
+  /**
+   * Read-only counterpart to upsertFromProvider: resolves an existing user
+   * from a verified principal using the same first three resolution steps
+   * (identity link, externalId, unambiguous verified email), but never
+   * creates one. For callers like PublicSignupService's "I already have an
+   * account" flow, where a non-match must be rejected, not silently
+   * provisioned.
+   */
+  async findExistingUserByPrincipal(principal: VerifiedPrincipal): Promise<User | null> {
+    const identity = await prisma.userIdentity.findUnique({
+      where: {
+        provider_providerSubject: {
+          provider: principal.provider,
+          providerSubject: principal.sub,
+        },
+      },
+      include: { user: true },
+    });
+    if (identity?.user) return identity.user;
+
+    if (principal.externalId) {
+      const byExternalId = await prisma.user.findUnique({
+        where: { id: principal.externalId },
+      });
+      if (byExternalId) return byExternalId;
+    }
+
+    const normalizedEmail = principal.email?.trim().toLowerCase();
+    if (normalizedEmail && principal.emailVerified) {
+      const matches = await prisma.user.findMany({
+        where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+        take: 2,
+      });
+      if (matches.length === 1) return matches[0];
+    }
+
+    return null;
   }
 
   private async touchExistingIdentity(

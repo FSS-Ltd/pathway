@@ -72,6 +72,20 @@ export type PublicSignupContactOnlyPayload = Omit<
   };
 };
 
+/**
+ * Existing-user signup carries no password - the caller authenticates with
+ * Clerk client-side first (useSignIn()) and this call is made with that
+ * session's bearer token instead.
+ */
+export type ExistingUserSignupPayload = Omit<PublicSignupSubmitPayload, "parent"> & {
+  parent: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    relationshipToChild?: string;
+  };
+};
+
 export async function signupPreflight(
   token: string,
   email: string,
@@ -145,11 +159,12 @@ export async function submitPublicSignup(
 }
 
 export async function submitExistingUserSignup(
-  payload: PublicSignupSubmitPayload,
+  payload: ExistingUserSignupPayload,
+  token: string,
 ): Promise<{ success: true; message: string }> {
   const res = await fetch(`${API_BASE_URL}/public/signup/submit-existing-user`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload),
     cache: "no-store",
   });

@@ -10,6 +10,8 @@ import { ChildGuardianContactType, prisma, Role } from "@pathway/db";
 import { MailerService } from "../mailer/mailer.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 import { ClerkManagementService } from "../auth/clerk-management.service";
+import { AuthIdentityService } from "../auth/auth-identity.service";
+import type { VerifiedPrincipal } from "../auth/token-verifier";
 import { getAuthProviderMode } from "../config/runtime-env";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { childPhotoKey } from "../common/storage/storage-key.util";
@@ -57,6 +59,8 @@ export class PublicSignupService {
     @Optional()
     @Inject(ClerkManagementService)
     private readonly clerkManagement: ClerkManagementService | null,
+    @Inject(AuthIdentityService)
+    private readonly authIdentity: AuthIdentityService,
     @Optional()
     @Inject(SupabaseStorageService)
     storage?: SupabaseStorageService,
@@ -279,43 +283,36 @@ export class PublicSignupService {
   }
 
   /**
-   * Submit for existing user: verify password, then link children and complete signup.
-   * Keeps user on the same form - no redirect to Auth0.
-   * Requires Auth0 "Password" grant type to be enabled.
+   * Submit for existing user: the client authenticates with Auth0/Clerk
+   * first and calls this endpoint with that session's bearer token
+   * (VerifiedPrincipalGuard on the controller route) - there is no
+   * server-side password check here. Clerk has no Resource Owner Password
+   * equivalent to Auth0's, so this can no longer take a password in the
+   * body at all; it resolves the existing user from the verified principal
+   * instead, using the same (identity, externalId, verified-email)
+   * resolution order as JIT provisioning elsewhere.
    */
   async submitExistingUser(
     dto: SubmitExistingUserDto,
+    principal: VerifiedPrincipal,
   ): Promise<{ success: true; message: string }> {
     const link = await this.resolveLink(dto.token);
     this.assertParentPortalEnabled(link);
 
     this.assertCommonSignupRequirements(dto);
 
-    const email = dto.parent.email.trim().toLowerCase();
-    const auth0Sub = await this.auth0Management?.verifyPassword(
-      email,
-      dto.parent.password,
-    );
-    if (!auth0Sub) {
-      throw new BadRequestException("Invalid email or password");
+    if (!principal.email || !principal.emailVerified) {
+      throw new BadRequestException("Please verify your email before continuing.");
     }
+    const email = principal.email.trim().toLowerCase();
 
-    const identity = await prisma.userIdentity.findUnique({
-      where: {
-        provider_providerSubject: {
-          provider: "auth0",
-          providerSubject: auth0Sub,
-        },
-      },
-      include: { user: true },
-    });
-    if (!identity?.user) {
+    const user = await this.authIdentity.findExistingUserByPrincipal(principal);
+    if (!user) {
       throw new BadRequestException(
         "Account not found. Please sign in via the app first, or use a different email.",
       );
     }
 
-    const user = identity.user;
     const fullName = dto.parent.fullName.trim();
     const safeName = fullName && !fullName.includes("@") ? fullName : null;
 

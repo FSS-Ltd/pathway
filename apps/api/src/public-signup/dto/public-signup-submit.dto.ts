@@ -48,7 +48,12 @@ export class ParentGuardianDto {
   relationshipToChild?: string;
 }
 
-/** Same as ParentGuardianDto but password only requires non-empty (existing users already have a password). */
+/**
+ * Same as ParentGuardianDto but with no password - the client authenticates
+ * with Auth0/Clerk separately before submitting (VerifiedPrincipalGuard on
+ * the controller route resolves who this is; email comes from that
+ * verified principal, not this field).
+ */
 export class ParentGuardianExistingUserDto {
   @IsString()
   @IsNotEmpty()
@@ -57,11 +62,6 @@ export class ParentGuardianExistingUserDto {
 
   @IsEmail()
   email!: string;
-
-  @IsString()
-  @IsNotEmpty({ message: "Password is required" })
-  @MaxLength(128)
-  password!: string;
 
   @IsOptional()
   @IsString()

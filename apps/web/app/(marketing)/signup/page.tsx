@@ -1,5 +1,7 @@
 "use client";
 
+import { ClerkProvider, useAuth, useSignIn } from "@clerk/nextjs";
+import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
@@ -9,6 +11,7 @@ import {
   submitPublicSignup,
   submitExistingUserSignup,
   signupPreflight,
+  type ExistingUserSignupPayload,
   type PublicSignupConfig,
   type PublicSignupContactOnlyPayload,
   type PublicSignupSubmitPayload,
@@ -75,6 +78,8 @@ const defaultEmergency = (): EmergencyEntry => ({
 function SignupContent() {
   const searchParams = useSearchParams();
   const token = searchParams?.get("token") ?? "";
+  const { isLoaded: isSignInLoaded, signIn, setActive } = useSignIn();
+  const { getToken } = useAuth();
 
   const [config, setConfig] = useState<PublicSignupConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -288,7 +293,32 @@ function SignupContent() {
         },
       };
 
-      if (parentPortalEnabled) {
+      if (parentPortalEnabled && preflightMode === "EXISTING_USER") {
+        if (!isSignInLoaded) {
+          throw new Error("Sign-in is still loading. Please try again in a moment.");
+        }
+        const attempt = await signIn.create({
+          identifier: parentEmail.trim().toLowerCase(),
+          password: parentPassword,
+        });
+        if (attempt.status !== "complete") {
+          throw new Error(
+            "We've upgraded sign-in. Please reset your password to continue - check your email for a reset link.",
+          );
+        }
+        await setActive({ session: attempt.createdSessionId });
+        const clerkToken = await getToken();
+        if (!clerkToken) {
+          throw new Error("Signed in, but couldn't start a session. Please try again.");
+        }
+        const payload: ExistingUserSignupPayload["parent"] = {
+          fullName: parentName.trim(),
+          email: parentEmail.trim().toLowerCase(),
+          phone: parentPhone.trim() || undefined,
+          relationshipToChild: parentRelationship.trim() || undefined,
+        };
+        await submitExistingUserSignup({ ...commonPayload, parent: payload }, clerkToken);
+      } else if (parentPortalEnabled) {
         const payload: PublicSignupSubmitPayload = {
           ...commonPayload,
           parent: {
@@ -299,11 +329,7 @@ function SignupContent() {
             relationshipToChild: parentRelationship.trim() || undefined,
           },
         };
-        if (preflightMode === "EXISTING_USER") {
-          await submitExistingUserSignup(payload);
-        } else {
-          await submitPublicSignup(payload);
-        }
+        await submitPublicSignup(payload);
       } else {
         const payload: PublicSignupContactOnlyPayload = {
           ...commonPayload,
@@ -319,7 +345,13 @@ function SignupContent() {
       setSubmitStatus("success");
     } catch (err) {
       setSubmitStatus("error");
-      setSubmitError(err instanceof Error ? err.message : "Registration failed. Please try again.");
+      setSubmitError(
+        isClerkAPIResponseError(err)
+          ? err.errors[0]?.longMessage ?? err.errors[0]?.message ?? "Sign-in failed."
+          : err instanceof Error
+            ? err.message
+            : "Registration failed. Please try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -843,14 +875,16 @@ function SignupContent() {
 
 export default function SignupPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="mx-auto max-w-2xl px-4 py-16 text-center text-pw-text-muted">
-          Loading…
-        </div>
-      }
-    >
-      <SignupContent />
-    </Suspense>
+    <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}>
+      <Suspense
+        fallback={
+          <div className="mx-auto max-w-2xl px-4 py-16 text-center text-pw-text-muted">
+            Loading…
+          </div>
+        }
+      >
+        <SignupContent />
+      </Suspense>
+    </ClerkProvider>
   );
 }

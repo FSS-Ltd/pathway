@@ -76,3 +76,6 @@ graphify-out/
 .worktrees/
 .vercel
 .env*
+
+# Auth0 -> Clerk migration exports (personal data, never committed)
+.auth0-export/

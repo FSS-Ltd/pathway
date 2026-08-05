@@ -175,57 +175,6 @@ export class Auth0ManagementService {
   }
 
   /**
-   * Verify password for an existing user via Auth0 Resource Owner Password grant.
-   * Requires "Password" grant type to be enabled in Auth0 Dashboard.
-   * Returns Auth0 user ID (sub) if valid, null otherwise.
-   */
-  async verifyPassword(email: string, password: string): Promise<string | null> {
-    if (!this.domain || !this.clientId || !this.clientSecret) {
-      return null;
-    }
-
-    const audience = process.env.AUTH0_AUDIENCE ?? undefined;
-
-    try {
-      const body: Record<string, string> = {
-        grant_type: "password",
-        username: email.toLowerCase().trim(),
-        password,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
-      };
-      if (audience) {
-        body.audience = audience;
-      }
-
-      const response = (await fetch(`https://${this.domain}/oauth/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      })) as FetchResponse;
-
-      if (!response.ok) {
-        const errText = await response.text();
-        this.logger.warn(
-          `Auth0 password verification failed for ${email}: ${response.status} - ${errText}`,
-        );
-        return null;
-      }
-
-      const data = (await response.json()) as { access_token?: string };
-      if (!data.access_token) return null;
-
-      const payload = JSON.parse(
-        Buffer.from(data.access_token.split(".")[1] ?? "", "base64url").toString(),
-      ) as { sub?: string };
-      return payload.sub ?? null;
-    } catch (error) {
-      this.logger.error("Auth0 verifyPassword error:", error);
-      return null;
-    }
-  }
-
-  /**
    * Get a user by email address.
    * Returns the Auth0 user ID (sub) if found, null otherwise.
    */
