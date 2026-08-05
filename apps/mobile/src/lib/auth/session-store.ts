@@ -1,77 +1,50 @@
 import type { AppSpace } from "@pathway/mobile-core";
 import * as SecureStore from "expo-secure-store";
 
-export type SessionSnapshot = {
-  accessToken: string;
-  idToken?: string;
-  refreshToken?: string;
+/**
+ * App-state only - Clerk owns the actual session token via its own
+ * tokenCache (see clerk-client.ts). This store just remembers which site/
+ * space the user was last on, keyed separately from apps/nexsteps-home's
+ * "nexsteps.home.session" so both apps can be installed side by side.
+ */
+export type AppStateSnapshot = {
   userId?: string;
   activeSiteId?: string;
   preferredSpace?: AppSpace;
-  expiresAt?: string;
   updatedAt: string;
 };
 
-let currentSession: SessionSnapshot | null = null;
-const SESSION_KEY = "nexsteps.session";
+let currentState: AppStateSnapshot | null = null;
+const STATE_KEY = "nexsteps.session";
 
-function isExpired(snapshot: SessionSnapshot): boolean {
-  if (!snapshot.expiresAt) return false;
-  const expiresAt = new Date(snapshot.expiresAt).getTime();
-  if (Number.isNaN(expiresAt)) return false;
-  return expiresAt <= Date.now();
-}
-
-export async function getSessionSnapshot(): Promise<SessionSnapshot | null> {
-  if (!currentSession) {
-    const raw = await SecureStore.getItemAsync(SESSION_KEY);
+export async function getAppStateSnapshot(): Promise<AppStateSnapshot | null> {
+  if (!currentState) {
+    const raw = await SecureStore.getItemAsync(STATE_KEY);
     if (!raw) return null;
     try {
-      currentSession = JSON.parse(raw) as SessionSnapshot;
+      currentState = JSON.parse(raw) as AppStateSnapshot;
     } catch {
-      await SecureStore.deleteItemAsync(SESSION_KEY);
-      currentSession = null;
+      await SecureStore.deleteItemAsync(STATE_KEY);
+      currentState = null;
       return null;
     }
   }
-
-  if (!currentSession) return null;
-  if (isExpired(currentSession)) {
-    await SecureStore.deleteItemAsync(SESSION_KEY);
-    currentSession = null;
-    return null;
-  }
-  return currentSession;
+  return currentState;
 }
 
-export async function setSessionSnapshot(
-  session: Omit<SessionSnapshot, "updatedAt">,
-): Promise<SessionSnapshot> {
-  currentSession = {
-    ...session,
-    updatedAt: new Date().toISOString(),
-  };
-  await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(currentSession));
-  return currentSession;
-}
-
-export async function updateSessionSnapshot(
-  patch: Partial<Omit<SessionSnapshot, "updatedAt">>,
-): Promise<SessionSnapshot | null> {
-  const existing = await getSessionSnapshot();
-  if (!existing) return null;
-
-  currentSession = {
-    ...existing,
+export async function updateAppStateSnapshot(
+  patch: Partial<Omit<AppStateSnapshot, "updatedAt">>,
+): Promise<AppStateSnapshot> {
+  currentState = {
+    ...(currentState ?? {}),
     ...patch,
     updatedAt: new Date().toISOString(),
   };
-  await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(currentSession));
-
-  return currentSession;
+  await SecureStore.setItemAsync(STATE_KEY, JSON.stringify(currentState));
+  return currentState;
 }
 
-export async function clearSessionSnapshot(): Promise<void> {
-  await SecureStore.deleteItemAsync(SESSION_KEY);
-  currentSession = null;
+export async function clearAppStateSnapshot(): Promise<void> {
+  await SecureStore.deleteItemAsync(STATE_KEY);
+  currentState = null;
 }

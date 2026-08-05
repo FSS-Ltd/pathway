@@ -1,3 +1,4 @@
+import { ClerkProvider } from "@clerk/clerk-expo";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useFonts } from "expo-font";
@@ -12,6 +13,8 @@ import {
   Quicksand_700Bold,
 } from "@expo-google-fonts/quicksand";
 
+import { env } from "@/config/env";
+import { clerkTokenCache } from "@/lib/auth/clerk-client";
 import { AppProviders } from "@/providers/app-providers";
 
 export default function RootLayout() {
@@ -29,9 +32,11 @@ export default function RootLayout() {
   }
 
   return (
-    <AppProviders>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }} />
-    </AppProviders>
+    <ClerkProvider publishableKey={env.clerkPublishableKey} tokenCache={clerkTokenCache}>
+      <AppProviders>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </AppProviders>
+    </ClerkProvider>
   );
 }
