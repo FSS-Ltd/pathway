@@ -6,6 +6,7 @@
  * any mismatch between that environment and the Clerk key actually
  * configured (a live key outside production, or a non-live key inside it).
  */
+import "dotenv/config";
 
 export type Environment = "development" | "staging" | "production";
 
