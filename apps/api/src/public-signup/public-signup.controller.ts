@@ -6,7 +6,10 @@ import {
   Inject,
   Post,
   Query,
+  Req,
+  UseGuards,
 } from "@nestjs/common";
+import type { Request } from "express";
 import { PublicSignupService } from "./public-signup.service";
 import { PublicSignupConfigDto } from "./dto/public-signup-config.dto";
 import {
@@ -15,6 +18,7 @@ import {
   SubmitExistingUserDto,
 } from "./dto/public-signup-submit.dto";
 import { SignupPreflightDto } from "./dto/signup-preflight.dto";
+import { VerifiedPrincipalGuard, getVerifiedPrincipal } from "../auth/verified-principal.guard";
 
 /**
  * Public (unauthenticated) endpoints for invite-only parent signup.
@@ -62,9 +66,11 @@ export class PublicSignupController {
   }
 
   @Post("signup/submit-existing-user")
+  @UseGuards(VerifiedPrincipalGuard)
   async submitExistingUser(
     @Body() body: SubmitExistingUserDto,
+    @Req() req: Request,
   ): Promise<{ success: true; message: string }> {
-    return this.publicSignupService.submitExistingUser(body);
+    return this.publicSignupService.submitExistingUser(body, getVerifiedPrincipal(req));
   }
 }

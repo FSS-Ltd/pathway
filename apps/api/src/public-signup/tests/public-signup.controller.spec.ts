@@ -1,7 +1,17 @@
+import { ExecutionContext } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
 import { PublicSignupController } from "../public-signup.controller";
 import { PublicSignupService } from "../public-signup.service";
+import { VerifiedPrincipalGuard } from "../../auth/verified-principal.guard";
+import type { RequestWithVerifiedPrincipal } from "../../auth/verified-principal.guard";
+
+const verifiedPrincipal = {
+  provider: "clerk" as const,
+  sub: "clerk|parent-1",
+  email: "sarah@example.com",
+  emailVerified: true,
+};
 
 describe("PublicSignupController", () => {
   let app: Awaited<ReturnType<typeof createApp>>;
@@ -17,7 +27,16 @@ describe("PublicSignupController", () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       controllers: [PublicSignupController],
       providers: [{ provide: PublicSignupService, useValue: serviceMock }],
-    }).compile();
+    })
+      .overrideGuard(VerifiedPrincipalGuard)
+      .useValue({
+        canActivate: (context: ExecutionContext) => {
+          const req = context.switchToHttp().getRequest<RequestWithVerifiedPrincipal>();
+          req.verifiedPrincipal = verifiedPrincipal;
+          return true;
+        },
+      })
+      .compile();
 
     const application = moduleRef.createNestApplication();
     await application.init();
@@ -181,6 +200,53 @@ describe("PublicSignupController", () => {
 
       expect(serviceMock.submitContactOnly).toHaveBeenCalledWith(validBody);
       expect(res.body.success).toBe(true);
+    });
+  });
+
+  describe("POST /public/signup/submit-existing-user", () => {
+    const validBody = {
+      token: "a".repeat(32),
+      parent: {
+        fullName: "Sarah Doe",
+        email: "sarah@example.com",
+        relationshipToChild: "Parent",
+      },
+      emergencyContacts: [{ name: "Emergency Contact", phone: "07700900123" }],
+      children: [
+        {
+          firstName: "Child",
+          lastName: "One",
+          photoConsent: false,
+        },
+      ],
+      consents: { dataProcessingConsent: true },
+    };
+
+    it("delegates to the service with the body and the verified principal - no password required", async () => {
+      serviceMock.submitExistingUser.mockResolvedValue({
+        success: true,
+        message: "Registration complete.",
+      });
+
+      const res = await request(app.getHttpServer())
+        .post("/public/signup/submit-existing-user")
+        .send(validBody)
+        .expect(201);
+
+      expect(serviceMock.submitExistingUser).toHaveBeenCalledWith(validBody, verifiedPrincipal);
+      expect(res.body.success).toBe(true);
+    });
+
+    it("returns 400 when the service reports no matching account", async () => {
+      const { BadRequestException } = await import("@nestjs/common");
+      serviceMock.submitExistingUser.mockRejectedValueOnce(
+        new BadRequestException("Account not found. Please sign in via the app first, or use a different email."),
+      );
+
+      await request(app.getHttpServer())
+        .post("/public/signup/submit-existing-user")
+        .send(validBody)
+        .expect(400);
     });
   });
 });
