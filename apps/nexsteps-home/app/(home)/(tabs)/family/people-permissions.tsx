@@ -52,12 +52,16 @@ export default function PeoplePermissionsScreen() {
 
   const canInvite = EMAIL_PATTERN.test(email.trim());
 
+  // The org-admin guards behind these mutations (assertOrgAdmin,
+  // requireOrgAdminAccess) throw UnauthorizedException, which Nest maps to
+  // 401, not 403 - check both so this state is actually reachable.
+  const isDeniedStatus = (status: number) => status === 401 || status === 403;
   const isPermissionDenied =
-    (inviteAdult.isError && inviteAdult.error instanceof ApiError && inviteAdult.error.status === 403) ||
+    (inviteAdult.isError && inviteAdult.error instanceof ApiError && isDeniedStatus(inviteAdult.error.status)) ||
     (removePersonAccess.isError &&
       removePersonAccess.error instanceof ApiError &&
-      removePersonAccess.error.status === 403) ||
-    (revokeInvite.isError && revokeInvite.error instanceof ApiError && revokeInvite.error.status === 403);
+      isDeniedStatus(removePersonAccess.error.status)) ||
+    (revokeInvite.isError && revokeInvite.error instanceof ApiError && isDeniedStatus(revokeInvite.error.status));
   const isValidationError =
     inviteAdult.isError && inviteAdult.error instanceof ApiError && inviteAdult.error.status === 400;
   const isOtherError =
@@ -168,7 +172,7 @@ export default function PeoplePermissionsScreen() {
 
         <ContentCard
           title="Invite an adult"
-          body="Choose a role before sending the secure invitation."
+          body="Send a secure invitation to share access."
           action={isInviting ? undefined : "Invite"}
           tone="mint"
           onPress={isInviting ? undefined : () => setIsInviting(true)}

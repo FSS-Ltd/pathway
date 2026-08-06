@@ -3,6 +3,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import * as orgPeopleApi from "@/lib/api/org-people";
+import { ApiError } from "@/lib/api/http";
 import { AppBootstrapContext } from "@/providers/app-providers";
 import PeoplePermissionsScreen from "../../../app/(home)/(tabs)/family/people-permissions";
 
@@ -104,5 +105,25 @@ describe("PeoplePermissionsScreen", () => {
     fireEvent.press(getByText("Send invite"));
 
     await waitFor(() => expect(inviteSpy).toHaveBeenCalledWith({ email: "auntie.may@example.com", name: undefined }));
+  });
+
+  it("shows the permission-denied notice for a real 401 from a non-admin invite attempt", async () => {
+    jest.spyOn(orgPeopleApi, "listOrgPeople").mockResolvedValue([
+      { id: "u1", name: "Sam R.", displayName: null, email: "sam@example.com", orgRole: "ORG_MEMBER", siteAccessSummary: { allSites: false, siteCount: 1 } },
+    ]);
+    jest.spyOn(orgPeopleApi, "listPendingInvites").mockResolvedValue([]);
+    jest
+      .spyOn(orgPeopleApi, "inviteAdult")
+      .mockRejectedValue(new ApiError("Unauthorized", 401, "You must be an Organisation admin to invite people"));
+
+    const { getByText, getByLabelText } = renderScreen(new QueryClient());
+
+    await waitFor(() => expect(getByText("Invite an adult")).toBeTruthy());
+    fireEvent.press(getByText("Invite"));
+    fireEvent.changeText(getByLabelText("Email"), "auntie.may@example.com");
+    fireEvent.press(getByText("Send invite"));
+
+    await waitFor(() => expect(getByText("You can't manage people")).toBeTruthy());
+    expect(getByText("Only admins can invite, remove or revoke access.")).toBeTruthy();
   });
 });
