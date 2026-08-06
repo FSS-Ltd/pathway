@@ -13,7 +13,7 @@ import {
 } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks";
-import { ApiError } from "@/lib/api";
+import { ApiError, isDeniedError } from "@/lib/api";
 import type { OrgRole } from "@/lib/api/org-people";
 import {
   useInviteAdult,
@@ -52,16 +52,10 @@ export default function PeoplePermissionsScreen() {
 
   const canInvite = EMAIL_PATTERN.test(email.trim());
 
-  // The org-admin guards behind these mutations (assertOrgAdmin,
-  // requireOrgAdminAccess) throw UnauthorizedException, which Nest maps to
-  // 401, not 403 - check both so this state is actually reachable.
-  const isDeniedStatus = (status: number) => status === 401 || status === 403;
   const isPermissionDenied =
-    (inviteAdult.isError && inviteAdult.error instanceof ApiError && isDeniedStatus(inviteAdult.error.status)) ||
-    (removePersonAccess.isError &&
-      removePersonAccess.error instanceof ApiError &&
-      isDeniedStatus(removePersonAccess.error.status)) ||
-    (revokeInvite.isError && revokeInvite.error instanceof ApiError && isDeniedStatus(revokeInvite.error.status));
+    (inviteAdult.isError && isDeniedError(inviteAdult.error)) ||
+    (removePersonAccess.isError && isDeniedError(removePersonAccess.error)) ||
+    (revokeInvite.isError && isDeniedError(revokeInvite.error));
   const isValidationError =
     inviteAdult.isError && inviteAdult.error instanceof ApiError && inviteAdult.error.status === 400;
   const isOtherError =
@@ -108,11 +102,20 @@ export default function PeoplePermissionsScreen() {
   };
 
   if (peopleQuery.isError || invitesQuery.isError) {
+    const isLoadDenied = isDeniedError(peopleQuery.error) || isDeniedError(invitesQuery.error);
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
           <ScreenHeader eyebrow="Family · People" title="Could not load people & permissions" />
-          <NoticeCard title="Something went wrong" body="Check your connection and try again." tone="danger" />
+          {isLoadDenied ? (
+            <NoticeCard
+              title="You can't manage people"
+              body="Only admins can invite, remove or revoke access."
+              tone="danger"
+            />
+          ) : (
+            <NoticeCard title="Something went wrong" body="Check your connection and try again." tone="danger" />
+          )}
         </View>
       </SafeAreaView>
     );

@@ -11,6 +11,15 @@ export class ApiError extends Error {
   }
 }
 
+// Every household-config endpoint uses plain AuthUserGuard, which throws
+// UnauthorizedException (401) for "not signed in" and also for "signed in
+// but not permitted" (e.g. assertOrgAdmin, requireOrgAdminAccess) - there is
+// no separate ForbiddenException path for these. 403 is included too since
+// it does appear elsewhere in the API (CapabilityGuard-backed endpoints).
+export function isDeniedError(error: unknown): error is ApiError {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 type RequestOptions = Omit<RequestInit, "headers"> & {
   token?: string;
   headers?: Record<string, string>;

@@ -4,11 +4,14 @@ import * as orgPeopleApi from "../api/org-people";
 import type { InviteAdultInput } from "../api/org-people";
 
 export function useOrgPeople() {
-  return useQuery({ queryKey: ["org-people"], queryFn: orgPeopleApi.listOrgPeople });
+  // GET /:orgId/people is ORG_ADMIN-only - a non-admin's request is a
+  // permanent 401, not worth the default 3 retries before the
+  // permission-denied state can show.
+  return useQuery({ queryKey: ["org-people"], queryFn: orgPeopleApi.listOrgPeople, retry: false });
 }
 
 export function usePendingInvites() {
-  return useQuery({ queryKey: ["org-invites"], queryFn: orgPeopleApi.listPendingInvites });
+  return useQuery({ queryKey: ["org-invites"], queryFn: orgPeopleApi.listPendingInvites, retry: false });
 }
 
 export function useInviteAdult() {

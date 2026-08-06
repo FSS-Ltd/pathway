@@ -126,4 +126,16 @@ describe("PeoplePermissionsScreen", () => {
     await waitFor(() => expect(getByText("You can't manage people")).toBeTruthy());
     expect(getByText("Only admins can invite, remove or revoke access.")).toBeTruthy();
   });
+
+  it("shows the permission-denied notice for a real 401 loading the member list", async () => {
+    jest
+      .spyOn(orgPeopleApi, "listOrgPeople")
+      .mockRejectedValue(new ApiError("Unauthorized", 401, "You must be an Organisation admin to view people"));
+    jest.spyOn(orgPeopleApi, "listPendingInvites").mockResolvedValue([]);
+
+    const { getByText } = renderScreen(new QueryClient());
+
+    await waitFor(() => expect(getByText("You can't manage people")).toBeTruthy());
+    expect(getByText("Only admins can invite, remove or revoke access.")).toBeTruthy();
+  });
 });
