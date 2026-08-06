@@ -19,6 +19,9 @@ const PRODUCTION_REQUIRED_ENV = [
   "AUTH0_CLIENT_ID",
   "AUTH0_CLIENT_SECRET",
   "AUTH0_AUDIENCE",
+  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+  "CLERK_SECRET_KEY",
+  "CLERK_WEBHOOK_SIGNING_SECRET",
   "BILLING_PROVIDER",
   "RESEND_API_KEY",
   "RESEND_FROM",
@@ -79,9 +82,13 @@ export function validateProductionEnv(): void {
  * Never infer the provider mode from which keys happen to be present -
  * require it explicit once set. Defaults to "auth0" (today's real
  * production behaviour) whenever it's unset, in every environment
- * including production - until the cutover PR adds AUTH_PROVIDER_MODE to
- * Vercel and to PRODUCTION_REQUIRED_ENV above, no PR in this migration may
- * make an unset var start throwing in production.
+ * including production. The Clerk keys (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+ * CLERK_SECRET_KEY, CLERK_WEBHOOK_SIGNING_SECRET) are confirmed set in
+ * Vercel production and required above, but AUTH_PROVIDER_MODE itself is
+ * deliberately NOT in PRODUCTION_REQUIRED_ENV yet - it isn't set in Vercel
+ * production, and adding it there first would make an unset var start
+ * throwing on the next deploy. Add it once it's actually set, as part of
+ * the rollout (dual -> clerk), not before.
  */
 export function getAuthProviderMode(): AuthProviderMode {
   const mode = process.env.AUTH_PROVIDER_MODE;

@@ -1,5 +1,14 @@
 # Auth0 Action: Post-Login - Link to Existing DB User
 
+> **Superseded by the Auth0 -> Clerk migration.** Clerk sign-ins are linked
+> via `apps/api/src/auth/auth-identity.service.ts`'s `upsertFromProvider()`,
+> called from `AuthUserGuard`'s JIT-provisioning path and from
+> `apps/api/src/auth/clerk-webhook.controller.ts` - no Dashboard Action or
+> external `/internal/auth/identity/upsert` POST is involved. This document
+> stays accurate for the Auth0 side while `AUTH_PROVIDER_MODE` includes
+> `auth0`/`dual` (the current rollback window); it will be removed once
+> Auth0 support is fully retired.
+
 This Auth0 Action runs after a user logs in and ensures their Auth0 account is linked to the existing user in the Nexsteps database.
 
 ## Setup Instructions

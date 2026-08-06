@@ -337,7 +337,7 @@ export default function PrivacyPage() {
           </p>
           <LegalList>
             <li>
-              <strong>Authentication provider</strong> – for example, Auth0, which manages secure authentication
+              <strong>Authentication provider</strong> – for example, Clerk, which manages secure authentication
               of users.
             </li>
             <li>

@@ -130,7 +130,7 @@ export const securityContent: SecurityContent = {
         {
           control: "Authentication",
           description:
-            "Nexsteps uses Auth0 for authentication, supporting SSO and multi-factor authentication (MFA). All authentication flows use industry-standard protocols (OAuth 2.0, OpenID Connect).",
+            "Nexsteps uses Clerk for authentication, supporting SSO and multi-factor authentication (MFA). All authentication flows use industry-standard protocols (OAuth 2.0, OpenID Connect).",
         },
         {
           control: "Authorisation",
