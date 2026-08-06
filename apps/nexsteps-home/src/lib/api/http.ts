@@ -11,6 +11,15 @@ export class ApiError extends Error {
   }
 }
 
+// Every household-config endpoint uses plain AuthUserGuard, which throws
+// UnauthorizedException (401) for "not signed in" and also for "signed in
+// but not permitted" (e.g. assertOrgAdmin, requireOrgAdminAccess) - there is
+// no separate ForbiddenException path for these. 403 is included too since
+// it does appear elsewhere in the API (CapabilityGuard-backed endpoints).
+export function isDeniedError(error: unknown): error is ApiError {
+  return error instanceof ApiError && (error.status === 401 || error.status === 403);
+}
+
 type RequestOptions = Omit<RequestInit, "headers"> & {
   token?: string;
   headers?: Record<string, string>;
@@ -34,6 +43,14 @@ function networkErrorSuggestion(url: string): string {
  */
 class HomeApiClient {
   private accessToken: string | null = null;
+  // A handful of already-shipped backend endpoints (org-people, invites)
+  // take orgId as a URL path param instead of resolving it server-side via
+  // @CurrentOrg like every other domain module in this app - no client-side
+  // helper for that existed before this org-people.ts needed one. Set once
+  // during bootstrap alongside the access token (see bootstrap.ts), same
+  // singleton pattern, so those two API modules can build their URLs
+  // without needing React context.
+  private orgId: string | null = null;
 
   setAccessToken(token: string | null) {
     this.accessToken = token;
@@ -41,6 +58,14 @@ class HomeApiClient {
 
   getAccessToken() {
     return this.accessToken;
+  }
+
+  setOrgId(orgId: string | null) {
+    this.orgId = orgId;
+  }
+
+  getOrgId() {
+    return this.orgId;
   }
 
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {

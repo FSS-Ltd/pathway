@@ -38,8 +38,18 @@ implementing:
 ## Global Constraints
 
 - Household = one `Org` + one `Tenant` (H1 decision, already implemented).
-  A client-provided tenant/org ID is never trusted — always resolve via
-  `@CurrentTenant`/`@CurrentOrg` from the authenticated request context.
+  A client-provided tenant/org ID is never trusted *for authorization* —
+  every mutating/reading endpoint must independently verify the
+  authenticated user (from the bearer token) actually belongs to that
+  org/tenant before acting, the way `assertOrgAdmin`/`@CurrentTenant` do.
+  This does not forbid an org/tenant ID appearing in a URL path param (some
+  already-shipped endpoints reused by sub-plan 08c, e.g. `GET
+  /orgs/:orgId/people`, take it that way) — it forbids trusting a
+  client-supplied ID as the source of truth for what that client is allowed
+  to do. Where a new endpoint is being designed from scratch, prefer
+  `@CurrentTenant`/`@CurrentOrg` over a path param; where an existing
+  endpoint already takes one, the server-side membership check is what
+  actually enforces this constraint, not the absence of the param.
 - No Home capability is added to an ACE vertical grant map; no existing ACE
   capability is renamed (`implementation-map.md:130-131`). Household-config
   endpoints in this plan use plain `AuthUserGuard`, not `CapabilityGuard`.
@@ -223,7 +233,7 @@ describe("children queries", () => {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-  Run: `pnpm --filter nexsteps-home test src/lib/queries/children.test.ts`
+  Run: `pnpm --filter nexsteps-home test:unit -- src/lib/queries/children.test.ts`
   Expected: FAIL — `./children` module does not exist yet.
 
 - [ ] **Step 4: Write the query module**
@@ -264,7 +274,7 @@ export const useUpdateChild = () => {
 
 - [ ] **Step 5: Run test to verify it passes**
 
-  Run: `pnpm --filter nexsteps-home test src/lib/queries/children.test.ts`
+  Run: `pnpm --filter nexsteps-home test:unit -- src/lib/queries/children.test.ts`
   Expected: PASS
 
 - [ ] **Step 6: Commit**
@@ -822,7 +832,7 @@ describe("org-people queries", () => {
 
 - [ ] **Step 3: Run test to verify it fails**
 
-  Run: `pnpm --filter nexsteps-home test src/lib/queries/org-people.test.ts`
+  Run: `pnpm --filter nexsteps-home test:unit -- src/lib/queries/org-people.test.ts`
   Expected: FAIL — modules don't exist.
 
 - [ ] **Step 4: Write the API module** (exact request shapes must match
@@ -839,14 +849,14 @@ export type InviteRow = { id: string; email: string; name: string | null; orgRol
 export type InviteAdultInput = { email: string; name?: string };
 
 // orgId resolution: see Step 1's finding — replace `currentOrgId()` below with whatever that step confirms.
-export const listOrgPeople = () => apiClient.request<OrgPersonRow[]>(`/${currentOrgId()}/people`);
+export const listOrgPeople = () => apiClient.request<OrgPersonRow[]>(`/orgs/${currentOrgId()}/people`);
 export const listPendingInvites = () => apiClient.request<InviteRow[]>(`/orgs/${currentOrgId()}/invites?status=pending`);
 export const inviteAdult = (input: InviteAdultInput) =>
   apiClient.request<InviteRow>(`/orgs/${currentOrgId()}/invites`, { method: "POST", body: JSON.stringify(input) });
 export const revokeInvite = (inviteId: string) =>
   apiClient.request<InviteRow>(`/orgs/${currentOrgId()}/invites/${inviteId}/revoke`, { method: "POST" });
 export const removePersonAccess = (userId: string) =>
-  apiClient.request<void>(`/${currentOrgId()}/people/${userId}`, { method: "DELETE" });
+  apiClient.request<void>(`/orgs/${currentOrgId()}/people/${userId}`, { method: "DELETE" });
 ```
 
 - [ ] **Step 5: Write the query module** (same shape as sub-plan 08a's
@@ -855,7 +865,7 @@ export const removePersonAccess = (userId: string) =>
 
 - [ ] **Step 6: Run test to verify it passes**
 
-  Run: `pnpm --filter nexsteps-home test src/lib/queries/org-people.test.ts`
+  Run: `pnpm --filter nexsteps-home test:unit -- src/lib/queries/org-people.test.ts`
   Expected: PASS
 
 - [ ] **Step 7: Build the `people-permissions` screen**
@@ -895,9 +905,9 @@ git commit -m "feat: add people and permissions screen"
 ```text
 Approved screens: people-permissions
 Owning phase: Phase 7, PR H5c
-Production paths: apps/nexsteps-home/app/(home)/(tabs)/family/people-permissions.tsx, src/lib/{api,queries}/org-people.ts
-Data and permission boundary: reuses existing ORG_ADMIN-gated GET/:orgId/people and org-scoped invites; no new backend
-States covered: loading, empty, validation/error, offline/retry, permission denied, success
+Production paths: apps/nexsteps-home/app/(home)/(tabs)/family/people-permissions.tsx, src/lib/{api,queries}/org-people.ts, src/lib/api/http.ts (new isDeniedError helper, now shared with preferences.tsx/notifications.tsx)
+Data and permission boundary: reuses existing ORG_ADMIN-gated GET/POST /orgs/:orgId/people and org-scoped invites; no new backend. The client learns its own org id via a new HomeApiClient.setOrgId, populated at bootstrap from resolveActiveSite - this is convenience for building request URLs only, never the authorization source: every reused endpoint independently re-derives the caller's org membership from the bearer token server-side (assertOrgAdmin/requireOrgAdminAccess), so a tampered client-side org id yields 401, not access.
+States covered: loading, empty, validation/error, offline/retry, permission denied (both mutation and initial-load paths), success
 Known limitation: no data-scoped "Contributor" role yet - invite always grants ORG_MEMBER
 ```
 

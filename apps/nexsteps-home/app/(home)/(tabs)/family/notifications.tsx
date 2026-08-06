@@ -4,7 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ContentCard, FieldInput, NoticeCard, ScreenActions, ScreenHeader, ToggleRow } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
-import { ApiError } from "@/lib/api";
+import { ApiError, isDeniedError } from "@/lib/api";
 import { useNotificationPreferences, useUpdateNotificationPreferences } from "@/lib/queries/preferences";
 
 export default function NotificationsScreen() {
@@ -42,10 +42,7 @@ export default function NotificationsScreen() {
     }
   }, [preferencesQuery.data]);
 
-  const isPermissionDenied =
-    updatePreferences.isError &&
-    updatePreferences.error instanceof ApiError &&
-    updatePreferences.error.status === 403;
+  const isPermissionDenied = updatePreferences.isError && isDeniedError(updatePreferences.error);
   const isValidationError =
     updatePreferences.isError &&
     updatePreferences.error instanceof ApiError &&

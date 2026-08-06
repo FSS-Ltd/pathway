@@ -102,6 +102,10 @@ export async function bootstrapAuthState(
   try {
     const me = await authApi.getAuthMe(token);
     const activeSiteState = await resolveActiveSite(token, state);
+    const activeSite = activeSiteState.sites.find(
+      (site) => site.id === activeSiteState.activeSiteId,
+    );
+    apiClient.setOrgId(activeSite?.orgId ?? activeSiteState.sites[0]?.orgId ?? null);
 
     const updatedState = await updateAppStateSnapshot({
       userId: me.userId,
@@ -120,6 +124,7 @@ export async function bootstrapAuthState(
     if (error instanceof ApiError && [401, 403].includes(error.status)) {
       await clearAppStateSnapshot();
       apiClient.setAccessToken(null);
+      apiClient.setOrgId(null);
       return { status: "unauthenticated", route: "/(setup)/welcome" };
     }
 

@@ -4,7 +4,7 @@ jest.mock("@/lib/api", () => {
   const actual = jest.requireActual("@/lib/api");
   return {
     ...actual,
-    apiClient: { setAccessToken: jest.fn() },
+    apiClient: { setAccessToken: jest.fn(), setOrgId: jest.fn() },
     authApi: {
       getAuthMe: jest.fn(),
       getActiveSiteState: jest.fn(),
@@ -58,6 +58,7 @@ describe("bootstrapAuthState", () => {
     const result = await bootstrapAuthState(async () => "token");
 
     expect(apiClient.setAccessToken).toHaveBeenCalledWith("token");
+    expect(apiClient.setOrgId).toHaveBeenCalledWith("org-1");
     expect(authApi.setActiveSite).toHaveBeenCalledWith("site-1", "token");
     expect(result.status).toBe("ready");
     if (result.status === "ready") {

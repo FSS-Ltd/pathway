@@ -1,6 +1,7 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import { ApiError } from "@/lib/api/http";
 import * as preferencesApi from "@/lib/api/preferences";
 import PreferencesScreen from "../../../app/(home)/(tabs)/family/preferences";
 
@@ -100,5 +101,40 @@ describe("PreferencesScreen canSave guard", () => {
     // Give any (incorrect) mutation a tick to fire before asserting it didn't.
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(updateSpy).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Regression test for the final-review finding: household-config endpoints
+ * throw UnauthorizedException (401) for "not permitted", not
+ * ForbiddenException (403) - the permission-denied check only looked for
+ * 403, so a real non-admin's save attempt fell through to the generic
+ * "Something went wrong" notice instead.
+ */
+describe("PreferencesScreen permission denied", () => {
+  it("shows the permission-denied notice for a real 401 on save", async () => {
+    const client = new QueryClient();
+    jest.spyOn(preferencesApi, "getPlanningPreferences").mockResolvedValue({
+      weekStartsOn: "Mon",
+      defaultActivityDurationMinutes: 45,
+      dailyPlanningLimit: 2,
+      timeFormat: "24h",
+      language: "en-GB",
+    });
+    jest
+      .spyOn(preferencesApi, "updatePlanningPreferences")
+      .mockRejectedValue(new ApiError("Unauthorized", 401, "You must be an Organisation admin"));
+
+    const { getByText } = render(
+      <QueryClientProvider client={client}>
+        <PreferencesScreen />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(getByText("Planning preferences")).toBeTruthy());
+    fireEvent.press(getByText("Save preferences"));
+
+    await waitFor(() => expect(getByText("You can't edit preferences")).toBeTruthy());
+    expect(getByText("Only admins and linked parents can make changes.")).toBeTruthy();
   });
 });

@@ -5,7 +5,7 @@ import { router } from "expo-router";
 
 import { ChipRow, FieldInput, NoticeCard, ScreenActions, ScreenHeader } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
-import { ApiError } from "@/lib/api";
+import { ApiError, isDeniedError } from "@/lib/api";
 import type { PlanningPreferences } from "@/lib/api/preferences";
 import { usePlanningPreferences, useUpdatePlanningPreferences } from "@/lib/queries/preferences";
 
@@ -58,10 +58,7 @@ export default function PreferencesScreen() {
     }
   }, [preferencesQuery.data]);
 
-  const isPermissionDenied =
-    updatePreferences.isError &&
-    updatePreferences.error instanceof ApiError &&
-    updatePreferences.error.status === 403;
+  const isPermissionDenied = updatePreferences.isError && isDeniedError(updatePreferences.error);
   const isValidationError =
     updatePreferences.isError &&
     updatePreferences.error instanceof ApiError &&
