@@ -1,5 +1,13 @@
 # Invite-Only Flow Implementation
 
+> **Superseded by the Auth0 -> Clerk migration.** Invite/purchase user
+> creation now branches on `getAuthProviderMode()` between
+> `Auth0ManagementService` and `apps/api/src/auth/clerk-management.service.ts`'s
+> `ClerkManagementService` (see `apps/api/src/invites/invites.service.ts`
+> and `apps/api/src/billing/webhook.controller.ts`). This document stays
+> accurate for the Auth0 path while `AUTH_PROVIDER_MODE` includes
+> `auth0`/`dual`; it will be removed once Auth0 support is fully retired.
+
 This document describes the invite-only authentication flow where:
 1. **Invites**: Create users in DB and Auth0, then send invite link
 2. **Purchases**: Collect name, email, password → Create org, user in DB, and Auth0 account → User logs in after payment

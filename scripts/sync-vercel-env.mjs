@@ -28,10 +28,14 @@ const PROJECTS = {
       "NEXT_PUBLIC_SITE_URL",
       "REVALIDATE_SECRET",
       "NEXT_PUBLIC_ANALYTICS_ENDPOINT",
+      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
     ],
   },
   admin: {
     idEnv: "VERCEL_ADMIN_PROJECT_ID",
+    // Auth0/NextAuth keys stay synced (not yet removed - see PR8 of the
+    // Auth0->Clerk migration) even though apps/admin itself runs on Clerk
+    // unconditionally as of the apps/admin migration PR.
     optionalKeys: [],
     keys: [
       "NODE_ENV",
@@ -45,6 +49,8 @@ const PROJECTS = {
       "AUTH0_AUDIENCE",
       "INTERNAL_AUTH_SECRET",
       "NEXT_PUBLIC_USE_MOCK_API",
+      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+      "CLERK_SECRET_KEY",
     ],
   },
   api: {
@@ -54,6 +60,10 @@ const PROJECTS = {
       "STRIPE_WEBHOOK_SECRET_TEST",
       "STRIPE_PRICE_MAP_TEST",
       "RESEND_WEBHOOK_SECRET",
+      // Not read unless the token issuer can't be derived from
+      // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY - see token-verifier.ts.
+      "CLERK_ISSUER",
+      "CLERK_AUDIENCE",
     ],
     keys: [
       "NODE_ENV",
@@ -67,6 +77,13 @@ const PROJECTS = {
       "AUTH0_CLIENT_ID",
       "AUTH0_CLIENT_SECRET",
       "AUTH0_AUDIENCE",
+      // AUTH_PROVIDER_MODE deliberately stays out of runtime-env.ts's
+      // PRODUCTION_REQUIRED_ENV until it's confirmed set here - adding it
+      // there first would make an unset var start throwing in production.
+      "AUTH_PROVIDER_MODE",
+      "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+      "CLERK_SECRET_KEY",
+      "CLERK_WEBHOOK_SIGNING_SECRET",
       "BILLING_PROVIDER",
       "STRIPE_SECRET_KEY",
       "STRIPE_SECRET_KEY_TEST",

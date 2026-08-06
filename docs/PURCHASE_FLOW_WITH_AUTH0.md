@@ -1,5 +1,15 @@
 # Purchase Flow with Auth0 User Creation
 
+> **Superseded by the Auth0 -> Clerk migration**, on top of already being
+> stale for the `/buy` page reference (see
+> `docs/NexStepsV2/06-cutover.md`'s own stale-flag on this file). Under
+> `getAuthProviderMode()` !== `"auth0"`, `apps/api/src/billing/webhook.controller.ts`
+> creates the user via `ClerkManagementService.createUser()` instead of
+> `Auth0ManagementService.createUser()` - same shape (email, name,
+> password), different provider. This document stays accurate for the
+> Auth0 path while `AUTH_PROVIDER_MODE` includes `auth0`/`dual`; it will be
+> removed once Auth0 support is fully retired.
+
 This document explains how the purchase flow creates users in both the database and Auth0.
 
 ## Overview
