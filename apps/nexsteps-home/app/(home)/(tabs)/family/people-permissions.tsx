@@ -38,7 +38,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function PeoplePermissionsScreen() {
   const { bootstrapState } = useAppReady();
-  const currentUserId = bootstrapState.status === "ready" ? bootstrapState.session.userId : undefined;
+  const currentUserId = bootstrapState.status === "ready" ? bootstrapState.state.userId : undefined;
 
   const peopleQuery = useOrgPeople();
   const invitesQuery = usePendingInvites();

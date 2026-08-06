@@ -11,12 +11,10 @@ const bootstrapContextValue = {
   bootstrapState: {
     status: "ready" as const,
     route: "/(home)/(tabs)/week" as const,
-    session: { accessToken: "token", userId: "u1", updatedAt: "2026-08-01T00:00:00.000Z" },
+    state: { userId: "u1", updatedAt: "2026-08-01T00:00:00.000Z" },
     activeSiteState: { activeSiteId: "site-1", sites: [] },
   },
   refreshBootstrap: jest.fn(),
-  signIn: jest.fn(),
-  signInWithPassword: jest.fn(),
   signOut: jest.fn(),
 };
 
