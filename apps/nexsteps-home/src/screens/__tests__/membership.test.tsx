@@ -103,6 +103,35 @@ describe("MembershipScreen", () => {
     );
   });
 
+  it("shows the billing-portal notice when openBrowserAsync rejects", async () => {
+    jest.spyOn(billingApi, "getEntitlements").mockResolvedValue({
+      orgId: "org1",
+      isMasterOrg: false,
+      subscriptionStatus: "ACTIVE",
+      subscription: {
+        planCode: "STARTER_49_MONTHLY",
+        status: "ACTIVE",
+        periodStart: "2026-07-01T00:00:00.000Z",
+        periodEnd: "2026-08-01T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+      },
+      maxChildren: 2,
+      leaderSeatsIncluded: 1,
+    });
+    jest
+      .spyOn(billingApi, "createBillingPortalSession")
+      .mockResolvedValue({ url: "https://billing.stripe.com/session/abc" });
+    mockOpenBrowserAsync.mockRejectedValueOnce(new Error("no browser available"));
+
+    const { getByText } = renderScreen(new QueryClient());
+
+    await waitFor(() => expect(getByText("Open portal")).toBeTruthy());
+    fireEvent.press(getByText("Open portal"));
+
+    await waitFor(() => expect(getByText("Could not open billing portal")).toBeTruthy());
+    expect(getByText("Check your connection and try again.")).toBeTruthy();
+  });
+
   it("shows the permission-denied notice for a real 401 loading entitlements", async () => {
     jest
       .spyOn(billingApi, "getEntitlements")

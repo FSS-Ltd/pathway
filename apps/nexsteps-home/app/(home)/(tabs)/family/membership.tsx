@@ -37,13 +37,21 @@ export default function MembershipScreen() {
   const entitlementsQuery = useEntitlements();
   const createPortalSession = useCreateBillingPortalSession();
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  // openBrowserAsync (invalid URL, no browser available, ...) fails
+  // separately from the createPortalSession mutation - it must surface
+  // through the same "Could not open billing portal" notice below, not
+  // swallow silently.
+  const [portalOpenFailed, setPortalOpenFailed] = useState(false);
 
   const handleManageBilling = () => {
+    setPortalOpenFailed(false);
     createPortalSession.mutate(undefined, {
       onSuccess: async (result) => {
         setIsOpeningPortal(true);
         try {
           await WebBrowser.openBrowserAsync(result.url);
+        } catch {
+          setPortalOpenFailed(true);
         } finally {
           setIsOpeningPortal(false);
         }
@@ -86,7 +94,7 @@ export default function MembershipScreen() {
   const isBusy = createPortalSession.isPending || isOpeningPortal;
 
   const isPermissionDenied = createPortalSession.isError && isDeniedError(createPortalSession.error);
-  const isOtherError = !isPermissionDenied && createPortalSession.isError;
+  const isOtherError = (!isPermissionDenied && createPortalSession.isError) || portalOpenFailed;
 
   const includedItems: ListCardItem[] = [
     { title: "Children", detail: maxChildren !== null ? `Up to ${maxChildren} children` : "Unlimited children" },
