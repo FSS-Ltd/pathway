@@ -1056,7 +1056,7 @@ git commit -m "feat: add membership screen"
 ```text
 Approved screens: membership
 Owning phase: Phase 7, PR H5d
-Production paths: apps/api/src/billing/billing-portal.controller.ts, apps/nexsteps-home/app/(home)/(tabs)/family/membership.tsx
+Production paths: apps/api/src/billing/billing.controller.ts (POST /billing/portal, added to the existing controller per Step 4's own "or add to" option - 84 lines, under the ~200-line split threshold), apps/nexsteps-home/app/(home)/(tabs)/family/membership.tsx
 Data and permission boundary: org-scoped via existing @CurrentOrg; portal session requires an org-level stripeCustomerId
 States covered: loading, empty (no subscription yet), validation/error, offline/retry, permission denied, success
 ```

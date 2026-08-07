@@ -9,3 +9,4 @@ export * as householdSetupApi from "./household-setup";
 export * as preferencesApi from "./preferences";
 export * as signupApi from "./signup";
 export * as orgPeopleApi from "./org-people";
+export * as billingApi from "./billing";

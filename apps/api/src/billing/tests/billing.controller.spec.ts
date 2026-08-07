@@ -5,6 +5,7 @@ import { BillingService } from "../billing.service";
 import { EntitlementsService } from "../entitlements.service";
 import { EntitlementsEnforcementService } from "../entitlements-enforcement.service";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
+import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "../billing-provider.config";
 
 describe("BillingController", () => {
   let controller: BillingController;
@@ -22,6 +23,10 @@ describe("BillingController", () => {
         {
           provide: EntitlementsEnforcementService,
           useValue: { checkAv30ForOrg: jest.fn() },
+        },
+        {
+          provide: BILLING_PROVIDER_CONFIG,
+          useValue: { activeProvider: "FAKE", stripe: {}, goCardless: {} } as BillingProviderConfig,
         },
       ],
     })
