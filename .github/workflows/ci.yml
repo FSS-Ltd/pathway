@@ -64,10 +64,41 @@ jobs:
         run: pnpm -r lint
         continue-on-error: false
 
-      - name: Test (Unit)
-        timeout-minutes: 8
-        run: pnpm turbo run test:unit --concurrency=4 --log-order=stream
-        continue-on-error: false
+      - name: Test (Unit) - db
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/db test:unit
+
+      - name: Test (Unit) - util
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/util test:unit
+
+      - name: Test (Unit) - auth
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/auth test:unit
+
+      - name: Test (Unit) - platform
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/platform test:unit
+
+      - name: Test (Unit) - workers
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/workers test:unit
+
+      - name: Test (Unit) - admin
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/admin test:unit
+
+      - name: Test (Unit) - web
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/web test:unit
+
+      - name: Test (Unit) - nexsteps-home
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/nexsteps-home test:unit
+
+      - name: Test (Unit) - api
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/api test:unit
 
   integration:
     name: Integration Tests
