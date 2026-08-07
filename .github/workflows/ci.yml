@@ -11,6 +11,7 @@ jobs:
   ci:
     name: Typecheck, Lint & Unit Test
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -64,13 +65,14 @@ jobs:
         continue-on-error: false
 
       - name: Test (Unit)
-        run: pnpm test:unit
+        run: pnpm turbo run test:unit --concurrency=4
         continue-on-error: false
 
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: ci # Ensure unit tests and linting pass first
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -164,6 +166,7 @@ jobs:
     name: System Role Seed Database Identity
     runs-on: ubuntu-22.04
     needs: ci
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -241,6 +244,7 @@ jobs:
     name: Permission Definition Database
     runs-on: ubuntu-22.04
     needs: ci
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -319,6 +323,7 @@ jobs:
     name: Organisation Role RLS
     runs-on: ubuntu-22.04
     needs: ci
+    timeout-minutes: 15
 
     services:
       postgres:
