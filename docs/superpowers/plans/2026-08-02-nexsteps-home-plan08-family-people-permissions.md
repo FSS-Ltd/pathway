@@ -1083,9 +1083,9 @@ enum DataExportKind {
 
 enum DataExportStatus {
   PENDING
+  GENERATING
   READY
   FAILED
-  EXPIRED
 }
 
 model DataExportRequest {
@@ -1096,9 +1096,7 @@ model DataExportRequest {
   requestedBy   User              @relation(fields: [requestedById], references: [id])
   kind          DataExportKind
   status        DataExportStatus  @default(PENDING)
-  downloadToken String?           @unique
-  expiresAt     DateTime?
-  failureReason String?
+  storageKey    String?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
@@ -1124,85 +1122,117 @@ Add both relations to `Tenant`/`User` (`dataExportRequests`,
 `accountDeletionRequests` — follow the existing relation-naming convention
 in the schema, e.g. `User.requestedReportBundles` as the closest analog).
 
-**Reuse, do not reinvent:** `ReportBundle`
-(`packages/db/prisma/schema.prisma:2281`) already has an async
-generate-then-download-token pattern for report PDFs
-(`apps/api/src/reports/`) — read that module in full before writing the
-export job; `DataExportRequest`'s worker should follow its exact job/status/
-download-token lifecycle, not a new one. Same for storage: use the existing
-authenticated storage abstraction the `reports`/`evidence` modules already
-use for private files (`implementation-map.md:106-107`) — do not add a new
-storage client.
+**Reuse, do not reinvent — corrected from an earlier draft of this plan.**
+The real generate-then-download pattern for `ReportBundle`
+(`packages/db/prisma/schema.prisma:2281`) is NOT in `apps/api/src/reports/`
+(that directory has no source files, only an unrelated ACE-vertical RLS
+test) — it's `LearningService.createReportBundle` in
+`apps/api/src/learning/learning.service.ts:216-283`, built for Plan 07.
+Read it in full before writing this task's export logic; it is
+**synchronous, not queue-based** — Plan 07's own code comment explains why
+("no async job/worker exists anywhere in this codebase to ever advance a
+report bundle past PENDING, so report generation would otherwise never
+complete"). `DataExportRequest` should follow the exact same shape:
+generate the content in-request inside the create call, upload via
+`SupabaseStorageService` (`apps/api/src/common/storage/supabase-storage.service.ts`,
+already imported by `learning.service.ts`), store the resulting key in a
+`storageKey` column (not a separate `downloadToken`), and mark `READY`
+immediately — no worker, no queue, no polling loop to write. Download is
+served by streaming the buffer back through `@Res()` directly
+(`learning.controller.ts:130-137`'s `report-bundles/:id/download` route is
+the exact pattern), not a redirect to a signed URL. A household export is
+larger than one CSV (multiple children, logs, preferences), so this is a
+deliberate, precedent-following tradeoff, not an oversight — document it
+the same way Plan 07 did, and if a real household ever produces an export
+large enough to risk a request timeout, that's a signal for a future async
+rework, not a reason to build one speculatively now.
 
 **Files:**
 - Modify: `packages/db/prisma/schema.prisma` (new enums/models above)
 - Create: migration
 - Create: `apps/api/src/privacy/privacy.controller.ts`,
   `privacy.service.ts`, `privacy.module.ts`, `dto/index.ts`
-- Create: `apps/api/src/privacy/export-job.worker.ts` (mirror
-  `apps/api/src/reports/`'s worker registration exactly — same queue
-  mechanism, check what that is first: `grep -rn "Queue\|bull\|pg-boss" apps/api/src/reports`)
-- Test: `privacy.controller.spec.ts`, `privacy.service.spec.ts`,
-  `export-job.worker.spec.ts`
+  (no worker file — generation is synchronous, inside the request, per the
+  corrected "Reuse, do not reinvent" note above)
+- Test: `privacy.controller.spec.ts`, `privacy.service.spec.ts`
 - Create: `apps/nexsteps-home/src/lib/api/privacy.ts`,
   `src/lib/queries/privacy.ts`
 - Create: `apps/nexsteps-home/app/(home)/(tabs)/family/privacy-data.tsx`
+- No zip library exists anywhere in this monorepo today (checked
+  `apps/api/package.json` and the root `package.json`) — this task
+  legitimately needs one, since the wireframe's "ZIP + JSON" format is a
+  real, new requirement, not something to hunt for a nonexistent
+  precedent of. `archiver` is the standard, well-maintained choice for
+  streaming a zip to a buffer/stream in Node — add it as a new dependency
+  to `apps/api` rather than agonizing over alternatives.
 
 **Interfaces:**
 - Produces: `POST /privacy/exports` (`{ kind: "FAMILY_DATA" | "REPORT_ARCHIVE" }`)
-  → `DataExportRequest` (status `PENDING`); `GET /privacy/exports` → list,
-  newest first; `GET /privacy/exports/:id/download` → 302 to the
-  authenticated storage URL once `status === "READY"`, 409 while `PENDING`,
-  410 once past `expiresAt`. `POST /privacy/deletion-requests`
+  → `DataExportRequest` (status `READY` once the synchronous call
+  returns, matching `createReportBundle`'s shape — there is no
+  meaningful `PENDING` window to poll for in a synchronous flow, unlike
+  the wording in Step 8 below assumed); `GET /privacy/exports` → list,
+  newest first; `GET /privacy/exports/:id/download` → streams the file
+  directly via `@Res()`, exactly like `report-bundles/:id/download`,
+  gated on `status === "READY"` and tenant ownership — no redirect, no
+  token, no expiry. `POST /privacy/deletion-requests`
   (`{ reason?: string }`) → `AccountDeletionRequest`; this endpoint also
   notifies support (reuse whatever the codebase already uses for internal
   notifications — check `apps/api/src/mailer/` before adding a new channel).
 
-- [ ] **Step 1: Read the reports module's async job/download-token pattern in full**
+- [ ] **Step 1: Read `LearningService.createReportBundle` and its download route in full**
 
-  Run: `cat apps/api/src/reports/*.ts`
+  Run: `sed -n '200,340p' apps/api/src/learning/learning.service.ts` and
+  `sed -n '120,140p' apps/api/src/learning/learning.controller.ts`
 
   This step has no test of its own — it's the research step that makes
-  every following step accurate instead of guessed. Note the exact queue
-  library, the exact `DownloadToken`-equivalent field lifecycle, and the
-  exact storage-signing helper name before writing Step 4.
+  every following step accurate instead of guessed. Note the exact
+  `SupabaseStorageService` method names (`uploadObject`/`downloadObject`),
+  the `storageKey` field's exact lifecycle, and the exact `@Res()`
+  streaming shape in the controller before writing Step 4.
 
 - [ ] **Step 2: Write the failing service test for requesting an export**
 
 ```ts
 // apps/api/src/privacy/privacy.service.spec.ts
 describe("requestExport", () => {
-  it("creates a pending export request and enqueues the job", async () => {
+  it("creates the export request, generates and uploads the zip, and marks it READY", async () => {
     prismaMock.dataExportRequest.create.mockResolvedValue({ id: "exp1", status: "PENDING", kind: "FAMILY_DATA" });
+    storageMock.uploadObject.mockResolvedValue(true);
+    prismaMock.dataExportRequest.update.mockResolvedValue({ id: "exp1", status: "READY", storageKey: "expected-key" });
+
     const result = await service.requestExport("FAMILY_DATA", "tenant-1", "user-1");
+
     expect(prismaMock.dataExportRequest.create).toHaveBeenCalledWith({
       data: { tenantId: "tenant-1", requestedById: "user-1", kind: "FAMILY_DATA", status: "PENDING" },
     });
-    expect(queueMock.enqueue).toHaveBeenCalledWith("data-export", { exportRequestId: "exp1" });
-    expect(result.status).toBe("PENDING");
+    expect(storageMock.uploadObject).toHaveBeenCalled();
+    expect(result.status).toBe("READY");
   });
 });
 ```
 
-  (Replace `queueMock.enqueue`'s call shape with whatever Step 1 found the
-  reports module actually calls.)
+  (Match `createReportBundle`'s exact real mock/assertion style once Step 1
+  is done — this is intent, not a literal transcript.)
 
 - [ ] **Step 3: Run test to verify it fails**
 
   Run: `pnpm --filter api test privacy.service.spec.ts`
   Expected: FAIL — service doesn't exist.
 
-- [ ] **Step 4: Add the Prisma models/migration, then implement the service, controller, and worker**
+- [ ] **Step 4: Add the Prisma models/migration, then implement the service and controller**
 
-  Follow the exact structure the reports module uses (Step 1). The worker's
-  job: gather `children` (name, age, notes — no photos/binary evidence in
-  the zip, link evidence by reference the same way the pack-export flow in
+  Follow `createReportBundle`'s exact structure (Step 1): create the
+  `DataExportRequest` row, gather the data synchronously in the same call
+  (`children` — name, age, notes, no photos/binary evidence in the zip,
+  link evidence by reference the same way the pack-export flow in
   `regulations-evidence` does — check that flow's "link rather than copy"
-  rule at `acceptance-criteria.md:62` applies equally here), `learningLogs`,
-  household `preferences`/`notificationPreferences`, then zip
-  (`archiver` or whatever the reports module already uses — check before
-  adding a new zip library) and upload via the shared storage abstraction,
-  then mark `READY` with a signed, expiring `downloadToken`.
+  rule at `acceptance-criteria.md:62` applies equally here — `learningLogs`,
+  household `preferences`/`notificationPreferences`), zip it with
+  `archiver` (new dependency, see Files above), upload via
+  `SupabaseStorageService.uploadObject`, then `update` the row to `READY`
+  with the resulting `storageKey` — matching `createReportBundle` line for
+  line in shape, swapping CSV-generation for zip-generation.
 
 - [ ] **Step 5: Run test to verify it passes**
 
@@ -1218,15 +1248,21 @@ describe("requestExport", () => {
 
 - [ ] **Step 8: Frontend — API/query modules and the `privacy-data` screen**
 
-  "Prepare export"/"Prepare" call `POST /privacy/exports`, poll or
-  re-fetch `GET /privacy/exports` (`useQuery` with `refetchInterval` while
-  any request is `PENDING`, matching however the reports screens already
-  poll `report-request`/`report-detail-download` — reuse that polling
-  pattern exactly, check `apps/nexsteps-home/app/(home)/(tabs)/progress/report-request.tsx`
-  first). "Manage" under "Community profile" links out to
-  `community-settings` (existing screen) — do not build a second privacy
-  toggle for the same setting. "Review" under "Delete family account" opens
-  a confirmation view (explains consequences per `acceptance-criteria.md:35`)
+  "Prepare export"/"Prepare" call `POST /privacy/exports`; since the
+  backend is now synchronous (Step 4), the mutation itself resolves with
+  the `READY` request — no polling/`refetchInterval` needed, just
+  `invalidateQueries(["privacy-exports"])` on success matching every
+  other mutation in this series (check `apps/nexsteps-home/app/(home)/(tabs)/progress/report-request.tsx`
+  for the equivalent screen's shape, but its polling logic doesn't apply
+  here — this endpoint doesn't have a pending window to poll).
+  "Manage" under "Community profile": `community-settings` is
+  **registered in `src/screens/registry.ts` but has no route file yet**
+  (Community phase, H8-H11, not built as of this plan) — do not link to
+  it; this app's own established convention (see 08a/08b/08c) is to omit
+  a link to a screen that doesn't exist yet rather than ship a dead one,
+  so drop this action or replace it with a static, non-interactive note
+  until Community lands. "Review" under "Delete family account" opens a
+  confirmation view (explains consequences per `acceptance-criteria.md:35`)
   before calling `POST /privacy/deletion-requests`.
 
 - [ ] **Step 9: Run full verification and commit**
