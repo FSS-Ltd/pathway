@@ -11,7 +11,7 @@
     "doctor": "npx expo-doctor",
     "lint": "eslint \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" \"fidelity/**/*.{ts,mjs}\" --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit",
-    "test:unit": "jest --config jest.config.js",
+    "test:unit": "jest --config jest.config.js --forceExit",
     "test:fidelity": "tsx fidelity/run.ts"
   },
   "dependencies": {
