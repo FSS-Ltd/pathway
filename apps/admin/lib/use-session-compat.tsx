@@ -110,6 +110,18 @@ export function SessionProvider({ children }: PropsWithChildren) {
     void resolve();
   }, [isLoaded, resolve]);
 
+  // Clerk session tokens are short-lived (default 60s) but resolve() above
+  // only runs once per sign-in, so the cached token in api-client.ts goes
+  // stale mid-session and every request after that 401s with an "exp"
+  // claim failure. Refresh it in the background well inside that window.
+  useEffect(() => {
+    if (!isSignedIn) return;
+    const interval = setInterval(() => {
+      void getToken().then((token: string | null) => setApiClientToken(token));
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [isSignedIn, getToken]);
+
   const value = useMemo(
     () => ({ data: session, status, update: resolve }),
     [session, status, resolve],
