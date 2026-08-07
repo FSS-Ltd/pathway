@@ -183,6 +183,18 @@ enum ReportBundleStatus {
   FAILED
 }
 
+enum DataExportKind {
+  FAMILY_DATA
+  REPORT_ARCHIVE
+}
+
+enum DataExportStatus {
+  PENDING
+  GENERATING
+  READY
+  FAILED
+}
+
 enum AcademicYearStatus {
   ACTIVE
   ARCHIVED
@@ -642,6 +654,8 @@ model Tenant {
   learningLogs           LearningLog[]
   evidence               Evidence[]
   reportBundles          ReportBundle[]
+  dataExportRequests     DataExportRequest[]
+  accountDeletionRequests AccountDeletionRequest[]
   activities             Activity[]
   tasks                  Task[]
   calendarItems          CalendarItem[]
@@ -805,6 +819,8 @@ model User {
   loggedLearningLogs      LearningLog[]           @relation("LearningLogLoggedBy")
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
+  requestedDataExports    DataExportRequest[]      @relation("DataExportRequestRequestedBy")
+  requestedAccountDeletions AccountDeletionRequest[] @relation("AccountDeletionRequestRequestedBy")
   createdActivities       Activity[]              @relation("ActivityCreatedBy")
   assignedTasks           Task[]                  @relation("TaskAssignedTo")
   createdTasks            Task[]                  @relation("TaskCreatedBy")
@@ -2555,6 +2571,41 @@ model ReportBundle {
 
   @@index([tenantId, childId])
   @@index([status])
+}
+
+// NexSteps Home privacy & data (Plan 08e): synchronous household export
+// requests (see PrivacyService.requestExport - no worker/queue, mirrors
+// ReportBundle/createReportBundle's own documented reasoning).
+model DataExportRequest {
+  id            String           @id @default(uuid())
+  tenantId      String
+  tenant        Tenant           @relation(fields: [tenantId], references: [id])
+  requestedById String
+  requestedBy   User             @relation("DataExportRequestRequestedBy", fields: [requestedById], references: [id])
+  kind          DataExportKind
+  status        DataExportStatus @default(PENDING)
+  storageKey    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([tenantId, kind, createdAt])
+}
+
+// NexSteps Home privacy & data (Plan 08e): support-routed "delete family
+// account" request - files a request for support to action, does not
+// delete anything itself.
+model AccountDeletionRequest {
+  id            String   @id @default(uuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  requestedById String
+  requestedBy   User     @relation("AccountDeletionRequestRequestedBy", fields: [requestedById], references: [id])
+  reason        String?
+  status        String   @default("SUBMITTED") // SUBMITTED | IN_REVIEW | COMPLETED | CANCELLED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, createdAt])
 }
 
 model Announcement {

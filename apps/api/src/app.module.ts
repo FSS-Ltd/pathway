@@ -36,6 +36,7 @@ import { StaffModule } from "./staff/staff.module";
 import { PublicSignupModule } from "./public-signup/public-signup.module";
 import { NexstepsHomeSignupModule } from "./nexsteps-home-signup/nexsteps-home-signup.module";
 import { HouseholdSetupModule } from "./household-setup/household-setup.module";
+import { PrivacyModule } from "./privacy/privacy.module";
 import { ExportsModule } from "./exports/exports.module";
 import { BlogModule } from "./blog/blog.module";
 import { HandoverModule } from "./handover/handover.module";
@@ -76,6 +77,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     PublicSignupModule,
     NexstepsHomeSignupModule,
     HouseholdSetupModule,
+    PrivacyModule,
     ExportsModule,
     BlogModule,
     HandoverModule,
