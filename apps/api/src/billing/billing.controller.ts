@@ -1,11 +1,30 @@
-import { BadRequestException, Body, Controller, Post, Get, Inject, UseGuards, forwardRef } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Post,
+  Get,
+  Inject,
+  NotFoundException,
+  UseGuards,
+  forwardRef,
+} from "@nestjs/common";
 import { z } from "zod";
+import Stripe from "stripe";
+import { prisma } from "@pathway/db";
 import { BillingService } from "./billing.service";
 import { checkoutDto } from "./dto/checkout.dto";
 import { EntitlementsService } from "./entitlements.service";
 import { EntitlementsEnforcementService } from "./entitlements-enforcement.service";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { CurrentOrg } from "@pathway/auth";
+import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
+
+// Default deep link back into the mobile app after the Stripe-hosted portal
+// closes (apps/nexsteps-home's scheme, app.config.ts:24) - overridable per
+// environment via NEXSTEPS_HOME_BILLING_RETURN_URL, same convention as
+// STRIPE_SUCCESS_URL/STRIPE_CANCEL_URL in .env.example.
+const DEFAULT_BILLING_RETURN_URL = "nexstepshome://family/membership";
 
 const parseOrBadRequest = async <T>(
   schema: z.ZodTypeAny,
@@ -31,11 +50,23 @@ const parseOrBadRequest = async <T>(
 
 @Controller("billing")
 export class BillingController {
+  private readonly stripe: Stripe | null;
+
   constructor(
     @Inject(BillingService) private readonly service: BillingService,
     @Inject(forwardRef(() => EntitlementsService)) private readonly entitlements: EntitlementsService,
     @Inject(forwardRef(() => EntitlementsEnforcementService)) private readonly enforcement: EntitlementsEnforcementService,
-  ) {}
+    @Inject(BILLING_PROVIDER_CONFIG) private readonly billingConfig: BillingProviderConfig,
+  ) {
+    // Same construction as StripeBuyNowProvider/BillingPricingService
+    // (providers/stripe-buy-now.provider.ts, pricing.service.ts): pinned
+    // apiVersion "2023-10-16", key sourced from BILLING_PROVIDER_CONFIG, and
+    // left null (not thrown) when unset so FAKE-provider dev/test boots
+    // still work - createPortalSession 404s instead.
+    this.stripe = this.billingConfig.stripe.secretKey
+      ? new Stripe(this.billingConfig.stripe.secretKey, { apiVersion: "2023-10-16" })
+      : null;
+  }
 
   @Post("checkout")
   async checkout(@Body() body: unknown) {
@@ -79,5 +110,27 @@ export class BillingController {
       maxSites: resolved.maxSites,
       usageCalculatedAt: resolved.usageCalculatedAt?.toISOString() ?? null,
     };
+  }
+
+  // Household-config endpoint (nexsteps-home membership screen's "Manage
+  // billing" action) - plain AuthUserGuard, not CapabilityGuard, matching
+  // every other household-config endpoint in this plan
+  // (implementation-map.md:130-131). orgId is resolved server-side from the
+  // bearer token via @CurrentOrg, never trusted from client input.
+  @Post("portal")
+  @UseGuards(AuthUserGuard)
+  async createPortalSession(@CurrentOrg("orgId") orgId: string) {
+    const org = await prisma.org.findUniqueOrThrow({
+      where: { id: orgId },
+      select: { stripeCustomerId: true },
+    });
+    if (!org.stripeCustomerId || !this.stripe) {
+      throw new NotFoundException("This household has no billing account yet");
+    }
+    const session = await this.stripe.billingPortal.sessions.create({
+      customer: org.stripeCustomerId,
+      return_url: process.env.NEXSTEPS_HOME_BILLING_RETURN_URL ?? DEFAULT_BILLING_RETURN_URL,
+    });
+    return { url: session.url };
   }
 }
