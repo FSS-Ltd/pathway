@@ -11,6 +11,7 @@ jobs:
   ci:
     name: Typecheck, Lint & Unit Test
     runs-on: ubuntu-22.04
+    timeout-minutes: 20
 
     steps:
       - name: Checkout code
@@ -63,14 +64,47 @@ jobs:
         run: pnpm -r lint
         continue-on-error: false
 
-      - name: Test (Unit)
-        run: pnpm test:unit
-        continue-on-error: false
+      - name: Test (Unit) - db
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/db test:unit
+
+      - name: Test (Unit) - util
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/util test:unit
+
+      - name: Test (Unit) - auth
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/auth test:unit
+
+      - name: Test (Unit) - platform
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/platform test:unit
+
+      - name: Test (Unit) - workers
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/workers test:unit
+
+      - name: Test (Unit) - admin
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/admin test:unit
+
+      - name: Test (Unit) - web
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/web test:unit
+
+      - name: Test (Unit) - nexsteps-home
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/nexsteps-home test:unit
+
+      - name: Test (Unit) - api
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/api test:unit
 
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: ci # Ensure unit tests and linting pass first
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -164,6 +198,7 @@ jobs:
     name: System Role Seed Database Identity
     runs-on: ubuntu-22.04
     needs: ci
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -241,6 +276,7 @@ jobs:
     name: Permission Definition Database
     runs-on: ubuntu-22.04
     needs: ci
+    timeout-minutes: 15
 
     services:
       postgres:
@@ -319,6 +355,7 @@ jobs:
     name: Organisation Role RLS
     runs-on: ubuntu-22.04
     needs: ci
+    timeout-minutes: 15
 
     services:
       postgres:
