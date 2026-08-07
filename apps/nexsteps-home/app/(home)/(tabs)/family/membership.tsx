@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as WebBrowser from "expo-web-browser";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { ContentCard, ListCard, NoticeCard, ScreenHeader, type ListCardItem } from "@/components/primitives";
 import { homeTokens } from "@/design/tokens";
@@ -34,6 +35,7 @@ function formatDate(iso: string): string {
 }
 
 export default function MembershipScreen() {
+  const queryClient = useQueryClient();
   const entitlementsQuery = useEntitlements();
   const createPortalSession = useCreateBillingPortalSession();
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
@@ -50,6 +52,11 @@ export default function MembershipScreen() {
         setIsOpeningPortal(true);
         try {
           await WebBrowser.openBrowserAsync(result.url);
+          // The user may have cancelled, upgraded or updated payment
+          // details in the portal - refetch so the plan card doesn't go
+          // stale once they're back (matches the invalidate-on-mutation
+          // convention every hook in lib/queries/org-people.ts follows).
+          void queryClient.invalidateQueries({ queryKey: ["billing-entitlements"] });
         } catch {
           setPortalOpenFailed(true);
         } finally {

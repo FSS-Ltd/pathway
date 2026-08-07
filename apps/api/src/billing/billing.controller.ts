@@ -5,6 +5,7 @@ import {
   Post,
   Get,
   Inject,
+  Logger,
   NotFoundException,
   UseGuards,
   forwardRef,
@@ -19,12 +20,6 @@ import { EntitlementsEnforcementService } from "./entitlements-enforcement.servi
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { CurrentOrg } from "@pathway/auth";
 import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
-
-// Default deep link back into the mobile app after the Stripe-hosted portal
-// closes (apps/nexsteps-home's scheme, app.config.ts:24) - overridable per
-// environment via NEXSTEPS_HOME_BILLING_RETURN_URL, same convention as
-// STRIPE_SUCCESS_URL/STRIPE_CANCEL_URL in .env.example.
-const DEFAULT_BILLING_RETURN_URL = "nexstepshome://family/membership";
 
 const parseOrBadRequest = async <T>(
   schema: z.ZodTypeAny,
@@ -51,6 +46,7 @@ const parseOrBadRequest = async <T>(
 @Controller("billing")
 export class BillingController {
   private readonly stripe: Stripe | null;
+  private readonly logger = new Logger(BillingController.name);
 
   constructor(
     @Inject(BillingService) private readonly service: BillingService,
@@ -127,10 +123,23 @@ export class BillingController {
     if (!org.stripeCustomerId || !this.stripe) {
       throw new NotFoundException("This household has no billing account yet");
     }
-    const session = await this.stripe.billingPortal.sessions.create({
-      customer: org.stripeCustomerId,
-      return_url: process.env.NEXSTEPS_HOME_BILLING_RETURN_URL ?? DEFAULT_BILLING_RETURN_URL,
-    });
+    // return_url is optional on Stripe's Billing Portal API - omitted, the
+    // portal falls back to its dashboard-configured default. A custom URL
+    // scheme (nexstepshome://...) is not a verified http(s) URL, and
+    // Stripe may reject a non-http(s) return_url, so only pass it when an
+    // operator has actually set NEXSTEPS_HOME_BILLING_RETURN_URL, never a
+    // guessed default.
+    const returnUrl = process.env.NEXSTEPS_HOME_BILLING_RETURN_URL;
+    let session: Stripe.BillingPortal.Session;
+    try {
+      session = await this.stripe.billingPortal.sessions.create({
+        customer: org.stripeCustomerId,
+        ...(returnUrl ? { return_url: returnUrl } : {}),
+      });
+    } catch (error) {
+      this.logger.error(`Failed to create Stripe billing portal session for org ${orgId}`, error);
+      throw error;
+    }
     return { url: session.url };
   }
 }

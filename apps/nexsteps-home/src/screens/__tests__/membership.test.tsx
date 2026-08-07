@@ -103,6 +103,38 @@ describe("MembershipScreen", () => {
     );
   });
 
+  it("refetches entitlements after the portal browser is dismissed", async () => {
+    const getEntitlementsSpy = jest.spyOn(billingApi, "getEntitlements").mockResolvedValue({
+      orgId: "org1",
+      isMasterOrg: false,
+      subscriptionStatus: "ACTIVE",
+      subscription: {
+        planCode: "STARTER_49_MONTHLY",
+        status: "ACTIVE",
+        periodStart: "2026-07-01T00:00:00.000Z",
+        periodEnd: "2026-08-01T00:00:00.000Z",
+        cancelAtPeriodEnd: false,
+      },
+      maxChildren: 2,
+      leaderSeatsIncluded: 1,
+    });
+    jest
+      .spyOn(billingApi, "createBillingPortalSession")
+      .mockResolvedValue({ url: "https://billing.stripe.com/session/abc" });
+
+    const { getByText } = renderScreen(new QueryClient());
+
+    await waitFor(() => expect(getByText("Open portal")).toBeTruthy());
+    const callsBeforePress = getEntitlementsSpy.mock.calls.length;
+    fireEvent.press(getByText("Open portal"));
+
+    // The portal opened and the user is back (openBrowserAsync resolved) -
+    // the stale plan card must refetch, not sit indefinitely on whatever
+    // it showed before the user could have cancelled/upgraded in the
+    // portal.
+    await waitFor(() => expect(getEntitlementsSpy.mock.calls.length).toBeGreaterThan(callsBeforePress));
+  });
+
   it("shows the billing-portal notice when openBrowserAsync rejects", async () => {
     jest.spyOn(billingApi, "getEntitlements").mockResolvedValue({
       orgId: "org1",
