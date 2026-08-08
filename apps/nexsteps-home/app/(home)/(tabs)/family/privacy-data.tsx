@@ -102,18 +102,23 @@ export default function PrivacyDataScreen() {
 
         <ContentCard
           title="Family data"
-          body="Children, learning logs and preferences as a downloadable archive."
-          action={requestExport.isPending ? "Preparing..." : "Download family data"}
+          body="Children, learning logs, preferences and evidence references."
+          action={requestExport.isPending ? "Preparing..." : "Prepare family data"}
           tone="mint"
           onPress={!requestExport.isPending ? () => requestExport.mutate("FAMILY_DATA") : undefined}
         />
 
         <ContentCard
           title="Report archive"
-          body="Every learning report generated for this household."
-          action={requestExport.isPending ? "Preparing..." : "Download report archive"}
+          body="Report history, learning logs and evidence references."
+          action={requestExport.isPending ? "Preparing..." : "Prepare report archive"}
           tone="mint"
           onPress={!requestExport.isPending ? () => requestExport.mutate("REPORT_ARCHIVE") : undefined}
+        />
+
+        <NoticeCard
+          title="How to receive a prepared export"
+          body="Once an export shows Ready below, contact support to receive a copy - in-app download isn't available yet."
         />
 
         {isExportPermissionDenied ? (

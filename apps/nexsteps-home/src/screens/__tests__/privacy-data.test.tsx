@@ -24,8 +24,12 @@ describe("PrivacyDataScreen", () => {
     const { getByText } = renderScreen(new QueryClient());
 
     await waitFor(() => expect(getByText("No exports yet")).toBeTruthy());
-    expect(getByText("Download family data")).toBeTruthy();
-    expect(getByText("Download report archive")).toBeTruthy();
+    expect(getByText("Prepare family data")).toBeTruthy();
+    expect(getByText("Prepare report archive")).toBeTruthy();
+    // Nothing on this screen can actually download a file yet (no
+    // expo-file-system/expo-sharing dependency anywhere in this monorepo) -
+    // the copy must not promise a download it can't deliver.
+    expect(getByText("How to receive a prepared export")).toBeTruthy();
   });
 
   it("lists past export requests with kind, date and status", async () => {
@@ -67,8 +71,8 @@ describe("PrivacyDataScreen", () => {
 
     const { getByText } = renderScreen(new QueryClient());
 
-    await waitFor(() => expect(getByText("Download family data")).toBeTruthy());
-    fireEvent.press(getByText("Download family data"));
+    await waitFor(() => expect(getByText("Prepare family data")).toBeTruthy());
+    fireEvent.press(getByText("Prepare family data"));
 
     await waitFor(() => expect(requestSpy).toHaveBeenCalledWith("FAMILY_DATA"));
   });
