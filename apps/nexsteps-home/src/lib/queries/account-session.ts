@@ -61,7 +61,12 @@ export function useRevokeSession() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (session: ClerkSession) => session.revoke(),
-    onSuccess: () => {
+    // onSettled, not onSuccess: revoke() already happened at Clerk even if
+    // this promise rejects (e.g. an already-revoked session). Gating the
+    // refetch on success only would leave the just-revoked device showing
+    // as active on error - the exact stale-list bug this screen exists to
+    // avoid.
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ACCOUNT_SESSIONS_QUERY_KEY });
     },
   });
@@ -73,8 +78,10 @@ export function useRevokeSession() {
  * so the revoked device's next token refresh fails at the source - this is
  * the property the removed Auth0-era design was trying to build a guard
  * for, and it comes for free here. Invalidating the sessions query on
- * success is what drives the post-revoke re-fetch the account-session
- * screen depends on to stop showing a just-revoked device as active.
+ * settle (not just success) is what drives the post-revoke re-fetch the
+ * account-session screen depends on to stop showing a just-revoked device
+ * as active - including when Promise.all rejects because one of several
+ * revoke() calls failed after the others already succeeded at Clerk.
  */
 export function useRevokeOtherSessions() {
   const queryClient = useQueryClient();
@@ -89,7 +96,7 @@ export function useRevokeOtherSessions() {
       const others = sessions.filter((session) => session.id !== currentSessionId);
       await Promise.all(others.map((session) => session.revoke()));
     },
-    onSuccess: () => {
+    onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ACCOUNT_SESSIONS_QUERY_KEY });
     },
   });

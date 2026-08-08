@@ -140,6 +140,43 @@ describe("account-session queries", () => {
     expect(getSessions).toHaveBeenCalledTimes(2);
   });
 
+  // Promise.all rejects on the first failure even after other revoke()
+  // calls already succeeded at Clerk - onSettled (not onSuccess) must
+  // still trigger the refetch, or the screen would keep showing an
+  // already-revoked device as active whenever one of several revokes
+  // fails and the others don't.
+  it("still re-fetches the session list when one of several revokes fails", async () => {
+    const currentSession = makeSession("sess_current");
+    const revokedOk = makeSession("sess_ok");
+    const revokedFailed = makeSession("sess_failed", {
+      revoke: jest.fn().mockRejectedValue(new Error("already revoked")),
+    });
+    const getSessions = jest
+      .fn()
+      .mockResolvedValueOnce([currentSession, revokedOk, revokedFailed])
+      .mockResolvedValueOnce([currentSession]);
+    const user = makeUser({ getSessions });
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = makeWrapper(client);
+
+    const { result: sessionsResult } = renderHook(() => useAccountSessions(user), { wrapper } as never);
+    await waitFor(() => expect(sessionsResult.current.isSuccess).toBe(true));
+    expect(sessionsResult.current.data?.sessions).toHaveLength(3);
+
+    const { result: revokeResult } = renderHook(() => useRevokeOtherSessions(), { wrapper } as never);
+    await expect(
+      revokeResult.current.mutateAsync({
+        sessions: sessionsResult.current.data!.sessions,
+        currentSessionId: "sess_current",
+      }),
+    ).rejects.toThrow("already revoked");
+
+    expect((revokedOk as { revoke: jest.Mock }).revoke).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(sessionsResult.current.data?.sessions).toHaveLength(1));
+    expect(getSessions).toHaveBeenCalledTimes(2);
+  });
+
   it("useChangePassword calls updatePassword with the current and new password", async () => {
     const updatePassword = jest.fn().mockResolvedValue({ id: "user_1" });
     const user = makeUser({ updatePassword });
