@@ -1275,6 +1275,7 @@ Production paths: apps/api/src/privacy/*, packages/db/prisma/schema.prisma, apps
 Data and permission boundary: tenant-scoped, requester-authenticated; cross-tenant negative tests required (new zip-of-household-data surface)
 States covered: loading, empty, validation/error, offline/retry, permission denied, success
 Release-gate note: deletion is support-routed only in this plan - no automated retention/deletion engine ships here (acceptance-criteria.md release gate item "Data migration and rollback are documented" still applies to the export job itself)
+Known operational ceiling (identified in final review, ponytail: precedent-conformant, upgrade path if triggered): the export upload runs inside the request's Postgres interactive transaction (TenantRlsInterceptor wraps every handler in $transaction with a 15s timeout), so a slow Supabase Storage upload can hit a transaction timeout and roll back with no FAILED row recorded, surfacing as a bare 500. Identical structure to createReportBundle (Plan 07), which accepted the same tradeoff for a single-CSV payload; here the payload is an unbounded whole-household zip, so the trigger condition is more reachable. Not fixed in this plan - if a real household export times out in practice, that's the signal to move export generation outside the request transaction (e.g. commit the PENDING row first, then upload and update in a second, untransacted call), not a reason to build async infrastructure speculatively now.
 ```
 
 ---
