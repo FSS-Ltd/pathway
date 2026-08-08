@@ -1,5 +1,5 @@
-import { Inject, Injectable, Optional, ServiceUnavailableException } from "@nestjs/common";
-import { prisma } from "@pathway/db";
+import { ForbiddenException, Inject, Injectable, Optional, ServiceUnavailableException } from "@nestjs/common";
+import { OrgRole, SiteRole, prisma } from "@pathway/db";
 import archiver from "archiver";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { dataExportKey } from "../common/storage/storage-key.util";
@@ -47,6 +47,24 @@ type LearningLogRow = {
   subject: { name: string } | null;
 };
 
+type ReportBundleRow = {
+  id: string;
+  childId: string | null;
+  periodStart: Date;
+  periodEnd: Date;
+  status: string;
+  createdAt: Date;
+};
+
+type EvidenceReferenceRow = {
+  id: string;
+  title: string;
+  childId: string;
+  mimeType: string;
+  byteSize: number;
+  capturedAt: Date | null;
+};
+
 @Injectable()
 export class PrivacyService {
   private readonly storage: SupabaseStorageService;
@@ -90,7 +108,7 @@ export class PrivacyService {
       select: dataExportSelect,
     });
 
-    const [children, learningLogs, tenant] = await Promise.all([
+    const [children, learningLogs, tenant, evidence, reportBundles] = await Promise.all([
       prisma.child.findMany({
         where: { tenantId },
         select: { id: true, firstName: true, preferredName: true, dateOfBirth: true, notes: true },
@@ -111,6 +129,25 @@ export class PrivacyService {
         where: { id: tenantId },
         select: { name: true, planningPreferences: true, notificationPreferences: true },
       }),
+      // Evidence is linked by reference, never copied - same "link rather
+      // than copy" rule the regulations-evidence pack export flow follows
+      // (acceptance-criteria.md:62). No binary content, no storageKey -
+      // just enough to know what exists and where to find it in-app.
+      prisma.evidence.findMany({
+        where: { tenantId },
+        select: { id: true, title: true, childId: true, mimeType: true, byteSize: true, capturedAt: true },
+      }),
+      // Report bundle metadata only, not the generated CSV bytes - those
+      // remain separately downloadable via
+      // GET /learning/report-bundles/:id/download. Only fetched for
+      // REPORT_ARCHIVE - FAMILY_DATA's zip doesn't claim to contain reports.
+      kind === "REPORT_ARCHIVE"
+        ? prisma.reportBundle.findMany({
+            where: { tenantId },
+            orderBy: { createdAt: "desc" },
+            select: { id: true, childId: true, periodStart: true, periodEnd: true, status: true, createdAt: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     const zip = await this.buildExportZip({
@@ -120,6 +157,8 @@ export class PrivacyService {
       learningLogs,
       planningPreferences: tenant.planningPreferences,
       notificationPreferences: tenant.notificationPreferences,
+      evidence,
+      reportBundles,
     });
 
     const key = dataExportKey(tenantId, request.id);
@@ -164,18 +203,25 @@ export class PrivacyService {
 
   /**
    * Files a support-routed deletion request - does not delete anything.
-   * The row is persisted before the notification attempt, so (matching
-   * InvitesService.createInvite's sendInviteEmail handling) a notification
-   * failure is logged, not thrown - the household's request is already on
-   * record either way.
+   * "Delete family account" is more consequential than any other
+   * household-config action gated by plain AuthUserGuard in this plan, so
+   * it needs the same site/org-admin check TenantsController.assertSiteOrOrgAdmin
+   * already uses for something less consequential (rotating a signup
+   * link) - see assertSiteOrOrgAdmin below. The row is persisted before
+   * the notification attempt, so (matching InvitesService.createInvite's
+   * sendInviteEmail handling) a notification failure is logged, not
+   * thrown - the household's request is already on record either way.
    */
   async requestDeletion(
     dto: RequestDeletionDto,
     tenantId: string,
+    orgId: string,
     requestedById: string,
     requesterEmail?: string,
     requesterName?: string,
   ) {
+    await this.assertSiteOrOrgAdmin(requestedById, tenantId, orgId);
+
     const request = await prisma.accountDeletionRequest.create({
       data: { tenantId, requestedById, reason: dto.reason ?? null },
       select: deletionRequestSelect,
@@ -199,6 +245,30 @@ export class PrivacyService {
     return request;
   }
 
+  /**
+   * Mirrors TenantsController.assertSiteOrOrgAdmin
+   * (apps/api/src/tenants/tenants.controller.ts:141) - same three-way
+   * site-admin/org-admin/legacy-org-role check, reused here rather than
+   * duplicated with different rules.
+   */
+  private async assertSiteOrOrgAdmin(userId: string, tenantId: string, orgId: string): Promise<void> {
+    const [siteMembership, orgMembership, userOrgRole] = await Promise.all([
+      prisma.siteMembership.findFirst({
+        where: { userId, tenantId, role: SiteRole.SITE_ADMIN },
+      }),
+      prisma.orgMembership.findFirst({
+        where: { userId, orgId, role: OrgRole.ORG_ADMIN },
+      }),
+      prisma.userOrgRole.findFirst({
+        where: { userId, orgId, role: OrgRole.ORG_ADMIN },
+      }),
+    ]);
+    const canManage = siteMembership !== null || orgMembership !== null || userOrgRole !== null;
+    if (!canManage) {
+      throw new ForbiddenException("Only admins can request deletion of this family account");
+    }
+  }
+
   private async buildExportZip(input: {
     kind: "FAMILY_DATA" | "REPORT_ARCHIVE";
     tenantName: string;
@@ -212,6 +282,8 @@ export class PrivacyService {
     learningLogs: LearningLogRow[];
     planningPreferences: unknown;
     notificationPreferences: unknown;
+    evidence: EvidenceReferenceRow[];
+    reportBundles: ReportBundleRow[] | null;
   }): Promise<Buffer> {
     const archive = archiver("zip", { zlib: { level: 9 } });
     const chunks: Buffer[] = [];
@@ -227,6 +299,14 @@ export class PrivacyService {
           kind: input.kind,
           household: input.tenantName,
           generatedAt: new Date().toISOString(),
+          contents: [
+            "manifest.json",
+            "children.json",
+            "learning-logs.csv",
+            "preferences.json",
+            "evidence.json",
+            ...(input.reportBundles ? ["report-bundles.json"] : []),
+          ],
         },
         null,
         2,
@@ -266,6 +346,42 @@ export class PrivacyService {
       ),
       { name: "preferences.json" },
     );
+
+    // References only, never copies - see the "link rather than copy"
+    // comment on the evidence.findMany call above.
+    archive.append(
+      JSON.stringify(
+        input.evidence.map((item) => ({
+          id: item.id,
+          title: item.title,
+          childId: item.childId,
+          mimeType: item.mimeType,
+          byteSize: item.byteSize,
+          capturedAt: item.capturedAt ? item.capturedAt.toISOString() : null,
+        })),
+        null,
+        2,
+      ),
+      { name: "evidence.json" },
+    );
+
+    if (input.reportBundles) {
+      archive.append(
+        JSON.stringify(
+          input.reportBundles.map((bundle) => ({
+            id: bundle.id,
+            childId: bundle.childId,
+            periodStart: bundle.periodStart.toISOString(),
+            periodEnd: bundle.periodEnd.toISOString(),
+            status: bundle.status,
+            createdAt: bundle.createdAt.toISOString(),
+          })),
+          null,
+          2,
+        ),
+        { name: "report-bundles.json" },
+      );
+    }
 
     await archive.finalize();
     await done;

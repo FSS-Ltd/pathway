@@ -9,7 +9,7 @@ import {
   Res,
   UseGuards,
 } from "@nestjs/common";
-import { CurrentTenant, CurrentUser } from "@pathway/auth";
+import { CurrentOrg, CurrentTenant, CurrentUser } from "@pathway/auth";
 import type { Response } from "express";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
@@ -61,12 +61,13 @@ export class PrivacyController {
   requestDeletion(
     @Body() body: unknown,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
     @CurrentUser("userId") userId: string,
     @CurrentUser("email") email: string | undefined,
     @CurrentUser("givenName") displayName: string | undefined,
   ) {
     const dto = this.parse(requestDeletionSchema, body);
-    return this.service.requestDeletion(dto, tenantId, userId, email, displayName);
+    return this.service.requestDeletion(dto, tenantId, orgId, userId, email, displayName);
   }
 
   private parse<T>(schema: z.ZodType<T>, value: unknown): T {

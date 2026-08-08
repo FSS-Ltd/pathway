@@ -98,7 +98,7 @@ describe("PrivacyController", () => {
     );
   });
 
-  it("requestDeletion() forwards the reason and caller identity to the service", async () => {
+  it("requestDeletion() forwards the reason, orgId and caller identity to the service", async () => {
     const spy = jest
       .spyOn(service, "requestDeletion")
       .mockResolvedValue({ id: "del1", status: "SUBMITTED" } as never);
@@ -106,6 +106,7 @@ describe("PrivacyController", () => {
     await controller.requestDeletion(
       { reason: "Moving away" },
       "tenant-a",
+      "org-a",
       "user-a",
       "parent@example.com",
       "Parent Name",
@@ -114,9 +115,26 @@ describe("PrivacyController", () => {
     expect(spy).toHaveBeenCalledWith(
       { reason: "Moving away" },
       "tenant-a",
+      "org-a",
       "user-a",
       "parent@example.com",
       "Parent Name",
     );
+  });
+
+  // Negative authorization: the admin gate itself lives in
+  // PrivacyService.assertSiteOrOrgAdmin (see privacy.service.spec.ts's
+  // "rejects a caller who is not a site or org admin") - this confirms the
+  // controller doesn't swallow that rejection and still returns it as the
+  // response to the caller.
+  it("requestDeletion() propagates a permission-denied rejection from the service", async () => {
+    const { ForbiddenException } = await import("@nestjs/common");
+    jest
+      .spyOn(service, "requestDeletion")
+      .mockRejectedValue(new ForbiddenException("Only admins can request deletion of this family account"));
+
+    await expect(
+      controller.requestDeletion({}, "tenant-a", "org-a", "user-a", undefined, undefined),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
