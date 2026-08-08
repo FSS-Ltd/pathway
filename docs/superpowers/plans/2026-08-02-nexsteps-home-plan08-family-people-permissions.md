@@ -1328,12 +1328,25 @@ This means **no new Prisma model, no new migration, no new `apps/api`
 module, and no new guard.** It also means the security property the old
 design was straining to build — "revoking a session actually terminates
 its access, not just removes a row from a list nobody enforces against" —
-comes for free and *stronger* than the old design would have delivered:
-`session.revoke()` invalidates the session at Clerk directly, so that
-device's next token refresh (already wired via `startTokenRefresh`, added
-in PR #309) fails at the source. The old design only checked a
-locally-stored `revokedAt` flag on each request; this checks it at the
-identity provider itself.
+comes for free here: `session.revoke()` invalidates the session at Clerk
+directly, so that device's next token refresh (already wired via
+`startTokenRefresh`, added in PR #309) fails at the source. The old design
+only checked a locally-stored `revokedAt` flag on each request; this checks
+it at the identity provider itself — enforcement moves to where it actually
+belongs, which is the real improvement.
+
+**Accuracy note, found during final review — this is not "immediate"
+revocation:** `apps/api`'s `token-verifier.ts` verifies Clerk JWTs
+statelessly via JWKS (signature + expiry), with no live revocation check
+against Clerk. A revoked device's *already-minted* JWT keeps working
+against `apps/api` for up to its remaining lifetime (Clerk's default token
+TTL, refreshed every 30s by `startTokenRefresh`) — a bounded window of well
+under a minute. Call this "revocation with a sub-minute tail," not
+"instant": the old per-request `revokedAt` guard would have cut access on
+the very next request, so the old design was actually faster in that one
+narrow respect, even though it depended on a check nothing enforced. The
+residual window here is standard JWT practice and not worth engineering
+away.
 
 **Prerequisite check (do this before writing any code) — same principle as
 the original plan, different platform:** confirm in the Clerk Dashboard
