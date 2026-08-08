@@ -111,6 +111,15 @@ const FEEDBACK_CATEGORY_LABELS: Record<SendFeedbackEmailParams["category"], stri
   other: "Other",
 };
 
+/** Params for a household's "delete family account" request, sent to the support inbox. */
+export type SendAccountDeletionRequestEmailParams = {
+  requestId: string;
+  tenantId: string;
+  requesterEmail?: string;
+  requesterName?: string;
+  reason?: string;
+};
+
 /** Params for demo request notifications, sent to the sales inbox. */
 export type SendDemoRequestEmailParams = {
   name: string;
@@ -1022,6 +1031,55 @@ Organisation: ${orgSlug || orgId || "Not set"}
 Tenant / site: ${tenantId || "Not set"}
 Screenshot: ${attachment ? "Attached" : "None"}
     `.trim();
+  }
+
+  /**
+   * Notify the support inbox that a household requested "delete family
+   * account". This does not delete anything - it only routes the request to
+   * support for manual review, same as sendFeedbackEmail's inbox.
+   */
+  async sendAccountDeletionRequestEmail(
+    params: SendAccountDeletionRequestEmailParams,
+  ): Promise<void> {
+    const subject = `[Account deletion request] ${params.tenantId}`;
+    const requester = params.requesterName
+      ? `${params.requesterName}${params.requesterEmail ? ` (${params.requesterEmail})` : ""}`
+      : (params.requesterEmail ?? "Unknown");
+    const text = `
+Nexsteps Account Deletion Request
+
+Request ID: ${params.requestId}
+Household (tenant): ${params.tenantId}
+Requested by: ${requester}
+Reason: ${params.reason ?? "Not provided"}
+    `.trim();
+
+    if (!this.isEnabled || !this.resend) {
+      this.logger.log(
+        `[📧 MAILER] MOCK MODE - Would send account deletion request email\n${text}`,
+      );
+      return;
+    }
+
+    try {
+      const result = await this.resend.emails.send({
+        from: this.fromAddress,
+        to: FEEDBACK_RECIPIENT,
+        subject,
+        text,
+        replyTo: params.requesterEmail,
+      });
+
+      if (result.error) {
+        this.logger.error(`[📧 MAILER] Account deletion request email error:`, result.error);
+        throw new Error(`Resend API error: ${JSON.stringify(result.error)}`);
+      }
+
+      this.logger.log(`[📧 MAILER] Account deletion request email sent to ${FEEDBACK_RECIPIENT}`);
+    } catch (error) {
+      this.logger.error(`[📧 MAILER] Exception sending account deletion request email:`, error);
+      throw new Error(`Failed to send account deletion request email: ${String(error)}`);
+    }
   }
 
   /**

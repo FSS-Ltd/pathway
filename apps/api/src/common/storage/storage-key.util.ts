@@ -42,6 +42,10 @@ export function reportBundleKey(tenantId: string, bundleId: string): string {
   return `tenants/${tenantId}/reports/${bundleId}/bundle.csv`;
 }
 
+export function dataExportKey(tenantId: string, requestId: string): string {
+  return `tenants/${tenantId}/privacy-exports/${requestId}/export.zip`;
+}
+
 export function blogAssetKey(sha256: string, mimeType: string): string {
   return `blog/assets/${sha256}.${storageExtension(mimeType)}`;
 }
