@@ -88,9 +88,14 @@ password-change endpoint, no 2FA anywhere in the codebase) and
 `privacy-data` (DSAR today is admin-only/child-scoped/JSON-only; exports
 are attendance-CSV-only; no deletion-request workflow exists). Product
 decisions taken for those two (2026-08-02, this session):
-- `account-session`: build a **real, independent session-tracking model**
-  (not dependent on Auth0's session-list API, whose availability varies by
-  Auth0 plan tier).
+- `account-session`: originally scoped as a real, independent session-
+  tracking model (not dependent on Auth0's session-list API, whose
+  availability varies by Auth0 plan tier). **Superseded 2026-08-08**: the
+  monorepo migrated from Auth0 to Clerk (PRs #295-#305) before this
+  sub-plan was picked up. Clerk's own client SDK natively provides session
+  listing/revocation, password change, and TOTP 2FA — see the corrected
+  Sub-plan 08f section below for the current design (no new backend at
+  all).
 - `privacy-data`: build a **real async export job** (zip of household data);
   "delete family account" **files a support/deletion request** rather than
   executing an irreversible delete — a full retention/deletion engine is not
@@ -110,7 +115,7 @@ its own PR.
 | 08c | `people-permissions` | none (reuse `orgs`/`invites`) | low |
 | 08d | `membership` | 1 new endpoint (Stripe portal) | low-medium |
 | 08e | `privacy-data` | new export job + deletion request | medium |
-| 08f | `account-session` | new session model + password + 2FA | highest |
+| 08f | `account-session` | none (Clerk native: sessions/password/2FA) — corrected post-Clerk-migration, see sub-plan below | low-medium |
 
 ## File Structure
 
@@ -1284,120 +1289,117 @@ Known operational ceiling (identified in final review, ponytail: precedent-confo
 
 **Screen:** `account-session` (`/(home)/(tabs)/family/account-session`).
 
-**Highest risk, ship last.** No device-session tracking, no user-facing
-password-change endpoint, and no 2FA exist anywhere in this codebase today
-(confirmed by a repo-wide grep for `mfa|2fa|totp|revokeSession|logout` with
-zero relevant matches). This sub-plan is deliberately specified at design
-depth rather than full line-by-line TDD steps — expand it into bite-sized
-tasks in its own session when picked up, the same way this repo's own root
-plan fully specified Plan 01 but left Plans 02-14 as specifications
-(`/Users/JeanFidele/.claude/plans/can-you-look-through-compressed-star.md:343-388`).
+**Corrected 2026-08-08, post-Clerk-migration.** The design below (custom
+`AuthSession` model, a new `sessions-auth` backend module, a header-based
+revocation guard, and an Auth0 Management API password-change call) was
+written when this app authenticated through Auth0. PRs #295-#305 migrated
+the whole monorepo (`apps/mobile` and `apps/nexsteps-home`) to Clerk before
+this sub-plan was picked up — confirmed by grepping both apps' `package.json`
+for `auth0` (zero matches) and reading `apps/nexsteps-home/src/lib/auth/`,
+which is now entirely `@clerk/clerk-expo` hooks. `Auth0ManagementService`
+(`apps/api/src/auth/auth0-management.service.ts`) still exists but never had
+a `verifyPassword` method — the plan's citation of line 182 was already
+wrong even under the old design — and is kept around only for other flows
+(invites, billing webhook user-provisioning) that predate this sub-plan and
+are out of scope here.
 
-**Prerequisite check (do this before writing any code):** 2FA in the
-wireframe ("Two-step verification: Authenticator app: On") implies Auth0
-Guardian/MFA. Confirm the Auth0 tenant this environment points at has MFA
-enabled (Auth0 dashboard → Security → Multi-factor Auth) before building
-against `/mfa/associate`. If it isn't enabled, ship password-change and
-session management now; add the 2FA toggle as a follow-up once MFA is
-turned on tenant-side — do not build UI for a capability the tenant can't
-actually perform yet.
+**Why this changes the entire design, not just a rename:** Clerk's client
+SDK (verified against the installed `@clerk/clerk-expo@2.19.31` →
+`@clerk/shared@4.25.10` type definitions, not assumed from memory) already
+provides every capability this sub-plan needs, running directly against
+Clerk's own backend with no round-trip through `apps/api`:
 
-**New model — independent of Auth0's session-list API (per the product
-decision recorded above), because that API's availability varies by Auth0
-plan tier:**
+- `user.getSessions(): Promise<SessionWithActivitiesResource[]>` — each item
+  has `id`, `lastActiveAt`, `latestActivity: { browserName, deviceType,
+  ipAddress, city, country }`, and its own `.revoke()` method.
+- `user.updatePassword({ currentPassword, newPassword })` — Clerk verifies
+  `currentPassword` server-side and throws a `ClerkAPIResponseError` if it's
+  wrong; there is no way to bypass this from the client, so the plan's
+  "re-verify before changing" requirement is enforced by Clerk itself, not
+  by code we write.
+- `user.twoFactorEnabled` / `user.totpEnabled` / `user.backupCodeEnabled`
+  (status flags) plus `user.createTOTP()` / `user.verifyTOTP({ code })` /
+  `user.disableTOTP()` for enabling/disabling authenticator-app 2FA.
+- `useSession()` returns the current session's `id`, which is exactly what's
+  needed to compute `isCurrent` client-side when rendering the list from
+  `getSessions()`.
 
-```prisma
-model AuthSession {
-  id           String    @id @default(uuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id])
-  deviceLabel  String    // e.g. "iPhone · Safari", derived from client-reported platform info, not raw user-agent sniffing
-  ipAddress    String?
-  city         String?   // coarse only, resolved server-side from ipAddress if a geo lookup is already used elsewhere in the codebase - check before adding a new geo-IP dependency
-  lastSeenAt   DateTime  @default(now())
-  createdAt    DateTime  @default(now())
-  revokedAt    DateTime?
+This means **no new Prisma model, no new migration, no new `apps/api`
+module, and no new guard.** It also means the security property the old
+design was straining to build — "revoking a session actually terminates
+its access, not just removes a row from a list nobody enforces against" —
+comes for free and *stronger* than the old design would have delivered:
+`session.revoke()` invalidates the session at Clerk directly, so that
+device's next token refresh (already wired via `startTokenRefresh`, added
+in PR #309) fails at the source. The old design only checked a
+locally-stored `revokedAt` flag on each request; this checks it at the
+identity provider itself.
 
-  @@index([userId, revokedAt])
-}
-```
+**Prerequisite check (do this before writing any code) — same principle as
+the original plan, different platform:** confirm in the Clerk Dashboard
+(User & Authentication → Multi-factor) that TOTP is enabled as a factor for
+this Clerk instance before building the 2FA toggle. If it isn't enabled,
+ship session management and password change now; add the 2FA section as a
+follow-up once TOTP is turned on instance-side — do not build UI for a
+capability the instance can't actually perform yet (mirrors 08e's and the
+original 08f's "don't build UI for a capability that isn't there" rule,
+just pointed at Clerk's dashboard instead of Auth0's).
 
-**How a session gets registered and enforced (the part that makes this a
-real security control, not just a display list):** the mobile app
-generates one random session id at login time and sends it on every
-authenticated request as a header (name it consistently with how the app
-already names custom auth headers — check `src/lib/api/http.ts`'s existing
-header set first, e.g. alongside the bearer token). A new lightweight guard
-addition (extend `AuthUserGuard` or add a small companion guard run after
-it) looks up `AuthSession` by that header value + `request.authUserId` and
-rejects with 401 if `revokedAt` is set — this is what makes "sign out this
-device" actually terminate access rather than just remove a row from a
-list nobody enforces against. Registering a session (first authenticated
-call after Auth0 login) upserts the `AuthSession` row; every subsequent
-request opportunistically bumps `lastSeenAt` (rate-limit this to, say, once
-per 5 minutes per session to avoid a write on every request — a `ponytail:`
-note here is warranted: "write-through on every request is the ceiling
-worth avoiding; a scheduled/batched lastSeenAt flush is the upgrade path if
-this becomes a hot path").
+**Sign-out (this device):** reuse `AppBootstrapContext`'s existing
+`signOut()` (`apps/nexsteps-home/src/providers/app-providers.tsx:53`) rather
+than inventing a second logout path — it already calls Clerk's `signOut()`
+and clears `apiClient`'s stored token/org id.
 
-**Password change:** `Auth0ManagementService.verifyPassword` already exists
-(`apps/api/src/auth/auth0-management.service.ts:182`) but nothing calls
-Auth0's password-change endpoint. Add a `changePassword(userId, newPassword)`
-method (Auth0 Management API `PATCH /api/v2/users/{id}` with a `password`
-field) and a `POST /auth/password` endpoint that first re-verifies the
-current password via the existing `verifyPassword` before calling it —
-never allow a password change without re-proving the current one, even
-though the request is already authenticated (this is a standard
-step-up check for a credential-change action, not redundant).
+**Sign-out other sessions:** fetch `user.getSessions()`, filter out the
+entry whose `id` matches the current `useSession()` session id, call
+`.revoke()` on each remaining one. No backend endpoint.
 
-**Sign-out / sign-out-others:** "Sign out" = client discards its local
-token + calls Auth0's logout endpoint (check whether
-`apps/nexsteps-home/src/lib/auth/` already has a logout function — if
-`apps/mobile` has one, mirror it rather than inventing a second logout
-flow) + marks its own `AuthSession` row revoked. "Sign out other sessions" =
-`POST /auth/sessions/revoke-others` marks every `AuthSession` for that user
-except the caller's own revoked.
+**Password change:** a form calling `user.updatePassword({ currentPassword,
+newPassword })`; handle the thrown error the same way
+`account-recover.tsx` already does (`isClerkAPIResponseError`), since that's
+this app's established pattern for surfacing Clerk validation errors.
 
 **Files:**
-- Modify: `packages/db/prisma/schema.prisma` (new `AuthSession` model)
-- Create: migration
-- Create: `apps/api/src/sessions-auth/` (new module name — do not reuse
-  `apps/api/src/sessions/`, which is the unrelated class-scheduling
-  `Session` model; a name collision there would be a real bug, not a style
-  nit) with `sessions-auth.controller.ts`, `.service.ts`, `.module.ts`,
-  `session-guard.ts`
-- Modify: `apps/api/src/auth/auth0-management.service.ts` (add
-  `changePassword`)
-- Test: full spec coverage for the new module, plus a guard test proving a
-  revoked session's subsequent request is rejected (this is the test that
-  actually validates the security property, not just the CRUD)
-- Modify: `apps/nexsteps-home/src/lib/api/http.ts` (attach the session-id
-  header to every request; generate/persist the session id at login)
-- Create: `apps/nexsteps-home/src/lib/api/account-session.ts`,
-  `src/lib/queries/account-session.ts`
+- Create: `apps/nexsteps-home/src/lib/queries/account-session.ts` — thin
+  react-query wrappers around the Clerk SDK calls above (not around
+  `apiClient`, since there is no backend call here), so this screen gets the
+  same loading/error state shape as every other screen in this plan, and so
+  "sign out other sessions" can trigger a query invalidation/refetch the
+  same way mutations do elsewhere in this codebase.
 - Create: `apps/nexsteps-home/app/(home)/(tabs)/family/account-session.tsx`
+- No backend files. No `packages/db` changes.
 
-**Interfaces:**
-- Produces: `GET /auth/sessions` → `AuthSession[]` (current user's own,
-  `revokedAt: null`, newest `lastSeenAt` first, with a `isCurrent: boolean`
-  flag computed server-side by comparing to the requesting session-id
-  header); `POST /auth/sessions/:id/revoke`; `POST /auth/sessions/revoke-others`;
-  `POST /auth/password` (`{ currentPassword: string, newPassword: string }`).
+**Interfaces:** none produced by `apps/api` — this screen talks to Clerk
+directly through `@clerk/clerk-expo` hooks (`useUser`, `useSession`,
+`useClerk`), the same pattern already established in `(setup)/account-
+recover.tsx` and `(setup)/account-create.tsx`.
 
-**States:** same six as every other screen, plus one this screen is unique
-in needing to get right: after "Sign out other sessions" succeeds, the
-*current* device's list must re-fetch and show only itself — a stale list
-that still shows a just-revoked device as active would be a real, visible
-bug in a security-sensitive screen, not a cosmetic one.
+**States:** same six as every other screen, adapted for a screen with no
+backend call to be denied access to:
+- loading / offline-retry / success apply to each Clerk SDK call
+  individually (session list fetch, password change, TOTP enroll).
+- "permission denied" doesn't apply in the usual 401/403-from-`apiClient`
+  sense (there is no tenant/org boundary here — every action operates on
+  the caller's own Clerk user, enforced by Clerk itself, not by
+  `apiClient`/`isDeniedError`). Note this explicitly in the screen rather
+  than silently dropping the state from the six — an expired/invalid Clerk
+  session surfaces through `AppBootstrapContext` redirecting to
+  `/(setup)/welcome` before this screen would even render, which is the
+  correct place for that case to be handled, not a local error state here.
+- the one this screen is unique in needing to get right: after "Sign out
+  other sessions" succeeds, the *current* device's list must re-fetch and
+  show only itself — a stale list that still shows a just-revoked device as
+  active would be a real, visible bug in a security-sensitive screen, not a
+  cosmetic one.
 
 **PR handoff block:**
 ```text
 Approved screens: account-session
 Owning phase: Phase 7, PR H5f
-Production paths: apps/api/src/sessions-auth/*, apps/api/src/auth/auth0-management.service.ts, packages/db/prisma/schema.prisma, apps/nexsteps-home/app/(home)/(tabs)/family/account-session.tsx
-Data and permission boundary: a session may only read/revoke its own user's AuthSession rows; password change requires re-verifying the current password
-States covered: loading, empty, validation/error, offline/retry, permission denied, success (+ post-revoke list re-fetch correctness)
-Prerequisite: Auth0 tenant MFA enablement confirmed before building the 2FA toggle; ships without it otherwise
+Production paths: apps/nexsteps-home/app/(home)/(tabs)/family/account-session.tsx, apps/nexsteps-home/src/lib/queries/account-session.ts
+Data and permission boundary: every action operates on the caller's own Clerk user via the Clerk SDK directly (no apps/api endpoint, no cross-user/cross-tenant surface); password change re-verification is enforced by Clerk itself
+States covered: loading, empty, validation/error, offline/retry, success (+ post-revoke list re-fetch correctness); permission-denied is N/A here and documented as such rather than omitted silently
+Prerequisite: Clerk instance TOTP/MFA enablement confirmed in the Clerk Dashboard before building the 2FA section; ships without it otherwise
 ```
 
 ---
