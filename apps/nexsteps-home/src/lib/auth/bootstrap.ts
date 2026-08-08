@@ -84,6 +84,20 @@ async function resolveActiveSite(
 }
 
 /**
+ * Clerk session tokens are short-lived (default 60s). AppProviders only
+ * calls bootstrapAuthState once per sign-in, so without this the token
+ * cached in apiClient goes stale mid-session and every request after that
+ * 401s with an "exp" claim failure. Call while signed in and clear the
+ * returned interval on sign-out/unmount.
+ */
+export function startTokenRefresh(getToken: () => Promise<string | null>): () => void {
+  const interval = setInterval(() => {
+    void getToken().then((token) => apiClient.setAccessToken(token));
+  }, 30_000);
+  return () => clearInterval(interval);
+}
+
+/**
  * getToken comes from Clerk's useAuth() - unlike the old stored
  * session.accessToken, Clerk tokens are short-lived and must be fetched
  * fresh for each call rather than cached across this whole bootstrap.

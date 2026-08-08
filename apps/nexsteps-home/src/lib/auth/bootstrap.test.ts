@@ -25,7 +25,7 @@ import {
   getAppStateSnapshot,
   updateAppStateSnapshot,
 } from "@/lib/auth/session-store";
-import { bootstrapAuthState } from "./bootstrap";
+import { bootstrapAuthState, startTokenRefresh } from "./bootstrap";
 
 const state = {
   updatedAt: "2026-08-01T00:00:00.000Z",
@@ -88,5 +88,34 @@ describe("bootstrapAuthState", () => {
       route: "/(setup)/welcome",
       message: "Network down",
     });
+  });
+});
+
+describe("startTokenRefresh", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("refreshes the api-client token on an interval well under Clerk's 60s token lifetime", async () => {
+    const getToken = jest.fn().mockResolvedValue("fresh-token");
+
+    const stop = startTokenRefresh(getToken);
+
+    expect(apiClient.setAccessToken).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(30_000);
+    await Promise.resolve();
+
+    expect(getToken).toHaveBeenCalledTimes(1);
+    expect(apiClient.setAccessToken).toHaveBeenCalledWith("fresh-token");
+
+    stop();
+    jest.advanceTimersByTime(60_000);
+    expect(getToken).toHaveBeenCalledTimes(1);
   });
 });

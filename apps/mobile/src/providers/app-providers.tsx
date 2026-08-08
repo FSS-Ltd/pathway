@@ -5,7 +5,7 @@ import { useAuth } from "@clerk/clerk-expo";
 
 import { assertEnv } from "@/config/env";
 import { apiClient } from "@/lib/api/client";
-import { bootstrapAuthState, type BootstrapState } from "@/lib/auth/bootstrap";
+import { bootstrapAuthState, startTokenRefresh, type BootstrapState } from "@/lib/auth/bootstrap";
 import { updateAppStateSnapshot } from "@/lib/auth/session-store";
 
 type AppBootstrapContextValue = {
@@ -88,6 +88,11 @@ export function AppProviders({ children }: PropsWithChildren) {
 
     void refreshBootstrap();
   }, [isLoaded, isSignedIn, refreshBootstrap]);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+    return startTokenRefresh(getToken);
+  }, [isSignedIn, getToken]);
 
   const value = useMemo(
     () => ({
