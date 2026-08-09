@@ -1307,5 +1307,3 @@ BEGIN
   END LOOP;
 END;
 $$;
-
-RESET search_path;
