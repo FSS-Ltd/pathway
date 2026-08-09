@@ -12,7 +12,8 @@
     "compute:av30": "tsx src/av30/compute-av30.cli.ts",
     "generate:report-bundle": "tsx src/learning/generate-report-bundle.cli.ts",
     "retention:run": "tsx src/retention/run-retention.cli.ts",
-    "guests:cleanup": "tsx src/guest-pass/run-guest-pass-cleanup.cli.ts"
+    "guests:cleanup": "tsx src/guest-pass/run-guest-pass-cleanup.cli.ts",
+    "outbox:dispatch": "tsx src/outbox/dispatch-outbox.cli.ts"
   },
   "dependencies": {
     "@pathway/db": "workspace:*",

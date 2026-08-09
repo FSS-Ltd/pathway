@@ -1,0 +1,27 @@
+-- ACE-F22 turns the durable outbox into a bounded retry state machine. Events
+-- are retained for auditability; a worker may only move them forward.
+DO $$ BEGIN
+  CREATE TYPE "OutboxStatus" AS ENUM ('PENDING', 'PROCESSING', 'DISPATCHED', 'DEAD_LETTER');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+ALTER TABLE "OutboxEvent"
+  ADD COLUMN IF NOT EXISTS "status" "OutboxStatus" NOT NULL DEFAULT 'PENDING',
+  ADD COLUMN IF NOT EXISTS "attempts" INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "nextAttemptAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS "dispatchedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "failedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "claimedAt" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "lastError" TEXT;
+
+CREATE INDEX IF NOT EXISTS "OutboxEvent_status_nextAttemptAt_createdAt_idx"
+  ON "OutboxEvent" ("status", "nextAttemptAt", "createdAt");
+
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'DISPATCHED';
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'EXPORTED';
+ALTER TYPE "AuditAction" ADD VALUE IF NOT EXISTS 'RETENTION_PURGED';
+ALTER TYPE "AuditEntityType" ADD VALUE IF NOT EXISTS 'OUTBOX_EVENT';
+ALTER TYPE "AuditEntityType" ADD VALUE IF NOT EXISTS 'ACE_COMMUNITY_CONTENT';
+ALTER TYPE "AuditEntityType" ADD VALUE IF NOT EXISTS 'ACE_MESSAGE';
+ALTER TYPE "AuditEntityType" ADD VALUE IF NOT EXISTS 'ACE_NOTICE';
+ALTER TYPE "AuditEntityType" ADD VALUE IF NOT EXISTS 'ACE_RECORD';

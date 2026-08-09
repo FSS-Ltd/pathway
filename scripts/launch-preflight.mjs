@@ -4,6 +4,10 @@ import process from "node:process";
 
 const STEPS = [
   {
+    label: "ACE foundation governance coverage",
+    command: [process.execPath, "scripts/check-ace-foundation-governance.mjs"],
+  },
+  {
     label: "Permission definition registry drift",
     command: ["pnpm", "permission-definitions:check"],
   },

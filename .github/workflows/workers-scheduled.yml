@@ -8,7 +8,7 @@ on:
 
 jobs:
   run:
-    name: AV30 and retention
+    name: AV30, outbox and retention
     runs-on: ubuntu-22.04
     environment: production
     permissions:
@@ -18,6 +18,9 @@ jobs:
       AV30_TENANT_IDS: ${{ secrets.AV30_TENANT_IDS }}
       REPORT_BUNDLE_TENANT_IDS: ${{ secrets.REPORT_BUNDLE_TENANT_IDS }}
       RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
+      OUTBOX_ORG_IDS: ${{ secrets.OUTBOX_ORG_IDS }}
+      OUTBOX_DISPATCH_URL: ${{ secrets.OUTBOX_DISPATCH_URL }}
+      OUTBOX_DISPATCH_TOKEN: ${{ secrets.OUTBOX_DISPATCH_TOKEN }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       SUPABASE_STORAGE_PRIVATE_BUCKET: ${{ secrets.SUPABASE_STORAGE_PRIVATE_BUCKET }}
@@ -75,6 +78,8 @@ jobs:
             echo "SUPABASE_STORAGE_PRIVATE_BUCKET secret is required for report bundles." >&2
             exit 1
           }
+          test -n "$OUTBOX_ORG_IDS" || { echo "OUTBOX_ORG_IDS secret is required for outbox dispatch." >&2; exit 1; }
+          test -n "$OUTBOX_DISPATCH_URL" || { echo "OUTBOX_DISPATCH_URL secret is required for outbox dispatch." >&2; exit 1; }
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline
@@ -84,6 +89,9 @@ jobs:
 
       - name: Generate report bundles
         run: pnpm --filter @pathway/workers generate:report-bundle
+
+      - name: Dispatch outbox events
+        run: pnpm --filter @pathway/workers outbox:dispatch
 
       - name: Run retention
         run: pnpm --filter @pathway/workers retention:run

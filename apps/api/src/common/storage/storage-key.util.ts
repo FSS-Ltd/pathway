@@ -46,6 +46,29 @@ export function dataExportKey(tenantId: string, requestId: string): string {
   return `tenants/${tenantId}/privacy-exports/${requestId}/export.zip`;
 }
 
+export function messageAttachmentKey(
+  tenantId: string,
+  messageId: string,
+  fileName: string,
+): string {
+  return `tenants/${tenantId}/messages/${messageId}/${sanitizeStorageSegment(fileName)}`;
+}
+
+export function noticeAttachmentKey(
+  tenantId: string,
+  noticeId: string,
+  fileName: string,
+): string {
+  return `tenants/${tenantId}/notices/${noticeId}/${sanitizeStorageSegment(fileName)}`;
+}
+
+/** Private buckets may only receive tenant-isolated classes registered here. */
+export function isPrivateStorageKey(key: string): boolean {
+  return /^tenants\/[^/]+\/(?:children\/[^/]+\/photo\.[^/]+|staff\/[^/]+\/avatar\.[^/]+|lessons\/[^/]+\/resources\/[^/]+|reports\/[^/]+\/bundle\.csv|privacy-exports\/[^/]+\/export\.zip|messages\/[^/]+\/[^/]+|notices\/[^/]+\/[^/]+)$/.test(
+    key,
+  );
+}
+
 export function blogAssetKey(sha256: string, mimeType: string): string {
   return `blog/assets/${sha256}.${storageExtension(mimeType)}`;
 }

@@ -4,13 +4,12 @@ import { PathwayAuthModule } from "@pathway/auth";
 import { TenantRlsInterceptor } from "./database/tenant-rls.interceptor";
 import { LoggingService } from "./logging/logging.service";
 import { SupabaseStorageService } from "./storage/supabase-storage.service";
-import { OutboxService } from "./outbox/outbox.service";
+import { OutboxModule } from "./outbox/outbox.module";
 
 @Module({
-  imports: [PathwayAuthModule],
+  imports: [PathwayAuthModule, OutboxModule],
   providers: [
     LoggingService,
-    OutboxService,
     SupabaseStorageService,
     {
       provide: APP_INTERCEPTOR,
@@ -20,7 +19,7 @@ import { OutboxService } from "./outbox/outbox.service";
   exports: [
     PathwayAuthModule,
     LoggingService,
-    OutboxService,
+    OutboxModule,
     SupabaseStorageService,
   ],
 })

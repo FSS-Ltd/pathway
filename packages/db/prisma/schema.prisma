@@ -114,6 +114,9 @@ enum AuditAction {
   ROLE_RETIRED
   ASSIGNMENT_CREATED
   ASSIGNMENT_REVOKED
+  DISPATCHED
+  EXPORTED
+  RETENTION_PURGED
 }
 
 enum AuditEntityType {
@@ -121,6 +124,18 @@ enum AuditEntityType {
   CHILD_NOTE
   ORG_ROLE
   ROLE_ASSIGNMENT
+  OUTBOX_EVENT
+  ACE_COMMUNITY_CONTENT
+  ACE_MESSAGE
+  ACE_NOTICE
+  ACE_RECORD
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DISPATCHED
+  DEAD_LETTER
 }
 
 enum LeadKind {
@@ -462,6 +477,13 @@ model OutboxEvent {
   eventType      String
   payload        Json
   idempotencyKey String
+  status         OutboxStatus @default(PENDING)
+  attempts       Int          @default(0)
+  nextAttemptAt  DateTime     @default(now())
+  dispatchedAt   DateTime?
+  failedAt       DateTime?
+  claimedAt      DateTime?
+  lastError      String?      @db.Text
   createdAt      DateTime @default(now())
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Restrict)
@@ -469,6 +491,7 @@ model OutboxEvent {
   @@unique([orgId, idempotencyKey])
   @@index([orgId, createdAt])
   @@index([aggregateType, aggregateId, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
 }
 
 model OrgVertical {
