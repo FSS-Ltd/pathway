@@ -72,6 +72,16 @@ const REQUIRED_RLS_TABLES = [
   "AceCommunityReport",
   "AceCommunityModerationAction",
   "AceCommunitySafeguardingReference",
+  "MessageConversation",
+  "MessageParticipant",
+  "Message",
+  "MessageParticipantReadCursor",
+  "MessageDelivery",
+  "MessageAttachment",
+  "AceNotice",
+  "AceNoticeAudienceMember",
+  "AceNoticeReceipt",
+  "AceNoticeAttachment",
 ];
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
