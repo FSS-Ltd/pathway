@@ -1,5 +1,7 @@
 import {
   DispatchOutboxJob,
+  parseOutboxOrgIds,
+  type OutboxEventDelegate,
   type OutboxDispatcher,
   type OutboxDispatchClient,
 } from "../dispatch-outbox.job";
@@ -16,26 +18,33 @@ const event = {
   claimedAt: null,
 };
 
-function createClient(
-  outboxEvent: OutboxDispatchClient["outboxEvent"],
-): OutboxDispatchClient {
+function createClient(outboxEvent: OutboxEventDelegate): OutboxDispatchClient {
   return {
     findOrgIds: jest.fn().mockResolvedValue(["org-1"]),
     runForOrg: async <T>(
       _orgId: string,
-      callback: (events: OutboxDispatchClient["outboxEvent"]) => Promise<T>,
+      callback: (events: OutboxEventDelegate) => Promise<T>,
     ) => callback(outboxEvent),
-    outboxEvent,
   };
 }
 
 describe("DispatchOutboxJob", () => {
+  it("requires explicit organisation scopes instead of bypassing RLS", () => {
+    expect(() => parseOutboxOrgIds(undefined)).toThrow(
+      "OUTBOX_ORG_IDS is required",
+    );
+    expect(parseOutboxOrgIds("org-1, org-1, org-2")).toEqual([
+      "org-1",
+      "org-2",
+    ]);
+  });
   it("claims a duplicate-key event once before dispatching it", async () => {
-    const client = createClient({
+    const outboxEvent = {
       findMany: jest.fn().mockResolvedValue([event]),
       updateMany: jest.fn().mockResolvedValueOnce({ count: 1 }),
       update: jest.fn().mockResolvedValue(undefined),
-    });
+    };
+    const client = createClient(outboxEvent);
     const dispatcher: jest.Mocked<OutboxDispatcher> = {
       dispatch: jest.fn().mockResolvedValue(undefined),
     };
@@ -55,7 +64,7 @@ describe("DispatchOutboxJob", () => {
       payload: { noticeId: "notice-1" },
       idempotencyKey: "notice-1:published",
     });
-    expect(client.outboxEvent.update).toHaveBeenCalledWith(
+    expect(outboxEvent.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "DISPATCHED" }),
       }),
@@ -63,11 +72,12 @@ describe("DispatchOutboxJob", () => {
   });
 
   it("does not dispatch an event another worker already claimed", async () => {
-    const client = createClient({
+    const outboxEvent = {
       findMany: jest.fn().mockResolvedValue([event]),
       updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       update: jest.fn(),
-    });
+    };
+    const client = createClient(outboxEvent);
     const dispatcher: jest.Mocked<OutboxDispatcher> = { dispatch: jest.fn() };
 
     await expect(
@@ -81,7 +91,7 @@ describe("DispatchOutboxJob", () => {
   });
 
   it("reclaims an expired processing lease after a worker crash", async () => {
-    const client = createClient({
+    const outboxEvent = {
       findMany: jest.fn().mockResolvedValue([
         {
           ...event,
@@ -91,7 +101,8 @@ describe("DispatchOutboxJob", () => {
       ]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockResolvedValue(undefined),
-    });
+    };
+    const client = createClient(outboxEvent);
     const dispatcher: jest.Mocked<OutboxDispatcher> = {
       dispatch: jest.fn().mockResolvedValue(undefined),
     };
@@ -100,7 +111,7 @@ describe("DispatchOutboxJob", () => {
       new Date("2026-08-09T10:10:00.000Z"),
     );
 
-    expect(client.outboxEvent.updateMany).toHaveBeenCalledWith(
+    expect(outboxEvent.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ OR: expect.any(Array) }),
       }),
@@ -109,11 +120,12 @@ describe("DispatchOutboxJob", () => {
   });
 
   it("dead-letters the fifth failed delivery attempt", async () => {
-    const client = createClient({
+    const outboxEvent = {
       findMany: jest.fn().mockResolvedValue([{ ...event, attempts: 4 }]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockResolvedValue(undefined),
-    });
+    };
+    const client = createClient(outboxEvent);
     const dispatcher: jest.Mocked<OutboxDispatcher> = {
       dispatch: jest.fn().mockRejectedValue(new Error("transport unavailable")),
     };
@@ -125,7 +137,7 @@ describe("DispatchOutboxJob", () => {
       retried: 0,
       deadLettered: 1,
     });
-    expect(client.outboxEvent.update).toHaveBeenCalledWith(
+    expect(outboxEvent.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           status: "DEAD_LETTER",

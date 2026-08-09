@@ -20,7 +20,8 @@ const migration = readFileSync(
 );
 const governance = JSON.parse(
   readFileSync(
-    resolve(root, "packages/db/ace-foundation-governance.json"),
+    process.env.ACE_GOVERNANCE_FILE ??
+      resolve(root, "packages/db/ace-foundation-governance.json"),
     "utf8",
   ),
 );

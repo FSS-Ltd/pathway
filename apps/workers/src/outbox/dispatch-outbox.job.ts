@@ -1,9 +1,4 @@
-import {
-  applyTenantContext,
-  prisma,
-  runTransaction,
-  type Prisma,
-} from "@pathway/db";
+import { applyTenantContext, runTransaction, type Prisma } from "@pathway/db";
 
 export type OutboxIntentForDispatch = {
   aggregateType: string;
@@ -32,7 +27,6 @@ export interface OutboxDispatchClient {
     orgId: string,
     callback: (events: OutboxEventDelegate) => Promise<T>,
   ): Promise<T>;
-  outboxEvent: OutboxEventDelegate;
 }
 
 export interface OutboxDispatcher {
@@ -44,8 +38,7 @@ const CLAIM_LEASE_MS = 5 * 60_000;
 
 const productionClient: OutboxDispatchClient = {
   async findOrgIds() {
-    const orgs = await prisma.org.findMany({ select: { id: true } });
-    return orgs.map((org) => org.id);
+    return parseOutboxOrgIds(process.env.OUTBOX_ORG_IDS);
   },
   async runForOrg<T>(
     orgId: string,
@@ -56,7 +49,6 @@ const productionClient: OutboxDispatchClient = {
       return callback(tx.outboxEvent);
     });
   },
-  outboxEvent: prisma.outboxEvent,
 };
 
 /**
@@ -156,6 +148,17 @@ export function createDispatchOutboxJob(
   dispatcher: OutboxDispatcher,
 ): DispatchOutboxJob {
   return new DispatchOutboxJob(productionClient, dispatcher);
+}
+
+export function parseOutboxOrgIds(value: string | undefined): string[] {
+  const orgIds = (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!orgIds.length) {
+    throw new Error("OUTBOX_ORG_IDS is required for outbox dispatch");
+  }
+  return [...new Set(orgIds)];
 }
 
 function toIntent(event: PendingOutboxEvent): OutboxIntentForDispatch {
