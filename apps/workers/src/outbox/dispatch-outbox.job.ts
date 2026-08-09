@@ -1,4 +1,9 @@
-import { prisma, type Prisma } from "@pathway/db";
+import {
+  applyTenantContext,
+  prisma,
+  runTransaction,
+  type Prisma,
+} from "@pathway/db";
 
 export type OutboxIntentForDispatch = {
   aggregateType: string;
@@ -10,81 +15,147 @@ export type OutboxIntentForDispatch = {
 
 type PendingOutboxEvent = OutboxIntentForDispatch & {
   id: string;
+  orgId: string;
   attempts: number;
+  claimedAt: Date | null;
 };
 
+export interface OutboxEventDelegate {
+  findMany(args: unknown): Promise<PendingOutboxEvent[]>;
+  updateMany(args: unknown): Promise<{ count: number }>;
+  update(args: unknown): Promise<unknown>;
+}
+
 export interface OutboxDispatchClient {
-  outboxEvent: {
-    findMany(args: unknown): Promise<PendingOutboxEvent[]>;
-    updateMany(args: unknown): Promise<{ count: number }>;
-    update(args: unknown): Promise<unknown>;
-  };
+  findOrgIds(): Promise<string[]>;
+  runForOrg<T>(
+    orgId: string,
+    callback: (events: OutboxEventDelegate) => Promise<T>,
+  ): Promise<T>;
+  outboxEvent: OutboxEventDelegate;
 }
 
 export interface OutboxDispatcher {
   dispatch(intent: OutboxIntentForDispatch): Promise<void>;
 }
 
-const outboxClient = prisma as unknown as OutboxDispatchClient;
 const MAX_ATTEMPTS = 5;
+const CLAIM_LEASE_MS = 5 * 60_000;
+
+const productionClient: OutboxDispatchClient = {
+  async findOrgIds() {
+    const orgs = await prisma.org.findMany({ select: { id: true } });
+    return orgs.map((org) => org.id);
+  },
+  async runForOrg<T>(
+    orgId: string,
+    callback: (events: OutboxEventDelegate) => Promise<T>,
+  ): Promise<T> {
+    return runTransaction(async (tx) => {
+      await applyTenantContext(tx, "", orgId);
+      return callback(tx.outboxEvent);
+    });
+  },
+  outboxEvent: prisma.outboxEvent,
+};
 
 /**
- * Claims durable outbox events with a conditional update before dispatching.
- * The claim is what prevents two worker processes from delivering one key twice.
+ * Claims each event in an organisation-scoped transaction before an external
+ * dispatcher runs. The dispatcher must be supplied by the runtime so an event
+ * can never be silently acknowledged without a real delivery mechanism.
  */
 export class DispatchOutboxJob {
   constructor(
-    private readonly client: OutboxDispatchClient = outboxClient,
-    private readonly dispatcher: OutboxDispatcher = {
-      dispatch: async () => undefined,
-    },
+    private readonly client: OutboxDispatchClient,
+    private readonly dispatcher: OutboxDispatcher,
   ) {}
 
   async run(
     now: Date = new Date(),
   ): Promise<{ dispatched: number; retried: number; deadLettered: number }> {
-    const events = await this.client.outboxEvent.findMany({
-      where: { status: "PENDING", nextAttemptAt: { lte: now } },
-      orderBy: { createdAt: "asc" },
-      take: 100,
-    });
     const result = { dispatched: 0, retried: 0, deadLettered: 0 };
-    for (const event of events) {
-      const claim = await this.client.outboxEvent.updateMany({
-        where: { id: event.id, status: "PENDING" },
-        data: { status: "PROCESSING", attempts: { increment: 1 } },
+    const leaseCutoff = new Date(now.getTime() - CLAIM_LEASE_MS);
+    for (const orgId of await this.client.findOrgIds()) {
+      const claimed = await this.client.runForOrg(orgId, async (events) => {
+        const candidates = await events.findMany({
+          where: {
+            OR: [
+              { status: "PENDING", nextAttemptAt: { lte: now } },
+              { status: "PROCESSING", claimedAt: { lte: leaseCutoff } },
+            ],
+          },
+          orderBy: { createdAt: "asc" },
+          take: 100,
+        });
+        const owned: PendingOutboxEvent[] = [];
+        for (const event of candidates) {
+          const claim = await events.updateMany({
+            where: {
+              id: event.id,
+              OR: [
+                { status: "PENDING" },
+                { status: "PROCESSING", claimedAt: { lte: leaseCutoff } },
+              ],
+            },
+            data: {
+              status: "PROCESSING",
+              attempts: { increment: 1 },
+              claimedAt: now,
+            },
+          });
+          if (claim.count === 1) owned.push(event);
+        }
+        return owned;
       });
-      if (claim.count !== 1) continue;
-      try {
-        await this.dispatcher.dispatch(toIntent(event));
-        await this.client.outboxEvent.update({
-          where: { id: event.id },
-          data: { status: "DISPATCHED", dispatchedAt: now, lastError: null },
-        });
-        result.dispatched += 1;
-      } catch (error) {
-        const attempts = event.attempts + 1;
-        const deadLetter = attempts >= MAX_ATTEMPTS;
-        await this.client.outboxEvent.update({
-          where: { id: event.id },
-          data: deadLetter
-            ? {
-                status: "DEAD_LETTER",
-                failedAt: now,
-                lastError: errorMessage(error),
-              }
-            : {
-                status: "PENDING",
-                nextAttemptAt: new Date(now.getTime() + attempts * 60_000),
-                lastError: errorMessage(error),
+      for (const event of claimed) {
+        try {
+          await this.dispatcher.dispatch(toIntent(event));
+          await this.client.runForOrg(orgId, (events) =>
+            events.update({
+              where: { id: event.id },
+              data: {
+                status: "DISPATCHED",
+                dispatchedAt: now,
+                claimedAt: null,
+                lastError: null,
               },
-        });
-        if (deadLetter) result.deadLettered += 1;
-        else result.retried += 1;
+            }),
+          );
+          result.dispatched += 1;
+        } catch (error) {
+          const attempts = event.attempts + 1;
+          const deadLetter = attempts >= MAX_ATTEMPTS;
+          await this.client.runForOrg(orgId, (events) =>
+            events.update({
+              where: { id: event.id },
+              data: deadLetter
+                ? {
+                    status: "DEAD_LETTER",
+                    failedAt: now,
+                    claimedAt: null,
+                    lastError: errorMessage(error),
+                  }
+                : {
+                    status: "PENDING",
+                    nextAttemptAt: new Date(now.getTime() + attempts * 60_000),
+                    claimedAt: null,
+                    lastError: errorMessage(error),
+                  },
+            }),
+          );
+          if (deadLetter) result.deadLettered += 1;
+          else result.retried += 1;
+        }
       }
     }
     return result;
   }
+}
+
+export function createDispatchOutboxJob(
+  dispatcher: OutboxDispatcher,
+): DispatchOutboxJob {
+  return new DispatchOutboxJob(productionClient, dispatcher);
 }
 
 function toIntent(event: PendingOutboxEvent): OutboxIntentForDispatch {

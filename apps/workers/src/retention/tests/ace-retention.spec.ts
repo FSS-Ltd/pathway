@@ -9,12 +9,18 @@ describe("ACE retention and export inventory", () => {
     expect(getAceRetentionExportPolicy("Message")).toEqual({
       retention: "communications",
       export: "tenant-admin",
+      auditEntity: "ACE_MESSAGE",
+      outbox: "NOT_APPLICABLE",
+      storage: "NONE",
     });
     expect(
       getAceRetentionExportPolicy("AceCommunitySafeguardingReference"),
     ).toEqual({
       retention: "safeguarding",
       export: "restricted",
+      auditEntity: "ACE_COMMUNITY_CONTENT",
+      outbox: "NOT_APPLICABLE",
+      storage: "NONE",
     });
   });
 });

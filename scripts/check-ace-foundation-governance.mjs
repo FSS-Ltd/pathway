@@ -18,9 +18,11 @@ const migration = readFileSync(
   ),
   "utf8",
 );
-const inventory = readFileSync(
-  resolve(root, "apps/workers/src/retention/ace-retention-inventory.ts"),
-  "utf8",
+const governance = JSON.parse(
+  readFileSync(
+    resolve(root, "packages/db/ace-foundation-governance.json"),
+    "utf8",
+  ),
 );
 const storage = readFileSync(
   resolve(root, "apps/api/src/common/storage/storage-key.util.ts"),
@@ -87,14 +89,36 @@ const requiredTables = [
   "AceNoticeAttachment",
 ];
 
-const missing = requiredTables.filter(
-  (name) =>
+const governanceByTable = new Map(
+  governance.groups.flatMap((group) =>
+    group.tables.map((table) => [table, group.controls]),
+  ),
+);
+const requiredControls = [
+  "retention",
+  "export",
+  "auditEntity",
+  "outbox",
+  "storage",
+];
+const missing = requiredTables.filter((name) => {
+  const controls = governanceByTable.get(name);
+  return (
     !schema.includes(`model ${name} `) ||
     !rlsGate.includes(`"${name}"`) ||
-    !inventory.includes(`"${name}"`),
+    !controls ||
+    requiredControls.some((control) => !controls[control])
+  );
+});
+const unexpected = [...governanceByTable.keys()].filter(
+  (name) => !requiredTables.includes(name),
 );
 if (missing.length)
   throw new Error(`ACE governance inventory incomplete: ${missing.join(", ")}`);
+if (unexpected.length)
+  throw new Error(
+    `ACE governance inventory contains unknown tables: ${unexpected.join(", ")}`,
+  );
 for (const token of [
   "OutboxStatus",
   "nextAttemptAt",
@@ -114,5 +138,5 @@ for (const functionName of [
     throw new Error(`ACE private storage class is missing ${functionName}`);
 }
 console.log(
-  `[ace-governance] ${requiredTables.length} tables classified for RLS, retention, export, audit, storage, and outbox controls.`,
+  `[ace-governance] ${requiredTables.length} tables have explicit RLS, retention, export, audit, storage, and outbox classifications.`,
 );

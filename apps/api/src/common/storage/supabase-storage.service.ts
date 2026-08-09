@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { isPrivateStorageKey } from "./storage-key.util";
 
 export type StorageUploadInput = {
   bucket: "private" | "public";
@@ -26,6 +27,7 @@ export class SupabaseStorageService {
   }
 
   async uploadObject(input: StorageUploadInput): Promise<StorageObject | null> {
+    this.assertPrivateStorageKey(input.bucket, input.key);
     if (!this.isConfigured()) return null;
 
     const bucket = this.resolveBucket(input.bucket);
@@ -55,6 +57,9 @@ export class SupabaseStorageService {
   }
 
   async downloadObject(bucket: string, key: string): Promise<Buffer | null> {
+    if (bucket === process.env.SUPABASE_STORAGE_PRIVATE_BUCKET?.trim()) {
+      this.assertPrivateStorageKey("private", key);
+    }
     if (!this.isConfigured()) return null;
 
     const response = await fetch(this.objectUrl(bucket, key), {
@@ -99,6 +104,15 @@ export class SupabaseStorageService {
       throw new Error(`Missing Supabase ${kind} storage bucket`);
     }
     return bucket.trim();
+  }
+
+  private assertPrivateStorageKey(
+    bucket: StorageUploadInput["bucket"],
+    key: string,
+  ): void {
+    if (bucket === "private" && !isPrivateStorageKey(key)) {
+      throw new Error("Private storage key is not allow-listed");
+    }
   }
 
   private objectUrl(bucket: string, key: string): string {

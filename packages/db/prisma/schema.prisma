@@ -482,6 +482,7 @@ model OutboxEvent {
   nextAttemptAt  DateTime     @default(now())
   dispatchedAt   DateTime?
   failedAt       DateTime?
+  claimedAt      DateTime?
   lastError      String?      @db.Text
   createdAt      DateTime @default(now())
 

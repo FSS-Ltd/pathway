@@ -30,4 +30,14 @@ describe("SupabaseStorageService.getPublicUrl", () => {
       "Missing Supabase public storage bucket",
     );
   });
+
+  it("rejects a private-bucket key outside the registered namespaces", async () => {
+    const service = new SupabaseStorageService();
+    await expect(service.uploadObject({
+      bucket: "private",
+      key: "unscoped/secret.pdf",
+      body: Buffer.from("secret"),
+      contentType: "application/pdf",
+    })).rejects.toThrow("Private storage key is not allow-listed");
+  });
 });
