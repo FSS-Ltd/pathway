@@ -2,6 +2,11 @@
 -- Message content is encrypted by the existing Prisma extension; attachment
 -- records retain private storage keys only.
 
+-- Prisma's permission-definition smoke applies migrations with `schema=public`.
+-- Keep F21 objects in the app schema, while allowing legacy core references to
+-- resolve from public in that portability check.
+SET search_path TO app, public;
+
 CREATE TYPE "MessageConversationKind" AS ENUM (
   'PARENT_STAFF',
   'STAFF_DIRECT',
@@ -1302,3 +1307,5 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+RESET search_path;
