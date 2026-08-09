@@ -12,6 +12,8 @@ jobs:
     name: Typecheck, Lint & Unit Test
     runs-on: ubuntu-22.04
     timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
 
     steps:
       - name: Checkout code
