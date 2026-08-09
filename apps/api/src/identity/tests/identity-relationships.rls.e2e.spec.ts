@@ -179,6 +179,16 @@ async function deleteIdentityRowsIfPresent(
 
   await client.$executeRawUnsafe(`
     TRUNCATE TABLE
+      "AceNoticeReceipt",
+      "AceNoticeAttachment",
+      "AceNoticeAudienceMember",
+      "AceNotice",
+      "MessageAttachment",
+      "MessageDelivery",
+      "MessageParticipantReadCursor",
+      "Message",
+      "MessageParticipant",
+      "MessageConversation",
       "FaithReflection",
       "FaithReadReceipt",
       "PermissionSlipResponse",
