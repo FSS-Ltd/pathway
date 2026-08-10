@@ -20,7 +20,6 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:migrate:reset": "prisma migrate reset --force --skip-generate --skip-seed",
-    "outbox:grant-dispatch-role": "tsx prisma/grant-outbox-dispatch-role.ts",
     "seed": "pnpm --dir ../.. db:seed",
     "seed:victorious-kids": "tsx prisma/seed-victorious-kids.ts",
     "postinstall": "prisma generate",
