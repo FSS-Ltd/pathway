@@ -116,6 +116,8 @@ runs:
 
     - name: Unit tests
       shell: bash
+      env:
+        NODE_OPTIONS: --max-old-space-size=4096
       run: pnpm --filter ${{ inputs.package }} test
 
     - name: Deploy with Vercel remote build
