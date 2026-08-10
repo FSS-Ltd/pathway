@@ -18,7 +18,6 @@ jobs:
       AV30_TENANT_IDS: ${{ secrets.AV30_TENANT_IDS }}
       REPORT_BUNDLE_TENANT_IDS: ${{ secrets.REPORT_BUNDLE_TENANT_IDS }}
       RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
-      OUTBOX_ORG_IDS: ${{ secrets.OUTBOX_ORG_IDS }}
       OUTBOX_DISPATCH_URL: ${{ secrets.OUTBOX_DISPATCH_URL }}
       OUTBOX_DISPATCH_TOKEN: ${{ secrets.OUTBOX_DISPATCH_TOKEN }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -78,7 +77,6 @@ jobs:
             echo "SUPABASE_STORAGE_PRIVATE_BUCKET secret is required for report bundles." >&2
             exit 1
           }
-          test -n "$OUTBOX_ORG_IDS" || { echo "OUTBOX_ORG_IDS secret is required for outbox dispatch." >&2; exit 1; }
           test -n "$OUTBOX_DISPATCH_URL" || { echo "OUTBOX_DISPATCH_URL secret is required for outbox dispatch." >&2; exit 1; }
 
       - name: Install dependencies

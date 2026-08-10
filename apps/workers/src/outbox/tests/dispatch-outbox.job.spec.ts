@@ -1,10 +1,16 @@
 import {
   DispatchOutboxJob,
-  parseOutboxOrgIds,
+  discoverDueOutboxOrgIds,
   type OutboxEventDelegate,
   type OutboxDispatcher,
   type OutboxDispatchClient,
 } from "../dispatch-outbox.job";
+import { runTransaction } from "@pathway/db";
+
+jest.mock("@pathway/db", () => ({
+  applyTenantContext: jest.fn(),
+  runTransaction: jest.fn(),
+}));
 
 const event = {
   id: "event-1",
@@ -29,11 +35,17 @@ function createClient(outboxEvent: OutboxEventDelegate): OutboxDispatchClient {
 }
 
 describe("DispatchOutboxJob", () => {
-  it("requires explicit organisation scopes instead of bypassing RLS", () => {
-    expect(() => parseOutboxOrgIds(undefined)).toThrow(
-      "OUTBOX_ORG_IDS is required",
-    );
-    expect(parseOutboxOrgIds("org-1, org-1, org-2")).toEqual([
+  it("discovers due organisation IDs without a deployment allow-list", async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValue([{ orgId: "org-1" }, { orgId: "org-2" }]);
+    jest
+      .mocked(runTransaction)
+      .mockImplementation(async (callback) =>
+        callback({ $queryRaw: query } as never),
+      );
+
+    await expect(discoverDueOutboxOrgIds()).resolves.toEqual([
       "org-1",
       "org-2",
     ]);

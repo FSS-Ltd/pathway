@@ -38,7 +38,7 @@ const CLAIM_LEASE_MS = 5 * 60_000;
 
 const productionClient: OutboxDispatchClient = {
   async findOrgIds() {
-    return parseOutboxOrgIds(process.env.OUTBOX_ORG_IDS);
+    return discoverDueOutboxOrgIds();
   },
   async runForOrg<T>(
     orgId: string,
@@ -150,15 +150,18 @@ export function createDispatchOutboxJob(
   return new DispatchOutboxJob(productionClient, dispatcher);
 }
 
-export function parseOutboxOrgIds(value: string | undefined): string[] {
-  const orgIds = (value ?? "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-  if (!orgIds.length) {
-    throw new Error("OUTBOX_ORG_IDS is required for outbox dispatch");
-  }
-  return [...new Set(orgIds)];
+/**
+ * The database-owned function is the only cross-organisation discovery
+ * boundary. It returns identifiers only; event data is read later under the
+ * corresponding organisation's transaction-local RLS context.
+ */
+export async function discoverDueOutboxOrgIds(): Promise<string[]> {
+  return runTransaction(async (tx) => {
+    const rows = await tx.$queryRaw<{ orgId: string }[]>`
+      SELECT "orgId" FROM app.list_due_outbox_org_ids()
+    `;
+    return rows.map(({ orgId }) => orgId);
+  });
 }
 
 function toIntent(event: PendingOutboxEvent): OutboxIntentForDispatch {
