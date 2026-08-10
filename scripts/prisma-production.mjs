@@ -29,10 +29,18 @@ if (!command || !(command in COMMANDS)) {
 const envFile = resolveEnvFile();
 const fileEnv = loadEnvFile(envFile);
 const databaseUrl = fileEnv.DIRECT_URL ?? fileEnv.DATABASE_URL;
+const runtimeDatabaseUrl = fileEnv.DATABASE_URL;
 
 if (!isPresent(databaseUrl)) {
   console.error(
     "[prisma-production] DIRECT_URL or DATABASE_URL is required in the production env file.",
+  );
+  process.exit(1);
+}
+
+if (command === "deploy" && !isPresent(runtimeDatabaseUrl)) {
+  console.error(
+    "[prisma-production] DATABASE_URL is required to grant outbox dispatch access.",
   );
   process.exit(1);
 }
@@ -44,20 +52,41 @@ console.log(
   )} command=${command}`,
 );
 
-const child = spawn("pnpm", COMMANDS[command], {
-  cwd: process.cwd(),
-  env: {
-    ...process.env,
-    ...fileEnv,
-    DATABASE_URL: databaseUrl,
-  },
-  stdio: "inherit",
-});
+const env = {
+  ...process.env,
+  ...fileEnv,
+  DATABASE_URL: databaseUrl,
+  OUTBOX_DISPATCH_DATABASE_URL: runtimeDatabaseUrl,
+};
 
-child.on("exit", (code, signal) => {
-  if (signal) {
-    console.error(`[prisma-production] terminated by ${signal}`);
-    process.exit(1);
+function runPnpm(args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("pnpm", args, {
+      cwd: process.cwd(),
+      env,
+      stdio: "inherit",
+    });
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (signal) {
+        reject(new Error(`[prisma-production] terminated by ${signal}`));
+        return;
+      }
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`[prisma-production] pnpm exited with ${code ?? 1}`));
+    });
+  });
+}
+
+try {
+  await runPnpm(COMMANDS[command]);
+  if (command === "deploy") {
+    await runPnpm(["db:grant-outbox-dispatch-role"]);
   }
-  process.exit(code ?? 1);
-});
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+}

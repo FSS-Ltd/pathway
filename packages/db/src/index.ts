@@ -8,6 +8,7 @@ import {
 
 export * from "./permission-definition-sync";
 export * from "./seed-system-roles";
+export * from "./outbox-dispatch-role";
 
 // Keep a single PrismaClient instance across hot-reloads in dev/test
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient };
