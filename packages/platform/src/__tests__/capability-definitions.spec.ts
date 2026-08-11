@@ -140,6 +140,8 @@ const ADDITIONAL_MATRIX_KEYS = [
   "family.tasks.write",
   "family.calendar.read",
   "family.calendar.write",
+  "family.regulations.read",
+  "family.regulations.write",
 ] as const;
 
 const NEW_PLATFORM_CORE_KEYS = [
@@ -165,8 +167,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 106 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(106);
+  it("contains exactly the 108 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(108);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
