@@ -42,7 +42,7 @@ continue.
 | 17 | 08d — Membership | **merged** | `feat/nexsteps-home-membership` | [#308](https://github.com/jntagengwa/pathway/pull/308) | squash-merged |
 | 18 | 08e — Privacy & data | **merged** | `feat/nexsteps-home-privacy-data` | [#310](https://github.com/jntagengwa/pathway/pull/310) | squash-merged |
 | 19 | 08f — Account & sessions | **merged** | `feat/nexsteps-home-account-sessions` | [#315](https://github.com/jntagengwa/pathway/pull/315) | squash-merged; plan corrected pre-Clerk-migration Auth0 design to a pure-frontend Clerk-SDK screen (no backend) |
-| 20 | 09 — Regulations data + API foundations (build plan) | in progress | `docs/nexsteps-home-plan09-regulations-foundations` | — | build-plan doc written, not yet implemented; 3 sub-plans (09a/09b/09c) specified |
+| 20 | 09 — Regulations data + API foundations (build plan) | **merged** | `docs/nexsteps-home-plan09-regulations-foundations` | [#319](https://github.com/jntagengwa/pathway/pull/319) | squash-merged; plan doc only, sub-plans 09a/09b/09c not yet implemented |
 | 21-25 | 09 implementation, 10-14 | not started | — | — | — |
 
 ## Environment
@@ -484,11 +484,15 @@ unaffected by construction, not just unrun.
 
 Plan 08 is complete: all 6 sub-plans (08a-08f) merged, covering the 8 Family-tab
 screens plus their backends (see the "Current phase" note above for the full
-Plan 08 record). **Next: implement Plan 09 (Regulations data + API foundations,
-H6)** against the build plan at
-`docs/superpowers/plans/2026-08-10-nexsteps-home-plan09-regulations-foundations.md`
-— start with sub-plan 09a (schema, migration, RLS, capabilities; no consumers),
-per that plan's own merge-safety ordering.
+Plan 08 record). The Plan 09 (Regulations data + API foundations, H6) build
+plan merged as [#319](https://github.com/jntagengwa/pathway/pull/319) — doc
+only, no implementation yet. **Next: implement sub-plan 09a** (schema,
+migration, RLS, capabilities; no consumers) against
+`docs/superpowers/plans/2026-08-10-nexsteps-home-plan09-regulations-foundations.md`,
+per that plan's own merge-safety ordering (migrations before consumers). Note:
+concurrent ACE-vertical work (`feat/ace-*` branches) continues landing on
+master in parallel — rebase onto latest master immediately before opening
+09a's PR, same discipline as Plan 08.
 
 *(Historical note, retained below: Plan 07 completed all 9 Progress screens
 against a `/learning/*` API that turned out to need real additions first - the
