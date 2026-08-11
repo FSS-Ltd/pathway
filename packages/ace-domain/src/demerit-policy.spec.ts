@@ -58,10 +58,35 @@ test("always sends serious misconduct to head review with a required note", () =
   assert.deepEqual(
     evaluateDemeritStage({
       ...baseInput,
+      demeritUnits: 6,
+      seriousMisconductStage: 1,
+      hasSeriousMisconduct: true,
+    }),
+    { stage: 2, action: "head-review", requiresNote: true },
+  );
+  assert.deepEqual(
+    evaluateDemeritStage({
+      ...baseInput,
+      seriousMisconductStage: 2,
+      hasSeriousMisconduct: true,
+      manualStage: 1,
+    }),
+    { stage: 2, action: "head-review", requiresNote: true },
+  );
+  assert.deepEqual(
+    evaluateDemeritStage({
+      ...baseInput,
       seriousMisconductStage: 2,
       hasSeriousMisconduct: true,
       manualStage: 3,
     }),
+    { stage: 3, action: "head-review", requiresNote: true },
+  );
+});
+
+test("requires a note for a non-serious manual Stage 3", () => {
+  assert.deepEqual(
+    evaluateDemeritStage({ ...baseInput, manualStage: 3 }),
     { stage: 3, action: "head-review", requiresNote: true },
   );
 });
