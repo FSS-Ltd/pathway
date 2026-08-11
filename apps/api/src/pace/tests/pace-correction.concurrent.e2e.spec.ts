@@ -16,6 +16,8 @@ interface Fixture {
   tenantId: string;
   actorId: string;
   orgHeadId: string;
+  overrideActorId: string;
+  nonPaceActorId: string;
   childId: string;
   subjectId: string;
   orgHeadSubjectId: string;
@@ -28,7 +30,7 @@ interface Fixture {
 
 describe("PACE correction transaction and assessment-command concurrency", () => {
   let fixture: Fixture | undefined;
-  let orgHeadRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
+  const orgScopedRoles: Array<Awaited<ReturnType<typeof seedE2eTypedRole>>> = [];
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
@@ -36,6 +38,8 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     const tenantId = randomUUID();
     const actorId = randomUUID();
     const orgHeadId = randomUUID();
+    const overrideActorId = randomUUID();
+    const nonPaceActorId = randomUUID();
     const childId = randomUUID();
     const subjectId = randomUUID();
     const orgHeadSubjectId = randomUUID();
@@ -49,6 +53,8 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
       tenantId,
       actorId,
       orgHeadId,
+      overrideActorId,
+      nonPaceActorId,
       childId,
       subjectId,
       orgHeadSubjectId,
@@ -76,20 +82,38 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
         timezone: "Europe/London",
       },
     });
-    await seedE2eAuthUser({
-      subject: `pace-org-head-${orgHeadId}`,
-      userId: orgHeadId,
-      tenantId,
-      orgId,
-      orgRole: "ORG_ADMIN",
-    });
-    orgHeadRole = await seedE2eTypedRole({
-      orgId,
-      userId: orgHeadId,
-      scope: "organisation",
-      name: "Organisation Head",
-      permissionKeys: ["ace.pace.correct", "ace.pace.override"],
-    });
+    for (const userId of [orgHeadId, overrideActorId, nonPaceActorId]) {
+      await seedE2eAuthUser({
+        subject: `pace-org-actor-${userId}`,
+        userId,
+        tenantId,
+        orgId,
+        orgRole: "ORG_MEMBER",
+      });
+    }
+    orgScopedRoles.push(
+      await seedE2eTypedRole({
+        orgId,
+        userId: orgHeadId,
+        scope: "organisation",
+        name: "PACE Correction Operator",
+        permissionKeys: ["ace.pace.correct"],
+      }),
+      await seedE2eTypedRole({
+        orgId,
+        userId: overrideActorId,
+        scope: "organisation",
+        name: "PACE Override Operator",
+        permissionKeys: ["ace.pace.override"],
+      }),
+      await seedE2eTypedRole({
+        orgId,
+        userId: nonPaceActorId,
+        scope: "organisation",
+        name: "PACE Read-only Operator",
+        permissionKeys: ["ace.pace.read"],
+      }),
+    );
     await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await tx.user.create({
         data: {
@@ -266,12 +290,27 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     await prisma.siteMembership.deleteMany({
       where: { tenantId: fixture.tenantId },
     });
-    if (orgHeadRole) {
-      await clearE2eTypedRole(orgHeadRole, fixture.orgId);
+    for (const role of orgScopedRoles) {
+      await clearE2eTypedRole(role, fixture.orgId);
     }
-    await clearE2eAuthAccess(fixture.orgHeadId);
+    for (const userId of [
+      fixture.orgHeadId,
+      fixture.overrideActorId,
+      fixture.nonPaceActorId,
+    ]) {
+      await clearE2eAuthAccess(userId);
+    }
     await prisma.user.deleteMany({
-      where: { id: { in: [fixture.actorId, fixture.orgHeadId] } },
+      where: {
+        id: {
+          in: [
+            fixture.actorId,
+            fixture.orgHeadId,
+            fixture.overrideActorId,
+            fixture.nonPaceActorId,
+          ],
+        },
+      },
     });
     await prisma.tenant.deleteMany({ where: { id: fixture.tenantId } });
     await prisma.org.deleteMany({ where: { id: fixture.orgId } });
@@ -469,18 +508,13 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     });
   });
 
-  it("accepts an active typed organisation head for corrections and overrides", async () => {
+  it("accepts an active correction-only organisation role for corrections", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     const service = new PaceCommandService(new OutboxService());
-    const now = new Date();
     const actor = {
       tenantId: fixture.tenantId,
       orgId: fixture.orgId,
       userId: fixture.orgHeadId,
-      stepUp: {
-        authenticatedAt: now.toISOString(),
-        secondFactor: true as const,
-      },
     };
 
     await expect(
@@ -500,6 +534,12 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     ).resolves.toMatchObject({
       assessment: { correctsAssessmentId: fixture.orgHeadOriginalId },
     });
+  });
+
+  it("accepts an active override-only organisation role for overrides", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+    const now = new Date();
 
     await expect(
       service.override(
@@ -513,11 +553,51 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
           assessedAt: now.toISOString(),
           policyCode: "score-below-threshold",
           expiresAt: new Date(now.getTime() + 10 * 60 * 1_000).toISOString(),
-          reason: "Organisation head supervised exception",
+          reason: "Organisation-scoped supervised exception",
         },
-        actor,
+        {
+          tenantId: fixture.tenantId,
+          orgId: fixture.orgId,
+          userId: fixture.overrideActorId,
+          stepUp: {
+            authenticatedAt: now.toISOString(),
+            secondFactor: true,
+          },
+        },
       ),
-    ).resolves.toMatchObject({ authorisedByUserId: fixture.orgHeadId });
+    ).resolves.toMatchObject({ authorisedByUserId: fixture.overrideActorId });
+  });
+
+  it("rejects an organisation role with no PACE mutation authority", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+    const now = new Date();
+
+    await expect(
+      service.override(
+        {
+          idempotencyKey: randomUUID(),
+          childId: fixture.childId,
+          subjectId: fixture.orgHeadSubjectId,
+          paceNumber: 1001,
+          assessmentType: "FinalTest",
+          score: 70,
+          assessedAt: now.toISOString(),
+          policyCode: "score-below-threshold",
+          expiresAt: new Date(now.getTime() + 10 * 60 * 1_000).toISOString(),
+          reason: "Read-only actor must not authorise",
+        },
+        {
+          tenantId: fixture.tenantId,
+          orgId: fixture.orgId,
+          userId: fixture.nonPaceActorId,
+          stepUp: {
+            authenticatedAt: now.toISOString(),
+            secondFactor: true,
+          },
+        },
+      ),
+    ).rejects.toMatchObject({ code: "P2003" });
   });
 
   it("serializes identical override retries into one immutable authorization", async () => {
