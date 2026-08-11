@@ -29,18 +29,10 @@ if (!command || !(command in COMMANDS)) {
 const envFile = resolveEnvFile();
 const fileEnv = loadEnvFile(envFile);
 const databaseUrl = fileEnv.DIRECT_URL ?? fileEnv.DATABASE_URL;
-const runtimeDatabaseUrl = fileEnv.DATABASE_URL;
 
 if (!isPresent(databaseUrl)) {
   console.error(
     "[prisma-production] DIRECT_URL or DATABASE_URL is required in the production env file.",
-  );
-  process.exit(1);
-}
-
-if (command === "deploy" && !isPresent(runtimeDatabaseUrl)) {
-  console.error(
-    "[prisma-production] DATABASE_URL is required to grant outbox dispatch access.",
   );
   process.exit(1);
 }
@@ -56,7 +48,6 @@ const env = {
   ...process.env,
   ...fileEnv,
   DATABASE_URL: databaseUrl,
-  OUTBOX_DISPATCH_DATABASE_URL: runtimeDatabaseUrl,
 };
 
 function runPnpm(args) {
@@ -83,9 +74,6 @@ function runPnpm(args) {
 
 try {
   await runPnpm(COMMANDS[command]);
-  if (command === "deploy") {
-    await runPnpm(["db:grant-outbox-dispatch-role"]);
-  }
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
