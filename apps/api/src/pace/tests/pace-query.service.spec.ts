@@ -404,4 +404,89 @@ describe("PaceQueryService", () => {
     expect(secondPage.items.map((item) => item.child.id)).toEqual(["child-2"]);
     expect(secondPage.nextCursor).toBeNull();
   });
+
+  it("canonicalizes UUID filters before cursor scoping and SQL binding", async () => {
+    const { service, tx } = createService();
+    const subjectId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+    const groupId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+    tx.tenant.findFirst.mockResolvedValue({ id: "tenant-1" });
+    tx.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          enrollmentId: "enrolment-1",
+          enrollmentCreatedAt: new Date("2026-09-02T09:00:00.000Z"),
+          childId: "child-1",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          preferredName: null,
+          groupId,
+          groupName: "Explorers",
+          subjectId,
+          subjectName: "Mathematics",
+          currentPace: 1,
+          targetPace: 12,
+          trackStatus: "ON_TRACK",
+          rebuiltAt: new Date("2026-09-02T09:00:00.000Z"),
+        },
+        {
+          enrollmentId: "enrolment-2",
+          enrollmentCreatedAt: new Date("2026-09-01T09:00:00.000Z"),
+          childId: "child-2",
+          firstName: "Grace",
+          lastName: "Hopper",
+          preferredName: null,
+          groupId,
+          groupName: "Explorers",
+          subjectId,
+          subjectName: "Mathematics",
+          currentPace: 2,
+          targetPace: 12,
+          trackStatus: "ON_TRACK",
+          rebuiltAt: new Date("2026-09-01T09:00:00.000Z"),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          enrollmentId: "enrolment-2",
+          enrollmentCreatedAt: new Date("2026-09-01T09:00:00.000Z"),
+          childId: "child-2",
+          firstName: "Grace",
+          lastName: "Hopper",
+          preferredName: null,
+          groupId,
+          groupName: "Explorers",
+          subjectId,
+          subjectName: "Mathematics",
+          currentPace: 2,
+          targetPace: 12,
+          trackStatus: "ON_TRACK",
+          rebuiltAt: new Date("2026-09-01T09:00:00.000Z"),
+        },
+      ]);
+
+    const firstPage = await service.listRoster(actor, {
+      subjectId: subjectId.toUpperCase(),
+      groupId: groupId.toUpperCase(),
+      search: "  ADA  ",
+      limit: 1,
+    });
+    const secondPage = await service.listRoster(actor, {
+      subjectId,
+      groupId,
+      search: "ada",
+      limit: 1,
+      cursor: firstPage.nextCursor ?? undefined,
+    });
+
+    expect(secondPage.items.map((item) => item.child.id)).toEqual(["child-2"]);
+    const sqlValues = jest
+      .mocked(Prisma.sql)
+      .mock.calls.flatMap(([, ...values]) => values);
+    expect(sqlValues).toEqual(
+      expect.arrayContaining([subjectId, groupId, "%ada%"]),
+    );
+    expect(sqlValues).not.toEqual(
+      expect.arrayContaining([subjectId.toUpperCase(), groupId.toUpperCase()]),
+    );
+  });
 });

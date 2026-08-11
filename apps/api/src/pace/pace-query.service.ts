@@ -256,9 +256,13 @@ function buildRosterQuery(
 }
 
 function normalizeRosterQuery(query: PaceRosterQuery): PaceRosterQuery {
+  const subjectId = query.subjectId?.toLowerCase();
+  const groupId = query.groupId?.toLowerCase();
   const search = query.search?.trim().toLocaleLowerCase();
   return {
     ...query,
+    ...(subjectId ? { subjectId } : { subjectId: undefined }),
+    ...(groupId ? { groupId } : { groupId: undefined }),
     ...(search ? { search } : { search: undefined }),
   };
 }

@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { INestApplication } from "@nestjs/common";
+import { ExecutionContext, INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { PrismaClient } from "@prisma/client";
 import { Prisma, prisma, withTenantRlsContext } from "@pathway/db";
 import request from "supertest";
 import { AppModule } from "../../app.module";
+import { AuthUserGuard } from "../../auth/auth-user.guard";
 import {
   clearE2eAuthAccess,
   clearE2eTypedRole,
@@ -13,6 +15,7 @@ import {
 } from "../../../test-helpers.e2e";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
+const E2E_BOOTSTRAP_ROLE = "pathway_test_user";
 
 interface PaceRosterFixture {
   childAId: string;
@@ -28,6 +31,38 @@ interface PaceRosterFixture {
 
 function useTenantRlsRole(): boolean {
   return process.env.E2E_USE_GLOBAL_SETUP === "true";
+}
+
+async function useRestrictedRoleForApplicationRequests(): Promise<void> {
+  if (!useTenantRlsRole()) return;
+  await prisma.$executeRawUnsafe(
+    `ALTER ROLE "${E2E_BOOTSTRAP_ROLE}" SET role TO "${TENANT_RLS_ROLE}"`,
+  );
+  await prisma.$disconnect();
+}
+
+async function restoreApplicationDatabaseRole(): Promise<void> {
+  if (!useTenantRlsRole()) return;
+  const bootstrapPrisma = new PrismaClient({
+    datasources: { db: { url: bootstrapDatabaseUrl() } },
+  });
+  try {
+    await bootstrapPrisma.$executeRawUnsafe(
+      `ALTER ROLE "${E2E_BOOTSTRAP_ROLE}" RESET role`,
+    );
+  } finally {
+    await bootstrapPrisma.$disconnect();
+  }
+  await prisma.$disconnect();
+}
+
+function bootstrapDatabaseUrl(): string {
+  const databaseUrl = process.env.E2E_DATABASE_URL;
+  if (!databaseUrl) throw new Error("E2E database URL is not configured");
+
+  const url = new URL(databaseUrl);
+  url.searchParams.set("options", `-c role=${E2E_BOOTSTRAP_ROLE}`);
+  return url.toString();
 }
 
 async function withPaceRlsContext<T>(
@@ -53,18 +88,13 @@ describe("ACE PACE roster RLS", () => {
   let typedRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
   let fixture: PaceRosterFixture | undefined;
   let createdOrgVertical = false;
+  let requestRoleConfigured = false;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
     if (!orgId || !tenantAId || !tenantBId) {
       throw new Error("E2E tenant fixtures are not configured");
     }
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-    app = moduleRef.createNestApplication();
-    await app.init();
 
     const vertical = await prisma.orgVertical.findUnique({ where: { orgId } });
     if (!vertical) {
@@ -97,11 +127,39 @@ describe("ACE PACE roster RLS", () => {
       tenantBId,
       writerAId: authUserId,
     });
+
+    await useRestrictedRoleForApplicationRequests();
+    requestRoleConfigured = useTenantRlsRole();
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [AppModule],
+    })
+      .overrideGuard(AuthUserGuard)
+      .useValue({
+        canActivate(context: ExecutionContext): boolean {
+          const request = context.switchToHttp().getRequest<Record<string, unknown>>();
+          request.authUserId = authUserId;
+          request.__pathwayContext = {
+            user: { userId: authUserId },
+            org: { orgId },
+            tenant: { tenantId: tenantAId, orgId },
+            roles: { org: ["org:admin"], tenant: ["tenant:admin"] },
+            permissions: [],
+            rawClaims: {},
+            siteRole: "SITE_ADMIN",
+          };
+          return true;
+        },
+      })
+      .compile();
+    app = moduleRef.createNestApplication();
+    await app.init();
   });
 
   afterAll(async () => {
-    if (!fixture) return;
-    await cleanupFixture(fixture);
+    await app?.close();
+    if (requestRoleConfigured) await restoreApplicationDatabaseRole();
+    if (fixture) await cleanupFixture(fixture);
     if (typedRole) await clearE2eTypedRole(typedRole, orgId);
     if (authUserId) {
       await clearE2eAuthAccess(authUserId);
@@ -110,7 +168,26 @@ describe("ACE PACE roster RLS", () => {
     if (createdOrgVertical) {
       await prisma.orgVertical.deleteMany({ where: { orgId } });
     }
-    await app?.close();
+  });
+
+  it("opens request-path tenant transactions as the no-BYPASS RLS role", async () => {
+    if (!requestRoleConfigured) return;
+
+    const [role] = await withTenantRlsContext(tenantAId, orgId, (tx) =>
+      tx.$queryRaw<
+        Array<{ currentUser: string; rolsuper: boolean; rolbypassrls: boolean }>
+      >`
+        SELECT current_user AS "currentUser", rolsuper, rolbypassrls
+        FROM pg_roles
+        WHERE rolname = current_user
+      `,
+    );
+
+    expect(role).toEqual({
+      currentUser: TENANT_RLS_ROLE,
+      rolsuper: false,
+      rolbypassrls: false,
+    });
   });
 
   it("does not return another site's roster row to an active site A request", async () => {
