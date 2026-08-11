@@ -57,8 +57,8 @@ process:
 | 06 | Week, Today, tasks, calendar screens (built before 05 — see sequencing note) | H3 | 8 | see PROGRESS.md |
 | 05 | Setup flow (9 screens) | H2 | 9 | see PROGRESS.md |
 | 07 | Progress | H4 | 9 | see PROGRESS.md |
-| 08 | Family, people, permissions, privacy | H5 | 8 | not started |
-| 09 | Regulations data + API foundations | H6 | 0 | not started |
+| 08 | Family, people, permissions, privacy | H5 | 8 | see PROGRESS.md |
+| 09 | Regulations data + API foundations | H6 | 0 | in progress |
 | 10 | Regulations & Evidence mobile flow | H7 | 17 | not started |
 | 11 | Community opt-in, directory, connections | H8 | 8 | not started |
 | 12 | Community conversations | H9 | 5 | not started |
