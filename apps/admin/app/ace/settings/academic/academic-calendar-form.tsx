@@ -128,6 +128,7 @@ export function AcademicCalendarForm({
   const [validation, setValidation] = React.useState<Record<string, string>>(
     {},
   );
+  const validationMessages = Object.values(validation);
   const presentation = academicCalendarPresentation({
     isLoading,
     academicYears,
@@ -182,7 +183,12 @@ export function AcademicCalendarForm({
         ) : null}
 
         <div aria-live="polite" aria-atomic="true">
-          {presentation.state === "loading" ? (
+          {validationMessages.length > 0 ? (
+            <p className="text-sm text-status-danger" role="alert">
+              Please correct the highlighted fields before saving the academic
+              calendar.
+            </p>
+          ) : presentation.state === "loading" ? (
             <div className="space-y-2" aria-label={presentation.message}>
               <span className="block h-3 w-48 animate-pulse rounded bg-muted" />
               <span className="block h-16 w-full animate-pulse rounded bg-muted" />
@@ -404,13 +410,21 @@ function Field({
   label: string;
   id: string;
   error?: string;
-  children: React.ReactNode;
+  children: React.ReactElement<React.InputHTMLAttributes<HTMLInputElement>>;
 }) {
+  const errorId = `${id}-error`;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      {children}
-      {error ? <p className="text-sm text-status-danger">{error}</p> : null}
+      {React.cloneElement(children, {
+        "aria-invalid": Boolean(error),
+        "aria-describedby": error ? errorId : undefined,
+      })}
+      {error ? (
+        <p id={errorId} className="text-sm text-status-danger">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
