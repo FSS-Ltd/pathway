@@ -342,10 +342,18 @@ ALTER TABLE "RequirementVersion" ADD CONSTRAINT "RequirementVersion_published_re
     OR ("reviewedByUserId" IS NOT NULL AND "reviewedAt" IS NOT NULL AND "publishedAt" IS NOT NULL)
   );
 
+-- The second reviewer must be a different person from the first reviewer.
+-- reviewedByUserId is guaranteed non-null in this branch by the sibling
+-- RequirementVersion_published_requires_review_check, so this comparison
+-- can't silently pass on a NULL. Without this, a single person could satisfy
+-- both review fields, defeating the entire point of a *second* reviewer -
+-- this CHECK is the only enforcement mechanism until the real two-person
+-- review workflow ships (locked decision 2).
 ALTER TABLE "RequirementVersion" ADD CONSTRAINT "RequirementVersion_high_impact_second_review_check"
   CHECK (
     "status" <> 'PUBLISHED' OR "impactLevel" <> 'HIGH'
-    OR ("secondReviewerUserId" IS NOT NULL AND "secondReviewedAt" IS NOT NULL)
+    OR ("secondReviewerUserId" IS NOT NULL AND "secondReviewedAt" IS NOT NULL
+        AND "secondReviewerUserId" <> "reviewedByUserId")
   );
 
 ALTER TABLE "RequirementVersion" ADD CONSTRAINT "RequirementVersion_effective_interval_check"
@@ -431,6 +439,23 @@ FOR EACH ROW EXECUTE FUNCTION app.require_learning_actor_membership('createdByUs
 
 -- 9. Tenant-owned regulations rows expose tenantId directly, so apply the
 --    established tenant RLS policy (see 20260805090000_add_privacy_data_requests).
+--
+--    Non-obvious for whoever extends this pattern in 09b/09c: the actor-
+--    membership triggers above and this WITH CHECK policy are BOTH load-
+--    bearing, but each is the one actually doing the work in a different
+--    connection mode - never assume either is redundant because a test only
+--    exercised one mode.
+--      - Under the e2e NOBYPASSRLS tenant role, a BEFORE INSERT trigger
+--        always fires before Postgres evaluates a table's RLS WITH CHECK
+--        policy. So in that mode, the trigger's own actor-membership lookup
+--        is what rejects a cross-tenant insert first; WITH CHECK is shadowed
+--        and never gets evaluated for that case.
+--      - In production, the app connects as the table owner, which is
+--        ENABLE-but-not-FORCE on SiteMembership - so the owner is NOT subject
+--        to RLS there and the trigger's membership lookup can see every
+--        tenant's rows. In that mode the trigger's own tenant check does
+--        nothing to stop a cross-tenant write; WITH CHECK is the guard that
+--        actually blocks it.
 DO $$
 DECLARE tbl text; policy_name text;
 BEGIN

@@ -651,6 +651,28 @@ describe("NexSteps Home regulations and evidence RLS", () => {
         ),
       "23514",
     );
+
+    // The second reviewer must be a different person from the first - a
+    // single person satisfying both review fields would defeat the entire
+    // point of a second reviewer for a high-impact publish.
+    await expectDatabaseRejection(
+      () =>
+        runTransaction((tx) =>
+          tx.$executeRaw`
+            INSERT INTO "RequirementVersion" (
+              "id", "requirementId", "versionNumber", "status", "title", "summary",
+              "primarySourceId", "impactLevel", "reviewedByUserId", "reviewedAt",
+              "secondReviewerUserId", "secondReviewedAt", "publishedAt"
+            ) VALUES (
+              ${randomUUID()}, ${fixture.requirementId}, 3, 'PUBLISHED',
+              'Annual notification', 'Placeholder summary text.',
+              ${SEEDED_ENGLAND_SOURCE_ID}, 'HIGH', ${fixture.actorAId}, now(),
+              ${fixture.actorAId}, now(), now()
+            )
+          `,
+        ),
+      "23514",
+    );
   });
 
   it("rejects a duplicate active HouseholdRequirement for the same child", async () => {
@@ -717,5 +739,29 @@ describe("NexSteps Home regulations and evidence RLS", () => {
     );
 
     expect(count.count).toBe(5n);
+  });
+
+  it("rejects a write to global regulatory content under the tenant-scoped e2e role", async () => {
+    if (!isDatabaseAvailable()) return;
+    if (!useTenantRlsRole()) return;
+
+    // Jurisdiction/RegulatoryAuthority/RegulatorySource/Requirement/
+    // RequirementVersion have a FOR SELECT USING (true) policy and no write
+    // policy at all. Table-level GRANTs for the e2e role are broad (SELECT,
+    // INSERT, UPDATE, DELETE on every table in the schema), so it's the
+    // *absence* of a write RLS policy - not a grant - that blocks this
+    // insert. Runs with no tenant context set, same as the read case above,
+    // since these tables carry no tenantId to scope a context to.
+    await expectDatabaseRejection(
+      () =>
+        withNoTenantRlsContext(
+          (tx) =>
+            tx.$executeRaw`
+              INSERT INTO "Jurisdiction" ("id", "countryCode", "name", "level")
+              VALUES (${randomUUID()}, 'GB', 'Injected', 'NATION')
+            `,
+        ),
+      "42501",
+    );
   });
 });
