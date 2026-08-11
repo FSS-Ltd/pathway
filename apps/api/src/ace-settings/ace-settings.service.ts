@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -56,7 +57,10 @@ export interface AceSettingsResponse {
 
 @Injectable()
 export class AceSettingsService {
-  constructor(private readonly outbox = new OutboxService()) {}
+  constructor(
+    @Inject(OutboxService)
+    private readonly outbox: OutboxService = new OutboxService(),
+  ) {}
 
   async get(actor: AceSettingsActor): Promise<AceSettingsResponse> {
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
