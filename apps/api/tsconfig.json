@@ -9,6 +9,8 @@
     "paths": {
       "@pathway/auth": ["../../packages/auth/src/index.ts"],
       "@pathway/auth/*": ["../../packages/auth/src/*"],
+      "@pathway/ace-domain": ["../../packages/ace-domain/src/index.ts"],
+      "@pathway/ace-domain/*": ["../../packages/ace-domain/src/*"],
       "@pathway/db": ["../../packages/db/src/index.ts"],
       "@pathway/db/*": ["../../packages/db/src/*"],
       "@pathway/platform": ["../../packages/platform/src/index.ts"],
@@ -26,6 +28,7 @@
     "src",
     "scripts",
     "../../packages/auth/src",
+    "../../packages/ace-domain/src",
     "../../packages/db/src",
     "../../packages/platform/src",
     "../../packages/pricing/src",
