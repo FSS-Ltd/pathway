@@ -13,13 +13,17 @@ import { z } from "zod";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { paceRosterQuerySchema } from "./dto/pace-query.dto";
+import {
+  paceExceptionsQuerySchema,
+  paceRosterQuerySchema,
+} from "./dto/pace-query.dto";
 import { createPaceAssessmentSchema } from "./dto/create-pace-assessment.dto";
 import {
   paceAssessmentCorrectionSchema,
   pacePolicyOverrideSchema,
 } from "./dto/pace-correction.dto";
 import { PaceCommandService } from "./pace-command.service";
+import { PaceExceptionsService } from "./pace-exceptions.service";
 import { PaceQueryService } from "./pace-query.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
@@ -28,6 +32,7 @@ export class PaceController {
   constructor(
     private readonly service: PaceQueryService,
     private readonly commandService: PaceCommandService,
+    private readonly exceptionsService: PaceExceptionsService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -38,6 +43,20 @@ export class PaceController {
       return await this.service.listRoster(
         this.actor(),
         await paceRosterQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Get("exceptions")
+  @RequirePermission("ace.pace.read")
+  async exceptions(@Query() query: unknown) {
+    try {
+      return await this.exceptionsService.listExceptions(
+        this.actor(),
+        await paceExceptionsQuerySchema.parseAsync(query),
       );
     } catch (error) {
       if (error instanceof z.ZodError) throw new BadRequestException(error.flatten());

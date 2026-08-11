@@ -554,6 +554,9 @@ importers:
 
   apps/workers:
     dependencies:
+      '@pathway/ace-domain':
+        specifier: workspace:*
+        version: link:../../packages/ace-domain
       '@pathway/db':
         specifier: workspace:*
         version: link:../../packages/db

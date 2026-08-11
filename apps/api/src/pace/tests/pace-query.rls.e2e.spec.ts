@@ -228,6 +228,29 @@ describe("ACE PACE roster RLS", () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("does not return another site's PACE exception to an active site A request", async () => {
+    if (!app || !fixture) return;
+
+    const response = await request(app.getHttpServer())
+      .get("/ace/pace/exceptions")
+      .set("Authorization", authHeader);
+
+    expect(response.status).toBe(200);
+    expect(response.body.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          child: { id: fixture.childAId },
+          exceptions: ["BEHIND"],
+        }),
+      ]),
+    );
+    expect(response.body.items).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ child: { id: fixture.childBId } }),
+      ]),
+    );
+  });
 });
 
 async function createFixture(input: {
@@ -286,7 +309,7 @@ async function createFixture(input: {
         subjectId: fixture.subjectAId,
         currentPace: 1,
         targetPace: 12,
-        trackStatus: "ON_TRACK",
+        trackStatus: "BEHIND",
         rebuiltAt: new Date("2026-09-02T00:00:00.000Z"),
       },
     });
@@ -345,7 +368,7 @@ async function createFixture(input: {
         subjectId: fixture.subjectBId,
         currentPace: 1,
         targetPace: 12,
-        trackStatus: "ON_TRACK",
+        trackStatus: "BEHIND",
         rebuiltAt: new Date("2026-09-02T00:00:00.000Z"),
       },
     });
