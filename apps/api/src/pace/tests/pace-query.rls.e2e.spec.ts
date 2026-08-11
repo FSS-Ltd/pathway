@@ -6,6 +6,7 @@ import { Prisma, prisma, withTenantRlsContext } from "@pathway/db";
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
+import { PaceRequestRlsRoleLease } from "./pace-request-rls-role-lease";
 import {
   clearE2eAuthAccess,
   clearE2eTypedRole,
@@ -31,29 +32,6 @@ interface PaceRosterFixture {
 
 function useTenantRlsRole(): boolean {
   return process.env.E2E_USE_GLOBAL_SETUP === "true";
-}
-
-async function useRestrictedRoleForApplicationRequests(): Promise<void> {
-  if (!useTenantRlsRole()) return;
-  await prisma.$executeRawUnsafe(
-    `ALTER ROLE "${E2E_BOOTSTRAP_ROLE}" SET role TO "${TENANT_RLS_ROLE}"`,
-  );
-  await prisma.$disconnect();
-}
-
-async function restoreApplicationDatabaseRole(): Promise<void> {
-  if (!useTenantRlsRole()) return;
-  const bootstrapPrisma = new PrismaClient({
-    datasources: { db: { url: bootstrapDatabaseUrl() } },
-  });
-  try {
-    await bootstrapPrisma.$executeRawUnsafe(
-      `ALTER ROLE "${E2E_BOOTSTRAP_ROLE}" RESET role`,
-    );
-  } finally {
-    await bootstrapPrisma.$disconnect();
-  }
-  await prisma.$disconnect();
 }
 
 function bootstrapDatabaseUrl(): string {
@@ -89,6 +67,7 @@ describe("ACE PACE roster RLS", () => {
   let fixture: PaceRosterFixture | undefined;
   let createdOrgVertical = false;
   let requestRoleConfigured = false;
+  let requestRoleLease: PaceRequestRlsRoleLease | undefined;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
@@ -128,8 +107,18 @@ describe("ACE PACE roster RLS", () => {
       writerAId: authUserId,
     });
 
-    await useRestrictedRoleForApplicationRequests();
-    requestRoleConfigured = useTenantRlsRole();
+    requestRoleLease = new PaceRequestRlsRoleLease({
+      enabled: useTenantRlsRole(),
+      bootstrapRole: E2E_BOOTSTRAP_ROLE,
+      restrictedRole: TENANT_RLS_ROLE,
+      requestClient: prisma,
+      createBootstrapClient: () =>
+        new PrismaClient({
+          datasources: { db: { url: bootstrapDatabaseUrl() } },
+        }),
+    });
+    await requestRoleLease.enable();
+    requestRoleConfigured = requestRoleLease.isConfigured;
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -157,17 +146,33 @@ describe("ACE PACE roster RLS", () => {
   });
 
   afterAll(async () => {
-    await app?.close();
-    if (requestRoleConfigured) await restoreApplicationDatabaseRole();
-    if (fixture) await cleanupFixture(fixture);
-    if (typedRole) await clearE2eTypedRole(typedRole, orgId);
-    if (authUserId) {
+    let firstError: unknown;
+    const cleanUp = async (operation: () => Promise<void>) => {
+      try {
+        await operation();
+      } catch (error) {
+        firstError ??= error;
+      }
+    };
+
+    await cleanUp(() => app?.close() ?? Promise.resolve());
+    await cleanUp(() => requestRoleLease?.restore() ?? Promise.resolve());
+    await cleanUp(() => (fixture ? cleanupFixture(fixture) : Promise.resolve()));
+    await cleanUp(() =>
+      typedRole ? clearE2eTypedRole(typedRole, orgId) : Promise.resolve(),
+    );
+    await cleanUp(async () => {
+      if (!authUserId) return;
       await clearE2eAuthAccess(authUserId);
       await prisma.user.deleteMany({ where: { id: authUserId } });
-    }
-    if (createdOrgVertical) {
-      await prisma.orgVertical.deleteMany({ where: { orgId } });
-    }
+    });
+    await cleanUp(() =>
+      createdOrgVertical
+        ? prisma.orgVertical.deleteMany({ where: { orgId } }).then(() => undefined)
+        : Promise.resolve(),
+    );
+
+    if (firstError) throw firstError;
   });
 
   it("opens request-path tenant transactions as the no-BYPASS RLS role", async () => {
