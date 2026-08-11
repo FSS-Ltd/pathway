@@ -16,6 +16,11 @@ import {
 describe("Handover (e2e)", () => {
   let app: INestApplication | null = null;
 
+  const sessionStartsAt = new Date("2099-08-12T00:17:00.000Z");
+  const sessionEndsAt = new Date("2099-08-12T01:17:00.000Z");
+  const handoverDate = new Date("2099-08-12T00:00:00.000Z");
+  const versionedHandoverDate = new Date("2099-08-13T00:00:00.000Z");
+
   const orgId = process.env.E2E_ORG_ID as string;
   const tenantId = process.env.E2E_TENANT_ID as string;
 
@@ -59,16 +64,12 @@ describe("Handover (e2e)", () => {
       });
       ids.group = group.id;
 
-      const now = new Date();
-      const startsAt = new Date(now.getTime() + 60 * 60 * 1000);
-      const endsAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-
       const session = await tx.session.create({
         data: {
           tenantId,
           groups: { connect: [{ id: ids.group }] },
-          startsAt,
-          endsAt,
+          startsAt: sessionStartsAt,
+          endsAt: sessionEndsAt,
         },
         select: { id: true },
       });
@@ -212,9 +213,7 @@ describe("Handover (e2e)", () => {
       .set("Authorization", staffAuthHeader)
       .send({
         groupId: ids.group,
-        handoverDate: new Date(
-          Date.now() + 0,
-        ).toISOString(), // same day as computed logic will map; approximate for e2e
+        handoverDate: handoverDate.toISOString(),
         contentJson: { summary: "Draft content", notes: [] },
       });
 
@@ -289,14 +288,12 @@ describe("Handover (e2e)", () => {
     expect([400, 403]).toContain(patchRes.status);
 
     // Instead, create a new log to test version increments
-    const nextHandoverDate = new Date();
-    nextHandoverDate.setUTCDate(nextHandoverDate.getUTCDate() + 1);
     const createRes = await request(app.getHttpServer())
       .post("/handover")
       .set("Authorization", staffAuthHeader)
       .send({
         groupId: ids.group,
-        handoverDate: nextHandoverDate.toISOString(),
+        handoverDate: versionedHandoverDate.toISOString(),
         contentJson: { summary: "V1", notes: [] },
         changeSummary: "v1",
       });
