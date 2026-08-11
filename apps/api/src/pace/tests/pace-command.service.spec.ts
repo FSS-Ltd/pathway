@@ -1,4 +1,8 @@
-import { BadRequestException, HttpException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  HttpException,
+  NotFoundException,
+} from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
@@ -8,12 +12,19 @@ import { createPaceAssessmentSchema } from "../dto/create-pace-assessment.dto";
 import type { CreatePaceAssessmentDto } from "../dto/create-pace-assessment.dto";
 
 jest.mock("@pathway/db", () => ({
-  Prisma: { sql: (strings: TemplateStringsArray) => strings.join("?") },
+  Prisma: {
+    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings: [...strings],
+      values,
+    }),
+  },
   withTenantRlsContext: jest.fn(),
 }));
 
 const actor = { tenantId: "tenant-1", orgId: "org-1", userId: "user-1" };
 const assessedAt = "2026-08-11T00:30:00.000Z";
+const commandFingerprint =
+  "ace-pace-assessment:tenant-1:6d182b57fce5fefa5f33ef8939f3e903a261fcc5980cebc0fa2045a238651a52:257c165e6e32217b085842dac8dfa9a216fad740f06a39e2a128086525014dea";
 
 function command(
   overrides: Partial<CreatePaceAssessmentDto> = {},
@@ -44,7 +55,7 @@ function transaction() {
       create: jest.fn(),
     },
     paceProgress: { findUnique: jest.fn(), upsert: jest.fn() },
-    auditEvent: { create: jest.fn() },
+    auditEvent: { create: jest.fn(), findFirst: jest.fn() },
     outboxEvent: {
       findFirst: jest.fn(),
       createMany: jest.fn(),
@@ -64,15 +75,20 @@ function assessment(overrides: Partial<Record<string, unknown>> = {}) {
     result: "PASSED",
     assessedOn: new Date("2026-08-10T00:00:00.000Z"),
     correctsAssessmentId: null,
+    createdAt: new Date("2026-08-10T12:00:00.000Z"),
+    reason: "Completed under normal supervision",
+    recordedByUserId: "user-1",
     ...overrides,
   };
 }
 
 function arrange() {
   const tx = transaction();
-  jest.mocked(withTenantRlsContext).mockImplementation(
-    async (_tenantId, _orgId, callback) => callback(tx as never),
-  );
+  jest
+    .mocked(withTenantRlsContext)
+    .mockImplementation(async (_tenantId, _orgId, callback) =>
+      callback(tx as never),
+    );
   tx.tenant.findFirst.mockResolvedValue({ timezone: "America/New_York" });
   tx.studentSubjectEnrollment.findFirst.mockResolvedValue({
     startingPace: 1001,
@@ -106,6 +122,22 @@ function arrange() {
     rebuiltAt: new Date("2026-08-11T00:30:00.000Z"),
   });
   tx.auditEvent.create.mockResolvedValue({});
+  tx.auditEvent.findFirst.mockResolvedValue({
+    metadata: {
+      policyDecision: "allow",
+      policyCode: "allowed",
+      policyNextPace: 1002,
+      progress: {
+        currentPace: 1002,
+        targetPace: 1002,
+        completedPaces: 1,
+        trackStatus: "ON_TRACK",
+        blockCode: null,
+        lastAssessmentId: "assessment-1",
+        rebuiltAt: "2026-08-10T12:00:00.000Z",
+      },
+    },
+  });
   tx.outboxEvent.createMany.mockResolvedValue({ count: 1 });
   tx.outboxEvent.findFirstOrThrow.mockResolvedValue({ id: "outbox-1" });
   return { service: new PaceCommandService(new OutboxService()), tx };
@@ -158,6 +190,16 @@ describe("PaceCommandService", () => {
       "org-1",
       expect.any(Function),
     );
+    expect(tx.$executeRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        values: expect.arrayContaining([
+          "ace-pace-assessment:tenant-1:child-1",
+        ]),
+      }),
+    );
+    expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      tx.paceAssessment.findMany.mock.invocationCallOrder[0]!,
+    );
     expect(tx.tenant.findFirst).toHaveBeenCalledWith({
       where: { id: "tenant-1", orgId: "org-1" },
       select: { timezone: true },
@@ -172,6 +214,15 @@ describe("PaceCommandService", () => {
       }),
     );
     expect(tx.auditEvent.create).toHaveBeenCalledTimes(1);
+    expect(tx.auditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.not.objectContaining({
+            reason: "Completed under normal supervision",
+          }),
+        }),
+      }),
+    );
     expect(tx.outboxEvent.createMany).toHaveBeenCalledWith({
       data: [
         expect.objectContaining({
@@ -186,7 +237,10 @@ describe("PaceCommandService", () => {
 
   it("returns a stable duplicate result without a second fact, projection, audit, or intent", async () => {
     const { service, tx } = arrange();
-    tx.outboxEvent.findFirst.mockResolvedValue({ aggregateId: "assessment-1" });
+    tx.outboxEvent.findFirst.mockResolvedValue({
+      aggregateId: "assessment-1",
+      idempotencyKey: commandFingerprint,
+    });
     tx.paceAssessment.findMany.mockResolvedValue([
       assessment({
         id: "self-test-1",
@@ -208,12 +262,74 @@ describe("PaceCommandService", () => {
 
     await expect(service.record(command(), actor)).resolves.toMatchObject({
       assessment: { id: "assessment-1" },
+      policy: {
+        decision: "allow",
+        code: "allowed",
+        nextPace: { raw: 1002, level: 1, sequence: 2 },
+      },
+      progress: {
+        currentPace: 1002,
+        targetPace: 1002,
+        completedPaces: 1,
+        trackStatus: "ON_TRACK",
+        blockCode: null,
+        lastAssessmentId: "assessment-1",
+        rebuiltAt: "2026-08-10T12:00:00.000Z",
+      },
       duplicate: true,
     });
     expect(tx.paceAssessment.create).not.toHaveBeenCalled();
     expect(tx.paceProgress.upsert).not.toHaveBeenCalled();
     expect(tx.auditEvent.create).not.toHaveBeenCalled();
     expect(tx.outboxEvent.createMany).not.toHaveBeenCalled();
+    expect(tx.paceProgress.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("rejects reuse of an idempotency key for different immutable command content", async () => {
+    const { service, tx } = arrange();
+    tx.outboxEvent.findFirst.mockResolvedValue({
+      aggregateId: "assessment-1",
+      idempotencyKey: "stored-command-fingerprint",
+    });
+
+    await expect(
+      service.record(command({ score: 81 }), actor),
+    ).rejects.toMatchObject({
+      response: {
+        statusCode: 409,
+        code: "PACE_IDEMPOTENCY_CONFLICT",
+      },
+    });
+    expect(tx.paceAssessment.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("does not treat a superseded correction predecessor as a duplicate or policy fact", async () => {
+    const { service, tx } = arrange();
+    tx.paceAssessment.findMany.mockResolvedValue([
+      assessment({
+        id: "self-test-1",
+        assessmentType: "SELF_TEST",
+        assessedOn: new Date("2026-08-09T00:00:00.000Z"),
+      }),
+      assessment({ id: "superseded-final" }),
+      assessment({
+        id: "correction-final",
+        paceNumber: 1002,
+        score: 70,
+        result: "FAILED",
+        correctsAssessmentId: "superseded-final",
+        createdAt: new Date("2026-08-10T13:00:00.000Z"),
+      }),
+    ]);
+
+    await service.record(command(), actor);
+
+    expect(tx.paceAssessment.create).toHaveBeenCalledTimes(1);
+    expect(tx.paceProgress.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ currentPace: 1002 }),
+      }),
+    );
   });
 
   it("returns a safe machine-readable policy error for daily-limit and same-day blocks", async () => {
@@ -233,9 +349,9 @@ describe("PaceCommandService", () => {
       message: "The PACE assessment is blocked by site policy.",
       details: { policyCode: "daily-limit" },
     });
-    expect(JSON.stringify((thrown as HttpException).getResponse())).not.toContain(
-      "Completed under normal supervision",
-    );
+    expect(
+      JSON.stringify((thrown as HttpException).getResponse()),
+    ).not.toContain("Completed under normal supervision");
     expect(tx.paceAssessment.create).not.toHaveBeenCalled();
 
     tx.$queryRaw.mockResolvedValue([{ count: 0 }]);
@@ -271,7 +387,9 @@ describe("PaceCommandService", () => {
 
   it("lets an outbox failure escape the RLS transaction so no partial commit can be acknowledged", async () => {
     const { service, tx } = arrange();
-    tx.outboxEvent.createMany.mockRejectedValue(new Error("outbox unavailable"));
+    tx.outboxEvent.createMany.mockRejectedValue(
+      new Error("outbox unavailable"),
+    );
 
     await expect(service.record(command(), actor)).rejects.toThrow(
       "outbox unavailable",

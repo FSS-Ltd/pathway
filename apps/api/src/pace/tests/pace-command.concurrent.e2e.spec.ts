@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import { OutboxService } from "../../common/outbox/outbox.service";
-import { isDatabaseAvailable, requireDatabase } from "../../../test-helpers.e2e";
+import {
+  isDatabaseAvailable,
+  requireDatabase,
+} from "../../../test-helpers.e2e";
 import { PaceCommandService } from "../pace-command.service";
+import { commandIdempotencyScope } from "../pace-command.support";
 
 interface Fixture {
   orgId: string;
@@ -86,7 +90,7 @@ describe("PACE assessment command database transaction and concurrency", () => {
           version: 1,
           selfTestPassingScore: 80,
           paceTestPassingScore: 80,
-          maxAssessmentsPerDay: 5,
+          maxAssessmentsPerDay: 1,
           allowSamePaceSameDay: true,
           effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
           createdByUserId: fixture!.actorId,
@@ -107,20 +111,40 @@ describe("PACE assessment command database transaction and concurrency", () => {
           reason: "Required Self Test fixture",
         },
       });
+      await tx.paceAssessment.create({
+        data: {
+          tenantId: fixture!.tenantId,
+          childId: fixture!.childId,
+          subjectId: fixture!.subjectId,
+          paceNumber: 1002,
+          assessmentType: "SELF_TEST",
+          score: 90,
+          result: "PASSED",
+          assessedOn: new Date("2026-08-10T12:00:00.000Z"),
+          recordedByUserId: fixture!.actorId,
+          reason: "Required second Self Test fixture",
+        },
+      });
     });
   });
 
   afterAll(async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     await prisma.outboxEvent.deleteMany({ where: { orgId: fixture.orgId } });
-    await prisma.auditEvent.deleteMany({ where: { tenantId: fixture.tenantId } });
+    await prisma.auditEvent.deleteMany({
+      where: { tenantId: fixture.tenantId },
+    });
     await prisma.$executeRawUnsafe(
       'TRUNCATE TABLE "PaceProgress", "PaceAssessment", "PacePolicy" CASCADE',
     );
-    await prisma.studentSubjectEnrollment.deleteMany({ where: { tenantId: fixture.tenantId } });
+    await prisma.studentSubjectEnrollment.deleteMany({
+      where: { tenantId: fixture.tenantId },
+    });
     await prisma.subject.deleteMany({ where: { tenantId: fixture.tenantId } });
     await prisma.child.deleteMany({ where: { tenantId: fixture.tenantId } });
-    await prisma.siteMembership.deleteMany({ where: { tenantId: fixture.tenantId } });
+    await prisma.siteMembership.deleteMany({
+      where: { tenantId: fixture.tenantId },
+    });
     await prisma.user.deleteMany({ where: { id: fixture.actorId } });
     await prisma.tenant.deleteMany({ where: { id: fixture.tenantId } });
     await prisma.org.deleteMany({ where: { id: fixture.orgId } });
@@ -151,6 +175,9 @@ describe("PACE assessment command database transaction and concurrency", () => {
     ]);
     expect(new Set(results.map((result) => result.assessment.id)).size).toBe(1);
     expect(results.filter((result) => result.duplicate)).toHaveLength(1);
+    const original = results.find((result) => !result.duplicate)!;
+    const replay = results.find((result) => result.duplicate)!;
+    expect({ ...replay, duplicate: false }).toEqual(original);
 
     const counts = await withTenantRlsContext(
       fixture.tenantId,
@@ -177,6 +204,119 @@ describe("PACE assessment command database transaction and concurrency", () => {
     expect(counts).toEqual({ facts: 1, projections: 1, audits: 1, intents: 1 });
   });
 
+  it("commits one fact for concurrent same-semantic commands with different idempotency keys", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+    const actor = {
+      tenantId: fixture.tenantId,
+      orgId: fixture.orgId,
+      userId: fixture.actorId,
+    };
+    const shared = {
+      childId: fixture.childId,
+      subjectId: fixture.subjectId,
+      paceNumber: 1002,
+      assessmentType: "FinalTest" as const,
+      score: 90,
+      assessedAt: "2026-08-12T11:30:00.000Z",
+      reason: "Same semantic PACE command",
+    };
+
+    const results = await Promise.all([
+      service.record({ ...shared, idempotencyKey: randomUUID() }, actor),
+      service.record({ ...shared, idempotencyKey: randomUUID() }, actor),
+    ]);
+
+    expect(new Set(results.map((result) => result.assessment.id)).size).toBe(1);
+    expect(results.filter((result) => result.duplicate)).toHaveLength(1);
+    const original = results.find((result) => !result.duplicate)!;
+    const duplicate = results.find((result) => result.duplicate)!;
+    expect({ ...duplicate, duplicate: false }).toEqual(original);
+    const counts = await withTenantRlsContext(
+      fixture.tenantId,
+      fixture.orgId,
+      async (tx) => ({
+        facts: await tx.paceAssessment.count({
+          where: {
+            tenantId: fixture!.tenantId,
+            paceNumber: 1002,
+            assessmentType: "PACE_TEST",
+          },
+        }),
+        projections: await tx.paceProgress.count({
+          where: {
+            tenantId: fixture!.tenantId,
+            childId: fixture!.childId,
+            subjectId: fixture!.subjectId,
+          },
+        }),
+      }),
+    );
+    expect(counts).toEqual({ facts: 1, projections: 1 });
+  });
+
+  it("serializes distinct-key commands before daily-limit and projection reads", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+    const actor = {
+      tenantId: fixture.tenantId,
+      orgId: fixture.orgId,
+      userId: fixture.actorId,
+    };
+    const shared = {
+      childId: fixture.childId,
+      subjectId: fixture.subjectId,
+      assessmentType: "SelfTest" as const,
+      score: 90,
+      assessedAt: "2026-08-13T11:30:00.000Z",
+      reason: "Concurrent daily-limit command",
+    };
+
+    const results = await Promise.allSettled([
+      service.record(
+        { ...shared, idempotencyKey: randomUUID(), paceNumber: 1003 },
+        actor,
+      ),
+      service.record(
+        { ...shared, idempotencyKey: randomUUID(), paceNumber: 1004 },
+        actor,
+      ),
+    ]);
+
+    expect(
+      results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    const rejected = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(rejected?.reason).toMatchObject({
+      response: {
+        code: "PACE_POLICY_BLOCKED",
+        details: { policyCode: "daily-limit" },
+      },
+    });
+    const counts = await withTenantRlsContext(
+      fixture.tenantId,
+      fixture.orgId,
+      async (tx) => ({
+        dailyFacts: await tx.paceAssessment.count({
+          where: {
+            tenantId: fixture!.tenantId,
+            assessedOn: new Date("2026-08-13T00:00:00.000Z"),
+          },
+        }),
+        projections: await tx.paceProgress.count({
+          where: {
+            tenantId: fixture!.tenantId,
+            childId: fixture!.childId,
+            subjectId: fixture!.subjectId,
+          },
+        }),
+      }),
+    );
+    expect(counts).toEqual({ dailyFacts: 1, projections: 1 });
+  });
+
   it("rolls back fact, projection, audit, and intent when outbox enqueue fails", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     const failureId = randomUUID();
@@ -185,6 +325,25 @@ describe("PACE assessment command database transaction and concurrency", () => {
         throw new Error("forced transactional outbox failure");
       },
     } as OutboxService);
+    const before = await withTenantRlsContext(
+      fixture.tenantId,
+      fixture.orgId,
+      async (tx) => ({
+        progress: await tx.paceProgress.findUnique({
+          where: {
+            tenantId_childId_subjectId: {
+              tenantId: fixture!.tenantId,
+              childId: fixture!.childId,
+              subjectId: fixture!.subjectId,
+            },
+          },
+          select: { currentPace: true, lastAssessmentId: true },
+        }),
+        auditCount: await tx.auditEvent.count({
+          where: { tenantId: fixture!.tenantId, entityType: "ACE_RECORD" },
+        }),
+      }),
+    );
 
     await expect(
       service.record(
@@ -192,10 +351,10 @@ describe("PACE assessment command database transaction and concurrency", () => {
           idempotencyKey: failureId,
           childId: fixture.childId,
           subjectId: fixture.subjectId,
-          paceNumber: 1002,
+          paceNumber: 1005,
           assessmentType: "SelfTest",
           score: 90,
-          assessedAt: "2026-08-12T11:30:00.000Z",
+          assessedAt: "2026-08-14T11:30:00.000Z",
           reason: "Rollback PACE command",
         },
         {
@@ -211,7 +370,7 @@ describe("PACE assessment command database transaction and concurrency", () => {
       fixture.orgId,
       async (tx) => ({
         fact: await tx.paceAssessment.findFirst({
-          where: { tenantId: fixture!.tenantId, paceNumber: 1002 },
+          where: { tenantId: fixture!.tenantId, paceNumber: 1005 },
           select: { id: true },
         }),
         progress: await tx.paceProgress.findUnique({
@@ -228,17 +387,21 @@ describe("PACE assessment command database transaction and concurrency", () => {
           where: { tenantId: fixture!.tenantId, entityType: "ACE_RECORD" },
         }),
         intent: await tx.outboxEvent.findFirst({
-          where: { idempotencyKey: `ace-pace-assessment:${fixture!.tenantId}:${failureId}` },
+          where: {
+            idempotencyKey: {
+              startsWith: `${commandIdempotencyScope(
+                fixture!.tenantId,
+                failureId,
+              )}:`,
+            },
+          },
           select: { id: true },
         }),
       }),
     );
     expect(rows.fact).toBeNull();
-    expect(rows.progress).toMatchObject({
-      currentPace: 1002,
-      lastAssessmentId: expect.any(String),
-    });
-    expect(rows.auditCount).toBe(1);
+    expect(rows.progress).toEqual(before.progress);
+    expect(rows.auditCount).toBe(before.auditCount);
     expect(rows.intent).toBeNull();
   });
 });

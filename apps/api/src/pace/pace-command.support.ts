@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { BadRequestException, HttpException, HttpStatus } from "@nestjs/common";
 import {
   comparePaceNumbers,
   parsePaceNumber,
+  rebuildPaceProgress,
   type PaceAssessmentFact,
   type PaceAssessmentType,
   type PaceNumber,
@@ -29,6 +31,9 @@ export interface AssessmentRecord {
   result: DatabaseAssessmentResult;
   assessedOn: Date;
   correctsAssessmentId: string | null;
+  createdAt: Date;
+  reason: string;
+  recordedByUserId: string;
 }
 
 export interface ProgressRecord {
@@ -75,6 +80,9 @@ export const assessmentSelect = {
   result: true,
   assessedOn: true,
   correctsAssessmentId: true,
+  createdAt: true,
+  reason: true,
+  recordedByUserId: true,
 } satisfies Prisma.PaceAssessmentSelect;
 
 export const progressSelect = {
@@ -97,6 +105,63 @@ export function policyBlocked(policyCode: string): HttpException {
     },
     HttpStatus.CONFLICT,
   );
+}
+
+export function idempotencyConflict(): HttpException {
+  return new HttpException(
+    {
+      statusCode: HttpStatus.CONFLICT,
+      code: "PACE_IDEMPOTENCY_CONFLICT",
+      message: "The idempotency key was already used for another command.",
+    },
+    HttpStatus.CONFLICT,
+  );
+}
+
+export function assessmentConflict(): HttpException {
+  return new HttpException(
+    {
+      statusCode: HttpStatus.CONFLICT,
+      code: "PACE_ASSESSMENT_CONFLICT",
+      message: "An assessment already exists and requires a correction.",
+    },
+    HttpStatus.CONFLICT,
+  );
+}
+
+export function commandIdempotencyScope(
+  tenantId: string,
+  clientKey: string,
+): string {
+  return `ace-pace-assessment:${tenantId}:${sha256(clientKey.trim())}`;
+}
+
+export function commandIdempotencyKey(
+  scope: string,
+  command: CreatePaceAssessmentDto,
+  actorUserId: string,
+  assessedOn: string,
+): string {
+  return `${scope}:${sha256(
+    JSON.stringify({
+      actorUserId,
+      childId: command.childId,
+      subjectId: command.subjectId,
+      paceNumber: command.paceNumber,
+      assessmentType: command.assessmentType,
+      score: command.score,
+      assessedAt: new Date(command.assessedAt).toISOString(),
+      assessedOn,
+      reason: command.reason.trim(),
+    }),
+  )}`;
+}
+
+export function clientCommandLockKey(
+  tenantId: string,
+  clientKey: string,
+): string {
+  return `ace-pace-client:${tenantId}:${sha256(clientKey.trim())}`;
 }
 
 export function parsePaceOrThrow(value: number): PaceNumber {
@@ -147,6 +212,39 @@ export function terminalAssessmentFacts(
     );
 }
 
+export function terminalAssessmentRecords(
+  facts: readonly AssessmentRecord[],
+): AssessmentRecord[] {
+  const correctedIds = new Set(
+    facts.flatMap((fact) =>
+      fact.correctsAssessmentId ? [fact.correctsAssessmentId] : [],
+    ),
+  );
+  return facts
+    .filter((fact) => !correctedIds.has(fact.id))
+    .sort(
+      (left, right) =>
+        formatDatabaseDate(left.assessedOn).localeCompare(
+          formatDatabaseDate(right.assessedOn),
+        ) || left.id.localeCompare(right.id),
+    );
+}
+
+export function toTerminalDomainFacts(
+  facts: readonly AssessmentRecord[],
+): PaceAssessmentFact[] {
+  return terminalAssessmentRecords(facts).map((fact) => {
+    const domainFact = toDomainFact(fact);
+    return {
+      id: domainFact.id,
+      paceNumber: domainFact.paceNumber,
+      assessmentType: domainFact.assessmentType,
+      result: domainFact.result,
+      assessedOn: domainFact.assessedOn,
+    };
+  });
+}
+
 export function completedPaceCount(
   facts: readonly PaceAssessmentFact[],
 ): number {
@@ -166,6 +264,33 @@ export function toTrackStatus(
   if (comparison > 0) return "AHEAD";
   if (comparison < 0) return "BEHIND";
   return "ON_TRACK";
+}
+
+export function rebuildProgressRecord(
+  enrollment: {
+    startingPace: number;
+    currentPace: number;
+    targetPace: number;
+  },
+  facts: readonly AssessmentRecord[],
+  policy: PacePolicyResult,
+  rebuiltAt: Date,
+): ProgressRecord {
+  const domainFacts = toTerminalDomainFacts(facts);
+  const rebuilt = rebuildPaceProgress({
+    assignedLevel: parsePaceOrThrow(enrollment.startingPace).level,
+    startingPace: enrollment.currentPace,
+    assessmentFacts: domainFacts,
+  });
+  return {
+    currentPace: rebuilt.currentPace.raw,
+    targetPace: enrollment.targetPace,
+    completedPaces: completedPaceCount(domainFacts),
+    trackStatus: toTrackStatus(rebuilt.currentPace.raw, enrollment.targetPace),
+    blockCode: policy.decision === "warn" ? policy.code : null,
+    lastAssessmentId: domainFacts.at(-1)?.id ?? null,
+    rebuiltAt,
+  };
 }
 
 export function localDateAt(instant: Date, timezone: string): string {
@@ -227,4 +352,8 @@ export function toCommandResponse(
     ...(policy ? { policy } : {}),
     duplicate,
   };
+}
+
+function sha256(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
 }
