@@ -3,6 +3,10 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
 import { PaceController } from "../pace.controller";
+import {
+  createPaceRosterCursorScope,
+  encodePaceRosterCursor,
+} from "../pace-cursor";
 import { PaceQueryService } from "../pace-query.service";
 import { StudentSubjectsController } from "../student-subjects.controller";
 
@@ -162,7 +166,7 @@ describe("PaceQueryService", () => {
     expect(sqlText).toContain('child."firstName" ILIKE ?');
     expect(sqlText).not.toContain("allergies");
     expect(sqlValues).toEqual(
-      expect.arrayContaining(["tenant-1", "subject-1", "AT_RISK", "group-1", "%Ada%"]),
+      expect.arrayContaining(["tenant-1", "subject-1", "AT_RISK", "group-1", "%ada%"]),
     );
   });
 
@@ -240,9 +244,18 @@ describe("PaceQueryService", () => {
     const { service, tx } = createService();
     tx.tenant.findFirst.mockResolvedValue({ id: "tenant-1" });
     tx.$queryRaw.mockResolvedValue([]);
-    const cursor = Buffer.from(
-      JSON.stringify({ createdAt: "2026-09-02T09:00:00.000Z", id: "enrolment-1" }),
-    ).toString("base64url");
+    const cursor = encodePaceRosterCursor({
+      createdAt: new Date("2026-09-02T09:00:00.000Z"),
+      id: "enrolment-1",
+      scope: createPaceRosterCursorScope({
+        tenantId: actor.tenantId,
+        orgId: actor.orgId,
+        subjectId: null,
+        status: null,
+        groupId: null,
+        search: null,
+      }),
+    });
 
     await service.listRoster(actor, { cursor });
 
@@ -258,5 +271,137 @@ describe("PaceQueryService", () => {
     expect(sqlValues).toEqual(
       expect.arrayContaining([new Date("2026-09-02T09:00:00.000Z"), "enrolment-1"]),
     );
+  });
+
+  it("rejects a roster cursor reused by another tenant or filter set before reading", async () => {
+    const { service, tx } = createService();
+    tx.tenant.findFirst.mockResolvedValue({ id: "tenant-1" });
+    tx.$queryRaw.mockResolvedValue([
+      {
+        enrollmentId: "enrolment-1",
+        enrollmentCreatedAt: new Date("2026-09-02T09:00:00.000Z"),
+        childId: "child-1",
+        firstName: "Ada",
+        lastName: "Lovelace",
+        preferredName: null,
+        groupId: null,
+        groupName: null,
+        subjectId: "subject-1",
+        subjectName: "Mathematics",
+        currentPace: 1,
+        targetPace: 12,
+        trackStatus: "ON_TRACK",
+        rebuiltAt: new Date("2026-09-02T09:00:00.000Z"),
+      },
+      {
+        enrollmentId: "enrolment-2",
+        enrollmentCreatedAt: new Date("2026-09-01T09:00:00.000Z"),
+        childId: "child-2",
+        firstName: "Grace",
+        lastName: "Hopper",
+        preferredName: null,
+        groupId: null,
+        groupName: null,
+        subjectId: "subject-1",
+        subjectName: "Mathematics",
+        currentPace: 2,
+        targetPace: 12,
+        trackStatus: "ON_TRACK",
+        rebuiltAt: new Date("2026-09-01T09:00:00.000Z"),
+      },
+    ]);
+
+    const firstPage = await service.listRoster(actor, {
+      subjectId: "11111111-1111-1111-1111-111111111111",
+      limit: 1,
+    });
+
+    await expect(
+      service.listRoster(
+        { ...actor, tenantId: "tenant-2" },
+        {
+          subjectId: "11111111-1111-1111-1111-111111111111",
+          limit: 1,
+          cursor: firstPage.nextCursor ?? undefined,
+        },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.listRoster(actor, {
+        subjectId: "22222222-2222-2222-2222-222222222222",
+        limit: 1,
+        cursor: firstPage.nextCursor ?? undefined,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("traverses consecutive pages when the cursor uses the same normalized filters", async () => {
+    const { service, tx } = createService();
+    tx.tenant.findFirst.mockResolvedValue({ id: "tenant-1" });
+    tx.$queryRaw
+      .mockResolvedValueOnce([
+        {
+          enrollmentId: "enrolment-1",
+          enrollmentCreatedAt: new Date("2026-09-02T09:00:00.000Z"),
+          childId: "child-1",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          preferredName: null,
+          groupId: null,
+          groupName: null,
+          subjectId: "subject-1",
+          subjectName: "Mathematics",
+          currentPace: 1,
+          targetPace: 12,
+          trackStatus: "ON_TRACK",
+          rebuiltAt: new Date("2026-09-02T09:00:00.000Z"),
+        },
+        {
+          enrollmentId: "enrolment-2",
+          enrollmentCreatedAt: new Date("2026-09-01T09:00:00.000Z"),
+          childId: "child-2",
+          firstName: "Grace",
+          lastName: "Hopper",
+          preferredName: null,
+          groupId: null,
+          groupName: null,
+          subjectId: "subject-1",
+          subjectName: "Mathematics",
+          currentPace: 2,
+          targetPace: 12,
+          trackStatus: "ON_TRACK",
+          rebuiltAt: new Date("2026-09-01T09:00:00.000Z"),
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          enrollmentId: "enrolment-2",
+          enrollmentCreatedAt: new Date("2026-09-01T09:00:00.000Z"),
+          childId: "child-2",
+          firstName: "Grace",
+          lastName: "Hopper",
+          preferredName: null,
+          groupId: null,
+          groupName: null,
+          subjectId: "subject-1",
+          subjectName: "Mathematics",
+          currentPace: 2,
+          targetPace: 12,
+          trackStatus: "ON_TRACK",
+          rebuiltAt: new Date("2026-09-01T09:00:00.000Z"),
+        },
+      ]);
+    const filters = { search: "  ADA  ", limit: 1 };
+
+    const firstPage = await service.listRoster(actor, filters);
+    const secondPage = await service.listRoster(actor, {
+      ...filters,
+      search: "ada",
+      cursor: firstPage.nextCursor ?? undefined,
+    });
+
+    expect(firstPage.items.map((item) => item.child.id)).toEqual(["child-1"]);
+    expect(secondPage.items.map((item) => item.child.id)).toEqual(["child-2"]);
+    expect(secondPage.nextCursor).toBeNull();
   });
 });

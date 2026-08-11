@@ -5,11 +5,12 @@ import {
   type Prisma as PrismaTypes,
 } from "@pathway/db";
 import { parsePaceNumber, rebuildPaceProgress } from "@pathway/ace-domain";
-import {
-  decodeCreatedAtIdCursor,
-  encodeCreatedAtIdCursor,
-} from "../access-control/cursor";
 import type { PaceRosterQuery } from "./dto/pace-query.dto";
+import {
+  createPaceRosterCursorScope,
+  decodePaceRosterCursor,
+  encodePaceRosterCursor,
+} from "./pace-cursor";
 
 const DEFAULT_ROSTER_LIMIT = 50;
 
@@ -75,13 +76,24 @@ const paceProgressSelect = {
 export class PaceQueryService {
   async listRoster(actor: PaceQueryActor, query: PaceRosterQuery) {
     this.assertActor(actor);
-    const limit = query.limit ?? DEFAULT_ROSTER_LIMIT;
-    const cursor = query.cursor ? this.parseCursor(query.cursor) : undefined;
+    const normalizedQuery = normalizeRosterQuery(query);
+    const limit = normalizedQuery.limit ?? DEFAULT_ROSTER_LIMIT;
+    const cursorScope = createPaceRosterCursorScope({
+      tenantId: actor.tenantId,
+      orgId: actor.orgId,
+      subjectId: normalizedQuery.subjectId ?? null,
+      status: normalizedQuery.status ?? null,
+      groupId: normalizedQuery.groupId ?? null,
+      search: normalizedQuery.search ?? null,
+    });
+    const cursor = normalizedQuery.cursor
+      ? this.parseCursor(normalizedQuery.cursor, cursorScope)
+      : undefined;
 
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await this.requireActiveSite(tx, actor);
       const rows = await tx.$queryRaw<RosterRecord[]>(
-        buildRosterQuery(actor.tenantId, query, cursor, limit),
+        buildRosterQuery(actor.tenantId, normalizedQuery, cursor, limit),
       );
       const page = rows.slice(0, limit);
       const last = page.at(-1);
@@ -90,9 +102,10 @@ export class PaceQueryService {
         items: page.map(toRosterItem),
         nextCursor:
           rows.length > limit && last
-            ? encodeCreatedAtIdCursor({
+            ? encodePaceRosterCursor({
                 createdAt: last.enrollmentCreatedAt,
                 id: last.enrollmentId,
+                scope: cursorScope,
               })
             : null,
       };
@@ -157,9 +170,11 @@ export class PaceQueryService {
     }
   }
 
-  private parseCursor(encodedCursor: string) {
+  private parseCursor(encodedCursor: string, cursorScope: string) {
     try {
-      return decodeCreatedAtIdCursor(encodedCursor);
+      const cursor = decodePaceRosterCursor(encodedCursor);
+      if (cursor.scope !== cursorScope) throw new Error("Cursor scope mismatch");
+      return cursor;
     } catch {
       throw new BadRequestException("Invalid roster cursor");
     }
@@ -180,7 +195,7 @@ export class PaceQueryService {
 function buildRosterQuery(
   tenantId: string,
   query: PaceRosterQuery,
-  cursor: ReturnType<typeof decodeCreatedAtIdCursor> | undefined,
+  cursor: ReturnType<typeof decodePaceRosterCursor> | undefined,
   limit: number,
 ) {
   const predicates = [Prisma.sql`enrollment."tenantId" = ${tenantId}`, Prisma.sql`enrollment.status = 'ACTIVE'`];
@@ -238,6 +253,14 @@ function buildRosterQuery(
     ORDER BY enrollment."createdAt" DESC, enrollment.id DESC
     LIMIT ${limit + 1}
   `;
+}
+
+function normalizeRosterQuery(query: PaceRosterQuery): PaceRosterQuery {
+  const search = query.search?.trim().toLocaleLowerCase();
+  return {
+    ...query,
+    ...(search ? { search } : { search: undefined }),
+  };
 }
 
 function toRosterItem(row: RosterRecord) {
