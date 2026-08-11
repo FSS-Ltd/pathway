@@ -5,3 +5,4 @@ export * from "./retention/retention-config.service";
 export * from "./guest-pass/guest-pass-cleanup.service";
 export * from "./outbox/dispatch-outbox.job";
 export * from "./retention/ace-retention-inventory";
+export * from "./pace/rebuild-pace-progress.job";

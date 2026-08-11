@@ -15,8 +15,21 @@ export interface PaceRosterCursorScope {
   search: string | null;
 }
 
+export interface PaceExceptionCursorScope {
+  tenantId: string;
+  orgId: string;
+}
+
 export function createPaceRosterCursorScope(
   scope: PaceRosterCursorScope,
+): string {
+  return createHash("sha256")
+    .update(JSON.stringify(scope))
+    .digest("base64url");
+}
+
+export function createPaceExceptionCursorScope(
+  scope: PaceExceptionCursorScope,
 ): string {
   return createHash("sha256")
     .update(JSON.stringify(scope))
@@ -62,4 +75,12 @@ export function decodePaceRosterCursor(encoded: string): PaceRosterCursor {
     throw new Error("Invalid PACE roster cursor");
   }
   return { createdAt, id: value.id, scope: value.scope };
+}
+
+export function encodePaceExceptionCursor(cursor: PaceRosterCursor): string {
+  return encodePaceRosterCursor(cursor);
+}
+
+export function decodePaceExceptionCursor(encoded: string): PaceRosterCursor {
+  return decodePaceRosterCursor(encoded);
 }

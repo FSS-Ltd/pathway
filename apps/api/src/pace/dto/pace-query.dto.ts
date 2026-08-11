@@ -18,3 +18,12 @@ export const paceRosterQuerySchema = z
   .strict();
 
 export type PaceRosterQuery = z.infer<typeof paceRosterQuerySchema>;
+
+export const paceExceptionsQuerySchema = z
+  .object({
+    limit: rosterLimit,
+    cursor: z.string().min(1).max(512).optional(),
+  })
+  .strict();
+
+export type PaceExceptionsQuery = z.infer<typeof paceExceptionsQuerySchema>;

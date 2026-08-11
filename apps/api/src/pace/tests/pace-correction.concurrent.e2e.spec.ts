@@ -279,9 +279,26 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     await prisma.auditEvent.deleteMany({
       where: { tenantId: fixture.tenantId },
     });
-    await prisma.$executeRawUnsafe(
-      'TRUNCATE TABLE "PaceProgress", "PaceAssessment", "PacePolicy" CASCADE',
-    );
+    await withTenantRlsContext(fixture.tenantId, fixture.orgId, async (tx) => {
+      await tx.$executeRawUnsafe(
+        "SET LOCAL session_replication_role = replica",
+      );
+      await tx.paceProgress.deleteMany({
+        where: { tenantId: fixture!.tenantId },
+      });
+      await tx.paceAssessment.deleteMany({
+        where: { tenantId: fixture!.tenantId },
+      });
+      await tx.pacePolicyOverride.deleteMany({
+        where: { tenantId: fixture!.tenantId },
+      });
+      await tx.pacePolicy.deleteMany({
+        where: { tenantId: fixture!.tenantId },
+      });
+      await tx.$executeRawUnsafe(
+        "SET LOCAL session_replication_role = origin",
+      );
+    });
     await prisma.studentSubjectEnrollment.deleteMany({
       where: { tenantId: fixture.tenantId },
     });
@@ -407,6 +424,7 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     if (!isDatabaseAvailable() || !fixture) return;
     const service = new PaceCommandService(new OutboxService());
     const now = new Date();
+    const assessedAt = new Date("2026-08-11T12:00:00.000Z");
     const actor = {
       tenantId: fixture.tenantId,
       orgId: fixture.orgId,
@@ -424,7 +442,7 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
         paceNumber: 1001,
         assessmentType: "FinalTest",
         score: 70,
-        assessedAt: now.toISOString(),
+        assessedAt: assessedAt.toISOString(),
         policyCode: "score-below-threshold",
         expiresAt: new Date(now.getTime() + 10 * 60 * 1_000).toISOString(),
         reason: "Supervised progression exception",
@@ -440,7 +458,7 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
         paceNumber: 1001,
         assessmentType: "FinalTest",
         score: 70,
-        assessedAt: now.toISOString(),
+        assessedAt: assessedAt.toISOString(),
         reason: "Assessment using authorised exception",
         policyOverrideId: policyOverride.id,
       },

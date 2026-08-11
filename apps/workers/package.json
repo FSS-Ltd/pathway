@@ -16,6 +16,7 @@
     "outbox:dispatch": "tsx src/outbox/dispatch-outbox.cli.ts"
   },
   "dependencies": {
+    "@pathway/ace-domain": "workspace:*",
     "@pathway/db": "workspace:*",
     "@pathway/types": "workspace:*",
     "dotenv": "^17.2.2"
