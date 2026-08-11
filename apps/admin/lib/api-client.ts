@@ -638,6 +638,81 @@ function buildAuthHeaders(accessToken?: string | null): HeadersInit {
   return headers;
 }
 
+export type AdminAcademicPeriod = {
+  id: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  status: "ACTIVE" | "ARCHIVED";
+};
+
+export type AdminAcademicYear = {
+  id: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  status: "ACTIVE" | "ARCHIVED";
+  periods: AdminAcademicPeriod[];
+};
+
+export type AdminAcademicCalendar = {
+  timezone: string;
+  academicYears: AdminAcademicYear[];
+};
+
+export type CreateAdminAcademicYearInput = {
+  reason: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  periods: Array<{
+    name: string;
+    startsOn: string;
+    endsOn: string;
+  }>;
+};
+
+/** Academic calendars are scoped to the authenticated user's active site. */
+export async function fetchAcademicCalendar(): Promise<AdminAcademicCalendar> {
+  if (isUsingMockApi()) {
+    return { timezone: "Europe/London", academicYears: [] };
+  }
+  const response = await fetch(`${API_BASE_URL}/ace/academic-years`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw await academicCalendarRequestError(response);
+  return response.json() as Promise<AdminAcademicCalendar>;
+}
+
+export async function createAcademicYear(
+  input: CreateAdminAcademicYearInput,
+): Promise<AdminAcademicYear> {
+  if (isUsingMockApi()) {
+    throw new Error("Academic calendar updates are not available in mock mode.");
+  }
+  const response = await fetch(`${API_BASE_URL}/ace/academic-years`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await academicCalendarRequestError(response);
+  return response.json() as Promise<AdminAcademicYear>;
+}
+
+async function academicCalendarRequestError(response: Response): Promise<Error> {
+  const fallback = `Academic calendar request failed: ${response.status}`;
+  const body = await response.json().catch(() => null) as unknown;
+  if (typeof body === "object" && body !== null && "message" in body) {
+    const message = body.message;
+    if (typeof message === "string" && message.trim()) return new Error(message);
+  }
+  return new Error(fallback);
+}
+
 /** Get current user id from API (when session.user.id is missing). */
 export async function fetchMe(): Promise<{ userId: string }> {
   if (isUsingMockApi()) {
