@@ -122,11 +122,12 @@ function assertAcyclicCorrectionLinks(
     let currentFact: PaceAssessmentFact | undefined = fact;
 
     while (currentFact?.correctsFactId !== undefined) {
-      if (!seenFactIds.add(currentFact.id)) {
+      if (seenFactIds.has(currentFact.id)) {
         throw new RangeError(
           `PACE assessment fact '${fact.id}' has a cyclic correction link.`,
         );
       }
+      seenFactIds.add(currentFact.id);
       currentFact = factsById.get(currentFact.correctsFactId);
     }
   }
