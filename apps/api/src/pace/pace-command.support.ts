@@ -31,6 +31,7 @@ export interface AssessmentRecord {
   result: DatabaseAssessmentResult;
   assessedOn: Date;
   correctsAssessmentId: string | null;
+  policyOverrideId: string | null;
   createdAt: Date;
   reason: string;
   recordedByUserId: string;
@@ -80,6 +81,7 @@ export const assessmentSelect = {
   result: true,
   assessedOn: true,
   correctsAssessmentId: true,
+  policyOverrideId: true,
   createdAt: true,
   reason: true,
   recordedByUserId: true,
@@ -129,6 +131,17 @@ export function assessmentConflict(): HttpException {
   );
 }
 
+export function policyOverrideInvalid(): HttpException {
+  return new HttpException(
+    {
+      statusCode: HttpStatus.CONFLICT,
+      code: "PACE_POLICY_OVERRIDE_INVALID",
+      message: "The PACE policy override is unavailable for this assessment.",
+    },
+    HttpStatus.CONFLICT,
+  );
+}
+
 export function commandIdempotencyScope(
   tenantId: string,
   clientKey: string,
@@ -153,6 +166,9 @@ export function commandIdempotencyKey(
       assessedAt: new Date(command.assessedAt).toISOString(),
       assessedOn,
       reason: command.reason.trim(),
+      ...(command.policyOverrideId
+        ? { policyOverrideId: command.policyOverrideId }
+        : {}),
     }),
   )}`;
 }
@@ -191,6 +207,7 @@ export function toDomainFact(fact: AssessmentRecord): PaceAssessmentFact {
     assessmentType: fromDatabaseAssessmentType(fact.assessmentType),
     result: fact.result === "PASSED" ? "passed" : "failed",
     assessedOn: formatDatabaseDate(fact.assessedOn),
+    ...(fact.policyOverrideId ? { hasAuthorisedOverride: true } : {}),
     ...(fact.correctsAssessmentId
       ? { correctsFactId: fact.correctsAssessmentId }
       : {}),
@@ -241,6 +258,9 @@ export function toTerminalDomainFacts(
       assessmentType: domainFact.assessmentType,
       result: domainFact.result,
       assessedOn: domainFact.assessedOn,
+      ...(domainFact.hasAuthorisedOverride
+        ? { hasAuthorisedOverride: true }
+        : {}),
     };
   });
 }
@@ -249,7 +269,9 @@ export function completedPaceCount(
   facts: readonly PaceAssessmentFact[],
 ): number {
   return facts.filter(
-    (fact) => fact.assessmentType === "FinalTest" && fact.result === "passed",
+    (fact) =>
+      fact.assessmentType === "FinalTest" &&
+      (fact.result === "passed" || fact.hasAuthorisedOverride === true),
   ).length;
 }
 

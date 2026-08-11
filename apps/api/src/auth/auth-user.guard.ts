@@ -233,6 +233,7 @@ export class AuthUserGuard implements CanActivate {
       permissions: [],
       rawClaims: principal as unknown as Record<string, unknown>,
       siteRole,
+      issuedAt: principal.issuedAt,
     };
 
     (req as Record<string, unknown>).__pathwayContext = pathwayContext;

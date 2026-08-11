@@ -17,6 +17,11 @@ export type VerifiedPrincipal = {
   name?: string;
   /** Set on tokens minted by our own createUser calls; internal User.id. */
   externalId?: string;
+  /** Signed provider claims retained for protected-action freshness checks. */
+  issuedAt?: number;
+  authenticationTime?: number;
+  authenticationMethods?: string[];
+  factorVerificationAgeMinutes?: [number, number];
 };
 
 type IssuerConfig = {
@@ -138,6 +143,9 @@ export async function signTestToken(payload: {
   emailVerified?: boolean;
   externalId?: string;
   provider?: VerifiedProvider;
+  authenticationTime?: number;
+  authenticationMethods?: string[];
+  factorVerificationAgeMinutes?: [number, number];
 }): Promise<string> {
   const secret = process.env.TEST_AUTH_TOKEN_SECRET;
   if (!secret) {
@@ -151,6 +159,9 @@ export async function signTestToken(payload: {
     email_verified: payload.emailVerified,
     external_id: payload.externalId,
     provider: payload.provider ?? "auth0",
+    auth_time: payload.authenticationTime,
+    amr: payload.authenticationMethods,
+    fva: payload.factorVerificationAgeMinutes,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(TEST_ISSUER)
@@ -168,6 +179,12 @@ function principalFromPayload(
   if (!sub) {
     throw new UnauthorizedException("Missing subject claim");
   }
+  const authenticationMethods = Array.isArray(payload.amr)
+    ? payload.amr.filter(
+        (method): method is string => typeof method === "string",
+      )
+    : undefined;
+  const factorVerificationAgeMinutes = parseFactorVerificationAge(payload.fva);
   return {
     provider,
     sub,
@@ -179,7 +196,28 @@ function principalFromPayload(
     name: typeof payload.name === "string" ? payload.name : undefined,
     externalId:
       typeof payload.external_id === "string" ? payload.external_id : undefined,
+    issuedAt: typeof payload.iat === "number" ? payload.iat : undefined,
+    authenticationTime:
+      typeof payload.auth_time === "number" ? payload.auth_time : undefined,
+    ...(authenticationMethods?.length ? { authenticationMethods } : {}),
+    ...(factorVerificationAgeMinutes
+      ? { factorVerificationAgeMinutes }
+      : {}),
   };
+}
+
+function parseFactorVerificationAge(value: unknown): [number, number] | undefined {
+  if (
+    !Array.isArray(value) ||
+    value.length !== 2 ||
+    !value.every(
+      (age) =>
+        typeof age === "number" && Number.isInteger(age) && age >= -1,
+    )
+  ) {
+    return undefined;
+  }
+  return [value[0] as number, value[1] as number];
 }
 
 /**

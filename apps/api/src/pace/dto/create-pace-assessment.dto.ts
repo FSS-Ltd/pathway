@@ -10,6 +10,7 @@ export const createPaceAssessmentSchema = z
     score: z.number().int().min(0).max(100),
     assessedAt: z.string().datetime({ offset: true }),
     reason: z.string().trim().min(1).max(1_000),
+    policyOverrideId: z.string().uuid().optional(),
   })
   .strict();
 
