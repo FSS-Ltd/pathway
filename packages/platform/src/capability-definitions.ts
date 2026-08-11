@@ -320,6 +320,18 @@ export const CAPABILITY_DEFINITIONS = {
     "site",
     "sensitive",
   ),
+  "family.regulations.read": defineCapability(
+    "View regulations and evidence",
+    "View the household's preparedness, official requirements, updates, linked evidence and correspondence",
+    "site",
+    "sensitive",
+  ),
+  "family.regulations.write": defineCapability(
+    "Manage regulations and evidence",
+    "Set the household's jurisdiction, update preparedness, link evidence and record correspondence",
+    "site",
+    "sensitive",
+  ),
   "platform.access.roles.read": defineCapability(
     "View roles",
     "View organisation role definitions",

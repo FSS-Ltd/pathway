@@ -34,6 +34,8 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
   PermissionSlipResponse: ["responsePayload"],
   PermissionSlipException: ["reason"],
   Message: ["bodyEncrypted"],
+  Correspondence: ["notes"],
+  HouseholdRequirement: ["notes"],
 };
 
 /**

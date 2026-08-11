@@ -198,6 +198,90 @@ enum ReportBundleStatus {
   FAILED
 }
 
+// NexSteps Home Regulations & Evidence (H6/Plan 09).
+enum JurisdictionLevel {
+  COUNTRY
+  NATION
+  REGION
+  LOCAL_AUTHORITY
+}
+
+enum JurisdictionContentStatus {
+  NOT_CONFIGURED
+  IN_PREPARATION
+  PUBLISHED
+  WITHDRAWN
+}
+
+enum RegulatoryAuthorityType {
+  NATIONAL_GOVERNMENT
+  DEVOLVED_GOVERNMENT
+  GOVERNMENT_DEPARTMENT
+  LOCAL_AUTHORITY
+}
+
+enum RegulatorySourceType {
+  GUIDANCE
+  LEGISLATION
+  FORM
+  LOCAL_PROCESS
+}
+
+enum SourceVerificationState {
+  UNVERIFIED
+  VERIFIED
+  NEEDS_REVERIFICATION
+  UNAVAILABLE
+  WITHDRAWN
+}
+
+enum RequirementVersionStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  SUPERSEDED
+  WITHDRAWN
+}
+
+enum RequirementImpactLevel {
+  ROUTINE
+  NOTABLE
+  HIGH
+}
+
+enum RequirementChangeKind {
+  NEW
+  CHANGED
+  CORRECTION
+  WITHDRAWN
+}
+
+enum RequirementAppliesTo {
+  HOUSEHOLD
+  CHILD
+}
+
+enum HouseholdPreparednessStatus {
+  NOT_REVIEWED
+  IN_PROGRESS
+  PREPARED
+  NEEDS_REVIEW
+}
+
+enum EvidenceLinkPurpose {
+  REQUIREMENT_EVIDENCE
+  CORRESPONDENCE_ATTACHMENT
+  RESPONSE_EVIDENCE
+}
+
+enum CorrespondenceStatus {
+  RECEIVED
+  REVIEWING
+  PREPARING_RESPONSE
+  RESPONDED
+  CLOSED
+}
+
 enum DataExportKind {
   FAMILY_DATA
   REPORT_ARCHIVE
@@ -782,6 +866,18 @@ model Tenant {
   planningPreferences     Json @default("{}")
   notificationPreferences Json @default("{}")
 
+  // NexSteps Home Regulations & Evidence (H6/Plan 09): the household's selected
+  // nation and optional verified local-authority overlay. Household-singleton
+  // settings on Tenant, matching the learningDays/planningPreferences precedent.
+  regulationsJurisdictionId      String?
+  regulationsJurisdiction        Jurisdiction? @relation("HouseholdNation", fields: [regulationsJurisdictionId], references: [id], onDelete: Restrict)
+  regulationsLocalAuthorityId    String?
+  regulationsLocalAuthority      Jurisdiction? @relation("HouseholdLocalAuthority", fields: [regulationsLocalAuthorityId], references: [id], onDelete: Restrict)
+  regulationsJurisdictionSetAt   DateTime?
+  householdRequirements          HouseholdRequirement[]
+  evidenceLinks                  EvidenceLink[]
+  correspondence                 Correspondence[]
+
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
@@ -886,6 +982,9 @@ model User {
   assignedTasks           Task[]                  @relation("TaskAssignedTo")
   createdTasks            Task[]                  @relation("TaskCreatedBy")
   createdCalendarItems    CalendarItem[]          @relation("CalendarItemCreatedBy")
+  updatedHouseholdRequirements HouseholdRequirement[] @relation("HouseholdRequirementUpdatedBy")
+  linkedEvidenceLinks     EvidenceLink[]          @relation("EvidenceLinkLinkedBy")
+  createdCorrespondence   Correspondence[]        @relation("CorrespondenceCreatedBy")
   recordedSubjectEnrollments StudentSubjectEnrollment[] @relation("StudentSubjectEnrollmentRecordedBy")
   recordedPaceAssessments    PaceAssessment[]            @relation("PaceAssessmentRecordedBy")
   createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
@@ -1300,6 +1399,8 @@ model Child {
   evidence                   Evidence[]
   reportBundles              ReportBundle[]
   activities                 Activity[]
+  householdRequirements      HouseholdRequirement[]
+  correspondence             Correspondence[]
   tripCheckpointAttendance   TripCheckpointAttendance[]
   permissionSlipRecipients   PermissionSlipRecipient[]
   permissionSlipResponses    PermissionSlipResponse[]
@@ -2772,7 +2873,9 @@ model Task {
   createdBy        User         @relation("TaskCreatedBy", fields: [createdByUserId], references: [id])
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+  correspondence   Correspondence[]
 
+  @@unique([id, tenantId])
   @@index([tenantId, dueAt])
   @@index([tenantId, completedAt])
 }
@@ -2812,7 +2915,10 @@ model Evidence {
   uploadedByUserId String
   uploadedBy       User         @relation("EvidenceUploadedBy", fields: [uploadedByUserId], references: [id])
   createdAt        DateTime     @default(now())
+  regulationEvidenceLinks  EvidenceLink[]
+  correspondenceOriginals  Correspondence[] @relation("CorrespondenceOriginal")
 
+  @@unique([id, tenantId])
   @@index([tenantId, childId])
   @@index([learningLogId])
 }
@@ -3097,4 +3203,187 @@ model IdentityWebhookEvent {
   receivedAt DateTime @default(now())
 
   @@index([provider, eventType])
+}
+
+// --- NexSteps Home Regulations & Evidence (H6/Plan 09) ---
+// 5 global reference tables (no tenantId, globally readable content, no
+// runtime writer in this sub-plan) + 3 tenant-owned tables. See
+// packages/db/prisma/migrations/20260810090000_add_regulations_foundation
+// for the RLS/CHECK-constraint treatment this schema does not model.
+
+model Jurisdiction {
+  id                   String                    @id @default(uuid())
+  countryCode          String                    @db.Char(2) // ISO 3166-1 alpha-2
+  subdivisionCode      String? // ISO 3166-2, null at COUNTRY level
+  name                 String
+  level                JurisdictionLevel
+  parentJurisdictionId String?
+  parent               Jurisdiction?             @relation("JurisdictionTree", fields: [parentJurisdictionId], references: [id], onDelete: Restrict)
+  children             Jurisdiction[]            @relation("JurisdictionTree")
+  contentStatus        JurisdictionContentStatus @default(NOT_CONFIGURED)
+  authorities          RegulatoryAuthority[]
+  requirements         Requirement[]
+  householdRequirements HouseholdRequirement[]
+  tenantsAsNation          Tenant[]               @relation("HouseholdNation")
+  tenantsAsLocalAuthority  Tenant[]               @relation("HouseholdLocalAuthority")
+
+  @@index([countryCode, subdivisionCode])
+  @@index([parentJurisdictionId])
+  @@index([level, contentStatus])
+}
+
+model RegulatoryAuthority {
+  id             String                  @id @default(uuid())
+  jurisdictionId String
+  jurisdiction   Jurisdiction            @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  name           String
+  authorityType  RegulatoryAuthorityType
+  officialDomain String
+  sources        RegulatorySource[]
+  correspondence Correspondence[]
+
+  @@index([jurisdictionId])
+}
+
+model RegulatorySource {
+  id                String                  @id @default(uuid())
+  authorityId       String
+  authority         RegulatoryAuthority     @relation(fields: [authorityId], references: [id], onDelete: Restrict)
+  title             String
+  canonicalUrl      String
+  sourceType        RegulatorySourceType
+  publishedAt       DateTime?
+  effectiveAt       DateTime?
+  lastCheckedAt     DateTime?
+  lastVerifiedAt    DateTime?
+  verifiedByUserId  String?
+  reviewWindowDays  Int                     @default(90)
+  verificationState SourceVerificationState @default(UNVERIFIED)
+  contentHash       String?
+  requirementVersions RequirementVersion[]
+
+  @@index([authorityId])
+  @@index([verificationState, lastVerifiedAt])
+}
+
+model Requirement {
+  id             String               @id @default(uuid())
+  jurisdictionId String
+  jurisdiction   Jurisdiction         @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  sortOrder      Int                  @default(0)
+  versions       RequirementVersion[]
+  householdRequirements HouseholdRequirement[]
+
+  @@index([jurisdictionId, sortOrder])
+}
+
+model RequirementVersion {
+  id                     String                   @id @default(uuid())
+  requirementId          String
+  requirement            Requirement              @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  versionNumber          Int
+  status                 RequirementVersionStatus @default(DRAFT)
+  title                  String
+  summary                String                   @db.Text
+  preparationSuggestions String[]                 @default([])
+  appliesTo              RequirementAppliesTo     @default(HOUSEHOLD)
+  applicabilityNote      String?                  @db.Text
+  primarySourceId        String
+  primarySource          RegulatorySource         @relation(fields: [primarySourceId], references: [id], onDelete: Restrict)
+  effectiveFrom          DateTime?
+  effectiveTo            DateTime?
+  impactLevel            RequirementImpactLevel   @default(ROUTINE)
+  changeKind             RequirementChangeKind    @default(NEW)
+  changeSummary          String?                  @db.Text
+  previousWording        String?                  @db.Text
+  reviewedByUserId       String?
+  reviewedAt             DateTime?
+  secondReviewerUserId   String?
+  secondReviewedAt       DateTime?
+  publishedAt            DateTime?
+  supersedesVersionId    String?
+  householdRequirementAcknowledgements HouseholdRequirement[]
+
+  @@unique([requirementId, versionNumber])
+  @@index([requirementId, status, publishedAt])
+  @@index([status, publishedAt])
+}
+
+model HouseholdRequirement {
+  id                    String                      @id @default(uuid())
+  tenantId              String
+  tenant                Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  requirementId         String
+  requirement           Requirement                 @relation(fields: [requirementId], references: [id], onDelete: Restrict)
+  jurisdictionId        String
+  jurisdiction          Jurisdiction                @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  childId               String?
+  child                 Child?                      @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  status                HouseholdPreparednessStatus @default(NOT_REVIEWED)
+  notes                 String?                     @db.Text
+  acknowledgedVersionId String?
+  acknowledgedVersion   RequirementVersion?         @relation(fields: [acknowledgedVersionId], references: [id], onDelete: Restrict)
+  deadlineAt            DateTime?
+  archivedAt            DateTime?
+  updatedByUserId       String
+  updatedBy             User                        @relation("HouseholdRequirementUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  evidenceLinks         EvidenceLink[]
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, status, deadlineAt])
+  @@index([tenantId, childId])
+  @@index([requirementId])
+}
+
+model EvidenceLink {
+  id                     String                @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  evidenceId             String
+  evidence               Evidence              @relation(fields: [evidenceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  householdRequirementId String?
+  householdRequirement   HouseholdRequirement? @relation(fields: [householdRequirementId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  correspondenceId       String?
+  correspondence         Correspondence?       @relation("CorrespondenceEvidenceLinks", fields: [correspondenceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  purpose                EvidenceLinkPurpose
+  linkedByUserId         String
+  linkedBy               User                  @relation("EvidenceLinkLinkedBy", fields: [linkedByUserId], references: [id], onDelete: Restrict)
+  linkedAt               DateTime              @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, evidenceId])
+  @@index([householdRequirementId])
+  @@index([correspondenceId])
+}
+
+model Correspondence {
+  id                  String               @id @default(uuid())
+  tenantId            String
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId             String?
+  child               Child?               @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  senderName          String
+  issuingAuthorityId  String?
+  issuingAuthority    RegulatoryAuthority? @relation(fields: [issuingAuthorityId], references: [id], onDelete: Restrict)
+  subject             String
+  receivedAt          DateTime
+  responseDueAt       DateTime?
+  respondedAt         DateTime?
+  status              CorrespondenceStatus @default(RECEIVED)
+  originalEvidenceId  String?
+  originalEvidence    Evidence?            @relation("CorrespondenceOriginal", fields: [originalEvidenceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  taskId              String?
+  task                Task?                @relation(fields: [taskId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  notes               String?              @db.Text
+  createdByUserId     String
+  createdBy           User                 @relation("CorrespondenceCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  evidenceLinks       EvidenceLink[]       @relation("CorrespondenceEvidenceLinks")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, status, responseDueAt])
+  @@index([tenantId, childId])
 }

@@ -118,6 +118,8 @@ export const VERTICAL_CAPABILITIES = {
     "family.tasks.write",
     "family.calendar.read",
     "family.calendar.write",
+    "family.regulations.read",
+    "family.regulations.write",
   ],
 } as const satisfies Record<Vertical, readonly Capability[]>;
 
