@@ -6,10 +6,11 @@ import { StudentSubjectsController } from "./student-subjects.controller";
 import { StudentSubjectsService } from "./student-subjects.service";
 import { PaceController } from "./pace.controller";
 import { PaceQueryService } from "./pace-query.service";
+import { PaceCommandService } from "./pace-command.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
   controllers: [StudentSubjectsController, PaceController],
-  providers: [StudentSubjectsService, PaceQueryService],
+  providers: [StudentSubjectsService, PaceQueryService, PaceCommandService],
 })
 export class PaceModule {}
