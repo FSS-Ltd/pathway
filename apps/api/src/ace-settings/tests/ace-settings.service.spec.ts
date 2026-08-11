@@ -8,6 +8,9 @@ import { updateAceSettingsSchema } from "../dto/ace-settings.dto";
 import { AceSettingsService } from "../ace-settings.service";
 
 jest.mock("@pathway/db", () => ({
+  Prisma: {
+    sql: (strings: TemplateStringsArray) => strings.join(""),
+  },
   withTenantRlsContext: jest.fn(),
 }));
 
@@ -58,6 +61,7 @@ function createTransaction() {
       updateMany: jest.fn(),
       findFirst: jest.fn(),
     },
+    $executeRaw: jest.fn(),
     auditEvent: { create: jest.fn() },
     outboxEvent: { createMany: jest.fn(), findFirstOrThrow: jest.fn() },
   };
@@ -375,8 +379,7 @@ describe("AceSettingsService", () => {
       }),
     });
     const outboxPayload = jest.mocked(tx.outboxEvent.createMany).mock.calls[0]?.[0]
-      .data[0].payload as Record<string, unknown>;
-    expect(outboxPayload).not.toHaveProperty("reason");
-    expect(outboxPayload).not.toHaveProperty("pacePolicy");
+      .data[0].payload;
+    expect(outboxPayload).toEqual({ changedSections: ["pacePolicy"] });
   });
 });
