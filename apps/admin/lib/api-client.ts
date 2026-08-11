@@ -672,6 +672,74 @@ export type CreateAdminAcademicYearInput = {
   }>;
 };
 
+export type AdminStudentSubjectPlacement = {
+  id: string;
+  subjectId: string;
+  subjectName: string;
+  startsOn: string;
+  endsOn: string | null;
+  status: "ACTIVE";
+  startingPace: number;
+  currentPace: number;
+  targetPace: number;
+};
+
+export type AdminStudentSubjectOption = {
+  id: string;
+  name: string;
+};
+
+export type AdminStudentSubjects = {
+  placements: AdminStudentSubjectPlacement[];
+  subjects: AdminStudentSubjectOption[];
+};
+
+export type CreateAdminStudentSubjectInput = {
+  subjectId: string;
+  startsOn: string;
+  startingPace: number;
+  currentPace: number;
+  targetPace: number;
+  reason: string;
+  replacesEnrollmentId?: string;
+};
+
+export async function fetchStudentSubjects(
+  childId: string,
+): Promise<AdminStudentSubjects> {
+  if (isUsingMockApi()) return { placements: [], subjects: [] };
+  const response = await fetch(
+    `${API_BASE_URL}/ace/students/${encodeURIComponent(childId)}/subjects`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) throw await studentSubjectsRequestError(response);
+  return response.json() as Promise<AdminStudentSubjects>;
+}
+
+export async function createStudentSubject(
+  childId: string,
+  input: CreateAdminStudentSubjectInput,
+): Promise<AdminStudentSubjectPlacement> {
+  if (isUsingMockApi())
+    throw new Error("Subject placements are not available in mock mode.");
+  const response = await fetch(
+    `${API_BASE_URL}/ace/students/${encodeURIComponent(childId)}/subjects`,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok) throw await studentSubjectsRequestError(response);
+  return response.json() as Promise<AdminStudentSubjectPlacement>;
+}
+
 /** Academic calendars are scoped to the authenticated user's active site. */
 export async function fetchAcademicCalendar(): Promise<AdminAcademicCalendar> {
   if (isUsingMockApi()) {
@@ -708,6 +776,16 @@ async function academicCalendarRequestError(response: Response): Promise<Error> 
   const body = await response.json().catch(() => null) as unknown;
   if (typeof body === "object" && body !== null && "message" in body) {
     const message = body.message;
+    if (typeof message === "string" && message.trim()) return new Error(message);
+  }
+  return new Error(fallback);
+}
+
+async function studentSubjectsRequestError(response: Response): Promise<Error> {
+  const fallback = `Subject placement request failed: ${response.status}`;
+  const body = await response.json().catch(() => null) as unknown;
+  if (typeof body === "object" && body !== null && "message" in body) {
+    const { message } = body;
     if (typeof message === "string" && message.trim()) return new Error(message);
   }
   return new Error(fallback);
