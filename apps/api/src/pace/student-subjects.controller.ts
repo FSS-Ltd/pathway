@@ -13,6 +13,7 @@ import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { createStudentSubjectSchema } from "./dto/student-subject.dto";
+import { PaceQueryService } from "./pace-query.service";
 import { StudentSubjectsService } from "./student-subjects.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
@@ -20,6 +21,7 @@ import { StudentSubjectsService } from "./student-subjects.service";
 export class StudentSubjectsController {
   constructor(
     private readonly service: StudentSubjectsService,
+    private readonly paceQuery: PaceQueryService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -27,6 +29,12 @@ export class StudentSubjectsController {
   @RequirePermission("ace.pace.read")
   list(@Param("childId") childId: string) {
     return this.service.list(childId, this.actor());
+  }
+
+  @Get(":childId/pace")
+  @RequirePermission("ace.pace.read")
+  listPace(@Param("childId") childId: string) {
+    return this.paceQuery.getChildProgress(childId, this.actor());
   }
 
   @Post(":childId/subjects")
