@@ -79,6 +79,7 @@ describe("AuthUserGuard", () => {
       sub: "clerk_abc",
       email: "person@example.test",
       emailVerified: true,
+      factorVerificationAgeMinutes: [1, 2],
     });
     findIdentity.mockResolvedValueOnce({
       userId: "user-1",
@@ -93,8 +94,14 @@ describe("AuthUserGuard", () => {
     expect(authIdentityService.upsertFromProvider).not.toHaveBeenCalled();
     expect((ctx.req as Record<string, unknown>).authUserId).toBe("user-1");
     const pathwayContext = (ctx.req as Record<string, unknown>)
-      .__pathwayContext as { user: { authProvider: string } };
+      .__pathwayContext as {
+      user: { authProvider: string };
+      rawClaims: Record<string, unknown>;
+    };
     expect(pathwayContext.user.authProvider).toBe("clerk");
+    expect(pathwayContext.rawClaims.factorVerificationAgeMinutes).toEqual([
+      1, 2,
+    ]);
   });
 
   it("JIT-provisions via AuthIdentityService when no identity is linked yet", async () => {

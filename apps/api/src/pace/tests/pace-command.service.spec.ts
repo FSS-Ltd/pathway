@@ -23,6 +23,7 @@ jest.mock("@pathway/db", () => ({
 
 const actor = { tenantId: "tenant-1", orgId: "org-1", userId: "user-1" };
 const assessedAt = "2026-08-11T00:30:00.000Z";
+const policyOverrideId = "c65f646d-e79d-474c-a8e1-d62bd1d4d154";
 const commandFingerprint =
   "ace-pace-assessment:tenant-1:6d182b57fce5fefa5f33ef8939f3e903a261fcc5980cebc0fa2045a238651a52:257c165e6e32217b085842dac8dfa9a216fad740f06a39e2a128086525014dea";
 
@@ -49,6 +50,7 @@ function transaction() {
     tenant: { findFirst: jest.fn() },
     studentSubjectEnrollment: { findFirst: jest.fn() },
     pacePolicy: { findFirst: jest.fn() },
+    pacePolicyOverride: { findFirst: jest.fn() },
     paceAssessment: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -75,6 +77,7 @@ function assessment(overrides: Partial<Record<string, unknown>> = {}) {
     result: "PASSED",
     assessedOn: new Date("2026-08-10T00:00:00.000Z"),
     correctsAssessmentId: null,
+    policyOverrideId: null,
     createdAt: new Date("2026-08-10T12:00:00.000Z"),
     reason: "Completed under normal supervision",
     recordedByUserId: "user-1",
@@ -102,6 +105,7 @@ function arrange() {
     maxAssessmentsPerDay: 2,
     allowSamePaceSameDay: false,
   });
+  tx.pacePolicyOverride.findFirst.mockResolvedValue(null);
   tx.outboxEvent.findFirst.mockResolvedValue(null);
   tx.paceAssessment.findMany.mockResolvedValue([
     assessment({
@@ -364,6 +368,61 @@ describe("PaceCommandService", () => {
         details: { policyCode: "same-pace-same-day" },
       },
     });
+  });
+
+  it("binds an explicit unused scoped override to the assessment that consumes it", async () => {
+    const { service, tx } = arrange();
+    tx.pacePolicyOverride.findFirst.mockResolvedValue({
+      id: policyOverrideId,
+    });
+    tx.paceAssessment.create.mockResolvedValue(
+      assessment({ score: 70, result: "FAILED" }),
+    );
+
+    await expect(
+      service.record(
+        command({ score: 70, policyOverrideId }),
+        actor,
+      ),
+    ).resolves.toMatchObject({
+      policy: { decision: "allow", code: "allowed" },
+    });
+    expect(tx.pacePolicyOverride.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: policyOverrideId,
+        tenantId: "tenant-1",
+        childId: "child-1",
+        subjectId: "subject-1",
+        pacePolicyId: "policy-1",
+        policyCode: "score-below-threshold",
+        assessmentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+        expiresAt: { gt: expect.any(Date) },
+        assessments: { none: {} },
+      },
+      select: { id: true },
+    });
+    expect(tx.paceAssessment.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ policyOverrideId }),
+      }),
+    );
+  });
+
+  it("rejects an explicit override that is expired, consumed, or outside the command scope", async () => {
+    const { service, tx } = arrange();
+
+    await expect(
+      service.record(
+        command({
+          score: 70,
+          policyOverrideId: "2259ad17-8ce4-41cf-8b02-5be08a6154a2",
+        }),
+        actor,
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ code: "PACE_POLICY_OVERRIDE_INVALID" }),
+    });
+    expect(tx.paceAssessment.create).not.toHaveBeenCalled();
   });
 
   it("uses allow-listed active-site reads and rejects invalid site, child/subject placement, and timezone", async () => {

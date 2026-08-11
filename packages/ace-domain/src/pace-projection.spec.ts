@@ -63,6 +63,16 @@ test("rebuildPaceProgress does not advance for Self Tests or failed Final Tests"
   assert.equal(progress.currentPace.raw, 1);
 });
 
+test("rebuildPaceProgress advances a failed Final Test only when an override is linked", () => {
+  const progress = rebuildPaceProgress({
+    assignedLevel: 1,
+    startingPace: 1,
+    assessmentFacts: [fact({ result: "failed", hasAuthorisedOverride: true })],
+  });
+
+  assert.equal(progress.currentPace.raw, 2);
+});
+
 test("rebuildPaceProgress excludes facts superseded by corrections", () => {
   const progress = rebuildPaceProgress({
     assignedLevel: 1,

@@ -51,6 +51,19 @@ describe("token-verifier", () => {
     expect(principal.externalId).toBe("internal-user-id");
   });
 
+  it("retains only signed step-up evidence needed by protected routes", async () => {
+    const token = await signTestToken({
+      sub: "user-1",
+      provider: "clerk",
+      factorVerificationAgeMinutes: [1, 2],
+    });
+
+    await expect(verifyBearerToken(`Bearer ${token}`)).resolves.toMatchObject({
+      provider: "clerk",
+      factorVerificationAgeMinutes: [1, 2],
+    });
+  });
+
   it("rejects a missing Authorization header", async () => {
     await expect(verifyBearerToken(undefined)).rejects.toBeInstanceOf(
       UnauthorizedException,

@@ -18,6 +18,7 @@ export interface PaceAssessmentFact {
   paceNumber: number;
   assessmentType: PaceAssessmentType;
   result: PaceAssessmentResult;
+  hasAuthorisedOverride?: boolean;
   assessedOn: string;
   correctsFactId?: string;
 }
@@ -56,7 +57,7 @@ export function rebuildPaceProgress(
   for (const fact of terminalFacts) {
     if (
       fact.assessmentType === "FinalTest" &&
-      fact.result === "passed" &&
+      (fact.result === "passed" || fact.hasAuthorisedOverride === true) &&
       comparePaceNumbers(parsePaceNumber(fact.paceNumber), currentPace) === 0
     ) {
       currentPace = advanceOrComplete(currentPace);
@@ -146,6 +147,14 @@ function assertFact(fact: PaceAssessmentFact): void {
   }
   if (fact.result !== "passed" && fact.result !== "failed") {
     throw new RangeError("PACE assessment fact result is invalid.");
+  }
+  if (
+    fact.hasAuthorisedOverride !== undefined &&
+    typeof fact.hasAuthorisedOverride !== "boolean"
+  ) {
+    throw new RangeError(
+      "PACE assessment fact hasAuthorisedOverride must be a boolean when supplied.",
+    );
   }
   if (!isLocalDate(fact.assessedOn)) {
     throw new RangeError(

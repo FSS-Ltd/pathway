@@ -11,6 +11,7 @@ import {
 } from "@pathway/ace-domain";
 import type { Prisma } from "@pathway/db";
 import type { CreatePaceAssessmentDto } from "./dto/create-pace-assessment.dto";
+import type { PacePolicyOverrideDto } from "./dto/pace-correction.dto";
 
 export type DatabaseAssessmentType = "SELF_TEST" | "PACE_TEST";
 export type DatabaseAssessmentResult = "PASSED" | "FAILED";
@@ -31,6 +32,7 @@ export interface AssessmentRecord {
   result: DatabaseAssessmentResult;
   assessedOn: Date;
   correctsAssessmentId: string | null;
+  policyOverrideId: string | null;
   createdAt: Date;
   reason: string;
   recordedByUserId: string;
@@ -80,6 +82,7 @@ export const assessmentSelect = {
   result: true,
   assessedOn: true,
   correctsAssessmentId: true,
+  policyOverrideId: true,
   createdAt: true,
   reason: true,
   recordedByUserId: true,
@@ -129,6 +132,17 @@ export function assessmentConflict(): HttpException {
   );
 }
 
+export function policyOverrideInvalid(): HttpException {
+  return new HttpException(
+    {
+      statusCode: HttpStatus.CONFLICT,
+      code: "PACE_POLICY_OVERRIDE_INVALID",
+      message: "The PACE policy override is unavailable for this assessment.",
+    },
+    HttpStatus.CONFLICT,
+  );
+}
+
 export function commandIdempotencyScope(
   tenantId: string,
   clientKey: string,
@@ -153,6 +167,9 @@ export function commandIdempotencyKey(
       assessedAt: new Date(command.assessedAt).toISOString(),
       assessedOn,
       reason: command.reason.trim(),
+      ...(command.policyOverrideId
+        ? { policyOverrideId: command.policyOverrideId }
+        : {}),
     }),
   )}`;
 }
@@ -162,6 +179,38 @@ export function clientCommandLockKey(
   clientKey: string,
 ): string {
   return `ace-pace-client:${tenantId}:${sha256(clientKey.trim())}`;
+}
+
+export function overrideClientCommandKeyHash(
+  tenantId: string,
+  clientKey: string,
+): string {
+  return sha256(`ace-pace-policy-override:${tenantId}:${clientKey.trim()}`);
+}
+
+export function paceOverrideAssessmentFingerprint(
+  tenantId: string,
+  command: Pick<
+    PacePolicyOverrideDto | CreatePaceAssessmentDto,
+    | "childId"
+    | "subjectId"
+    | "paceNumber"
+    | "assessmentType"
+    | "score"
+    | "assessedAt"
+  >,
+): string {
+  return sha256(
+    JSON.stringify({
+      tenantId,
+      childId: command.childId,
+      subjectId: command.subjectId,
+      paceNumber: command.paceNumber,
+      assessmentType: command.assessmentType,
+      score: command.score,
+      assessedAt: new Date(command.assessedAt).toISOString(),
+    }),
+  );
 }
 
 export function parsePaceOrThrow(value: number): PaceNumber {
@@ -191,6 +240,7 @@ export function toDomainFact(fact: AssessmentRecord): PaceAssessmentFact {
     assessmentType: fromDatabaseAssessmentType(fact.assessmentType),
     result: fact.result === "PASSED" ? "passed" : "failed",
     assessedOn: formatDatabaseDate(fact.assessedOn),
+    ...(fact.policyOverrideId ? { hasAuthorisedOverride: true } : {}),
     ...(fact.correctsAssessmentId
       ? { correctsFactId: fact.correctsAssessmentId }
       : {}),
@@ -241,6 +291,9 @@ export function toTerminalDomainFacts(
       assessmentType: domainFact.assessmentType,
       result: domainFact.result,
       assessedOn: domainFact.assessedOn,
+      ...(domainFact.hasAuthorisedOverride
+        ? { hasAuthorisedOverride: true }
+        : {}),
     };
   });
 }
@@ -249,7 +302,9 @@ export function completedPaceCount(
   facts: readonly PaceAssessmentFact[],
 ): number {
   return facts.filter(
-    (fact) => fact.assessmentType === "FinalTest" && fact.result === "passed",
+    (fact) =>
+      fact.assessmentType === "FinalTest" &&
+      (fact.result === "passed" || fact.hasAuthorisedOverride === true),
   ).length;
 }
 
