@@ -63,7 +63,16 @@ export default function StudentSubjectsPage({
       const placement = await createStudentSubject(params.childId, input);
       setData((current) =>
         current
-          ? { ...current, placements: [...current.placements, placement] }
+          ? {
+              ...current,
+              placements: [
+                ...current.placements.filter(
+                  (currentPlacement) =>
+                    currentPlacement.id !== input.replacesEnrollmentId,
+                ),
+                placement,
+              ],
+            }
           : current,
       );
       setSuccess("Subject placement saved.");

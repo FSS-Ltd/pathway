@@ -11,6 +11,7 @@ Object.assign(globalThis, {
   document: dom.window.document,
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
+  HTMLSelectElement: dom.window.HTMLSelectElement,
   HTMLFormElement: dom.window.HTMLFormElement,
   Node: dom.window.Node,
   Text: dom.window.Text,
@@ -46,6 +47,12 @@ function input(container: HTMLElement, id: string): HTMLInputElement {
   return element;
 }
 
+function select(container: HTMLElement, id: string): HTMLSelectElement {
+  const element = container.querySelector<HTMLSelectElement>(`#${id}`);
+  assert.ok(element, `expected #${id}`);
+  return element;
+}
+
 async function change(element: HTMLInputElement, value: string): Promise<void> {
   const setter = Object.getOwnPropertyDescriptor(
     dom.window.HTMLInputElement.prototype,
@@ -55,6 +62,21 @@ async function change(element: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     setter.call(element, value);
     element.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  });
+}
+
+async function changeSelect(
+  element: HTMLSelectElement,
+  value: string,
+): Promise<void> {
+  const setter = Object.getOwnPropertyDescriptor(
+    dom.window.HTMLSelectElement.prototype,
+    "value",
+  )?.set;
+  assert.ok(setter, "select value setter is available");
+  await act(async () => {
+    setter.call(element, value);
+    element.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
   });
 }
 
@@ -120,6 +142,96 @@ async function run(): Promise<void> {
     );
     await render(root, props({ success: "Subject placement saved." }));
     assert.match(container.textContent ?? "", /Subject placement saved\./);
+
+    const revisionContainer = document.createElement("div");
+    document.body.append(revisionContainer);
+    const revisionRoot = createRoot(revisionContainer);
+    const revisionSaves: unknown[] = [];
+    await render(
+      revisionRoot,
+      props({
+        placements: [
+          {
+            id: "enrollment-1",
+            subjectId: "subject-1",
+            subjectName: "Mathematics",
+            startsOn: "2026-09-01",
+            endsOn: null,
+            status: "ACTIVE",
+            startingPace: 1,
+            currentPace: 2,
+            targetPace: 12,
+          },
+        ],
+        onSave: async (value) => void revisionSaves.push(value),
+      }),
+    );
+    assert.match(
+      revisionContainer.textContent ?? "",
+      /Replace an active placement \(optional\)/,
+      "offers an explicit revision choice",
+    );
+    await changeSelect(
+      select(revisionContainer, "subject-placement-replacement"),
+      "enrollment-1",
+    );
+    await change(
+      input(revisionContainer, "subject-placement-starts-on"),
+      "2026-09-02",
+    );
+    assert.match(
+      revisionContainer.textContent ?? "",
+      /The existing Mathematics placement will end on 2026-09-01\./,
+      "communicates the prior-day end date",
+    );
+    await change(
+      input(revisionContainer, "subject-placement-starting-pace"),
+      "2",
+    );
+    await change(
+      input(revisionContainer, "subject-placement-current-pace"),
+      "3",
+    );
+    await change(
+      input(revisionContainer, "subject-placement-target-pace"),
+      "12",
+    );
+    await change(
+      input(revisionContainer, "subject-placement-reason"),
+      "Correct diagnostic placement",
+    );
+    const revisionForm = revisionContainer.querySelector("form");
+    assert.ok(revisionForm, "renders a revision form");
+    await submit(revisionForm);
+    assert.deepEqual(
+      revisionSaves,
+      [
+        {
+          subjectId: "subject-1",
+          startsOn: "2026-09-02",
+          startingPace: 2,
+          currentPace: 3,
+          targetPace: 12,
+          reason: "Correct diagnostic placement",
+          replacesEnrollmentId: "enrollment-1",
+        },
+      ],
+      "submits the explicitly selected enrollment as a revision",
+    );
+    await render(
+      revisionRoot,
+      props({
+        placements: [],
+        success: "Subject placement saved.",
+      }),
+    );
+    assert.match(
+      revisionContainer.textContent ?? "",
+      /Subject placement saved\./,
+      "preserves success feedback after a revision",
+    );
+    await act(async () => revisionRoot.unmount());
+    revisionContainer.remove();
 
     await act(async () => root.unmount());
     const keyboardContainer = document.createElement("div");

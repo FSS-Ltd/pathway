@@ -26,6 +26,7 @@ type SubjectPlacementFormValue = {
   currentPace: string;
   targetPace: string;
   reason: string;
+  replacesEnrollmentId: string;
 };
 
 export function createInitialSubjectPlacementForm(
@@ -38,6 +39,7 @@ export function createInitialSubjectPlacementForm(
     currentPace: "",
     targetPace: "",
     reason: "",
+    replacesEnrollmentId: "",
   };
 }
 
@@ -58,6 +60,9 @@ export function SubjectPlacementForm({
     {},
   );
   const formDisabled = !canRecord || isSaving || subjects.length === 0;
+  const replacement = placements.find(
+    (placement) => placement.id === form.replacesEnrollmentId,
+  );
 
   React.useEffect(() => {
     setForm((current) =>
@@ -69,6 +74,19 @@ export function SubjectPlacementForm({
 
   const update = (field: keyof SubjectPlacementFormValue, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+  const updateSubject = (subjectId: string) => {
+    setForm((current) => ({ ...current, subjectId, replacesEnrollmentId: "" }));
+  };
+  const updateReplacement = (replacesEnrollmentId: string) => {
+    const selected = placements.find(
+      (placement) => placement.id === replacesEnrollmentId,
+    );
+    setForm((current) => ({
+      ...current,
+      replacesEnrollmentId,
+      subjectId: selected?.subjectId ?? current.subjectId,
+    }));
   };
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -82,6 +100,9 @@ export function SubjectPlacementForm({
       currentPace: Number(form.currentPace),
       targetPace: Number(form.targetPace),
       reason: form.reason.trim(),
+      ...(form.replacesEnrollmentId
+        ? { replacesEnrollmentId: form.replacesEnrollmentId }
+        : {}),
     });
   };
 
@@ -146,7 +167,7 @@ export function SubjectPlacementForm({
                 id="subject-placement-subject"
                 value={form.subjectId}
                 disabled={formDisabled}
-                onChange={(event) => update("subjectId", event.target.value)}
+                onChange={(event) => updateSubject(event.target.value)}
                 className={inputClassName}
               >
                 {subjects.length === 0 ? (
@@ -160,6 +181,27 @@ export function SubjectPlacementForm({
                 )}
               </select>
             </Field>
+            {placements.length > 0 ? (
+              <Field
+                label="Replace an active placement (optional)"
+                id="subject-placement-replacement"
+              >
+                <select
+                  id="subject-placement-replacement"
+                  value={form.replacesEnrollmentId}
+                  disabled={formDisabled}
+                  onChange={(event) => updateReplacement(event.target.value)}
+                  className={inputClassName}
+                >
+                  <option value="">Create a new placement</option>
+                  {placements.map((placement) => (
+                    <option key={placement.id} value={placement.id}>
+                      {placement.subjectName} (started {placement.startsOn})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
             <Field
               label="Placement starts"
               id="subject-placement-starts-on"
@@ -212,6 +254,15 @@ export function SubjectPlacementForm({
               />
             </Field>
           </div>
+          {replacement ? (
+            <p className="text-sm text-text-muted" role="status">
+              The existing {replacement.subjectName} placement will end on{" "}
+              {isDateOnly(form.startsOn)
+                ? previousDate(form.startsOn)
+                : "the day before this new placement starts"}
+              .
+            </p>
+          ) : null}
           {validationSummary(validation) ? (
             <p className="text-sm text-status-danger" role="alert">
               Please correct the highlighted fields before saving the placement.
@@ -370,6 +421,17 @@ function isValidPace(value: string): boolean {
   if (!/^\d+$/.test(value)) return false;
   const pace = Number(value);
   return (pace >= 1 && pace <= 144) || (pace >= 1001 && pace <= 1144);
+}
+
+function previousDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  date.setUTCDate(date.getUTCDate() - 1);
+  return [
+    date.getUTCFullYear().toString().padStart(4, "0"),
+    (date.getUTCMonth() + 1).toString().padStart(2, "0"),
+    date.getUTCDate().toString().padStart(2, "0"),
+  ].join("-");
 }
 
 const inputClassName =
