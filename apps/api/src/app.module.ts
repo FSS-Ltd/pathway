@@ -3,6 +3,7 @@ import { CommonModule } from "./common/common.module";
 import { OrgsModule } from "./orgs/orgs.module";
 import { PlatformModule } from "./platform/platform.module";
 import { BillingModule } from "./billing/billing.module";
+import { AceSettingsModule } from "./ace-settings/ace-settings.module";
 
 // Core modules
 import { HealthModule } from "./health/health.module";
@@ -72,6 +73,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     PlatformModule,
     AccessControlModule,
     BillingModule,
+    AceSettingsModule,
     LeadsModule,
     StaffModule,
     PublicSignupModule,
