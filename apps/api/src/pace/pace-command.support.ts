@@ -11,6 +11,7 @@ import {
 } from "@pathway/ace-domain";
 import type { Prisma } from "@pathway/db";
 import type { CreatePaceAssessmentDto } from "./dto/create-pace-assessment.dto";
+import type { PacePolicyOverrideDto } from "./dto/pace-correction.dto";
 
 export type DatabaseAssessmentType = "SELF_TEST" | "PACE_TEST";
 export type DatabaseAssessmentResult = "PASSED" | "FAILED";
@@ -178,6 +179,38 @@ export function clientCommandLockKey(
   clientKey: string,
 ): string {
   return `ace-pace-client:${tenantId}:${sha256(clientKey.trim())}`;
+}
+
+export function overrideClientCommandKeyHash(
+  tenantId: string,
+  clientKey: string,
+): string {
+  return sha256(`ace-pace-policy-override:${tenantId}:${clientKey.trim()}`);
+}
+
+export function paceOverrideAssessmentFingerprint(
+  tenantId: string,
+  command: Pick<
+    PacePolicyOverrideDto | CreatePaceAssessmentDto,
+    | "childId"
+    | "subjectId"
+    | "paceNumber"
+    | "assessmentType"
+    | "score"
+    | "assessedAt"
+  >,
+): string {
+  return sha256(
+    JSON.stringify({
+      tenantId,
+      childId: command.childId,
+      subjectId: command.subjectId,
+      paceNumber: command.paceNumber,
+      assessmentType: command.assessmentType,
+      score: command.score,
+      assessedAt: new Date(command.assessedAt).toISOString(),
+    }),
+  );
 }
 
 export function parsePaceOrThrow(value: number): PaceNumber {

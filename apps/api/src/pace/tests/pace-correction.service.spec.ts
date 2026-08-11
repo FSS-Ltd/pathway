@@ -13,7 +13,8 @@ import {
   type PacePolicyOverrideDto,
 } from "../dto/pace-correction.dto";
 import { PaceCommandService } from "../pace-command.service";
-import { PaceController } from "../pace.controller";
+import { paceOverrideAssessmentFingerprint } from "../pace-command.support";
+import { PaceController, stepUpFromSignedClaims } from "../pace.controller";
 
 jest.mock("@pathway/db", () => ({
   Prisma: {
@@ -53,8 +54,13 @@ function override(
   overrides: Partial<PacePolicyOverrideDto> = {},
 ): PacePolicyOverrideDto {
   return {
+    idempotencyKey: "override-command-1",
     childId: "5dce6037-f0e3-46e6-8463-2013e4251ed0",
     subjectId: "7a7450c4-54ad-407e-8388-90185ff9a5f6",
+    paceNumber: 1001,
+    assessmentType: "FinalTest",
+    score: 70,
+    assessedAt: "2026-08-11T12:05:00.000Z",
     policyCode: "score-below-threshold",
     expiresAt: "2026-08-11T12:10:00.000Z",
     reason: "Authorised progression after supervised review",
@@ -83,10 +89,11 @@ function assessment(overrides: Partial<Record<string, unknown>> = {}) {
 function transaction() {
   return {
     $executeRaw: jest.fn().mockResolvedValue(0),
+    $queryRaw: jest.fn().mockResolvedValue([{ count: 0 }]),
     tenant: { findFirst: jest.fn() },
     studentSubjectEnrollment: { findFirst: jest.fn() },
     pacePolicy: { findFirst: jest.fn() },
-    pacePolicyOverride: { create: jest.fn() },
+    pacePolicyOverride: { findFirst: jest.fn(), create: jest.fn() },
     paceAssessment: {
       findFirst: jest.fn(),
       findMany: jest.fn(),
@@ -201,9 +208,59 @@ describe("PACE correction and override commands", () => {
     expect(() =>
       pacePolicyOverrideSchema.parse({ ...override(), policyCode: "allowed" }),
     ).toThrow();
+    for (const policyCode of [
+      "daily-limit",
+      "duplicate-self-test",
+      "same-pace-same-day",
+      "progression-blocked",
+      "override-required",
+    ]) {
+      expect(() =>
+        pacePolicyOverrideSchema.parse({ ...override(), policyCode }),
+      ).toThrow();
+    }
+    expect(() =>
+      pacePolicyOverrideSchema.parse({
+        ...override(),
+        idempotencyKey: undefined,
+      }),
+    ).toThrow();
     expect(() =>
       pacePolicyOverrideSchema.parse({ ...override(), unexpected: true }),
     ).toThrow();
+  });
+
+  it("only derives Auth0 step-up from explicit MFA assurance", () => {
+    const signedAt = Date.parse("2026-08-11T11:58:00.000Z") / 1_000;
+    for (const method of ["otp", "webauthn", "hwk", "swk"]) {
+      expect(
+        stepUpFromSignedClaims({
+          provider: "auth0",
+          authenticationTime: signedAt,
+          authenticationMethods: [method],
+        }),
+      ).toBeUndefined();
+    }
+    expect(
+      stepUpFromSignedClaims({
+        provider: "auth0",
+        authenticationTime: signedAt,
+        authenticationMethods: ["pwd", "mfa"],
+      }),
+    ).toEqual({
+      authenticatedAt: "2026-08-11T11:58:00.000Z",
+      secondFactor: true,
+    });
+    expect(
+      stepUpFromSignedClaims({
+        provider: "clerk",
+        issuedAt: signedAt,
+        factorVerificationAgeMinutes: [1, 2],
+      }),
+    ).toEqual({
+      authenticatedAt: "2026-08-11T11:56:00.000Z",
+      secondFactor: true,
+    });
   });
 
   it("creates a complete immutable successor under the child lock and rebuilds from terminal facts", async () => {
@@ -324,6 +381,8 @@ describe("PACE correction and override commands", () => {
         subjectId: override().subjectId,
         pacePolicyId: "policy-1",
         policyCode: "score-below-threshold",
+        clientCommandKeyHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        assessmentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
         authorisedByUserId: "user-1",
         reason: "Authorised progression after supervised review",
         expiresAt: new Date("2026-08-11T12:10:00.000Z"),
@@ -352,6 +411,50 @@ describe("PACE correction and override commands", () => {
       ],
       skipDuplicates: true,
     });
+  });
+
+  it("replays an identical override command without another fact, audit, or intent", async () => {
+    const { service, tx } = arrange();
+    tx.pacePolicyOverride.findFirst.mockResolvedValue({
+      id: "override-existing",
+      childId: override().childId,
+      subjectId: override().subjectId,
+      pacePolicyId: "policy-1",
+      policyCode: "score-below-threshold",
+      authorisedByUserId: "user-1",
+      reason: override().reason,
+      expiresAt: new Date(override().expiresAt),
+      createdAt: new Date("2026-08-11T12:00:00.000Z"),
+      assessmentFingerprint: paceOverrideAssessmentFingerprint(
+        actor.tenantId,
+        override(),
+      ),
+    });
+
+    await service.override(override(), steppedUpActor);
+
+    expect(tx.pacePolicyOverride.create).not.toHaveBeenCalled();
+    expect(tx.auditEvent.create).not.toHaveBeenCalled();
+    expect(tx.outboxEvent.createMany).not.toHaveBeenCalled();
+  });
+
+  it("uses the child-wide daily terminal count while excluding the corrected predecessor", async () => {
+    const { service, tx } = arrange();
+    tx.$queryRaw.mockResolvedValue([{ count: 2 }]);
+
+    await expect(
+      service.correct("assessment-original", correction(), actor),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        details: { policyCode: "daily-limit" },
+      }),
+    });
+    expect(tx.$queryRaw).toHaveBeenCalledWith(
+      expect.objectContaining({
+        values: expect.arrayContaining(["assessment-original"]),
+      }),
+    );
+    expect(tx.paceAssessment.create).not.toHaveBeenCalled();
   });
 
   it("keeps correction audit and outbox in the same RLS transaction", async () => {

@@ -34,6 +34,8 @@ import {
   idempotencyConflict,
   isIanaTimezone,
   localDateAt,
+  overrideClientCommandKeyHash,
+  paceOverrideAssessmentFingerprint,
   parsePaceOrThrow,
   policyBlocked,
   policyOverrideInvalid,
@@ -244,6 +246,10 @@ export class PaceCommandService {
         hasAuthorisedOverride: false,
       });
       if (command.policyOverrideId) {
+        const assessmentFingerprint = paceOverrideAssessmentFingerprint(
+          actor.tenantId,
+          command,
+        );
         const policyOverride = await tx.pacePolicyOverride.findFirst({
           where: {
             id: command.policyOverrideId,
@@ -252,6 +258,7 @@ export class PaceCommandService {
             subjectId: command.subjectId,
             pacePolicyId: policy.id,
             policyCode: policyResult.code,
+            assessmentFingerprint,
             expiresAt: { gt: new Date() },
             assessments: { none: {} },
           },
@@ -437,15 +444,20 @@ export class PaceCommandService {
         startingPace: enrollment.currentPace,
         assessmentFacts: remainingDomainFacts,
       });
+      const dailyTestCount = await this.countDailyTerminalFacts(
+        tx,
+        actor.tenantId,
+        command.childId,
+        assessedOnDate,
+        original.id,
+      );
       const policyResult = evaluatePaceAssessment({
         assessmentType: command.assessmentType,
         score: command.score,
         passThreshold,
         assessedPace: parsePaceOrThrow(command.paceNumber),
         currentPace: currentProjection.currentPace,
-        dailyTestCount: remainingFacts.filter(
-          (fact) => formatDatabaseDate(fact.assessedOn) === assessedOn,
-        ).length,
+        dailyTestCount,
         dailyTestLimitEnabled: true,
         dailyTestLimit: policy.maxAssessmentsPerDay,
         samePaceSameDayBlockEnabled: !policy.allowSamePaceSameDay,
@@ -561,6 +573,7 @@ export class PaceCommandService {
     actor: PaceCommandActor,
   ): Promise<PacePolicyOverrideResponse> {
     this.assertActor(actor);
+    this.assertOverrideCommand(command);
     const now = new Date();
     this.assertFreshStepUp(actor, now);
     const expiresAt = this.parseOverrideExpiry(command.expiresAt, now);
@@ -568,7 +581,48 @@ export class PaceCommandService {
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       const site = await this.requireActiveSite(tx, actor);
       const today = toDatabaseDate(localDateAt(now, site.timezone));
-      await this.acquireAggregateLock(tx, actor.tenantId, command.childId);
+      const clientCommandKeyHash = overrideClientCommandKeyHash(
+        actor.tenantId,
+        command.idempotencyKey,
+      );
+      const assessmentFingerprint = paceOverrideAssessmentFingerprint(
+        actor.tenantId,
+        command,
+      );
+      await this.acquireCommandLocks(
+        tx,
+        actor.tenantId,
+        command.childId,
+        command.idempotencyKey,
+      );
+
+      const existing = await tx.pacePolicyOverride.findFirst({
+        where: { tenantId: actor.tenantId, clientCommandKeyHash },
+        select: {
+          id: true,
+          childId: true,
+          subjectId: true,
+          pacePolicyId: true,
+          policyCode: true,
+          authorisedByUserId: true,
+          reason: true,
+          expiresAt: true,
+          createdAt: true,
+          assessmentFingerprint: true,
+        },
+      });
+      if (existing) {
+        if (
+          existing.assessmentFingerprint !== assessmentFingerprint ||
+          existing.policyCode !== command.policyCode ||
+          existing.authorisedByUserId !== actor.userId ||
+          existing.reason !== command.reason.trim() ||
+          existing.expiresAt.getTime() !== expiresAt.getTime()
+        ) {
+          throw idempotencyConflict();
+        }
+        return this.toPolicyOverrideResponse(existing);
+      }
 
       const enrollment = await tx.studentSubjectEnrollment.findFirst({
         where: {
@@ -604,6 +658,8 @@ export class PaceCommandService {
           subjectId: command.subjectId,
           pacePolicyId: policy.id,
           policyCode: command.policyCode,
+          clientCommandKeyHash,
+          assessmentFingerprint,
           authorisedByUserId: actor.userId,
           reason: command.reason.trim(),
           expiresAt,
@@ -614,6 +670,7 @@ export class PaceCommandService {
           subjectId: true,
           pacePolicyId: true,
           policyCode: true,
+          assessmentFingerprint: true,
           authorisedByUserId: true,
           expiresAt: true,
           createdAt: true,
@@ -640,15 +697,9 @@ export class PaceCommandService {
         aggregateId: policyOverride.id,
         eventType: "ace.pace.policy-override-authorised",
         payload: {},
-        idempotencyKey: `ace-pace-policy-override:${actor.tenantId}:${policyOverride.id}`,
+        idempotencyKey: `ace-pace-policy-override:${clientCommandKeyHash}:${assessmentFingerprint}`,
       });
-      return {
-        ...policyOverride,
-        policyCode:
-          policyOverride.policyCode as PacePolicyOverrideDto["policyCode"],
-        expiresAt: policyOverride.expiresAt.toISOString(),
-        createdAt: policyOverride.createdAt.toISOString(),
-      };
+      return this.toPolicyOverrideResponse(policyOverride);
     });
   }
 
@@ -690,6 +741,7 @@ export class PaceCommandService {
     tenantId: string,
     childId: string,
     assessedOn: Date,
+    excludedAssessmentId?: string,
   ): Promise<number> {
     const [row] = await tx.$queryRaw<Array<{ count: number }>>(
       Prisma.sql`
@@ -698,6 +750,7 @@ export class PaceCommandService {
         WHERE fact."tenantId" = ${tenantId}
           AND fact."childId" = ${childId}
           AND fact."assessedOn" = CAST(${assessedOn} AS date)
+          AND (${excludedAssessmentId ?? null}::text IS NULL OR fact.id <> ${excludedAssessmentId ?? null})
           AND NOT EXISTS (
             SELECT 1
             FROM "PaceAssessment" AS correction
@@ -797,6 +850,45 @@ export class PaceCommandService {
       throw new BadRequestException("Invalid PACE correction command");
     }
     parsePaceOrThrow(command.paceNumber);
+  }
+
+  private assertOverrideCommand(command: PacePolicyOverrideDto): void {
+    if (
+      !command.idempotencyKey?.trim() ||
+      !command.childId?.trim() ||
+      !command.subjectId?.trim() ||
+      !command.reason?.trim() ||
+      !Number.isInteger(command.score) ||
+      command.score < 0 ||
+      command.score > 100 ||
+      Number.isNaN(new Date(command.assessedAt).getTime())
+    ) {
+      throw new BadRequestException("Invalid PACE policy override command");
+    }
+    parsePaceOrThrow(command.paceNumber);
+  }
+
+  private toPolicyOverrideResponse(policyOverride: {
+    id: string;
+    childId: string;
+    subjectId: string;
+    pacePolicyId: string;
+    policyCode: string;
+    authorisedByUserId: string;
+    expiresAt: Date;
+    createdAt: Date;
+  }): PacePolicyOverrideResponse {
+    return {
+      id: policyOverride.id,
+      childId: policyOverride.childId,
+      subjectId: policyOverride.subjectId,
+      pacePolicyId: policyOverride.pacePolicyId,
+      policyCode:
+        policyOverride.policyCode as PacePolicyOverrideDto["policyCode"],
+      authorisedByUserId: policyOverride.authorisedByUserId,
+      expiresAt: policyOverride.expiresAt.toISOString(),
+      createdAt: policyOverride.createdAt.toISOString(),
+    };
   }
 
   private assertFreshStepUp(actor: PaceCommandActor, now: Date): void {

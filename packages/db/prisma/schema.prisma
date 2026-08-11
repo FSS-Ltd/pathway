@@ -2716,6 +2716,8 @@ model PacePolicyOverride {
   pacePolicyId       String
   pacePolicy         PacePolicy       @relation(fields: [pacePolicyId, tenantId], references: [id, tenantId], onDelete: Restrict)
   policyCode         String
+  clientCommandKeyHash  String?
+  assessmentFingerprint String?
   authorisedByUserId String
   authorisedBy       User             @relation("PacePolicyOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
   reason             String           @db.Text
@@ -2725,6 +2727,7 @@ model PacePolicyOverride {
 
   @@unique([id, tenantId])
   @@unique([id, tenantId, childId, subjectId])
+  @@unique([tenantId, clientCommandKeyHash], map: "PacePolicyOverride_tenant_client_command_key")
   @@index([tenantId, childId, expiresAt])
   @@index([tenantId, subjectId, expiresAt])
 }

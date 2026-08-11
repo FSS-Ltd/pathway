@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import {
+  clearE2eAuthAccess,
+  clearE2eTypedRole,
   isDatabaseAvailable,
   requireDatabase,
+  seedE2eAuthUser,
+  seedE2eTypedRole,
 } from "../../../test-helpers.e2e";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import { PaceCommandService } from "../pace-command.service";
@@ -11,29 +15,48 @@ interface Fixture {
   orgId: string;
   tenantId: string;
   actorId: string;
+  orgHeadId: string;
   childId: string;
   subjectId: string;
+  orgHeadSubjectId: string;
+  limitSubjectId: string;
+  crossSubjectId: string;
   originalFinalId: string;
+  orgHeadOriginalId: string;
+  limitOriginalId: string;
 }
 
 describe("PACE correction transaction and assessment-command concurrency", () => {
   let fixture: Fixture | undefined;
+  let orgHeadRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
     const orgId = randomUUID();
     const tenantId = randomUUID();
     const actorId = randomUUID();
+    const orgHeadId = randomUUID();
     const childId = randomUUID();
     const subjectId = randomUUID();
+    const orgHeadSubjectId = randomUUID();
+    const limitSubjectId = randomUUID();
+    const crossSubjectId = randomUUID();
     const originalFinalId = randomUUID();
+    const orgHeadOriginalId = randomUUID();
+    const limitOriginalId = randomUUID();
     fixture = {
       orgId,
       tenantId,
       actorId,
+      orgHeadId,
       childId,
       subjectId,
+      orgHeadSubjectId,
+      limitSubjectId,
+      crossSubjectId,
       originalFinalId,
+      orgHeadOriginalId,
+      limitOriginalId,
     };
 
     await prisma.org.create({
@@ -52,6 +75,20 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
         slug: `pace-correction-${tenantId}`,
         timezone: "Europe/London",
       },
+    });
+    await seedE2eAuthUser({
+      subject: `pace-org-head-${orgHeadId}`,
+      userId: orgHeadId,
+      tenantId,
+      orgId,
+      orgRole: "ORG_ADMIN",
+    });
+    orgHeadRole = await seedE2eTypedRole({
+      orgId,
+      userId: orgHeadId,
+      scope: "organisation",
+      name: "Organisation Head",
+      permissionKeys: ["ace.pace.correct", "ace.pace.override"],
     });
     await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await tx.user.create({
@@ -75,18 +112,53 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
       await tx.subject.create({
         data: { id: subjectId, tenantId, name: `Mathematics ${subjectId}` },
       });
-      await tx.studentSubjectEnrollment.create({
-        data: {
-          tenantId,
-          childId,
-          subjectId,
-          startsOn: new Date("2026-08-01T12:00:00.000Z"),
-          startingPace: 1001,
-          currentPace: 1001,
-          targetPace: 1003,
-          recordedByUserId: actorId,
-          reason: "PACE correction concurrency fixture",
-        },
+      await tx.subject.createMany({
+        data: [
+          {
+            id: orgHeadSubjectId,
+            tenantId,
+            name: `English ${orgHeadSubjectId}`,
+          },
+          { id: limitSubjectId, tenantId, name: `Science ${limitSubjectId}` },
+          { id: crossSubjectId, tenantId, name: `History ${crossSubjectId}` },
+        ],
+      });
+      await tx.studentSubjectEnrollment.createMany({
+        data: [
+          {
+            tenantId,
+            childId,
+            subjectId,
+            startsOn: new Date("2026-08-01T12:00:00.000Z"),
+            startingPace: 1001,
+            currentPace: 1001,
+            targetPace: 1003,
+            recordedByUserId: actorId,
+            reason: "PACE correction concurrency fixture",
+          },
+          {
+            tenantId,
+            childId,
+            subjectId: orgHeadSubjectId,
+            startsOn: new Date("2026-08-01T12:00:00.000Z"),
+            startingPace: 1001,
+            currentPace: 1001,
+            targetPace: 1003,
+            recordedByUserId: actorId,
+            reason: "Organisation-head fixture",
+          },
+          {
+            tenantId,
+            childId,
+            subjectId: limitSubjectId,
+            startsOn: new Date("2026-08-01T12:00:00.000Z"),
+            startingPace: 1001,
+            currentPace: 1001,
+            targetPace: 1003,
+            recordedByUserId: actorId,
+            reason: "Cross-subject limit fixture",
+          },
+        ],
       });
       await tx.pacePolicy.create({
         data: {
@@ -94,7 +166,7 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
           version: 1,
           selfTestPassingScore: 80,
           paceTestPassingScore: 80,
-          maxAssessmentsPerDay: 5,
+          maxAssessmentsPerDay: 4,
           allowSamePaceSameDay: true,
           effectiveFrom: new Date("2026-08-01T00:00:00.000Z"),
           createdByUserId: actorId,
@@ -130,6 +202,50 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
           reason: "Original Final Test fixture",
         },
       });
+      await tx.paceAssessment.create({
+        data: {
+          id: orgHeadOriginalId,
+          tenantId,
+          childId,
+          subjectId: orgHeadSubjectId,
+          paceNumber: 1001,
+          assessmentType: "SELF_TEST",
+          score: 90,
+          result: "PASSED",
+          assessedOn: new Date("2026-08-20T12:00:00.000Z"),
+          recordedByUserId: actorId,
+          reason: "Organisation-head correction target",
+        },
+      });
+      await tx.paceAssessment.create({
+        data: {
+          id: limitOriginalId,
+          tenantId,
+          childId,
+          subjectId: limitSubjectId,
+          paceNumber: 1001,
+          assessmentType: "SELF_TEST",
+          score: 90,
+          result: "PASSED",
+          assessedOn: new Date("2026-08-18T12:00:00.000Z"),
+          recordedByUserId: actorId,
+          reason: "Cross-subject correction target",
+        },
+      });
+      await tx.paceAssessment.createMany({
+        data: [1, 2, 3, 4].map(() => ({
+          tenantId,
+          childId,
+          subjectId: crossSubjectId,
+          paceNumber: 1001,
+          assessmentType: "SELF_TEST" as const,
+          score: 90,
+          result: "PASSED" as const,
+          assessedOn: new Date("2026-08-18T12:00:00.000Z"),
+          recordedByUserId: actorId,
+          reason: "Cross-subject daily terminal fact",
+        })),
+      });
     });
   });
 
@@ -150,7 +266,13 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     await prisma.siteMembership.deleteMany({
       where: { tenantId: fixture.tenantId },
     });
-    await prisma.user.deleteMany({ where: { id: fixture.actorId } });
+    if (orgHeadRole) {
+      await clearE2eTypedRole(orgHeadRole, fixture.orgId);
+    }
+    await clearE2eAuthAccess(fixture.orgHeadId);
+    await prisma.user.deleteMany({
+      where: { id: { in: [fixture.actorId, fixture.orgHeadId] } },
+    });
     await prisma.tenant.deleteMany({ where: { id: fixture.tenantId } });
     await prisma.org.deleteMany({ where: { id: fixture.orgId } });
   });
@@ -257,8 +379,13 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
     };
     const policyOverride = await service.override(
       {
+        idempotencyKey: randomUUID(),
         childId: fixture.childId,
         subjectId: fixture.subjectId,
+        paceNumber: 1001,
+        assessmentType: "FinalTest",
+        score: 70,
+        assessedAt: now.toISOString(),
         policyCode: "score-below-threshold",
         expiresAt: new Date(now.getTime() + 10 * 60 * 1_000).toISOString(),
         reason: "Supervised progression exception",
@@ -311,6 +438,174 @@ describe("PACE correction transaction and assessment-command concurrency", () =>
       policyOverrideId: policyOverride.id,
     });
     expect(state.progress).toEqual({ currentPace: 1002, completedPaces: 1 });
+  });
+
+  it("applies the daily limit across subjects while excluding the corrected predecessor", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+
+    await expect(
+      service.correct(
+        fixture.limitOriginalId,
+        {
+          childId: fixture.childId,
+          subjectId: fixture.limitSubjectId,
+          paceNumber: 1001,
+          assessmentType: "SelfTest",
+          score: 90,
+          assessedAt: "2026-08-18T11:00:00.000Z",
+          reason: "Correct under the child-wide daily limit",
+        },
+        {
+          tenantId: fixture.tenantId,
+          orgId: fixture.orgId,
+          userId: fixture.actorId,
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({
+        details: { policyCode: "daily-limit" },
+      }),
+    });
+  });
+
+  it("accepts an active typed organisation head for corrections and overrides", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+    const now = new Date();
+    const actor = {
+      tenantId: fixture.tenantId,
+      orgId: fixture.orgId,
+      userId: fixture.orgHeadId,
+      stepUp: {
+        authenticatedAt: now.toISOString(),
+        secondFactor: true as const,
+      },
+    };
+
+    await expect(
+      service.correct(
+        fixture.orgHeadOriginalId,
+        {
+          childId: fixture.childId,
+          subjectId: fixture.orgHeadSubjectId,
+          paceNumber: 1001,
+          assessmentType: "SelfTest",
+          score: 85,
+          assessedAt: "2026-08-21T11:00:00.000Z",
+          reason: "Organisation head correction",
+        },
+        actor,
+      ),
+    ).resolves.toMatchObject({
+      assessment: { correctsAssessmentId: fixture.orgHeadOriginalId },
+    });
+
+    await expect(
+      service.override(
+        {
+          idempotencyKey: randomUUID(),
+          childId: fixture.childId,
+          subjectId: fixture.orgHeadSubjectId,
+          paceNumber: 1001,
+          assessmentType: "FinalTest",
+          score: 70,
+          assessedAt: now.toISOString(),
+          policyCode: "score-below-threshold",
+          expiresAt: new Date(now.getTime() + 10 * 60 * 1_000).toISOString(),
+          reason: "Organisation head supervised exception",
+        },
+        actor,
+      ),
+    ).resolves.toMatchObject({ authorisedByUserId: fixture.orgHeadId });
+  });
+
+  it("serializes identical override retries into one immutable authorization", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+    const now = new Date();
+    const actor = {
+      tenantId: fixture.tenantId,
+      orgId: fixture.orgId,
+      userId: fixture.actorId,
+      stepUp: {
+        authenticatedAt: now.toISOString(),
+        secondFactor: true as const,
+      },
+    };
+    const command = {
+      idempotencyKey: randomUUID(),
+      childId: fixture.childId,
+      subjectId: fixture.subjectId,
+      paceNumber: 1002,
+      assessmentType: "FinalTest" as const,
+      score: 70,
+      assessedAt: now.toISOString(),
+      policyCode: "score-below-threshold" as const,
+      expiresAt: new Date(now.getTime() + 10 * 60 * 1_000).toISOString(),
+      reason: "Concurrent identical override retry",
+    };
+
+    const [left, right] = await Promise.all([
+      service.override(command, actor),
+      service.override(command, actor),
+    ]);
+    expect(right.id).toBe(left.id);
+
+    const state = await withTenantRlsContext(
+      fixture.tenantId,
+      fixture.orgId,
+      async (tx) => ({
+        overrides: await tx.pacePolicyOverride.count({
+          where: { id: left.id },
+        }),
+        audits: await tx.auditEvent.count({
+          where: { tenantId: fixture!.tenantId, entityId: left.id },
+        }),
+        intents: await tx.outboxEvent.count({
+          where: { aggregateId: left.id },
+        }),
+      }),
+    );
+    expect(state).toEqual({ overrides: 1, audits: 1, intents: 1 });
+  });
+
+  it("allows only one of two concurrent overrides that reuse a key for different assessments", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const service = new PaceCommandService(new OutboxService());
+    const now = new Date();
+    const actor = {
+      tenantId: fixture.tenantId,
+      orgId: fixture.orgId,
+      userId: fixture.actorId,
+      stepUp: {
+        authenticatedAt: now.toISOString(),
+        secondFactor: true as const,
+      },
+    };
+    const idempotencyKey = randomUUID();
+    const base = {
+      idempotencyKey,
+      childId: fixture.childId,
+      subjectId: fixture.subjectId,
+      paceNumber: 1002,
+      assessmentType: "FinalTest" as const,
+      assessedAt: now.toISOString(),
+      policyCode: "score-below-threshold" as const,
+      expiresAt: new Date(now.getTime() + 10 * 60 * 1_000).toISOString(),
+      reason: "Concurrent conflicting override retry",
+    };
+
+    const results = await Promise.allSettled([
+      service.override({ ...base, score: 70 }, actor),
+      service.override({ ...base, score: 71 }, actor),
+    ]);
+    expect(
+      results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      results.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
   });
 
   it("rolls correction fact, projection, audit, and intent back together", async () => {

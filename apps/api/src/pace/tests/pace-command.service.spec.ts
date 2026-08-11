@@ -395,6 +395,7 @@ describe("PaceCommandService", () => {
         subjectId: "subject-1",
         pacePolicyId: "policy-1",
         policyCode: "score-below-threshold",
+        assessmentFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
         expiresAt: { gt: expect.any(Date) },
         assessments: { none: {} },
       },

@@ -104,7 +104,7 @@ export class PaceController {
   }
 }
 
-function stepUpFromSignedClaims(
+export function stepUpFromSignedClaims(
   claims: Record<string, unknown>,
 ): { authenticatedAt: string; secondFactor: true } | undefined {
   if (
@@ -131,14 +131,12 @@ function stepUpFromSignedClaims(
     claims.provider === "auth0" &&
     typeof claims.authenticationTime === "number" &&
     Array.isArray(claims.authenticationMethods) &&
-    claims.authenticationMethods.some(
-      (method) =>
-        typeof method === "string" &&
-        ["mfa", "otp", "webauthn", "hwk", "swk"].includes(method),
-    )
+    claims.authenticationMethods.some((method) => method === "mfa")
   ) {
     return {
-      authenticatedAt: new Date(claims.authenticationTime * 1_000).toISOString(),
+      authenticatedAt: new Date(
+        claims.authenticationTime * 1_000,
+      ).toISOString(),
       secondFactor: true,
     };
   }

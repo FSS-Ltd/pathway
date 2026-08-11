@@ -19,14 +19,12 @@ export const paceAssessmentCorrectionSchema = z
 export const pacePolicyOverrideSchema = z
   .object({
     ...scopedPaceCommandFields,
-    policyCode: z.enum([
-      "score-below-threshold",
-      "daily-limit",
-      "duplicate-self-test",
-      "same-pace-same-day",
-      "progression-blocked",
-      "override-required",
-    ]),
+    idempotencyKey: z.string().trim().min(1).max(128),
+    paceNumber: z.number().int(),
+    assessmentType: z.enum(["SelfTest", "FinalTest"]),
+    score: z.number().int().min(0).max(100),
+    assessedAt: z.string().datetime({ offset: true }),
+    policyCode: z.literal("score-below-threshold"),
     expiresAt: z.string().datetime({ offset: true }),
   })
   .strict();
