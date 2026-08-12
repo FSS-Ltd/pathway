@@ -43,6 +43,30 @@ export function AttendanceStatusControls({
 }: AttendanceStatusControlsProps) {
   const isChanged = selected !== row.status && selected !== "unknown";
   const needsReason = Boolean(row.attendanceId && isChanged);
+  const optionRefs = React.useRef<
+    Partial<Record<AttendanceMarkStatus, HTMLButtonElement>>
+  >({});
+
+  const moveSelection = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number,
+  ) => {
+    const direction =
+      event.key === "ArrowRight" || event.key === "ArrowDown"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowUp"
+          ? -1
+          : 0;
+    if (direction === 0) return;
+
+    event.preventDefault();
+    const nextIndex =
+      (currentIndex + direction + STATUS_OPTIONS.length) %
+      STATUS_OPTIONS.length;
+    const nextStatus = STATUS_OPTIONS[nextIndex];
+    onSelect(nextStatus);
+    optionRefs.current[nextStatus]?.focus();
+  };
 
   return (
     <div className="space-y-2">
@@ -51,7 +75,7 @@ export function AttendanceStatusControls({
         className="flex flex-wrap gap-2"
         role="radiogroup"
       >
-        {STATUS_OPTIONS.map((status) => (
+        {STATUS_OPTIONS.map((status, index) => (
           <Button
             aria-checked={selected === status}
             aria-label={`${row.childName}: ${STATUS_LABEL[status]}`}
@@ -59,10 +83,19 @@ export function AttendanceStatusControls({
             disabled={disabled}
             id={`attendance-${row.childId}-${status}`}
             key={status}
+            onKeyDown={(event) => moveSelection(event, index)}
             onClick={() => onSelect(status)}
+            ref={(control) => {
+              if (control) optionRefs.current[status] = control;
+            }}
             role="radio"
             size="sm"
             type="button"
+            tabIndex={
+              selected === status || (selected === "unknown" && index === 0)
+                ? 0
+                : -1
+            }
             variant={selected === status ? "primary" : "outline"}
           >
             <StatusIcon status={status} />

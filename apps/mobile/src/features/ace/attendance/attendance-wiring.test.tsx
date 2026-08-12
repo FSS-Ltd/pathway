@@ -33,13 +33,23 @@ const initialDetail: attendanceApi.AttendanceSessionDetail = {
     groupIds: ["group-1"],
     ageGroupLabel: "Year 4",
   },
-  children: [{ id: "child-1", displayName: "Jordan Smith" }],
+  children: [
+    { id: "child-1", displayName: "Jordan Smith" },
+    { id: "child-2", displayName: "Alex Morgan" },
+  ],
   rows: [
     {
       id: "attendance-1",
       childId: "child-1",
       present: false,
       status: "ABSENT",
+      timestamp: "2026-08-12T08:31:00.000Z",
+    },
+    {
+      id: "attendance-2",
+      childId: "child-2",
+      present: true,
+      status: "PRESENT",
       timestamp: "2026-08-12T08:31:00.000Z",
     },
   ],
@@ -50,17 +60,29 @@ const initialDetail: attendanceApi.AttendanceSessionDetail = {
       childName: "Jordan Smith",
       status: "absent",
     },
+    {
+      attendanceId: "attendance-2",
+      childId: "child-2",
+      childName: "Alex Morgan",
+      status: "present",
+    },
   ],
-  summary: { present: 0, absent: 1, late: 0, unknown: 0 },
+  summary: { present: 1, absent: 1, late: 0, unknown: 0 },
   progressStatus: "completed",
   timingStatus: "live",
 };
 
 const correctedDetail: attendanceApi.AttendanceSessionDetail = {
   ...initialDetail,
-  rows: [{ ...initialDetail.rows[0], status: "LATE", present: true }],
-  childStatusRows: [{ ...initialDetail.childStatusRows[0], status: "late" }],
-  summary: { present: 0, absent: 0, late: 1, unknown: 0 },
+  rows: [
+    { ...initialDetail.rows[0], status: "LATE", present: true },
+    { ...initialDetail.rows[1], status: "ABSENT", present: false },
+  ],
+  childStatusRows: [
+    { ...initialDetail.childStatusRows[0], status: "late" },
+    { ...initialDetail.childStatusRows[1], status: "absent" },
+  ],
+  summary: { present: 0, absent: 1, late: 1, unknown: 0 },
 };
 
 beforeEach(() => {
@@ -92,7 +114,19 @@ it("keeps saved status authoritative with non-colour 44-point controls at 320pt 
   expect(StyleSheet.flatten(late.props.style).minHeight).toBeGreaterThanOrEqual(
     44,
   );
-  expect(screen.getByText("Late").props.numberOfLines).toBeUndefined();
+  expect(
+    StyleSheet.flatten(
+      screen.getByLabelText("Attendance status for Jordan Smith").props.style,
+    ).flexWrap,
+  ).toBe("wrap");
+  for (const choice of screen.getAllByRole("radio")) {
+    expect(
+      StyleSheet.flatten(choice.props.style).minHeight,
+    ).toBeGreaterThanOrEqual(44);
+  }
+  for (const label of screen.getAllByText("Late")) {
+    expect(label.props.numberOfLines).toBeUndefined();
+  }
   expect(screen.getByText("Saved: Absent")).toBeTruthy();
   expect(screen.getByLabelText("0 saved late")).toBeTruthy();
 
@@ -122,7 +156,9 @@ it("keeps saved status authoritative with non-colour 44-point controls at 320pt 
 it("requires a trimmed correction reason, preserves the failed batch, and retries the same DTO", async () => {
   const save = jest
     .spyOn(attendanceApi, "saveAttendanceSession")
-    .mockRejectedValueOnce(new Error("Connection interrupted."))
+    .mockRejectedValueOnce(
+      new attendanceApi.AttendanceSaveError("rejected", 422),
+    )
     .mockResolvedValueOnce(correctedDetail);
   const screen = render(<AttendanceScreen />);
   await waitFor(() => expect(screen.getByText("Jordan Smith")).toBeTruthy());
@@ -136,6 +172,11 @@ it("requires a trimmed correction reason, preserves the failed batch, and retrie
     screen.getByLabelText("Correction reason for Jordan Smith"),
     "  Arrived after the register closed  ",
   );
+  fireEvent.press(screen.getByLabelText("Alex Morgan: Absent"));
+  fireEvent.changeText(
+    screen.getByLabelText("Correction reason for Alex Morgan"),
+    "  Marked against the wrong learner  ",
+  );
   fireEvent.press(screen.getByText("Save register"));
   await waitFor(() =>
     expect(screen.getByText(/No attendance changes were saved/)).toBeTruthy(),
@@ -147,19 +188,101 @@ it("requires a trimmed correction reason, preserves the failed batch, and retrie
       status: "LATE",
       correctionReason: "Arrived after the register closed",
     },
+    {
+      childId: "child-2",
+      status: "ABSENT",
+      correctionReason: "Marked against the wrong learner",
+    },
   ]);
+  expect(screen.getByText("Pending: Absent")).toBeTruthy();
+  expect(
+    screen.getByLabelText("Correction reason for Alex Morgan").props.value,
+  ).toBe("  Marked against the wrong learner  ");
 
   fireEvent.press(screen.getByText("Retry save"));
   await waitFor(() => expect(screen.getByText("Saved: Late")).toBeTruthy());
   expect(save).toHaveBeenCalledTimes(2);
   expect(save.mock.calls[1]).toEqual(save.mock.calls[0]);
   expect(screen.queryByText("Pending: Late")).toBeNull();
+  expect(screen.queryByText("Pending: Absent")).toBeNull();
   expect(screen.getByLabelText("1 saved late")).toBeTruthy();
+});
+
+it("reconciles an unknown save outcome before claiming success or offering retry", async () => {
+  const committedAfterNetworkFailure = {
+    ...initialDetail,
+    rows: [
+      { ...initialDetail.rows[0], status: "LATE" as const, present: true },
+      initialDetail.rows[1],
+    ],
+    childStatusRows: [
+      { ...initialDetail.childStatusRows[0], status: "late" as const },
+      initialDetail.childStatusRows[1],
+    ],
+    summary: { present: 1, absent: 0, late: 1, unknown: 0 },
+  };
+  const fetch = jest
+    .spyOn(attendanceApi, "fetchAttendanceSessionDetail")
+    .mockReset()
+    .mockResolvedValueOnce(initialDetail)
+    .mockResolvedValueOnce(committedAfterNetworkFailure);
+  jest
+    .spyOn(attendanceApi, "saveAttendanceSession")
+    .mockRejectedValue(new attendanceApi.AttendanceSaveError("unknown", null));
+  const screen = render(<AttendanceScreen />);
+  await waitFor(() => expect(screen.getByText("Jordan Smith")).toBeTruthy());
+
+  fireEvent.press(screen.getByLabelText("Jordan Smith: Late"));
+  fireEvent.changeText(
+    screen.getByLabelText("Correction reason for Jordan Smith"),
+    "Network ended after submit",
+  );
+  fireEvent.press(screen.getByText("Save register"));
+
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  expect(screen.queryByText(/No attendance changes were saved/)).toBeNull();
+  expect(screen.getByText(/confirmed after refreshing/i)).toBeTruthy();
+  expect(screen.getByText("Saved: Late")).toBeTruthy();
+  expect(screen.queryByText("Pending: Late")).toBeNull();
+  expect(screen.queryByText("Retry save")).toBeNull();
+});
+
+it("blocks a blind retry while an unknown outcome cannot be reconciled", async () => {
+  const fetch = jest
+    .spyOn(attendanceApi, "fetchAttendanceSessionDetail")
+    .mockReset()
+    .mockResolvedValueOnce(initialDetail)
+    .mockRejectedValue(new Error("Register refresh unavailable"));
+  const save = jest
+    .spyOn(attendanceApi, "saveAttendanceSession")
+    .mockRejectedValue(new attendanceApi.AttendanceSaveError("unknown", null));
+  const screen = render(<AttendanceScreen />);
+  await waitFor(() => expect(screen.getByText("Jordan Smith")).toBeTruthy());
+
+  fireEvent.press(screen.getByLabelText("Jordan Smith: Late"));
+  fireEvent.changeText(
+    screen.getByLabelText("Correction reason for Jordan Smith"),
+    "Network ended after submit",
+  );
+  fireEvent.press(screen.getByText("Save register"));
+
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  expect(screen.queryByText(/No attendance changes were saved/)).toBeNull();
+  expect(screen.getByText(/outcome is unknown/i)).toBeTruthy();
+  expect(screen.getByText("Pending: Late")).toBeTruthy();
+  expect(
+    screen.getByLabelText("Correction reason for Jordan Smith").props.value,
+  ).toBe("Network ended after submit");
+  expect(screen.queryByText("Retry save")).toBeNull();
+  fireEvent.press(screen.getByText("Check server status"));
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
+  expect(save).toHaveBeenCalledTimes(1);
 });
 
 it("marks an unrecorded child without requesting a correction reason", async () => {
   const unmarked = {
     ...initialDetail,
+    children: [initialDetail.children[0]],
     rows: [],
     childStatusRows: [
       {

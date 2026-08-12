@@ -64,6 +64,12 @@ export default function AttendanceDetailPage() {
     [sessionId],
   );
 
+  const reconcile = React.useCallback(async () => {
+    const updated = await fetchAttendanceDetailBySessionId(sessionId);
+    if (!updated) throw new Error("Attendance session not found.");
+    return updated;
+  }, [sessionId]);
+
   return (
     <div className="flex flex-col gap-4">
       <Button
@@ -121,7 +127,12 @@ export default function AttendanceDetailPage() {
           </div>
         </Card>
       ) : detail ? (
-        <AttendanceRegister detail={detail} onRefresh={load} onSave={save} />
+        <AttendanceRegister
+          detail={detail}
+          onReconcile={reconcile}
+          onRefresh={load}
+          onSave={save}
+        />
       ) : null}
     </div>
   );

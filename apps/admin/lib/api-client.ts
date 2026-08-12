@@ -4311,6 +4311,22 @@ export type SaveAttendanceRow = {
   correctionReason?: string;
 };
 
+export type AdminAttendanceSaveOutcome = "rejected" | "unknown";
+
+export class AdminAttendanceSaveError extends Error {
+  constructor(
+    readonly outcome: AdminAttendanceSaveOutcome,
+    readonly status: number | null,
+  ) {
+    super(
+      outcome === "rejected"
+        ? "The server rejected the attendance update."
+        : "The attendance save outcome is unknown.",
+    );
+    this.name = "AdminAttendanceSaveError";
+  }
+}
+
 export async function saveAttendanceForSession(
   sessionId: string,
   rows: SaveAttendanceRow[],
@@ -4329,19 +4345,26 @@ export async function saveAttendanceForSession(
         : { correctionReason: r.correctionReason.trim() }),
     })),
   };
-  const res = await fetch(
-    `${API_BASE_URL}/attendance/session/${encodeURIComponent(sessionId)}`,
-    {
-      method: "PUT",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-      body: JSON.stringify(payload),
-    },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `${API_BASE_URL}/attendance/session/${encodeURIComponent(sessionId)}`,
+      {
+        method: "PUT",
+        headers: buildAuthHeaders(),
+        credentials: "include",
+        cache: "no-store",
+        body: JSON.stringify(payload),
+      },
+    );
+  } catch {
+    throw new AdminAttendanceSaveError("unknown", null);
+  }
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to save attendance: ${res.status} ${body}`);
+    throw new AdminAttendanceSaveError(
+      res.status >= 400 && res.status < 500 ? "rejected" : "unknown",
+      res.status,
+    );
   }
   return mapApiAttendanceDetail(
     (await res.json()) as ApiAttendanceSessionDetail,

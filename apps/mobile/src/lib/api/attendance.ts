@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api/client";
+import { apiClient, ApiError } from "@/lib/api/client";
 
 export type AttendanceSessionProgress =
   | "not_started"
@@ -70,6 +70,22 @@ export type SaveAttendanceRow = {
   status: AttendanceStatus;
   correctionReason?: string;
 };
+
+export type AttendanceSaveOutcome = "rejected" | "unknown";
+
+export class AttendanceSaveError extends Error {
+  constructor(
+    readonly outcome: AttendanceSaveOutcome,
+    readonly status: number | null,
+  ) {
+    super(
+      outcome === "rejected"
+        ? "The server rejected the attendance update."
+        : "The attendance save outcome is unknown.",
+    );
+    this.name = "AttendanceSaveError";
+  }
+}
 
 function mapRegisterStatus(
   row: AttendanceSessionDetailResponse["rows"][number] | undefined,
@@ -147,21 +163,36 @@ export async function saveAttendanceSession(
   sessionId: string,
   rows: SaveAttendanceRow[],
 ): Promise<AttendanceSessionDetail> {
-  const response = await apiClient.request<AttendanceSessionDetailResponse>(
-    `/attendance/session/${encodeURIComponent(sessionId)}`,
-    {
-      method: "PUT",
-      body: JSON.stringify({
-        rows: rows.map((row) => ({
-          childId: row.childId,
-          status: row.status,
-          ...(row.correctionReason === undefined
-            ? {}
-            : { correctionReason: row.correctionReason.trim() }),
-        })),
-      }),
-    },
-  );
+  let response: AttendanceSessionDetailResponse;
+  try {
+    response = await apiClient.request<AttendanceSessionDetailResponse>(
+      `/attendance/session/${encodeURIComponent(sessionId)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({
+          rows: rows.map((row) => ({
+            childId: row.childId,
+            status: row.status,
+            ...(row.correctionReason === undefined
+              ? {}
+              : { correctionReason: row.correctionReason.trim() }),
+          })),
+        }),
+      },
+    );
+  } catch (cause) {
+    if (
+      cause instanceof ApiError &&
+      cause.status >= 400 &&
+      cause.status < 500
+    ) {
+      throw new AttendanceSaveError("rejected", cause.status);
+    }
+    throw new AttendanceSaveError(
+      "unknown",
+      cause instanceof ApiError ? cause.status : null,
+    );
+  }
 
   return mapAttendanceSessionDetail(response);
 }

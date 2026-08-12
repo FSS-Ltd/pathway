@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, ApiError } from "./client";
 import {
   fetchAttendanceSessionDetail,
   saveAttendanceSession,
@@ -97,4 +97,36 @@ it("sends the exact status DTO and trims correction reasons without inventing an
       }),
     },
   );
+});
+
+it("classifies a 4xx response as a confirmed attendance rejection", async () => {
+  jest
+    .spyOn(apiClient, "request")
+    .mockRejectedValue(new ApiError("validation failed", 422, "{}"));
+
+  await expect(
+    saveAttendanceSession("session/1", [
+      { childId: "child-1", status: "LATE" },
+    ]),
+  ).rejects.toMatchObject({
+    name: "AttendanceSaveError",
+    outcome: "rejected",
+    status: 422,
+  });
+});
+
+it("classifies a transport failure as an unknown attendance outcome", async () => {
+  jest
+    .spyOn(apiClient, "request")
+    .mockRejectedValue(new Error("Connection interrupted."));
+
+  await expect(
+    saveAttendanceSession("session/1", [
+      { childId: "child-1", status: "LATE" },
+    ]),
+  ).rejects.toMatchObject({
+    name: "AttendanceSaveError",
+    outcome: "unknown",
+    status: null,
+  });
 });

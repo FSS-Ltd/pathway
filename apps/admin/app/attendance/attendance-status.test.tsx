@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
+import { AdminAttendanceSaveError } from "../../lib/api-client";
 import { AttendanceRegister } from "./[sessionId]/attendance-register";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -16,6 +17,7 @@ Object.assign(globalThis, {
   Node: dom.window.Node,
   Text: dom.window.Text,
   Event: dom.window.Event,
+  KeyboardEvent: dom.window.KeyboardEvent,
   IS_REACT_ACT_ENVIRONMENT: true,
 });
 Object.defineProperty(globalThis, "navigator", {
@@ -38,13 +40,13 @@ const initialDetail = {
       status: "absent" as const,
     },
     {
-      attendanceId: null,
+      attendanceId: "attendance-2",
       childId: "child-2",
       childName: "Alex Morgan",
-      status: "unknown" as const,
+      status: "present" as const,
     },
   ],
-  summary: { present: 0, absent: 1, late: 0, unknown: 1 },
+  summary: { present: 1, absent: 1, late: 0, unknown: 0 },
   status: "in_progress" as const,
 };
 
@@ -52,9 +54,9 @@ const correctedDetail = {
   ...initialDetail,
   rows: [
     { ...initialDetail.rows[0], status: "late" as const },
-    initialDetail.rows[1],
+    { ...initialDetail.rows[1], status: "absent" as const },
   ],
-  summary: { present: 0, absent: 0, late: 1, unknown: 1 },
+  summary: { present: 0, absent: 1, late: 1, unknown: 0 },
 };
 
 type Root = { render: (node: React.ReactNode) => void; unmount: () => void };
@@ -89,6 +91,17 @@ async function change(control: HTMLInputElement, value: string): Promise<void> {
   });
 }
 
+async function pressArrow(
+  control: HTMLButtonElement,
+  key: "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown",
+): Promise<void> {
+  await act(async () => {
+    control.dispatchEvent(
+      new dom.window.KeyboardEvent("keydown", { key, bubbles: true }),
+    );
+  });
+}
+
 async function run(): Promise<void> {
   const { createRoot } = await import("react-dom/client");
   const container = document.createElement("div");
@@ -105,7 +118,9 @@ async function run(): Promise<void> {
         onSave={async (rows) => {
           submissions.push(rows);
           saveAttempt += 1;
-          if (saveAttempt === 1) throw new Error("Connection interrupted.");
+          if (saveAttempt === 1) {
+            throw new AdminAttendanceSaveError("rejected", 422);
+          }
           return correctedDetail;
         }}
       />,
@@ -124,9 +139,33 @@ async function run(): Promise<void> {
     assert.match(late.textContent ?? "", /Late/);
     assert.ok(late.querySelector("svg"), "Late includes a non-colour icon cue");
 
-    await click(
-      element<HTMLButtonElement>(container, "#attendance-child-1-absent"),
+    const absent = element<HTMLButtonElement>(
+      container,
+      "#attendance-child-1-absent",
     );
+    assert.equal(absent.tabIndex, 0, "the selected radio is the tab stop");
+    assert.equal(late.tabIndex, -1, "unselected radios leave the tab order");
+    absent.focus();
+    await pressArrow(absent, "ArrowRight");
+    assert.equal(
+      document.activeElement,
+      late,
+      "ArrowRight moves focus to the next radio",
+    );
+    assert.equal(
+      late.getAttribute("aria-checked"),
+      "true",
+      "ArrowRight selects the focused radio",
+    );
+    await pressArrow(late, "ArrowUp");
+    assert.equal(
+      document.activeElement,
+      absent,
+      "ArrowUp wraps focus to the previous radio",
+    );
+    assert.equal(absent.getAttribute("aria-checked"), "true");
+
+    await click(absent);
     assert.equal(
       container.querySelector("#attendance-correction-reason-child-1"),
       null,
@@ -165,12 +204,25 @@ async function run(): Promise<void> {
     );
     assert.equal(reason.required, true);
     await change(reason, "  Arrived after the register closed  ");
+    await click(
+      element<HTMLButtonElement>(container, "#attendance-child-2-absent"),
+    );
+    const secondReason = element<HTMLInputElement>(
+      container,
+      "#attendance-correction-reason-child-2",
+    );
+    await change(secondReason, "  Marked against the wrong learner  ");
     await click(save);
     assert.deepEqual(submissions[0], [
       {
         childId: "child-1",
         status: "LATE",
         correctionReason: "Arrived after the register closed",
+      },
+      {
+        childId: "child-2",
+        status: "ABSENT",
+        correctionReason: "Marked against the wrong learner",
       },
     ]);
     assert.match(
@@ -179,6 +231,8 @@ async function run(): Promise<void> {
     );
     assert.equal(late.getAttribute("aria-checked"), "true");
     assert.equal(reason.value, "  Arrived after the register closed  ");
+    assert.match(container.textContent ?? "", /Pending: Absent/);
+    assert.equal(secondReason.value, "  Marked against the wrong learner  ");
 
     await click(element<HTMLButtonElement>(container, "#attendance-retry"));
     assert.deepEqual(submissions[1], submissions[0]);
@@ -189,26 +243,86 @@ async function run(): Promise<void> {
       "shows the returned server state after retry succeeds",
     );
     assert.equal(container.textContent?.includes("Pending: Late"), false);
+    assert.equal(container.textContent?.includes("Pending: Absent"), false);
     assert.match(
       element<HTMLElement>(container, "#attendance-summary-late").textContent ??
         "",
       /1/,
     );
 
+    let reconciliations = 0;
+    await render(
+      root,
+      <AttendanceRegister
+        key="network-commit"
+        detail={initialDetail}
+        onReconcile={async () => {
+          reconciliations += 1;
+          return {
+            ...initialDetail,
+            rows: [
+              { ...initialDetail.rows[0], status: "late" as const },
+              initialDetail.rows[1],
+            ],
+            summary: { present: 1, absent: 0, late: 1, unknown: 0 },
+          };
+        }}
+        onSave={async () => {
+          throw new AdminAttendanceSaveError("unknown", null);
+        }}
+      />,
+    );
+    await click(
+      element<HTMLButtonElement>(container, "#attendance-child-1-late"),
+    );
+    await change(
+      element<HTMLInputElement>(
+        container,
+        "#attendance-correction-reason-child-1",
+      ),
+      "Network ended after submit",
+    );
+    await click(element<HTMLButtonElement>(container, "#attendance-save"));
+    assert.equal(reconciliations, 1, "unknown outcomes trigger one GET");
+    assert.doesNotMatch(
+      container.textContent ?? "",
+      /No attendance changes were saved/,
+      "unknown outcomes never claim the batch was rejected",
+    );
+    assert.match(container.textContent ?? "", /confirmed after refreshing/i);
+    assert.match(
+      element<HTMLElement>(container, "#attendance-saved-child-1")
+        .textContent ?? "",
+      /Saved: Late/,
+    );
+    assert.equal(container.textContent?.includes("Pending: Late"), false);
+
     const initialMarks: unknown[] = [];
+    const unmarkedDetail = {
+      ...initialDetail,
+      rows: [
+        initialDetail.rows[0],
+        {
+          ...initialDetail.rows[1],
+          attendanceId: null,
+          status: "unknown" as const,
+        },
+      ],
+      summary: { present: 0, absent: 1, late: 0, unknown: 1 },
+    };
     await render(
       root,
       <AttendanceRegister
         key="initial-mark"
-        detail={initialDetail}
+        detail={unmarkedDetail}
         onSave={async (rows) => {
           initialMarks.push(rows);
           return {
-            ...initialDetail,
+            ...unmarkedDetail,
             rows: [
-              initialDetail.rows[0],
+              unmarkedDetail.rows[0],
               {
-                ...initialDetail.rows[1],
+                ...unmarkedDetail.rows[1],
                 attendanceId: "attendance-2",
                 status: "present" as const,
               },
@@ -217,6 +331,12 @@ async function run(): Promise<void> {
           };
         }}
       />,
+    );
+    assert.equal(
+      element<HTMLButtonElement>(container, "#attendance-child-2-present")
+        .tabIndex,
+      0,
+      "an unmarked group exposes its first radio as the tab stop",
     );
     await click(
       element<HTMLButtonElement>(container, "#attendance-child-2-present"),

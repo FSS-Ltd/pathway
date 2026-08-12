@@ -13,6 +13,7 @@ import { mobileTokens } from "@/design/tokens";
 import {
   fetchAttendanceSessionDetail,
   saveAttendanceSession,
+  AttendanceSaveError,
   type AttendanceRegisterStatus,
   type AttendanceSessionDetail,
   type SaveAttendanceRow,
@@ -41,8 +42,10 @@ export function AttendanceScreen() {
   const [isNotFound, setIsNotFound] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [needsReconciliation, setNeedsReconciliation] = useState(false);
   const submissionGate = useRef(false);
+  const uncertainRowsRef = useRef<SaveAttendanceRow[] | null>(null);
 
   const loadSession = useCallback(async () => {
     if (!sessionId) {
@@ -65,7 +68,9 @@ export function AttendanceScreen() {
       setReasons({});
       setValidation({});
       setSaveError(null);
-      setSaveSuccess(false);
+      setSaveSuccess(null);
+      setNeedsReconciliation(false);
+      uncertainRowsRef.current = null;
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 404) {
         setIsNotFound(true);
@@ -105,8 +110,40 @@ export function AttendanceScreen() {
     setDraftStatus((current) => ({ ...current, [childId]: status }));
     setValidation((current) => ({ ...current, [childId]: "" }));
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
   }, []);
+
+  const reconcileUnknownOutcome = useCallback(
+    async (payload: SaveAttendanceRow[]) => {
+      if (!sessionId) return;
+      try {
+        const updated = await fetchAttendanceSessionDetail(sessionId);
+        setDetail(updated);
+        if (hasAppliedRows(updated, payload)) {
+          setDraftStatus(statusMap(updated));
+          setReasons({});
+          setValidation({});
+          setSaveError(null);
+          setSaveSuccess(
+            "Attendance was confirmed after refreshing the server register.",
+          );
+        } else {
+          setSaveError(
+            "The save response was interrupted. The latest server register was loaded and your pending choices were preserved. Review them before retrying.",
+          );
+        }
+        uncertainRowsRef.current = null;
+        setNeedsReconciliation(false);
+      } catch {
+        uncertainRowsRef.current = payload;
+        setNeedsReconciliation(true);
+        setSaveError(
+          "The save response was interrupted, so the outcome is unknown. Check the server register before retrying.",
+        );
+      }
+    },
+    [sessionId],
+  );
 
   const save = useCallback(async () => {
     if (!sessionId || submissionGate.current || changes.length === 0) return;
@@ -129,23 +166,42 @@ export function AttendanceScreen() {
     submissionGate.current = true;
     setIsSaving(true);
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
     try {
       const updated = await saveAttendanceSession(sessionId, payload);
       setDetail(updated);
       setDraftStatus(statusMap(updated));
       setReasons({});
       setValidation({});
-      setSaveSuccess(true);
-    } catch {
-      setSaveError(
-        "No attendance changes were saved. Check the register and retry.",
-      );
+      setNeedsReconciliation(false);
+      uncertainRowsRef.current = null;
+      setSaveSuccess("Attendance saved from the server response.");
+    } catch (cause) {
+      if (
+        cause instanceof AttendanceSaveError &&
+        cause.outcome === "rejected"
+      ) {
+        setSaveError(
+          "No attendance changes were saved. Check the register and retry.",
+        );
+      } else {
+        await reconcileUnknownOutcome(payload);
+      }
     } finally {
       submissionGate.current = false;
       setIsSaving(false);
     }
-  }, [changes, reasons, sessionId]);
+  }, [changes, reasons, reconcileUnknownOutcome, sessionId]);
+
+  const checkServerStatus = useCallback(async () => {
+    const payload = uncertainRowsRef.current;
+    if (!payload || submissionGate.current) return;
+    submissionGate.current = true;
+    setIsSaving(true);
+    await reconcileUnknownOutcome(payload);
+    submissionGate.current = false;
+    setIsSaving(false);
+  }, [reconcileUnknownOutcome]);
 
   const markAllPresent = useCallback(() => {
     setDraftStatus((current) => {
@@ -156,7 +212,7 @@ export function AttendanceScreen() {
       return next;
     });
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
   }, [rows]);
 
   const reset = useCallback(() => {
@@ -165,7 +221,7 @@ export function AttendanceScreen() {
     setReasons({});
     setValidation({});
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
   }, [detail]);
 
   const title = detail?.session.title ?? sessionDetail?.title ?? "Session";
@@ -277,7 +333,7 @@ export function AttendanceScreen() {
                     childName={row.childName}
                     correctionError={validation[row.childId]}
                     correctionReason={reasons[row.childId] ?? ""}
-                    disabled={isSaving}
+                    disabled={isSaving || needsReconciliation}
                     key={row.childId}
                     onChangeCorrectionReason={(value) => {
                       setReasons((current) => ({
@@ -320,8 +376,12 @@ export function AttendanceScreen() {
                 </Text>
                 <StandardButton
                   disabled={isSaving}
-                  label="Retry save"
-                  onPress={() => void save()}
+                  label={
+                    needsReconciliation ? "Check server status" : "Retry save"
+                  }
+                  onPress={() =>
+                    void (needsReconciliation ? checkServerStatus() : save())
+                  }
                   size="medium"
                   tone="serve"
                   variant="white"
@@ -330,12 +390,12 @@ export function AttendanceScreen() {
             ) : null}
             {saveSuccess ? (
               <Text accessibilityLiveRegion="polite" style={styles.successText}>
-                Attendance saved from the server response.
+                {saveSuccess}
               </Text>
             ) : null}
             <View style={styles.actionRow}>
               <StandardButton
-                disabled={isSaving || rows.length === 0}
+                disabled={isSaving || needsReconciliation || rows.length === 0}
                 label="Mark all present"
                 multiline
                 onPress={markAllPresent}
@@ -345,7 +405,9 @@ export function AttendanceScreen() {
                 variant="primary"
               />
               <StandardButton
-                disabled={isSaving || changes.length === 0}
+                disabled={
+                  isSaving || needsReconciliation || changes.length === 0
+                }
                 label="Reset changes"
                 multiline
                 onPress={reset}
@@ -356,7 +418,7 @@ export function AttendanceScreen() {
               />
             </View>
             <StandardButton
-              disabled={isSaving || changes.length === 0}
+              disabled={isSaving || needsReconciliation || changes.length === 0}
               label={isSaving ? "Saving register…" : "Save register"}
               multiline
               onPress={() => void save()}
@@ -397,6 +459,19 @@ function toApiStatus(status: MarkedStatus): SaveAttendanceRow["status"] {
   if (status === "present") return "PRESENT";
   if (status === "absent") return "ABSENT";
   return "LATE";
+}
+
+function hasAppliedRows(
+  detail: AttendanceSessionDetail,
+  rows: SaveAttendanceRow[],
+): boolean {
+  const statuses = new Map(
+    detail.childStatusRows.map((row) => [
+      row.childId,
+      row.status === "unknown" ? null : toApiStatus(row.status),
+    ]),
+  );
+  return rows.every((row) => statuses.get(row.childId) === row.status);
 }
 
 function formatSessionDateTime(startsAt?: string, endsAt?: string): string {

@@ -10,9 +10,10 @@ import {
   type ColumnDef,
   Input,
 } from "@pathway/ui";
-import type {
-  AdminAttendanceDetail,
-  SaveAttendanceRow,
+import {
+  AdminAttendanceSaveError,
+  type AdminAttendanceDetail,
+  type SaveAttendanceRow,
 } from "../../../lib/api-client";
 import { getInitials } from "../../../lib/names";
 import {
@@ -48,12 +49,14 @@ const PROGRESS_TONE: Record<
 type AttendanceRegisterProps = {
   detail: AdminAttendanceDetail;
   onSave: (rows: SaveAttendanceRow[]) => Promise<AdminAttendanceDetail>;
+  onReconcile?: () => Promise<AdminAttendanceDetail>;
   onRefresh?: () => Promise<void> | void;
 };
 
 export function AttendanceRegister({
   detail,
   onSave,
+  onReconcile,
   onRefresh,
 }: AttendanceRegisterProps) {
   const [authoritative, setAuthoritative] =
@@ -67,13 +70,15 @@ export function AttendanceRegister({
   );
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = React.useState(false);
+  const [saveSuccess, setSaveSuccess] = React.useState<string | null>(null);
+  const [needsReconciliation, setNeedsReconciliation] = React.useState(false);
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | AttendanceDisplayStatus
   >("all");
   const [childSearch, setChildSearch] = React.useState("");
   const successRef = React.useRef<HTMLDivElement>(null);
   const submissionGate = React.useRef(false);
+  const uncertainRowsRef = React.useRef<SaveAttendanceRow[] | null>(null);
   const detailVersion = React.useMemo(
     () =>
       detail.rows
@@ -88,7 +93,9 @@ export function AttendanceRegister({
     setReasons({});
     setValidation({});
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
+    setNeedsReconciliation(false);
+    uncertainRowsRef.current = null;
   }, [detail, detailVersion]);
 
   React.useEffect(() => {
@@ -115,7 +122,7 @@ export function AttendanceRegister({
       });
       setValidation((current) => ({ ...current, [childId]: "" }));
       setSaveError(null);
-      setSaveSuccess(false);
+      setSaveSuccess(null);
     },
     [],
   );
@@ -127,7 +134,7 @@ export function AttendanceRegister({
       return next;
     });
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
   }, [authoritative.rows]);
 
   const resetChanges = React.useCallback(() => {
@@ -135,8 +142,48 @@ export function AttendanceRegister({
     setReasons({});
     setValidation({});
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
   }, [authoritative]);
+
+  const reconcileUnknownOutcome = React.useCallback(
+    async (rows: SaveAttendanceRow[]) => {
+      if (!onReconcile) {
+        uncertainRowsRef.current = rows;
+        setNeedsReconciliation(true);
+        setSaveError(
+          "The save response was interrupted, so the outcome is unknown. Check the server register before retrying.",
+        );
+        return;
+      }
+
+      try {
+        const updated = await onReconcile();
+        setAuthoritative(updated);
+        if (hasAppliedRows(updated, rows)) {
+          setDraftStatus(statusMap(updated));
+          setReasons({});
+          setValidation({});
+          setSaveError(null);
+          setSaveSuccess(
+            "Attendance was confirmed after refreshing the server register.",
+          );
+        } else {
+          setSaveError(
+            "The save response was interrupted. The latest server register was loaded and your pending choices were preserved. Review them before retrying.",
+          );
+        }
+        uncertainRowsRef.current = null;
+        setNeedsReconciliation(false);
+      } catch {
+        uncertainRowsRef.current = rows;
+        setNeedsReconciliation(true);
+        setSaveError(
+          "The save response was interrupted, so the outcome is unknown. Check the server register before retrying.",
+        );
+      }
+    },
+    [onReconcile],
+  );
 
   const save = React.useCallback(async () => {
     if (submissionGate.current || changes.length === 0) return;
@@ -160,23 +207,42 @@ export function AttendanceRegister({
     submissionGate.current = true;
     setIsSaving(true);
     setSaveError(null);
-    setSaveSuccess(false);
+    setSaveSuccess(null);
     try {
       const updated = await onSave(rows);
       setAuthoritative(updated);
       setDraftStatus(statusMap(updated));
       setReasons({});
       setValidation({});
-      setSaveSuccess(true);
-    } catch {
-      setSaveError(
-        "No attendance changes were saved. Check the register and retry.",
-      );
+      setNeedsReconciliation(false);
+      uncertainRowsRef.current = null;
+      setSaveSuccess("Attendance saved from the server response.");
+    } catch (cause) {
+      if (
+        cause instanceof AdminAttendanceSaveError &&
+        cause.outcome === "rejected"
+      ) {
+        setSaveError(
+          "No attendance changes were saved. Check the register and retry.",
+        );
+      } else {
+        await reconcileUnknownOutcome(rows);
+      }
     } finally {
       submissionGate.current = false;
       setIsSaving(false);
     }
-  }, [changes, onSave, reasons]);
+  }, [changes, onSave, reasons, reconcileUnknownOutcome]);
+
+  const checkServerStatus = React.useCallback(async () => {
+    const rows = uncertainRowsRef.current;
+    if (!rows || submissionGate.current) return;
+    submissionGate.current = true;
+    setIsSaving(true);
+    await reconcileUnknownOutcome(rows);
+    submissionGate.current = false;
+    setIsSaving(false);
+  }, [reconcileUnknownOutcome]);
 
   const columns = React.useMemo<ColumnDef<AttendanceDisplayRow>[]>(
     () => [
@@ -197,7 +263,7 @@ export function AttendanceRegister({
           const selected = draftStatus.get(row.childId) ?? row.status;
           return (
             <AttendanceStatusControls
-              disabled={isSaving}
+              disabled={isSaving || needsReconciliation}
               onReasonChange={(value) => {
                 setReasons((current) => ({
                   ...current,
@@ -220,7 +286,14 @@ export function AttendanceRegister({
         width: "520px",
       },
     ],
-    [draftStatus, isSaving, reasons, selectStatus, validation],
+    [
+      draftStatus,
+      isSaving,
+      needsReconciliation,
+      reasons,
+      selectStatus,
+      validation,
+    ],
   );
 
   const filteredRows = React.useMemo(() => {
@@ -264,7 +337,7 @@ export function AttendanceRegister({
               {onRefresh ? (
                 <Button
                   className="min-h-11"
-                  disabled={isSaving}
+                  disabled={isSaving || needsReconciliation}
                   onClick={() => void onRefresh()}
                   type="button"
                   variant="secondary"
@@ -274,7 +347,9 @@ export function AttendanceRegister({
               ) : null}
               <Button
                 className="min-h-11"
-                disabled={changes.length === 0 || isSaving}
+                disabled={
+                  changes.length === 0 || isSaving || needsReconciliation
+                }
                 id="attendance-save"
                 onClick={() => void save()}
                 type="button"
@@ -293,7 +368,7 @@ export function AttendanceRegister({
           role="status"
           tabIndex={-1}
         >
-          Attendance saved from the server response.
+          {saveSuccess}
         </div>
       ) : null}
       {saveError ? (
@@ -307,11 +382,13 @@ export function AttendanceRegister({
             className="mt-3 min-h-11"
             disabled={isSaving}
             id="attendance-retry"
-            onClick={() => void save()}
+            onClick={() =>
+              void (needsReconciliation ? checkServerStatus() : save())
+            }
             type="button"
             variant="secondary"
           >
-            Retry save
+            {needsReconciliation ? "Check server status" : "Retry save"}
           </Button>
         </div>
       ) : null}
@@ -360,7 +437,7 @@ export function AttendanceRegister({
           />
           <Button
             className="min-h-11"
-            disabled={isSaving}
+            disabled={isSaving || needsReconciliation}
             onClick={markAllPresent}
             type="button"
             variant="outline"
@@ -369,7 +446,7 @@ export function AttendanceRegister({
           </Button>
           <Button
             className="min-h-11 gap-2"
-            disabled={changes.length === 0 || isSaving}
+            disabled={changes.length === 0 || isSaving || needsReconciliation}
             onClick={resetChanges}
             type="button"
             variant="outline"
@@ -429,4 +506,17 @@ function AttendanceChildCell({
 
 function statusMap(detail: AdminAttendanceDetail) {
   return new Map(detail.rows.map((row) => [row.childId, row.status]));
+}
+
+function hasAppliedRows(
+  detail: AdminAttendanceDetail,
+  rows: SaveAttendanceRow[],
+): boolean {
+  const statuses = new Map(
+    detail.rows.map((row) => [
+      row.childId,
+      row.status === "unknown" ? null : API_STATUS[row.status],
+    ]),
+  );
+  return rows.every((row) => statuses.get(row.childId) === row.status);
 }
