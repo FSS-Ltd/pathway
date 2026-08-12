@@ -17,10 +17,12 @@ import {
   behaviourClientLockKey,
   behaviourCommandFingerprint,
   behaviourEntryCommandSelect,
+  behaviourEntryReplayMetadataSelect,
   behaviourIdempotencyConflict,
   toBehaviourEntryResponse,
   type BehaviourEntryCommand,
   type BehaviourEntryRecord,
+  type BehaviourEntryReplayMetadata,
 } from "./behaviour-entry.support";
 import type {
   BehaviourCorrectionDto,
@@ -106,18 +108,22 @@ export class BehaviourCommandService {
             command.idempotencyKey,
           );
 
-          const replay = (await tx.behaviourEntry.findFirst({
+          const replayMetadata = (await tx.behaviourEntry.findFirst({
             where: { tenantId: actor.tenantId, clientCommandKeyHash },
-            select: behaviourEntryCommandSelect,
-          })) as BehaviourEntryRecord | null;
-          if (replay) {
-            if (replay.commandFingerprint !== commandFingerprint) {
+            select: behaviourEntryReplayMetadataSelect,
+          })) as BehaviourEntryReplayMetadata | null;
+          if (replayMetadata) {
+            if (replayMetadata.commandFingerprint !== commandFingerprint) {
               throw behaviourIdempotencyConflict();
             }
             this.requireSensitivePermission(
-              replay.visibility,
+              replayMetadata.visibility,
               canReadSensitive,
             );
+            const replay = (await tx.behaviourEntry.findFirstOrThrow({
+              where: { id: replayMetadata.id, tenantId: actor.tenantId },
+              select: behaviourEntryCommandSelect,
+            })) as BehaviourEntryRecord;
             return {
               entry: toBehaviourEntryResponse(replay),
               duplicate: true,
@@ -206,6 +212,8 @@ export class BehaviourCommandService {
               payload: {
                 behaviourEntryId: entry.id,
                 childId: entry.childId,
+                tenantId: actor.tenantId,
+                orgId: actor.orgId,
                 pointsDelta: meritPointsDelta,
                 correctsBehaviourEntryId: entry.correctsBehaviourEntryId,
               },

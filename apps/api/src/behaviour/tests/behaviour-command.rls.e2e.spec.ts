@@ -228,6 +228,8 @@ describe("ACE behaviour command database boundary", () => {
     expect(reversalIntent.payload).toEqual({
       behaviourEntryId: reversal.entry.id,
       childId: fixture.childAId,
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgId,
       pointsDelta: -3,
       correctsBehaviourEntryId: results[0]!.entry.id,
     });

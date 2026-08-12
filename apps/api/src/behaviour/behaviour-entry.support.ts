@@ -29,6 +29,18 @@ export interface BehaviourEntryRecord {
   createdAt: Date;
 }
 
+export interface BehaviourEntryReplayMetadata {
+  id: string;
+  visibility: "GENERAL" | "SENSITIVE";
+  commandFingerprint: string | null;
+}
+
+export const behaviourEntryReplayMetadataSelect = {
+  id: true,
+  visibility: true,
+  commandFingerprint: true,
+} satisfies Prisma.BehaviourEntrySelect;
+
 export const behaviourEntryCommandSelect = {
   id: true,
   childId: true,

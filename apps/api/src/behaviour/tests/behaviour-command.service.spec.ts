@@ -99,6 +99,7 @@ function transaction() {
     behaviourCategory: { aggregate: jest.fn(), findFirst: jest.fn() },
     behaviourEntry: {
       findFirst: jest.fn(),
+      findFirstOrThrow: jest.fn(),
       findMany: jest.fn(),
       create: jest.fn(),
     },
@@ -142,6 +143,7 @@ function arrange(options: { sensitive?: boolean } = {}) {
     isSerious: false,
   });
   tx.behaviourEntry.findFirst.mockResolvedValue(null);
+  tx.behaviourEntry.findFirstOrThrow.mockResolvedValue(entry());
   tx.behaviourEntry.findMany.mockResolvedValue([]);
   tx.behaviourEntry.create.mockResolvedValue(entry());
   tx.auditEvent.create.mockResolvedValue({});
@@ -281,6 +283,8 @@ describe("BehaviourCommandService", () => {
           payload: {
             behaviourEntryId: "entry-1",
             childId,
+            tenantId: actor.tenantId,
+            orgId: actor.orgId,
             pointsDelta: 3,
             correctsBehaviourEntryId: null,
           },
@@ -419,6 +423,22 @@ describe("BehaviourCommandService", () => {
     await expect(
       commandService.record(command(), actor),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tx.behaviourEntry.findFirst).toHaveBeenCalledTimes(1);
+    expect(tx.behaviourEntry.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        clientCommandKeyHash: behaviourClientCommandKeyHash(
+          actor.tenantId,
+          command().idempotencyKey,
+        ),
+      },
+      select: {
+        id: true,
+        visibility: true,
+        commandFingerprint: true,
+      },
+    });
+    expect(tx.behaviourEntry.findFirstOrThrow).not.toHaveBeenCalled();
   });
 
   it("records a complete correction only for a terminal predecessor under the same child and tenant", async () => {
@@ -531,6 +551,8 @@ describe("BehaviourCommandService", () => {
           payload: {
             behaviourEntryId: "correction-1",
             childId,
+            tenantId: actor.tenantId,
+            orgId: actor.orgId,
             pointsDelta: -3,
             correctsBehaviourEntryId: originalId,
           },
