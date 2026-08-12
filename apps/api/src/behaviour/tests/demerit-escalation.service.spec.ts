@@ -267,6 +267,46 @@ describe("DemeritEscalationService", () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it("creates a head review for each distinct serious misconduct fact", async () => {
+    const { tx, events } = transaction({
+      priorEntries: [
+        {
+          pointsDelta: -1,
+          occurredAt: new Date("2026-08-11T09:00:00.000Z"),
+          categoryIsSerious: true,
+        },
+      ],
+      reviewerUserIds: ["head-1"],
+    });
+    const { escalation } = service();
+
+    const result = await escalation.createIntents(tx as never, {
+      actor,
+      entry: behaviourEntry({
+        id: "distinct-serious-entry",
+        categoryIsSerious: true,
+        note: "Required restricted context",
+      }),
+      predecessor: null,
+      timezone: "Europe/London",
+      now,
+    });
+
+    expect(result).toEqual({
+      stage: 3,
+      action: "head-review",
+      policyVersion: 3,
+      createdIntentCount: 1,
+    });
+    expect([...events.values()]).toEqual([
+      expect.objectContaining({
+        aggregateId: "distinct-serious-entry",
+        eventType: "behaviour.review-requested",
+        payload: expect.objectContaining({ reviewKind: "HEAD" }),
+      }),
+    ]);
+  });
+
   it("notifies guardians when a correction changes head review to notification", async () => {
     const { tx, events } = transaction();
     const { escalation } = service();

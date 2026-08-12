@@ -109,10 +109,10 @@ export class DemeritEscalationService {
       );
     }
 
-    const seriousnessIntroduced =
-      !previousSummary.hasSeriousMisconduct &&
-      currentSummary.hasSeriousMisconduct;
-    if (!seriousnessIntroduced && current.action === previous.action) {
+    const seriousnessIntroducedByFact =
+      input.entry.categoryIsSerious === true &&
+      input.predecessor?.categoryIsSerious !== true;
+    if (!seriousnessIntroducedByFact && current.action === previous.action) {
       return {
         stage: current.stage,
         action: current.action,
