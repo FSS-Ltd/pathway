@@ -57,6 +57,14 @@ const navItemsWithAccess: (SidebarNavItem & {
   { ...defaultSidebarItems[4], access: "staff-or-admin", group: "Teaching" }, // Lessons
   { ...defaultSidebarItems[5], access: "site-admin-or-higher", group: "Teaching" }, // Classes (admins only)
   { label: "Learning", href: "/learning", iconIndex: 20, access: "staff-or-admin", capability: "learning.log.read", group: "Teaching" },
+  {
+    label: "PACE",
+    href: "/ace/pace",
+    iconIndex: 22,
+    access: "staff-or-admin",
+    permission: "ace.pace.read",
+    group: "Teaching",
+  },
   { ...defaultSidebarItems[6], access: "staff-or-admin", group: "Schedule" }, // Sessions & Rota
   { ...defaultSidebarItems[7], access: "staff-or-admin", group: "Schedule" }, // My schedule
   { ...defaultSidebarItems[8], access: "staff-or-admin", permission: "attendance.read", group: "Schedule" }, // Attendance
@@ -83,6 +91,7 @@ const titleMap: Record<string, string> = {
   "/parents": "Parents & Guardians",
   "/lessons": "Lessons",
   "/learning": "Learning",
+  "/ace/pace": "PACE workflow",
   "/classes": "Classes",
   "/sessions": "Sessions & Rota",
   "/my-schedule": "My schedule",
@@ -125,7 +134,6 @@ const BrandMark = ({ logoUrl, alt }: { logoUrl?: string | null; alt: string }) =
 
   if (logoUrl && !broken) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={logoUrl}
         alt={alt}
@@ -250,7 +258,9 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
 
     // Check if this is a first-time login
     // We'll check the session for a flag or check if name/displayName are missing
-    const user = session.user as any;
+    const user = session.user as typeof session.user & {
+      displayName?: string;
+    };
     const needsOnboarding =
       !user.name?.trim() ||
       (!user.displayName?.trim() && user.email === user.displayName);
