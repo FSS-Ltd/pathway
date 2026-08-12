@@ -24,6 +24,24 @@ const event = {
   claimedAt: null,
 };
 
+const behaviourNotificationEvent = {
+  ...event,
+  aggregateType: "BEHAVIOUR_ENTRY",
+  aggregateId: "entry-1",
+  eventType: "behaviour.guardian-notification.requested",
+  payload: {
+    behaviourEntryId: "entry-1",
+    childId: "child-1",
+    tenantId: "tenant-1",
+    orgId: "org-1",
+    stage: 2,
+    demeritPolicyVersion: 3,
+    occurredOn: "2026-08-12",
+    recipientUserIds: ["guardian-1"],
+  },
+  idempotencyKey: "behaviour-guardian-notification:entry-1:2",
+};
+
 function createClient(outboxEvent: OutboxEventDelegate): OutboxDispatchClient {
   return {
     findOrgIds: jest.fn().mockResolvedValue(["org-1"]),
@@ -174,9 +192,40 @@ describe("DispatchOutboxJob", () => {
     expect(dispatcher.dispatch).toHaveBeenCalledTimes(1);
   });
 
+  it("returns a failed behaviour notification to durable retry state", async () => {
+    const outboxEvent = {
+      findMany: jest.fn().mockResolvedValue([behaviourNotificationEvent]),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const dispatcher: jest.Mocked<OutboxDispatcher> = {
+      dispatch: jest.fn().mockRejectedValue(new Error("provider unavailable")),
+    };
+    const now = new Date("2026-08-12T12:00:00.000Z");
+
+    await expect(
+      new DispatchOutboxJob(createClient(outboxEvent), dispatcher).run(now),
+    ).resolves.toEqual({
+      dispatched: 0,
+      retried: 1,
+      deadLettered: 0,
+    });
+    expect(outboxEvent.update).toHaveBeenCalledWith({
+      where: { id: behaviourNotificationEvent.id },
+      data: {
+        status: "PENDING",
+        nextAttemptAt: new Date("2026-08-12T12:01:00.000Z"),
+        claimedAt: null,
+        lastError: "provider unavailable",
+      },
+    });
+  });
+
   it("dead-letters the fifth failed delivery attempt", async () => {
     const outboxEvent = {
-      findMany: jest.fn().mockResolvedValue([{ ...event, attempts: 4 }]),
+      findMany: jest
+        .fn()
+        .mockResolvedValue([{ ...behaviourNotificationEvent, attempts: 4 }]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       update: jest.fn().mockResolvedValue(undefined),
     };
