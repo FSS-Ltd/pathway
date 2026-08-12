@@ -1,4 +1,7 @@
-import { HttpOutboxDispatcher } from "../outbox-http-dispatcher";
+import {
+  HttpOutboxDispatcher,
+  loadBehaviourOutboxEndpoint,
+} from "../outbox-http-dispatcher";
 
 describe("HttpOutboxDispatcher", () => {
   const fetchMock = jest.fn();
@@ -10,11 +13,14 @@ describe("HttpOutboxDispatcher", () => {
   });
 
   it("routes guardian notifications to the API delivery endpoint with the stable outbox key", async () => {
-    const dispatcher = new HttpOutboxDispatcher(
-      "https://api.example.test/",
-      "dispatch-token",
-      "internal-secret",
-    );
+    const dispatcher = new HttpOutboxDispatcher({
+      genericUrl: "https://dispatch.example.test/events",
+      genericToken: "dispatch-token",
+      behaviour: {
+        url: "https://api.example.test/internal/outbox/behaviour",
+        secret: "behaviour-secret",
+      },
+    });
     const intent = {
       aggregateType: "BEHAVIOUR_ENTRY",
       aggregateId: "entry-1",
@@ -32,8 +38,7 @@ describe("HttpOutboxDispatcher", () => {
         headers: {
           "content-type": "application/json",
           "idempotency-key": intent.idempotencyKey,
-          authorization: "Bearer dispatch-token",
-          "x-pathway-internal-secret": "internal-secret",
+          "x-pathway-internal-secret": "behaviour-secret",
         },
         body: JSON.stringify(intent),
       },
@@ -42,7 +47,13 @@ describe("HttpOutboxDispatcher", () => {
 
   it("surfaces a failed delivery so the outbox job can retry", async () => {
     fetchMock.mockResolvedValue({ ok: false, status: 503 });
-    const dispatcher = new HttpOutboxDispatcher("https://api.example.test");
+    const dispatcher = new HttpOutboxDispatcher({
+      genericUrl: "https://dispatch.example.test/events",
+      behaviour: {
+        url: "https://api.example.test/internal/outbox/behaviour",
+        secret: "behaviour-secret",
+      },
+    });
 
     await expect(
       dispatcher.dispatch({
@@ -56,11 +67,14 @@ describe("HttpOutboxDispatcher", () => {
   });
 
   it("preserves the generic outbox endpoint and does not expose the internal secret", async () => {
-    const dispatcher = new HttpOutboxDispatcher(
-      "https://dispatch.example.test/events",
-      "dispatch-token",
-      "internal-secret",
-    );
+    const dispatcher = new HttpOutboxDispatcher({
+      genericUrl: "https://dispatch.example.test/events",
+      genericToken: "dispatch-token",
+      behaviour: {
+        url: "https://api.example.test/internal/outbox/behaviour",
+        secret: "behaviour-secret",
+      },
+    });
     const intent = {
       aggregateType: "ACE_NOTICE",
       aggregateId: "notice-1",
@@ -81,5 +95,47 @@ describe("HttpOutboxDispatcher", () => {
         },
       }),
     );
+  });
+
+  it("rejects insecure or non-behaviour API endpoints before dispatch", () => {
+    expect(() =>
+      loadBehaviourOutboxEndpoint({
+        BEHAVIOUR_OUTBOX_DISPATCH_URL:
+          "http://api.example.test/internal/outbox/behaviour",
+        BEHAVIOUR_OUTBOX_SECRET: "behaviour-secret",
+      }),
+    ).toThrow("BEHAVIOUR_OUTBOX_DISPATCH_URL must use HTTPS");
+    expect(() =>
+      loadBehaviourOutboxEndpoint({
+        BEHAVIOUR_OUTBOX_DISPATCH_URL: "https://dispatch.example.test/events",
+        BEHAVIOUR_OUTBOX_SECRET: "behaviour-secret",
+      }),
+    ).toThrow(
+      "BEHAVIOUR_OUTBOX_DISPATCH_URL must target /internal/outbox/behaviour",
+    );
+  });
+
+  it("rejects partial behaviour dispatch configuration without blocking an unconfigured generic dispatcher", async () => {
+    expect(() =>
+      loadBehaviourOutboxEndpoint({
+        BEHAVIOUR_OUTBOX_DISPATCH_URL:
+          "https://api.example.test/internal/outbox/behaviour",
+      }),
+    ).toThrow("BEHAVIOUR_OUTBOX_SECRET is required");
+
+    const dispatcher = new HttpOutboxDispatcher({
+      genericUrl: "https://dispatch.example.test/events",
+      behaviour: loadBehaviourOutboxEndpoint({}),
+    });
+    await expect(
+      dispatcher.dispatch({
+        aggregateType: "BEHAVIOUR_ENTRY",
+        aggregateId: "entry-1",
+        eventType: "behaviour.guardian-notification.requested",
+        payload: {},
+        idempotencyKey: "delivery-key",
+      }),
+    ).rejects.toThrow("Behaviour outbox dispatch is not configured");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

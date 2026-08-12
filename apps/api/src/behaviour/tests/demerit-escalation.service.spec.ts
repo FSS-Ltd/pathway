@@ -149,10 +149,12 @@ async function createIntents(options: {
 
 describe("DemeritEscalationService", () => {
   const originalInternalAuthSecret = process.env.INTERNAL_AUTH_SECRET;
+  const originalBehaviourOutboxSecret = process.env.BEHAVIOUR_OUTBOX_SECRET;
 
   beforeEach(() => jest.clearAllMocks());
   afterEach(() => {
     process.env.INTERNAL_AUTH_SECRET = originalInternalAuthSecret;
+    process.env.BEHAVIOUR_OUTBOX_SECRET = originalBehaviourOutboxSecret;
   });
 
   it.each([
@@ -263,6 +265,73 @@ describe("DemeritEscalationService", () => {
         entry: behaviourEntry({ categoryIsSerious: true, note: null }),
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it("notifies guardians when a correction changes head review to notification", async () => {
+    const { tx, events } = transaction();
+    const { escalation } = service();
+
+    const result = await escalation.createIntents(tx as never, {
+      actor,
+      entry: behaviourEntry({
+        id: "correction-1",
+        pointsDelta: -6,
+        categoryIsSerious: false,
+      }),
+      predecessor: {
+        id: "entry-1",
+        type: "DEMERIT",
+        pointsDelta: -10,
+        occurredAt: new Date("2026-08-12T09:30:00.000Z"),
+        categoryIsSerious: true,
+      },
+      timezone: "Europe/London",
+      now,
+    });
+
+    expect(result).toEqual({
+      stage: 2,
+      action: "notify",
+      policyVersion: 3,
+      createdIntentCount: 1,
+    });
+    expect([...events.values()]).toEqual([
+      expect.objectContaining({
+        aggregateId: "correction-1",
+        eventType: "behaviour.guardian-notification.requested",
+      }),
+    ]);
+  });
+
+  it("does not repeat head review when a correction remains serious", async () => {
+    const { tx, events } = transaction();
+    const { escalation } = service();
+
+    const result = await escalation.createIntents(tx as never, {
+      actor,
+      entry: behaviourEntry({
+        id: "correction-1",
+        pointsDelta: -2,
+        categoryIsSerious: true,
+      }),
+      predecessor: {
+        id: "entry-1",
+        type: "DEMERIT",
+        pointsDelta: -1,
+        occurredAt: new Date("2026-08-12T09:30:00.000Z"),
+        categoryIsSerious: true,
+      },
+      timezone: "Europe/London",
+      now,
+    });
+
+    expect(result).toEqual({
+      stage: 3,
+      action: "head-review",
+      policyVersion: 3,
+      createdIntentCount: 0,
+    });
+    expect(events).toHaveProperty("size", 0);
   });
 
   it("uses the site timezone for the cumulative window and applies an active authorised override", async () => {
@@ -453,6 +522,7 @@ describe("DemeritEscalationService", () => {
 
   it("exposes guardian delivery only through the authenticated internal outbox route", async () => {
     process.env.INTERNAL_AUTH_SECRET = "internal-secret";
+    process.env.BEHAVIOUR_OUTBOX_SECRET = "behaviour-secret";
     const { escalation } = service();
     jest.spyOn(escalation, "dispatch").mockResolvedValue({ sent: 1 });
     const controller = new BehaviourOutboxController(escalation);
@@ -462,8 +532,11 @@ describe("DemeritEscalationService", () => {
       UnauthorizedException,
     );
     await expect(
-      controller.dispatch(intent, "internal-secret"),
+      controller.dispatch(intent, "behaviour-secret"),
     ).resolves.toEqual({ sent: 1 });
+    expect(() => controller.dispatch(intent, "internal-secret")).toThrow(
+      UnauthorizedException,
+    );
     expect(escalation.dispatch).toHaveBeenCalledWith(intent);
   });
 });

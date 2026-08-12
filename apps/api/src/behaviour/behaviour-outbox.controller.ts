@@ -18,7 +18,7 @@ export class BehaviourOutboxController {
     @Body() body: unknown,
     @Headers(INTERNAL_SECRET_HEADER) providedSecret?: string,
   ): Promise<{ sent: number }> {
-    const expectedSecret = process.env.INTERNAL_AUTH_SECRET;
+    const expectedSecret = process.env.BEHAVIOUR_OUTBOX_SECRET;
     if (!expectedSecret || providedSecret !== expectedSecret) {
       throw new UnauthorizedException("Invalid internal auth secret");
     }

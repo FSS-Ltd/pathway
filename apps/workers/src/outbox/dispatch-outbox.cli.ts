@@ -1,7 +1,10 @@
 import "dotenv/config";
 import { closePrisma } from "@pathway/db";
 import { createDispatchOutboxJob } from "./dispatch-outbox.job";
-import { HttpOutboxDispatcher } from "./outbox-http-dispatcher";
+import {
+  HttpOutboxDispatcher,
+  loadBehaviourOutboxEndpoint,
+} from "./outbox-http-dispatcher";
 
 async function main(): Promise<void> {
   const url = process.env.OUTBOX_DISPATCH_URL?.trim();
@@ -9,11 +12,11 @@ async function main(): Promise<void> {
     throw new Error("OUTBOX_DISPATCH_URL is required for outbox dispatch");
   }
   const result = await createDispatchOutboxJob(
-    new HttpOutboxDispatcher(
-      url,
-      process.env.OUTBOX_DISPATCH_TOKEN?.trim(),
-      process.env.INTERNAL_AUTH_SECRET?.trim(),
-    ),
+    new HttpOutboxDispatcher({
+      genericUrl: url,
+      genericToken: process.env.OUTBOX_DISPATCH_TOKEN?.trim(),
+      behaviour: loadBehaviourOutboxEndpoint(process.env),
+    }),
   ).run();
   console.log("[outbox] dispatch complete", result);
 }

@@ -20,7 +20,8 @@ jobs:
       RETENTION_ENABLED: ${{ secrets.RETENTION_ENABLED }}
       OUTBOX_DISPATCH_URL: ${{ secrets.OUTBOX_DISPATCH_URL }}
       OUTBOX_DISPATCH_TOKEN: ${{ secrets.OUTBOX_DISPATCH_TOKEN }}
-      INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
+      BEHAVIOUR_OUTBOX_DISPATCH_URL: ${{ secrets.BEHAVIOUR_OUTBOX_DISPATCH_URL }}
+      BEHAVIOUR_OUTBOX_SECRET: ${{ secrets.BEHAVIOUR_OUTBOX_SECRET }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       SUPABASE_STORAGE_PRIVATE_BUCKET: ${{ secrets.SUPABASE_STORAGE_PRIVATE_BUCKET }}
@@ -79,7 +80,8 @@ jobs:
             exit 1
           }
           test -n "$OUTBOX_DISPATCH_URL" || { echo "OUTBOX_DISPATCH_URL secret is required for outbox dispatch." >&2; exit 1; }
-          test -n "$INTERNAL_AUTH_SECRET" || { echo "INTERNAL_AUTH_SECRET is required for behaviour notification dispatch." >&2; exit 1; }
+          test -n "$BEHAVIOUR_OUTBOX_DISPATCH_URL" || { echo "BEHAVIOUR_OUTBOX_DISPATCH_URL secret is required for behaviour notification dispatch." >&2; exit 1; }
+          test -n "$BEHAVIOUR_OUTBOX_SECRET" || { echo "BEHAVIOUR_OUTBOX_SECRET is required for behaviour notification dispatch." >&2; exit 1; }
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --prefer-offline

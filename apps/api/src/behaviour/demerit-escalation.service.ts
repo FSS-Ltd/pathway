@@ -90,14 +90,16 @@ export class DemeritEscalationService {
       input.predecessor,
       window,
     );
+    const previousSummary = summariseDemerits(previousEntries);
+    const currentSummary = summariseDemerits([...priorEntries, input.entry]);
     const previous = evaluateDemeritStage({
       ...toPolicyInput(policy),
-      ...summariseDemerits(previousEntries),
+      ...previousSummary,
       manualStage: override?.stage,
     });
     const current = evaluateDemeritStage({
       ...toPolicyInput(policy),
-      ...summariseDemerits([...priorEntries, input.entry]),
+      ...currentSummary,
       manualStage: override?.stage,
     });
 
@@ -107,8 +109,10 @@ export class DemeritEscalationService {
       );
     }
 
-    const isNewSeriousMisconduct = input.entry.categoryIsSerious === true;
-    if (!isNewSeriousMisconduct && current.stage <= previous.stage) {
+    const seriousnessIntroduced =
+      !previousSummary.hasSeriousMisconduct &&
+      currentSummary.hasSeriousMisconduct;
+    if (!seriousnessIntroduced && current.action === previous.action) {
       return {
         stage: current.stage,
         action: current.action,
