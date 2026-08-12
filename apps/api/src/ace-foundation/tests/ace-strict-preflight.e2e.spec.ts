@@ -14,7 +14,7 @@ describe("ACE strict foundation preflight", () => {
       encoding: "utf8",
     });
 
-    expect(output).toContain("57 tables have explicit");
+    expect(output).toContain("tables have explicit RLS, retention, export");
   });
 
   it("fails when a required control classification is removed", () => {
