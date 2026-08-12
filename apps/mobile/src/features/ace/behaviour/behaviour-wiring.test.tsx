@@ -272,6 +272,9 @@ describe("BehaviourScreen", () => {
     expect(record.mock.calls[1]?.[0].idempotencyKey).not.toBe(
       record.mock.calls[2]?.[0].idempotencyKey,
     );
+    expect(record.mock.calls[1]?.[0].occurredAt).not.toBe(
+      record.mock.calls[2]?.[0].occurredAt,
+    );
     expect(record.mock.calls[2]?.[0].reason).toBe("Helped two learners");
     await waitFor(() =>
       expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
@@ -281,6 +284,52 @@ describe("BehaviourScreen", () => {
         ),
       ),
     );
+  });
+
+  it("reuses the exact command timestamp when retrying without edits", async () => {
+    jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+    jest.setSystemTime(new Date("2026-08-12T09:30:00.000Z"));
+    try {
+      const record = jest
+        .spyOn(behaviourApi, "recordBehaviour")
+        .mockRejectedValueOnce(new Error("Connection interrupted. Try again."))
+        .mockResolvedValueOnce({ entry: historyEntry, duplicate: false });
+      const screen = render(<BehaviourScreen />);
+
+      await waitFor(() => expect(screen.getByText("Jordan Smith")).toBeTruthy());
+      fireEvent.press(screen.getByText("Jordan Smith"));
+      fireEvent.press(screen.getByText("Kindness"));
+      fireEvent.changeText(screen.getByLabelText("Behaviour points"), "2");
+      fireEvent.changeText(
+        screen.getByLabelText("Behaviour reason"),
+        "Helped another learner",
+      );
+      jest.setSystemTime(new Date("2026-08-12T09:30:00.000Z"));
+      fireEvent.press(screen.getByText("Record behaviour"));
+
+      await waitFor(() =>
+        expect(
+          screen.getByText("Connection interrupted. Try again."),
+        ).toBeTruthy(),
+      );
+      jest.setSystemTime(new Date("2026-08-12T09:31:00.000Z"));
+      fireEvent.press(screen.getByText("Record behaviour"));
+      await waitFor(() =>
+        expect(screen.getByText("Behaviour recorded.")).toBeTruthy(),
+      );
+
+      expect(record.mock.calls[0]?.[0].idempotencyKey).toBe(
+        record.mock.calls[1]?.[0].idempotencyKey,
+      );
+      expect(record.mock.calls[0]?.[0].occurredAt).toBe(
+        "2026-08-12T09:30:00.000Z",
+      );
+      expect(record.mock.calls[1]?.[0].occurredAt).toBe(
+        record.mock.calls[0]?.[0].occurredAt,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it("renders loading, error retry, and empty states", async () => {

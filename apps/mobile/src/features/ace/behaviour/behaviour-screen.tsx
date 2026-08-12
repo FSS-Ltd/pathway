@@ -53,6 +53,7 @@ export function BehaviourScreen() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const submitting = useRef(false);
   const commandAttempted = useRef(false);
+  const commandOccurredAt = useRef<string | null>(null);
   const loadRequest = useRef(0);
   const userId =
     bootstrapState.status === "ready" ? bootstrapState.state.userId : undefined;
@@ -117,9 +118,17 @@ export function BehaviourScreen() {
           (item) => item.visibility === "GENERAL" || sensitive,
         ),
       );
-      setDraft((current) =>
-        sanitiseDraft(current, policy.categories, sensitive),
-      );
+      setDraft((current) => {
+        const safeDraft = sanitiseDraft(
+          current,
+          policy.categories,
+          sensitive,
+        );
+        if (safeDraft.idempotencyKey !== current.idempotencyKey) {
+          commandOccurredAt.current = null;
+        }
+        return safeDraft;
+      });
       if (!sensitive) setVisibility("GENERAL");
     } catch (cause) {
       if (request !== loadRequest.current) return;
@@ -150,6 +159,7 @@ export function BehaviourScreen() {
     let mounted = true;
     setHydratedScopeKey(null);
     setIsDraftSanitised(false);
+    commandOccurredAt.current = null;
     setDraft(createEmptyDraft());
     setVisibility("GENERAL");
     if (
@@ -186,6 +196,9 @@ export function BehaviourScreen() {
     }
     const safeDraft = sanitiseDraft(draft, categories, canSensitive);
     if (safeDraft !== draft) {
+      if (safeDraft.idempotencyKey !== draft.idempotencyKey) {
+        commandOccurredAt.current = null;
+      }
       setDraft(safeDraft);
       setIsDraftSanitised(true);
       return;
@@ -223,6 +236,7 @@ export function BehaviourScreen() {
   const editDraft = (update: (current: BehaviourDraft) => BehaviourDraft) => {
     const rotateKey = commandAttempted.current;
     commandAttempted.current = false;
+    if (rotateKey) commandOccurredAt.current = null;
     setDraft((current) => ({
       ...update(current),
       ...(rotateKey ? { idempotencyKey: createCommandKey() } : {}),
@@ -281,6 +295,9 @@ export function BehaviourScreen() {
     setIsSubmitting(true);
     setFeedback(null);
     const note = draft.note.trim();
+    const occurredAt =
+      commandOccurredAt.current ?? new Date().toISOString();
+    commandOccurredAt.current = occurredAt;
     void recordBehaviour({
       idempotencyKey: draft.idempotencyKey,
       childId: draft.childId,
@@ -288,7 +305,7 @@ export function BehaviourScreen() {
       type: category.type,
       visibility: category.visibility,
       pointsDelta: Number(draft.pointsDelta),
-      occurredAt: new Date().toISOString(),
+      occurredAt,
       reason: draft.reason.trim(),
       ...(note ? { note } : {}),
     })
@@ -304,6 +321,7 @@ export function BehaviourScreen() {
           childId: current.childId,
         }));
         commandAttempted.current = false;
+        commandOccurredAt.current = null;
         await load();
       })
       .catch((cause: unknown) => {
