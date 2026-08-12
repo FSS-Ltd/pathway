@@ -791,6 +791,284 @@ async function studentSubjectsRequestError(response: Response): Promise<Error> {
   return new Error(fallback);
 }
 
+export type AdminPaceTrackStatus =
+  | "AHEAD"
+  | "ON_TRACK"
+  | "AT_RISK"
+  | "BEHIND"
+  | "BLOCKED";
+
+export type AdminPacePolicyCode =
+  | "allowed"
+  | "score-below-threshold"
+  | "daily-limit"
+  | "duplicate-self-test"
+  | "same-pace-same-day"
+  | "progression-blocked"
+  | "override-required";
+
+const adminPacePolicyCodes: readonly string[] = [
+  "allowed",
+  "score-below-threshold",
+  "daily-limit",
+  "duplicate-self-test",
+  "same-pace-same-day",
+  "progression-blocked",
+  "override-required",
+];
+
+export type AdminPaceRosterItem = {
+  child: { id: string; displayName: string };
+  group: { id: string; name: string } | null;
+  subject: { id: string; name: string };
+  currentPace: number;
+  targetPace: number;
+  status: AdminPaceTrackStatus | null;
+  currentLevel: number;
+  rebuiltAt: string | null;
+};
+
+export type AdminPaceException =
+  | "ABSENT"
+  | "STALE"
+  | "BLOCKED"
+  | "BEHIND"
+  | "WARNING";
+
+export type AdminPaceExceptionItem = {
+  enrollmentId: string;
+  child: { id: string };
+  subject: { id: string; name: string };
+  currentPace: number;
+  targetPace: number;
+  status: AdminPaceTrackStatus | null;
+  blockCode: string | null;
+  lastAssessmentId: string | null;
+  lastAssessmentOn: string | null;
+  rebuiltAt: string | null;
+  exceptions: AdminPaceException[];
+};
+
+export type AdminPaceRosterResponse = {
+  items: AdminPaceRosterItem[];
+  nextCursor: string | null;
+};
+
+export type AdminPaceExceptionsResponse = {
+  items: AdminPaceExceptionItem[];
+  nextCursor: string | null;
+};
+
+export type AdminPacePolicyResult = {
+  decision: "allow" | "warn" | "block";
+  code: AdminPacePolicyCode;
+  nextPace?: { raw: number; level: number; sequence: number };
+};
+
+export type AdminPaceAssessmentInput = {
+  idempotencyKey: string;
+  childId: string;
+  subjectId: string;
+  paceNumber: number;
+  assessmentType: "SelfTest" | "FinalTest";
+  score: number;
+  assessedAt: string;
+  reason: string;
+  policyOverrideId?: string;
+};
+
+export type AdminPaceCorrectionInput = Omit<
+  AdminPaceAssessmentInput,
+  "idempotencyKey" | "policyOverrideId"
+>;
+
+export type AdminPacePolicyOverrideInput = Omit<
+  AdminPaceAssessmentInput,
+  "policyOverrideId"
+> & {
+  policyCode: "score-below-threshold";
+  expiresAt: string;
+};
+
+export type AdminPaceCommandResponse = {
+  assessment: {
+    id: string;
+    childId: string;
+    subjectId: string;
+    paceNumber: number;
+    assessmentType: "SelfTest" | "FinalTest";
+    score: number;
+    result: "passed" | "failed";
+    assessedOn: string;
+  };
+  progress: {
+    currentPace: number;
+    targetPace: number;
+    completedPaces: number;
+    trackStatus: AdminPaceTrackStatus;
+    blockCode: string | null;
+    lastAssessmentId: string | null;
+    rebuiltAt: string;
+  };
+  policy?: AdminPacePolicyResult;
+  duplicate: boolean;
+};
+
+export type AdminPacePolicyOverride = {
+  id: string;
+  childId: string;
+  subjectId: string;
+  pacePolicyId: string;
+  policyCode: "score-below-threshold";
+  authorisedByUserId: string;
+  expiresAt: string;
+  createdAt: string;
+};
+
+export class AdminPaceApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly policyCode?: AdminPacePolicyCode,
+  ) {
+    super(message);
+    this.name = "AdminPaceApiError";
+  }
+}
+
+export async function fetchPaceRoster(
+  query: {
+    limit?: number;
+    cursor?: string;
+    subjectId?: string;
+    status?: AdminPaceTrackStatus;
+    groupId?: string;
+    search?: string;
+  } = {},
+): Promise<AdminPaceRosterResponse> {
+  if (isUsingMockApi()) return { items: [], nextCursor: null };
+  const response = await fetch(
+    `${API_BASE_URL}/ace/pace/roster${paceQueryString(query)}`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) throw await paceRequestError(response);
+  return response.json() as Promise<AdminPaceRosterResponse>;
+}
+
+export async function fetchPaceExceptions(
+  query: { limit?: number; cursor?: string } = {},
+): Promise<AdminPaceExceptionsResponse> {
+  if (isUsingMockApi()) return { items: [], nextCursor: null };
+  const response = await fetch(
+    `${API_BASE_URL}/ace/pace/exceptions${paceQueryString(query)}`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!response.ok) throw await paceRequestError(response);
+  return response.json() as Promise<AdminPaceExceptionsResponse>;
+}
+
+export async function createPaceAssessment(
+  input: AdminPaceAssessmentInput,
+): Promise<AdminPaceCommandResponse> {
+  return paceCommandRequest("/ace/pace/assessments", input);
+}
+
+export async function correctPaceAssessment(
+  assessmentId: string,
+  input: AdminPaceCorrectionInput,
+): Promise<AdminPaceCommandResponse> {
+  return paceCommandRequest(
+    `/ace/pace/assessments/${encodeURIComponent(assessmentId)}/corrections`,
+    input,
+  );
+}
+
+export async function createPacePolicyOverride(
+  input: AdminPacePolicyOverrideInput,
+): Promise<AdminPacePolicyOverride> {
+  if (isUsingMockApi()) {
+    throw new Error("PACE policy overrides are not available in mock mode.");
+  }
+  const response = await fetch(`${API_BASE_URL}/ace/pace/policy-overrides`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await paceRequestError(response);
+  return response.json() as Promise<AdminPacePolicyOverride>;
+}
+
+async function paceCommandRequest(
+  path: string,
+  input: AdminPaceAssessmentInput | AdminPaceCorrectionInput,
+): Promise<AdminPaceCommandResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("PACE assessments are not available in mock mode.");
+  }
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await paceRequestError(response);
+  return response.json() as Promise<AdminPaceCommandResponse>;
+}
+
+function paceQueryString(query: Record<string, string | number | undefined>) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const encoded = params.toString();
+  return encoded ? `?${encoded}` : "";
+}
+
+async function paceRequestError(
+  response: Response,
+): Promise<AdminPaceApiError> {
+  const fallback = `PACE request failed: ${response.status}`;
+  const body = (await response.json().catch(() => null)) as unknown;
+  if (!isPaceErrorBody(body))
+    return new AdminPaceApiError(fallback, response.status);
+  return new AdminPaceApiError(
+    body.message?.trim() || fallback,
+    response.status,
+    body.code,
+    pacePolicyCode(body.details),
+  );
+}
+
+function isPaceErrorBody(
+  value: unknown,
+): value is { message?: string; code?: string; details?: unknown } {
+  return typeof value === "object" && value !== null;
+}
+
+function pacePolicyCode(value: unknown): AdminPacePolicyCode | undefined {
+  if (typeof value !== "object" || value === null || !("policyCode" in value)) {
+    return undefined;
+  }
+  const policyCode = value.policyCode;
+  return isAdminPacePolicyCode(policyCode) ? policyCode : undefined;
+}
+
+function isAdminPacePolicyCode(value: unknown): value is AdminPacePolicyCode {
+  return typeof value === "string" && adminPacePolicyCodes.includes(value);
+}
+
 /** Get current user id from API (when session.user.id is missing). */
 export async function fetchMe(): Promise<{ userId: string }> {
   if (isUsingMockApi()) {
