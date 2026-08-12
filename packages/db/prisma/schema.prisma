@@ -2770,6 +2770,8 @@ model BehaviourEntry {
   type                     BehaviourType
   visibility               BehaviourVisibility @default(GENERAL)
   category                 String
+  categoryPolicyVersion    Int?
+  categoryIsSerious        Boolean?
   pointsDelta              Int                 @default(0)
   occurredAt               DateTime
   recordedByUserId         String
@@ -2777,6 +2779,8 @@ model BehaviourEntry {
   reason                   String              @db.Text
   note                     String?             @db.Text
   correctsBehaviourEntryId String?
+  clientCommandKeyHash     String?
+  commandFingerprint       String?
   correctsBehaviourEntry   BehaviourEntry?     @relation("BehaviourEntryCorrections", fields: [correctsBehaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict, map: "BehaviourEntry_correction_target_fkey")
   correction               BehaviourEntry?     @relation("BehaviourEntryCorrections")
   createdAt                DateTime            @default(now())
@@ -2784,6 +2788,7 @@ model BehaviourEntry {
   @@unique([id, tenantId])
   @@unique([id, tenantId, childId])
   @@unique([correctsBehaviourEntryId, tenantId, childId], map: "BehaviourEntry_correction_target_key")
+  @@unique([tenantId, clientCommandKeyHash], map: "BehaviourEntry_tenant_client_command_key")
   @@index([tenantId, childId, occurredAt])
   @@index([tenantId, type, occurredAt])
   @@index([tenantId, correctsBehaviourEntryId])
