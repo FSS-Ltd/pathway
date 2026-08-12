@@ -111,7 +111,7 @@ export function ServeBottomNav({
           setRowWidth(event.nativeEvent.layout.width);
         }}
       >
-        {entries.length > 0 && activeIndex >= 0 ? (
+        {!isCompactLargeText && entries.length > 0 && activeIndex >= 0 ? (
           <Animated.View
             pointerEvents="none"
             style={[
@@ -125,6 +125,15 @@ export function ServeBottomNav({
         ) : null}
         {entries.map((entry) => {
           const isFocused = state.routes[state.index]?.key === entry.route.key;
+          const labelStyle = [
+            isFocused ? styles.activeText : styles.inactiveText,
+            isCompactLargeText
+              ? {
+                  lineHeight:
+                    mobileTokens.typography.body.xs.lineHeight * fontScale,
+                }
+              : undefined,
+          ];
           const options = descriptors[entry.route.key]?.options as
             | {
                 tabBarAccessibilityLabel?: string;
@@ -159,6 +168,7 @@ export function ServeBottomNav({
               testID={options?.tabBarButtonTestID}
               style={({ pressed }) => [
                 styles.item,
+                isCompactLargeText ? styles.largeTextItem : undefined,
                 pressed ? styles.pressedItem : undefined,
               ]}
             >
@@ -177,13 +187,7 @@ export function ServeBottomNav({
                       : mobileTokens.colors.text.muted
                   }
                 />
-                <Text
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={isCompactLargeText ? 1 : undefined}
-                  style={isFocused ? styles.activeText : styles.inactiveText}
-                >
-                  {entry.label}
-                </Text>
+                <Text style={labelStyle}>{entry.label}</Text>
               </View>
             </Pressable>
           );
@@ -218,12 +222,18 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   largeTextRow: {
-    minHeight: 64,
+    flexWrap: "wrap",
+    justifyContent: "center",
   },
   item: {
     flex: 1,
     alignItems: "stretch",
     justifyContent: "center",
+  },
+  largeTextItem: {
+    flexBasis: "33.333%",
+    flexGrow: 0,
+    flexShrink: 0,
   },
   tabTile: {
     width: "100%",
@@ -236,7 +246,9 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   largeTextTile: {
-    minHeight: 64,
+    maxWidth: "100%",
+    minHeight: 84,
+    paddingHorizontal: 2,
   },
   activeIndicator: {
     position: "absolute",

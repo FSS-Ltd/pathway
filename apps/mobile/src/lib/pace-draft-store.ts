@@ -27,14 +27,19 @@ export function paceDraftStorageKey(scope: PaceDraftScope): string {
   return `${PACE_DRAFT_KEY_PREFIX}:${encodeURIComponent(scope.userId)}:${encodeURIComponent(scope.siteId)}`;
 }
 
-export function activatePaceDraftScope(scope: PaceDraftScope): void {
-  const state = stateFor(paceDraftStorageKey(scope));
+export function activateAndReadPaceDraft(
+  scope: PaceDraftScope,
+): Promise<string | null> {
+  const key = paceDraftStorageKey(scope);
+  const state = stateFor(key);
   state.generation += 1;
   state.isActive = true;
-}
-
-export function readPaceDraft(scope: PaceDraftScope): Promise<string | null> {
-  return SecureStore.getItemAsync(paceDraftStorageKey(scope));
+  const generation = state.generation;
+  return serialize(key, async () => {
+    const current = stateFor(key);
+    if (!current.isActive || current.generation !== generation) return null;
+    return SecureStore.getItemAsync(key);
+  });
 }
 
 export function writePaceDraft(
@@ -68,9 +73,12 @@ function stateFor(key: string): DraftOperationState {
   return state;
 }
 
-function serialize(key: string, operation: () => Promise<void>): Promise<void> {
+function serialize<T>(key: string, operation: () => Promise<T>): Promise<T> {
   const state = stateFor(key);
   const next = state.queue.catch(() => undefined).then(operation);
-  state.queue = next.catch(() => undefined);
+  state.queue = next.then(
+    () => undefined,
+    () => undefined,
+  );
   return next;
 }

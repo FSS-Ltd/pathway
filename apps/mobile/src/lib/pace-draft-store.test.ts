@@ -1,13 +1,14 @@
 import * as SecureStore from "expo-secure-store";
 
 import {
-  activatePaceDraftScope,
+  activateAndReadPaceDraft,
   clearPaceDraft,
   writePaceDraft,
   type PaceDraftScope,
 } from "./pace-draft-store";
 
 const scope: PaceDraftScope = { userId: "user-1", siteId: "site-1" };
+const secondScope: PaceDraftScope = { userId: "user-1", siteId: "site-2" };
 const storageKey = "ace-pace-draft-v1:user-1:site-1";
 
 function deferred() {
@@ -19,6 +20,7 @@ function deferred() {
 }
 
 beforeEach(() => {
+  jest.spyOn(SecureStore, "getItemAsync").mockResolvedValue(null);
   jest.spyOn(SecureStore, "setItemAsync").mockResolvedValue();
   jest.spyOn(SecureStore, "deleteItemAsync").mockResolvedValue();
 });
@@ -32,7 +34,7 @@ it("does not recreate a cleared draft when an earlier write resolves late", asyn
   jest
     .spyOn(SecureStore, "setItemAsync")
     .mockImplementationOnce(() => pendingWrite.promise);
-  activatePaceDraftScope(scope);
+  await activateAndReadPaceDraft(scope);
 
   const writing = writePaceDraft(scope, "before-logout");
   await Promise.resolve();
@@ -49,4 +51,29 @@ it("does not recreate a cleared draft when an earlier write resolves late", asyn
   expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(storageKey);
   await writePaceDraft(scope, "after-logout");
   expect(SecureStore.setItemAsync).toHaveBeenCalledTimes(1);
+});
+
+it("reads the latest A draft after an A-to-B-to-A reactivation", async () => {
+  const stored = new Map([[storageKey, "stale-A"]]);
+  const pendingLatestWrite = deferred();
+  jest
+    .spyOn(SecureStore, "getItemAsync")
+    .mockImplementation(async (key) => stored.get(key) ?? null);
+  jest
+    .spyOn(SecureStore, "setItemAsync")
+    .mockImplementationOnce(async (key, value) => {
+      await pendingLatestWrite.promise;
+      stored.set(key, value);
+    });
+
+  await activateAndReadPaceDraft(scope);
+  const latestWrite = writePaceDraft(scope, "latest-A");
+  await Promise.resolve();
+  await Promise.resolve();
+  await activateAndReadPaceDraft(secondScope);
+  const restoredDraft = activateAndReadPaceDraft(scope);
+  pendingLatestWrite.resolve();
+
+  await latestWrite;
+  await expect(restoredDraft).resolves.toBe("latest-A");
 });

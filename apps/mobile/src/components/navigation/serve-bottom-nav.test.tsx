@@ -1,4 +1,5 @@
 import { fireEvent, render } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 const mockWindowDimensions = jest.fn();
 
@@ -45,7 +46,7 @@ describe("ServeBottomNav", () => {
     mockWindowDimensions.mockReset();
   });
 
-  it("keeps five labelled actions usable at 320pt with a 200% font scale", () => {
+  it("keeps five untruncated labelled actions usable at 320pt with a 200% font scale", () => {
     const navigation = {
       emit: jest.fn(() => ({ defaultPrevented: false })),
       navigate: jest.fn(),
@@ -68,7 +69,10 @@ describe("ServeBottomNav", () => {
     expect(mockWindowDimensions).toHaveBeenCalled();
     expect(screen.getAllByRole("button")).toHaveLength(5);
     for (const label of ["Today", "Schedule", "PACE", "Pickups", "Settings"]) {
-      expect(screen.getByText(label).props.maxFontSizeMultiplier).toBe(1);
+      const labelNode = screen.getByText(label);
+      expect(labelNode.props.maxFontSizeMultiplier).toBeUndefined();
+      expect(labelNode.props.numberOfLines).toBeUndefined();
+      expect(StyleSheet.flatten(labelNode.props.style).lineHeight).toBe(36);
     }
 
     fireEvent.press(screen.getByText("Schedule"));

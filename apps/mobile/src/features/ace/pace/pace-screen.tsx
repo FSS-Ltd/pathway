@@ -6,9 +6,8 @@ import { Screen } from "@/components/primitives/screen";
 import { mobileTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks/use-app-ready";
 import {
-  activatePaceDraftScope,
+  activateAndReadPaceDraft,
   paceDraftStorageKey,
-  readPaceDraft,
   resolvePaceDraftScope,
   writePaceDraft,
 } from "@/lib/pace-draft-store";
@@ -100,9 +99,8 @@ export function PaceScreen() {
     setHydratedDraftScopeKey(null);
     setDraft(createEmptyDraft());
     if (!draftScope || !draftScopeKey) return undefined;
-    activatePaceDraftScope(draftScope);
 
-    void readPaceDraft(draftScope)
+    void activateAndReadPaceDraft(draftScope)
       .then((value) => {
         if (!isMounted || !value) return;
         const storedDraft = parseStoredDraft(value);
