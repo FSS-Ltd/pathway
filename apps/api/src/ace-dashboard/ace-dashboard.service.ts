@@ -228,7 +228,7 @@ function paceAggregateQuery(tenantId: string, localDate: Date): Prisma.Sql {
               AND correction."subjectId" = fact."subjectId"
               AND correction."correctsAssessmentId" = fact.id
           )
-        ORDER BY fact."assessedOn" DESC, fact."createdAt" DESC, fact.id DESC
+        ORDER BY fact."assessedOn" DESC, fact.id DESC
         LIMIT 1
       ) AS terminal ON TRUE
       WHERE enrollment."tenantId" = ${tenantId}

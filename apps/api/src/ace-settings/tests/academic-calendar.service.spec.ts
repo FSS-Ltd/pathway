@@ -100,7 +100,7 @@ describe("AcademicCalendarService", () => {
     expect(tx.academicYear.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          tenantId: TENANT_ID,
+          tenant: { connect: { id: TENANT_ID } },
           name: "2026/27",
           status: "ACTIVE",
           startsOn: new Date("2026-09-01T12:00:00.000Z"),
@@ -108,7 +108,7 @@ describe("AcademicCalendarService", () => {
           periods: {
             create: expect.arrayContaining([
               expect.objectContaining({
-                tenantId: TENANT_ID,
+                tenant: { connect: { id: TENANT_ID } },
                 name: "Autumn",
                 status: "ACTIVE",
               }),

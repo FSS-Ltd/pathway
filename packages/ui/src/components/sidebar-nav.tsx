@@ -26,6 +26,7 @@ import {
   KeyRound,
   Gauge,
   Award,
+  PieChart,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -84,6 +85,7 @@ const iconComponents: LucideIcon[] = [
   KeyRound, // 21 Roles & Access
   Gauge, // 22 PACE workflow
   Award, // 23 Behaviour capture
+  PieChart, // 24 ACE overview
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.

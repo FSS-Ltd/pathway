@@ -98,14 +98,14 @@ export class AcademicCalendarService {
           await this.requireSite(tx, actor);
           const academicYear = await tx.academicYear.create({
             data: {
-              tenantId: actor.tenantId,
+              tenant: { connect: { id: actor.tenantId } },
               name: command.name.trim(),
               startsOn: toDatabaseDate(command.startsOn),
               endsOn: toDatabaseDate(command.endsOn),
               status: "ACTIVE",
               periods: {
                 create: command.periods.map((period) => ({
-                  tenantId: actor.tenantId,
+                  tenant: { connect: { id: actor.tenantId } },
                   name: period.name.trim(),
                   startsOn: toDatabaseDate(period.startsOn),
                   endsOn: toDatabaseDate(period.endsOn),
