@@ -696,6 +696,12 @@ model AutomationBlogPublishAudit {
   @@index([blogPostId])
 }
 
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
 enum StaffAttendanceStatus {
   PRESENT
   ABSENT
@@ -991,6 +997,7 @@ model User {
   createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
   authorisedPaceOverrides    PacePolicyOverride[]        @relation("PacePolicyOverrideAuthorisedBy")
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
+  correctedAttendance       Attendance[]                 @relation("AttendanceCorrectedBy")
   createdBehaviourCategories BehaviourCategory[]         @relation("BehaviourCategoryCreatedBy")
   createdDemeritPolicies     DemeritPolicy[]             @relation("DemeritPolicyCreatedBy")
   authorisedDemeritOverrides DemeritStageOverride[]      @relation("DemeritStageOverrideAuthorisedBy")
@@ -2108,19 +2115,26 @@ model PermissionSlipReminder {
 }
 
 model Attendance {
-  id        String   @id @default(uuid())
-  childId   String
-  child     Child    @relation(fields: [childId], references: [id])
-  groupId   String
-  group     Group    @relation(fields: [groupId], references: [id])
-  sessionId String?
-  session   Session? @relation(fields: [sessionId], references: [id])
-  present   Boolean
-  timestamp DateTime @default(now())
+  id                  String           @id @default(uuid())
+  childId             String
+  child               Child            @relation(fields: [childId], references: [id])
+  groupId             String
+  group               Group            @relation(fields: [groupId], references: [id])
+  sessionId           String?
+  session             Session?         @relation(fields: [sessionId], references: [id])
+  present             Boolean
+  status              AttendanceStatus
+  timestamp           DateTime         @default(now())
+  correctedAt         DateTime?
+  correctedByUserId   String?
+  correctedByUser     User?            @relation("AttendanceCorrectedBy", fields: [correctedByUserId], references: [id], onDelete: Restrict)
+  correctionReason    String?
 
   @@index([childId])
   @@index([sessionId])
   @@index([groupId])
+  @@index([sessionId, status])
+  @@index([correctedByUserId, correctedAt])
 }
 
 // summary/details are encrypted at rest — see packages/db/src/pii-encryption.ts.

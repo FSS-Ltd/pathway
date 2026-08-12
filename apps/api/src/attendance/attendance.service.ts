@@ -4,6 +4,7 @@ import {
   Inject,
   NotFoundException,
   Optional,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
 import { PathwayRequestContext } from "@pathway/auth";
@@ -12,15 +13,52 @@ import { Av30ActivityService } from "../av30/av30-activity.service";
 import { CreateAttendanceDto } from "./dto/create-attendance.dto";
 import { UpdateAttendanceDto } from "./dto/update-attendance.dto";
 import type { UpsertSessionAttendanceDto } from "./dto/upsert-session-attendance.dto";
+import {
+  attendanceStatusFromPresent,
+  presentFromAttendanceStatus,
+  type AttendanceStatus,
+} from "./dto/attendance-status";
 
 const SELECT = {
   id: true,
   childId: true,
   groupId: true,
   present: true,
+  status: true,
   timestamp: true,
   sessionId: true,
+  correctedAt: true,
+  correctedByUserId: true,
+  correctionReason: true,
 } as const;
+
+type AttendanceStatusInput = {
+  status?: AttendanceStatus;
+  present?: boolean;
+};
+
+function requestedAttendanceStatus(
+  input: AttendanceStatusInput,
+): AttendanceStatus | undefined {
+  if (input.status !== undefined) return input.status;
+  if (input.present !== undefined) {
+    return attendanceStatusFromPresent(input.present);
+  }
+  return undefined;
+}
+
+function effectiveAttendanceStatus(row: {
+  status: AttendanceStatus | null;
+  present: boolean;
+}): AttendanceStatus {
+  return row.status ?? attendanceStatusFromPresent(row.present);
+}
+
+function toAttendanceResponse<
+  T extends { status: AttendanceStatus | null; present: boolean },
+>(row: T): Omit<T, "status"> & { status: AttendanceStatus } {
+  return { ...row, status: effectiveAttendanceStatus(row) };
+}
 
 @Injectable()
 export class AttendanceService {
@@ -37,11 +75,12 @@ export class AttendanceService {
       child: { tenantId },
     };
     if (sessionId) where.sessionId = sessionId;
-    return prisma.attendance.findMany({
+    const rows = await prisma.attendance.findMany({
       where,
       select: SELECT,
       orderBy: [{ timestamp: "desc" }],
     });
+    return rows.map(toAttendanceResponse);
   }
 
   /** Session summaries for list page: sessions in range with markedCount and totalChildCount. */
@@ -174,7 +213,11 @@ export class AttendanceService {
           id: row?.id,
           childId: c.id,
           present: row?.present ?? null,
+          status: row ? effectiveAttendanceStatus(row) : null,
           timestamp: row?.timestamp,
+          correctedAt: row?.correctedAt,
+          correctedByUserId: row?.correctedByUserId,
+          correctionReason: row?.correctionReason,
         };
       }),
     };
@@ -195,9 +238,14 @@ export class AttendanceService {
 
     const existing = await prisma.attendance.findMany({
       where: { sessionId, child: { tenantId } },
-      select: { id: true, childId: true },
+      select: {
+        id: true,
+        childId: true,
+        present: true,
+        status: true,
+      },
     });
-    const existingByChild = new Map(existing.map((r) => [r.childId, r.id]));
+    const existingByChild = new Map(existing.map((row) => [row.childId, row]));
 
     const now = new Date();
     for (const row of input.rows) {
@@ -212,11 +260,29 @@ export class AttendanceService {
           `Child ${row.childId} is not in a group for this session`,
         );
 
-      const existingId = existingByChild.get(row.childId);
-      if (existingId) {
+      const requestedStatus = requestedAttendanceStatus(row);
+      if (!requestedStatus) {
+        throw new BadRequestException(
+          `Attendance status is required for child ${row.childId}`,
+        );
+      }
+      const existingRow = existingByChild.get(row.childId);
+      if (existingRow) {
+        const correction = this.correctionData(
+          tenantId,
+          effectiveAttendanceStatus(existingRow),
+          requestedStatus,
+          row.correctionReason,
+          now,
+        );
         await prisma.attendance.update({
-          where: { id: existingId },
-          data: { present: row.present, timestamp: now },
+          where: { id: existingRow.id },
+          data: {
+            status: requestedStatus,
+            present: presentFromAttendanceStatus(requestedStatus),
+            timestamp: now,
+            ...correction,
+          },
           select: SELECT,
         });
       } else {
@@ -225,7 +291,8 @@ export class AttendanceService {
             childId: row.childId,
             groupId: child.groupId,
             sessionId,
-            present: row.present,
+            status: requestedStatus,
+            present: presentFromAttendanceStatus(requestedStatus),
             timestamp: now,
           },
           select: SELECT,
@@ -254,10 +321,14 @@ export class AttendanceService {
       select: SELECT,
     });
     if (!row) throw new NotFoundException("Attendance not found");
-    return row;
+    return toAttendanceResponse(row);
   }
 
   async create(input: CreateAttendanceDto, tenantId: string) {
+    const status = requestedAttendanceStatus(input);
+    if (!status) {
+      throw new BadRequestException("status or present is required");
+    }
     // Validate child exists
     const child = await prisma.child.findUnique({
       where: { id: input.childId },
@@ -302,7 +373,8 @@ export class AttendanceService {
       data: {
         child: { connect: { id: input.childId } },
         group: { connect: { id: input.groupId } },
-        present: input.present,
+        status,
+        present: presentFromAttendanceStatus(status),
         timestamp: input.timestamp ?? new Date(),
         ...(input.sessionId
           ? { session: { connect: { id: input.sessionId } } }
@@ -325,7 +397,7 @@ export class AttendanceService {
         });
     }
 
-    return created;
+    return toAttendanceResponse(created);
   }
 
   async update(id: string, input: UpdateAttendanceDto, tenantId: string) {
@@ -335,6 +407,8 @@ export class AttendanceService {
       select: {
         id: true,
         groupId: true,
+        present: true,
+        status: true,
         child: { select: { tenantId: true } },
       },
     });
@@ -375,15 +449,28 @@ export class AttendanceService {
       }
     }
 
+    const requestedStatus = requestedAttendanceStatus(input);
+    const correction = requestedStatus
+      ? this.correctionData(
+          tenantId,
+          effectiveAttendanceStatus(current),
+          requestedStatus,
+          input.correctionReason,
+          new Date(),
+        )
+      : {};
     const updated = await prisma.attendance.update({
       where: { id },
       data: {
-        present: input.present ?? undefined,
+        status: requestedStatus,
+        present:
+          requestedStatus === undefined
+            ? undefined
+            : presentFromAttendanceStatus(requestedStatus),
         timestamp: input.timestamp ?? undefined,
-        ...(input.groupId ? { group: { connect: { id: input.groupId } } } : {}),
-        ...(input.sessionId
-          ? { session: { connect: { id: input.sessionId } } }
-          : {}),
+        ...correction,
+        groupId: input.groupId ?? undefined,
+        sessionId: input.sessionId ?? undefined,
       },
       select: SELECT,
     });
@@ -405,6 +492,42 @@ export class AttendanceService {
         });
     }
 
-    return updated;
+    return toAttendanceResponse(updated);
+  }
+
+  private correctionData(
+    tenantId: string,
+    currentStatus: AttendanceStatus,
+    requestedStatus: AttendanceStatus,
+    correctionReason: string | undefined,
+    correctedAt: Date,
+  ):
+    | {
+        correctedAt: Date;
+        correctedByUserId: string;
+        correctionReason: string;
+      }
+    | Record<string, never> {
+    if (currentStatus === requestedStatus) return {};
+
+    const normalizedReason = correctionReason?.trim();
+    if (!normalizedReason) {
+      throw new BadRequestException(
+        "correctionReason is required when changing attendance status",
+      );
+    }
+
+    const actorUserId = this.requestContext.currentUserId;
+    if (!actorUserId || this.requestContext.currentTenantId !== tenantId) {
+      throw new UnauthorizedException(
+        "An authenticated site actor is required to correct attendance",
+      );
+    }
+
+    return {
+      correctedAt,
+      correctedByUserId: actorUserId,
+      correctionReason: normalizedReason,
+    };
   }
 }

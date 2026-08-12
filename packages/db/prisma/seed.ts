@@ -187,6 +187,7 @@ export async function seedDemoData(prisma: PrismaClient): Promise<void> {
       childId: child.id,
       groupId: group45.id,
       present: true,
+      status: "PRESENT",
     },
   });
 

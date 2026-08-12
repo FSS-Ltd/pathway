@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { prisma } from "@pathway/db";
+import { AttendanceStatus, prisma } from "@pathway/db";
 
 export type AttendanceExportType = "children" | "staff" | "all";
 
@@ -21,6 +21,16 @@ function formatDate(d: Date): string {
 
 function formatTime(d: Date): string {
   return d.toISOString().slice(11, 16);
+}
+
+function childAttendanceStatus(
+  attendance: { status: AttendanceStatus | null; present: boolean } | undefined,
+): AttendanceStatus | "UNKNOWN" {
+  if (!attendance) return "UNKNOWN";
+  return (
+    attendance.status ??
+    (attendance.present ? AttendanceStatus.PRESENT : AttendanceStatus.ABSENT)
+  );
 }
 
 /** Safeguarding: initials only (e.g. "A P.") for children in exports. */
@@ -115,6 +125,7 @@ export class ExportsService {
           select: {
             childId: true,
             present: true,
+            status: true,
             timestamp: true,
           },
         },
@@ -156,7 +167,16 @@ export class ExportsService {
       const gLabel = groupLabel(s);
 
       if (type === "children" || type === "all") {
-        const attendanceByChild = new Map(s.attendances.map((a) => [a.childId, { present: a.present, timestamp: a.timestamp ?? undefined }]));
+        const attendanceByChild = new Map(
+          s.attendances.map((attendance) => [
+            attendance.childId,
+            {
+              present: attendance.present,
+              status: attendance.status,
+              timestamp: attendance.timestamp ?? undefined,
+            },
+          ]),
+        );
         const groupIds = s.groups.map((g) => g.id);
         const children =
           groupIds.length > 0
@@ -168,7 +188,7 @@ export class ExportsService {
             : [];
         for (const c of children) {
           const row = attendanceByChild.get(c.id);
-          const status = row?.present === true ? "PRESENT" : row?.present === false ? "ABSENT" : "UNKNOWN";
+          const status = childAttendanceStatus(row);
           const recordedAt = row?.timestamp ? row.timestamp.toISOString() : "";
           const rowData =
             type === "all"
@@ -239,7 +259,12 @@ export class ExportsService {
     const sessionIds = sessions.map((s) => s.id);
     const attendances = await prisma.attendance.findMany({
       where: { sessionId: { in: sessionIds }, childId },
-      select: { sessionId: true, present: true, timestamp: true },
+      select: {
+        sessionId: true,
+        present: true,
+        status: true,
+        timestamp: true,
+      },
     });
     const bySession = new Map(attendances.map((a) => [a.sessionId, a]));
 
@@ -248,7 +273,7 @@ export class ExportsService {
 
     const rows = sessions.map((s) => {
       const a = bySession.get(s.id);
-      const status = a?.present === true ? "PRESENT" : a?.present === false ? "ABSENT" : "UNKNOWN";
+      const status = childAttendanceStatus(a);
       const recordedAt = a?.timestamp ? a.timestamp.toISOString() : "";
       return [
         childName,

@@ -183,6 +183,7 @@ async function seedTenantData(
           groupId,
           sessionId,
           present: true,
+          status: "PRESENT",
         },
       });
 

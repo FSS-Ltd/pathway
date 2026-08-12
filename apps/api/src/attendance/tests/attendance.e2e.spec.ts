@@ -17,6 +17,9 @@ const ids = {
   group: randomUUID(),
   group2: randomUUID(),
   child: randomUUID(),
+  child2: randomUUID(),
+  child3: randomUUID(),
+  session: randomUUID(),
 } as const;
 
 const nonce = Date.now();
@@ -60,7 +63,10 @@ describe("Attendance (e2e)", () => {
           ],
         },
       });
-      await tx.child.deleteMany({ where: { id: ids.child } });
+      await tx.child.deleteMany({
+        where: { id: { in: [ids.child, ids.child2, ids.child3] } },
+      });
+      await tx.session.deleteMany({ where: { id: ids.session } });
       await tx.group.deleteMany({
         where: { id: { in: [ids.group, ids.group2] } },
       });
@@ -83,6 +89,38 @@ describe("Attendance (e2e)", () => {
           groupId: ids.group,
           allergies: "none",
           disabilities: [],
+        },
+      });
+      await tx.child.create({
+        data: {
+          id: ids.child3,
+          firstName: "Jordan",
+          lastName: "Morgan",
+          tenantId: TENANT_A_ID,
+          groupId: ids.group,
+          allergies: "none",
+          disabilities: [],
+        },
+      });
+      await tx.child.create({
+        data: {
+          id: ids.child2,
+          firstName: "Alex",
+          lastName: "Taylor",
+          tenantId: TENANT_A_ID,
+          groupId: ids.group,
+          allergies: "none",
+          disabilities: [],
+        },
+      });
+      await tx.session.create({
+        data: {
+          id: ids.session,
+          tenantId: TENANT_A_ID,
+          title: `Attendance ${nonce}`,
+          startsAt: new Date("2026-08-12T09:00:00.000Z"),
+          endsAt: new Date("2026-08-12T10:00:00.000Z"),
+          groups: { connect: { id: ids.group } },
         },
       });
     });
@@ -142,12 +180,10 @@ describe("Attendance (e2e)", () => {
       });
       await prisma.child.deleteMany({
         where: {
-          OR: [
-            { id: ids.child },
-            { groupId: { in: [ids.group, ids.group2] } },
-          ],
+          OR: [{ id: ids.child }, { groupId: { in: [ids.group, ids.group2] } }],
         },
       });
+      await prisma.session.deleteMany({ where: { id: ids.session } });
       await prisma.group.deleteMany({
         where: { id: { in: [ids.group, ids.group2] } },
       });
@@ -172,11 +208,16 @@ describe("Attendance (e2e)", () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 
-  it("POST /attendance should create a record", async () => {
+  it("POST /attendance accepts the legacy Boolean and returns its status", async () => {
     if (!app) return;
     const res = await request(app.getHttpServer())
       .post("/attendance")
-      .send({ childId: ids.child, groupId: ids.group, present: true })
+      .send({
+        childId: ids.child,
+        groupId: ids.group,
+        sessionId: ids.session,
+        present: true,
+      })
       .set("content-type", "application/json")
       .set("Authorization", authHeader);
 
@@ -185,6 +226,7 @@ describe("Attendance (e2e)", () => {
       childId: ids.child,
       groupId: ids.group,
       present: true,
+      status: "PRESENT",
     });
     expect(res.body).toHaveProperty("id");
     createdId = res.body.id;
@@ -200,18 +242,200 @@ describe("Attendance (e2e)", () => {
       id: createdId,
       childId: ids.child,
       groupId: ids.group,
+      present: true,
+      status: "PRESENT",
     });
   });
 
-  it("PATCH /attendance/:id should update present", async () => {
+  it("POST /attendance creates and reads Late without losing legacy meaning", async () => {
+    if (!app) return;
+    const created = await request(app.getHttpServer())
+      .post("/attendance")
+      .send({
+        childId: ids.child3,
+        groupId: ids.group,
+        sessionId: ids.session,
+        status: "LATE",
+      })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({
+      childId: ids.child3,
+      present: true,
+      status: "LATE",
+    });
+
+    const read = await request(app.getHttpServer())
+      .get(`/attendance/${created.body.id as string}`)
+      .set("Authorization", authHeader);
+    expect(read.status).toBe(200);
+    expect(read.body).toMatchObject({ present: true, status: "LATE" });
+  });
+
+  it("PATCH /attendance/:id rejects a status correction without a reason", async () => {
     if (!app) return;
     const res = await request(app.getHttpServer())
       .patch(`/attendance/${createdId}`)
       .send({ present: false })
       .set("content-type", "application/json")
       .set("Authorization", authHeader);
+    expect(res.status).toBe(400);
+  });
+
+  it("PATCH /attendance/:id round-trips Late and records correction provenance", async () => {
+    if (!app) return;
+    const res = await request(app.getHttpServer())
+      .patch(`/attendance/${createdId}`)
+      .send({ status: "LATE", correctionReason: "Transport delay" })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ id: createdId, present: false });
+    expect(res.body).toMatchObject({
+      id: createdId,
+      present: true,
+      status: "LATE",
+      correctedByUserId: authUserId,
+      correctionReason: "Transport delay",
+    });
+    expect(res.body.correctedAt).toEqual(expect.any(String));
+
+    const stored = await prisma.attendance.findUniqueOrThrow({
+      where: { id: createdId },
+      select: {
+        present: true,
+        status: true,
+        correctedByUserId: true,
+        correctionReason: true,
+      },
+    });
+    expect(stored).toEqual({
+      present: true,
+      status: "LATE",
+      correctedByUserId: authUserId,
+      correctionReason: "Transport delay",
+    });
+  });
+
+  it("PUT /attendance/session/:id creates Late and corrects existing statuses", async () => {
+    if (!app) return;
+    const created = await request(app.getHttpServer())
+      .put(`/attendance/session/${ids.session}`)
+      .send({ rows: [{ childId: ids.child2, status: "LATE" }] })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+
+    expect(created.status).toBe(200);
+    expect(created.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          childId: ids.child2,
+          present: true,
+          status: "LATE",
+        }),
+      ]),
+    );
+
+    const rejected = await request(app.getHttpServer())
+      .put(`/attendance/session/${ids.session}`)
+      .send({ rows: [{ childId: ids.child2, status: "ABSENT" }] })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+    expect(rejected.status).toBe(400);
+
+    const corrected = await request(app.getHttpServer())
+      .put(`/attendance/session/${ids.session}`)
+      .send({
+        rows: [
+          {
+            childId: ids.child2,
+            status: "ABSENT",
+            correctionReason: "Marked in error",
+          },
+        ],
+      })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+    expect(corrected.status).toBe(200);
+    expect(corrected.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          childId: ids.child2,
+          present: false,
+          status: "ABSENT",
+          correctedByUserId: authUserId,
+          correctionReason: "Marked in error",
+        }),
+      ]),
+    );
+  });
+
+  it("exports Late using the authoritative status", async () => {
+    if (!app) return;
+    const res = await request(app.getHttpServer())
+      .get(
+        "/exports/attendance/site?from=2026-08-12T00:00:00.000Z&to=2026-08-12T23:59:59.999Z&type=children",
+      )
+      .set("Authorization", authHeader);
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("LATE");
+  });
+
+  it("keeps status and present coherent for expand-era database writes", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+
+    await prisma.$executeRaw`
+      UPDATE "Attendance"
+      SET "present" = false
+      WHERE "id" = ${createdId}
+    `;
+    await expect(
+      prisma.attendance.findUniqueOrThrow({
+        where: { id: createdId },
+        select: { present: true, status: true },
+      }),
+    ).resolves.toEqual({ present: false, status: "ABSENT" });
+
+    await prisma.$executeRaw`
+      UPDATE "Attendance"
+      SET "status" = 'LATE'::"AttendanceStatus"
+      WHERE "id" = ${createdId}
+    `;
+    await expect(
+      prisma.attendance.findUniqueOrThrow({
+        where: { id: createdId },
+        select: { present: true, status: true },
+      }),
+    ).resolves.toEqual({ present: true, status: "LATE" });
+  });
+
+  it("does not expose another site's correction metadata under strict RLS", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+    const roleName = process.env.E2E_TENANT_RLS_ROLE;
+    if (!roleName) return;
+    if (roleName !== "pathway_e2e_tenant_rls") {
+      throw new Error(`Unexpected E2E tenant RLS role: ${roleName}`);
+    }
+
+    const rows = await withTenantRlsContext(TENANT_B_ID, ORG_ID, async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${roleName}"`);
+      return tx.$queryRaw<
+        Array<{
+          id: string;
+          correctedByUserId: string | null;
+          correctionReason: string | null;
+        }>
+      >`
+          SELECT "id", "correctedByUserId", "correctionReason"
+          FROM "Attendance"
+          WHERE "id" = ${createdId}
+        `;
+    });
+
+    expect(rows).toEqual([]);
   });
 
   it("POST /attendance should 404 when child/group cross-tenant", async () => {
@@ -245,6 +469,7 @@ describe("Attendance (e2e)", () => {
           childId: childB.id,
           groupId: ids.group2,
           present: true,
+          status: "PRESENT",
         },
       }),
     );
@@ -282,6 +507,7 @@ describe("Attendance (e2e)", () => {
             childId: childB.id,
             groupId: ids.group2,
             present: false,
+            status: "ABSENT",
           },
         }),
     );

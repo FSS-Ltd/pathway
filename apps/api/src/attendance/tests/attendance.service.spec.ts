@@ -1,10 +1,17 @@
-import { NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { AttendanceService } from "../attendance.service";
 import { prisma } from "@pathway/db";
 import { PathwayRequestContext, UserTenantRole } from "@pathway/auth";
 import { Av30ActivityService } from "../../av30/av30-activity.service";
 import type { AuthContext } from "@pathway/auth/src/types/auth-context";
 import type { Request } from "express";
+import { createAttendanceDto } from "../dto/create-attendance.dto";
+import { updateAttendanceDto } from "../dto/update-attendance.dto";
+import { upsertSessionAttendanceDto } from "../dto/upsert-session-attendance.dto";
 
 // --- Prisma mocks
 const aFindMany = jest.spyOn(prisma.attendance, "findMany");
@@ -14,6 +21,20 @@ const aUpdate = jest.spyOn(prisma.attendance, "update");
 
 const cFindUnique = jest.spyOn(prisma.child, "findUnique");
 const gFindUnique = jest.spyOn(prisma.group, "findUnique");
+const sFindFirst = jest.spyOn(prisma.session, "findFirst");
+
+const attendanceSelect = {
+  id: true,
+  childId: true,
+  groupId: true,
+  present: true,
+  status: true,
+  sessionId: true,
+  timestamp: true,
+  correctedAt: true,
+  correctedByUserId: true,
+  correctionReason: true,
+} as const;
 
 describe("AttendanceService", () => {
   let svc: AttendanceService;
@@ -94,6 +115,7 @@ describe("AttendanceService", () => {
     aUpdate.mockReset();
     cFindUnique.mockReset();
     gFindUnique.mockReset();
+    sFindFirst.mockReset();
 
     mockAv30Service = {
       recordActivityForCurrentUser: jest.fn().mockResolvedValue(undefined),
@@ -112,16 +134,92 @@ describe("AttendanceService", () => {
       expect(res).toEqual([]);
       expect(aFindMany).toHaveBeenCalledWith({
         where: { child: { tenantId: "t1" } },
-        select: {
-          id: true,
-          childId: true,
-          groupId: true,
-          present: true,
-          sessionId: true,
-          timestamp: true,
-        },
+        select: attendanceSelect,
         orderBy: [{ timestamp: "desc" }],
       });
+    });
+
+    it.each([
+      [true, "PRESENT"],
+      [false, "ABSENT"],
+    ] as const)(
+      "maps legacy present=%s rows to %s while preserving the Boolean read",
+      async (present, status) => {
+        aFindMany.mockResolvedValueOnce([
+          {
+            id: `att-${status}`,
+            childId: "c1",
+            groupId: "g1",
+            sessionId: null,
+            present,
+            status: null,
+            timestamp: new Date("2026-08-12T09:00:00.000Z"),
+            correctedAt: null,
+            correctedByUserId: null,
+            correctionReason: null,
+          },
+        ] as unknown as Awaited<ReturnType<typeof prisma.attendance.findMany>>);
+
+        await expect(svc.list("t1")).resolves.toEqual([
+          expect.objectContaining({ present, status }),
+        ]);
+      },
+    );
+  });
+
+  describe("DTO compatibility", () => {
+    const childId = "11111111-1111-1111-1111-111111111111";
+    const groupId = "22222222-2222-2222-2222-222222222222";
+
+    it("accepts either the legacy Boolean or a status when creating", () => {
+      expect(
+        createAttendanceDto.safeParse({ childId, groupId, present: false })
+          .success,
+      ).toBe(true);
+      expect(
+        createAttendanceDto.safeParse({ childId, groupId, status: "LATE" })
+          .success,
+      ).toBe(true);
+      expect(
+        createAttendanceDto.safeParse({
+          childId,
+          groupId,
+          status: "LATE",
+          present: false,
+        }).success,
+      ).toBe(false);
+      expect(createAttendanceDto.safeParse({ childId, groupId }).success).toBe(
+        false,
+      );
+    });
+
+    it("accepts and trims correction reasons for status updates", () => {
+      expect(
+        updateAttendanceDto.parse({
+          status: "ABSENT",
+          correctionReason: "  Parent confirmed absence  ",
+        }),
+      ).toEqual({
+        status: "ABSENT",
+        correctionReason: "Parent confirmed absence",
+      });
+      expect(
+        updateAttendanceDto.safeParse({
+          status: "ABSENT",
+          correctionReason: "   ",
+        }).success,
+      ).toBe(false);
+    });
+
+    it("accepts new and legacy session-upsert rows", () => {
+      expect(
+        upsertSessionAttendanceDto.safeParse({
+          rows: [
+            { childId, status: "LATE" },
+            { childId, present: true },
+          ],
+        }).success,
+      ).toBe(true);
     });
   });
 
@@ -132,22 +230,19 @@ describe("AttendanceService", () => {
         childId: "c1",
         groupId: "g1",
         present: true,
+        status: "PRESENT" as const,
         timestamp: new Date(),
         sessionId: null,
+        correctedAt: null,
+        correctedByUserId: null,
+        correctionReason: null,
       };
       aFindFirst.mockResolvedValueOnce(row);
       const res = await svc.getById("att1", "t1");
-      expect(res).toBe(row);
+      expect(res).toEqual(row);
       expect(aFindFirst).toHaveBeenCalledWith({
         where: { id: "att1", child: { tenantId: "t1" } },
-        select: {
-          id: true,
-          childId: true,
-          groupId: true,
-          present: true,
-          sessionId: true,
-          timestamp: true,
-        },
+        select: attendanceSelect,
       });
     });
 
@@ -210,8 +305,12 @@ describe("AttendanceService", () => {
         childId,
         groupId: groupSame,
         present: true,
+        status: "PRESENT",
         timestamp: new Date(),
         sessionId: null,
+        correctedAt: null,
+        correctedByUserId: null,
+        correctionReason: null,
       });
 
       const res = await svc.create(
@@ -233,16 +332,10 @@ describe("AttendanceService", () => {
           child: { connect: { id: childId } },
           group: { connect: { id: groupSame } },
           present: true,
+          status: "PRESENT",
           timestamp: expect.any(Date),
         },
-        select: {
-          id: true,
-          childId: true,
-          groupId: true,
-          present: true,
-          sessionId: true,
-          timestamp: true,
-        },
+        select: attendanceSelect,
       });
       // Verify AV30 activity was recorded
       expect(
@@ -265,8 +358,12 @@ describe("AttendanceService", () => {
         childId,
         groupId: groupSame,
         present: false,
+        status: "ABSENT",
         timestamp: ts,
         sessionId: null,
+        correctedAt: null,
+        correctedByUserId: null,
+        correctionReason: null,
       });
 
       const res = await svc.create(
@@ -284,17 +381,50 @@ describe("AttendanceService", () => {
           child: { connect: { id: childId } },
           group: { connect: { id: groupSame } },
           present: false,
+          status: "ABSENT",
           timestamp: ts,
         },
-        select: {
-          id: true,
-          childId: true,
-          groupId: true,
-          present: true,
-          sessionId: true,
-          timestamp: true,
-        },
+        select: attendanceSelect,
       });
+    });
+
+    it("creates Late as the authoritative status and keeps legacy present true", async () => {
+      cFindUnique.mockResolvedValueOnce({
+        ...makeChild("t1"),
+        id: childId,
+      } as Awaited<ReturnType<typeof prisma.child.findUnique>>);
+      gFindUnique.mockResolvedValueOnce({
+        ...makeGroup("t1"),
+        id: groupSame,
+      } as Awaited<ReturnType<typeof prisma.group.findUnique>>);
+      aCreate.mockResolvedValueOnce({
+        id: "att-late",
+        childId,
+        groupId: groupSame,
+        present: true,
+        status: "LATE",
+        timestamp: new Date(),
+        sessionId: null,
+        correctedAt: null,
+        correctedByUserId: null,
+        correctionReason: null,
+      } as unknown as Awaited<ReturnType<typeof prisma.attendance.create>>);
+
+      const res = await svc.create(
+        {
+          childId,
+          groupId: groupSame,
+          status: "LATE",
+        } as unknown as Parameters<AttendanceService["create"]>[0],
+        "t1",
+      );
+
+      expect(res).toMatchObject({ status: "LATE", present: true });
+      expect(aCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "LATE", present: true }),
+        }),
+      );
     });
   });
 
@@ -309,9 +439,12 @@ describe("AttendanceService", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
-    it("updates present only", async () => {
+    it("accepts an idempotent legacy present write", async () => {
       aFindFirst.mockResolvedValueOnce({
         id,
+        groupId: "g1",
+        present: false,
+        status: "ABSENT",
         child: { tenantId: "t1" },
       } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
       aUpdate.mockResolvedValueOnce({
@@ -319,23 +452,26 @@ describe("AttendanceService", () => {
         childId: "c1",
         groupId: "g1",
         present: false,
+        status: "ABSENT",
         timestamp: new Date(),
         sessionId: null,
+        correctedAt: null,
+        correctedByUserId: null,
+        correctionReason: null,
       });
 
       const res = await svc.update(id, { present: false }, "t1");
       expect(res.present).toBe(false);
       expect(aUpdate).toHaveBeenCalledWith({
         where: { id },
-        data: { present: false, timestamp: undefined },
-        select: {
-          id: true,
-          childId: true,
-          groupId: true,
-          present: true,
-          sessionId: true,
-          timestamp: true,
+        data: {
+          status: "ABSENT",
+          present: false,
+          timestamp: undefined,
+          groupId: undefined,
+          sessionId: undefined,
         },
+        select: attendanceSelect,
       });
       // Verify AV30 activity was recorded
       expect(
@@ -346,6 +482,9 @@ describe("AttendanceService", () => {
     it("throws when changing group across tenants", async () => {
       aFindFirst.mockResolvedValueOnce({
         id,
+        groupId: "g1",
+        present: true,
+        status: "PRESENT",
         child: { tenantId: "t1" },
       } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
       gFindUnique.mockResolvedValueOnce({
@@ -361,6 +500,9 @@ describe("AttendanceService", () => {
     it("connects new group when same tenant", async () => {
       aFindFirst.mockResolvedValueOnce({
         id,
+        groupId: "g1",
+        present: true,
+        status: "PRESENT",
         child: { tenantId: "t1" },
       } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
       gFindUnique.mockResolvedValueOnce({
@@ -372,27 +514,206 @@ describe("AttendanceService", () => {
         childId: "c1",
         groupId: newGroup,
         present: true,
+        status: "PRESENT",
         timestamp: new Date(),
         sessionId: null,
+        correctedAt: null,
+        correctedByUserId: null,
+        correctionReason: null,
       });
 
       await svc.update(id, { groupId: newGroup }, "t1");
       expect(aUpdate).toHaveBeenCalledWith({
         where: { id },
         data: {
+          status: undefined,
           present: undefined,
           timestamp: undefined,
-          group: { connect: { id: newGroup } },
+          groupId: newGroup,
+          sessionId: undefined,
         },
-        select: {
-          id: true,
-          childId: true,
-          groupId: true,
-          present: true,
-          sessionId: true,
-          timestamp: true,
-        },
+        select: attendanceSelect,
       });
+    });
+
+    it("requires a reason before changing an existing status", async () => {
+      aFindFirst.mockResolvedValueOnce({
+        id,
+        groupId: "g1",
+        present: true,
+        status: "PRESENT",
+        child: { tenantId: "tenant-123" },
+      } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
+
+      await expect(
+        svc.update(
+          id,
+          { status: "LATE" } as unknown as Parameters<
+            AttendanceService["update"]
+          >[1],
+          "tenant-123",
+        ),
+      ).rejects.toEqual(
+        new BadRequestException(
+          "correctionReason is required when changing attendance status",
+        ),
+      );
+      expect(aUpdate).not.toHaveBeenCalled();
+    });
+
+    it("records correction provenance and keeps Late compatible with present=true", async () => {
+      const correctedAt = new Date("2026-08-12T11:00:00.000Z");
+      jest.useFakeTimers().setSystemTime(correctedAt);
+      aFindFirst.mockResolvedValueOnce({
+        id,
+        groupId: "g1",
+        present: false,
+        status: "ABSENT",
+        child: { tenantId: "tenant-123" },
+      } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
+      aUpdate.mockResolvedValueOnce({
+        id,
+        childId: "c1",
+        groupId: "g1",
+        present: true,
+        status: "LATE",
+        timestamp: correctedAt,
+        sessionId: null,
+        correctedAt,
+        correctedByUserId: "user-123",
+        correctionReason: "Bus arrived late",
+      } as unknown as Awaited<ReturnType<typeof prisma.attendance.update>>);
+
+      const result = await svc.update(
+        id,
+        {
+          status: "LATE",
+          correctionReason: "Bus arrived late",
+        } as unknown as Parameters<AttendanceService["update"]>[1],
+        "tenant-123",
+      );
+
+      expect(result).toMatchObject({ status: "LATE", present: true });
+      expect(aUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "LATE",
+            present: true,
+            correctedAt,
+            correctedByUserId: "user-123",
+            correctionReason: "Bus arrived late",
+          }),
+        }),
+      );
+      jest.useRealTimers();
+    });
+
+    it("rejects correction provenance from a different active site", async () => {
+      aFindFirst.mockResolvedValueOnce({
+        id,
+        groupId: "g1",
+        present: false,
+        status: "ABSENT",
+        child: { tenantId: "tenant-other" },
+      } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
+
+      await expect(
+        svc.update(
+          id,
+          { status: "PRESENT", correctionReason: "Verified onsite" },
+          "tenant-other",
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(aUpdate).not.toHaveBeenCalled();
+    });
+
+    it("does not require or overwrite correction metadata for a no-op status write", async () => {
+      aFindFirst.mockResolvedValueOnce({
+        id,
+        groupId: "g1",
+        present: true,
+        status: "LATE",
+        child: { tenantId: "tenant-123" },
+      } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
+      aUpdate.mockResolvedValueOnce({
+        id,
+        childId: "c1",
+        groupId: "g1",
+        present: true,
+        status: "LATE",
+        timestamp: new Date(),
+        sessionId: null,
+        correctedAt: new Date("2026-08-11T10:00:00.000Z"),
+        correctedByUserId: "earlier-user",
+        correctionReason: "Earlier correction",
+      } as unknown as Awaited<ReturnType<typeof prisma.attendance.update>>);
+
+      await svc.update(
+        id,
+        { status: "LATE" } as unknown as Parameters<
+          AttendanceService["update"]
+        >[1],
+        "tenant-123",
+      );
+
+      const updateCall = aUpdate.mock.calls[0]?.[0];
+      expect(updateCall?.data).toMatchObject({ status: "LATE", present: true });
+      expect(updateCall?.data).not.toHaveProperty("correctedAt");
+      expect(updateCall?.data).not.toHaveProperty("correctedByUserId");
+      expect(updateCall?.data).not.toHaveProperty("correctionReason");
+    });
+  });
+
+  describe("upsertSessionAttendance", () => {
+    it("requires per-row correction provenance and writes Late coherently", async () => {
+      sFindFirst.mockResolvedValueOnce({
+        id: "session-1",
+        groups: [{ id: "group-1" }],
+      } as unknown as Awaited<ReturnType<typeof prisma.session.findFirst>>);
+      aFindMany.mockResolvedValueOnce([
+        {
+          id: "attendance-1",
+          childId: "child-1",
+          present: false,
+          status: "ABSENT",
+        },
+      ] as unknown as Awaited<ReturnType<typeof prisma.attendance.findMany>>);
+      cFindUnique.mockResolvedValueOnce({
+        id: "child-1",
+        tenantId: "tenant-123",
+        groupId: "group-1",
+      } as unknown as Awaited<ReturnType<typeof prisma.child.findUnique>>);
+      aUpdate.mockResolvedValueOnce(
+        {} as Awaited<ReturnType<typeof prisma.attendance.update>>,
+      );
+      jest
+        .spyOn(svc, "getSessionAttendanceDetail")
+        .mockResolvedValueOnce({ rows: [] } as unknown as Awaited<
+          ReturnType<AttendanceService["getSessionAttendanceDetail"]>
+        >);
+
+      await svc.upsertSessionAttendance("session-1", "tenant-123", {
+        rows: [
+          {
+            childId: "child-1",
+            status: "LATE",
+            correctionReason: "Traffic delay",
+          },
+        ],
+      } as unknown as Parameters<
+        AttendanceService["upsertSessionAttendance"]
+      >[2]);
+
+      expect(aUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "LATE",
+            present: true,
+            correctedByUserId: "user-123",
+            correctionReason: "Traffic delay",
+          }),
+        }),
+      );
     });
   });
 });
