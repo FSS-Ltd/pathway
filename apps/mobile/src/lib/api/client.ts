@@ -196,6 +196,14 @@ class MobileApiClient {
     });
   }
 
+  getOwnPermissions(token?: string) {
+    return this.request<{
+      orgId: string;
+      tenantId: string | null;
+      permissions: string[];
+    }>("/access/users/me/permissions", { method: "GET", token });
+  }
+
   setActiveSite(siteId: string, token?: string) {
     return this.request<ActiveSiteState>("/auth/active-site", {
       method: "POST",

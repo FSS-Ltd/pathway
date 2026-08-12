@@ -35,6 +35,7 @@ const readyState = {
     activeSiteId: "site-1",
     updatedAt: "2026-08-12T09:00:00.000Z",
   },
+  permissions: [],
   roles: {},
   activeSiteState: { activeSiteId: "site-1", sites: [] },
   space: "serve" as const,
@@ -71,8 +72,8 @@ afterEach(() => {
   mockSetActiveSite.mockReset();
 });
 
-describe("AppProviders PACE draft cleanup", () => {
-  it("clears the current user/site PACE draft before signing out", async () => {
+describe("AppProviders scoped draft cleanup", () => {
+  it("clears the current user/site ACE drafts before signing out", async () => {
     render(
       <AppProviders>
         <Probe />
@@ -88,6 +89,9 @@ describe("AppProviders PACE draft cleanup", () => {
 
     expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
       "ace-pace-draft-v1:user-1:site-1",
+    );
+    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
+      "ace-behaviour-draft-v1:user-1:site-1",
     );
     expect(mockAuth().signOut).toHaveBeenCalledTimes(1);
   });

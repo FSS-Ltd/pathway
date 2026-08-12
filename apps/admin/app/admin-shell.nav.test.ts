@@ -72,6 +72,14 @@ assert.ok(
   "expected PACE navigation to require the ace.pace.read permission",
 );
 
+const behaviourNavEntry = shellSource.match(
+  /label:\s*"Behaviour"[\s\S]*?href:\s*"\/ace\/behaviour"[\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"ace\.behaviour\.read"[\s\S]*?group:\s*"Teaching",?\s*\},/,
+);
+assert.ok(
+  behaviourNavEntry,
+  "expected Behaviour navigation to require the ace.behaviour.read permission",
+);
+
 // ACE-F14: Roles & Access must be gated by the typed permission, not a role
 // display name - no `access:` string on this entry.
 const rolesAccessNavEntry = shellSource.match(

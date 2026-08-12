@@ -30,6 +30,7 @@ export type BootstrapState =
       route: "/(auth)/site-select";
       state: AppStateSnapshot;
       roles: RolesResponse;
+      permissions: string[];
       activeSiteState: ActiveSiteState;
       space: AppSpace;
       availableSpaces: AppSpace[];
@@ -113,7 +114,13 @@ export async function bootstrapAuthState(
       };
     }
 
-    const roles = await apiClient.getRoles(token);
+    const [roles, permissions] = await Promise.all([
+      apiClient.getRoles(token),
+      apiClient
+        .getOwnPermissions(token)
+        .then((response) => response.permissions)
+        .catch(() => []),
+    ]);
     const spaceResolution = resolveSpaceFromRoles(roles, state.preferredSpace);
     const nextSpace = spaceResolution.primarySpace;
 
@@ -128,6 +135,7 @@ export async function bootstrapAuthState(
       route: "/(auth)/site-select",
       state: updatedState,
       roles,
+      permissions,
       activeSiteState,
       space: nextSpace,
       availableSpaces: spaceResolution.availableSpaces,
@@ -159,4 +167,3 @@ export async function bootstrapAuthState(
     };
   }
 }
-

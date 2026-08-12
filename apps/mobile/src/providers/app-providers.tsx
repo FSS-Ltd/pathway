@@ -18,6 +18,10 @@ import {
 } from "@/lib/auth/bootstrap";
 import { updateAppStateSnapshot } from "@/lib/auth/session-store";
 import { clearPaceDraft, resolvePaceDraftScope } from "@/lib/pace-draft-store";
+import {
+  clearBehaviourDraft,
+  resolveBehaviourDraftScope,
+} from "@/lib/behaviour-draft-store";
 
 type AppBootstrapContextValue = {
   bootstrapState: BootstrapState;
@@ -50,7 +54,15 @@ export function AppProviders({ children }: PropsWithChildren) {
 
   const signOut = useCallback(async () => {
     const draftScope = paceDraftScopeForState(bootstrapState);
-    if (draftScope) await clearPaceDraft(draftScope).catch(() => undefined);
+    const behaviourDraftScope = behaviourDraftScopeForState(bootstrapState);
+    await Promise.all([
+      draftScope
+        ? clearPaceDraft(draftScope).catch(() => undefined)
+        : Promise.resolve(),
+      behaviourDraftScope
+        ? clearBehaviourDraft(behaviourDraftScope).catch(() => undefined)
+        : Promise.resolve(),
+    ]);
     await clerkSignOut();
     setBootstrapState({ status: "unauthenticated", route: "/(auth)/sign-in" });
   }, [bootstrapState, clerkSignOut]);
@@ -132,6 +144,14 @@ export function AppProviders({ children }: PropsWithChildren) {
 function paceDraftScopeForState(state: BootstrapState) {
   if (state.status !== "ready") return null;
   return resolvePaceDraftScope(
+    state.state.userId,
+    state.activeSiteState.activeSiteId,
+  );
+}
+
+function behaviourDraftScopeForState(state: BootstrapState) {
+  if (state.status !== "ready") return null;
+  return resolveBehaviourDraftScope(
     state.state.userId,
     state.activeSiteState.activeSiteId,
   );

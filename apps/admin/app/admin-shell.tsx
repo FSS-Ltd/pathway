@@ -65,6 +65,14 @@ const navItemsWithAccess: (SidebarNavItem & {
     permission: "ace.pace.read",
     group: "Teaching",
   },
+  {
+    label: "Behaviour",
+    href: "/ace/behaviour",
+    iconIndex: 23,
+    access: "staff-or-admin",
+    permission: "ace.behaviour.read",
+    group: "Teaching",
+  },
   { ...defaultSidebarItems[6], access: "staff-or-admin", group: "Schedule" }, // Sessions & Rota
   { ...defaultSidebarItems[7], access: "staff-or-admin", group: "Schedule" }, // My schedule
   { ...defaultSidebarItems[8], access: "staff-or-admin", permission: "attendance.read", group: "Schedule" }, // Attendance
@@ -92,6 +100,7 @@ const titleMap: Record<string, string> = {
   "/lessons": "Lessons",
   "/learning": "Learning",
   "/ace/pace": "PACE workflow",
+  "/ace/behaviour": "Behaviour capture",
   "/classes": "Classes",
   "/sessions": "Sessions & Rota",
   "/my-schedule": "My schedule",

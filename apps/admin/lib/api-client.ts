@@ -1069,6 +1069,185 @@ function isAdminPacePolicyCode(value: unknown): value is AdminPacePolicyCode {
   return typeof value === "string" && adminPacePolicyCodes.includes(value);
 }
 
+export type AdminBehaviourType = "MERIT" | "DEMERIT" | "GENERAL";
+export type AdminBehaviourVisibility = "GENERAL" | "SENSITIVE";
+
+export type AdminBehaviourCategory = {
+  code: string;
+  label: string;
+  type: AdminBehaviourType;
+  visibility: AdminBehaviourVisibility;
+  isActive: boolean;
+  isSerious: boolean;
+  sortOrder: number;
+};
+
+export type AdminBehaviourPolicyResponse = {
+  categoryVersion: number;
+  categories: AdminBehaviourCategory[];
+  demeritPolicy: {
+    id: string;
+    version: number;
+    windowDays: number;
+    stageOneThreshold: number;
+    stageTwoThreshold: number;
+    stageThreeThreshold: number;
+    seriousMisconductStage: number;
+    effectiveFrom: string;
+    effectiveTo: string | null;
+  } | null;
+};
+
+export type AdminBehaviourEntry = {
+  id: string;
+  childId: string;
+  category: string;
+  categoryPolicyVersion: number | null;
+  categoryIsSerious: boolean | null;
+  type: AdminBehaviourType;
+  visibility: AdminBehaviourVisibility;
+  pointsDelta: number;
+  occurredAt: string;
+  recordedByUserId: string;
+  reason: string;
+  note: string | null;
+  correctsBehaviourEntryId: string | null;
+  createdAt: string;
+};
+
+export type AdminBehaviourCommandInput = {
+  idempotencyKey: string;
+  childId: string;
+  category: string;
+  type: AdminBehaviourType;
+  visibility: AdminBehaviourVisibility;
+  pointsDelta: number;
+  occurredAt: string;
+  reason: string;
+  note?: string;
+};
+
+export type AdminBehaviourCommandResponse = {
+  entry: AdminBehaviourEntry;
+  duplicate: boolean;
+};
+
+export type AdminBehaviourHistoryResponse = {
+  items: AdminBehaviourEntry[];
+};
+
+export type AdminBehaviourHistoryQuery = {
+  childId?: string;
+  type?: AdminBehaviourType;
+  occurredFrom?: string;
+  occurredTo?: string;
+  limit?: number;
+};
+
+export class AdminBehaviourApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "AdminBehaviourApiError";
+  }
+}
+
+export async function fetchBehaviourPolicy(): Promise<AdminBehaviourPolicyResponse> {
+  if (isUsingMockApi()) {
+    return { categoryVersion: 0, categories: [], demeritPolicy: null };
+  }
+  return behaviourRequest<AdminBehaviourPolicyResponse>(
+    "/ace/behaviour/policy",
+  );
+}
+
+export async function fetchBehaviourHistory(
+  query: AdminBehaviourHistoryQuery = {},
+): Promise<AdminBehaviourHistoryResponse> {
+  if (isUsingMockApi()) return { items: [] };
+  return behaviourRequest<AdminBehaviourHistoryResponse>(
+    `/ace/behaviour${behaviourQueryString(query)}`,
+  );
+}
+
+export function recordBehaviour(
+  input: AdminBehaviourCommandInput,
+): Promise<AdminBehaviourCommandResponse> {
+  return behaviourCommandRequest("/ace/behaviour", input);
+}
+
+export function correctBehaviour(
+  entryId: string,
+  input: AdminBehaviourCommandInput,
+): Promise<AdminBehaviourCommandResponse> {
+  return behaviourCommandRequest(
+    `/ace/behaviour/${encodeURIComponent(entryId)}/corrections`,
+    input,
+  );
+}
+
+async function behaviourCommandRequest(
+  path: string,
+  input: AdminBehaviourCommandInput,
+): Promise<AdminBehaviourCommandResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("Behaviour commands are not available in mock mode.");
+  }
+  return behaviourRequest<AdminBehaviourCommandResponse>(path, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+async function behaviourRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw await behaviourRequestError(response);
+  return response.json() as Promise<T>;
+}
+
+function behaviourQueryString(query: AdminBehaviourHistoryQuery): string {
+  const params = new URLSearchParams();
+  if (query.childId) params.set("childId", query.childId);
+  if (query.type) params.set("type", query.type);
+  if (query.occurredFrom) params.set("occurredFrom", query.occurredFrom);
+  if (query.occurredTo) params.set("occurredTo", query.occurredTo);
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  const encoded = params.toString();
+  return encoded ? `?${encoded}` : "";
+}
+
+async function behaviourRequestError(
+  response: Response,
+): Promise<AdminBehaviourApiError> {
+  const fallback = `Behaviour request failed: ${response.status}`;
+  const body = (await response.json().catch(() => null)) as unknown;
+  if (typeof body !== "object" || body === null) {
+    return new AdminBehaviourApiError(fallback, response.status);
+  }
+  const message =
+    "message" in body && typeof body.message === "string"
+      ? body.message.trim()
+      : "";
+  const code =
+    "code" in body && typeof body.code === "string" ? body.code : undefined;
+  return new AdminBehaviourApiError(
+    message || fallback,
+    response.status,
+    code,
+  );
+}
+
 /** Get current user id from API (when session.user.id is missing). */
 export async function fetchMe(): Promise<{ userId: string }> {
   if (isUsingMockApi()) {
