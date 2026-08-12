@@ -1,13 +1,13 @@
-import type { ReactNode } from "react";
 import { ScrollView, StyleSheet } from "react-native";
-import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
+import { fireEvent, renderRouter, waitFor } from "expo-router/testing-library";
 
+import { mobileTokens } from "@/design/tokens";
+import { ServeBottomNav } from "@/components/navigation/serve-bottom-nav";
 import * as paceApi from "@/lib/api/pace";
 import ServeTabsLayout from "../../../../app/(serve)/(tabs)/_layout";
 import { PaceScreen } from "./pace-screen";
 
-let mockTabScene: ReactNode = null;
 const mockWindowDimensions = jest.fn();
 const mockAppReady = jest.fn();
 
@@ -15,41 +15,6 @@ jest.mock("react-native/Libraries/Utilities/useWindowDimensions", () => ({
   __esModule: true,
   default: () => mockWindowDimensions(),
 }));
-
-jest.mock("expo-router", () => {
-  const React = jest.requireActual<typeof import("react")>("react");
-  const routes = [
-    { key: "attendance-key", name: "attendance" },
-    { key: "schedule-key", name: "schedule" },
-    { key: "pace-key", name: "pace" },
-    { key: "communications-key", name: "communications" },
-    { key: "account-key", name: "account" },
-  ];
-  const Tabs = ({
-    tabBar,
-  }: {
-    tabBar: (props: Record<string, unknown>) => ReactNode;
-  }) =>
-    React.createElement(
-      React.Fragment,
-      null,
-      mockTabScene,
-      tabBar({
-        descriptors: {},
-        insets: { bottom: 0, left: 0, right: 0, top: 0 },
-        navigation: {
-          emit: jest.fn(() => ({ defaultPrevented: false })),
-          navigate: jest.fn(),
-        },
-        state: { index: 2, routes },
-      }),
-    );
-  Tabs.Screen = () => null;
-  return {
-    router: { push: jest.fn(), replace: jest.fn() },
-    Tabs,
-  };
-});
 
 jest.mock("react-native-safe-area-context", () => {
   const actual = jest.requireActual("react-native-safe-area-context");
@@ -130,31 +95,80 @@ beforeEach(() => {
   );
   jest.spyOn(SecureStore, "setItemAsync").mockResolvedValue();
   jest.spyOn(SecureStore, "deleteItemAsync").mockResolvedValue();
-  mockTabScene = <PaceScreen />;
 });
 
 afterEach(() => {
-  mockTabScene = null;
   mockWindowDimensions.mockReset();
   mockAppReady.mockReset();
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
-it("keeps the PACE Record action scrollable above the expanded Serve nav at 320pt and 200% text", async () => {
-  const screen = render(<ServeTabsLayout />);
+it("lets the real tab layout reserve the expanded Serve nav exactly once", async () => {
+  const screen = renderRouter(
+    {
+      _layout: ServeTabsLayout,
+      account: () => null,
+      attendance: () => null,
+      communications: () => null,
+      pace: () => <PaceScreen />,
+      reporting: () => null,
+      safeguarding: () => null,
+      schedule: () => null,
+    },
+    { initialUrl: "/pace" },
+  );
 
   await waitFor(() =>
     expect(screen.getByText("Record assessment")).toBeTruthy(),
   );
   expect(mockWindowDimensions).toHaveBeenCalled();
 
-  fireEvent(screen.getByTestId("serve-bottom-nav"), "layout", {
-    nativeEvent: { layout: { height: 220, width: 320, x: 0, y: 0 } },
+  const tabBar = screen.UNSAFE_root.findByType(ServeBottomNav);
+  const tabBarHost = screen.getByTestId("serve-bottom-nav");
+  if (typeof tabBarHost.props.onLayout === "function") {
+    fireEvent(tabBarHost, "layout", {
+      nativeEvent: { layout: { height: 220, width: 320, x: 0, y: 0 } },
+    });
+  }
+
+  let tabBranch = tabBar;
+  let navigator = tabBar.parent;
+  while (
+    navigator &&
+    !navigator.children.some((child) => {
+      if (typeof child === "string" || child === tabBranch) return false;
+      const style = StyleSheet.flatten(child.props.style);
+      return style?.flex === 1 && style?.overflow === "hidden";
+    })
+  ) {
+    tabBranch = navigator;
+    navigator = navigator.parent;
+  }
+
+  const scene = navigator?.children.find((child) => {
+    if (typeof child === "string" || child === tabBranch) return false;
+    const style = StyleSheet.flatten(child.props.style);
+    return style?.flex === 1 && style?.overflow === "hidden";
   });
+  expect(StyleSheet.flatten(navigator?.props.style)?.flexDirection).toBe(
+    "column",
+  );
+  expect(
+    typeof scene === "string"
+      ? undefined
+      : StyleSheet.flatten(scene?.props.style),
+  ).toEqual(expect.objectContaining({ flex: 1, overflow: "hidden" }));
+  expect(StyleSheet.flatten(tabBranch.props.style)?.position).not.toBe(
+    "absolute",
+  );
+  expect(StyleSheet.flatten(tabBarHost.props.style)?.position).not.toBe(
+    "absolute",
+  );
 
   const scrollView = screen.UNSAFE_root.findByType(ScrollView);
   const contentStyle = StyleSheet.flatten(
     scrollView.props.contentContainerStyle,
   );
-  expect(contentStyle?.paddingBottom).toBeGreaterThanOrEqual(220);
+  expect(contentStyle?.paddingBottom).toBe(mobileTokens.spacing.xs);
 });

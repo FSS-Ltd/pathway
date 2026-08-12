@@ -3,7 +3,6 @@ import type { PropsWithChildren } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { useServeTabBarInset } from "@/components/navigation/serve-tab-bar-inset";
 import {
   getSpaceAccentColor,
   getSpaceBackgroundColor,
@@ -28,15 +27,12 @@ export function Screen({
   children,
 }: ScreenProps) {
   const { signOut } = useAppReady();
-  const serveTabBarInset = useServeTabBarInset();
   const showSpaceActions = tone === "family" || tone === "serve";
   const safeAreaEdges = showSpaceActions
     ? (["top", "left", "right"] as const)
     : undefined;
   const scrollPaddingBottom = showSpaceActions
-    ? tone === "serve" && serveTabBarInset > 0
-      ? serveTabBarInset + mobileTokens.spacing.xs
-      : mobileTokens.spacing.xs
+    ? mobileTokens.spacing.xs
     : mobileTokens.spacing.xxl;
 
   return (
