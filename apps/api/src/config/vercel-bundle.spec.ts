@@ -10,17 +10,17 @@ interface VercelConfig {
 }
 
 describe("Vercel API bundle", () => {
-  it("includes the pricing workspace package at runtime", () => {
+  it("includes all API workspace packages at runtime", () => {
     const config: VercelConfig = JSON.parse(
       readFileSync(resolve(process.cwd(), "vercel.json"), "utf8"),
     );
     const includeFiles = config.functions["api/[...path].js"]?.includeFiles;
 
     expect(includeFiles).toContain(
-      "../../packages/{auth,db,platform,pricing,types,util}/src/**",
+      "../../packages/{ace-domain,auth,db,platform,pricing,types,util}/src/**",
     );
     expect(includeFiles).toContain(
-      "../../packages/{auth,db,platform,pricing,types,util}/package.json",
+      "../../packages/{ace-domain,auth,db,platform,pricing,types,util}/package.json",
     );
   });
 });
