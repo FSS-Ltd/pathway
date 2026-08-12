@@ -55,7 +55,7 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R30: "migrated",
   R31: "migrated",
   R69: { pending: "self-scoped; no capability/permission layer by design" },
-  R70: { pending: "ACE operations dashboard route not built" },
+  R70: "migrated",
 };
 
 for (let n = 15; n <= 68; n += 1) {
@@ -79,6 +79,10 @@ describe("access route matrix", () => {
     for (const row of rows) {
       expect(ROUTE_STATUS[row.id]).toBeDefined();
     }
+  });
+
+  it("classifies the guarded ACE dashboard route as migrated", () => {
+    expect(ROUTE_STATUS.R70).toBe("migrated");
   });
 
   it("has an identical capability and permission key for every migrated route", () => {
