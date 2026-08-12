@@ -361,6 +361,74 @@ async function run(): Promise<void> {
       "retries the assessment with the original override identifier",
     );
 
+    let editedOverrideCalls = 0;
+    const editedAssessments: Array<{ policyOverrideId?: string }> = [];
+    await render(
+      root,
+      <PaceEntryDialog
+        key="override-after-edit"
+        isOpen
+        rosterItem={{
+          child: { id: childId, displayName: "Jordan Smith" },
+          group: null,
+          subject: { id: subjectId, name: "Mathematics" },
+          currentPace: 1001,
+          targetPace: 1012,
+          status: "ON_TRACK",
+          currentLevel: 10,
+          rebuiltAt: null,
+        }}
+        canOverride
+        onClose={() => undefined}
+        onSave={async (input) => {
+          editedAssessments.push(input);
+          if (editedAssessments.length === 1) {
+            throw new Error("Connection interrupted. Try again.");
+          }
+          return successfulCommand();
+        }}
+        onAuthoriseOverride={async () => {
+          editedOverrideCalls += 1;
+          return {
+            id:
+              editedOverrideCalls === 1
+                ? "77777777-7777-4777-8777-777777777777"
+                : "88888888-8888-4888-8888-888888888888",
+            childId,
+            subjectId,
+            pacePolicyId: "55555555-5555-4555-8555-555555555555",
+            policyCode: "score-below-threshold",
+            authorisedByUserId: "66666666-6666-4666-8666-666666666666",
+            expiresAt: "2026-08-12T09:44:00.000Z",
+            createdAt: "2026-08-12T09:30:00.000Z",
+          };
+        }}
+        onSuccess={() => undefined}
+        onRefreshStepUp={async () => undefined}
+      />,
+    );
+    await fillEntryForm(container);
+    const editedOverride = input(container, "pace-entry-override");
+    await act(async () => editedOverride.click());
+    const editedOverrideForm = container.querySelector("form");
+    assert.ok(editedOverrideForm, "renders an override entry form");
+    await submit(editedOverrideForm);
+    await change(input(container, "pace-entry-score"), "77");
+    await submit(editedOverrideForm);
+    assert.equal(
+      editedOverrideCalls,
+      2,
+      "requests a fresh override after an assessment-bound field changes",
+    );
+    assert.deepEqual(
+      editedAssessments.map((input) => input.policyOverrideId),
+      [
+        "77777777-7777-4777-8777-777777777777",
+        "88888888-8888-4888-8888-888888888888",
+      ],
+      "does not reuse a stale override after the assessment changes",
+    );
+
     const pageQueries: Array<{ limit: number; cursor?: string }> = [];
     const pagedItems = await fetchAllPacePages(async (query) => {
       pageQueries.push(query);

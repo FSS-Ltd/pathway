@@ -22,6 +22,14 @@ export type PaceEntryFormValue = {
   reason: string;
 };
 
+const assessmentBoundFields = new Set<keyof PaceEntryFormValue>([
+  "paceNumber",
+  "assessmentType",
+  "score",
+  "assessedAt",
+  "reason",
+]);
+
 type PaceEntryDialogProps = {
   isOpen: boolean;
   rosterItem: AdminPaceRosterItem | null;
@@ -83,10 +91,23 @@ export function PaceEntryDialog({
     if (success) successRef.current?.focus();
   }, [success]);
 
+  React.useEffect(() => {
+    if (canOverride) return;
+    setUseOverride(false);
+    setAuthorisedOverride(null);
+  }, [canOverride]);
+
   if (!isOpen || !rosterItem) return null;
 
   const update = (field: keyof PaceEntryFormValue, value: string) => {
+    if (form[field] !== value && assessmentBoundFields.has(field)) {
+      setAuthorisedOverride(null);
+    }
     setForm((current) => ({ ...current, [field]: value }));
+  };
+  const updateOverrideUse = (enabled: boolean) => {
+    setUseOverride(enabled);
+    if (!enabled) setAuthorisedOverride(null);
   };
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -277,7 +298,7 @@ export function PaceEntryDialog({
                 type="checkbox"
                 checked={useOverride}
                 disabled={isSaving}
-                onChange={(event) => setUseOverride(event.target.checked)}
+                onChange={(event) => updateOverrideUse(event.target.checked)}
               />
               <span>
                 Authorise a score-below-threshold override before recording.
