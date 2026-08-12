@@ -51,6 +51,14 @@ const navItemsWithAccess: (SidebarNavItem & {
     group: "Teaching",
   },
   {
+    label: "ACE overview",
+    href: "/ace",
+    iconIndex: 24,
+    access: "staff-or-admin",
+    permission: "ace.dashboard.read",
+    group: "Teaching",
+  },
+  {
     label: "PACE",
     href: "/ace/pace",
     iconIndex: 22,

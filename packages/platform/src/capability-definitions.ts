@@ -443,6 +443,14 @@ export const CAPABILITY_DEFINITIONS = {
     "protected",
     false,
   ),
+  "ace.dashboard.read": defineCapability(
+    "View ACE dashboard",
+    "View the active site's ACE operations overview",
+    "site",
+    "standard",
+    true,
+    aceRequirement,
+  ),
   "ace.settings.read": defineCapability(
     "View ACE settings",
     "View ACE and academic-year configuration",

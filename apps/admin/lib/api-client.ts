@@ -678,6 +678,64 @@ export type CreateAdminAcademicYearInput = {
   }>;
 };
 
+export type AceDashboardResponse = {
+  localDate: string;
+  timezone: string;
+  attendance: {
+    present: number;
+    absent: number;
+    late: number;
+    unmarked: number;
+  };
+  pace: {
+    ahead: number;
+    onTrack: number;
+    atRisk: number;
+    behind: number;
+    blocked: number;
+    stale: number;
+  };
+  behaviour: {
+    siteReview: number;
+    headReview: number;
+  };
+};
+
+export async function fetchAceDashboard(
+  input: { date?: string; signal?: AbortSignal } = {},
+): Promise<AceDashboardResponse> {
+  if (isUsingMockApi()) {
+    return {
+      localDate: input.date ?? toLocalDateKey(new Date()),
+      timezone: "UTC",
+      attendance: { present: 0, absent: 0, late: 0, unmarked: 0 },
+      pace: {
+        ahead: 0,
+        onTrack: 0,
+        atRisk: 0,
+        behind: 0,
+        blocked: 0,
+        stale: 0,
+      },
+      behaviour: { siteReview: 0, headReview: 0 },
+    };
+  }
+
+  const query = input.date
+    ? `?${new URLSearchParams({ date: input.date }).toString()}`
+    : "";
+  const response = await fetch(`${API_BASE_URL}/ace/dashboard${query}`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    signal: input.signal,
+  });
+  if (!response.ok) {
+    throw new Error("Unable to load the ACE overview.");
+  }
+  return response.json() as Promise<AceDashboardResponse>;
+}
+
 export type AdminStudentSubjectPlacement = {
   id: string;
   subjectId: string;

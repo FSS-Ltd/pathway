@@ -166,6 +166,12 @@ Added by ACE-F14 to give the admin nav a source for the caller's own effective p
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | R69 | GET | `/access/users/me/permissions` | `none` | `none` | any authenticated user | active organisation membership | self only; not a delegation-boundary read | current-effective-assignments-only | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 
+## ACE operations dashboard route
+
+| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R70 | GET | `/ace/dashboard` | `ace.dashboard.read` | `ace.dashboard.read` | organisation-head, site-lead | active selected-site context | active-site aggregate domain | staff-only | none | standard | trusted organisation/site context; tenant-scoped RLS |
+
 ## NexSteps legacy surface (Batch A)
 
 Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cutover, using `platform.access.*`-family keys already active in `PLATFORM_CORE_CAPABILITIES` for every vertical. Not part of the 68 exact ACE routes; recorded separately so that count stays accurate. Migration is bounded to the two controllers that authorised from no role check at all (announcements, attendance) - see the ACE-F14 build plan for the controllers still blocked on a missing permission key or a commercial-entitlement decision (children, classes, parents, lessons, orgs, staff, session assignments, learning).

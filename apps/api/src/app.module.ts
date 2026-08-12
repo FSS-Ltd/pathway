@@ -6,6 +6,7 @@ import { BillingModule } from "./billing/billing.module";
 import { AceSettingsModule } from "./ace-settings/ace-settings.module";
 import { PaceModule } from "./pace/pace.module";
 import { BehaviourModule } from "./behaviour/behaviour.module";
+import { AceDashboardModule } from "./ace-dashboard/ace-dashboard.module";
 
 // Core modules
 import { HealthModule } from "./health/health.module";
@@ -78,6 +79,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     AceSettingsModule,
     PaceModule,
     BehaviourModule,
+    AceDashboardModule,
     LeadsModule,
     StaffModule,
     PublicSignupModule,
