@@ -1,7 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
+import {
+  Animated,
+  Easing,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { mobileTokens } from "@/design/tokens";
@@ -9,8 +23,17 @@ import { mobileTokens } from "@/design/tokens";
 const SERVE_ITEMS = [
   { routeName: "attendance", label: "Today", icon: "home-outline" as const },
   { routeName: "schedule", label: "Schedule", icon: "people-outline" as const },
-  { routeName: "communications", label: "Pickups", icon: "notifications-outline" as const },
-  { routeName: "account", label: "Settings", icon: "settings-outline" as const },
+  { routeName: "pace", label: "PACE", icon: "school-outline" as const },
+  {
+    routeName: "communications",
+    label: "Pickups",
+    icon: "notifications-outline" as const,
+  },
+  {
+    routeName: "account",
+    label: "Settings",
+    icon: "settings-outline" as const,
+  },
 ];
 
 type ExpoTabBarProps = Parameters<
@@ -19,8 +42,14 @@ type ExpoTabBarProps = Parameters<
 
 const ACTIVE_TILE_WIDTH = 76;
 
-export function ServeBottomNav({ state, descriptors, navigation }: ExpoTabBarProps) {
+export function ServeBottomNav({
+  state,
+  descriptors,
+  navigation,
+}: ExpoTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { fontScale, width } = useWindowDimensions();
+  const isCompactLargeText = width <= 320 && fontScale >= 2;
   const [rowWidth, setRowWidth] = useState(0);
   const indicatorX = useRef(new Animated.Value(0)).current;
   const indicatorInitialized = useRef(false);
@@ -37,11 +66,16 @@ export function ServeBottomNav({ state, descriptors, navigation }: ExpoTabBarPro
       };
     }).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
   }, [state.routes]);
-  const activeIndex = entries.findIndex((entry) => state.routes[state.index]?.key === entry.route.key);
-  const slotWidth = entries.length > 0 && rowWidth > 0 ? rowWidth / entries.length : 0;
-  const targetX = activeIndex >= 0 && slotWidth > 0
-    ? activeIndex * slotWidth + (slotWidth - ACTIVE_TILE_WIDTH) / 2
-    : 0;
+  const activeIndex = entries.findIndex(
+    (entry) => state.routes[state.index]?.key === entry.route.key,
+  );
+  const slotWidth =
+    entries.length > 0 && rowWidth > 0 ? rowWidth / entries.length : 0;
+  const activeTileWidth = Math.min(ACTIVE_TILE_WIDTH, slotWidth);
+  const targetX =
+    activeIndex >= 0 && slotWidth > 0
+      ? activeIndex * slotWidth + (slotWidth - activeTileWidth) / 2
+      : 0;
 
   useEffect(() => {
     if (activeIndex < 0 || slotWidth <= 0) return;
@@ -61,30 +95,52 @@ export function ServeBottomNav({ state, descriptors, navigation }: ExpoTabBarPro
   }, [activeIndex, indicatorX, slotWidth, targetX]);
 
   return (
-    <View style={[styles.container, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+    <View
+      testID="serve-bottom-nav"
+      style={[
+        styles.container,
+        isCompactLargeText ? styles.compactContainer : undefined,
+        { paddingBottom: Math.max(insets.bottom, 10) },
+      ]}
+    >
       <View
-        style={styles.row}
+        style={[
+          styles.row,
+          isCompactLargeText ? styles.largeTextRow : undefined,
+        ]}
         onLayout={(event) => {
           setRowWidth(event.nativeEvent.layout.width);
         }}
       >
-        {entries.length > 0 && activeIndex >= 0 ? (
+        {!isCompactLargeText && entries.length > 0 && activeIndex >= 0 ? (
           <Animated.View
             pointerEvents="none"
             style={[
               styles.activeIndicator,
               {
                 transform: [{ translateX: indicatorX }],
+                width: activeTileWidth,
               },
             ]}
           />
         ) : null}
         {entries.map((entry) => {
           const isFocused = state.routes[state.index]?.key === entry.route.key;
-          const options = descriptors[entry.route.key]?.options as {
-            tabBarAccessibilityLabel?: string;
-            tabBarButtonTestID?: string;
-          } | undefined;
+          const labelStyle = [
+            isFocused ? styles.activeText : styles.inactiveText,
+            isCompactLargeText
+              ? {
+                  lineHeight:
+                    mobileTokens.typography.body.xs.lineHeight * fontScale,
+                }
+              : undefined,
+          ];
+          const options = descriptors[entry.route.key]?.options as
+            | {
+                tabBarAccessibilityLabel?: string;
+                tabBarButtonTestID?: string;
+              }
+            | undefined;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -102,21 +158,37 @@ export function ServeBottomNav({ state, descriptors, navigation }: ExpoTabBarPro
               key={entry.route.key}
               onPress={onPress}
               onLongPress={() => {
-                navigation.emit({ type: "tabLongPress", target: entry.route.key });
+                navigation.emit({
+                  type: "tabLongPress",
+                  target: entry.route.key,
+                });
               }}
               accessibilityRole="button"
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options?.tabBarAccessibilityLabel}
               testID={options?.tabBarButtonTestID}
-              style={({ pressed }) => [styles.item, pressed ? styles.pressedItem : undefined]}
+              style={({ pressed }) => [
+                styles.item,
+                isCompactLargeText ? styles.largeTextItem : undefined,
+                pressed ? styles.pressedItem : undefined,
+              ]}
             >
-              <View style={styles.tabTile}>
+              <View
+                style={[
+                  styles.tabTile,
+                  isCompactLargeText ? styles.largeTextTile : undefined,
+                ]}
+              >
                 <Ionicons
                   name={entry.icon}
                   size={isFocused ? 23 : 22}
-                  color={isFocused ? mobileTokens.colors.text.primary : mobileTokens.colors.text.muted}
+                  color={
+                    isFocused
+                      ? mobileTokens.colors.text.primary
+                      : mobileTokens.colors.text.muted
+                  }
                 />
-                <Text style={isFocused ? styles.activeText : styles.inactiveText}>{entry.label}</Text>
+                <Text style={labelStyle}>{entry.label}</Text>
               </View>
             </Pressable>
           );
@@ -140,6 +212,9 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingHorizontal: 12,
   },
+  compactContainer: {
+    paddingHorizontal: 4,
+  },
   row: {
     minHeight: 54,
     flexDirection: "row",
@@ -147,19 +222,34 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     position: "relative",
   },
+  largeTextRow: {
+    flexWrap: "wrap",
+    justifyContent: "center",
+  },
   item: {
     flex: 1,
     alignItems: "stretch",
     justifyContent: "center",
   },
+  largeTextItem: {
+    flexBasis: "33.333%",
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   tabTile: {
-    width: ACTIVE_TILE_WIDTH,
+    width: "100%",
+    maxWidth: ACTIVE_TILE_WIDTH,
     minHeight: 56,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     gap: 1,
     alignSelf: "center",
+  },
+  largeTextTile: {
+    maxWidth: "100%",
+    minHeight: 84,
+    paddingHorizontal: 2,
   },
   activeIndicator: {
     position: "absolute",

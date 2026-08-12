@@ -1,12 +1,23 @@
 import type { PropsWithChildren } from "react";
-import { createContext, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import type { AppSpace } from "@pathway/mobile-core";
 import { useAuth } from "@clerk/clerk-expo";
 
 import { assertEnv } from "@/config/env";
 import { apiClient } from "@/lib/api/client";
-import { bootstrapAuthState, startTokenRefresh, type BootstrapState } from "@/lib/auth/bootstrap";
+import {
+  bootstrapAuthState,
+  startTokenRefresh,
+  type BootstrapState,
+} from "@/lib/auth/bootstrap";
 import { updateAppStateSnapshot } from "@/lib/auth/session-store";
+import { clearPaceDraft, resolvePaceDraftScope } from "@/lib/pace-draft-store";
 
 type AppBootstrapContextValue = {
   bootstrapState: BootstrapState;
@@ -16,9 +27,8 @@ type AppBootstrapContextValue = {
   switchActiveSite: (siteId: string) => Promise<void>;
 };
 
-export const AppBootstrapContext = createContext<AppBootstrapContextValue | null>(
-  null,
-);
+export const AppBootstrapContext =
+  createContext<AppBootstrapContextValue | null>(null);
 
 /**
  * There's no signIn() here anymore - Clerk's sign-in is a hook-driven flow
@@ -39,9 +49,11 @@ export function AppProviders({ children }: PropsWithChildren) {
   }, [getToken]);
 
   const signOut = useCallback(async () => {
+    const draftScope = paceDraftScopeForState(bootstrapState);
+    if (draftScope) await clearPaceDraft(draftScope).catch(() => undefined);
     await clerkSignOut();
     setBootstrapState({ status: "unauthenticated", route: "/(auth)/sign-in" });
-  }, [clerkSignOut]);
+  }, [bootstrapState, clerkSignOut]);
 
   const switchSpace = useCallback(
     async (space: AppSpace) => {
@@ -76,13 +88,18 @@ export function AppProviders({ children }: PropsWithChildren) {
         status: "error",
         route: "/(auth)/sign-in",
         message:
-          error instanceof Error ? error.message : "Mobile environment configuration is invalid.",
+          error instanceof Error
+            ? error.message
+            : "Mobile environment configuration is invalid.",
       });
       return;
     }
 
     if (!isSignedIn) {
-      setBootstrapState({ status: "unauthenticated", route: "/(auth)/sign-in" });
+      setBootstrapState({
+        status: "unauthenticated",
+        route: "/(auth)/sign-in",
+      });
       return;
     }
 
@@ -109,5 +126,13 @@ export function AppProviders({ children }: PropsWithChildren) {
     <AppBootstrapContext.Provider value={value}>
       {children}
     </AppBootstrapContext.Provider>
+  );
+}
+
+function paceDraftScopeForState(state: BootstrapState) {
+  if (state.status !== "ready") return null;
+  return resolvePaceDraftScope(
+    state.state.userId,
+    state.activeSiteState.activeSiteId,
   );
 }

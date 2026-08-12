@@ -7,9 +7,6 @@ export default function ServeTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          position: "absolute",
-        },
       }}
       tabBar={(props) => <ServeBottomNav {...props} />}
     >
@@ -23,6 +20,13 @@ export default function ServeTabsLayout() {
         name="schedule"
         options={{
           title: "Schedule",
+        }}
+      />
+      <Tabs.Screen
+        name="pace"
+        options={{
+          title: "PACE",
+          tabBarAccessibilityLabel: "PACE assessments",
         }}
       />
       <Tabs.Screen
