@@ -26,6 +26,13 @@ export default function ServeTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="pace"
+        options={{
+          title: "PACE",
+          tabBarAccessibilityLabel: "PACE assessments",
+        }}
+      />
+      <Tabs.Screen
         name="communications"
         options={{
           title: "Pickups",

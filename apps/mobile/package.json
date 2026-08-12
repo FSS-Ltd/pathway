@@ -9,6 +9,8 @@
     "android": "expo run:android",
     "web": "expo start --web",
     "doctor": "npx expo-doctor",
+    "test": "tsx src/features/ace/pace/pace-wiring.test.ts",
+    "test:unit": "tsx src/features/ace/pace/pace-wiring.test.ts",
     "lint": "eslint \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" --no-error-on-unmatched-pattern",
     "typecheck": "tsc --noEmit"
   },
