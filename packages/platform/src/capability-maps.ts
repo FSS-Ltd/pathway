@@ -46,6 +46,7 @@ export const VERTICAL_CAPABILITIES = {
     "pace.manage",
     "parents.read",
     "reports.read",
+    "ace.dashboard.read",
     "ace.settings.read",
     "ace.settings.manage",
     "ace.pace.read",

@@ -68,6 +68,7 @@ const LEGACY_MAP_KEYS = [
 ] as const;
 
 const SECTION_5_2_KEYS = [
+  "ace.dashboard.read",
   "ace.settings.read",
   "ace.settings.manage",
   "ace.pace.read",
@@ -167,8 +168,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 108 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(108);
+  it("contains exactly the 109 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(109);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
@@ -197,6 +198,10 @@ describe("capability definitions", () => {
         ),
       ).toBe(true);
     }
+  });
+
+  it("grants ACE schools the dashboard capability", () => {
+    expect(VERTICAL_CAPABILITIES.ACE_SCHOOL).toContain("ace.dashboard.read");
   });
 
   it("uses high-water sensitivity and the approved delegation policy", () => {
@@ -228,6 +233,11 @@ describe("capability definitions", () => {
   });
 
   it("uses the most restrictive scope without replacing route checks", () => {
+    expect(CAPABILITY_DEFINITIONS["ace.dashboard.read"]).toMatchObject({
+      scope: "site",
+      sensitivity: "standard",
+      requiredVertical: Vertical.ACE_SCHOOL,
+    });
     expect(CAPABILITY_DEFINITIONS["ace.parent.progress.read"].scope).toBe(
       "relationship",
     );

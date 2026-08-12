@@ -61,6 +61,7 @@ describe("ACE system role templates", () => {
           "volunteers.manage",
           "giving.manage",
           "calendar.read",
+          "ace.dashboard.read",
           "ace.settings.read",
           "ace.settings.manage",
           "ace.pace.read",
@@ -111,6 +112,7 @@ describe("ACE system role templates", () => {
           "volunteers.manage",
           "giving.manage",
           "calendar.read",
+          "ace.dashboard.read",
           "ace.settings.read",
           "ace.settings.manage",
           "ace.pace.read",
@@ -230,6 +232,18 @@ describe("ACE system role templates", () => {
         ],
       },
     });
+  });
+
+  it("grants dashboard access only to organisation and site leaders", () => {
+    expect(SYSTEM_ROLE_TEMPLATES.organisationHead.permissions).toContain(
+      "ace.dashboard.read",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.siteLead.permissions).toContain(
+      "ace.dashboard.read",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.staff.permissions).not.toContain(
+      "ace.dashboard.read",
+    );
   });
 
   it("gives every template except financeOperator at least one core (vertical-independent) permission", () => {

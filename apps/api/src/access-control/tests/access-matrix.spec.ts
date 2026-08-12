@@ -55,6 +55,7 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R30: "migrated",
   R31: "migrated",
   R69: { pending: "self-scoped; no capability/permission layer by design" },
+  R70: { pending: "ACE operations dashboard route not built" },
 };
 
 for (let n = 15; n <= 68; n += 1) {
@@ -70,8 +71,8 @@ describe("access route matrix", () => {
   const markdown = readFileSync(MATRIX_PATH, "utf8");
   const rows = parseMatrix(markdown);
 
-  it("parses at least the 68 exact routes plus the self-scoped route", () => {
-    expect(rows.length).toBeGreaterThanOrEqual(69);
+  it("parses at least the 68 exact routes plus two additional routes", () => {
+    expect(rows.length).toBeGreaterThanOrEqual(70);
   });
 
   it("classifies every committed matrix row as migrated or explicitly pending", () => {
@@ -133,6 +134,17 @@ describe("access route matrix", () => {
       method: "PUT",
       path: "/ace/behaviour/policy",
       permission: "ace.behaviour.policy.manage",
+    });
+  });
+
+  it("gives the ACE dashboard route its least-privilege permission key", () => {
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+
+    expect(byId.R70).toMatchObject({
+      method: "GET",
+      path: "/ace/dashboard",
+      capability: "ace.dashboard.read",
+      permission: "ace.dashboard.read",
     });
   });
 });
