@@ -114,6 +114,7 @@ describe("DSAR (e2e)", () => {
           groupId,
           sessionId,
           present: true,
+          status: "PRESENT",
           timestamp: new Date("2025-01-01T09:05:00Z"),
         },
       });

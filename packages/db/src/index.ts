@@ -165,6 +165,7 @@ export {
   PendingOrderStatus,
   OrgRole,
   SiteRole,
+  AttendanceStatus,
   StaffAttendanceStatus,
   ChildGuardianContactType,
   OrgSector,
