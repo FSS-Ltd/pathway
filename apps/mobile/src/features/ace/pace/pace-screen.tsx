@@ -1,10 +1,16 @@
-import * as SecureStore from "expo-secure-store";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { BrandedCard, SectionTitle } from "@/components/primitives/ui";
 import { Screen } from "@/components/primitives/screen";
 import { mobileTokens } from "@/design/tokens";
+import { useAppReady } from "@/hooks/use-app-ready";
+import {
+  paceDraftStorageKey,
+  readPaceDraft,
+  resolvePaceDraftScope,
+  writePaceDraft,
+} from "@/lib/pace-draft-store";
 import {
   fetchPaceRoster,
   recordPaceAssessment,
@@ -21,8 +27,6 @@ import {
   type PaceAssessmentDraft,
 } from "./pace-subject-panel";
 
-const PACE_DRAFT_KEY = "ace-pace-draft-v1";
-
 type StoredPaceDraft = PaceAssessmentDraft & {
   childId: string | null;
   subjectId: string | null;
@@ -36,9 +40,12 @@ type Feedback = {
 };
 
 export function PaceScreen() {
+  const { bootstrapState } = useAppReady();
   const [items, setItems] = useState<PaceRosterItem[]>([]);
   const [draft, setDraft] = useState<StoredPaceDraft>(createEmptyDraft);
-  const [isDraftHydrated, setIsDraftHydrated] = useState(false);
+  const [hydratedDraftScopeKey, setHydratedDraftScopeKey] = useState<
+    string | null
+  >(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -47,6 +54,17 @@ export function PaceScreen() {
     Partial<Record<keyof PaceAssessmentDraft, string>>
   >({});
   const submissionGate = useRef(createPaceSubmissionGate()).current;
+  const draftScope = useMemo(
+    () =>
+      bootstrapState.status === "ready"
+        ? resolvePaceDraftScope(
+            bootstrapState.state.userId,
+            bootstrapState.activeSiteState.activeSiteId,
+          )
+        : null,
+    [bootstrapState],
+  );
+  const draftScopeKey = draftScope ? paceDraftStorageKey(draftScope) : null;
 
   const loadRoster = useCallback(async () => {
     setIsLoading(true);
@@ -68,33 +86,46 @@ export function PaceScreen() {
   }, []);
 
   useEffect(() => {
+    if (!draftScopeKey) {
+      setItems([]);
+      setIsLoading(false);
+      return;
+    }
     void loadRoster();
-  }, [loadRoster]);
+  }, [draftScopeKey, loadRoster]);
 
   useEffect(() => {
     let isMounted = true;
+    setHydratedDraftScopeKey(null);
+    setDraft(createEmptyDraft());
+    if (!draftScope || !draftScopeKey) return undefined;
 
-    void SecureStore.getItemAsync(PACE_DRAFT_KEY)
+    void readPaceDraft(draftScope)
       .then((value) => {
         if (!isMounted || !value) return;
         const storedDraft = parseStoredDraft(value);
         if (storedDraft) setDraft(storedDraft);
       })
       .finally(() => {
-        if (isMounted) setIsDraftHydrated(true);
+        if (isMounted) setHydratedDraftScopeKey(draftScopeKey);
       });
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [draftScope, draftScopeKey]);
 
   useEffect(() => {
-    if (!isDraftHydrated) return;
-    void SecureStore.setItemAsync(PACE_DRAFT_KEY, JSON.stringify(draft)).catch(
+    if (
+      !draftScope ||
+      !draftScopeKey ||
+      hydratedDraftScopeKey !== draftScopeKey
+    )
+      return;
+    void writePaceDraft(draftScope, JSON.stringify(draft)).catch(
       () => undefined,
     );
-  }, [draft, isDraftHydrated]);
+  }, [draft, draftScope, draftScopeKey, hydratedDraftScopeKey]);
 
   const subjects = useMemo(
     () => items.filter((item) => item.child.id === draft.childId),
@@ -104,7 +135,10 @@ export function PaceScreen() {
     () => subjects.find((item) => item.subject.id === draft.subjectId) ?? null,
     [draft.subjectId, subjects],
   );
-  const isReady = !isLoading && isDraftHydrated;
+  const isReady =
+    !isLoading &&
+    hydratedDraftScopeKey === draftScopeKey &&
+    Boolean(draftScopeKey);
 
   const selectStudent = (childId: string) => {
     setFeedback(null);

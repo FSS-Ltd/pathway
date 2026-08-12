@@ -1,11 +1,6 @@
-export type PacePolicyCode =
-  | "allowed"
-  | "score-below-threshold"
-  | "daily-limit"
-  | "duplicate-self-test"
-  | "same-pace-same-day"
-  | "progression-blocked"
-  | "override-required";
+import { pacePolicyCodes, type PacePolicyCode } from "@pathway/ace-domain";
+
+export type { PacePolicyCode } from "@pathway/ace-domain";
 
 export function parsePaceErrorBody(value: unknown): {
   message: string | null;
@@ -27,15 +22,7 @@ export function parsePaceErrorBody(value: unknown): {
 function isPacePolicyCode(value: unknown): value is PacePolicyCode {
   return (
     typeof value === "string" &&
-    [
-      "allowed",
-      "score-below-threshold",
-      "daily-limit",
-      "duplicate-self-test",
-      "same-pace-same-day",
-      "progression-blocked",
-      "override-required",
-    ].includes(value)
+    pacePolicyCodes.includes(value as PacePolicyCode)
   );
 }
 

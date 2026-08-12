@@ -6,14 +6,17 @@ import {
 
 export type PaceAssessmentType = "SelfTest" | "FinalTest";
 
-export type PacePolicyCode =
-  | "allowed"
-  | "score-below-threshold"
-  | "daily-limit"
-  | "duplicate-self-test"
-  | "same-pace-same-day"
-  | "progression-blocked"
-  | "override-required";
+export const pacePolicyCodes = [
+  "allowed",
+  "score-below-threshold",
+  "daily-limit",
+  "duplicate-self-test",
+  "same-pace-same-day",
+  "progression-blocked",
+  "override-required",
+] as const;
+
+export type PacePolicyCode = (typeof pacePolicyCodes)[number];
 
 export interface PacePolicyResult {
   decision: "allow" | "warn" | "block";
