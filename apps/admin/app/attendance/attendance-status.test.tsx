@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
-import { AdminAttendanceSaveError } from "../../lib/api-client";
-import { AttendanceRegister } from "./[sessionId]/attendance-register";
+import { AdminAttendanceSaveError } from "../../lib/attendance-save-error";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost",
@@ -103,7 +102,13 @@ async function pressArrow(
 }
 
 async function run(): Promise<void> {
+  delete process.env.NEXT_PUBLIC_USE_MOCK_API;
+  delete process.env.NEXT_PUBLIC_API_URL;
+  delete process.env.NEXT_PUBLIC_API_BASE_URL;
+
   const { createRoot } = await import("react-dom/client");
+  const { AttendanceRegister } =
+    await import("./[sessionId]/attendance-register");
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);

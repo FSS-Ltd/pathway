@@ -10,11 +10,11 @@ import {
   type ColumnDef,
   Input,
 } from "@pathway/ui";
-import {
-  AdminAttendanceSaveError,
-  type AdminAttendanceDetail,
-  type SaveAttendanceRow,
+import type {
+  AdminAttendanceDetail,
+  SaveAttendanceRow,
 } from "../../../lib/api-client";
+import { AdminAttendanceSaveError } from "../../../lib/attendance-save-error";
 import { getInitials } from "../../../lib/names";
 import {
   AttendanceStatusControls,

@@ -5,6 +5,11 @@
 // rely on implicit mock fallbacks.
 import { toLocalDateKey } from "./date";
 import { notifyActiveSiteChanged } from "./active-site-events";
+import { AdminAttendanceSaveError } from "./attendance-save-error";
+
+export { AdminAttendanceSaveError } from "./attendance-save-error";
+export type { AdminAttendanceSaveOutcome } from "./attendance-save-error";
+
 const useMockApiExplicit =
   typeof process.env.NEXT_PUBLIC_USE_MOCK_API === "string" &&
   process.env.NEXT_PUBLIC_USE_MOCK_API === "true";
@@ -4310,22 +4315,6 @@ export type SaveAttendanceRow = {
   status: ApiAttendanceStatus;
   correctionReason?: string;
 };
-
-export type AdminAttendanceSaveOutcome = "rejected" | "unknown";
-
-export class AdminAttendanceSaveError extends Error {
-  constructor(
-    readonly outcome: AdminAttendanceSaveOutcome,
-    readonly status: number | null,
-  ) {
-    super(
-      outcome === "rejected"
-        ? "The server rejected the attendance update."
-        : "The attendance save outcome is unknown.",
-    );
-    this.name = "AdminAttendanceSaveError";
-  }
-}
 
 export async function saveAttendanceForSession(
   sessionId: string,
