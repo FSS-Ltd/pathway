@@ -1,9 +1,17 @@
 import { prisma, withTenantRlsContext } from "@pathway/db";
+import {
+  PathwayRequestContext,
+  UserTenantRole,
+  type AuthContext,
+} from "@pathway/auth";
 import { randomUUID } from "node:crypto";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import type { Request } from "express";
 import request from "supertest";
 import { AppModule } from "../../app.module";
+import { Av30ActivityService } from "../../av30/av30-activity.service";
+import { AttendanceService } from "../attendance.service";
 import {
   clearE2eAuthAccess,
   clearE2eTypedRole,
@@ -40,6 +48,36 @@ describe("Attendance (e2e)", () => {
   let authUserId: string;
   let typedRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
   let createdOrgVertical = false;
+
+  function directAttendanceService() {
+    const tenantId = TENANT_A_ID;
+    const orgId = ORG_ID;
+    if (!tenantId || !orgId) {
+      throw new Error("Attendance E2E tenant context is unavailable");
+    }
+    const context = new PathwayRequestContext({} as Request);
+    const authContext: AuthContext = {
+      user: {
+        userId: authUserId,
+        email: "attendance-e2e@example.com",
+        authProvider: "auth0",
+      },
+      org: { orgId },
+      tenant: { tenantId, orgId },
+      roles: { org: [], tenant: [UserTenantRole.ADMIN] },
+      permissions: ["attendance.read", "attendance.manage"],
+      rawClaims: {},
+    };
+    context.setContext(authContext);
+    const recordActivityForCurrentUser = jest.fn().mockResolvedValue(undefined);
+    const av30 = {
+      recordActivityForCurrentUser,
+    } as unknown as Av30ActivityService;
+    return {
+      service: new AttendanceService(av30, context),
+      recordActivityForCurrentUser,
+    };
+  }
 
   beforeAll(async () => {
     if (!requireDatabase()) {
@@ -368,6 +406,119 @@ describe("Attendance (e2e)", () => {
           correctedByUserId: authUserId,
           correctionReason: "Marked in error",
         }),
+      ]),
+    );
+  });
+
+  it("rolls back an earlier valid correction when a later batch row is invalid", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+    const { service, recordActivityForCurrentUser } = directAttendanceService();
+
+    await expect(
+      service.upsertSessionAttendance(ids.session, TENANT_A_ID, {
+        rows: [
+          {
+            childId: ids.child,
+            status: "ABSENT",
+            correctionReason: "First row is valid",
+          },
+          { childId: ids.child2, status: "PRESENT" },
+        ],
+      }),
+    ).rejects.toThrow(
+      "correctionReason is required when changing attendance status",
+    );
+
+    const storedRows = await prisma.attendance.findMany({
+      where: {
+        sessionId: ids.session,
+        childId: { in: [ids.child, ids.child2] },
+      },
+      select: { childId: true, status: true },
+    });
+    expect(storedRows).toHaveLength(2);
+    expect(storedRows).toEqual(
+      expect.arrayContaining([
+        { childId: ids.child, status: "LATE" },
+        { childId: ids.child2, status: "ABSENT" },
+      ]),
+    );
+    expect(recordActivityForCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects duplicate child rows before the service writes", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+    const { service, recordActivityForCurrentUser } = directAttendanceService();
+
+    await expect(
+      service.upsertSessionAttendance(ids.session, TENANT_A_ID, {
+        rows: [
+          {
+            childId: ids.child3,
+            status: "ABSENT",
+            correctionReason: "First duplicate",
+          },
+          {
+            childId: ids.child3,
+            status: "PRESENT",
+            correctionReason: "Second duplicate",
+          },
+        ],
+      }),
+    ).rejects.toThrow("childId must be unique within an attendance batch");
+
+    await expect(
+      prisma.attendance.findFirstOrThrow({
+        where: { sessionId: ids.session, childId: ids.child3 },
+        select: { status: true, correctionReason: true },
+      }),
+    ).resolves.toEqual({ status: "LATE", correctionReason: null });
+    expect(recordActivityForCurrentUser).not.toHaveBeenCalled();
+  });
+
+  it("commits a fully valid session batch", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+
+    const res = await request(app.getHttpServer())
+      .put(`/attendance/session/${ids.session}`)
+      .send({
+        rows: [
+          {
+            childId: ids.child,
+            status: "ABSENT",
+            correctionReason: "Confirmed absent",
+          },
+          {
+            childId: ids.child2,
+            status: "PRESENT",
+            correctionReason: "Arrived onsite",
+          },
+        ],
+      })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+
+    expect(res.status).toBe(200);
+    const storedRows = await prisma.attendance.findMany({
+      where: {
+        sessionId: ids.session,
+        childId: { in: [ids.child, ids.child2] },
+      },
+      select: { childId: true, status: true, correctionReason: true },
+    });
+    expect(storedRows).toHaveLength(2);
+    expect(storedRows).toEqual(
+      expect.arrayContaining([
+        {
+          childId: ids.child,
+          status: "ABSENT",
+          correctionReason: "Confirmed absent",
+        },
+        {
+          childId: ids.child2,
+          status: "PRESENT",
+          correctionReason: "Arrived onsite",
+        },
       ]),
     );
   });

@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { AttendanceService } from "../attendance.service";
-import { prisma } from "@pathway/db";
+import { prisma, withTenantRlsContext } from "@pathway/db";
 import { PathwayRequestContext, UserTenantRole } from "@pathway/auth";
 import { Av30ActivityService } from "../../av30/av30-activity.service";
 import type { AuthContext } from "@pathway/auth/src/types/auth-context";
@@ -13,6 +13,21 @@ import { createAttendanceDto } from "../dto/create-attendance.dto";
 import { updateAttendanceDto } from "../dto/update-attendance.dto";
 import { upsertSessionAttendanceDto } from "../dto/upsert-session-attendance.dto";
 
+jest.mock("@pathway/db", () => {
+  const actual =
+    jest.requireActual<typeof import("@pathway/db")>("@pathway/db");
+  return {
+    ...actual,
+    withTenantRlsContext: jest.fn(
+      async (
+        _tenantId: string,
+        _orgId: string | null,
+        callback: Parameters<typeof actual.withTenantRlsContext>[2],
+      ) => callback(actual.prisma),
+    ),
+  };
+});
+
 // --- Prisma mocks
 const aFindMany = jest.spyOn(prisma.attendance, "findMany");
 const aFindFirst = jest.spyOn(prisma.attendance, "findFirst");
@@ -20,6 +35,7 @@ const aCreate = jest.spyOn(prisma.attendance, "create");
 const aUpdate = jest.spyOn(prisma.attendance, "update");
 
 const cFindUnique = jest.spyOn(prisma.child, "findUnique");
+const cFindMany = jest.spyOn(prisma.child, "findMany");
 const gFindUnique = jest.spyOn(prisma.group, "findUnique");
 const sFindFirst = jest.spyOn(prisma.session, "findFirst");
 
@@ -114,6 +130,7 @@ describe("AttendanceService", () => {
     aCreate.mockReset();
     aUpdate.mockReset();
     cFindUnique.mockReset();
+    cFindMany.mockReset();
     gFindUnique.mockReset();
     sFindFirst.mockReset();
 
@@ -169,6 +186,7 @@ describe("AttendanceService", () => {
 
   describe("DTO compatibility", () => {
     const childId = "11111111-1111-1111-1111-111111111111";
+    const otherChildId = "33333333-3333-3333-3333-333333333333";
     const groupId = "22222222-2222-2222-2222-222222222222";
 
     it("accepts either the legacy Boolean or a status when creating", () => {
@@ -216,10 +234,21 @@ describe("AttendanceService", () => {
         upsertSessionAttendanceDto.safeParse({
           rows: [
             { childId, status: "LATE" },
-            { childId, present: true },
+            { childId: otherChildId, present: true },
           ],
         }).success,
       ).toBe(true);
+    });
+
+    it("rejects duplicate child rows before a session upsert", () => {
+      expect(
+        upsertSessionAttendanceDto.safeParse({
+          rows: [
+            { childId, status: "LATE" },
+            { childId, status: "ABSENT" },
+          ],
+        }).success,
+      ).toBe(false);
     });
   });
 
@@ -678,11 +707,12 @@ describe("AttendanceService", () => {
           status: "ABSENT",
         },
       ] as unknown as Awaited<ReturnType<typeof prisma.attendance.findMany>>);
-      cFindUnique.mockResolvedValueOnce({
-        id: "child-1",
-        tenantId: "tenant-123",
-        groupId: "group-1",
-      } as unknown as Awaited<ReturnType<typeof prisma.child.findUnique>>);
+      cFindMany.mockResolvedValueOnce([
+        {
+          id: "child-1",
+          groupId: "group-1",
+        },
+      ] as Awaited<ReturnType<typeof prisma.child.findMany>>);
       aUpdate.mockResolvedValueOnce(
         {} as Awaited<ReturnType<typeof prisma.attendance.update>>,
       );
@@ -713,6 +743,11 @@ describe("AttendanceService", () => {
             correctionReason: "Traffic delay",
           }),
         }),
+      );
+      expect(withTenantRlsContext).toHaveBeenCalledWith(
+        "tenant-123",
+        "org-123",
+        expect.any(Function),
       );
     });
   });

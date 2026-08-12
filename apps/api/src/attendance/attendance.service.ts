@@ -6,7 +6,7 @@ import {
   Optional,
   UnauthorizedException,
 } from "@nestjs/common";
-import { prisma } from "@pathway/db";
+import { prisma, withTenantRlsContext } from "@pathway/db";
 import { PathwayRequestContext } from "@pathway/auth";
 import { Av30ActivityType } from "@pathway/types/av30";
 import { Av30ActivityService } from "../av30/av30-activity.service";
@@ -205,7 +205,8 @@ export class AttendanceService {
       },
       children: children.map((c) => ({
         id: c.id,
-        displayName: [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || "Child",
+        displayName:
+          [c.firstName, c.lastName].filter(Boolean).join(" ").trim() || "Child",
       })),
       rows: children.map((c) => {
         const row = rowsByChild.get(c.id);
@@ -229,76 +230,121 @@ export class AttendanceService {
     tenantId: string,
     input: UpsertSessionAttendanceDto,
   ) {
-    const session = await prisma.session.findFirst({
-      where: { id: sessionId, tenantId },
-      select: { id: true, groups: { select: { id: true } } },
-    });
-    if (!session) throw new NotFoundException("Session not found");
-    const groupIds = new Set(session.groups.map((g) => g.id));
-
-    const existing = await prisma.attendance.findMany({
-      where: { sessionId, child: { tenantId } },
-      select: {
-        id: true,
-        childId: true,
-        present: true,
-        status: true,
-      },
-    });
-    const existingByChild = new Map(existing.map((row) => [row.childId, row]));
-
-    const now = new Date();
-    for (const row of input.rows) {
-      const child = await prisma.child.findUnique({
-        where: { id: row.childId },
-        select: { id: true, tenantId: true, groupId: true },
-      });
-      if (!child || child.tenantId !== tenantId)
-        throw new BadRequestException(`Child ${row.childId} not found`);
-      if (!child.groupId || !groupIds.has(child.groupId))
-        throw new BadRequestException(
-          `Child ${row.childId} is not in a group for this session`,
-        );
-
-      const requestedStatus = requestedAttendanceStatus(row);
-      if (!requestedStatus) {
-        throw new BadRequestException(
-          `Attendance status is required for child ${row.childId}`,
-        );
-      }
-      const existingRow = existingByChild.get(row.childId);
-      if (existingRow) {
-        const correction = this.correctionData(
-          tenantId,
-          effectiveAttendanceStatus(existingRow),
-          requestedStatus,
-          row.correctionReason,
-          now,
-        );
-        await prisma.attendance.update({
-          where: { id: existingRow.id },
-          data: {
-            status: requestedStatus,
-            present: presentFromAttendanceStatus(requestedStatus),
-            timestamp: now,
-            ...correction,
-          },
-          select: SELECT,
-        });
-      } else {
-        await prisma.attendance.create({
-          data: {
-            childId: row.childId,
-            groupId: child.groupId,
-            sessionId,
-            status: requestedStatus,
-            present: presentFromAttendanceStatus(requestedStatus),
-            timestamp: now,
-          },
-          select: SELECT,
-        });
-      }
+    if (this.requestContext.currentTenantId !== tenantId) {
+      throw new UnauthorizedException(
+        "An authenticated site actor is required to record attendance",
+      );
     }
+    const childIds = input.rows.map((row) => row.childId);
+    if (new Set(childIds).size !== childIds.length) {
+      throw new BadRequestException(
+        "childId must be unique within an attendance batch",
+      );
+    }
+    const now = new Date();
+    const detail = await withTenantRlsContext(
+      tenantId,
+      this.requestContext.currentOrgId,
+      async (tx) => {
+        const session = await tx.session.findFirst({
+          where: { id: sessionId, tenantId },
+          select: { id: true, groups: { select: { id: true } } },
+        });
+        if (!session) throw new NotFoundException("Session not found");
+        const groupIds = new Set(session.groups.map((group) => group.id));
+
+        const [existing, children] = await Promise.all([
+          tx.attendance.findMany({
+            where: {
+              sessionId,
+              childId: { in: childIds },
+              child: { tenantId },
+            },
+            select: {
+              id: true,
+              childId: true,
+              present: true,
+              status: true,
+            },
+          }),
+          tx.child.findMany({
+            where: { id: { in: childIds }, tenantId },
+            select: { id: true, groupId: true },
+          }),
+        ]);
+        const existingByChild = new Map(
+          existing.map((row) => [row.childId, row]),
+        );
+        const childrenById = new Map(
+          children.map((child) => [child.id, child]),
+        );
+
+        const plannedRows = input.rows.map((row) => {
+          const child = childrenById.get(row.childId);
+          if (!child) {
+            throw new BadRequestException(`Child ${row.childId} not found`);
+          }
+          if (!child.groupId || !groupIds.has(child.groupId)) {
+            throw new BadRequestException(
+              `Child ${row.childId} is not in a group for this session`,
+            );
+          }
+
+          const requestedStatus = requestedAttendanceStatus(row);
+          if (!requestedStatus) {
+            throw new BadRequestException(
+              `Attendance status is required for child ${row.childId}`,
+            );
+          }
+          const existingRow = existingByChild.get(row.childId);
+          const correction = existingRow
+            ? this.correctionData(
+                tenantId,
+                effectiveAttendanceStatus(existingRow),
+                requestedStatus,
+                row.correctionReason,
+                now,
+              )
+            : {};
+          return {
+            correction,
+            existingRow,
+            groupId: child.groupId,
+            requestedStatus,
+            row,
+          };
+        });
+
+        for (const plan of plannedRows) {
+          if (plan.existingRow) {
+            await tx.attendance.update({
+              where: { id: plan.existingRow.id },
+              data: {
+                status: plan.requestedStatus,
+                present: presentFromAttendanceStatus(plan.requestedStatus),
+                timestamp: now,
+                ...plan.correction,
+              },
+              select: SELECT,
+            });
+          } else {
+            await tx.attendance.create({
+              data: {
+                childId: plan.row.childId,
+                groupId: plan.groupId,
+                sessionId,
+                status: plan.requestedStatus,
+                present: presentFromAttendanceStatus(plan.requestedStatus),
+                timestamp: now,
+              },
+              select: SELECT,
+            });
+          }
+        }
+
+        return this.getSessionAttendanceDetail(sessionId, tenantId);
+      },
+    );
 
     if (this.av30ActivityService) {
       await this.av30ActivityService
@@ -312,7 +358,7 @@ export class AttendanceService {
         });
     }
 
-    return this.getSessionAttendanceDetail(sessionId, tenantId);
+    return detail;
   }
 
   async getById(id: string, tenantId: string) {
