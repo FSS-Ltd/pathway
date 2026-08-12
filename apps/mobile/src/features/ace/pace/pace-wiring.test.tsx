@@ -179,6 +179,35 @@ describe("PaceScreen", () => {
     );
   });
 
+  it("retains an offline draft when staff return to a previously active site", async () => {
+    const screen = render(<PaceScreen />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Assessment reason").props.value).toBe(
+        "Supervised PACE test",
+      ),
+    );
+
+    mockAppReady.mockReturnValue(appReady("user-1", "site-2"));
+    jest.spyOn(SecureStore, "getItemAsync").mockResolvedValueOnce(null);
+    screen.rerender(<PaceScreen />);
+    await waitFor(() =>
+      expect(SecureStore.getItemAsync).toHaveBeenCalledWith(
+        "ace-pace-draft-v1:user-1:site-2",
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Assessment reason")).toBeNull(),
+    );
+
+    mockAppReady.mockReturnValue(appReady("user-1", "site-1"));
+    screen.rerender(<PaceScreen />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Assessment reason").props.value).toBe(
+        "Supervised PACE test",
+      ),
+    );
+  });
+
   it("renders large flexible controls for a 320pt/200% layout and shows a server policy block", async () => {
     jest
       .spyOn(paceApi, "recordPaceAssessment")

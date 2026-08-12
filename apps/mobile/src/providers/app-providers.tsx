@@ -72,14 +72,10 @@ export function AppProviders({ children }: PropsWithChildren) {
       if (!token) return;
 
       await apiClient.setActiveSite(siteId, token);
-      const priorDraftScope = paceDraftScopeForState(bootstrapState);
-      if (priorDraftScope && priorDraftScope.siteId !== siteId) {
-        await clearPaceDraft(priorDraftScope).catch(() => undefined);
-      }
       await updateAppStateSnapshot({ activeSiteId: siteId });
       await refreshBootstrap();
     },
-    [bootstrapState, getToken, refreshBootstrap],
+    [getToken, refreshBootstrap],
   );
 
   useEffect(() => {

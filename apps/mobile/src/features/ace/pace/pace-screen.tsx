@@ -6,6 +6,7 @@ import { Screen } from "@/components/primitives/screen";
 import { mobileTokens } from "@/design/tokens";
 import { useAppReady } from "@/hooks/use-app-ready";
 import {
+  activatePaceDraftScope,
   paceDraftStorageKey,
   readPaceDraft,
   resolvePaceDraftScope,
@@ -54,15 +55,15 @@ export function PaceScreen() {
     Partial<Record<keyof PaceAssessmentDraft, string>>
   >({});
   const submissionGate = useRef(createPaceSubmissionGate()).current;
+  const draftUserId =
+    bootstrapState.status === "ready" ? bootstrapState.state.userId : undefined;
+  const draftSiteId =
+    bootstrapState.status === "ready"
+      ? bootstrapState.activeSiteState.activeSiteId
+      : null;
   const draftScope = useMemo(
-    () =>
-      bootstrapState.status === "ready"
-        ? resolvePaceDraftScope(
-            bootstrapState.state.userId,
-            bootstrapState.activeSiteState.activeSiteId,
-          )
-        : null,
-    [bootstrapState],
+    () => resolvePaceDraftScope(draftUserId, draftSiteId),
+    [draftSiteId, draftUserId],
   );
   const draftScopeKey = draftScope ? paceDraftStorageKey(draftScope) : null;
 
@@ -99,6 +100,7 @@ export function PaceScreen() {
     setHydratedDraftScopeKey(null);
     setDraft(createEmptyDraft());
     if (!draftScope || !draftScopeKey) return undefined;
+    activatePaceDraftScope(draftScope);
 
     void readPaceDraft(draftScope)
       .then((value) => {

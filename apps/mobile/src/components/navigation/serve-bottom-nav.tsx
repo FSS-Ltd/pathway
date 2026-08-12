@@ -13,6 +13,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,6 +48,8 @@ export function ServeBottomNav({
   navigation,
 }: ExpoTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { fontScale, width } = useWindowDimensions();
+  const isCompactLargeText = width <= 320 && fontScale >= 2;
   const [rowWidth, setRowWidth] = useState(0);
   const indicatorX = useRef(new Animated.Value(0)).current;
   const indicatorInitialized = useRef(false);
@@ -93,10 +96,17 @@ export function ServeBottomNav({
 
   return (
     <View
-      style={[styles.container, { paddingBottom: Math.max(insets.bottom, 10) }]}
+      style={[
+        styles.container,
+        isCompactLargeText ? styles.compactContainer : undefined,
+        { paddingBottom: Math.max(insets.bottom, 10) },
+      ]}
     >
       <View
-        style={styles.row}
+        style={[
+          styles.row,
+          isCompactLargeText ? styles.largeTextRow : undefined,
+        ]}
         onLayout={(event) => {
           setRowWidth(event.nativeEvent.layout.width);
         }}
@@ -152,7 +162,12 @@ export function ServeBottomNav({
                 pressed ? styles.pressedItem : undefined,
               ]}
             >
-              <View style={styles.tabTile}>
+              <View
+                style={[
+                  styles.tabTile,
+                  isCompactLargeText ? styles.largeTextTile : undefined,
+                ]}
+              >
                 <Ionicons
                   name={entry.icon}
                   size={isFocused ? 23 : 22}
@@ -164,6 +179,7 @@ export function ServeBottomNav({
                 />
                 <Text
                   numberOfLines={1}
+                  maxFontSizeMultiplier={isCompactLargeText ? 1 : undefined}
                   style={isFocused ? styles.activeText : styles.inactiveText}
                 >
                   {entry.label}
@@ -191,12 +207,18 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     paddingHorizontal: 12,
   },
+  compactContainer: {
+    paddingHorizontal: 4,
+  },
   row: {
     minHeight: 54,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     position: "relative",
+  },
+  largeTextRow: {
+    minHeight: 64,
   },
   item: {
     flex: 1,
@@ -212,6 +234,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 1,
     alignSelf: "center",
+  },
+  largeTextTile: {
+    minHeight: 64,
   },
   activeIndicator: {
     position: "absolute",

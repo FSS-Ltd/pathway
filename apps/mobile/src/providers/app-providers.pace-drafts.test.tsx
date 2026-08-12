@@ -92,7 +92,7 @@ describe("AppProviders PACE draft cleanup", () => {
     expect(mockAuth().signOut).toHaveBeenCalledTimes(1);
   });
 
-  it("clears the prior site's PACE draft after changing active site", async () => {
+  it("retains the prior site's PACE draft after changing active site", async () => {
     render(
       <AppProviders>
         <Probe />
@@ -107,8 +107,6 @@ describe("AppProviders PACE draft cleanup", () => {
     });
 
     expect(mockSetActiveSite).toHaveBeenCalledWith("site-2", "token-1");
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
-      "ace-pace-draft-v1:user-1:site-1",
-    );
+    expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
   });
 });

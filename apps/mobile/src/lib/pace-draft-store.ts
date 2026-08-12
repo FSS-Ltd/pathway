@@ -7,6 +7,14 @@ export type PaceDraftScope = {
   siteId: string;
 };
 
+type DraftOperationState = {
+  generation: number;
+  isActive: boolean;
+  queue: Promise<void>;
+};
+
+const operationStates = new Map<string, DraftOperationState>();
+
 export function resolvePaceDraftScope(
   userId: string | undefined,
   siteId: string | null,
@@ -19,6 +27,12 @@ export function paceDraftStorageKey(scope: PaceDraftScope): string {
   return `${PACE_DRAFT_KEY_PREFIX}:${encodeURIComponent(scope.userId)}:${encodeURIComponent(scope.siteId)}`;
 }
 
+export function activatePaceDraftScope(scope: PaceDraftScope): void {
+  const state = stateFor(paceDraftStorageKey(scope));
+  state.generation += 1;
+  state.isActive = true;
+}
+
 export function readPaceDraft(scope: PaceDraftScope): Promise<string | null> {
   return SecureStore.getItemAsync(paceDraftStorageKey(scope));
 }
@@ -27,9 +41,36 @@ export function writePaceDraft(
   scope: PaceDraftScope,
   draft: string,
 ): Promise<void> {
-  return SecureStore.setItemAsync(paceDraftStorageKey(scope), draft);
+  const key = paceDraftStorageKey(scope);
+  const state = stateFor(key);
+  const generation = state.generation;
+  return serialize(key, async () => {
+    const current = stateFor(key);
+    if (!current.isActive || current.generation !== generation) return;
+    await SecureStore.setItemAsync(key, draft);
+  });
 }
 
 export function clearPaceDraft(scope: PaceDraftScope): Promise<void> {
-  return SecureStore.deleteItemAsync(paceDraftStorageKey(scope));
+  const key = paceDraftStorageKey(scope);
+  const state = stateFor(key);
+  state.generation += 1;
+  state.isActive = false;
+  return serialize(key, () => SecureStore.deleteItemAsync(key));
+}
+
+function stateFor(key: string): DraftOperationState {
+  const existing = operationStates.get(key);
+  if (existing) return existing;
+
+  const state = { generation: 0, isActive: false, queue: Promise.resolve() };
+  operationStates.set(key, state);
+  return state;
+}
+
+function serialize(key: string, operation: () => Promise<void>): Promise<void> {
+  const state = stateFor(key);
+  const next = state.queue.catch(() => undefined).then(operation);
+  state.queue = next.catch(() => undefined);
+  return next;
 }
