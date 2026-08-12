@@ -83,6 +83,49 @@ describe("DispatchOutboxJob", () => {
     );
   });
 
+  it("preserves trusted behaviour tenant and organisation scope in the consumer intent", async () => {
+    const behaviourEvent = {
+      ...event,
+      aggregateType: "BEHAVIOUR_ENTRY",
+      aggregateId: "entry-1",
+      eventType: "behaviour.merit-awarded",
+      payload: {
+        behaviourEntryId: "entry-1",
+        childId: "child-1",
+        tenantId: "tenant-1",
+        orgId: "org-1",
+        pointsDelta: 3,
+        correctsBehaviourEntryId: null,
+      },
+      idempotencyKey: "behaviour-merit-awarded:entry-1",
+    };
+    const outboxEvent = {
+      findMany: jest.fn().mockResolvedValue([behaviourEvent]),
+      updateMany: jest.fn().mockResolvedValueOnce({ count: 1 }),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const dispatcher: jest.Mocked<OutboxDispatcher> = {
+      dispatch: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await new DispatchOutboxJob(createClient(outboxEvent), dispatcher).run();
+
+    expect(dispatcher.dispatch).toHaveBeenCalledWith({
+      aggregateType: "BEHAVIOUR_ENTRY",
+      aggregateId: "entry-1",
+      eventType: "behaviour.merit-awarded",
+      payload: {
+        behaviourEntryId: "entry-1",
+        childId: "child-1",
+        tenantId: "tenant-1",
+        orgId: "org-1",
+        pointsDelta: 3,
+        correctsBehaviourEntryId: null,
+      },
+      idempotencyKey: "behaviour-merit-awarded:entry-1",
+    });
+  });
+
   it("does not dispatch an event another worker already claimed", async () => {
     const outboxEvent = {
       findMany: jest.fn().mockResolvedValue([event]),

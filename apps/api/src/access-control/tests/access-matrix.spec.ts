@@ -49,6 +49,9 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R12: "migrated",
   R13: "migrated",
   R14: "migrated",
+  R27: "migrated",
+  R28: "migrated",
+  R29: "migrated",
   R30: "migrated",
   R31: "migrated",
   R69: { pending: "self-scoped; no capability/permission layer by design" },
@@ -103,9 +106,24 @@ describe("access route matrix", () => {
     expect(byId.R14).toMatchObject({ method: "GET", path: "/access/audit", permission: "platform.access.audit.read" });
   });
 
-  it("gives the behaviour policy routes their registered permission keys", () => {
+  it("gives the behaviour routes their registered permission keys", () => {
     const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
 
+    expect(byId.R27).toMatchObject({
+      method: "GET",
+      path: "/ace/behaviour",
+      permission: "ace.behaviour.read",
+    });
+    expect(byId.R28).toMatchObject({
+      method: "POST",
+      path: "/ace/behaviour",
+      permission: "ace.behaviour.record",
+    });
+    expect(byId.R29).toMatchObject({
+      method: "POST",
+      path: "/ace/behaviour/:id/corrections",
+      permission: "ace.behaviour.record",
+    });
     expect(byId.R30).toMatchObject({
       method: "GET",
       path: "/ace/behaviour/policy",
