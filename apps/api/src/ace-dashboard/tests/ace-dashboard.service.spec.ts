@@ -25,8 +25,6 @@ const actor = {
 function transaction() {
   return {
     tenant: { findFirst: jest.fn() },
-    attendance: { groupBy: jest.fn() },
-    child: { count: jest.fn() },
     $queryRaw: jest.fn(),
   };
 }
@@ -42,9 +40,10 @@ function createService(tx = transaction()) {
 
 function mockEmptyAggregates(tx: ReturnType<typeof transaction>) {
   tx.tenant.findFirst.mockResolvedValue({ timezone: "Europe/London" });
-  tx.attendance.groupBy.mockResolvedValue([]);
-  tx.child.count.mockResolvedValue(0);
   tx.$queryRaw
+    .mockResolvedValueOnce([
+      { present: 0n, absent: 0n, late: 0n, unmarked: 0n },
+    ])
     .mockResolvedValueOnce([
       {
         ahead: 0n,
@@ -102,16 +101,11 @@ describe("AceDashboardService", () => {
       expect.any(Function),
     );
     const queryCount =
-      tx.tenant.findFirst.mock.calls.length +
-      tx.attendance.groupBy.mock.calls.length +
-      tx.child.count.mock.calls.length +
-      tx.$queryRaw.mock.calls.length;
+      tx.tenant.findFirst.mock.calls.length + tx.$queryRaw.mock.calls.length;
     expect(queryCount).toBeLessThanOrEqual(6);
 
     const selectedFields = JSON.stringify({
       site: tx.tenant.findFirst.mock.calls,
-      attendance: tx.attendance.groupBy.mock.calls,
-      children: tx.child.count.mock.calls,
       aggregateSql: jest
         .mocked(Prisma.sql)
         .mock.calls.map(([strings]) => strings.join("?")),
@@ -119,17 +113,19 @@ describe("AceDashboardService", () => {
     expect(selectedFields).not.toMatch(
       /reason|note|firstName|lastName|preferredName|guardian|family/i,
     );
+    expect(selectedFields).not.toMatch(
+      /payload->>'(?:childId|recipientUserIds)'/,
+    );
+    expect(selectedFields).not.toContain("event.payload AS");
   });
 
-  it("maps partial buckets, current PACE facts, and terminal review intents", async () => {
+  it("maps daily terminal attendance, current PACE facts, and terminal review states", async () => {
     const { service, tx } = createService();
     tx.tenant.findFirst.mockResolvedValue({ timezone: "Europe/London" });
-    tx.attendance.groupBy.mockResolvedValue([
-      { status: "PRESENT", _count: { _all: 7 } },
-      { status: "LATE", _count: { _all: 2 } },
-    ]);
-    tx.child.count.mockResolvedValue(12);
     tx.$queryRaw
+      .mockResolvedValueOnce([
+        { present: 7n, absent: 0n, late: 2n, unmarked: 3n },
+      ])
       .mockResolvedValueOnce([
         {
           ahead: 1n,
@@ -164,17 +160,33 @@ describe("AceDashboardService", () => {
 
     await service.get({ date: "2026-03-29" }, actor);
 
-    expect(tx.attendance.groupBy).toHaveBeenCalledWith({
-      by: ["status"],
-      where: {
-        timestamp: {
-          gte: new Date("2026-03-29T00:00:00.000Z"),
-          lt: new Date("2026-03-29T23:00:00.000Z"),
-        },
-        child: { tenantId: actor.tenantId },
-      },
-      _count: { _all: true },
-    });
+    expect(tx.$queryRaw.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        values: expect.arrayContaining([
+          actor.tenantId,
+          new Date("2026-03-29T00:00:00.000Z"),
+          new Date("2026-03-29T23:00:00.000Z"),
+        ]),
+      }),
+    );
+  });
+
+  it("uses the first valid instant of a day when IANA rules skip local midnight", async () => {
+    const { service, tx } = createService();
+    mockEmptyAggregates(tx);
+    tx.tenant.findFirst.mockResolvedValue({ timezone: "America/Havana" });
+
+    await service.get({ date: "2026-03-08" }, actor);
+
+    expect(tx.$queryRaw.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        values: expect.arrayContaining([
+          actor.tenantId,
+          new Date("2026-03-08T05:00:00.000Z"),
+          new Date("2026-03-09T04:00:00.000Z"),
+        ]),
+      }),
+    );
   });
 
   it.each(["2026-02-30", "12-08-2026", "2026-8-12", "2026-08-12x"])(
@@ -205,7 +217,7 @@ describe("AceDashboardService", () => {
     await expect(service.get({}, actor)).rejects.toBeInstanceOf(
       BadRequestException,
     );
-    expect(tx.attendance.groupBy).not.toHaveBeenCalled();
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("rejects a selected site outside the actor's organisation", async () => {

@@ -6,7 +6,12 @@ import { PrismaClient } from "@prisma/client";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import request from "supertest";
 import { AppModule } from "../../app.module";
+import type { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
+import { BehaviourCommandService } from "../../behaviour/behaviour-command.service";
+import { DemeritEscalationService } from "../../behaviour/demerit-escalation.service";
+import { OutboxService } from "../../common/outbox/outbox.service";
+import type { MailerService } from "../../mailer/mailer.service";
 import { PaceRequestRlsRoleLease } from "../../pace/tests/pace-request-rls-role-lease";
 import {
   clearE2eAuthAccess,
@@ -28,7 +33,24 @@ interface DashboardFixture {
   progressId: string;
   attendanceIds: string[];
   behaviourEntryIds: string[];
+  behaviourCorrectionIds: string[];
+  retainedReviewSourceId: string;
   outboxEventIds: string[];
+}
+
+function behaviourCommandService(): BehaviourCommandService {
+  const outbox = new OutboxService();
+  const escalation = new DemeritEscalationService(outbox, {
+    sendBehaviourNotification: jest.fn().mockResolvedValue(undefined),
+  } as unknown as MailerService);
+  const permissions = {
+    resolve: jest.fn().mockResolvedValue({
+      allowed: true,
+      reason: "allowed",
+      sourceRoleIds: ["fixture-role"],
+    }),
+  } as unknown as EffectivePermissionsService;
+  return new BehaviourCommandService(outbox, permissions, escalation);
 }
 
 function useTenantRlsRole(): boolean {
@@ -236,7 +258,43 @@ describe("ACE dashboard restricted-role RLS", () => {
   });
 
   it("returns only site A aggregate counts across the London DST boundary", async () => {
-    if (!app) return;
+    if (!app || !fixture) return;
+
+    const reviewIntentState = await withTenantRlsContext(
+      tenantAId,
+      orgId,
+      async (tx) => {
+        const [original, correction, retainedSource] = await Promise.all([
+          tx.outboxEvent.count({
+            where: {
+              eventType: "behaviour.review-requested",
+              aggregateId: { in: fixture!.behaviourEntryIds },
+            },
+          }),
+          tx.outboxEvent.count({
+            where: {
+              eventType: "behaviour.review-requested",
+              aggregateId: { in: fixture!.behaviourCorrectionIds },
+            },
+          }),
+          tx.outboxEvent.findFirstOrThrow({
+            where: {
+              eventType: "behaviour.review-requested",
+              aggregateId: fixture!.retainedReviewSourceId,
+            },
+            select: { payload: true },
+          }),
+        ]);
+        return { original, correction, retainedSource };
+      },
+    );
+    expect(reviewIntentState).toEqual({
+      original: 2,
+      correction: 0,
+      retainedSource: {
+        payload: expect.objectContaining({ occurredOn: "2026-03-28" }),
+      },
+    });
 
     const response = await request(app.getHttpServer())
       .get(`/ace/dashboard?date=${LOCAL_DATE}`)
@@ -255,7 +313,7 @@ describe("ACE dashboard restricted-role RLS", () => {
         blocked: 0,
         stale: 0,
       },
-      behaviour: { siteReview: 1, headReview: 0 },
+      behaviour: { siteReview: 0, headReview: 1 },
     });
     expect(response.body).not.toHaveProperty("children");
     expect(JSON.stringify(response.body)).not.toContain(
@@ -326,147 +384,237 @@ async function createPartialSiteFixture(input: {
   tenantId: string;
   actorUserId: string;
 }): Promise<DashboardFixture> {
-  return withTenantRlsContext(input.tenantId, input.orgId, async (tx) => {
-    const groupId = randomUUID();
-    const childIds = [randomUUID(), randomUUID()];
-    const subjectId = randomUUID();
-    const enrollmentId = randomUUID();
-    const progressId = randomUUID();
-    const attendanceIds = [randomUUID(), randomUUID()];
-    const behaviourEntryIds = [randomUUID(), randomUUID()];
-    const outboxEventIds = [randomUUID(), randomUUID()];
+  const fixture = await withTenantRlsContext(
+    input.tenantId,
+    input.orgId,
+    async (tx) => {
+      const groupId = randomUUID();
+      const childIds = [randomUUID(), randomUUID()];
+      const subjectId = randomUUID();
+      const enrollmentId = randomUUID();
+      const progressId = randomUUID();
+      const attendanceIds = [randomUUID(), randomUUID(), randomUUID()];
 
-    await tx.group.create({
-      data: { id: groupId, tenantId: input.tenantId, name: `ACE ${groupId}` },
-    });
-    await tx.child.createMany({
-      data: childIds.map((id, index) => ({
-        id,
-        tenantId: input.tenantId,
+      await tx.group.create({
+        data: { id: groupId, tenantId: input.tenantId, name: `ACE ${groupId}` },
+      });
+      await tx.child.createMany({
+        data: childIds.map((id, index) => ({
+          id,
+          tenantId: input.tenantId,
+          groupId,
+          firstName: `Dashboard ${index}`,
+          lastName: "Fixture",
+        })),
+      });
+      await tx.subject.create({
+        data: {
+          id: subjectId,
+          tenantId: input.tenantId,
+          name: `ACE ${subjectId}`,
+        },
+      });
+      await tx.studentSubjectEnrollment.create({
+        data: {
+          id: enrollmentId,
+          tenantId: input.tenantId,
+          childId: childIds[0]!,
+          subjectId,
+          startsOn: new Date("2026-03-01T00:00:00.000Z"),
+          status: "ACTIVE",
+          startingPace: 1,
+          currentPace: 1,
+          targetPace: 1,
+          recordedByUserId: input.actorUserId,
+          reason: "Dashboard fixture enrolment",
+        },
+      });
+      await tx.paceProgress.create({
+        data: {
+          id: progressId,
+          tenantId: input.tenantId,
+          childId: childIds[0]!,
+          subjectId,
+          currentPace: 1,
+          targetPace: 1,
+          trackStatus: "ON_TRACK",
+          rebuiltAt: new Date("2026-03-28T12:00:00.000Z"),
+        },
+      });
+      await tx.attendance.createMany({
+        data: [
+          {
+            id: attendanceIds[0]!,
+            childId: childIds[0]!,
+            groupId,
+            present: true,
+            status: "PRESENT",
+            timestamp: new Date("2026-03-29T08:00:00.000Z"),
+          },
+          {
+            id: attendanceIds[1]!,
+            childId: childIds[0]!,
+            groupId,
+            present: true,
+            status: "LATE",
+            timestamp: new Date("2026-03-29T22:30:00.000Z"),
+          },
+          {
+            id: attendanceIds[2]!,
+            childId: childIds[0]!,
+            groupId,
+            present: false,
+            status: "ABSENT",
+            timestamp: new Date("2026-03-29T23:30:00.000Z"),
+          },
+        ],
+      });
+      await tx.behaviourCategory.createMany({
+        data: [
+          {
+            tenantId: input.tenantId,
+            policyVersion: 1,
+            code: "conduct",
+            label: "Conduct",
+            type: "DEMERIT",
+            visibility: "GENERAL",
+            isActive: true,
+            isSerious: true,
+            sortOrder: 1,
+            createdByUserId: input.actorUserId,
+            reason: "Dashboard fixture policy",
+          },
+          {
+            tenantId: input.tenantId,
+            policyVersion: 1,
+            code: "routine",
+            label: "Routine",
+            type: "DEMERIT",
+            visibility: "GENERAL",
+            isActive: true,
+            isSerious: false,
+            sortOrder: 2,
+            createdByUserId: input.actorUserId,
+            reason: "Dashboard fixture policy",
+          },
+        ],
+      });
+      await tx.demeritPolicy.create({
+        data: {
+          tenantId: input.tenantId,
+          version: 1,
+          windowDays: 30,
+          stageOneThreshold: 3,
+          stageTwoThreshold: 6,
+          stageThreeThreshold: 10,
+          seriousMisconductStage: 3,
+          effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+          createdByUserId: input.actorUserId,
+          reason: "Dashboard fixture policy",
+        },
+      });
+
+      return {
         groupId,
-        firstName: `Dashboard ${index}`,
-        lastName: "Fixture",
-      })),
-    });
-    await tx.subject.create({
-      data: {
-        id: subjectId,
-        tenantId: input.tenantId,
-        name: `ACE ${subjectId}`,
-      },
-    });
-    await tx.studentSubjectEnrollment.create({
-      data: {
-        id: enrollmentId,
-        tenantId: input.tenantId,
-        childId: childIds[0]!,
+        childIds,
         subjectId,
-        startsOn: new Date("2026-03-01T00:00:00.000Z"),
-        status: "ACTIVE",
-        startingPace: 1,
-        currentPace: 1,
-        targetPace: 1,
-        recordedByUserId: input.actorUserId,
-        reason: "Dashboard fixture enrolment",
-      },
-    });
-    await tx.paceProgress.create({
-      data: {
-        id: progressId,
-        tenantId: input.tenantId,
-        childId: childIds[0]!,
-        subjectId,
-        currentPace: 1,
-        targetPace: 1,
-        trackStatus: "ON_TRACK",
-        rebuiltAt: new Date("2026-03-28T12:00:00.000Z"),
-      },
-    });
-    await tx.attendance.createMany({
-      data: [
-        {
-          id: attendanceIds[0]!,
-          childId: childIds[0]!,
-          groupId,
-          present: true,
-          status: "LATE",
-          timestamp: new Date("2026-03-29T22:30:00.000Z"),
-        },
-        {
-          id: attendanceIds[1]!,
-          childId: childIds[0]!,
-          groupId,
-          present: false,
-          status: "ABSENT",
-          timestamp: new Date("2026-03-29T23:30:00.000Z"),
-        },
-      ],
-    });
-    await tx.behaviourEntry.create({
-      data: {
-        id: behaviourEntryIds[0]!,
-        tenantId: input.tenantId,
-        childId: childIds[0]!,
-        type: "DEMERIT",
-        category: "review",
-        pointsDelta: -1,
-        occurredAt: new Date("2026-03-29T12:00:00.000Z"),
-        recordedByUserId: input.actorUserId,
-        reason: "Sensitive behaviour narrative",
-        note: "Sensitive behaviour narrative",
-      },
-    });
-    await tx.behaviourEntry.create({
-      data: {
-        id: behaviourEntryIds[1]!,
-        tenantId: input.tenantId,
-        childId: childIds[0]!,
-        type: "DEMERIT",
-        category: "review-corrected",
-        pointsDelta: -1,
-        occurredAt: new Date("2026-03-29T12:00:00.000Z"),
-        recordedByUserId: input.actorUserId,
-        reason: "Sensitive behaviour narrative corrected",
-        note: "Sensitive behaviour narrative corrected",
-        correctsBehaviourEntryId: behaviourEntryIds[0]!,
-      },
-    });
+        enrollmentId,
+        progressId,
+        attendanceIds,
+      };
+    },
+  );
 
-    const reviewPayload = (behaviourEntryId: string) => ({
-      behaviourEntryId,
-      childId: childIds[0]!,
-      tenantId: input.tenantId,
-      orgId: input.orgId,
-      stage: 1,
-      demeritPolicyVersion: 1,
-      occurredOn: LOCAL_DATE,
-      recipientUserIds: [input.actorUserId],
-      reviewKind: "SITE",
-    });
-    await tx.outboxEvent.createMany({
-      data: behaviourEntryIds.map((behaviourEntryId, index) => ({
-        id: outboxEventIds[index]!,
+  const actor = {
+    tenantId: input.tenantId,
+    orgId: input.orgId,
+    userId: input.actorUserId,
+  };
+  const commands = behaviourCommandService();
+  const sameAction = await commands.record(
+    {
+      idempotencyKey: randomUUID(),
+      childId: fixture.childIds[0]!,
+      category: "conduct",
+      type: "DEMERIT",
+      visibility: "GENERAL",
+      pointsDelta: -1,
+      occurredAt: "2026-03-28T12:00:00.000Z",
+      reason: "Sensitive behaviour narrative",
+      note: "Sensitive behaviour narrative",
+    },
+    actor,
+  );
+  const sameActionCorrection = await commands.correct(
+    sameAction.entry.id,
+    {
+      idempotencyKey: randomUUID(),
+      childId: fixture.childIds[0]!,
+      category: "conduct",
+      type: "DEMERIT",
+      visibility: "GENERAL",
+      pointsDelta: -2,
+      occurredAt: "2026-03-29T12:30:00.000Z",
+      reason: "Sensitive behaviour narrative corrected",
+      note: "Sensitive behaviour narrative corrected",
+    },
+    actor,
+  );
+  const removedReview = await commands.record(
+    {
+      idempotencyKey: randomUUID(),
+      childId: fixture.childIds[1]!,
+      category: "conduct",
+      type: "DEMERIT",
+      visibility: "GENERAL",
+      pointsDelta: -1,
+      occurredAt: "2026-03-29T13:00:00.000Z",
+      reason: "Review later removed by correction",
+      note: "Sensitive behaviour narrative",
+    },
+    actor,
+  );
+  const removedReviewCorrection = await commands.correct(
+    removedReview.entry.id,
+    {
+      idempotencyKey: randomUUID(),
+      childId: fixture.childIds[1]!,
+      category: "routine",
+      type: "DEMERIT",
+      visibility: "GENERAL",
+      pointsDelta: -1,
+      occurredAt: "2026-03-29T13:30:00.000Z",
+      reason: "Correction no longer requires review",
+    },
+    actor,
+  );
+
+  const behaviourEntryIds = [
+    sameAction.entry.id,
+    sameActionCorrection.entry.id,
+    removedReview.entry.id,
+    removedReviewCorrection.entry.id,
+  ];
+  const outboxEventIds = (
+    await prisma.outboxEvent.findMany({
+      where: {
         orgId: input.orgId,
-        aggregateType: "BEHAVIOUR_ENTRY",
-        aggregateId: behaviourEntryId,
-        eventType: "behaviour.review-requested",
-        payload: reviewPayload(behaviourEntryId),
-        idempotencyKey: `ace-dashboard-${behaviourEntryId}`,
-        createdAt: new Date("2026-03-29T12:00:00.000Z"),
-      })),
-    });
+        aggregateId: { in: behaviourEntryIds },
+      },
+      select: { id: true },
+    })
+  ).map(({ id }) => id);
 
-    return {
-      groupId,
-      childIds,
-      subjectId,
-      enrollmentId,
-      progressId,
-      attendanceIds,
-      behaviourEntryIds,
-      outboxEventIds,
-    };
-  });
+  return {
+    ...fixture,
+    behaviourEntryIds,
+    behaviourCorrectionIds: [
+      sameActionCorrection.entry.id,
+      removedReviewCorrection.entry.id,
+    ],
+    retainedReviewSourceId: sameAction.entry.id,
+    outboxEventIds,
+  };
 }
 
 async function cleanupFixture(
@@ -477,11 +625,16 @@ async function cleanupFixture(
   await prisma.outboxEvent.deleteMany({
     where: { id: { in: fixture.outboxEventIds } },
   });
+  await prisma.auditEvent.deleteMany({
+    where: { orgId, entityId: { in: fixture.behaviourEntryIds } },
+  });
   await withTenantRlsContext(tenantId, orgId, async (tx) => {
     await tx.$executeRawUnsafe("SET LOCAL session_replication_role = replica");
     await tx.behaviourEntry.deleteMany({
       where: { id: { in: fixture.behaviourEntryIds } },
     });
+    await tx.behaviourCategory.deleteMany({ where: { tenantId } });
+    await tx.demeritPolicy.deleteMany({ where: { tenantId } });
     await tx.$executeRawUnsafe("SET LOCAL session_replication_role = origin");
   });
   await prisma.paceProgress.deleteMany({ where: { id: fixture.progressId } });

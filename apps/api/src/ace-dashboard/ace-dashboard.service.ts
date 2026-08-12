@@ -28,6 +28,13 @@ interface PaceAggregateRow {
   stale: CountValue;
 }
 
+interface AttendanceAggregateRow {
+  present: CountValue;
+  absent: CountValue;
+  late: CountValue;
+  unmarked: CountValue;
+}
+
 interface BehaviourAggregateRow {
   siteReview: CountValue;
   headReview: CountValue;
@@ -48,36 +55,31 @@ export class AceDashboardService {
       const dateBounds = localDateBounds(localDate, timezone);
       const databaseDate = new Date(`${localDate}T12:00:00.000Z`);
 
-      const [attendanceRows, childCount, paceRows, behaviourRows] =
-        await Promise.all([
-          tx.attendance.groupBy({
-            by: ["status"],
-            where: {
-              timestamp: { gte: dateBounds.start, lt: dateBounds.end },
-              child: { tenantId: actor.tenantId },
-            },
-            _count: { _all: true },
+      const [attendanceRows, paceRows, behaviourRows] = await Promise.all([
+        tx.$queryRaw<AttendanceAggregateRow[]>(
+          attendanceAggregateQuery(
+            actor.tenantId,
+            dateBounds.start,
+            dateBounds.end,
+          ),
+        ),
+        tx.$queryRaw<PaceAggregateRow[]>(
+          paceAggregateQuery(actor.tenantId, databaseDate),
+        ),
+        tx.$queryRaw<BehaviourAggregateRow[]>(
+          behaviourAggregateQuery({
+            tenantId: actor.tenantId,
+            orgId: actor.orgId,
+            start: dateBounds.start,
+            end: dateBounds.end,
           }),
-          tx.child.count({ where: { tenantId: actor.tenantId } }),
-          tx.$queryRaw<PaceAggregateRow[]>(
-            paceAggregateQuery(actor.tenantId, databaseDate),
-          ),
-          tx.$queryRaw<BehaviourAggregateRow[]>(
-            behaviourAggregateQuery({
-              tenantId: actor.tenantId,
-              orgId: actor.orgId,
-              localDate,
-              start: dateBounds.start,
-              end: dateBounds.end,
-            }),
-          ),
-        ]);
+        ),
+      ]);
 
-      const attendance = attendanceCounts(attendanceRows, childCount);
       return {
         localDate,
         timezone,
-        attendance,
+        attendance: attendanceCounts(attendanceRows[0]),
         pace: paceCounts(paceRows[0]),
         behaviour: behaviourCounts(behaviourRows[0]),
       };
@@ -122,17 +124,14 @@ function parseQuery(query: unknown): AceDashboardQuery {
 }
 
 function attendanceCounts(
-  rows: Array<{ status: string; _count: { _all: number } }>,
-  childCount: number,
+  row: AttendanceAggregateRow | undefined,
 ): AceDashboardResponse["attendance"] {
-  const counts = { present: 0, absent: 0, late: 0 };
-  for (const row of rows) {
-    if (row.status === "PRESENT") counts.present = row._count._all;
-    if (row.status === "ABSENT") counts.absent = row._count._all;
-    if (row.status === "LATE") counts.late = row._count._all;
-  }
-  const marked = counts.present + counts.absent + counts.late;
-  return { ...counts, unmarked: Math.max(childCount - marked, 0) };
+  return {
+    present: toCount(row?.present),
+    absent: toCount(row?.absent),
+    late: toCount(row?.late),
+    unmarked: toCount(row?.unmarked),
+  };
 }
 
 function paceCounts(
@@ -161,7 +160,43 @@ function toCount(value: CountValue): number {
   return Number(value ?? 0);
 }
 
-function paceAggregateQuery(tenantId: string, localDate: Date) {
+function attendanceAggregateQuery(
+  tenantId: string,
+  start: Date,
+  end: Date,
+): Prisma.Sql {
+  return Prisma.sql`
+    WITH site_children AS (
+      SELECT child.id
+      FROM "Child" AS child
+      WHERE child."tenantId" = ${tenantId}
+    ),
+    daily_terminal_status AS (
+      SELECT DISTINCT ON (attendance."childId")
+        attendance."childId",
+        attendance.status
+      FROM "Attendance" AS attendance
+      INNER JOIN site_children AS child
+        ON child.id = attendance."childId"
+      WHERE attendance.timestamp >= ${start}
+        AND attendance.timestamp < ${end}
+      ORDER BY
+        attendance."childId",
+        attendance.timestamp DESC,
+        attendance.id DESC
+    )
+    SELECT
+      COUNT(*) FILTER (WHERE status.status = 'PRESENT') AS "present",
+      COUNT(*) FILTER (WHERE status.status = 'ABSENT') AS "absent",
+      COUNT(*) FILTER (WHERE status.status = 'LATE') AS "late",
+      COUNT(*) FILTER (WHERE status."childId" IS NULL) AS "unmarked"
+    FROM site_children AS child
+    LEFT JOIN daily_terminal_status AS status
+      ON status."childId" = child.id
+  `;
+}
+
+function paceAggregateQuery(tenantId: string, localDate: Date): Prisma.Sql {
   return Prisma.sql`
     WITH current_enrolments AS (
       SELECT
@@ -225,27 +260,80 @@ function paceAggregateQuery(tenantId: string, localDate: Date) {
 function behaviourAggregateQuery(input: {
   tenantId: string;
   orgId: string;
-  localDate: string;
   start: Date;
   end: Date;
-}) {
+}): Prisma.Sql {
   return Prisma.sql`
-    SELECT
-      COUNT(*) FILTER (WHERE event.payload->>'reviewKind' = 'SITE') AS "siteReview",
-      COUNT(*) FILTER (WHERE event.payload->>'reviewKind' = 'HEAD') AS "headReview"
-    FROM "OutboxEvent" AS event
-    WHERE event."orgId" = ${input.orgId}
-      AND event."eventType" = 'behaviour.review-requested'
-      AND event."createdAt" >= ${input.start}
-      AND event."createdAt" < ${input.end}
-      AND event.payload->>'tenantId' = ${input.tenantId}
-      AND event.payload->>'occurredOn' = ${input.localDate}
-      AND NOT EXISTS (
+    WITH RECURSIVE terminal_facts AS (
+      SELECT
+        fact.id,
+        fact."correctsBehaviourEntryId"
+      FROM "BehaviourEntry" AS fact
+      WHERE fact."tenantId" = ${input.tenantId}
+        AND fact.type = 'DEMERIT'
+        AND fact."occurredAt" >= ${input.start}
+        AND fact."occurredAt" < ${input.end}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "BehaviourEntry" AS successor
+          WHERE successor."tenantId" = ${input.tenantId}
+            AND successor."correctsBehaviourEntryId" = fact.id
+        )
+    ),
+    fact_lineage AS (
+      SELECT
+        terminal.id AS "terminalId",
+        terminal.id AS "factId",
+        terminal."correctsBehaviourEntryId" AS "predecessorId"
+      FROM terminal_facts AS terminal
+
+      UNION ALL
+
+      SELECT
+        lineage."terminalId",
+        predecessor.id AS "factId",
+        predecessor."correctsBehaviourEntryId" AS "predecessorId"
+      FROM fact_lineage AS lineage
+      INNER JOIN "BehaviourEntry" AS predecessor
+        ON predecessor.id = lineage."predecessorId"
+        AND predecessor."tenantId" = ${input.tenantId}
+    ),
+    current_review_states AS (
+      SELECT
+        terminal.id,
+        current_policy."action" AS "currentAction"
+      FROM terminal_facts AS terminal
+      INNER JOIN LATERAL (
+        SELECT audit.metadata->>'demeritAction' AS "action"
+        FROM "AuditEvent" AS audit
+        WHERE audit."entityId" = terminal.id
+          AND audit."tenantId" = ${input.tenantId}
+          AND audit."orgId" = ${input.orgId}
+          AND audit."entityType" = 'ACE_RECORD'
+          AND audit.action = 'CREATED'
+          AND audit.metadata->>'operation' IN (
+            'BEHAVIOUR_ENTRY_RECORDED',
+            'BEHAVIOUR_ENTRY_CORRECTED'
+          )
+        ORDER BY audit."createdAt" DESC, audit.id DESC
+        LIMIT 1
+      ) AS current_policy ON TRUE
+      WHERE EXISTS (
         SELECT 1
-        FROM "BehaviourEntry" AS correction
-        WHERE correction."tenantId" = ${input.tenantId}
-          AND correction."correctsBehaviourEntryId" = event."aggregateId"
+        FROM fact_lineage AS lineage
+        INNER JOIN "OutboxEvent" AS event
+          ON event."aggregateType" = 'BEHAVIOUR_ENTRY'
+          AND event."aggregateId" = lineage."factId"
+          AND event."eventType" = 'behaviour.review-requested'
+          AND event."orgId" = ${input.orgId}
+          AND event.payload->>'tenantId' = ${input.tenantId}
+        WHERE lineage."terminalId" = terminal.id
       )
+    )
+    SELECT
+      COUNT(*) FILTER (WHERE state."currentAction" = 'review') AS "siteReview",
+      COUNT(*) FILTER (WHERE state."currentAction" = 'head-review') AS "headReview"
+    FROM current_review_states AS state
   `;
 }
 
@@ -254,44 +342,43 @@ function localDateAt(instant: Date, timezone: string): string {
   return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
 }
 
-function localDateBounds(localDate: string, timezone: string) {
+function localDateBounds(
+  localDate: string,
+  timezone: string,
+): { start: Date; end: Date } {
   return {
-    start: localMidnightToUtc(localDate, timezone),
-    end: localMidnightToUtc(addCalendarDays(localDate, 1), timezone),
+    start: firstInstantOfLocalDate(localDate, timezone),
+    end: firstInstantOfLocalDate(addCalendarDays(localDate, 1), timezone),
   };
 }
 
-function localMidnightToUtc(localDate: string, timezone: string): Date {
+function firstInstantOfLocalDate(localDate: string, timezone: string): Date {
   const [year, month, day] = localDate.split("-").map(Number);
-  const target = Date.UTC(year!, month! - 1, day!);
-  let candidate = target;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    const parts = dateTimeParts(new Date(candidate), timezone);
-    const represented = Date.UTC(
-      parts.year,
-      parts.month - 1,
-      parts.day,
-      parts.hour,
-      parts.minute,
-      parts.second,
-    );
-    const corrected = candidate + (target - represented);
-    if (corrected === candidate) return new Date(candidate);
-    candidate = corrected;
+  const nominalUtc = Date.UTC(year!, month! - 1, day!);
+  let before = nominalUtc - 36 * 60 * 60 * 1_000;
+  let atOrAfter = nominalUtc + 36 * 60 * 60 * 1_000;
+
+  while (atOrAfter - before > 1) {
+    const middle = before + Math.floor((atOrAfter - before) / 2);
+    if (localDateAt(new Date(middle), timezone) < localDate) {
+      before = middle;
+    } else {
+      atOrAfter = middle;
+    }
   }
-  return new Date(candidate);
+
+  return new Date(atOrAfter);
 }
 
-function dateTimeParts(instant: Date, timezone: string) {
+function dateTimeParts(
+  instant: Date,
+  timezone: string,
+): { year: number; month: number; day: number } {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: timezone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hourCycle: "h23",
   }).formatToParts(instant);
   const value = (type: Intl.DateTimeFormatPartTypes) =>
     Number(parts.find((part) => part.type === type)?.value);
@@ -299,9 +386,6 @@ function dateTimeParts(instant: Date, timezone: string) {
     year: value("year"),
     month: value("month"),
     day: value("day"),
-    hour: value("hour"),
-    minute: value("minute"),
-    second: value("second"),
   };
 }
 
