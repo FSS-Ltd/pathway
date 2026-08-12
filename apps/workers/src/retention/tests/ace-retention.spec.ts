@@ -1,17 +1,24 @@
 import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
+import governance from "../../../../../packages/db/ace-foundation-governance.json";
 import {
   ACE_RETENTION_EXPORT_INVENTORY,
   getAceRetentionExportPolicy,
 } from "../ace-retention-inventory";
 
 const repositoryRoot = resolve(__dirname, "../../../../..");
+const governedTableNames = governance.groups
+  .flatMap(({ tables }) => tables)
+  .sort();
 
 describe("ACE retention and export inventory", () => {
-  it("keeps the retention inventory in ACE governance schema parity", () => {
-    expect(Object.keys(ACE_RETENTION_EXPORT_INVENTORY)).toEqual(
-      expect.arrayContaining(["BehaviourCategory"]),
+  it("maps every governed ACE table into the retention inventory", () => {
+    expect(Object.keys(ACE_RETENTION_EXPORT_INVENTORY).sort()).toEqual(
+      governedTableNames,
     );
+  });
+
+  it("passes the ACE governance schema parity gate", () => {
     expect(() =>
       execFileSync(process.execPath, ["scripts/check-ace-foundation-governance.mjs"], {
         cwd: repositoryRoot,
