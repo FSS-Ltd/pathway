@@ -79,6 +79,7 @@ export function StandardButton({
   iconLeft,
   style,
   textStyle,
+  multiline = false,
 }: {
   label?: string;
   onPress?: () => void;
@@ -89,9 +90,11 @@ export function StandardButton({
   iconLeft?: ReactNode;
   style?: ViewStyle | ViewStyle[];
   textStyle?: TextStyle;
+  multiline?: boolean;
 }) {
   const accentColor = getSpaceAccentColor(tone);
   const effectiveVariant = disabled ? "disabled" : variant;
+  const isDisabled = disabled || effectiveVariant === "disabled";
   const base =
     effectiveVariant === "primary"
       ? { backgroundColor: mobileTokens.colors.accent.primary, borderColor: mobileTokens.colors.accent.primary, borderWidth: 0 }
@@ -111,6 +114,8 @@ export function StandardButton({
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [
         styles.standardButtonBase,
         heightStyle,
@@ -119,13 +124,13 @@ export function StandardButton({
         pressed ? styles.buttonPressed : undefined,
       ]}
       onPress={onPress}
-      disabled={disabled || effectiveVariant === "disabled"}
+      disabled={isDisabled}
     >
       {iconLeft ? (
         <View style={[styles.buttonIconWrap, !label ? styles.buttonIconOnly : undefined]}>{iconLeft}</View>
       ) : null}
       {label ? (
-        <Text numberOfLines={1} style={[styles.standardButtonText, { color: textColor }, textStyle]}>
+        <Text numberOfLines={multiline ? undefined : 1} style={[styles.standardButtonText, multiline ? styles.standardButtonTextMultiline : undefined, { color: textColor }, textStyle]}>
           {label}
         </Text>
       ) : null}
@@ -221,6 +226,10 @@ const styles = StyleSheet.create({
     fontWeight: mobileTokens.typography.weight.bold,
     fontSize: mobileTokens.typography.body.md.size,
     lineHeight: mobileTokens.typography.body.md.lineHeight,
+  },
+  standardButtonTextMultiline: {
+    flexShrink: 1,
+    textAlign: "center",
   },
   buttonPressed: {
     opacity: 0.9,

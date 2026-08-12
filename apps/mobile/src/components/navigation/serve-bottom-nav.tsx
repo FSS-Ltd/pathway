@@ -25,6 +25,12 @@ const SERVE_ITEMS = [
   { routeName: "schedule", label: "Schedule", icon: "people-outline" as const },
   { routeName: "pace", label: "PACE", icon: "school-outline" as const },
   {
+    routeName: "behaviour",
+    label: "Behaviour",
+    icon: "ribbon-outline" as const,
+    permission: "ace.behaviour.read",
+  },
+  {
     routeName: "communications",
     label: "Pickups",
     icon: "notifications-outline" as const,
@@ -46,7 +52,8 @@ export function ServeBottomNav({
   state,
   descriptors,
   navigation,
-}: ExpoTabBarProps) {
+  permissions,
+}: ExpoTabBarProps & { permissions: string[] }) {
   const insets = useSafeAreaInsets();
   const { fontScale, width } = useWindowDimensions();
   const isCompactLargeText = width <= 320 && fontScale >= 2;
@@ -54,7 +61,9 @@ export function ServeBottomNav({
   const indicatorX = useRef(new Animated.Value(0)).current;
   const indicatorInitialized = useRef(false);
   const entries = useMemo(() => {
-    return SERVE_ITEMS.map((item) => {
+    return SERVE_ITEMS.filter(
+      (item) => !item.permission || permissions.includes(item.permission),
+    ).map((item) => {
       const route = state.routes.find(
         (r: { key: string; name: string }) =>
           r.name === item.routeName || r.name.startsWith(`${item.routeName}/`),
@@ -65,7 +74,7 @@ export function ServeBottomNav({
         route,
       };
     }).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
-  }, [state.routes]);
+  }, [permissions, state.routes]);
   const activeIndex = entries.findIndex(
     (entry) => state.routes[state.index]?.key === entry.route.key,
   );

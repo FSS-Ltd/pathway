@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { SidebarNav } from "@pathway/ui";
+import { resolveAdminNavItems } from "./admin-navigation";
 
-const shellSource = readFileSync(
-  new URL("./admin-shell.tsx", import.meta.url),
+const navigationSource = readFileSync(
+  new URL("./admin-navigation.ts", import.meta.url),
   "utf8",
 );
 const sidebarNavSource = readFileSync(
@@ -16,8 +20,8 @@ const sidebarNavSource = readFileSync(
 // Every nav destination must point at a distinct icon - regression test for the bug
 // where several items (Guest pass/Handover/Handover logs/Attendance, Profile/People,
 // Blog/Lessons) shared an iconIndex, and Settings pointed past the end of the array.
-const iconIndexes = [...shellSource.matchAll(/iconIndex:\s*(\d+)/g)].map((m) =>
-  Number(m[1]),
+const iconIndexes = [...navigationSource.matchAll(/iconIndex:\s*(\d+)/g)].map(
+  (m) => Number(m[1]),
 );
 assert.ok(
   iconIndexes.length > 0,
@@ -52,7 +56,7 @@ assert.ok(
   `iconComponents (${iconNames.length} entries) must cover the highest iconIndex used (${maxIconIndex})`,
 );
 
-const learningNavEntry = shellSource.match(
+const learningNavEntry = navigationSource.match(
   /label:\s*"Learning"[\s\S]*?href:\s*"\/learning"[\s\S]*?iconIndex:\s*(\d+)[\s\S]*?access:\s*"staff-or-admin"[\s\S]*?capability:\s*"learning\.log\.read"[\s\S]*?group:\s*"Teaching"/,
 );
 assert.ok(
@@ -64,7 +68,7 @@ assert.ok(
   "Learning navigation iconIndex must be covered by iconComponents",
 );
 
-const paceNavEntry = shellSource.match(
+const paceNavEntry = navigationSource.match(
   /label:\s*"PACE"[\s\S]*?href:\s*"\/ace\/pace"[\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"ace\.pace\.read"[\s\S]*?group:\s*"Teaching",?\s*\},/,
 );
 assert.ok(
@@ -72,10 +76,42 @@ assert.ok(
   "expected PACE navigation to require the ace.pace.read permission",
 );
 
+const staffRole = {
+  isOrgAdmin: false,
+  isOrgOwner: false,
+  isSiteAdmin: false,
+  isStaff: true,
+  isSafeguardingStaff: false,
+  isSuperUser: false,
+};
+const renderNavigation = (permissions: string[]) =>
+  renderToStaticMarkup(
+    React.createElement(SidebarNav, {
+      currentPath: "/ace/behaviour",
+      items: resolveAdminNavItems({
+        role: staffRole,
+        currentOrgIsMasterOrg: false,
+        capabilities: [],
+        permissions,
+        ui: { labels: {} },
+      }),
+    }),
+  );
+assert.doesNotMatch(
+  renderNavigation([]),
+  /href="\/ace\/behaviour"/,
+  "Behaviour navigation stays hidden without ace.behaviour.read",
+);
+assert.match(
+  renderNavigation(["ace.behaviour.read"]),
+  /href="\/ace\/behaviour"[^>]*>[\s\S]*?Behaviour/,
+  "Behaviour navigation renders after ace.behaviour.read is loaded",
+);
+
 // ACE-F14: Roles & Access must be gated by the typed permission, not a role
 // display name - no `access:` string on this entry.
-const rolesAccessNavEntry = shellSource.match(
-  /label:\s*"Roles & Access"[\s\S]*?href:\s*"\/settings\/roles"[\s\S]*?capability:\s*"platform\.access\.roles\.read"[\s\S]*?permission:\s*"platform\.access\.roles\.read"[\s\S]*?group:\s*"Admin"\s*\},/,
+const rolesAccessNavEntry = navigationSource.match(
+  /label:\s*"Roles & Access"[\s\S]*?href:\s*"\/settings\/roles"[\s\S]*?capability:\s*"platform\.access\.roles\.read"[\s\S]*?permission:\s*"platform\.access\.roles\.read"[\s\S]*?group:\s*"Admin",?\s*\},/,
 );
 assert.ok(
   rolesAccessNavEntry,
@@ -89,16 +125,16 @@ assert.ok(
 // Production-403 fix: Attendance and Notices are gated by their typed
 // permission too, not just the coarse role-name access requirement, so a
 // user without attendance.read/notices.read doesn't even see the link.
-const attendanceNavEntry = shellSource.match(
-  /defaultSidebarItems\[8\][\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"attendance\.read"[\s\S]*?group:\s*"Schedule"\s*\},/,
+const attendanceNavEntry = navigationSource.match(
+  /defaultSidebarItems\[8\][\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"attendance\.read"[\s\S]*?group:\s*"Schedule",?\s*\},/,
 );
 assert.ok(
   attendanceNavEntry,
   "expected Attendance navigation to require the attendance.read permission",
 );
 
-const noticesNavEntry = shellSource.match(
-  /defaultSidebarItems\[9\][\s\S]*?access:\s*"site-admin-or-higher"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication"\s*\},/,
+const noticesNavEntry = navigationSource.match(
+  /defaultSidebarItems\[9\][\s\S]*?access:\s*"site-admin-or-higher"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication",?\s*\},/,
 );
 assert.ok(
   noticesNavEntry,
@@ -106,7 +142,7 @@ assert.ok(
 );
 
 // Grouped items render as accordion sections; Dashboard stays top-level.
-const groupLabels = [...shellSource.matchAll(/group:\s*"([^"]+)"/g)].map(
+const groupLabels = [...navigationSource.matchAll(/group:\s*"([^"]+)"/g)].map(
   (m) => m[1],
 );
 assert.ok(
@@ -114,7 +150,7 @@ assert.ok(
   "expected nav items to declare accordion groups",
 );
 assert.match(
-  shellSource,
+  navigationSource,
   /\{ \.\.\.defaultSidebarItems\[0\], access: "staff-or-admin" \},/,
   "Dashboard has no group",
 );

@@ -46,6 +46,7 @@ function appReady(userId = "user-1", siteId = "site-1") {
         activeSiteId: siteId,
         updatedAt: "2026-08-12T09:00:00.000Z",
       },
+      permissions: [],
       roles: {},
       activeSiteState: { activeSiteId: siteId, sites: [] },
       space: "serve" as const,

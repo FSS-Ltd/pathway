@@ -1,14 +1,21 @@
 import { Tabs } from "expo-router";
 
 import { ServeBottomNav } from "@/components/navigation/serve-bottom-nav";
+import { useAppReady } from "@/hooks/use-app-ready";
 
 export default function ServeTabsLayout() {
+  const { bootstrapState } = useAppReady();
+  const permissions =
+    bootstrapState.status === "ready" ? bootstrapState.permissions : [];
+  const canReadBehaviour = permissions.includes("ace.behaviour.read");
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
       }}
-      tabBar={(props) => <ServeBottomNav {...props} />}
+      tabBar={(props) => (
+        <ServeBottomNav {...props} permissions={permissions} />
+      )}
     >
       <Tabs.Screen
         name="attendance"
@@ -27,6 +34,14 @@ export default function ServeTabsLayout() {
         options={{
           title: "PACE",
           tabBarAccessibilityLabel: "PACE assessments",
+        }}
+      />
+      <Tabs.Screen
+        name="behaviour"
+        options={{
+          title: "Behaviour",
+          tabBarAccessibilityLabel: "Behaviour capture",
+          href: canReadBehaviour ? undefined : null,
         }}
       />
       <Tabs.Screen
