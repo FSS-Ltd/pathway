@@ -5,6 +5,7 @@ import { PlatformModule } from "./platform/platform.module";
 import { BillingModule } from "./billing/billing.module";
 import { AceSettingsModule } from "./ace-settings/ace-settings.module";
 import { PaceModule } from "./pace/pace.module";
+import { BehaviourModule } from "./behaviour/behaviour.module";
 
 // Core modules
 import { HealthModule } from "./health/health.module";
@@ -76,6 +77,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     BillingModule,
     AceSettingsModule,
     PaceModule,
+    BehaviourModule,
     LeadsModule,
     StaffModule,
     PublicSignupModule,

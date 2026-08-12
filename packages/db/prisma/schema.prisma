@@ -802,6 +802,7 @@ model Tenant {
   pacePolicies           PacePolicy[]
   pacePolicyOverrides    PacePolicyOverride[]
   behaviourEntries       BehaviourEntry[]
+  behaviourCategories    BehaviourCategory[]
   demeritPolicies        DemeritPolicy[]
   demeritStageOverrides  DemeritStageOverride[]
   studentPortalPolicy    StudentPortalPolicy?
@@ -990,6 +991,7 @@ model User {
   createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
   authorisedPaceOverrides    PacePolicyOverride[]        @relation("PacePolicyOverrideAuthorisedBy")
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
+  createdBehaviourCategories BehaviourCategory[]         @relation("BehaviourCategoryCreatedBy")
   createdDemeritPolicies     DemeritPolicy[]             @relation("DemeritPolicyCreatedBy")
   authorisedDemeritOverrides DemeritStageOverride[]      @relation("DemeritStageOverrideAuthorisedBy")
   compiledAceReports          AceReportCompilation[]      @relation("AceReportCompilationCompiledBy")
@@ -2730,6 +2732,31 @@ model PacePolicyOverride {
   @@unique([tenantId, clientCommandKeyHash], map: "PacePolicyOverride_tenant_client_command_key")
   @@index([tenantId, childId, expiresAt])
   @@index([tenantId, subjectId, expiresAt])
+}
+
+// Immutable category snapshots. A site's current configuration is the highest
+// policyVersion, so inactive categories remain available for historic entries.
+model BehaviourCategory {
+  id              String              @id @default(uuid())
+  tenantId        String
+  tenant          Tenant              @relation(fields: [tenantId], references: [id])
+  policyVersion   Int
+  code            String
+  label           String
+  type            BehaviourType
+  visibility      BehaviourVisibility @default(GENERAL)
+  isActive        Boolean             @default(true)
+  isSerious       Boolean             @default(false)
+  sortOrder       Int
+  createdByUserId String
+  createdBy       User                @relation("BehaviourCategoryCreatedBy", fields: [createdByUserId], references: [id])
+  reason          String              @db.Text
+  createdAt       DateTime            @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, policyVersion, code])
+  @@unique([tenantId, policyVersion, sortOrder])
+  @@index([tenantId, policyVersion, sortOrder])
 }
 
 // note is sensitive free text encrypted transparently by packages/db/src/pii-encryption.ts.
