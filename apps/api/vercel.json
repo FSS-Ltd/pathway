@@ -6,7 +6,7 @@
   "functions": {
     "api/[...path].js": {
       "maxDuration": 30,
-      "includeFiles": "{api/package.json,tsconfig.json,src/**,../../packages/{auth,db,platform,pricing,types,util}/src/**,../../packages/{auth,db,platform,pricing,types,util}/package.json,../../packages/config/{package.json,tsconfig/**},../../packages/db/prisma/**}"
+      "includeFiles": "{api/package.json,tsconfig.json,src/**,../../packages/{ace-domain,auth,db,platform,pricing,types,util}/src/**,../../packages/{ace-domain,auth,db,platform,pricing,types,util}/package.json,../../packages/config/{package.json,tsconfig/**},../../packages/db/prisma/**}"
     }
   },
   "routes": [
