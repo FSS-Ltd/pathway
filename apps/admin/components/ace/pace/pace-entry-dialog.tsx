@@ -52,6 +52,8 @@ export function PaceEntryDialog({
   );
   const [idempotencyKey, setIdempotencyKey] = React.useState(createCommandKey);
   const [useOverride, setUseOverride] = React.useState(false);
+  const [authorisedOverride, setAuthorisedOverride] =
+    React.useState<AdminPacePolicyOverride | null>(null);
   const [validation, setValidation] = React.useState<Record<string, string>>(
     {},
   );
@@ -69,6 +71,7 @@ export function PaceEntryDialog({
     setForm(initialForm(rosterItem));
     setIdempotencyKey(createCommandKey());
     setUseOverride(false);
+    setAuthorisedOverride(null);
     setValidation({});
     setError(null);
     setPolicy(undefined);
@@ -101,8 +104,10 @@ export function PaceEntryDialog({
     try {
       const command = toAssessmentCommand(form, idempotencyKey);
       const override = useOverride
-        ? await onAuthoriseOverride(toOverrideCommand(command))
+        ? (authorisedOverride ??
+          (await onAuthoriseOverride(toOverrideCommand(command))))
         : undefined;
+      if (override && !authorisedOverride) setAuthorisedOverride(override);
       const response = await onSave(
         override ? { ...command, policyOverrideId: override.id } : command,
       );

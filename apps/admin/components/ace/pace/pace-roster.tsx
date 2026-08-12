@@ -17,6 +17,29 @@ type PaceRosterProps = {
   onRetry: () => void;
 };
 
+export async function fetchAllPacePages<T>(
+  fetchPage: (query: { limit: number; cursor?: string }) => Promise<{
+    items: T[];
+    nextCursor: string | null;
+  }>,
+): Promise<T[]> {
+  const items: T[] = [];
+  let cursor: string | undefined;
+  const seenCursors = new Set<string>();
+
+  do {
+    const page = await fetchPage({ limit: 50, ...(cursor ? { cursor } : {}) });
+    items.push(...page.items);
+    cursor = page.nextCursor ?? undefined;
+    if (cursor && seenCursors.has(cursor)) {
+      throw new Error("PACE pagination returned a repeated cursor.");
+    }
+    if (cursor) seenCursors.add(cursor);
+  } while (cursor);
+
+  return items;
+}
+
 export function PaceRoster({
   isLoading,
   items,

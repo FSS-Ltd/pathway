@@ -10,6 +10,7 @@ import {
   fetchPaceExceptions,
   fetchPaceRoster,
   type AdminPaceCorrectionInput,
+  type AdminPaceExceptionItem,
   type AdminPaceRosterItem,
   type AdminPaceAssessmentInput,
   type AdminPacePolicyOverrideInput,
@@ -18,7 +19,10 @@ import { useAdminAccess } from "@/lib/use-admin-access";
 import { useSession } from "@/lib/use-session-compat";
 import { PaceCorrectionDialog } from "@/components/ace/pace/pace-correction-dialog";
 import { PaceEntryDialog } from "@/components/ace/pace/pace-entry-dialog";
-import { PaceRoster } from "@/components/ace/pace/pace-roster";
+import {
+  fetchAllPacePages,
+  PaceRoster,
+} from "@/components/ace/pace/pace-roster";
 
 type CorrectionTarget = {
   assessmentId: string;
@@ -36,12 +40,10 @@ export default function PacePage() {
   const canRecord = hasPermission(permissions, "ace.pace.record");
   const canCorrect = hasPermission(permissions, "ace.pace.correct");
   const canOverride = hasPermission(permissions, "ace.pace.override");
-  const [roster, setRoster] = React.useState<Awaited<
-    ReturnType<typeof fetchPaceRoster>
-  > | null>(null);
-  const [exceptions, setExceptions] = React.useState<Awaited<
-    ReturnType<typeof fetchPaceExceptions>
-  > | null>(null);
+  const [roster, setRoster] = React.useState<AdminPaceRosterItem[]>([]);
+  const [exceptions, setExceptions] = React.useState<AdminPaceExceptionItem[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [entryTarget, setEntryTarget] =
@@ -54,8 +56,8 @@ export default function PacePage() {
     setError(null);
     try {
       const [nextRoster, nextExceptions] = await Promise.all([
-        fetchPaceRoster(),
-        fetchPaceExceptions(),
+        fetchAllPacePages(fetchPaceRoster),
+        fetchAllPacePages(fetchPaceExceptions),
       ]);
       setRoster(nextRoster);
       setExceptions(nextExceptions);
@@ -109,8 +111,8 @@ export default function PacePage() {
       </div>
       <PaceRoster
         isLoading={isLoading}
-        items={roster?.items ?? []}
-        exceptions={exceptions?.items ?? []}
+        items={roster}
+        exceptions={exceptions}
         error={error}
         canRecord={canRecord}
         canCorrect={canCorrect}

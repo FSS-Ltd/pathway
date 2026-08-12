@@ -7,6 +7,7 @@ export function PolicyResultCallout({
 }: {
   policy: Pick<AdminPacePolicyResult, "decision" | "code">;
 }) {
+  if (policy.decision === "allow") return null;
   const content = policyCopy(policy);
   const isBlock = policy.decision === "block";
 
@@ -46,8 +47,6 @@ function policyCopy(
     case "override-required":
       return "A separately authorised policy override is required before recording this assessment.";
     case "allowed":
-      return policy.decision === "block"
-        ? "The assessment is blocked by the active site policy."
-        : "The assessment was accepted by the active site policy.";
+      return "The assessment was accepted by the active site policy.";
   }
 }
