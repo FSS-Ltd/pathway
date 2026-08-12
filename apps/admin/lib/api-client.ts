@@ -702,7 +702,7 @@ export type AceDashboardResponse = {
 };
 
 export async function fetchAceDashboard(
-  input: { date?: string } = {},
+  input: { date?: string; signal?: AbortSignal } = {},
 ): Promise<AceDashboardResponse> {
   if (isUsingMockApi()) {
     return {
@@ -728,6 +728,7 @@ export async function fetchAceDashboard(
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",
+    signal: input.signal,
   });
   if (!response.ok) {
     throw new Error("Unable to load the ACE overview.");

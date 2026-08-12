@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { resolveAdminNavItems } from "@/app/admin-navigation";
+import { notifyActiveSiteChanged } from "@/lib/active-site-events";
 import { AceOverview } from "./ace-overview";
+import { useAceDashboard } from "./use-ace-dashboard";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost/ace",
@@ -55,6 +57,12 @@ const emptyDashboard = {
   behaviour: { siteReview: 0, headReview: 0 },
 };
 
+const nextSiteDashboard = {
+  ...dashboard,
+  localDate: "2026-08-13",
+  attendance: { present: 11, absent: 1, late: 0, unmarked: 0 },
+};
+
 const staffRole = {
   isOrgAdmin: false,
   isOrgOwner: false,
@@ -68,6 +76,29 @@ type Root = { render: (node: React.ReactNode) => void; unmount: () => void };
 
 async function render(root: Root, node: React.ReactNode): Promise<void> {
   await act(async () => root.render(node));
+}
+
+function DashboardHarness() {
+  const state = useAceDashboard(true);
+  return <AceOverview {...state} />;
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function jsonResponse(value: unknown): Response {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 async function run(): Promise<void> {
@@ -196,6 +227,54 @@ async function run(): Promise<void> {
       );
     });
     assert.equal(retries, 1, "invokes the retry action once");
+
+    const originalFetch = globalThis.fetch;
+    const firstResponse = deferred<Response>();
+    const secondResponse = deferred<Response>();
+    const requestSignals: AbortSignal[] = [];
+    let requestCount = 0;
+    globalThis.fetch = async (_input, init) => {
+      requestCount += 1;
+      if (init?.signal) requestSignals.push(init.signal);
+      return requestCount === 1
+        ? firstResponse.promise
+        : secondResponse.promise;
+    };
+
+    try {
+      await render(root, <DashboardHarness />);
+      assert.equal(requestCount, 1, "loads the active site's dashboard");
+
+      await act(async () => {
+        notifyActiveSiteChanged(dom.window);
+      });
+      assert.equal(requestCount, 2, "reloads after the active site changes");
+      assert.equal(
+        requestSignals[0]?.aborted,
+        true,
+        "aborts the prior site's request",
+      );
+
+      await act(async () => {
+        secondResponse.resolve(jsonResponse(nextSiteDashboard));
+        await secondResponse.promise;
+      });
+      assert.match(container.textContent ?? "", /2026-08-13/);
+      assert.match(container.textContent ?? "", /Present:\s*11/);
+
+      await act(async () => {
+        firstResponse.resolve(jsonResponse(dashboard));
+        await firstResponse.promise;
+      });
+      assert.match(
+        container.textContent ?? "",
+        /2026-08-13/,
+        "keeps the new site's dashboard when the stale response resolves last",
+      );
+      assert.doesNotMatch(container.textContent ?? "", /2026-08-12/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
 
     Object.defineProperty(dom.window, "innerWidth", {
       value: 320,
