@@ -249,6 +249,7 @@ export type AdminAttendanceDetail = {
   roomLabel: string | null;
   ageGroupLabel: string | null;
   rows: {
+    attendanceId: string | null;
     childId: string;
     childName: string;
     status: "present" | "absent" | "late" | "unknown";
@@ -4158,11 +4159,17 @@ export async function downloadLessonResource(lessonId: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-const mapAttendanceStatus = (
-  present: boolean | null,
-): "present" | "absent" | "late" | "unknown" => {
-  if (present === true) return "present";
-  if (present === false) return "absent";
+type ApiAttendanceStatus = "PRESENT" | "ABSENT" | "LATE";
+
+const mapAttendanceStatus = (row?: {
+  status?: ApiAttendanceStatus | null;
+  present: boolean | null;
+}): "present" | "absent" | "late" | "unknown" => {
+  if (row?.status === "PRESENT") return "present";
+  if (row?.status === "ABSENT") return "absent";
+  if (row?.status === "LATE") return "late";
+  if (row?.present === true) return "present";
+  if (row?.present === false) return "absent";
   return "unknown";
 };
 
@@ -4257,6 +4264,7 @@ type ApiAttendanceSessionDetail = {
     id?: string;
     childId: string;
     present: boolean | null;
+    status?: ApiAttendanceStatus | null;
     timestamp?: string;
   }>;
 };
@@ -4274,8 +4282,8 @@ export async function fetchAttendanceDetailBySessionId(
       roomLabel: "Room 12",
       ageGroupLabel: "Year 3",
       rows: [
-        { childId: "c1", childName: "Amara Patel", status: "present" },
-        { childId: "c2", childName: "Leo Williams", status: "absent" },
+        { attendanceId: "a1", childId: "c1", childName: "Amara Patel", status: "present" },
+        { attendanceId: "a2", childId: "c2", childName: "Leo Williams", status: "absent" },
       ],
       summary: { present: 1, absent: 1, late: 0, unknown: 0 },
       status: "in_progress",
@@ -4292,55 +4300,17 @@ export async function fetchAttendanceDetailBySessionId(
     throw new Error(`Failed to fetch attendance detail: ${res.status} ${body}`);
   }
 
-  const data = (await res.json()) as ApiAttendanceSessionDetail;
-  const { session, children, rows: rawRows } = data;
-  const childMap = new Map(children.map((c) => [c.id, c.displayName]));
-  const rowsByChild = new Map(rawRows.map((r) => [r.childId, r.present]));
-
-  const rows = children.map((c) => {
-    const present = rowsByChild.get(c.id);
-    const status = mapAttendanceStatus(present ?? null);
-    return {
-      childId: c.id,
-      childName: childMap.get(c.id) ?? `Child ${c.id}`,
-      status,
-    };
-  });
-
-  const summary = rows.reduce(
-    (acc, row) => {
-      acc[row.status] += 1;
-      return acc;
-    },
-    { present: 0, absent: 0, late: 0, unknown: 0 },
+  return mapApiAttendanceDetail(
+    (await res.json()) as ApiAttendanceSessionDetail,
   );
-
-  const timeRangeLabel =
-    buildTimeRangeLabel(session.startsAt, session.endsAt) ?? "Time TBC";
-
-  return {
-    sessionId: session.id,
-    title: session.title ?? "Session",
-    date: session.startsAt,
-    timeRangeLabel,
-    roomLabel: null,
-    ageGroupLabel: session.ageGroupLabel ?? null,
-    rows,
-    summary,
-    status: mapSessionStatus(session.startsAt, session.endsAt),
-  };
 }
 
-/** Payload for saving attendance: childId + status (present/absent/late/unknown). */
 export type SaveAttendanceRow = {
   childId: string;
-  status: "present" | "absent" | "late" | "unknown";
+  status: ApiAttendanceStatus;
+  correctionReason?: string;
 };
 
-/**
- * Save attendance for a session. Requires real API (no mock).
- * Maps status to present: only "present" -> true, else false.
- */
 export async function saveAttendanceForSession(
   sessionId: string,
   rows: SaveAttendanceRow[],
@@ -4353,7 +4323,10 @@ export async function saveAttendanceForSession(
   const payload = {
     rows: rows.map((r) => ({
       childId: r.childId,
-      present: r.status === "present",
+      status: r.status,
+      ...(r.correctionReason === undefined
+        ? {}
+        : { correctionReason: r.correctionReason.trim() }),
     })),
   };
   const res = await fetch(
@@ -4370,14 +4343,25 @@ export async function saveAttendanceForSession(
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to save attendance: ${res.status} ${body}`);
   }
-  const data = (await res.json()) as ApiAttendanceSessionDetail;
+  return mapApiAttendanceDetail(
+    (await res.json()) as ApiAttendanceSessionDetail,
+  );
+}
+
+function mapApiAttendanceDetail(
+  data: ApiAttendanceSessionDetail,
+): AdminAttendanceDetail {
   const { session, children, rows: rawRows } = data;
-  const rowsByChild = new Map(rawRows.map((r) => [r.childId, r.present]));
-  const detailRows = children.map((c) => ({
-    childId: c.id,
-    childName: c.displayName,
-    status: mapAttendanceStatus(rowsByChild.get(c.id) ?? null),
-  }));
+  const rowsByChild = new Map(rawRows.map((row) => [row.childId, row]));
+  const detailRows = children.map((child) => {
+    const attendanceRow = rowsByChild.get(child.id);
+    return {
+      attendanceId: attendanceRow?.id ?? null,
+      childId: child.id,
+      childName: child.displayName,
+      status: mapAttendanceStatus(attendanceRow),
+    };
+  });
   const summary = detailRows.reduce(
     (acc, row) => {
       acc[row.status] += 1;
