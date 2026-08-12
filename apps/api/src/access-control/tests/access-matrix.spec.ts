@@ -49,11 +49,13 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R12: "migrated",
   R13: "migrated",
   R14: "migrated",
+  R30: "migrated",
+  R31: "migrated",
   R69: { pending: "self-scoped; no capability/permission layer by design" },
 };
 
 for (let n = 15; n <= 68; n += 1) {
-  ROUTE_STATUS[`R${n}`] = { pending: "ACE-F15+ - route not built" };
+  ROUTE_STATUS[`R${n}`] ??= { pending: "ACE-F15+ - route not built" };
 }
 
 const MATRIX_PATH = join(
@@ -99,5 +101,20 @@ describe("access route matrix", () => {
     expect(byId.R12).toMatchObject({ method: "GET", path: "/access/users/:userId/effective-permissions", permission: "platform.access.users.read" });
     expect(byId.R13).toMatchObject({ method: "GET", path: "/access/users/:userId/access-summary", permission: "platform.access.users.read" });
     expect(byId.R14).toMatchObject({ method: "GET", path: "/access/audit", permission: "platform.access.audit.read" });
+  });
+
+  it("gives the behaviour policy routes their registered permission keys", () => {
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+
+    expect(byId.R30).toMatchObject({
+      method: "GET",
+      path: "/ace/behaviour/policy",
+      permission: "ace.behaviour.read",
+    });
+    expect(byId.R31).toMatchObject({
+      method: "PUT",
+      path: "/ace/behaviour/policy",
+      permission: "ace.behaviour.policy.manage",
+    });
   });
 });

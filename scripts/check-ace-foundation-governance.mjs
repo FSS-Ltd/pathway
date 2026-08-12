@@ -38,6 +38,7 @@ const requiredTables = [
   "PaceProgress",
   "PacePolicy",
   "PacePolicyOverride",
+  "BehaviourCategory",
   "BehaviourEntry",
   "DemeritPolicy",
   "DemeritStageOverride",

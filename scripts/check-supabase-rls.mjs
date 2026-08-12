@@ -32,6 +32,7 @@ const REQUIRED_RLS_TABLES = [
   "PaceProgress",
   "PacePolicy",
   "PacePolicyOverride",
+  "BehaviourCategory",
   "BehaviourEntry",
   "DemeritPolicy",
   "DemeritStageOverride",
