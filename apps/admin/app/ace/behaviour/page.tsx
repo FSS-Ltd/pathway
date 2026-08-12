@@ -4,8 +4,10 @@ import React from "react";
 import { NoAccessCard } from "@/components/no-access-card";
 import { BehaviourForm } from "@/components/ace/behaviour/behaviour-form";
 import { BehaviourHistory } from "@/components/ace/behaviour/behaviour-history";
+import { isValidIanaTimeZone } from "@/components/ace/behaviour/behaviour-time";
 import {
   correctBehaviour,
+  fetchActiveSiteState,
   fetchBehaviourHistory,
   fetchBehaviourPolicy,
   fetchChildren,
@@ -32,6 +34,8 @@ export default function BehaviourPage() {
     [],
   );
   const [history, setHistory] = React.useState<AdminBehaviourEntry[]>([]);
+  const [activeSiteId, setActiveSiteId] = React.useState<string | null>(null);
+  const [siteTimeZone, setSiteTimeZone] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -39,11 +43,20 @@ export default function BehaviourPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [nextChildren, policy, nextHistory] = await Promise.all([
+      const [siteState, nextChildren, policy, nextHistory] = await Promise.all([
+        fetchActiveSiteState(),
         fetchChildren(),
         fetchBehaviourPolicy(),
         fetchBehaviourHistory({ limit: 50 }),
       ]);
+      const activeSite = siteState.sites.find(
+        (site) => site.id === siteState.activeSiteId,
+      );
+      if (!activeSite?.timezone || !isValidIanaTimeZone(activeSite.timezone)) {
+        throw new Error("The active site timezone is unavailable.");
+      }
+      setSiteTimeZone(activeSite.timezone);
+      setActiveSiteId(activeSite.id);
       setChildren(
         nextChildren
           .filter((child) => child.status === "active")
@@ -58,6 +71,8 @@ export default function BehaviourPage() {
           : "Unable to load behaviour capture.",
       );
       setHistory([]);
+      setActiveSiteId(null);
+      setSiteTimeZone(null);
     } finally {
       setIsLoading(false);
     }
@@ -97,11 +112,13 @@ export default function BehaviourPage() {
         </p>
       </div>
 
-      {canRecord ? (
+      {canRecord && siteTimeZone ? (
         <BehaviourForm
+          key={`behaviour-form-${activeSiteId}`}
           children={children}
           categories={categories}
           canSensitive={canSensitive}
+          siteTimeZone={siteTimeZone}
           disabled={isLoading}
           onSave={recordBehaviour}
           onSuccess={load}
@@ -109,12 +126,14 @@ export default function BehaviourPage() {
       ) : null}
 
       <BehaviourHistory
+        key={`behaviour-history-${activeSiteId}`}
         isLoading={isLoading}
         error={error}
         items={history}
         children={children}
         canCorrect={canRecord}
         canSensitive={canSensitive}
+        siteTimeZone={siteTimeZone ?? "UTC"}
         onRetry={() => void load()}
         onCorrect={correctBehaviour}
         onSuccess={load}

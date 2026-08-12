@@ -39,6 +39,9 @@ export function BehaviourScreen() {
   const [categories, setCategories] = useState<BehaviourCategory[]>([]);
   const [history, setHistory] = useState<BehaviourEntry[]>([]);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const [authorisedTenantId, setAuthorisedTenantId] = useState<string | null>(
+    null,
+  );
   const [draft, setDraft] = useState<BehaviourDraft>(createEmptyDraft);
   const [visibility, setVisibility] = useState<BehaviourVisibility>("GENERAL");
   const [validation, setValidation] = useState<BehaviourDraftValidation>({});
@@ -49,11 +52,18 @@ export function BehaviourScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const submitting = useRef(false);
+  const commandAttempted = useRef(false);
+  const loadRequest = useRef(0);
   const userId =
     bootstrapState.status === "ready" ? bootstrapState.state.userId : undefined;
   const siteId =
     bootstrapState.status === "ready"
       ? bootstrapState.activeSiteState.activeSiteId
+      : null;
+  const siteTimeZone =
+    bootstrapState.status === "ready"
+      ? (bootstrapState.activeSiteState.sites.find((site) => site.id === siteId)
+          ?.timezone ?? null)
       : null;
   const draftScope = useMemo(
     () => resolveBehaviourDraftScope(userId, siteId),
@@ -67,21 +77,35 @@ export function BehaviourScreen() {
   const canSensitive = permissions.includes("ace.behaviour.sensitive.read");
 
   const load = useCallback(async () => {
+    const request = ++loadRequest.current;
+    let scopeAuthorised = false;
     setIsLoading(true);
-    setIsDraftSanitised(false);
     setLoadError(null);
+    setAuthorisedTenantId((current) => (current === siteId ? current : null));
     try {
-      const [access, nextChildren, policy, nextHistory] = await Promise.all([
-        fetchBehaviourPermissions(),
-        fetchBehaviourChildren(),
-        fetchBehaviourPolicy(),
-        fetchBehaviourHistory({ limit: 50 }),
-      ]);
+      if (!siteId || !siteTimeZone || !isValidIanaTimeZone(siteTimeZone)) {
+        throw new Error("The active site timezone is unavailable.");
+      }
+      const access = await fetchBehaviourPermissions();
+      if (request !== loadRequest.current) return;
+      if (access.tenantId !== siteId) {
+        throw new Error(
+          "Your current access does not match the active site. Try switching sites again.",
+        );
+      }
       if (!access.permissions.includes("ace.behaviour.read")) {
         throw new Error(
           "You do not have access to behaviour records for this site.",
         );
       }
+      setAuthorisedTenantId(siteId);
+      scopeAuthorised = true;
+      const [nextChildren, policy, nextHistory] = await Promise.all([
+        fetchBehaviourChildren(),
+        fetchBehaviourPolicy(),
+        fetchBehaviourHistory({ limit: 50 }),
+      ]);
+      if (request !== loadRequest.current) return;
       const sensitive = access.permissions.includes(
         "ace.behaviour.sensitive.read",
       );
@@ -98,16 +122,18 @@ export function BehaviourScreen() {
       );
       if (!sensitive) setVisibility("GENERAL");
     } catch (cause) {
+      if (request !== loadRequest.current) return;
       const apiError = toBehaviourApiError(cause);
+      if (!scopeAuthorised) setAuthorisedTenantId(null);
       setPermissions([]);
       setChildren([]);
       setCategories([]);
       setHistory([]);
       setLoadError(apiError.message);
     } finally {
-      setIsLoading(false);
+      if (request === loadRequest.current) setIsLoading(false);
     }
-  }, []);
+  }, [siteId, siteTimeZone]);
 
   useEffect(() => {
     if (!draftScopeKey) {
@@ -115,6 +141,9 @@ export function BehaviourScreen() {
       return;
     }
     void load();
+    return () => {
+      loadRequest.current += 1;
+    };
   }, [draftScopeKey, load]);
 
   useEffect(() => {
@@ -123,7 +152,13 @@ export function BehaviourScreen() {
     setIsDraftSanitised(false);
     setDraft(createEmptyDraft());
     setVisibility("GENERAL");
-    if (!draftScope || !draftScopeKey) return undefined;
+    if (
+      !draftScope ||
+      !draftScopeKey ||
+      authorisedTenantId !== draftScope.siteId
+    ) {
+      return undefined;
+    }
     void activateAndReadBehaviourDraft(draftScope)
       .then((value) => {
         if (!mounted || !value) return;
@@ -136,12 +171,13 @@ export function BehaviourScreen() {
     return () => {
       mounted = false;
     };
-  }, [draftScope, draftScopeKey]);
+  }, [authorisedTenantId, draftScope, draftScopeKey]);
 
   useEffect(() => {
     if (
       !draftScope ||
       !draftScopeKey ||
+      authorisedTenantId !== draftScope.siteId ||
       hydratedScopeKey !== draftScopeKey ||
       isLoading ||
       loadError
@@ -154,7 +190,7 @@ export function BehaviourScreen() {
       setIsDraftSanitised(true);
       return;
     }
-    setIsDraftSanitised(true);
+    if (!isDraftSanitised) setIsDraftSanitised(true);
     void writeBehaviourDraft(draftScope, JSON.stringify(safeDraft)).catch(
       () => undefined,
     );
@@ -164,13 +200,15 @@ export function BehaviourScreen() {
     draft,
     draftScope,
     draftScopeKey,
+    authorisedTenantId,
     hydratedScopeKey,
+    isDraftSanitised,
     isLoading,
     loadError,
   ]);
 
   const updateDraft = (field: keyof BehaviourDraft, value: string) => {
-    setDraft((current) => ({ ...current, [field]: value }));
+    editDraft((current) => ({ ...current, [field]: value }));
     if (
       field === "childId" ||
       field === "category" ||
@@ -182,13 +220,22 @@ export function BehaviourScreen() {
     setFeedback(null);
   };
 
+  const editDraft = (update: (current: BehaviourDraft) => BehaviourDraft) => {
+    const rotateKey = commandAttempted.current;
+    commandAttempted.current = false;
+    setDraft((current) => ({
+      ...update(current),
+      ...(rotateKey ? { idempotencyKey: createCommandKey() } : {}),
+    }));
+  };
+
   const selectChild = (childId: string) => {
     updateDraft("childId", childId);
   };
 
   const selectCategory = (category: BehaviourCategory) => {
     if (!isCategoryAvailable(category, canSensitive)) return;
-    setDraft((current) => ({
+    editDraft((current) => ({
       ...current,
       category: category.code,
       pointsDelta: defaultPoints(category.type),
@@ -204,7 +251,11 @@ export function BehaviourScreen() {
   const selectVisibility = (next: BehaviourVisibility) => {
     if (next === "SENSITIVE" && !canSensitive) return;
     setVisibility(next);
-    setDraft((current) => ({ ...current, category: null, pointsDelta: "" }));
+    editDraft((current) => ({
+      ...current,
+      category: null,
+      pointsDelta: "",
+    }));
     setValidation((current) => ({
       ...current,
       category: undefined,
@@ -226,6 +277,7 @@ export function BehaviourScreen() {
     if (Object.keys(errors).length > 0 || !category || !draft.childId) return;
 
     submitting.current = true;
+    commandAttempted.current = true;
     setIsSubmitting(true);
     setFeedback(null);
     const note = draft.note.trim();
@@ -236,7 +288,7 @@ export function BehaviourScreen() {
       type: category.type,
       visibility: category.visibility,
       pointsDelta: Number(draft.pointsDelta),
-      occurredAt: new Date(draft.occurredAt).toISOString(),
+      occurredAt: new Date().toISOString(),
       reason: draft.reason.trim(),
       ...(note ? { note } : {}),
     })
@@ -251,6 +303,7 @@ export function BehaviourScreen() {
           ...createEmptyDraft(),
           childId: current.childId,
         }));
+        commandAttempted.current = false;
         await load();
       })
       .catch((cause: unknown) => {
@@ -268,6 +321,7 @@ export function BehaviourScreen() {
   const ready =
     hydratedScopeKey === draftScopeKey &&
     Boolean(draftScopeKey) &&
+    authorisedTenantId === siteId &&
     isDraftSanitised;
 
   return (
@@ -277,7 +331,7 @@ export function BehaviourScreen() {
       title="Behaviour capture"
       subtitle="Record one observed behaviour using active site categories. The server applies policy and escalation."
     >
-      {isLoading || !ready ? (
+      {!loadError && (isLoading || !ready) ? (
         <BrandedCard>
           <Text style={styles.stateText}>Loading behaviour capture…</Text>
         </BrandedCard>
@@ -334,6 +388,7 @@ export function BehaviourScreen() {
               children={children}
               canCorrect={canRecord}
               disabled={isSubmitting}
+              siteTimeZone={siteTimeZone!}
               onCorrect={correctBehaviour}
               onSuccess={async () => {
                 setFeedback({
@@ -372,7 +427,6 @@ function createEmptyDraft(): BehaviourDraft {
     childId: null,
     category: null,
     pointsDelta: "",
-    occurredAt: new Date().toISOString(),
     reason: "",
     note: "",
     idempotencyKey: createCommandKey(),
@@ -386,15 +440,20 @@ function parseDraft(value: string): BehaviourDraft | null {
       (parsed.childId !== null && typeof parsed.childId !== "string") ||
       (parsed.category !== null && typeof parsed.category !== "string") ||
       typeof parsed.pointsDelta !== "string" ||
-      typeof parsed.occurredAt !== "string" ||
-      Number.isNaN(Date.parse(parsed.occurredAt)) ||
       typeof parsed.reason !== "string" ||
       typeof parsed.note !== "string" ||
       typeof parsed.idempotencyKey !== "string"
     ) {
       return null;
     }
-    return parsed as BehaviourDraft;
+    return {
+      childId: parsed.childId ?? null,
+      category: parsed.category ?? null,
+      pointsDelta: parsed.pointsDelta,
+      reason: parsed.reason,
+      note: parsed.note,
+      idempotencyKey: parsed.idempotencyKey,
+    };
   } catch {
     return null;
   }
@@ -430,7 +489,12 @@ function sanitiseDraft(
   }
   if (!category || !isCategoryAvailable(category, canSensitive)) {
     if (draft.category === null && draft.pointsDelta === "") return draft;
-    return { ...draft, category: null, pointsDelta: "" };
+    return {
+      ...draft,
+      category: null,
+      pointsDelta: "",
+      idempotencyKey: createCommandKey(),
+    };
   }
   return draft;
 }
@@ -476,6 +540,15 @@ function createCommandKey(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   if (uuid) return uuid;
   return `behaviour-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function isValidIanaTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone }).format();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const styles = StyleSheet.create({

@@ -9,6 +9,7 @@ import type {
   AdminBehaviourType,
   AdminBehaviourVisibility,
 } from "@/lib/api-client";
+import { siteDateTimeToIso, toSiteDateTimeInput } from "./behaviour-time";
 
 export type BehaviourDraft = {
   childId: string;
@@ -23,6 +24,7 @@ type BehaviourFormProps = {
   children: Array<{ id: string; fullName: string }>;
   categories: AdminBehaviourCategory[];
   canSensitive: boolean;
+  siteTimeZone: string;
   disabled?: boolean;
   initialDraft?: BehaviourDraft;
   onSave: (
@@ -38,13 +40,19 @@ export function BehaviourForm({
   children,
   categories,
   canSensitive,
+  siteTimeZone,
   disabled = false,
   initialDraft,
   onSave,
   onSuccess,
 }: BehaviourFormProps) {
   const [draft, setDraft] = React.useState<BehaviourDraft>(() =>
-    sanitiseDraft(initialDraft ?? emptyDraft(), categories, canSensitive),
+    sanitiseDraft(
+      initialDraft ?? emptyDraft(siteTimeZone),
+      categories,
+      canSensitive,
+      siteTimeZone,
+    ),
   );
   const [typeFilter, setTypeFilter] = React.useState<TypeFilter>("ALL");
   const [visibility, setVisibility] = React.useState<AdminBehaviourVisibility>(
@@ -56,24 +64,34 @@ export function BehaviourForm({
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
   const submissionGate = React.useRef(false);
+  const commandAttempted = React.useRef(false);
   const successRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (!initialDraft) return;
-    setDraft(sanitiseDraft(initialDraft, categories, canSensitive));
+    setDraft(
+      sanitiseDraft(initialDraft, categories, canSensitive, siteTimeZone),
+    );
     setVisibility(visibilityForDraft(initialDraft, categories, canSensitive));
     setTypeFilter("ALL");
     setIdempotencyKey(createCommandKey());
     setValidation({});
     setError(null);
     setSuccess(null);
-  }, [canSensitive, categories, initialDraft]);
+    commandAttempted.current = false;
+  }, [canSensitive, categories, initialDraft, siteTimeZone]);
 
   React.useEffect(() => {
     if (canSensitive) return;
+    if (commandAttempted.current) {
+      commandAttempted.current = false;
+      setIdempotencyKey(createCommandKey());
+    }
     setVisibility("GENERAL");
-    setDraft((current) => sanitiseDraft(current, categories, false));
-  }, [canSensitive, categories]);
+    setDraft((current) =>
+      sanitiseDraft(current, categories, false, siteTimeZone),
+    );
+  }, [canSensitive, categories, siteTimeZone]);
 
   React.useEffect(() => {
     if (success) successRef.current?.focus();
@@ -86,26 +104,41 @@ export function BehaviourForm({
       (typeFilter === "ALL" || category.type === typeFilter),
   );
 
-  const update = (field: keyof BehaviourDraft, value: string) => {
-    setDraft((current) => ({ ...current, [field]: value }));
-    setValidation((current) => ({ ...current, [field]: undefined }));
+  const editDraft = (
+    updateDraft: (current: BehaviourDraft) => BehaviourDraft,
+  ) => {
+    const rotateKey = commandAttempted.current;
+    commandAttempted.current = false;
+    if (rotateKey) setIdempotencyKey(createCommandKey());
+    setDraft(updateDraft);
     setError(null);
     setSuccess(null);
+  };
+
+  const update = (field: keyof BehaviourDraft, value: string) => {
+    editDraft((current) => ({ ...current, [field]: value }));
+    setValidation((current) => ({ ...current, [field]: undefined }));
   };
 
   const selectVisibility = (next: AdminBehaviourVisibility) => {
     if (next === "SENSITIVE" && !canSensitive) return;
     setVisibility(next);
-    setDraft((current) => ({ ...current, category: "" }));
+    editDraft((current) => ({ ...current, category: "" }));
     setValidation((current) => ({ ...current, category: undefined }));
-    setError(null);
-    setSuccess(null);
   };
 
   const selectCategory = (category: AdminBehaviourCategory) => {
     if (!isSelectableCategory(category, canSensitive)) return;
-    update("category", category.code);
-    update("pointsDelta", defaultPoints(category.type));
+    editDraft((current) => ({
+      ...current,
+      category: category.code,
+      pointsDelta: defaultPoints(category.type),
+    }));
+    setValidation((current) => ({
+      ...current,
+      category: undefined,
+      pointsDelta: undefined,
+    }));
   };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -117,24 +150,28 @@ export function BehaviourForm({
         candidate.code === draft.category &&
         isSelectableCategory(candidate, canSensitive),
     );
-    const errors = validateDraft(draft, category);
+    const errors = validateDraft(draft, category, siteTimeZone);
     setValidation(errors);
     if (Object.keys(errors).length > 0 || !category) return;
 
     submissionGate.current = true;
+    commandAttempted.current = true;
     setIsSaving(true);
     setError(null);
     setSuccess(null);
     try {
-      const response = await onSave(toCommand(draft, category, idempotencyKey));
+      const response = await onSave(
+        toCommand(draft, category, idempotencyKey, siteTimeZone),
+      );
       setSuccess(
         response.duplicate
           ? "This behaviour was already recorded."
           : "Behaviour recorded.",
       );
       setIdempotencyKey(createCommandKey());
+      commandAttempted.current = false;
       setDraft((current) => ({
-        ...emptyDraft(),
+        ...emptyDraft(siteTimeZone),
         childId: current.childId,
       }));
       setTypeFilter("ALL");
@@ -329,7 +366,7 @@ export function BehaviourForm({
               id="behaviour-occurred-at"
               className={controlClassName}
               type="datetime-local"
-              value={toDateTimeLocal(draft.occurredAt)}
+              value={draft.occurredAt}
               disabled={formDisabled}
               onChange={(event) => update("occurredAt", event.target.value)}
               aria-invalid={Boolean(validation.occurredAt)}
@@ -455,12 +492,12 @@ function VisibilityOption({
   );
 }
 
-function emptyDraft(): BehaviourDraft {
+function emptyDraft(siteTimeZone: string): BehaviourDraft {
   return {
     childId: "",
     category: "",
     pointsDelta: "",
-    occurredAt: new Date().toISOString(),
+    occurredAt: toSiteDateTimeInput(new Date().toISOString(), siteTimeZone),
     reason: "",
     note: "",
   };
@@ -470,13 +507,21 @@ function sanitiseDraft(
   draft: BehaviourDraft,
   categories: AdminBehaviourCategory[],
   canSensitive: boolean,
+  siteTimeZone: string,
 ): BehaviourDraft {
+  const localDraft = {
+    ...draft,
+    occurredAt: toSiteDateTimeInput(draft.occurredAt, siteTimeZone),
+  };
   const category = categories.find(
-    (candidate) => candidate.code === draft.category,
+    (candidate) => candidate.code === localDraft.category,
   );
-  if (category?.visibility === "SENSITIVE" && !canSensitive) {
+  if (
+    !canSensitive &&
+    (category?.visibility === "SENSITIVE" || (!category && draft.category))
+  ) {
     return {
-      ...draft,
+      ...localDraft,
       category: "",
       pointsDelta: "",
       reason: "",
@@ -484,9 +529,9 @@ function sanitiseDraft(
     };
   }
   if (!category || !isSelectableCategory(category, canSensitive)) {
-    return { ...draft, category: "" };
+    return { ...localDraft, category: "" };
   }
-  return { ...draft };
+  return localDraft;
 }
 
 function visibilityForDraft(
@@ -513,6 +558,7 @@ function isSelectableCategory(
 function validateDraft(
   draft: BehaviourDraft,
   category: AdminBehaviourCategory | undefined,
+  siteTimeZone: string,
 ): Validation {
   const errors: Validation = {};
   if (!draft.childId) errors.childId = "Choose a learner.";
@@ -529,7 +575,7 @@ function validateDraft(
     errors.pointsDelta =
       "Merit points must be positive, Demerit points negative, and General points zero.";
   }
-  if (!draft.occurredAt || Number.isNaN(Date.parse(draft.occurredAt))) {
+  if (!siteDateTimeToIso(draft.occurredAt, siteTimeZone)) {
     errors.occurredAt = "Enter when this behaviour occurred.";
   }
   if (!draft.reason.trim()) errors.reason = "Enter a reason.";
@@ -540,6 +586,7 @@ function toCommand(
   draft: BehaviourDraft,
   category: AdminBehaviourCategory,
   idempotencyKey: string,
+  siteTimeZone: string,
 ): AdminBehaviourCommandInput {
   const note = draft.note.trim();
   return {
@@ -549,7 +596,7 @@ function toCommand(
     type: category.type,
     visibility: category.visibility,
     pointsDelta: Number(draft.pointsDelta),
-    occurredAt: new Date(draft.occurredAt).toISOString(),
+    occurredAt: siteDateTimeToIso(draft.occurredAt, siteTimeZone)!,
     reason: draft.reason.trim(),
     ...(note ? { note } : {}),
   };
@@ -565,13 +612,6 @@ function typeLabel(type: AdminBehaviourType): string {
   if (type === "MERIT") return "Merit";
   if (type === "DEMERIT") return "Demerit";
   return "General";
-}
-
-function toDateTimeLocal(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const offsetMs = date.getTimezoneOffset() * 60_000;
-  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
 function createCommandKey(): string {

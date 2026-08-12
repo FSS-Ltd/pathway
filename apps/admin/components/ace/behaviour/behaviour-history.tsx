@@ -7,6 +7,7 @@ import type {
   AdminBehaviourCommandResponse,
   AdminBehaviourEntry,
 } from "@/lib/api-client";
+import { formatSiteDateTime } from "./behaviour-time";
 
 type BehaviourHistoryProps = {
   isLoading: boolean;
@@ -15,6 +16,7 @@ type BehaviourHistoryProps = {
   children: Array<{ id: string; fullName: string }>;
   canCorrect: boolean;
   canSensitive: boolean;
+  siteTimeZone: string;
   onRetry: () => void;
   onCorrect: (
     entryId: string,
@@ -30,6 +32,7 @@ export function BehaviourHistory({
   children,
   canCorrect,
   canSensitive,
+  siteTimeZone,
   onRetry,
   onCorrect,
   onSuccess,
@@ -43,12 +46,18 @@ export function BehaviourHistory({
   const [correctionTarget, setCorrectionTarget] = React.useState<string | null>(
     null,
   );
+  const [success, setSuccess] = React.useState<string | null>(null);
+  const successRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (canSensitive || !correctionTarget) return;
     const target = items.find((item) => item.id === correctionTarget);
     if (target?.visibility === "SENSITIVE") setCorrectionTarget(null);
   }, [canSensitive, correctionTarget, items]);
+
+  React.useEffect(() => {
+    if (success) successRef.current?.focus();
+  }, [success]);
 
   return (
     <section className="rounded-lg border border-border bg-surface p-5">
@@ -61,6 +70,17 @@ export function BehaviourHistory({
           replacement and keep the original audit trail.
         </p>
       </div>
+
+      {success ? (
+        <div
+          ref={successRef}
+          className="mt-5 rounded-md bg-green-50 p-3 text-sm text-text-primary"
+          role="status"
+          tabIndex={-1}
+        >
+          {success}
+        </div>
+      ) : null}
 
       {isLoading ? (
         <div aria-label="Loading behaviour history…" className="mt-5 space-y-2">
@@ -106,7 +126,7 @@ export function BehaviourHistory({
                   <p className="mt-1 text-sm text-text-muted">
                     {formatType(item.type)} · {formatPoints(item.pointsDelta)} ·{" "}
                     <time dateTime={item.occurredAt}>
-                      {formatDateTime(item.occurredAt)}
+                      {formatSiteDateTime(item.occurredAt, siteTimeZone)}
                     </time>
                   </p>
                   <p className="mt-2 text-sm text-text-primary">
@@ -124,7 +144,10 @@ export function BehaviourHistory({
                     type="button"
                     variant="secondary"
                     size="sm"
-                    onClick={() => setCorrectionTarget(item.id)}
+                    onClick={() => {
+                      setSuccess(null);
+                      setCorrectionTarget(item.id);
+                    }}
                   >
                     Correct
                   </Button>
@@ -137,6 +160,11 @@ export function BehaviourHistory({
                   onCorrect={onCorrect}
                   onSuccess={async (response) => {
                     setCorrectionTarget(null);
+                    setSuccess(
+                      response.duplicate
+                        ? "This correction was already recorded."
+                        : "Correction recorded.",
+                    );
                     await onSuccess?.(response);
                   }}
                 />
@@ -162,11 +190,21 @@ function CorrectionForm({
 }) {
   const [reason, setReason] = React.useState("");
   const [note, setNote] = React.useState(entry.note ?? "");
-  const [idempotencyKey] = React.useState(createCommandKey);
+  const [idempotencyKey, setIdempotencyKey] = React.useState(createCommandKey);
   const [reasonError, setReasonError] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
   const submitting = React.useRef(false);
+  const commandAttempted = React.useRef(false);
+
+  const editCommand = (edit: () => void) => {
+    if (commandAttempted.current) {
+      commandAttempted.current = false;
+      setIdempotencyKey(createCommandKey());
+    }
+    edit();
+    setError(null);
+  };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -177,6 +215,7 @@ function CorrectionForm({
     }
 
     submitting.current = true;
+    commandAttempted.current = true;
     setIsSaving(true);
     setError(null);
     try {
@@ -222,9 +261,8 @@ function CorrectionForm({
           maxLength={1000}
           disabled={isSaving}
           onChange={(event) => {
-            setReason(event.target.value);
+            editCommand(() => setReason(event.target.value));
             setReasonError(null);
-            setError(null);
           }}
           aria-invalid={Boolean(reasonError)}
           aria-describedby={
@@ -253,7 +291,7 @@ function CorrectionForm({
           value={note}
           maxLength={4000}
           disabled={isSaving}
-          onChange={(event) => setNote(event.target.value)}
+          onChange={(event) => editCommand(() => setNote(event.target.value))}
         />
       </div>
       {error ? (
@@ -297,15 +335,6 @@ function formatPoints(points: number): string {
   if (points > 0) return `+${points} points`;
   if (points < 0) return `${points} points`;
   return "No points";
-}
-
-function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
 }
 
 function createCommandKey(): string {

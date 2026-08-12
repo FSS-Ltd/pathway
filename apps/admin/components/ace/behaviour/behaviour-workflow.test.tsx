@@ -8,6 +8,7 @@ import type {
 } from "@/lib/api-client";
 import { BehaviourForm } from "./behaviour-form";
 import { BehaviourHistory } from "./behaviour-history";
+import { isValidIanaTimeZone, siteDateTimeToIso } from "./behaviour-time";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost",
@@ -148,6 +149,7 @@ async function run(): Promise<void> {
         children={[child]}
         categories={categories}
         canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
         onSave={async () => ({ entry, duplicate: false })}
       />,
     );
@@ -190,6 +192,7 @@ async function run(): Promise<void> {
         children={[child]}
         categories={categories}
         canSensitive
+        siteTimeZone="America/Los_Angeles"
         initialDraft={{
           childId: child.id,
           category: "pastoral",
@@ -217,6 +220,7 @@ async function run(): Promise<void> {
         children={[child]}
         categories={categories}
         canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
         initialDraft={{
           childId: child.id,
           category: "pastoral",
@@ -259,10 +263,11 @@ async function run(): Promise<void> {
         children={[child]}
         categories={categories}
         canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
         onSave={async (command) => {
           commands.push(command);
           attempt += 1;
-          if (attempt === 1)
+          if (attempt <= 2)
             throw new Error("Connection interrupted. Try again.");
           return { entry, duplicate: false };
         }}
@@ -301,6 +306,19 @@ async function run(): Promise<void> {
       commands[1]?.idempotencyKey,
       "reuses the command key while retrying the same draft",
     );
+    assert.match(container.textContent ?? "", /Connection interrupted/);
+    await change(
+      element<HTMLInputElement>(container, "#behaviour-reason"),
+      "Helped two learners",
+    );
+    await submit(captureForm);
+    assert.equal(commands.length, 3);
+    assert.notEqual(
+      commands[1]?.idempotencyKey,
+      commands[2]?.idempotencyKey,
+      "rotates the command key after a failed payload is edited",
+    );
+    assert.equal(commands[2]?.reason, "Helped two learners");
     const success = container.querySelector<HTMLElement>('[role="status"]');
     assert.match(success?.textContent ?? "", /Behaviour recorded\./);
     assert.equal(document.activeElement, success, "focuses the success result");
@@ -315,6 +333,7 @@ async function run(): Promise<void> {
         children={[child]}
         canCorrect={false}
         canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
         onRetry={() => {
           retried += 1;
         }}
@@ -334,6 +353,7 @@ async function run(): Promise<void> {
         children={[child]}
         canCorrect={false}
         canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
         onRetry={() => {
           retried += 1;
         }}
@@ -354,6 +374,7 @@ async function run(): Promise<void> {
         children={[child]}
         canCorrect={false}
         canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
         onRetry={() => undefined}
         onCorrect={async () => ({ entry, duplicate: false })}
       />,
@@ -364,6 +385,7 @@ async function run(): Promise<void> {
       entryId: string;
       input: AdminBehaviourCommandInput;
     }> = [];
+    let correctionAttempt = 0;
     await render(
       root,
       <BehaviourHistory
@@ -373,9 +395,14 @@ async function run(): Promise<void> {
         children={[child]}
         canCorrect
         canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
         onRetry={() => undefined}
         onCorrect={async (entryId, input) => {
           corrections.push({ entryId, input });
+          correctionAttempt += 1;
+          if (correctionAttempt === 1) {
+            throw new Error("Correction temporarily unavailable.");
+          }
           return {
             entry: { ...entry, reason: input.reason },
             duplicate: false,
@@ -398,9 +425,113 @@ async function run(): Promise<void> {
     assert.equal(reason.getAttribute("aria-invalid"), "true");
     await change(reason, "Correct the recorded context");
     await submit(correctionForm);
-    assert.equal(corrections.length, 1);
+    assert.match(
+      container.textContent ?? "",
+      /Correction temporarily unavailable/,
+    );
+    await change(reason, "Correct the recorded context and outcome");
+    await submit(correctionForm);
+    assert.equal(corrections.length, 2);
     assert.equal(corrections[0]?.entryId, entry.id);
     assert.equal(corrections[0]?.input.reason, "Correct the recorded context");
+    assert.equal(
+      corrections[1]?.input.reason,
+      "Correct the recorded context and outcome",
+    );
+    assert.notEqual(
+      corrections[0]?.input.idempotencyKey,
+      corrections[1]?.input.idempotencyKey,
+      "rotates correction idempotency after a failed payload is edited",
+    );
+    const correctionSuccess = element<HTMLElement>(
+      container,
+      '[role="status"]',
+    );
+    assert.match(correctionSuccess.textContent ?? "", /Correction recorded/);
+    assert.equal(
+      document.activeElement,
+      correctionSuccess,
+      "focuses correction success feedback",
+    );
+
+    const zonedCommands: AdminBehaviourCommandInput[] = [];
+    await render(
+      root,
+      <BehaviourForm
+        children={[child]}
+        categories={categories}
+        canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
+        initialDraft={{
+          childId: child.id,
+          category: "kindness",
+          pointsDelta: "2",
+          occurredAt: "2026-06-01T00:30:00.000Z",
+          reason: "Site-local capture",
+          note: "",
+        }}
+        onSave={async (input) => {
+          zonedCommands.push(input);
+          return { entry, duplicate: false };
+        }}
+      />,
+    );
+    const occurredAt = element<HTMLInputElement>(
+      container,
+      "#behaviour-occurred-at",
+    );
+    assert.equal(
+      occurredAt.value,
+      "2026-05-31T17:30",
+      "constructs the input in the active site's IANA timezone",
+    );
+    await change(occurredAt, "2026-05-31T18:45");
+    await submit(
+      element<HTMLFormElement>(
+        container,
+        'form[aria-label="Record behaviour"]',
+      ),
+    );
+    assert.equal(
+      zonedCommands[0]?.occurredAt,
+      "2026-06-01T01:45:00.000Z",
+      "submits the site-local input as the matching UTC instant",
+    );
+
+    await render(
+      root,
+      <BehaviourHistory
+        isLoading={false}
+        error={null}
+        items={[{ ...entry, occurredAt: "2026-06-01T00:30:00.000Z" }]}
+        children={[child]}
+        canCorrect={false}
+        canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
+        onRetry={() => undefined}
+        onCorrect={async () => ({ entry, duplicate: false })}
+      />,
+    );
+    assert.match(
+      container.textContent ?? "",
+      /31 May 2026.*17:30/,
+      "renders history in the active site's IANA timezone",
+    );
+    assert.equal(
+      siteDateTimeToIso("2026-03-08T02:30", "America/Los_Angeles"),
+      null,
+      "rejects a site-local time skipped by the daylight-saving transition",
+    );
+    assert.equal(
+      siteDateTimeToIso("2026-11-01T01:30", "America/Los_Angeles"),
+      "2026-11-01T08:30:00.000Z",
+      "uses the earlier instant when a site-local time repeats",
+    );
+    assert.equal(
+      isValidIanaTimeZone("not/a-timezone"),
+      false,
+      "rejects an invalid active-site timezone",
+    );
   } finally {
     await act(async () => root.unmount());
     container.remove();

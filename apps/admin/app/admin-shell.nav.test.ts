@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { SidebarNav } from "@pathway/ui";
+import { resolveAdminNavItems } from "./admin-shell";
 
 const shellSource = readFileSync(
   new URL("./admin-shell.tsx", import.meta.url),
@@ -72,12 +76,36 @@ assert.ok(
   "expected PACE navigation to require the ace.pace.read permission",
 );
 
-const behaviourNavEntry = shellSource.match(
-  /label:\s*"Behaviour"[\s\S]*?href:\s*"\/ace\/behaviour"[\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"ace\.behaviour\.read"[\s\S]*?group:\s*"Teaching",?\s*\},/,
+const staffRole = {
+  isOrgAdmin: false,
+  isOrgOwner: false,
+  isSiteAdmin: false,
+  isStaff: true,
+  isSafeguardingStaff: false,
+  isSuperUser: false,
+};
+const renderNavigation = (permissions: string[]) =>
+  renderToStaticMarkup(
+    React.createElement(SidebarNav, {
+      currentPath: "/ace/behaviour",
+      items: resolveAdminNavItems({
+        role: staffRole,
+        currentOrgIsMasterOrg: false,
+        capabilities: [],
+        permissions,
+        ui: { labels: {} },
+      }),
+    }),
+  );
+assert.doesNotMatch(
+  renderNavigation([]),
+  /href="\/ace\/behaviour"/,
+  "Behaviour navigation stays hidden without ace.behaviour.read",
 );
-assert.ok(
-  behaviourNavEntry,
-  "expected Behaviour navigation to require the ace.behaviour.read permission",
+assert.match(
+  renderNavigation(["ace.behaviour.read"]),
+  /href="\/ace\/behaviour"[^>]*>[\s\S]*?Behaviour/,
+  "Behaviour navigation renders after ace.behaviour.read is loaded",
 );
 
 // ACE-F14: Roles & Access must be gated by the typed permission, not a role

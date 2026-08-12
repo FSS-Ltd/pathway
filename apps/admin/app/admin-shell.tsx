@@ -21,10 +21,11 @@ import {
   hasPermission,
   meetsAccessRequirement,
   type AccessRequirement,
+  type AdminRoleInfo,
 } from "@/lib/access";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { useOrgUi } from "@/lib/use-org-ui";
-import { orgLabel } from "@/lib/org-ui";
+import { orgLabel, type OrgUi } from "@/lib/org-ui";
 import { cn } from "@pathway/ui";
 
 const getDevRuntimeState = () => {
@@ -88,6 +89,31 @@ const navItemsWithAccess: (SidebarNavItem & {
   { ...defaultSidebarItems[13], access: "admin-only", group: "Admin" }, // Settings
   { label: "Roles & Access", href: "/settings/roles", iconIndex: 21, capability: "platform.access.roles.read", permission: "platform.access.roles.read", group: "Admin" },
 ];
+
+export function resolveAdminNavItems({
+  role,
+  currentOrgIsMasterOrg,
+  capabilities,
+  permissions,
+  ui,
+}: {
+  role: AdminRoleInfo;
+  currentOrgIsMasterOrg: boolean;
+  capabilities: string[];
+  permissions: string[] | null;
+  ui: OrgUi;
+}): SidebarNavItem[] {
+  return navItemsWithAccess
+    .filter(
+      (item) =>
+        meetsAccessRequirement(role, item.access, {
+          currentOrgIsMasterOrg,
+        }) &&
+        hasCapability(capabilities, item.capability) &&
+        hasPermission(permissions, item.permission),
+    )
+    .map((item) => ({ ...item, label: orgLabel(ui, item.href, item.label) }));
+}
 
 const titleMap: Record<string, string> = {
   "/": "Today",
@@ -303,16 +329,13 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   // Filter nav items based on user's role (hide billing for master orgs)
   const visibleNavItems = React.useMemo(
     () =>
-      navItemsWithAccess
-        .filter(
-          (item) =>
-            meetsAccessRequirement(role, item.access, {
-              currentOrgIsMasterOrg,
-            }) &&
-            hasCapability(capabilities, item.capability) &&
-            hasPermission(permissions, item.permission),
-        )
-        .map((item) => ({ ...item, label: orgLabel(ui, item.href, item.label) })),
+      resolveAdminNavItems({
+        role,
+        currentOrgIsMasterOrg,
+        capabilities,
+        permissions,
+        ui,
+      }),
     [role, currentOrgIsMasterOrg, capabilities, permissions, ui],
   );
 

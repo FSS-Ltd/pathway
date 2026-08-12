@@ -15,6 +15,7 @@ type BehaviourHistoryListProps = {
   children: BehaviourChild[];
   canCorrect: boolean;
   disabled: boolean;
+  siteTimeZone: string;
   onCorrect: (
     entryId: string,
     input: BehaviourCommandInput,
@@ -27,6 +28,7 @@ export function BehaviourHistoryList({
   children,
   canCorrect,
   disabled,
+  siteTimeZone,
   onCorrect,
   onSuccess,
 }: BehaviourHistoryListProps) {
@@ -47,7 +49,7 @@ export function BehaviourHistoryList({
           </Text>
           <Text style={styles.entryMeta}>
             {formatType(item.type)} · {formatPoints(item.pointsDelta)} ·{" "}
-            {formatDateTime(item.occurredAt)}
+            {formatDateTime(item.occurredAt, siteTimeZone)}
           </Text>
           <Text style={styles.entryReason}>{item.reason}</Text>
           {item.note ? <Text style={styles.entryNote}>{item.note}</Text> : null}
@@ -93,8 +95,9 @@ function CorrectionForm({
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [idempotencyKey] = useState(createCommandKey);
+  const [idempotencyKey, setIdempotencyKey] = useState(createCommandKey);
   const submitting = useRef(false);
+  const commandAttempted = useRef(false);
 
   const submit = () => {
     if (submitting.current) return;
@@ -103,6 +106,7 @@ function CorrectionForm({
       return;
     }
     submitting.current = true;
+    commandAttempted.current = true;
     setIsSaving(true);
     setError(null);
     const note = entry.note?.trim();
@@ -140,8 +144,13 @@ function CorrectionForm({
         maxLength={1000}
         multiline
         onChangeText={(value) => {
+          if (commandAttempted.current) {
+            commandAttempted.current = false;
+            setIdempotencyKey(createCommandKey());
+          }
           setReason(value);
           setReasonError(null);
+          setError(null);
         }}
         style={[styles.input, styles.textArea]}
         textAlignVertical="top"
@@ -165,6 +174,7 @@ function CorrectionForm({
           size="medium"
           tone="serve"
           style={styles.flexButton}
+          multiline
         />
         <StandardButton
           disabled={isSaving}
@@ -200,12 +210,13 @@ function formatPoints(points: number): string {
   return "No points";
 }
 
-function formatDateTime(value: string): string {
+function formatDateTime(value: string, timeZone: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("en-GB", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone,
   }).format(date);
 }
 
@@ -295,7 +306,7 @@ const styles = StyleSheet.create({
     gap: mobileTokens.spacing.xs,
     marginTop: mobileTokens.spacing.xs,
   },
-  flexButton: { flexGrow: 1 },
+  flexButton: { flexGrow: 1, flexBasis: 140 },
   errorText: {
     fontFamily: mobileTokens.typography.fontFamily.body,
     fontSize: mobileTokens.typography.body.sm.size,

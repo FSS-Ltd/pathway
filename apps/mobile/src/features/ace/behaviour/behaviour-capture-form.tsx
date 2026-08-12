@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { StandardButton } from "@/components/primitives/ui";
@@ -14,11 +14,12 @@ export type BehaviourDraft = {
   childId: string | null;
   category: string | null;
   pointsDelta: string;
-  occurredAt: string;
   reason: string;
   note: string;
   idempotencyKey: string;
 };
+
+type TypeFilter = BehaviourType | "ALL";
 
 export type BehaviourDraftValidation = Partial<
   Record<"childId" | "category" | "pointsDelta" | "reason", string>
@@ -53,11 +54,13 @@ export function BehaviourCaptureForm({
   onSelectVisibility,
   onSubmit,
 }: BehaviourCaptureFormProps) {
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
   const availableCategories = categories.filter(
     (category) =>
       category.isActive &&
       category.visibility === visibility &&
-      (category.visibility === "GENERAL" || canSensitive),
+      (category.visibility === "GENERAL" || canSensitive) &&
+      (typeFilter === "ALL" || category.type === typeFilter),
   );
 
   return (
@@ -96,6 +99,35 @@ export function BehaviourCaptureForm({
           </View>
         </Field>
       ) : null}
+
+      <Field label="Category type">
+        <View accessibilityRole="radiogroup" style={styles.rowOptions}>
+          {(["ALL", "MERIT", "DEMERIT", "GENERAL"] as TypeFilter[]).map(
+            (filter) => (
+              <Choice
+                key={filter}
+                label={typeFilterLabel(filter)}
+                selected={typeFilter === filter}
+                disabled={disabled}
+                onPress={() => {
+                  setTypeFilter(filter);
+                  const selected = categories.find(
+                    (category) => category.code === draft.category,
+                  );
+                  if (
+                    selected &&
+                    filter !== "ALL" &&
+                    selected.type !== filter
+                  ) {
+                    onChange("category", "");
+                  }
+                }}
+                flexible
+              />
+            ),
+          )}
+        </View>
+      </Field>
 
       {visibility === "SENSITIVE" && canSensitive ? (
         <View accessibilityRole="alert" style={styles.warning}>
@@ -137,6 +169,7 @@ export function BehaviourCaptureForm({
           value={draft.pointsDelta}
         />
       </Field>
+      <Text style={styles.stateText}>Occurred at: now</Text>
       <Field label="Reason" error={validation.reason}>
         <TextInput
           accessibilityLabel="Behaviour reason"
@@ -171,6 +204,7 @@ export function BehaviourCaptureForm({
         onPress={onSubmit}
         size="large"
         tone="serve"
+        multiline
       />
     </View>
   );
@@ -241,6 +275,13 @@ function typeLabel(type: BehaviourType): string {
   if (type === "MERIT") return "Merit";
   if (type === "DEMERIT") return "Demerit";
   return "General";
+}
+
+function typeFilterLabel(type: TypeFilter): string {
+  if (type === "ALL") return "All categories";
+  if (type === "MERIT") return "Merit categories";
+  if (type === "DEMERIT") return "Demerit categories";
+  return "General categories";
 }
 
 const styles = StyleSheet.create({
