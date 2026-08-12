@@ -32,7 +32,6 @@ export function activateAndReadPaceDraft(
 ): Promise<string | null> {
   const key = paceDraftStorageKey(scope);
   const state = stateFor(key);
-  state.generation += 1;
   state.isActive = true;
   const generation = state.generation;
   return serialize(key, async () => {

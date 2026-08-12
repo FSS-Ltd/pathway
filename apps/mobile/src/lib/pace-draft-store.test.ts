@@ -53,27 +53,31 @@ it("does not recreate a cleared draft when an earlier write resolves late", asyn
   expect(SecureStore.setItemAsync).toHaveBeenCalledTimes(1);
 });
 
-it("reads the latest A draft after an A-to-B-to-A reactivation", async () => {
+it("drains every retained A write before an A-to-B-to-A reactivation reads", async () => {
   const stored = new Map([[storageKey, "stale-A"]]);
-  const pendingLatestWrite = deferred();
+  const pendingFirstWrite = deferred();
   jest
     .spyOn(SecureStore, "getItemAsync")
     .mockImplementation(async (key) => stored.get(key) ?? null);
   jest
     .spyOn(SecureStore, "setItemAsync")
     .mockImplementationOnce(async (key, value) => {
-      await pendingLatestWrite.promise;
+      await pendingFirstWrite.promise;
+      stored.set(key, value);
+    })
+    .mockImplementation(async (key, value) => {
       stored.set(key, value);
     });
 
   await activateAndReadPaceDraft(scope);
+  const firstWrite = writePaceDraft(scope, "first-A");
+  await Promise.resolve();
+  await Promise.resolve();
   const latestWrite = writePaceDraft(scope, "latest-A");
-  await Promise.resolve();
-  await Promise.resolve();
   await activateAndReadPaceDraft(secondScope);
   const restoredDraft = activateAndReadPaceDraft(scope);
-  pendingLatestWrite.resolve();
+  pendingFirstWrite.resolve();
 
-  await latestWrite;
+  await Promise.all([firstWrite, latestWrite]);
   await expect(restoredDraft).resolves.toBe("latest-A");
 });

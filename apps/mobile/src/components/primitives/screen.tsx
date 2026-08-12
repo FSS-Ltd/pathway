@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { useServeTabBarInset } from "@/components/navigation/serve-tab-bar-inset";
 import {
   getSpaceAccentColor,
   getSpaceBackgroundColor,
@@ -27,26 +28,40 @@ export function Screen({
   children,
 }: ScreenProps) {
   const { signOut } = useAppReady();
+  const serveTabBarInset = useServeTabBarInset();
   const showSpaceActions = tone === "family" || tone === "serve";
-  const safeAreaEdges = showSpaceActions ? ["top", "left", "right"] as const : undefined;
+  const safeAreaEdges = showSpaceActions
+    ? (["top", "left", "right"] as const)
+    : undefined;
   const scrollPaddingBottom = showSpaceActions
-    ? mobileTokens.spacing.xs
+    ? tone === "serve" && serveTabBarInset > 0
+      ? serveTabBarInset + mobileTokens.spacing.xs
+      : mobileTokens.spacing.xs
     : mobileTokens.spacing.xxl;
 
   return (
     <SafeAreaView
       edges={safeAreaEdges}
-      style={[styles.safeArea, { backgroundColor: getSpaceBackgroundColor(tone) }]}
+      style={[
+        styles.safeArea,
+        { backgroundColor: getSpaceBackgroundColor(tone) },
+      ]}
     >
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: scrollPaddingBottom }]}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: scrollPaddingBottom },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {showSpaceActions ? (
           <View style={styles.spaceActionsRow}>
             <Pressable
               onPress={() => router.push("/(auth)/site-select")}
-              style={({ pressed }) => [styles.spaceActionButton, pressed ? styles.pressed : undefined]}
+              style={({ pressed }) => [
+                styles.spaceActionButton,
+                pressed ? styles.pressed : undefined,
+              ]}
             >
               <Text style={styles.spaceActionText}>Switch Site/Space</Text>
             </Pressable>
@@ -55,14 +70,17 @@ export function Screen({
                 void signOut();
                 router.replace("/(auth)/sign-in");
               }}
-              style={({ pressed }) => [styles.spaceActionButton, pressed ? styles.pressed : undefined]}
+              style={({ pressed }) => [
+                styles.spaceActionButton,
+                pressed ? styles.pressed : undefined,
+              ]}
             >
               <Text style={styles.spaceActionText}>Logout</Text>
             </Pressable>
           </View>
         ) : null}
 
-        {(title || subtitle || badge) ? (
+        {title || subtitle || badge ? (
           <View
             style={[
               styles.hero,
@@ -76,7 +94,12 @@ export function Screen({
               <BrandLogo width={126} height={46} />
             </View>
             {badge ? (
-              <View style={[styles.badge, { backgroundColor: getSpaceAccentColor(tone) }]}> 
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: getSpaceAccentColor(tone) },
+                ]}
+              >
                 <Text style={styles.badgeText}>{badge}</Text>
               </View>
             ) : null}
@@ -101,7 +124,9 @@ export function InfoCard({
   tone?: MobileSpaceTone;
 }) {
   return (
-    <View style={[styles.card, { borderColor: mobileTokens.colors.border.subtle }]}> 
+    <View
+      style={[styles.card, { borderColor: mobileTokens.colors.border.subtle }]}
+    >
       <View
         style={[
           styles.cardStripe,

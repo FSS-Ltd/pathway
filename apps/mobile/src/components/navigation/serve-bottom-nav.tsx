@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { mobileTokens } from "@/design/tokens";
+import { useSetServeTabBarInset } from "./serve-tab-bar-inset";
 
 const SERVE_ITEMS = [
   { routeName: "attendance", label: "Today", icon: "home-outline" as const },
@@ -48,6 +49,7 @@ export function ServeBottomNav({
   navigation,
 }: ExpoTabBarProps) {
   const insets = useSafeAreaInsets();
+  const setTabBarInset = useSetServeTabBarInset();
   const { fontScale, width } = useWindowDimensions();
   const isCompactLargeText = width <= 320 && fontScale >= 2;
   const [rowWidth, setRowWidth] = useState(0);
@@ -96,6 +98,10 @@ export function ServeBottomNav({
 
   return (
     <View
+      testID="serve-bottom-nav"
+      onLayout={(event) => {
+        setTabBarInset(event.nativeEvent.layout.height);
+      }}
       style={[
         styles.container,
         isCompactLargeText ? styles.compactContainer : undefined,
