@@ -24,6 +24,7 @@ import {
   type BehaviourEntryRecord,
   type BehaviourEntryReplayMetadata,
 } from "./behaviour-entry.support";
+import { DemeritEscalationService } from "./demerit-escalation.service";
 import type {
   BehaviourCorrectionDto,
   CreateBehaviourEntryDto,
@@ -49,6 +50,8 @@ interface BehaviourPredecessor {
   type: "MERIT" | "DEMERIT" | "GENERAL";
   visibility: "GENERAL" | "SENSITIVE";
   pointsDelta: number;
+  occurredAt: Date;
+  categoryIsSerious: boolean | null;
 }
 
 @Injectable()
@@ -57,6 +60,8 @@ export class BehaviourCommandService {
     @Inject(OutboxService) private readonly outbox: OutboxService,
     @Inject(EffectivePermissionsService)
     private readonly permissions: EffectivePermissionsService,
+    @Inject(DemeritEscalationService)
+    private readonly demeritEscalation: DemeritEscalationService,
   ) {}
 
   async record(command: CreateBehaviourEntryDto, actor: BehaviourActor) {
@@ -99,7 +104,7 @@ export class BehaviourCommandService {
         actor.tenantId,
         actor.orgId,
         async (tx) => {
-          await this.requireActiveSite(tx, actor);
+          const site = await this.requireActiveSite(tx, actor);
           await this.requireChild(tx, actor.tenantId, command.childId);
           await this.acquireCommandLocks(
             tx,
@@ -178,6 +183,17 @@ export class BehaviourCommandService {
             select: behaviourEntryCommandSelect,
           })) as BehaviourEntryRecord;
 
+          const demeritEscalation = await this.demeritEscalation.createIntents(
+            tx,
+            {
+              actor,
+              entry,
+              predecessor,
+              timezone: site.timezone,
+              now: new Date(),
+            },
+          );
+
           await recordAuditEventInTransaction(tx, {
             actorUserId: actor.userId,
             tenantId: actor.tenantId,
@@ -197,6 +213,14 @@ export class BehaviourCommandService {
               visibility: entry.visibility,
               pointsDelta: entry.pointsDelta,
               correctsBehaviourEntryId: entry.correctsBehaviourEntryId,
+              ...(demeritEscalation
+                ? {
+                    demeritStage: demeritEscalation.stage,
+                    demeritAction: demeritEscalation.action,
+                    demeritPolicyVersion: demeritEscalation.policyVersion,
+                    demeritIntentCount: demeritEscalation.createdIntentCount,
+                  }
+                : {}),
             },
           });
 
@@ -249,12 +273,13 @@ export class BehaviourCommandService {
   private async requireActiveSite(
     tx: Prisma.TransactionClient,
     actor: BehaviourActor,
-  ): Promise<void> {
+  ): Promise<{ id: string; timezone: string | null }> {
     const site = await tx.tenant.findFirst({
       where: { id: actor.tenantId, orgId: actor.orgId },
-      select: { id: true },
+      select: { id: true, timezone: true },
     });
     if (!site) throw new NotFoundException("Active site not found");
+    return site;
   }
 
   private async requireChild(
@@ -306,6 +331,8 @@ export class BehaviourCommandService {
         type: true,
         visibility: true,
         pointsDelta: true,
+        occurredAt: true,
+        categoryIsSerious: true,
         correction: { select: { id: true } },
       },
     });
@@ -318,6 +345,8 @@ export class BehaviourCommandService {
       type: predecessor.type,
       visibility: predecessor.visibility,
       pointsDelta: predecessor.pointsDelta,
+      occurredAt: predecessor.occurredAt,
+      categoryIsSerious: predecessor.categoryIsSerious,
     };
   }
 

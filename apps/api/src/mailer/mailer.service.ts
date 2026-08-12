@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Resend } from "resend";
+import { renderBehaviourNotification } from "./templates/behaviour-notification";
 
 /** Resend requires: `email@example.com` or `Name <email@example.com>` */
 const DEFAULT_FROM = "Nexsteps <noreply@mail.nexsteps.dev>";
@@ -92,6 +93,16 @@ export type SendParentSignupCompleteParams = {
   loginUrl: string;
 };
 
+export type SendBehaviourNotificationParams = {
+  to: string;
+  guardianName: string;
+  childName: string;
+  siteName: string;
+  stage: 1 | 2 | 3;
+  occurredOn: string;
+  idempotencyKey: string;
+};
+
 /** Params for admin feedback / feature-request submissions, sent to the support inbox. */
 export type SendFeedbackEmailParams = {
   category: "bug" | "feature-request" | "other";
@@ -159,6 +170,34 @@ export class MailerService {
       this.isEnabled = false;
       this.logger.warn(
         "RESEND_API_KEY not set - email sending disabled (emails will be logged only)",
+      );
+    }
+  }
+
+  async sendBehaviourNotification(
+    params: SendBehaviourNotificationParams,
+  ): Promise<void> {
+    const rendered = renderBehaviourNotification(params);
+    if (!this.isEnabled || !this.resend) {
+      this.logger.log(
+        `[MAILER] MOCK MODE - Would send behaviour notification to ${params.to}`,
+      );
+      return;
+    }
+
+    const result = await this.resend.emails.send(
+      {
+        from: this.fromAddress,
+        to: params.to,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+      },
+      { idempotencyKey: params.idempotencyKey },
+    );
+    if (result.error) {
+      throw new Error(
+        `Failed to send behaviour notification: ${result.error.message}`,
       );
     }
   }

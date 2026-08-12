@@ -10,6 +10,7 @@ import { REQUIRED_PERMISSION } from "../../access-control/require-permission.dec
 import type { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import { BehaviourCommandService } from "../behaviour-command.service";
+import type { DemeritEscalationService } from "../demerit-escalation.service";
 import {
   behaviourClientCommandKeyHash,
   behaviourCommandFingerprint,
@@ -124,12 +125,18 @@ function permissions(allowed = true) {
 function arrange(options: { sensitive?: boolean } = {}) {
   const tx = transaction();
   const effectivePermissions = permissions(options.sensitive ?? true);
+  const demeritEscalation = {
+    createIntents: jest.fn().mockResolvedValue(null),
+  };
   jest
     .mocked(withTenantRlsContext)
     .mockImplementation(async (_tenantId, _orgId, callback) =>
       callback(tx as never),
     );
-  tx.tenant.findFirst.mockResolvedValue({ id: actor.tenantId });
+  tx.tenant.findFirst.mockResolvedValue({
+    id: actor.tenantId,
+    timezone: "Europe/London",
+  });
   tx.child.findFirst.mockResolvedValue({ id: childId });
   tx.behaviourCategory.aggregate.mockResolvedValue({
     _max: { policyVersion: 3 },
@@ -155,7 +162,9 @@ function arrange(options: { sensitive?: boolean } = {}) {
     commandService: new BehaviourCommandService(
       new OutboxService(),
       effectivePermissions as unknown as EffectivePermissionsService,
+      demeritEscalation as unknown as DemeritEscalationService,
     ),
+    demeritEscalation,
     queryService: new BehaviourQueryService(
       effectivePermissions as unknown as EffectivePermissionsService,
     ),
@@ -232,7 +241,7 @@ describe("BehaviourCommandService", () => {
     );
     expect(tx.tenant.findFirst).toHaveBeenCalledWith({
       where: { id: actor.tenantId, orgId: actor.orgId },
-      select: { id: true },
+      select: { id: true, timezone: true },
     });
     expect(tx.child.findFirst).toHaveBeenCalledWith({
       where: { id: childId, tenantId: actor.tenantId },
@@ -292,6 +301,55 @@ describe("BehaviourCommandService", () => {
         },
       ],
       skipDuplicates: true,
+    });
+  });
+
+  it("applies demerit escalation inside the behaviour transaction and records the classified result in audit metadata", async () => {
+    const { commandService, tx, demeritEscalation } = arrange();
+    const demerit = command({
+      category: "conduct",
+      type: "DEMERIT",
+      pointsDelta: -6,
+    });
+    const created = entry({
+      category: "conduct",
+      type: "DEMERIT",
+      pointsDelta: -6,
+    });
+    tx.behaviourCategory.findFirst.mockResolvedValue({
+      policyVersion: 3,
+      code: "conduct",
+      type: "DEMERIT",
+      visibility: "GENERAL",
+      isActive: true,
+      isSerious: false,
+    });
+    tx.behaviourEntry.create.mockResolvedValue(created);
+    demeritEscalation.createIntents.mockResolvedValue({
+      stage: 2,
+      action: "notify",
+      policyVersion: 3,
+      createdIntentCount: 1,
+    });
+
+    await commandService.record(demerit, actor);
+
+    expect(demeritEscalation.createIntents).toHaveBeenCalledWith(tx, {
+      actor,
+      entry: created,
+      predecessor: null,
+      timezone: "Europe/London",
+      now: expect.any(Date),
+    });
+    expect(tx.auditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        metadata: expect.objectContaining({
+          demeritStage: 2,
+          demeritAction: "notify",
+          demeritPolicyVersion: 3,
+          demeritIntentCount: 1,
+        }),
+      }),
     });
   });
 
@@ -367,7 +425,7 @@ describe("BehaviourCommandService", () => {
   });
 
   it("returns an identical replay and rejects payload mismatch for a reused command key", async () => {
-    const { commandService, tx } = arrange();
+    const { commandService, tx, demeritEscalation } = arrange();
     tx.behaviourEntry.findFirst.mockResolvedValueOnce(
       entry({
         clientCommandKeyHash: behaviourClientCommandKeyHash(
@@ -390,6 +448,7 @@ describe("BehaviourCommandService", () => {
     expect(tx.behaviourEntry.create).not.toHaveBeenCalled();
     expect(tx.auditEvent.create).not.toHaveBeenCalled();
     expect(tx.outboxEvent.createMany).not.toHaveBeenCalled();
+    expect(demeritEscalation.createIntents).not.toHaveBeenCalled();
 
     tx.behaviourEntry.findFirst.mockResolvedValueOnce(
       entry({
@@ -472,6 +531,8 @@ describe("BehaviourCommandService", () => {
         type: true,
         visibility: true,
         pointsDelta: true,
+        occurredAt: true,
+        categoryIsSerious: true,
         correction: { select: { id: true } },
       },
     });

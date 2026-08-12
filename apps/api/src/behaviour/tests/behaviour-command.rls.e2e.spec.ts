@@ -11,8 +11,10 @@ import {
 } from "../../../test-helpers.e2e";
 import type { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
 import { OutboxService } from "../../common/outbox/outbox.service";
+import type { MailerService } from "../../mailer/mailer.service";
 import { BehaviourCommandService } from "../behaviour-command.service";
 import { BehaviourQueryService } from "../behaviour-query.service";
+import { DemeritEscalationService } from "../demerit-escalation.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 
@@ -35,6 +37,18 @@ function permissions(allowed: boolean): EffectivePermissionsService {
       sourceRoleIds: allowed ? ["role-1"] : [],
     }),
   } as unknown as EffectivePermissionsService;
+}
+
+function commandService(allowed = true): BehaviourCommandService {
+  const outbox = new OutboxService();
+  const mailer = {
+    sendBehaviourNotification: jest.fn().mockResolvedValue(undefined),
+  } as unknown as MailerService;
+  return new BehaviourCommandService(
+    outbox,
+    permissions(allowed),
+    new DemeritEscalationService(outbox, mailer),
+  );
 }
 
 describe("ACE behaviour command database boundary", () => {
@@ -120,6 +134,7 @@ describe("ACE behaviour command database boundary", () => {
         );
         await tx.behaviourEntry.deleteMany({ where: { tenantId } });
         await tx.behaviourCategory.deleteMany({ where: { tenantId } });
+        await tx.demeritPolicy.deleteMany({ where: { tenantId } });
         await tx.$executeRawUnsafe(
           "SET LOCAL session_replication_role = origin",
         );
@@ -148,10 +163,7 @@ describe("ACE behaviour command database boundary", () => {
 
   it("commits one fact, audit, and merit intent for concurrent command replay", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
-    const service = new BehaviourCommandService(
-      new OutboxService(),
-      permissions(true),
-    );
+    const service = commandService();
     const actor = {
       tenantId: fixture.tenantAId,
       orgId: fixture.orgId,
@@ -237,10 +249,7 @@ describe("ACE behaviour command database boundary", () => {
 
   it("encrypts sensitive narrative at rest and filters it without the sensitive permission", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
-    const sensitiveService = new BehaviourCommandService(
-      new OutboxService(),
-      permissions(true),
-    );
+    const sensitiveService = commandService();
     const actor = {
       tenantId: fixture.tenantAId,
       orgId: fixture.orgId,
@@ -297,10 +306,7 @@ describe("ACE behaviour command database boundary", () => {
 
   it("allows one concurrent immutable correction and returns only terminal facts", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
-    const service = new BehaviourCommandService(
-      new OutboxService(),
-      permissions(true),
-    );
+    const service = commandService();
     const query = new BehaviourQueryService(permissions(true));
     const actor = {
       tenantId: fixture.tenantAId,
@@ -317,6 +323,7 @@ describe("ACE behaviour command database boundary", () => {
         pointsDelta: -2,
         occurredAt: "2026-08-12T11:00:00.000Z",
         reason: "Original conduct record",
+        note: "Required serious conduct context",
       },
       actor,
     );
@@ -328,6 +335,7 @@ describe("ACE behaviour command database boundary", () => {
       pointsDelta: -1,
       occurredAt: "2026-08-12T11:00:00.000Z",
       reason: "Corrected conduct points",
+      note: "Required corrected conduct context",
     };
 
     const results = await Promise.allSettled([
@@ -371,10 +379,7 @@ describe("ACE behaviour command database boundary", () => {
 
   it("accepts an organisation-scoped behaviour recorder and keeps tenant scope forced", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
-    const service = new BehaviourCommandService(
-      new OutboxService(),
-      permissions(true),
-    );
+    const service = commandService();
     await expect(
       service.record(
         {
@@ -511,6 +516,20 @@ async function seedSite(
           reason: "Behaviour command fixture",
         },
       ],
+    });
+    await tx.demeritPolicy.create({
+      data: {
+        tenantId,
+        version: 1,
+        windowDays: 30,
+        stageOneThreshold: 3,
+        stageTwoThreshold: 6,
+        stageThreeThreshold: 10,
+        seriousMisconductStage: 3,
+        effectiveFrom: new Date("2026-01-01T00:00:00.000Z"),
+        createdByUserId: actorId,
+        reason: "Behaviour command fixture",
+      },
     });
   });
 }

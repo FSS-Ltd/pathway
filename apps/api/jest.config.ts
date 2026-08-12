@@ -5,9 +5,9 @@ const config: Config = {
   testEnvironment: "node",
   verbose: true,
   rootDir: ".",
-  extensionsToTreatAsEsm: [".ts"],
+  extensionsToTreatAsEsm: [".ts", ".tsx"],
   transform: {
-    "^.+\\.(t|j)s$": [
+    "^.+\\.(t|j)sx?$": [
       "ts-jest",
       {
         useESM: true,
@@ -15,7 +15,7 @@ const config: Config = {
       },
     ],
   },
-  moduleFileExtensions: ["ts", "js", "json"],
+  moduleFileExtensions: ["ts", "tsx", "js", "json"],
   moduleNameMapper: {
     // Map workspace imports like @pathway/db -> ../../packages/db/src/index.ts for tests
     "^@pathway/([^/]+)$": "<rootDir>/../../packages/$1/src/index.ts",
