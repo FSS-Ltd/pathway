@@ -10,6 +10,7 @@ import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { OutboxService } from "../common/outbox/outbox.service";
+import { acquireAceSettingsWriteLock } from "../ace-settings/ace-settings-write-lock";
 import {
   updateBehaviourPolicySchema,
   type BehaviourCategoryDto,
@@ -40,8 +41,6 @@ export interface BehaviourPolicyResponse {
   demeritPolicy: DemeritPolicy | null;
 }
 
-const BEHAVIOUR_POLICY_WRITE_LOCK_PREFIX = "ace-behaviour-policy";
-
 @Injectable()
 export class BehaviourPolicyService {
   constructor(
@@ -71,7 +70,7 @@ export class BehaviourPolicyService {
         actor.tenantId,
         actor.orgId,
         async (tx) => {
-          await this.acquireWriteLock(tx, actor.tenantId);
+          await acquireAceSettingsWriteLock(tx, actor.tenantId);
           await this.requireSite(tx, actor);
           const current = await this.loadCurrentPolicy(tx, actor.tenantId);
 
@@ -214,19 +213,6 @@ export class BehaviourPolicyService {
     if (!site) {
       throw new NotFoundException("Active site not found");
     }
-  }
-
-  private async acquireWriteLock(
-    tx: Prisma.TransactionClient,
-    tenantId: string,
-  ): Promise<void> {
-    await tx.$executeRaw(
-      Prisma.sql`
-        SELECT pg_advisory_xact_lock(
-          hashtextextended(${`${BEHAVIOUR_POLICY_WRITE_LOCK_PREFIX}:${tenantId}`}, 0)
-        )
-      `,
-    );
   }
 
   private assertExpectedVersion(

@@ -10,6 +10,7 @@ import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { OutboxService } from "../common/outbox/outbox.service";
+import { acquireAceSettingsWriteLock } from "./ace-settings-write-lock";
 import type { UpdateAceSettingsDto } from "./dto/ace-settings.dto";
 
 interface AceSettingsActor {
@@ -45,8 +46,6 @@ type CommunityFeature = {
   enabled: boolean;
   updatedAt: string | null;
 };
-
-const SETTINGS_WRITE_LOCK_PREFIX = "ace-settings";
 
 export interface AceSettingsResponse {
   timezone: string;
@@ -86,7 +85,7 @@ export class AceSettingsService {
 
     try {
       return await withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-        await this.acquireSettingsWriteLock(tx, actor.tenantId);
+        await acquireAceSettingsWriteLock(tx, actor.tenantId);
         const site = await this.requireSite(tx, actor);
         const [currentPacePolicy, currentDemeritPolicy, communityPolicy] =
           await Promise.all([
@@ -203,19 +202,6 @@ export class AceSettingsService {
       throw new BadRequestException("The active site has an invalid timezone");
     }
     return { timezone: site.timezone };
-  }
-
-  private async acquireSettingsWriteLock(
-    tx: Prisma.TransactionClient,
-    tenantId: string,
-  ): Promise<void> {
-    await tx.$executeRaw(
-      Prisma.sql`
-        SELECT pg_advisory_xact_lock(
-          hashtextextended(${`${SETTINGS_WRITE_LOCK_PREFIX}:${tenantId}`}, 0)
-        )
-      `,
-    );
   }
 
   private findCurrentPacePolicy(
