@@ -9,6 +9,8 @@ interface VercelConfig {
   functions: Record<string, VercelFunctionConfig>;
 }
 
+const VERCEL_INCLUDE_FILES_MAX_LENGTH = 256;
+
 describe("Vercel API bundle", () => {
   it("includes all API workspace packages at runtime", () => {
     const config: VercelConfig = JSON.parse(
@@ -17,10 +19,10 @@ describe("Vercel API bundle", () => {
     const includeFiles = config.functions["api/[...path].js"]?.includeFiles;
 
     expect(includeFiles).toContain(
-      "../../packages/{ace-domain,auth,db,platform,pricing,types,util}/src/**",
+      "../../packages/{ace-domain,auth,db,platform,pricing,types,util}/{src/**,package.json}",
     );
-    expect(includeFiles).toContain(
-      "../../packages/{ace-domain,auth,db,platform,pricing,types,util}/package.json",
+    expect(includeFiles.length).toBeLessThanOrEqual(
+      VERCEL_INCLUDE_FILES_MAX_LENGTH,
     );
   });
 });
