@@ -23,6 +23,16 @@ const prismaProductionScript = readFileSync(
   "utf8",
 );
 
+const apiRuntimeEnv = readFileSync(
+  path.resolve(process.cwd(), "../../apps/api/src/config/runtime-env.ts"),
+  "utf8",
+);
+
+const vercelEnvSyncScript = readFileSync(
+  path.resolve(process.cwd(), "../../scripts/sync-vercel-env.mjs"),
+  "utf8",
+);
+
 describe("deploy workflow contract", () => {
   it("runs deploy-time package tests with the CI heap budget", () => {
     expect(ciWorkflow).toContain("NODE_OPTIONS: --max-old-space-size=4096");
@@ -42,5 +52,19 @@ describe("deploy workflow contract", () => {
         Object.hasOwn(rootPackageJson.scripts ?? {}, scriptName),
       ),
     );
+  });
+
+  it("syncs API production bootstrap secrets to Vercel", () => {
+    const apiProductionRequiredEnv = Array.from(
+      apiRuntimeEnv.matchAll(/"([A-Z0-9_]+)"/g),
+      ([, envKey]) => envKey,
+    );
+    const apiSyncSection = vercelEnvSyncScript.match(
+      /api:\s*\{[\s\S]*?keys:\s*\[([\s\S]*?)\],\s*\},/,
+    )?.[1];
+
+    expect(apiSyncSection).toBeDefined();
+    expect(apiProductionRequiredEnv).toContain("BEHAVIOUR_OUTBOX_SECRET");
+    expect(apiSyncSection).toContain('"BEHAVIOUR_OUTBOX_SECRET"');
   });
 });
