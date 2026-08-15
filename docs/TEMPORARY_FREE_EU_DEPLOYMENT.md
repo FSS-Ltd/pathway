@@ -187,6 +187,21 @@ Required GitHub Actions production secrets:
 - `VERCEL_WEB_PROJECT_ID`
 - `VERCEL_ADMIN_PROJECT_ID`
 - `VERCEL_API_PROJECT_ID`
+- `DATABASE_URL`
+- `DIRECT_URL`
+- `RETENTION_ENABLED`
+- `OUTBOX_DISPATCH_URL`
+- `BEHAVIOUR_OUTBOX_DISPATCH_URL`
+- `BEHAVIOUR_OUTBOX_SECRET`
+- `SUPABASE_URL`
+- `SUPABASE_SECRET_KEY`
+- `SUPABASE_STORAGE_PRIVATE_BUCKET`
+
+Optional GitHub Actions production secrets:
+
+- `AV30_TENANT_IDS`
+- `REPORT_BUNDLE_TENANT_IDS`
+- `OUTBOX_DISPATCH_TOKEN`
 
 The GitHub connector reports `jntagengwa/pathway` as a private repository with
 default branch `master`. The CI workflow is configured for `master` and
