@@ -33,6 +33,16 @@ const vercelEnvSyncScript = readFileSync(
   "utf8",
 );
 
+const githubSecretsScript = readFileSync(
+  path.resolve(process.cwd(), "../../scripts/setup-github-actions-secrets.mjs"),
+  "utf8",
+);
+
+const scheduledWorkersWorkflow = readFileSync(
+  path.resolve(process.cwd(), "../../.github/workflows/workers-scheduled.yml"),
+  "utf8",
+);
+
 describe("deploy workflow contract", () => {
   it("runs deploy-time package tests with the CI heap budget", () => {
     expect(ciWorkflow).toContain("NODE_OPTIONS: --max-old-space-size=4096");
@@ -66,5 +76,20 @@ describe("deploy workflow contract", () => {
     expect(apiSyncSection).toBeDefined();
     expect(apiProductionRequiredEnv).toContain("BEHAVIOUR_OUTBOX_SECRET");
     expect(apiSyncSection).toContain('"BEHAVIOUR_OUTBOX_SECRET"');
+  });
+
+  it("manages every Scheduled workers secret in the GitHub secret setup helper", () => {
+    const scheduledWorkerSecrets = Array.from(
+      scheduledWorkersWorkflow.matchAll(/secrets\.([A-Z0-9_]+)/g),
+      ([, secretName]) => secretName,
+    );
+    const githubSecretNames = Array.from(
+      githubSecretsScript.matchAll(/"([A-Z0-9_]+)"/g),
+      ([, secretName]) => secretName,
+    );
+
+    for (const secretName of scheduledWorkerSecrets) {
+      expect(githubSecretNames).toContain(secretName);
+    }
   });
 });

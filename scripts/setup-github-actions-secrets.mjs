@@ -28,8 +28,18 @@ const REQUIRED_SECRET_NAMES = [
   "DATABASE_URL",
   "DIRECT_URL",
   "RETENTION_ENABLED",
+  "OUTBOX_DISPATCH_URL",
+  "BEHAVIOUR_OUTBOX_DISPATCH_URL",
+  "BEHAVIOUR_OUTBOX_SECRET",
+  "SUPABASE_URL",
+  "SUPABASE_SECRET_KEY",
+  "SUPABASE_STORAGE_PRIVATE_BUCKET",
 ];
-const OPTIONAL_SECRET_NAMES = ["AV30_TENANT_IDS"];
+const OPTIONAL_SECRET_NAMES = [
+  "AV30_TENANT_IDS",
+  "REPORT_BUNDLE_TENANT_IDS",
+  "OUTBOX_DISPATCH_TOKEN",
+];
 const SECRET_NAMES = [...REQUIRED_SECRET_NAMES, ...OPTIONAL_SECRET_NAMES];
 
 await main().catch((error) => {
@@ -162,6 +172,13 @@ function withDerivedValues(input) {
   const next = { ...input };
   if (!isPresent(next.VERCEL_ORG_ID) && isPresent(next.VERCEL_TEAM_ID)) {
     next.VERCEL_ORG_ID = next.VERCEL_TEAM_ID;
+  }
+  const apiUrl = next.API_INTERNAL_URL ?? next.NEXT_PUBLIC_API_URL;
+  if (isPresent(apiUrl)) {
+    next.BEHAVIOUR_OUTBOX_DISPATCH_URL ??= new URL(
+      "/internal/outbox/behaviour",
+      apiUrl,
+    ).toString();
   }
   return next;
 }
