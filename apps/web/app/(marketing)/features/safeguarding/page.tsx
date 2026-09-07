@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import CtaButton from "../../../../components/cta-button";
 import PageWrapper from "../../../../components/page-wrapper";
+import FeatureBreadcrumbJsonLd from "../../../../components/seo/feature-breadcrumb-json-ld";
 import { configuratorRolloutHref } from "../../../../lib/configurator-rollout";
+import { metadataForPath } from "../../../../lib/seo";
 
-export const metadata: Metadata = {
-  title: "Safeguarding | Nexsteps",
-  description:
-    "Use safeguarding as a built-in foundation with audit trails and role-based access across connected operations.",
-};
+export const metadata = metadataForPath("/features/safeguarding");
 
 const outcomes = [
   "Keep safeguarding records in context with attendance, sessions, and staffing activity.",
@@ -20,29 +17,39 @@ const outcomes = [
 export default function SafeguardingFeaturePage() {
   return (
     <PageWrapper>
+      <FeatureBreadcrumbJsonLd
+        name="Safeguarding"
+        path="/features/safeguarding"
+      />
       <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-16 md:py-24">
         <section className="flex flex-col gap-4">
           <p className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
             Feature
           </p>
-          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">Safeguarding</h1>
+          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">
+            Safeguarding
+          </h1>
           <p className="text-lg text-pw-text-muted">
-            Safeguarding is built into the platform foundation, with role-based access
-            and auditability across day-to-day operations.
+            Safeguarding is built into the platform foundation, with role-based
+            access and auditability across day-to-day operations.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">Replace fragmented tools</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Replace fragmented tools
+          </h2>
           <p className="text-pw-text-muted leading-relaxed">
-            Move away from separate logs, spreadsheet trackers, group chat updates,
-            and disconnected parent tooling. Keep sensitive processes anchored in one
-            connected operational system.
+            Move away from separate logs, spreadsheet trackers, group chat
+            updates, and disconnected parent tooling. Keep sensitive processes
+            anchored in one connected operational system.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-4 text-2xl font-semibold text-pw-text">Practical outcomes</h2>
+          <h2 className="mb-4 text-2xl font-semibold text-pw-text">
+            Practical outcomes
+          </h2>
           <ul className="flex flex-col gap-3 text-pw-text-muted">
             {outcomes.map((outcome) => (
               <li key={outcome}>• {outcome}</li>
@@ -51,17 +58,36 @@ export default function SafeguardingFeaturePage() {
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">Role-based value</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Role-based value
+          </h2>
           <p className="text-pw-text-muted leading-relaxed">
-            Leaders get confidence through auditable oversight, staff can act within
-            clear permissions, and families benefit from stronger operational trust and safeguards.
+            Leaders get confidence through auditable oversight, staff can act
+            within clear permissions, and families benefit from stronger
+            operational trust and safeguards.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">See it in action</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Where the software fits
+          </h2>
+          <p className="text-pw-text-muted leading-relaxed">
+            Nexsteps supports record keeping and accountable follow-up. It does
+            not replace your safeguarding policy, professional judgement or
+            statutory duties. Confirm reporter permissions, restricted access,
+            review, retention and export requirements during a security
+            walkthrough.
+          </p>
+        </section>
+
+        <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            See it in action
+          </h2>
           <p className="mb-5 text-pw-text-muted">
-            Explore how safeguarding fits into a broader connected operations model.
+            Explore how safeguarding fits into a broader connected operations
+            model.
           </p>
           <div className="flex flex-wrap gap-4">
             <CtaButton href="/demo" location="feature_safeguarding_cta_primary">

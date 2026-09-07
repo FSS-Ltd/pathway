@@ -1,12 +1,8 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { securityContent } from "../../../content/security-content";
+import { metadataForPath } from "../../../lib/seo";
 
-export const metadata: Metadata = {
-  title: "Security, Safeguarding & Compliance | Nexsteps",
-  description:
-    "Learn how Nexsteps protects data with secure architecture, GDPR-aligned controls, role-based access, and safeguarding workflows.",
-};
+export const metadata = metadataForPath("/security");
 
 export default function SecurityPage() {
   const { hero, sections, lastUpdated } = securityContent;
@@ -15,7 +11,9 @@ export default function SecurityPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-12 px-4 py-16 md:py-24">
       {/* Hero Section */}
       <section className="flex flex-col gap-6 text-center">
-        <h1 className="text-4xl font-bold text-pw-text md:text-5xl">{hero.title}</h1>
+        <h1 className="text-4xl font-bold text-pw-text md:text-5xl">
+          {hero.title}
+        </h1>
         <p className="mx-auto max-w-3xl text-lg text-pw-text-muted">
           {hero.description}
         </p>

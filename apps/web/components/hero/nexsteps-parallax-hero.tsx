@@ -42,20 +42,24 @@ const COPY_STAGES: CopyStage[] = [
   {
     from: 0,
     to: 0.15,
-    headline: "Your day should not run in five different places.",
-    micro: "Registers. Rotas. Group chats. Safeguarding notes. Reports.",
+    headline:
+      "Connected operations software for schools, clubs, churches and charities.",
+    micro:
+      "Attendance, rotas, safeguarding, communications and reporting in one place.",
   },
   {
     from: 0.15,
     to: 0.35,
     headline: "When systems are disconnected, support gets harder to deliver.",
-    micro: "Missed actions. Manual reports. Weak audit trails. Too much admin friction.",
+    micro:
+      "Missed actions. Manual reports. Weak audit trails. Too much admin friction.",
   },
   {
     from: 0.35,
     to: 0.55,
     headline: "NexSteps brings the workflow together.",
-    micro: "Attendance, rotas, safeguarding, communications and reporting in one place.",
+    micro:
+      "Attendance, rotas, safeguarding, communications and reporting in one place.",
   },
   {
     from: 0.55,
@@ -79,6 +83,7 @@ function StageCopy({
   stage: CopyStage;
   isFirst: boolean;
 }) {
+  const Heading = isFirst ? "h1" : "h2";
   const fadeIn = isFirst ? stage.from : stage.from + 0.03;
   const fadeOut = stage.to - 0.02;
   const opacity = useTransform(
@@ -95,13 +100,26 @@ function StageCopy({
       style={{ opacity, y }}
       className="absolute inset-x-0 bottom-[18vh] mx-auto max-w-3xl px-6 text-center md:bottom-[16vh]"
     >
-      <h2 className="text-3xl font-bold leading-tight text-white drop-shadow-[0_2px_12px_rgba(2,6,23,0.8)] md:text-5xl">
+      <Heading className="text-3xl font-bold leading-tight text-white drop-shadow-[0_2px_12px_rgba(2,6,23,0.8)] md:text-5xl">
         {stage.headline}
-      </h2>
+      </Heading>
       {stage.micro ? (
         <p className="mt-4 text-sm font-medium tracking-wide text-slate-200/90 drop-shadow-[0_1px_8px_rgba(2,6,23,0.8)] md:text-base">
           {stage.micro}
         </p>
+      ) : null}
+      {isFirst ? (
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+          <CtaButton href="/demo" location="home_hero" variant="primary">
+            Book a demo
+          </CtaButton>
+          <Link
+            href="/configure"
+            className="rounded-md border border-white/25 bg-white/10 px-6 py-3 text-base font-medium text-white backdrop-blur transition hover:bg-white/20"
+          >
+            View plans
+          </Link>
+        </div>
       ) : null}
     </motion.div>
   );
@@ -171,7 +189,8 @@ function StaticHero() {
           />
         </div>
         <h1 className="mt-8 max-w-3xl text-3xl font-bold leading-tight text-white md:text-5xl">
-          From admin chaos to coordinated care.
+          Connected operations software for schools, clubs, churches and
+          charities.
         </h1>
         <p className="mt-4 max-w-2xl text-base text-slate-200/90 md:text-lg">
           Attendance, rotas, safeguarding, communications and reporting — one
@@ -254,7 +273,11 @@ export default function NexStepsParallaxHero() {
 
   const scrollHintOpacity = useTransform(scrollYProgress, [0, 0.05], [1, 0]);
   // Ease the dark scrims off as the video brightens into its dawn ending.
-  const scrimOpacity = useTransform(scrollYProgress, [0, 0.75, 0.92], [1, 1, 0.35]);
+  const scrimOpacity = useTransform(
+    scrollYProgress,
+    [0, 0.75, 0.92],
+    [1, 1, 0.35],
+  );
 
   if (prefersReducedMotion) {
     return <StaticHero />;
@@ -340,13 +363,6 @@ export default function NexStepsParallaxHero() {
             className="block h-6 w-px bg-slate-300/60"
           />
         </motion.div>
-
-        {/* Screen-reader narrative equivalent of the visual sequence */}
-        <h1 className="sr-only">
-          NexSteps — from admin chaos to coordinated care. Attendance, rotas,
-          safeguarding, communications and reporting in one trusted system.
-          Forward together.
-        </h1>
       </div>
     </div>
   );

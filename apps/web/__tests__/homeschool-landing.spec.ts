@@ -1,5 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import { metadata } from "../app/(marketing)/homeschool/page";
+import { homeschoolStructuredData } from "../lib/homeschool-seo";
+import { buildStaticSitemap, SITE_ORIGIN } from "../lib/seo";
 
 const webRoot = path.join(__dirname, "..");
 
@@ -10,13 +13,17 @@ function readSource(...segments: string[]): string {
 
 describe("NexSteps Home landing page", () => {
   it("publishes complete search and answer-engine metadata", () => {
-    const page = readSource("app", "(marketing)", "homeschool", "page.tsx");
+    const schemaTypes = JSON.stringify(homeschoolStructuredData);
 
-    expect(page).toContain("Homeschool Planner App for UK Families | Nexsteps");
-    expect(page).toContain("/homeschool");
-    expect(page).toContain('"SoftwareApplication"');
-    expect(page).toContain('"FAQPage"');
-    expect(page).toContain("What is NexSteps Home?");
+    expect(metadata.title).toBe(
+      "NexSteps Home: Home Education Planning and Records",
+    );
+    expect(metadata.alternates).toEqual({
+      canonical: `${SITE_ORIGIN}/homeschool`,
+    });
+    expect(schemaTypes).toContain('"SoftwareApplication"');
+    expect(schemaTypes).toContain('"FAQPage"');
+    expect(schemaTypes).toContain("What is NexSteps Home?");
   });
 
   it("uses the five approved product screens", () => {
@@ -49,11 +56,15 @@ describe("NexSteps Home landing page", () => {
   it("links the route from navigation, footer, and sitemap", () => {
     const header = readSource("components", "header-nav.tsx");
     const footer = readSource("components", "footer.tsx");
-    const sitemap = readSource("app", "sitemap.ts");
+    const sitemap = buildStaticSitemap();
 
     expect(header).toContain('{ label: "Homeschool", href: "/homeschool" }');
     expect(footer).toContain('{ label: "Homeschool", href: "/homeschool" }');
-    expect(sitemap).toContain('url: `${baseUrl}/homeschool`');
+    expect(sitemap).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ url: `${SITE_ORIGIN}/homeschool` }),
+      ]),
+    );
   });
 
   it("keeps split-screen layouts for wide viewports where copy and imagery do not collide", () => {
@@ -62,11 +73,7 @@ describe("NexSteps Home landing page", () => {
       "homeschool",
       "homeschool-landing-page.tsx",
     );
-    const reveal = readSource(
-      "components",
-      "homeschool",
-      "product-reveal.tsx",
-    );
+    const reveal = readSource("components", "homeschool", "product-reveal.tsx");
 
     expect(landing).toContain("xl:grid-cols-[1.02fr_0.98fr]");
     expect(landing).toContain("sm:min-h-[60rem]");

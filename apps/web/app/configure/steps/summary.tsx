@@ -88,7 +88,7 @@ export function SummaryStep({
           Review your configuration
         </h2>
         <p className="text-text-muted">
-          Check your choices and add the details we need for your Pathway
+          Check your choices and add the details we need for your Nexsteps
           workspace.
         </p>
       </div>

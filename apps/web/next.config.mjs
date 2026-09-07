@@ -28,6 +28,11 @@ const nextConfig = {
     },
   },
   async headers() {
+    const previewIndexingHeaders =
+      process.env.VERCEL_ENV && process.env.VERCEL_ENV !== "production"
+        ? [{ key: "X-Robots-Tag", value: "noindex, nofollow" }]
+        : [];
+
     return [
       {
         source: "/(.*)",
@@ -56,12 +61,19 @@ const nextConfig = {
             key: "Content-Security-Policy-Report-Only",
             value: cspReportOnly,
           },
+          ...previewIndexingHeaders,
         ],
       },
     ];
   },
   async redirects() {
     return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "nexsteps.dev" }],
+        destination: "https://www.nexsteps.dev/:path*",
+        permanent: true,
+      },
       { source: "/resources", destination: "/blog", permanent: true },
       {
         source: "/resources/:slug",

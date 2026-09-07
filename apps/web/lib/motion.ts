@@ -52,6 +52,18 @@ export const reducedOptionGroupVariants = {
   visible: {},
 } satisfies Variants;
 
+export const visibleFirstContainerVariants = {
+  hidden: { opacity: 1, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.2,
+    },
+  },
+} satisfies Variants;
+
 export const optionCardVariants = {
   hidden: { opacity: 0, y: 12 },
   visible: { opacity: 1, y: 0, transition: springEnter },
@@ -61,7 +73,7 @@ export type StepDirection = "forward" | "back";
 
 export const configuratorStepVariants = {
   initial: (direction: StepDirection) => ({
-    opacity: 0,
+    opacity: 1,
     x: direction === "back" ? -24 : 24,
   }),
   animate: (direction: StepDirection) => ({
@@ -77,7 +89,7 @@ export const configuratorStepVariants = {
 };
 
 export const reducedStepVariants = {
-  initial: { opacity: 0 },
+  initial: { opacity: 1 },
   animate: { opacity: 1, transition: reducedMotionFade },
   exit: { opacity: 0, transition: reducedMotionFade },
 } satisfies Variants;

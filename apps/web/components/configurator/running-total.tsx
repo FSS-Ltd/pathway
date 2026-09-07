@@ -31,6 +31,7 @@ import {
   totalTick,
 } from "../../lib/motion";
 import type { ConfiguratorState } from "../../app/configure/state";
+import { formatRunningTotal } from "./running-total-copy";
 
 type RunningTotalProps = {
   state: ConfiguratorState;
@@ -136,6 +137,10 @@ export function RunningTotal({
     state.vertical && state.planCode
       ? `${VERTICAL_LABELS[state.vertical]} · ${PLANS[state.planCode].displayName} · billed ${state.frequency}`
       : "Choose a plan to see your configuration total.";
+  const totalDisplay = formatRunningTotal(
+    totals ? totals.totalMajor : null,
+    state.frequency,
+  );
 
   return (
     <section aria-labelledby="running-total-title" className="space-y-5">
@@ -190,12 +195,14 @@ export function RunningTotal({
       </div>
       <div className="border-t border-border-subtle pt-4">
         <p className="text-sm font-medium text-text-primary">
-          Total per {state.frequency === "monthly" ? "month" : "year"}
+          {totalDisplay.label}
         </p>
-        <AnimatedTotal
-          amountMajor={totals?.totalMajor ?? 0}
-          prefersReducedMotion={prefersReducedMotion}
-        />
+        {totalDisplay.amount === null ? null : (
+          <AnimatedTotal
+            amountMajor={totalDisplay.amount}
+            prefersReducedMotion={prefersReducedMotion}
+          />
+        )}
         <p className="mt-1 text-xs text-text-muted">
           Final price and tax are confirmed at checkout.
         </p>

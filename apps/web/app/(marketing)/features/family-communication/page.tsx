@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import CtaButton from "../../../../components/cta-button";
 import PageWrapper from "../../../../components/page-wrapper";
+import FeatureBreadcrumbJsonLd from "../../../../components/seo/feature-breadcrumb-json-ld";
 import { configuratorRolloutHref } from "../../../../lib/configurator-rollout";
+import { metadataForPath } from "../../../../lib/seo";
 
-export const metadata: Metadata = {
-  title: "Family Communication | Nexsteps",
-  description:
-    "Deliver clearer family communication connected to daily operations and attendance context.",
-};
+export const metadata = metadataForPath("/features/family-communication");
 
 const outcomes = [
   "Send updates from one place instead of juggling multiple channels.",
@@ -20,28 +17,38 @@ const outcomes = [
 export default function FamilyCommunicationFeaturePage() {
   return (
     <PageWrapper>
+      <FeatureBreadcrumbJsonLd
+        name="Family Communication"
+        path="/features/family-communication"
+      />
       <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-16 md:py-24">
         <section className="flex flex-col gap-4">
           <p className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
             Feature
           </p>
-          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">Family Communication</h1>
+          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">
+            Family Communication
+          </h1>
           <p className="text-lg text-pw-text-muted">
-            Keep families informed through communication that is connected to real
-            operational activity, not scattered across disconnected tools.
+            Keep families informed through communication that is connected to
+            real operational activity, not scattered across disconnected tools.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">Replace fragmented tools</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Replace fragmented tools
+          </h2>
           <p className="text-pw-text-muted leading-relaxed">
-            Replace spreadsheet notes, group chat broadcasts, stand-alone parent apps,
-            and separate logs with a connected communication workflow.
+            Replace spreadsheet notes, group chat broadcasts, stand-alone parent
+            apps, and separate logs with a connected communication workflow.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-4 text-2xl font-semibold text-pw-text">Practical outcomes</h2>
+          <h2 className="mb-4 text-2xl font-semibold text-pw-text">
+            Practical outcomes
+          </h2>
           <ul className="flex flex-col gap-3 text-pw-text-muted">
             {outcomes.map((outcome) => (
               <li key={outcome}>• {outcome}</li>
@@ -50,20 +57,41 @@ export default function FamilyCommunicationFeaturePage() {
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">Role-based value</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Role-based value
+          </h2>
           <p className="text-pw-text-muted leading-relaxed">
-            Leaders gain communication consistency, staff spend less time chasing
-            updates, and parents receive clearer, more dependable information.
+            Leaders gain communication consistency, staff spend less time
+            chasing updates, and parents receive clearer, more dependable
+            information.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">See it in action</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Check your workflow
+          </h2>
+          <p className="text-pw-text-muted leading-relaxed">
+            Confirm the delivery channels available to your organisation, who
+            can select recipients and which communication history each role can
+            view. A demonstration can map those boundaries to your current
+            process.
+          </p>
+        </section>
+
+        <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            See it in action
+          </h2>
           <p className="mb-5 text-pw-text-muted">
-            Discover how family communication works better when connected to the rest of your operations.
+            Discover how family communication works better when connected to the
+            rest of your operations.
           </p>
           <div className="flex flex-wrap gap-4">
-            <CtaButton href="/demo" location="feature_family_communication_cta_primary">
+            <CtaButton
+              href="/demo"
+              location="feature_family_communication_cta_primary"
+            >
               Book a Demo
             </CtaButton>
             <Link

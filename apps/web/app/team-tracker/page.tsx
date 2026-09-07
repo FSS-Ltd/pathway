@@ -1,11 +1,7 @@
-import type { Metadata } from "next";
 import TeamTrackerLanding from "./team-tracker-landing";
+import { metadataForPath } from "../../lib/seo";
 
-export const metadata: Metadata = {
-  title: "Free One-Page Team Tracker",
-  description:
-    "A free Excel workbook for schools, youth groups, clubs, and charities to organise people, sessions, attendance, and follow-ups in one weekly view.",
-};
+export const metadata = metadataForPath("/team-tracker");
 
 export default function TeamTrackerPage() {
   return <TeamTrackerLanding />;

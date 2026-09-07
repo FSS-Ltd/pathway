@@ -6,14 +6,12 @@ const config: Config = {
   roots: ["<rootDir>"],
   testMatch: ["**/__tests__/**/*.spec.ts", "**/__tests__/**/*.spec.tsx"],
   modulePathIgnorePatterns: ["<rootDir>/.next"],
-  transformIgnorePatterns: [
-    "node_modules/(?!(@react-pdf)/)",
-  ],
+  transformIgnorePatterns: ["node_modules/(?!(@react-pdf)/)"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
   },
   transform: {
-    "^.+\\.(t|j)sx?$": ["ts-jest", { tsconfig: "tsconfig.json" }],
+    "^.+\\.(t|j)sx?$": ["ts-jest", { tsconfig: "tsconfig.jest.json" }],
   },
 };
 

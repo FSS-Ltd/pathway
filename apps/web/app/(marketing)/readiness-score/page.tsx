@@ -24,7 +24,7 @@ export default function ReadinessScoreStartPage() {
       <div className="mx-auto max-w-[1120px] px-4 py-12 sm:px-6 sm:py-16 md:px-8 md:py-20">
         <motion.div
           className="flex flex-col gap-6 text-center"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
@@ -35,13 +35,14 @@ export default function ReadinessScoreStartPage() {
             A 3-minute assessment to highlight risk areas and next steps.
           </p>
           <p className="text-text-muted">
-            Get a score, a simple impact estimate, and a recommended plan based on your answers.
+            Get a score, a simple impact estimate, and a recommended plan based
+            on your answers.
           </p>
         </motion.div>
 
         <motion.div
           className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-text-muted"
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
@@ -61,7 +62,7 @@ export default function ReadinessScoreStartPage() {
 
         <motion.div
           className="mt-12 flex justify-center"
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 1, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
         >
