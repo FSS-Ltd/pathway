@@ -1,4 +1,7 @@
 import MarketingLayout from "../(marketing)/layout";
+import { metadataForPath } from "../../lib/seo";
+
+export const metadata = metadataForPath("/configure");
 
 export default function ConfiguratorLayout({
   children,

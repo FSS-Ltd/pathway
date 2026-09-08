@@ -76,7 +76,7 @@ export default function ToolkitPage() {
       <div className="mx-auto max-w-2xl px-4 py-16 md:py-24">
         <motion.div
           className="flex flex-col gap-6"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
@@ -103,7 +103,7 @@ export default function ToolkitPage() {
 
         <motion.section
           className="mt-10 rounded-xl border border-border-subtle bg-surface p-6 shadow-soft"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 1, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >

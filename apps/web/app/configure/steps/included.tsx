@@ -16,7 +16,7 @@ export function IncludedStep({ vertical }: IncludedStepProps) {
           Built for {VERTICAL_LABELS[vertical]}
         </h2>
         <p className="text-text-muted">
-          Every Pathway workspace starts with these essential capabilities.
+          Every Nexsteps workspace starts with these essential capabilities.
         </p>
       </div>
       <ul

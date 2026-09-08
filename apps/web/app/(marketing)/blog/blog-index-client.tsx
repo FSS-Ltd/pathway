@@ -5,19 +5,27 @@ import Link from "next/link";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, Search, ExternalLink } from "lucide-react";
 import type { BlogPostSummary } from "../../../lib/blog-client";
+import {
+  BLOG_POSTS_PER_PAGE,
+  blogPageHref,
+} from "../../../lib/blog-pagination";
 
-const POSTS_PER_PAGE = 10;
 const CATEGORIES_PER_PAGE = 10;
 
 type Props = {
   posts: BlogPostSummary[];
   allTags: string[];
+  initialPage: number;
 };
 
-export default function BlogIndexClient({ posts, allTags }: Props) {
+export default function BlogIndexClient({
+  posts,
+  allTags,
+  initialPage,
+}: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [currentPage, setCurrentPage] = useState(0);
+  const [currentPage, setCurrentPage] = useState(initialPage - 1);
   const [categoryPage, setCategoryPage] = useState(0);
 
   const filteredPosts = useMemo(() => {
@@ -39,11 +47,11 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
 
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredPosts.length / POSTS_PER_PAGE),
+    Math.ceil(filteredPosts.length / BLOG_POSTS_PER_PAGE),
   );
   const pagePosts = filteredPosts.slice(
-    currentPage * POSTS_PER_PAGE,
-    (currentPage + 1) * POSTS_PER_PAGE,
+    currentPage * BLOG_POSTS_PER_PAGE,
+    (currentPage + 1) * BLOG_POSTS_PER_PAGE,
   );
   const filteredFeatured = currentPage === 0 ? pagePosts[0] : undefined;
   const paginatedGridPosts = currentPage === 0 ? pagePosts.slice(1) : pagePosts;
@@ -63,6 +71,10 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
   useEffect(() => {
     setCurrentPage(0);
   }, [searchQuery, selectedCategory]);
+
+  useEffect(() => {
+    setCurrentPage(initialPage - 1);
+  }, [initialPage]);
 
   useEffect(() => {
     setCurrentPage((page) => Math.min(page, Math.max(totalPages - 1, 0)));
@@ -166,7 +178,7 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
       </aside>
 
       {/* Main Content */}
-      <main className="min-w-0 flex-1">
+      <section aria-label="Blog articles" className="min-w-0 flex-1">
         {filteredPosts.length === 0 ? (
           <div className="rounded-xl border border-border-subtle bg-surface p-12 text-center">
             <p className="text-text-muted">
@@ -320,46 +332,66 @@ export default function BlogIndexClient({ posts, allTags }: Props) {
           </div>
         )}
 
-        {filteredPosts.length > POSTS_PER_PAGE && (
+        {filteredPosts.length > BLOG_POSTS_PER_PAGE && (
           <div className="mt-8 flex flex-col items-center justify-between gap-3 border-t border-border-subtle pt-6 sm:flex-row">
             <p className="text-sm text-text-muted">
-              Showing {currentPage * POSTS_PER_PAGE + 1}–
+              Showing {currentPage * BLOG_POSTS_PER_PAGE + 1}–
               {Math.min(
-                (currentPage + 1) * POSTS_PER_PAGE,
+                (currentPage + 1) * BLOG_POSTS_PER_PAGE,
                 filteredPosts.length,
               )}{" "}
               of {filteredPosts.length}
             </p>
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((page) => Math.max(0, page - 1))}
-                disabled={currentPage === 0}
-                className="inline-flex items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Previous blog page"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </button>
+              {currentPage === 0 ? (
+                <span
+                  aria-disabled="true"
+                  className="inline-flex cursor-not-allowed items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary opacity-50"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </span>
+              ) : (
+                <Link
+                  href={blogPageHref(currentPage)}
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(0, page - 1))
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-muted"
+                  aria-label="Previous blog page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Link>
+              )}
               <span className="text-sm text-text-muted">
                 Page {currentPage + 1} of {totalPages}
               </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setCurrentPage((page) => Math.min(totalPages - 1, page + 1))
-                }
-                disabled={currentPage >= totalPages - 1}
-                className="inline-flex items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Next blog page"
-              >
-                Next
-                <ChevronRight className="h-4 w-4" />
-              </button>
+              {currentPage >= totalPages - 1 ? (
+                <span
+                  aria-disabled="true"
+                  className="inline-flex cursor-not-allowed items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary opacity-50"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </span>
+              ) : (
+                <Link
+                  href={blogPageHref(currentPage + 2)}
+                  onClick={() =>
+                    setCurrentPage((page) => Math.min(totalPages - 1, page + 1))
+                  }
+                  className="inline-flex items-center gap-1 rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-muted"
+                  aria-label="Next blog page"
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              )}
             </div>
           </div>
         )}
-      </main>
+      </section>
     </div>
   );
 }

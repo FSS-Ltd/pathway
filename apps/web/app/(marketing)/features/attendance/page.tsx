@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import CtaButton from "../../../../components/cta-button";
 import PageWrapper from "../../../../components/page-wrapper";
+import FeatureBreadcrumbJsonLd from "../../../../components/seo/feature-breadcrumb-json-ld";
 import { configuratorRolloutHref } from "../../../../lib/configurator-rollout";
+import { metadataForPath } from "../../../../lib/seo";
 
-export const metadata: Metadata = {
-  title: "Attendance | Nexsteps",
-  description:
-    "Run attendance as one connected workflow across registers, staff updates, and family visibility.",
-};
+export const metadata = metadataForPath("/features/attendance");
 
 const outcomes = [
   "Capture registers quickly with fewer handoffs between staff.",
@@ -20,29 +17,36 @@ const outcomes = [
 export default function AttendanceFeaturePage() {
   return (
     <PageWrapper>
+      <FeatureBreadcrumbJsonLd name="Attendance" path="/features/attendance" />
       <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-16 md:py-24">
         <section className="flex flex-col gap-4">
           <p className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
             Feature
           </p>
-          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">Attendance</h1>
+          <h1 className="text-4xl font-bold text-pw-text md:text-5xl">
+            Attendance
+          </h1>
           <p className="text-lg text-pw-text-muted">
-            Keep attendance connected to daily operations, so leaders and staff can
-            act quickly without chasing updates across disconnected systems.
+            Keep attendance connected to daily operations, so leaders and staff
+            can act quickly without chasing updates across disconnected systems.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">Replace fragmented tools</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Replace fragmented tools
+          </h2>
           <p className="text-pw-text-muted leading-relaxed">
             Move away from spreadsheets, group chats, separate parent apps, and
-            stand-alone logs. Nexsteps keeps attendance activity in one operational
-            flow so information is easier to trust and act on.
+            stand-alone logs. Nexsteps keeps attendance activity in one
+            operational flow so information is easier to trust and act on.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-4 text-2xl font-semibold text-pw-text">Practical outcomes</h2>
+          <h2 className="mb-4 text-2xl font-semibold text-pw-text">
+            Practical outcomes
+          </h2>
           <ul className="flex flex-col gap-3 text-pw-text-muted">
             {outcomes.map((outcome) => (
               <li key={outcome}>• {outcome}</li>
@@ -51,18 +55,35 @@ export default function AttendanceFeaturePage() {
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">Role-based value</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Role-based value
+          </h2>
           <p className="text-pw-text-muted leading-relaxed">
             Leaders get clearer oversight of attendance trends, staff get faster
-            day-to-day workflows, and families benefit from more reliable updates.
+            day-to-day workflows, and families benefit from more reliable
+            updates.
           </p>
         </section>
 
         <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
-          <h2 className="mb-3 text-2xl font-semibold text-pw-text">See it in action</h2>
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            Check your workflow
+          </h2>
+          <p className="text-pw-text-muted leading-relaxed">
+            Ask to see how a session is opened, how the correct group is
+            selected, how a register is corrected and which records can be
+            reviewed or exported. Confirm device and connectivity requirements
+            for the places where your team takes attendance.
+          </p>
+        </section>
+
+        <section className="rounded-xl border border-pw-border bg-white p-6 shadow-soft">
+          <h2 className="mb-3 text-2xl font-semibold text-pw-text">
+            See it in action
+          </h2>
           <p className="mb-5 text-pw-text-muted">
-            Explore how attendance fits into a connected operations model across your
-            teams and sessions.
+            Explore how attendance fits into a connected operations model across
+            your teams and sessions.
           </p>
           <div className="flex flex-wrap gap-4">
             <CtaButton href="/demo" location="feature_attendance_cta_primary">

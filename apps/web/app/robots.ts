@@ -1,16 +1,14 @@
 import type { MetadataRoute } from "next";
+import { SITE_ORIGIN } from "../lib/seo";
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = "https://nexsteps.dev";
-
   return {
     rules: {
       userAgent: "*",
       allow: "/",
       disallow: [],
     },
-    sitemap: `${baseUrl}/sitemap.xml`,
-    host: baseUrl,
+    sitemap: `${SITE_ORIGIN}/sitemap.xml`,
+    host: SITE_ORIGIN,
   };
 }
-

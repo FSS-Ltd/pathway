@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
 import SectorLandingPage from "../../../components/sector/SectorLandingPage";
 import { getSectorById } from "../../../content/sectors";
 import type { SectorDefinition } from "../../../content/sectors";
+import { metadataForPath } from "../../../lib/seo";
 
 const sectorResult = getSectorById("charities");
 
@@ -11,12 +11,8 @@ if (!sectorResult) {
 
 const sector: SectorDefinition = sectorResult;
 
-export const metadata: Metadata = {
-  title: `Nexsteps for ${sector.name}`,
-  description: sector.heroSubtitle,
-};
+export const metadata = metadataForPath("/charities");
 
 export default function CharitiesPage() {
   return <SectorLandingPage sector={sector} />;
 }
-

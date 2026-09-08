@@ -5,8 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { fetchBlogPosts } from "../../../lib/blog-client";
-
-const baseUrl = "https://nexsteps.dev";
+import { SITE_ORIGIN } from "../../../lib/seo";
 
 function escapeXml(str: string): string {
   return str
@@ -22,11 +21,17 @@ export async function GET() {
 
   const items = posts
     .map(
-      (post: { title: string; slug: string; excerpt: string | null; seoDescription: string | null; publishedAt: string | null }) => `
+      (post: {
+        title: string;
+        slug: string;
+        excerpt: string | null;
+        seoDescription: string | null;
+        publishedAt: string | null;
+      }) => `
     <item>
       <title>${escapeXml(post.title)}</title>
-      <link>${baseUrl}/blog/${escapeXml(post.slug)}</link>
-      <guid isPermaLink="true">${baseUrl}/blog/${escapeXml(post.slug)}</guid>
+      <link>${SITE_ORIGIN}/blog/${escapeXml(encodeURIComponent(post.slug))}</link>
+      <guid isPermaLink="true">${SITE_ORIGIN}/blog/${escapeXml(encodeURIComponent(post.slug))}</guid>
       <description>${escapeXml(post.excerpt ?? post.seoDescription ?? "")}</description>
       <pubDate>${post.publishedAt ? new Date(post.publishedAt).toUTCString() : ""}</pubDate>
     </item>`,
@@ -37,11 +42,11 @@ export async function GET() {
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Nexsteps Blog</title>
-    <link>${baseUrl}/blog</link>
+    <link>${SITE_ORIGIN}/blog</link>
     <description>Insights on safeguarding, attendance, rotas, and school operations.</description>
     <language>en-GB</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-    <atom:link href="${baseUrl}/blog/feed.xml" rel="self" type="application/rss+xml"/>
+    <atom:link href="${SITE_ORIGIN}/blog/feed.xml" rel="self" type="application/rss+xml"/>
     ${items}
   </channel>
 </rss>`;

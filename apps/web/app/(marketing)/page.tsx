@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import HomeCtaSection from "../../components/home-cta-section";
 import { sectors } from "../../content/sectors";
 import FeatureCards from "../../components/feature-cards";
@@ -8,12 +7,9 @@ import ReportingVisibilitySection from "../../components/reporting-visibility-se
 import SectorGrid from "../../components/sector-grid";
 import TrustSection from "../../components/trust-section";
 import WhyNexsteps from "../../components/why-nexsteps";
+import { metadataForPath } from "../../lib/seo";
 
-export const metadata: Metadata = {
-  title: "Nexsteps - Connected operations for schools, clubs, churches & charities",
-  description:
-    "Nexsteps helps organisations run attendance, teams, family communication, safeguarding, and reporting from one connected system.",
-};
+export const metadata = metadataForPath("/");
 
 export default function HomePage() {
   return (

@@ -4,29 +4,37 @@
  * ISR with revalidate 60s.
  */
 
-import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound, permanentRedirect } from "next/navigation";
 import { fetchAllBlogPosts } from "../../../lib/blog-client";
 import BlogFaq from "./blog-faq";
 import BlogIndexClient from "./blog-index-client";
+import {
+  BLOG_POSTS_PER_PAGE,
+  buildBlogIndexMetadata,
+  parseBlogPage,
+} from "../../../lib/blog-pagination";
 
-export const metadata: Metadata = {
-  title: "Browse Our Resources",
-  description:
-    "We provide tips and resources from industry leaders. Insights on safeguarding, attendance, rotas, and school operations.",
-  openGraph: {
-    title: "Browse Our Resources | Nexsteps",
-    description:
-      "We provide tips and resources from industry leaders. Insights on safeguarding, attendance, rotas, and school operations.",
-    url: "https://nexsteps.dev/blog",
-    type: "website",
-  },
+type BlogIndexPageProps = {
+  searchParams?: { page?: string | string[] };
 };
+
+export function generateMetadata({ searchParams }: BlogIndexPageProps) {
+  return buildBlogIndexMetadata(parseBlogPage(searchParams?.page) ?? 1);
+}
 
 export const revalidate = 60;
 
-export default async function BlogIndexPage() {
+export default async function BlogIndexPage({
+  searchParams,
+}: BlogIndexPageProps) {
+  if (searchParams?.page === "1") permanentRedirect("/blog");
+  const page = parseBlogPage(searchParams?.page);
+  if (page === null) notFound();
+
   const posts = await fetchAllBlogPosts();
+  const totalPages = Math.max(1, Math.ceil(posts.length / BLOG_POSTS_PER_PAGE));
+  if (page > totalPages) notFound();
 
   // All unique tags for categories
   const allTags = Array.from(
@@ -51,7 +59,7 @@ export default async function BlogIndexPage() {
         </p>
       </div>
 
-      <BlogIndexClient posts={posts} allTags={allTags} />
+      <BlogIndexClient posts={posts} allTags={allTags} initialPage={page} />
 
       <BlogFaq />
     </div>

@@ -234,17 +234,41 @@ export default function ConfigurePage() {
   };
 
   return (
-    <main className="bg-shell py-10 sm:py-14">
+    <div className="bg-shell py-10 sm:py-14">
       <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr),minmax(400px,44%)] lg:px-8">
         <section className="max-w-xl space-y-8">
           <header className="space-y-3">
             <p className="text-sm font-semibold text-accent-strong">
-              Configure Pathway
+              Configure Nexsteps
             </p>
             <h1 className="font-heading text-3xl font-bold text-text-primary sm:text-4xl">
               Build the right workspace for your organisation.
             </h1>
+            <p className="text-base leading-relaxed text-text-muted">
+              Compare the published plans, then choose your organisation type,
+              optional modules, billing period and storage. Your total updates
+              as you configure the workspace, with final pricing and tax
+              confirmed at checkout.
+            </p>
           </header>
+          <section
+            aria-labelledby="pricing-explained-title"
+            className="rounded-2xl border border-border-subtle bg-surface p-5 shadow-soft"
+          >
+            <h2
+              id="pricing-explained-title"
+              className="font-heading text-xl font-bold text-text-primary"
+            >
+              How pricing works
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-text-muted">
+              Each plan includes a site limit and an Active People allowance.
+              Active People are unique staff or volunteers who have qualifying
+              activity during the previous 30 days; parent accounts do not
+              count. Storage is the optional usage add-on. Monthly and annual
+              totals are shown before checkout.
+            </p>
+          </section>
           {pricingWarning ? (
             <p
               role="status"
@@ -390,6 +414,6 @@ export default function ConfigurePage() {
           </AnimatePresence>
         </section>
       </div>
-    </main>
+    </div>
   );
 }

@@ -55,16 +55,16 @@ export interface SecurityContent {
 
 export const securityContent: SecurityContent = {
   hero: {
-    title: "Security, Safeguarding & Compliance at Nexsteps",
+    title: "Security, Privacy and Data Handling at Nexsteps",
     description:
-      "Nexsteps is a connected operations system with security and compliance built in. We protect children's data, support safeguarding workflows, and help organisations operate with stronger accountability.",
+      "This page explains the controls used by Nexsteps and the questions buyers should verify for their deployment. Nexsteps supports organisational safeguarding processes; it does not replace policy, professional judgement or legal advice.",
     primaryCta: {
       label: "Book a security walkthrough",
       href: "/demo?topic=security",
     },
     secondaryCta: {
-      label: "Download security overview (PDF)",
-      href: "#", // TODO: Add PDF download when available
+      label: "Request security information",
+      href: "/demo?topic=security",
     },
   },
   sections: {
@@ -150,12 +150,12 @@ export const securityContent: SecurityContent = {
         {
           control: "Encryption at Rest",
           description:
-            "Data stored in our databases and file storage systems is encrypted at rest using encryption managed by our cloud provider. Encryption keys are managed securely and rotated regularly.",
+            "Database and file-storage encryption is supplied by the configured cloud services. Buyers can request the current provider and control inventory for their deployment review.",
         },
         {
           control: "Backups & Disaster Recovery",
           description:
-            "Nexsteps performs regular automated backups of all production data. Backups are retained according to our retention policy and are tested regularly to ensure they can be restored. Disaster recovery procedures are documented and tested.",
+            "Backup, retention and recovery arrangements depend on the production data services in use. Request the current recovery scope and retention schedule during security review.",
         },
         {
           control: "Logging & Monitoring",
@@ -167,8 +167,8 @@ export const securityContent: SecurityContent = {
     dataLocations: {
       title: "Data Locations",
       content: [
-        "Nexsteps production infrastructure is hosted with reputable cloud providers. Our primary hosting regions are designed to serve UK and EU customers, with data residency aligned to support GDPR and UK data protection requirements.",
-        "As we expand our service, we will keep this page updated with specific region information. If your organisation has specific data residency requirements, please contact us to discuss how we can meet your needs.",
+        "The public Nexsteps website is currently configured for delivery from Vercel's London region. That setting does not, by itself, describe where private application records, backups or subprocessors operate.",
+        "If your organisation has data-location requirements, request the current production architecture and subprocessor information before relying on a residency assumption.",
       ],
     },
     safeguarding: {
@@ -184,5 +184,5 @@ export const securityContent: SecurityContent = {
       ],
     },
   },
-  lastUpdated: "December 2024",
+  lastUpdated: "September 2026",
 };

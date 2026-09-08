@@ -25,7 +25,7 @@ export default function RoleBasedValueSection() {
     <section className="mx-auto max-w-7xl px-4 py-16 md:py-24">
       <motion.div
         className="rounded-xl border border-border-subtle bg-surface p-8 shadow-soft md:p-12"
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 1, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.6 }}

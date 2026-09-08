@@ -79,7 +79,12 @@ export default function ProductShowcase() {
 
         <div className="relative mt-16 md:mt-24">
           <ScrollReveal delay={0.1} className="mx-auto max-w-4xl">
-            <BrowserFrame src={ADMIN_SRC} alt="NexSteps admin dashboard overview" />
+            <figure>
+              <BrowserFrame src={ADMIN_SRC} alt="NexSteps admin dashboard overview" />
+              <figcaption className="mt-3 text-center text-sm text-text-muted">
+                Product demonstration using synthetic data.
+              </figcaption>
+            </figure>
           </ScrollReveal>
 
           {/* Mobile: phones sit in normal flow below the browser frame.
@@ -87,7 +92,7 @@ export default function ProductShowcase() {
           <div className="mt-10 flex justify-center gap-6 px-4 md:pointer-events-none md:absolute md:inset-x-0 md:-bottom-32 md:mt-0 md:gap-10">
             <motion.div
               className="pointer-events-auto hidden md:block"
-              initial={{ opacity: 0, y: 40, rotate: -6 }}
+              initial={{ opacity: 1, y: 40, rotate: -6 }}
               whileInView={{ opacity: 1, y: 0, rotate: -6 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.7, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
@@ -102,7 +107,7 @@ export default function ProductShowcase() {
 
             <motion.div
               className="pointer-events-auto md:translate-y-6"
-              initial={{ opacity: 0, y: 40, rotate: 6 }}
+              initial={{ opacity: 1, y: 40, rotate: 6 }}
               whileInView={{ opacity: 1, y: 0, rotate: 6 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{ duration: 0.7, delay: 0.35, ease: [0.16, 1, 0.3, 1] }}

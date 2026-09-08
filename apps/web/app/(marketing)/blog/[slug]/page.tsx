@@ -13,8 +13,14 @@ import {
   fetchBlogPosts,
   fetchRelatedPosts,
 } from "../../../../lib/blog-client";
-
-const baseUrl = "https://nexsteps.dev";
+import { prepareArticleContent } from "../../../../lib/article-content";
+import JsonLd from "../../../../components/seo/json-ld";
+import {
+  absoluteContentUrl,
+  articleJsonLd,
+  breadcrumbJsonLd,
+  buildArticleMetadata,
+} from "../../../../lib/seo";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -29,30 +35,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const title = post.seoTitle ?? post.title;
   const description = post.seoDescription ?? post.excerpt ?? undefined;
-  const canonical = `${baseUrl}/blog/${slug}`;
-  const ogImage = post.thumbnailImageId ?? post.headerImageId
-    ? `${baseUrl}/media/${post.thumbnailImageId ?? post.headerImageId}`
-    : undefined;
+  const imageId = post.thumbnailImageId ?? post.headerImageId;
+  const articlePath = `/blog/${encodeURIComponent(slug)}`;
 
-  return {
+  return buildArticleMetadata({
+    path: articlePath,
     title,
     description,
-    alternates: { canonical },
-    openGraph: {
-      title,
-      description,
-      url: canonical,
-      type: "article",
-      publishedTime: post.publishedAt ?? undefined,
-      modifiedTime: post.updatedAt,
-      images: ogImage ? [{ url: ogImage }] : undefined,
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-    },
-  };
+    publishedAt: post.publishedAt ?? undefined,
+    updatedAt: post.updatedAt,
+    imagePath: imageId ? `/media/${imageId}` : undefined,
+  });
 }
 
 export const revalidate = 60;
@@ -66,55 +59,15 @@ export async function generateStaticParams() {
   }
 }
 
-type TocItem = {
-  id: string;
-  label: string;
-};
-
-function slugifyHeading(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/&amp;/g, "and")
-    .replace(/[^a-z0-9\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-");
-}
-
-function buildContentWithToc(contentHtml: string): { html: string; toc: TocItem[] } {
-  const toc: TocItem[] = [];
-  const slugCounts = new Map<string, number>();
-
-  const html = contentHtml.replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/gi, (match, attrs, inner) => {
-    const label = inner.replace(/<[^>]+>/g, "").trim();
-    if (!label) return match;
-
-    const existingIdMatch = attrs.match(/\sid=(["'])(.*?)\1/i);
-    let id = existingIdMatch?.[2];
-    if (!id) {
-      const base = slugifyHeading(label) || "section";
-      const seen = slugCounts.get(base) ?? 0;
-      slugCounts.set(base, seen + 1);
-      id = seen === 0 ? base : `${base}-${seen + 1}`;
-    }
-
-    toc.push({ id, label });
-
-    if (existingIdMatch) return match;
-    return `<h2${attrs} id="${id}">${inner}</h2>`;
-  });
-
-  return { html, toc };
-}
-
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
   const post = await fetchBlogPostBySlug(slug);
   if (!post) notFound();
 
-  const [relatedPosts] = await Promise.all([
-    fetchRelatedPosts(slug, 4),
-  ]);
-  const { html: postHtmlWithIds, toc } = buildContentWithToc(post.contentHtml);
+  const [relatedPosts] = await Promise.all([fetchRelatedPosts(slug, 4)]);
+  const { html: postHtmlWithIds, toc } = prepareArticleContent(
+    post.contentHtml,
+  );
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "";
@@ -125,30 +78,27 @@ export default async function BlogPostPage({ params }: Props) {
     });
   };
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BlogPosting",
-    headline: post.title,
+  const imageId = post.headerImageId ?? post.thumbnailImageId;
+  const articlePath = `/blog/${encodeURIComponent(slug)}`;
+  const jsonLd = articleJsonLd({
+    path: articlePath,
+    title: post.title,
     description: post.excerpt ?? post.seoDescription ?? undefined,
-    datePublished: post.publishedAt ?? undefined,
-    dateModified: post.updatedAt,
-    author: {
-      "@type": "Person",
-      name: post.authorName ?? "Nexsteps",
-    },
-    publisher: {
-      "@type": "Organization",
-      name: "Nexsteps",
-      logo: { "@type": "ImageObject", url: `${baseUrl}/NSLogo.svg` },
-    },
-    mainEntityOfPage: { "@type": "WebPage", "@id": `${baseUrl}/blog/${slug}` },
-  };
+    publishedAt: post.publishedAt ?? undefined,
+    updatedAt: post.updatedAt,
+    authorName: post.authorName,
+    imageUrl: imageId ? absoluteContentUrl(`/media/${imageId}`) : undefined,
+  });
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      <JsonLd data={jsonLd} />
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: "Home", path: "/" },
+          { name: "Guides", path: "/blog" },
+          { name: post.title, path: articlePath },
+        ])}
       />
       <article>
         <section className="bg-shell">
@@ -176,7 +126,9 @@ export default async function BlogPostPage({ params }: Props) {
                   {post.title}
                 </h1>
                 {post.excerpt && (
-                  <p className="mt-4 text-base text-text-muted sm:text-lg">{post.excerpt}</p>
+                  <p className="mt-4 text-base text-text-muted sm:text-lg">
+                    {post.excerpt}
+                  </p>
                 )}
                 <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-text-muted">
                   <span>{formatDate(post.publishedAt)}</span>

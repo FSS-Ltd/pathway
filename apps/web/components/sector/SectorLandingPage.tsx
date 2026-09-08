@@ -9,13 +9,14 @@ import { getFirstTouchAttribution } from "../../lib/attribution";
 import { configuratorRolloutHref } from "../../lib/configurator-rollout";
 import CtaButton from "../cta-button";
 import PageWrapper from "../page-wrapper";
+import BreadcrumbJsonLd from "../seo/breadcrumb-json-ld";
 
 interface SectorLandingPageProps {
   sector: SectorDefinition;
 }
 
 const containerVariants = {
-  hidden: { opacity: 0 },
+  hidden: { opacity: 1 },
   visible: {
     opacity: 1,
     transition: {
@@ -25,7 +26,7 @@ const containerVariants = {
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 1, y: 20 },
   visible: {
     opacity: 1,
     y: 0,
@@ -66,10 +67,16 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
 
   return (
     <PageWrapper>
+      <BreadcrumbJsonLd
+        items={[
+          { name: "Home", path: "/" },
+          { name: sector.name, path: `/${sector.slug}` },
+        ]}
+      />
       <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-16 md:py-24">
         <motion.div
           className="flex flex-col gap-4"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
         >
@@ -94,7 +101,7 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
 
         <motion.section
           className="rounded-xl border border-pw-border bg-white p-6 shadow-soft"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 1, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.2 }}
         >
@@ -106,7 +113,7 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
 
         <motion.section
           className="rounded-xl border border-pw-border bg-white p-6 shadow-soft"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 1, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.25 }}
         >
@@ -122,7 +129,7 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
 
         <motion.section
           className="rounded-xl border border-pw-border bg-white p-6 shadow-soft"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 1, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
         >
@@ -145,7 +152,7 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
 
         <motion.section
           className="rounded-xl border border-pw-border bg-white p-6 shadow-soft"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 1, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.35 }}
         >
@@ -161,7 +168,7 @@ export default function SectorLandingPage({ sector }: SectorLandingPageProps) {
 
         <motion.section
           className="rounded-xl border border-pw-border bg-white p-6 shadow-soft"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 1, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
         >
