@@ -169,7 +169,7 @@ describe("module catalogue", () => {
 
   it("covers every vertical with customer-readable included features", () => {
     expect(Object.keys(VERTICAL_FEATURES).sort()).toEqual(
-      [...VERTICAL_OPTIONS.map(({ value }) => value), "HOME_EDUCATION"].sort(),
+      VERTICAL_OPTIONS.map(({ value }) => value).sort(),
     );
     expect(Object.keys(VERTICAL_FEATURES).sort()).toEqual(
       Object.keys(VERTICAL_CAPABILITIES).sort(),
