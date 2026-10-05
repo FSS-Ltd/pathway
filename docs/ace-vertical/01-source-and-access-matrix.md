@@ -6,6 +6,28 @@
 
 **Source order:** explicit product-owner instruction, `docs/ADDON_PRICING.md` for commercial facts, the ACE build plan for product/security/release scope, the ACE implementation plan set, current NexSteps patterns, then Oasis as read-only reference.
 
+## Superseding access decision (5 October 2026)
+
+The product owner replaced customer-created roles in every sector with fixed
+platform roles and scoped access tags. The route matrix below describes the
+previously implemented ACE-F14 role API until its runtime cutover; it is not
+approval to keep customer role writes. The target contract is:
+
+| Existing route family | Target behavior |
+| --- | --- |
+| R02, R04-R07 role creation, editing, cloning, permission replacement, and retirement | Reject legacy writes; fixed role templates remain read-only. |
+| R09-R11 assignments | Assign only platform-owned fixed roles, preserve historical custom assignments during audited parity migration, and retain one-way revocation. |
+| R12-R14 effective access and audit | Include active, scoped tag grants after delegation and entitlement checks; preserve tenant, relationship, and safeguarding boundaries. |
+| New access-tag catalogue, grant, revoke, and effective-access routes | Resolve exact paths and guards in the API step; no client-defined permission key or paid-module activation. |
+
+The tag catalogue contains all 17 Oasis concepts. Concepts without a matching
+typed permission, entitlement, or record-scope guard remain unavailable. A tag
+may be issued only for permissions the actor currently holds and may delegate;
+the issued scope cannot exceed the actor's scope. The grant record retains
+grantor, validity, one-way revocation, and audit facts. Access reads must ignore
+expired and revoked grants and re-evaluate on site switches. Until the API and
+migration steps merge, the existing R01-R14 behavior below remains live.
+
 ## Contract boundaries
 
 Sections 8.2 through 8.4 define **68 exact routes**. Section 8.5 defines four add-on operation families but no HTTP methods or paths. The add-on families are recorded separately and do not increase the exact-route count.
