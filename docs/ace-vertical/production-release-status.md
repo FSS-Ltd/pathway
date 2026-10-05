@@ -12,13 +12,13 @@ production migration or deployment is claimed by this record.
 
 ## Delivery steps
 
-| Step | Scope                                                     | State          | PR and base       | Checked revision and CI         | Merge evidence |
-| ---- | --------------------------------------------------------- | -------------- | ----------------- | ------------------------------- | -------------- |
-| 1.1  | Validate the Supabase migration target before Prisma runs | Local verified | Pending, `master` | Local checks passed; CI pending | Pending        |
-| 1.2  | Fixed roles and scoped access tags                        | Planned        | Pending           | Pending                         | Pending        |
-| 1.3  | ACE core web journeys                                     | Planned        | Pending           | Pending                         | Pending        |
-| 1.4  | Paid add-ons and entitlement billing                      | Planned        | Pending           | Pending                         | Pending        |
-| 1.5  | Shared web UI and messaging finish                        | Planned        | Pending           | Pending                         | Pending        |
+| Step | Scope                                                     | State   | PR and base                                                     | Checked revision and CI                      | Merge evidence |
+| ---- | --------------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------- | -------------- |
+| 1.1  | Validate the Supabase migration target before Prisma runs | PR open | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `14de1c53` locally checked; current CI in PR | Pending        |
+| 1.2  | Fixed roles and scoped access tags                        | Planned | Pending                                                         | Pending                                      | Pending        |
+| 1.3  | ACE core web journeys                                     | Planned | Pending                                                         | Pending                                      | Pending        |
+| 1.4  | Paid add-ons and entitlement billing                      | Planned | Pending                                                         | Pending                                      | Pending        |
+| 1.5  | Shared web UI and messaging finish                        | Planned | Pending                                                         | Pending                                      | Pending        |
 
 Step 1.1 accepts only the configured Supabase project's direct database endpoint
 or shared session pooler on port 5432 for migrations. It rejects a transaction
