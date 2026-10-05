@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { isPresent, loadEnvFile, resolveEnvFile } from "./lib/env-file.mjs";
+import { validatePrismaMigrationUrl } from "./validate-prisma-migration-url.mjs";
 
 const command = process.argv[2];
 const COMMANDS = {
@@ -37,11 +38,24 @@ if (!isPresent(databaseUrl)) {
   process.exit(1);
 }
 
+let migrationEndpoint;
+try {
+  migrationEndpoint = validatePrismaMigrationUrl(
+    databaseUrl,
+    fileEnv.SUPABASE_URL,
+  );
+} catch (error) {
+  console.error(
+    `[prisma-production] ${error instanceof Error ? error.message : "Invalid migration URL."}`,
+  );
+  process.exit(1);
+}
+
 console.log(
   `[prisma-production] source=${path.relative(
     process.cwd(),
     envFile,
-  )} command=${command}`,
+  )} command=${command} endpoint=${migrationEndpoint}`,
 );
 
 const env = {
