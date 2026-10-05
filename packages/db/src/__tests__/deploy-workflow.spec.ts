@@ -42,12 +42,28 @@ const scheduledWorkersWorkflow = readFileSync(
   path.resolve(process.cwd(), "../../.github/workflows/workers-scheduled.yml"),
   "utf8",
 );
+const databaseDeployWorkflow = readFileSync(
+  path.resolve(process.cwd(), "../../.github/workflows/db-deploy.yml"),
+  "utf8",
+);
 
 describe("deploy workflow contract", () => {
   it("runs deploy-time package tests with the CI heap budget", () => {
     expect(ciWorkflow).toContain("NODE_OPTIONS: --max-old-space-size=4096");
     expect(deployAction).toMatch(
       /- name: Unit tests\s+shell: bash\s+env:\s+NODE_OPTIONS: --max-old-space-size=4096\s+run: pnpm --filter \$\{\{ inputs\.package \}\} test/,
+    );
+  });
+
+  it("validates the migration endpoint before running Prisma", () => {
+    expect(databaseDeployWorkflow).toContain(
+      "DATABASE_URL: ${{ secrets.DIRECT_URL }}",
+    );
+    expect(databaseDeployWorkflow).toContain(
+      "SUPABASE_URL: ${{ secrets.SUPABASE_URL }}",
+    );
+    expect(databaseDeployWorkflow).toContain(
+      "node scripts/validate-prisma-migration-url.mjs",
     );
   });
 
