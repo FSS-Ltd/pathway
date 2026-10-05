@@ -1,8 +1,6 @@
 name: Deploy to Vercel
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
     inputs:
       target:
@@ -23,11 +21,6 @@ concurrency:
 jobs:
   deploy-db:
     name: Deploy database migrations
-    if: >-
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'push'
-      }}
     uses: ./.github/workflows/db-deploy.yml
     with:
       ref: ${{ github.ref_name }}
@@ -42,7 +35,6 @@ jobs:
       ${{
         needs.deploy-db.result == 'success' &&
         (
-          github.event_name == 'push' ||
           inputs.target == 'all' ||
           inputs.target == 'web'
         )
@@ -74,7 +66,6 @@ jobs:
       ${{
         needs.deploy-db.result == 'success' &&
         (
-          github.event_name == 'push' ||
           inputs.target == 'all' ||
           inputs.target == 'admin'
         )
@@ -106,7 +97,6 @@ jobs:
       ${{
         needs.deploy-db.result == 'success' &&
         (
-          github.event_name == 'push' ||
           inputs.target == 'all' ||
           inputs.target == 'api'
         )

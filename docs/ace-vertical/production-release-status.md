@@ -7,28 +7,31 @@ The last successful deployment was
 [`ea7c44c6edd043889f90e62935bf851505ebb5df`](https://github.com/FSS-Ltd/pathway/actions/runs/31965820501).
 
 The product owner has directed us to continue implementation while Supabase is
-unavailable, then run migrations and resolve database issues at the end. No
-production migration or deployment is claimed by this record.
+unavailable, then run migrations and resolve database issues at the end. The
+production workflow therefore requires manual dispatch; merging to `master`
+does not start migrations or app deployment. No production migration or
+deployment is claimed by this record.
 
 ## Delivery steps
 
-| Step | Scope                                                     | State   | PR and base                                                     | Checked revision and CI                      | Merge evidence |
-| ---- | --------------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------- | -------------- |
-| 1.1  | Validate the Supabase migration target before Prisma runs | PR open | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `14de1c53` locally checked; current CI in PR | Pending        |
-| 1.2  | Fixed roles and scoped access tags                        | Planned | Pending                                                         | Pending                                      | Pending        |
-| 1.3  | ACE core web journeys                                     | Planned | Pending                                                         | Pending                                      | Pending        |
-| 1.4  | Paid add-ons and entitlement billing                      | Planned | Pending                                                         | Pending                                      | Pending        |
-| 1.5  | Shared web UI and messaging finish                        | Planned | Pending                                                         | Pending                                      | Pending        |
+| Step | Scope                                                | State   | PR and base                                                     | Checked revision and CI                      | Merge evidence |
+| ---- | ---------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------- | -------------- |
+| 1.1  | Require manual release and validate migration target | PR open | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `14de1c53` locally checked; current CI in PR | Pending        |
+| 1.2  | Fixed roles and scoped access tags                   | Planned | Pending                                                         | Pending                                      | Pending        |
+| 1.3  | ACE core web journeys                                | Planned | Pending                                                         | Pending                                      | Pending        |
+| 1.4  | Paid add-ons and entitlement billing                 | Planned | Pending                                                         | Pending                                      | Pending        |
+| 1.5  | Shared web UI and messaging finish                   | Planned | Pending                                                         | Pending                                      | Pending        |
 
-Step 1.1 accepts only the configured Supabase project's direct database endpoint
-or shared session pooler on port 5432 for migrations. It rejects a transaction
-pooler URL, missing credentials and a project mismatch before Prisma starts.
+Step 1.1 makes production deployment explicit and accepts only the configured
+Supabase project's direct database endpoint or shared session pooler on port
+5432 for migrations. It rejects a transaction pooler URL, missing credentials
+and a project mismatch before Prisma starts.
 The production credentials, connection and schema status still need verification
 when Supabase is available. Later steps start only after the preceding PR has
 passing CI on its current revision and is merged into `master`.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
-tests 5/5; lint and typecheck 16/16 packages each; Prettier and
+tests 6/6; lint and typecheck 16/16 packages each; Prettier and
 `git diff --check` passed. `graphify update .` rebuilt the code graph. The
 database connection, migration status and production smoke journeys remain
 unverified while Supabase is unavailable. No app build was run because this

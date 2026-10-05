@@ -46,6 +46,10 @@ const databaseDeployWorkflow = readFileSync(
   path.resolve(process.cwd(), "../../.github/workflows/db-deploy.yml"),
   "utf8",
 );
+const productionDeployWorkflow = readFileSync(
+  path.resolve(process.cwd(), "../../.github/workflows/deploy.yml"),
+  "utf8",
+);
 
 describe("deploy workflow contract", () => {
   it("runs deploy-time package tests with the CI heap budget", () => {
@@ -64,6 +68,14 @@ describe("deploy workflow contract", () => {
     );
     expect(databaseDeployWorkflow).toContain(
       "node scripts/validate-prisma-migration-url.mjs",
+    );
+  });
+
+  it("requires manual dispatch for production deployment", () => {
+    expect(productionDeployWorkflow).toContain("workflow_dispatch:");
+    expect(productionDeployWorkflow).not.toMatch(/^\s+push:\s*$/m);
+    expect(productionDeployWorkflow).not.toContain(
+      "github.event_name == 'push'",
     );
   });
 
