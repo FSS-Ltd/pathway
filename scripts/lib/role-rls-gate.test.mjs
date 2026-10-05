@@ -12,6 +12,7 @@ const REQUIRED_TABLES = [
   "OrgRolePermission",
   "OrgRoleRevision",
   "UserRoleAssignment",
+  "AccessTagGrant",
   "AuditEvent",
   "OutboxEvent",
 ];
@@ -56,6 +57,24 @@ const reviewedPolicies = [
     reviewedSystemRolePermissionQualifier,
   ),
   policy("OrgRoleRevision", "OrgRoleRevision_rls", reviewedRoleQualifier),
+  policy(
+    "AccessTagGrant",
+    "AccessTagGrant_rls_select",
+    reviewedRoleQualifier,
+    { command: "r", check_qualifier: null },
+  ),
+  policy(
+    "AccessTagGrant",
+    "AccessTagGrant_rls_insert",
+    null,
+    { command: "a", check_qualifier: reviewedRoleQualifier },
+  ),
+  policy(
+    "AccessTagGrant",
+    "AccessTagGrant_rls_update",
+    reviewedRoleQualifier,
+    { command: "w" },
+  ),
   policy("OutboxEvent", "OutboxEvent_rls", reviewedOutboxQualifier),
   policy(
     "UserRoleAssignment",
@@ -163,6 +182,32 @@ test("rejects an extra permissive UserRoleAssignment policy", () => {
 
   assert.deepEqual(findUnreviewedRolePolicies(policies), [
     "UserRoleAssignment.UserRoleAssignment_extra_select",
+  ]);
+});
+
+test("rejects an access-tag DELETE policy", () => {
+  const policies = [
+    ...reviewedPolicies,
+    policy("AccessTagGrant", "AccessTagGrant_delete", reviewedRoleQualifier, {
+      command: "d",
+      check_qualifier: null,
+    }),
+  ];
+
+  assert.deepEqual(findUnreviewedRolePolicies(policies), [
+    "AccessTagGrant.AccessTagGrant_delete",
+  ]);
+});
+
+test("rejects a widened access-tag INSERT scope", () => {
+  const policies = reviewedPolicies.map((entry) =>
+    entry.policy_name === "AccessTagGrant_rls_insert"
+      ? { ...entry, check_qualifier: "true" }
+      : entry,
+  );
+
+  assert.deepEqual(findUnreviewedRolePolicies(policies), [
+    "AccessTagGrant.AccessTagGrant_rls_insert",
   ]);
 });
 

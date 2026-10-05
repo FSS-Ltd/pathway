@@ -10,6 +10,8 @@ const REQUIRED_QUALIFIER_BY_TABLE = {
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
   UserRoleAssignment:
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
+  AccessTagGrant:
+    '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
   OutboxEvent:
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()))',
 };
@@ -46,6 +48,31 @@ const REVIEWED_ROLE_POLICIES = [
     '((SESSION_USER = \'pathway_system_role_seed\'::name) AND (EXISTS ( SELECT 1 FROM "OrgRoleDefinition" role_definition WHERE ((role_definition.id = "OrgRolePermission"."roleDefinitionId") AND role_definition."isSystem"))))',
   ),
   reviewedPolicy("OrgRoleRevision", "OrgRoleRevision_rls", "OrgRoleRevision"),
+  reviewedPolicy(
+    "AccessTagGrant",
+    "AccessTagGrant_rls_select",
+    "AccessTagGrant",
+    undefined,
+    { command: "r", check_qualifier: null },
+  ),
+  reviewedPolicy(
+    "AccessTagGrant",
+    "AccessTagGrant_rls_insert",
+    undefined,
+    null,
+    {
+      command: "a",
+      using_qualifier: null,
+      check_qualifier: REQUIRED_QUALIFIER_BY_TABLE.AccessTagGrant,
+    },
+  ),
+  reviewedPolicy(
+    "AccessTagGrant",
+    "AccessTagGrant_rls_update",
+    "AccessTagGrant",
+    undefined,
+    { command: "w" },
+  ),
   reviewedPolicy("OutboxEvent", "OutboxEvent_rls", "OutboxEvent"),
   reviewedPolicy(
     "UserRoleAssignment",

@@ -1,7 +1,7 @@
 # ACE production release status
 
-Checked on 5 October 2026. The latest `master` commit is
-`92d492680baef463c4696ea0a98f2832f1cce805`. Its [production deployment](https://github.com/FSS-Ltd/pathway/actions/runs/34189600516)
+Checked on 5 October 2026. Step 1.1 merged into `master` as
+`d27b9df77e4416dc2cd472abf59dc2a6568b7b2a`. The earlier [production deployment](https://github.com/FSS-Ltd/pathway/actions/runs/34189600516)
 failed during Prisma migration; the API, admin and web deploy jobs were skipped.
 The last successful deployment was
 [`ea7c44c6edd043889f90e62935bf851505ebb5df`](https://github.com/FSS-Ltd/pathway/actions/runs/31965820501).
@@ -14,13 +14,14 @@ deployment is claimed by this record.
 
 ## Delivery steps
 
-| Step | Scope                                                | State   | PR and base                                                     | Checked revision and CI                      | Merge evidence |
-| ---- | ---------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------- | -------------- |
-| 1.1  | Require manual release and validate migration target | PR open | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `14de1c53` locally checked; current CI in PR | Pending        |
-| 1.2  | Fixed roles and scoped access tags                   | Planned | Pending                                                         | Pending                                      | Pending        |
-| 1.3  | ACE core web journeys                                | Planned | Pending                                                         | Pending                                      | Pending        |
-| 1.4  | Paid add-ons and entitlement billing                 | Planned | Pending                                                         | Pending                                      | Pending        |
-| 1.5  | Shared web UI and messaging finish                   | Planned | Pending                                                         | Pending                                      | Pending        |
+| Step | Scope                                                 | State   | PR and base                                                     | Checked revision and CI                                                                                                                            | Merge evidence                             |
+| ---- | ----------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1.1  | Require manual release and validate migration target  | Merged  | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `07cd5eeb4432a7400297865166564acb9a8032ab`; all five jobs passed in [run 37317265932](https://github.com/FSS-Ltd/pathway/actions/runs/37317265932) | `d27b9df77e4416dc2cd472abf59dc2a6568b7b2a` |
+| 1.2a | Scoped access-tag grant storage and RLS               | PR open | [#347](https://github.com/FSS-Ltd/pathway/pull/347) to `master` | CI pending on current PR revision                                                                                                                  | Pending                                    |
+| 1.2b | Fixed-role catalogue, delegation and effective access | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.3  | ACE core web journeys                                 | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.4  | Paid add-ons and entitlement billing                  | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.5  | Shared web UI and messaging finish                    | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 
 Step 1.1 makes production deployment explicit and accepts only the configured
 Supabase project's direct database endpoint or shared session pooler on port
@@ -36,6 +37,12 @@ tests 6/6; lint and typecheck 16/16 packages each; Prettier and
 database connection, migration status and production smoke journeys remain
 unverified while Supabase is unavailable. No app build was run because this
 step changes the release workflow and CLI scripts, not app code.
+
+Step 1.2a introduces the grant record, validity and revocation fields, and
+organisation or site scoped RLS. It does not enable any tag or change effective
+permissions. The catalogue, delegation checks, APIs and custom-role migration
+remain for later delivery steps. Its migration is committed for later staging
+and production application; no live Supabase migration is being attempted now.
 
 ## Release gate
 

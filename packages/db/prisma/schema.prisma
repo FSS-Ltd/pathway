@@ -124,6 +124,7 @@ enum AuditEntityType {
   CHILD_NOTE
   ORG_ROLE
   ROLE_ASSIGNMENT
+  ACCESS_TAG_GRANT
   OUTBOX_EVENT
   ACE_COMMUNITY_CONTENT
   ACE_MESSAGE
@@ -189,6 +190,26 @@ enum ModuleStatus {
   ACTIVE
   EXPIRED
   CANCELLED
+}
+
+enum AccessTagKey {
+  SHOPKEEPER                  @map("shopkeeper")
+  SHOPADMIN                   @map("shopadmin")
+  FINANCE_ADMIN               @map("finance-admin")
+  LEADERBOARD_ADMIN           @map("leaderboard-admin")
+  ATTENDANCE_EXPORTER         @map("attendance-exporter")
+  ATTENDANCE_RECORDER         @map("attendance-recorder")
+  AUDIT_VIEWER                @map("audit-viewer")
+  SENSITIVE_NOTE_VIEWER       @map("sensitive-note-viewer")
+  BEHAVIOUR_VIEWER            @map("behaviour-viewer")
+  STUDENT_DRILLTHROUGH_VIEWER @map("student-drillthrough-viewer")
+  PACE_FULL_ACCESS            @map("pace-full-access")
+  SUPERVISOR_ALL_STUDENTS     @map("supervisor-all-students")
+  SUPERVISOR_PRIMARY_STUDENTS @map("supervisor-primary-students")
+  CALENDAR_MANAGER            @map("calendar-manager")
+  PARENT_MESSAGE_RESPONDER    @map("parent-message-responder")
+  CLUB_LEAD                   @map("club-lead")
+  LIBRARIAN                   @map("librarian")
 }
 
 enum ReportBundleStatus {
@@ -553,6 +574,30 @@ model UserRoleAssignment {
   @@index([orgId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
+model AccessTagGrant {
+  id          String       @id @default(uuid())
+  orgId       String
+  tenantId    String?
+  userId      String
+  tagKey      AccessTagKey
+  grantedById String
+  startsAt    DateTime     @default(now())
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  revokedById String?
+  createdAt   DateTime     @default(now())
+
+  org       Org     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant    Tenant? @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  user      User    @relation("AccessTagGrantAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  grantedBy User    @relation("AccessTagGrantor", fields: [grantedById], references: [id], onDelete: Restrict)
+  revokedBy User?   @relation("AccessTagGrantRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([orgId, userId, revokedAt])
+  @@index([tenantId, userId, revokedAt])
+  @@index([orgId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
 model OutboxEvent {
   id             String   @id @default(uuid())
   orgId          String   @default(dbgenerated("app.current_org_id()"))
@@ -752,6 +797,7 @@ model Org {
   roleDefinitions     OrgRoleDefinition[]
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
+  accessTagGrants     AccessTagGrant[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -782,6 +828,7 @@ model Tenant {
   staffActivities StaffActivity[]
   pendingOrders   PendingOrder[]
   siteMemberships        SiteMembership[]
+  accessTagGrants        AccessTagGrant[]
   lastActiveUsers        User[]                  @relation("UserLastActiveTenant")
   staffUnavailableDates  StaffUnavailableDate[]
   staffPreferredGroups   StaffPreferredGroup[]
@@ -1029,6 +1076,9 @@ model User {
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
   roleAssignmentsRevoked  UserRoleAssignment[]    @relation("UserRoleAssignmentRevokedBy")
+  accessTagGrants         AccessTagGrant[]        @relation("AccessTagGrantAssignee")
+  accessTagGrantsIssued   AccessTagGrant[]        @relation("AccessTagGrantor")
+  accessTagGrantsRevoked  AccessTagGrant[]        @relation("AccessTagGrantRevoker")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.

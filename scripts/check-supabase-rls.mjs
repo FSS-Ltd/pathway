@@ -23,6 +23,7 @@ const REQUIRED_RLS_TABLES = [
   "OrgRolePermission",
   "OrgRoleRevision",
   "UserRoleAssignment",
+  "AccessTagGrant",
   "AuditEvent",
   "OutboxEvent",
   "AcademicYear",
@@ -182,7 +183,7 @@ async function main() {
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = $1
-        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AuditEvent', 'OutboxEvent')
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AccessTagGrant', 'AuditEvent', 'OutboxEvent')
       ORDER BY c.relname, p.polname
     `, databaseSchema),
     ]);
