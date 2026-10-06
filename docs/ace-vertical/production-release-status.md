@@ -33,7 +33,7 @@ deployment is claimed by this record.
 | 1.3b2b2  | Guarded physical PACE current-stock entry              | Merged  | [#360](https://github.com/FSS-Ltd/pathway/pull/360) to `master` | `e7db9758f1c2a3f2ef6f1ae2d60a168324d4870e`; all five jobs passed in [run 37454020484](https://github.com/FSS-Ltd/pathway/actions/runs/37454020484)             | `3bba6edfee0d2bd4754841645da0cf17579bede1` |
 | 1.3b2b3  | Forward-only physical PACE delivery transitions        | Merged  | [#361](https://github.com/FSS-Ltd/pathway/pull/361) to `master` | `afdadffbfcae1b6e6bf6c32c6a5cc1dcbfb61e6e`; all five jobs passed in [run 37456709818](https://github.com/FSS-Ltd/pathway/actions/runs/37456709818)             | `c0fc043fcc7d90040849fad5c9a144cb4a850724` |
 | 1.3b2c1  | Read-only physical PACE inventory web journey          | Merged  | [#362](https://github.com/FSS-Ltd/pathway/pull/362) to `master` | `8d99ae4ca11661a5331905726cb6a01048ae6b9f`; all five jobs passed in [run 37487356359](https://github.com/FSS-Ltd/pathway/actions/runs/37487356359)             | `ae7b9aa17174b0831fbbe9ae3bfba23047a10a27` |
-| 1.3b2c2  | Physical PACE order creation web control               | PR open | [#363](https://github.com/FSS-Ltd/pathway/pull/363) to `master` | Initial revision `8e9c628224176abcbe2e743b43f71060f6772e72`; current-revision CI pending                                                                       | Pending                                    |
+| 1.3b2c2  | Physical PACE order creation web control               | Merged  | [#363](https://github.com/FSS-Ltd/pathway/pull/363) to `master` | `3214a41c930edb7bfae2e18deadaf003dfab5ddb`; all five jobs passed in [run 37492380380](https://github.com/FSS-Ltd/pathway/actions/runs/37492380380)             | `9b8e2d1b91f5adb34f3711ad3c2186008dfb8009` |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -46,11 +46,57 @@ The production credentials, connection and schema status still need verification
 when Supabase is available. Later steps start only after the preceding PR has
 passing CI on its current revision and is merged into `master`.
 
-The target for a future database move is a new Supabase project in the new
-organisation. The source project will remain intact through a verified backup,
-restore, configuration and storage copy, staging checks, and a controlled
-application cutover. No live copy or cutover can be verified while the source
-project is unavailable.
+## New Supabase project cutover conditions
+
+The target is a **new project in the new organisation**, not a transfer of the
+existing project. Creating that empty project is separate from migrating its
+data and switching production traffic. The source project remains intact until
+the restored target is verified and a rollback window has passed. No live copy
+or cutover can be verified while the source is unavailable unless a complete,
+restorable backup and its storage objects have already been independently
+verified.
+
+1. Record the source and target project refs, region, required extensions,
+   database roles, migration history, storage buckets and object counts, Auth
+   configuration if used, scheduled jobs, Edge Functions and external webhook
+   destinations. Confirm the target region and data residency requirements
+   before creating the project. Keep credentials and backup files in approved
+   secret storage, outside the repository.
+2. Restore a verified, point-in-time source backup into a **disposable target**
+   first. For a target in another organisation, use Supabase's documented
+   backup/restore procedure for a newly created project. The dashboard's
+   physical "Restore to a new project" route has eligibility and region
+   constraints; do not assume it can place a clone in another organisation.
+   Reconcile the Prisma migration table before applying only genuinely pending
+   migrations. Restore database roles and any encryption key material required
+   by encrypted data through the documented secure process.
+3. Copy Supabase Storage objects separately, then compare bucket inventories
+   and representative object checksums. Recreate project-specific settings,
+   keys, functions, Realtime configuration, and any Auth settings in use.
+   Keep scheduled jobs and webhook delivery disabled or isolated until their
+   external effects are understood; a database restore can reactivate them.
+4. In staging, compare table counts and sampled records, verify tenant RLS,
+   fixed-role and tag access, linked-child scope, uploads/downloads, workers,
+   billing webhooks and critical API/admin/configurator journeys. Record the
+   exact source snapshot and target migration status. Resolve differences
+   before production cutover.
+5. Schedule a write freeze, take and verify a final backup, replay any approved
+   delta, and recheck parity. Update `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`,
+   storage keys and relevant secrets in every deployment surface. In particular,
+   `scripts/prepare-production-env.mjs` currently supplies the old project URL
+   and a fixed pooler host; revise and test those defaults before generating
+   target credentials. The migration workflow validates that `DIRECT_URL` and
+   `SUPABASE_URL` select the same project and that migration uses port 5432.
+6. Dispatch the manual production workflow only after the staging gate and
+   cutover authorization. Smoke-test the deployed commit and monitor errors,
+   queues and external callbacks. Keep the old project read-only and recoverable
+   through the agreed rollback window; do not restore old traffic after new
+   writes without reconciling them.
+
+Supabase references: [backup and restore into a new
+project](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore),
+[physical restore limits](https://supabase.com/docs/guides/platform/clone-project),
+and [project transfer](https://supabase.com/docs/guides/platform/project-transfer).
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and
