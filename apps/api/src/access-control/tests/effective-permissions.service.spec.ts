@@ -197,7 +197,11 @@ describe("EffectivePermissionsService", () => {
     const findAssignments = jest.fn().mockResolvedValue([grant()]);
     const cache = new AccessCacheService();
     const service = new EffectivePermissionsService(
-      { getOrganisationMembership, findAssignments, findTagGrants: async () => [] },
+      {
+        getOrganisationMembership,
+        findAssignments,
+        findTagGrants: async () => [],
+      },
       { get: async () => ["ace.pace.read"] },
       { isAvailable: async () => true },
       testPermissionsContext,
@@ -218,9 +222,7 @@ describe("EffectivePermissionsService", () => {
 
   it("reuses a shared cached snapshot but denies it once its assignment expires", async () => {
     const expiresAt = new Date(NOW.getTime() + 1_000);
-    const findAssignments = jest
-      .fn()
-      .mockResolvedValue([grant({ expiresAt })]);
+    const findAssignments = jest.fn().mockResolvedValue([grant({ expiresAt })]);
     const service = new EffectivePermissionsService(
       {
         getOrganisationMembership: async () => true,
@@ -236,9 +238,7 @@ describe("EffectivePermissionsService", () => {
     await expect(resolve(service)).resolves.toMatchObject({
       allowed: true,
     });
-    await expect(
-      resolve(service, { now: expiresAt }),
-    ).resolves.toEqual({
+    await expect(resolve(service, { now: expiresAt })).resolves.toEqual({
       allowed: false,
       reason: "permission-missing",
       sourceRoleIds: [],
@@ -531,9 +531,36 @@ describe("EffectivePermissionsService", () => {
     await expect(
       service.listForUserWithSources(USER_ID, ORG_ID),
     ).resolves.toEqual([
-      { permissionKey: "ace.behaviour.read", sourceRoleIds: ["role-other-permission"] },
+      {
+        permissionKey: "ace.behaviour.read",
+        sourceRoleIds: ["role-other-permission"],
+      },
       { permissionKey: "ace.pace.read", sourceRoleIds: ["role-a", "role-z"] },
     ]);
+  });
+
+  it("evaluates source access at a supplied cutover timestamp", async () => {
+    const expiresAt = new Date(NOW.getTime() + 60_000);
+    const options = {
+      grants: [grant({ startsAt: new Date(0), expiresAt })],
+    };
+
+    await expect(
+      createService(options).listForUserWithSources(
+        USER_ID,
+        ORG_ID,
+        undefined,
+        NOW,
+      ),
+    ).resolves.toHaveLength(1);
+    await expect(
+      createService(options).listForUserWithSources(
+        USER_ID,
+        ORG_ID,
+        undefined,
+        expiresAt,
+      ),
+    ).resolves.toEqual([]);
   });
 
   it("allows an active tag without claiming it came from a role", async () => {
@@ -548,7 +575,9 @@ describe("EffectivePermissionsService", () => {
     await expect(service.listForUser(USER_ID, ORG_ID)).resolves.toEqual([
       "ace.pace.read",
     ]);
-    await expect(service.listForUserWithSources(USER_ID, ORG_ID)).resolves.toEqual([
+    await expect(
+      service.listForUserWithSources(USER_ID, ORG_ID),
+    ).resolves.toEqual([
       {
         permissionKey: "ace.pace.read",
         sourceRoleIds: [],
@@ -568,12 +597,16 @@ describe("EffectivePermissionsService", () => {
       reason: "permission-missing",
       sourceRoleIds: [],
     });
-    await expect(resolve(service, { tenantId: OTHER_SITE_ID })).resolves.toEqual({
+    await expect(
+      resolve(service, { tenantId: OTHER_SITE_ID }),
+    ).resolves.toEqual({
       allowed: false,
       reason: "permission-missing",
       sourceRoleIds: [],
     });
-    await expect(resolve(service, { tenantId: SITE_ID })).resolves.toMatchObject({
+    await expect(
+      resolve(service, { tenantId: SITE_ID }),
+    ).resolves.toMatchObject({
       allowed: true,
       sourceTagGrantIds: ["tag-grant-1"],
     });
@@ -584,7 +617,10 @@ describe("EffectivePermissionsService", () => {
     ["expired", { expiresAt: NOW }],
     ["revoked", { revokedAt: NOW }],
   ] as const)("denies a %s tag", async (_name, fields) => {
-    const service = createService({ grants: [], tagGrants: [tagGrant(fields)] });
+    const service = createService({
+      grants: [],
+      tagGrants: [tagGrant(fields)],
+    });
 
     await expect(resolve(service)).resolves.toEqual({
       allowed: false,

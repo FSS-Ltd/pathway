@@ -14,19 +14,20 @@ deployment is claimed by this record.
 
 ## Delivery steps
 
-| Step | Scope                                                | State   | PR and base                                                     | Checked revision and CI                                                                                                                            | Merge evidence                             |
-| ---- | ---------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 1.1  | Require manual release and validate migration target | Merged  | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `07cd5eeb4432a7400297865166564acb9a8032ab`; all five jobs passed in [run 37317265932](https://github.com/FSS-Ltd/pathway/actions/runs/37317265932) | `d27b9df77e4416dc2cd472abf59dc2a6568b7b2a` |
-| 1.2a | Scoped access-tag grant storage and RLS              | Merged  | [#347](https://github.com/FSS-Ltd/pathway/pull/347) to `master` | `143a7bd507127556c5322184a1c2000108fc0346`; all five jobs passed in [run 37322499197](https://github.com/FSS-Ltd/pathway/actions/runs/37322499197) | `f1674f41a39e80abb0b1cc4282056a808f83b425` |
-| 1.2b | Typed access-tag catalogue and access decision docs  | Merged  | [#348](https://github.com/FSS-Ltd/pathway/pull/348) to `master` | `a975bc89e36a12f5a5e2e3526d222e310777b1bc`; all five jobs passed in [run 37369195079](https://github.com/FSS-Ltd/pathway/actions/runs/37369195079) (attempt 4) | `173420159825f2d029c685e4b2c19a7ba07e5970` |
-| 1.2c | Delegation, grant/revoke and effective-access APIs   | Merged  | [#349](https://github.com/FSS-Ltd/pathway/pull/349) to `master` | `ff0d294709cece7f19974697ad57b0fd28f632de`; all five jobs passed in [run 37413254333](https://github.com/FSS-Ltd/pathway/actions/runs/37413254333) | `784f261ec9e2463a9a7b519328cb7d8b27560f8f` |
-| 1.2d1 | Retire customer role write routes and editor         | Merged  | [#350](https://github.com/FSS-Ltd/pathway/pull/350) to `master` | `1de73eeb12a71882740f8d6dce1b8d8f7d731151`; all five jobs passed in [run 37415925535](https://github.com/FSS-Ltd/pathway/actions/runs/37415925535) | `de2ce169476b5809c3f0b46b1567b619cac6b75d` |
-| 1.2d2 | Fixed-role-only assignment cutover                    | Merged | [#351](https://github.com/FSS-Ltd/pathway/pull/351) to `master` | `a9493ed9c5d05fa86a6a96afcd077ba6004cad71`; all five jobs passed in [run 37418692392](https://github.com/FSS-Ltd/pathway/actions/runs/37418692392) | `a1f8bbbe19bc056e4e28138657f1acdd2de7bfd5` |
-| 1.2d3a | Read-only custom-assignment inventory                 | PR open | [#352](https://github.com/FSS-Ltd/pathway/pull/352) to `master` | Local lint, typecheck, API unit/build, disposable DB smoke and Graphify passed; CI pending | Pending |
-| 1.2d3b | Effective-access parity and audited retirement       | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
-| 1.3  | ACE core web journeys                                | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
-| 1.4  | Paid add-ons and entitlement billing                 | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
-| 1.5  | Shared web UI and messaging finish                   | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| Step    | Scope                                                 | State   | PR and base                                                     | Checked revision and CI                                                                                                                                        | Merge evidence                             |
+| ------- | ----------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1.1     | Require manual release and validate migration target  | Merged  | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `07cd5eeb4432a7400297865166564acb9a8032ab`; all five jobs passed in [run 37317265932](https://github.com/FSS-Ltd/pathway/actions/runs/37317265932)             | `d27b9df77e4416dc2cd472abf59dc2a6568b7b2a` |
+| 1.2a    | Scoped access-tag grant storage and RLS               | Merged  | [#347](https://github.com/FSS-Ltd/pathway/pull/347) to `master` | `143a7bd507127556c5322184a1c2000108fc0346`; all five jobs passed in [run 37322499197](https://github.com/FSS-Ltd/pathway/actions/runs/37322499197)             | `f1674f41a39e80abb0b1cc4282056a808f83b425` |
+| 1.2b    | Typed access-tag catalogue and access decision docs   | Merged  | [#348](https://github.com/FSS-Ltd/pathway/pull/348) to `master` | `a975bc89e36a12f5a5e2e3526d222e310777b1bc`; all five jobs passed in [run 37369195079](https://github.com/FSS-Ltd/pathway/actions/runs/37369195079) (attempt 4) | `173420159825f2d029c685e4b2c19a7ba07e5970` |
+| 1.2c    | Delegation, grant/revoke and effective-access APIs    | Merged  | [#349](https://github.com/FSS-Ltd/pathway/pull/349) to `master` | `ff0d294709cece7f19974697ad57b0fd28f632de`; all five jobs passed in [run 37413254333](https://github.com/FSS-Ltd/pathway/actions/runs/37413254333)             | `784f261ec9e2463a9a7b519328cb7d8b27560f8f` |
+| 1.2d1   | Retire customer role write routes and editor          | Merged  | [#350](https://github.com/FSS-Ltd/pathway/pull/350) to `master` | `1de73eeb12a71882740f8d6dce1b8d8f7d731151`; all five jobs passed in [run 37415925535](https://github.com/FSS-Ltd/pathway/actions/runs/37415925535)             | `de2ce169476b5809c3f0b46b1567b619cac6b75d` |
+| 1.2d2   | Fixed-role-only assignment cutover                    | Merged  | [#351](https://github.com/FSS-Ltd/pathway/pull/351) to `master` | `a9493ed9c5d05fa86a6a96afcd077ba6004cad71`; all five jobs passed in [run 37418692392](https://github.com/FSS-Ltd/pathway/actions/runs/37418692392)             | `a1f8bbbe19bc056e4e28138657f1acdd2de7bfd5` |
+| 1.2d3a  | Read-only custom-assignment inventory                 | Merged  | [#352](https://github.com/FSS-Ltd/pathway/pull/352) to `master` | `9be47a8aed1bcbb808e392fb8db02df54737e6c2`; all five jobs passed in [run 37420486397](https://github.com/FSS-Ltd/pathway/actions/runs/37420486397)             | `053743614742c4acec9b2180604d294f3102d2e4` |
+| 1.2d3b1 | Effective-access parity preview for proposed mappings | PR open | [#353](https://github.com/FSS-Ltd/pathway/pull/353) to `master` | Local lint/typecheck 16/16, API unit 1007/1007, build, formatting, disposable DB smoke and Graphify passed; CI pending                                         | Pending                                    |
+| 1.2d3b2 | Audited assignment retirement                         | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
+| 1.3     | ACE core web journeys                                 | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
+| 1.4     | Paid add-ons and entitlement billing                  | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
+| 1.5     | Shared web UI and messaging finish                    | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 
 Step 1.1 makes production deployment explicit and accepts only the configured
 Supabase project's direct database endpoint or shared session pooler on port
@@ -86,7 +87,7 @@ on the final PR revision and the host confirmed the merge.
 Step 1.2d2 makes the assignment service select only active, platform-owned
 fixed roles for new grants. The shared admin assignment picker shows only
 those roles. Historical custom assignments remain visible and revocable so
-step 1.2d3 can compare and retire them without widening user access.
+step 1.2d3b can compare and retire them without widening user access.
 Local lint and typecheck passed 16/16 packages, API unit tests passed
 130/130 suites (998 tests), admin tests passed, and API/admin builds passed.
 The two affected database integration suites passed 12/12 tests after a
@@ -99,14 +100,25 @@ confirmed the merge.
 Step 1.2d3a inventories currently valid custom-role assignments for one
 organisation through read-only, organisation-scoped pages. It reports raw
 permission keys and conservative fixed-role/tag candidates without issuing
-or revoking grants. Live source data, effective-access parity, and audited
-retirement remain for step 1.2d3b when the database is available.
+or revoking grants. Live source data and audited retirement remain for step
+1.2d3b2 when the database is available.
 Local verification: repository lint and typecheck passed 16/16 packages;
 API unit tests passed 131/131 suites (1001 tests); the API build and targeted
 formatting passed. A populated disposable Postgres smoke run reported a
 custom assignment and candidate tag, then the fixture was removed and its
 absence verified. The script also rejects an invalid organisation ID before
 opening a database connection. No production inventory was run.
+
+Step 1.2d3b1 previews an explicit proposed mapping for every active custom
+assignment. It rejects candidates from the wrong scope or site, reports
+uncovered legacy keys, and compares current effective permission keys with a
+projected result for each affected user at organisation scope and every site.
+It performs no grants or revocations. A disposable PostgreSQL 17 instance with
+all 93 migrations applied produced a matching three-context report for a site
+tag replacement and a nonmatching report for an empty mapping; the synthetic
+records were removed. A separate read-only-login smoke run confirmed that a
+future-dated custom assignment blocks the preview. Production parity remains
+unverified while the source Supabase project is unavailable.
 
 ## Release gate
 
