@@ -1,5 +1,11 @@
 import { Module } from "@nestjs/common";
-import { prisma, withOrgRlsContext, withTenantRlsContext } from "@pathway/db";
+import {
+  applyTenantContext,
+  prisma,
+  withOrgRlsContext,
+  withPrismaTransactionContext,
+  withTenantRlsContext,
+} from "@pathway/db";
 import {
   CAPABILITY_DEFINITIONS,
   accessTagPermissionKeys,
@@ -120,10 +126,7 @@ const effectivePermissionsReader: EffectivePermissionsReader = {
           OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
           AND: [
             {
-              OR: [
-                { tenantId: null },
-                ...(tenantId ? [{ tenantId }] : []),
-              ],
+              OR: [{ tenantId: null }, ...(tenantId ? [{ tenantId }] : [])],
             },
           ],
         },
@@ -150,14 +153,18 @@ const effectivePermissionsReader: EffectivePermissionsReader = {
         publicKey: fromStoredAccessTagKey(grant.tagKey),
       }))
       .filter(({ publicKey }) => isAccessTagAvailable(publicKey));
-    const keys = [...new Set(visible.flatMap(({ publicKey }) =>
-      accessTagPermissionKeys(publicKey),
-    ))];
+    const keys = [
+      ...new Set(
+        visible.flatMap(({ publicKey }) => accessTagPermissionKeys(publicKey)),
+      ),
+    ];
     const metadata = await prisma.permissionDefinition.findMany({
       where: { key: { in: keys } },
       select: { key: true, isActive: true },
     });
-    const activeByKey = new Map(metadata.map(({ key, isActive }) => [key, isActive]));
+    const activeByKey = new Map(
+      metadata.map(({ key, isActive }) => [key, isActive]),
+    );
     return visible.flatMap(({ grant, publicKey }) =>
       accessTagPermissionKeys(publicKey).map((permissionKey) => ({
         tagGrantId: grant.id,
@@ -191,7 +198,11 @@ const featureAvailabilityReader: FeatureAvailabilityReader = {
 };
 
 const effectivePermissionsContext: EffectivePermissionsContext = {
-  async run(orgId, tenantId, operation) {
+  async run(orgId, tenantId, operation, transaction) {
+    if (transaction) {
+      await applyTenantContext(transaction, tenantId ?? "", orgId);
+      return withPrismaTransactionContext(transaction, operation);
+    }
     return tenantId
       ? withTenantRlsContext(tenantId, orgId, () => operation())
       : withOrgRlsContext(orgId, () => operation());

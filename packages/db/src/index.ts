@@ -211,6 +211,14 @@ export async function runTransaction<T>(
   );
 }
 
+/** Bind Prisma proxy reads to an existing transaction; the caller sets its RLS context. */
+export function withPrismaTransactionContext<T>(
+  tx: Prisma.TransactionClient,
+  operation: () => Promise<T>,
+): Promise<T> {
+  return prismaContext.run(tx, operation);
+}
+
 export async function runReadOnlyTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {

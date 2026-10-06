@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { Test, type TestingModule } from "@nestjs/testing";
-import { Prisma, Vertical, prisma, withOrgRlsContext } from "@pathway/db";
+import {
+  applyTenantContext,
+  Prisma,
+  Vertical,
+  prisma,
+  runTransaction,
+  withOrgRlsContext,
+} from "@pathway/db";
 import {
   EFFECTIVE_PERMISSIONS_CONTEXT,
   FEATURE_AVAILABILITY_READER,
@@ -89,9 +96,14 @@ describe("effective permission RLS resolution", () => {
     crossOrgUser: randomUUID(),
     orgARole: randomUUID(),
     orgBRole: randomUUID(),
+    siteA: randomUUID(),
+    siteB: randomUUID(),
+    siteRole: randomUUID(),
   };
   let service: EffectivePermissionsService | undefined;
   let moduleRef: TestingModule | undefined;
+  let transactionalService: EffectivePermissionsService | undefined;
+  let transactionalModuleRef: TestingModule | undefined;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
@@ -124,12 +136,31 @@ describe("effective permission RLS resolution", () => {
         },
       ],
     });
+    await prisma.tenant.createMany({
+      data: [
+        {
+          id: fixture.siteA,
+          orgId: fixture.orgA,
+          name: "Effective permission site A",
+          slug: `effective-permission-site-a-${fixture.siteA}`,
+        },
+        {
+          id: fixture.siteB,
+          orgId: fixture.orgA,
+          name: "Effective permission site B",
+          slug: `effective-permission-site-b-${fixture.siteB}`,
+        },
+      ],
+    });
     await prisma.orgMembership.createMany({
       data: [
         { orgId: fixture.orgA, userId: fixture.allowedUser },
         { orgId: fixture.orgA, userId: fixture.crossOrgUser },
         { orgId: fixture.orgB, userId: fixture.crossOrgUser },
       ],
+    });
+    await prisma.siteMembership.create({
+      data: { tenantId: fixture.siteA, userId: fixture.allowedUser },
     });
     await prisma.orgVertical.createMany({
       data: [
@@ -155,6 +186,15 @@ describe("effective permission RLS resolution", () => {
           createdById: fixture.crossOrgUser,
           updatedById: fixture.crossOrgUser,
         },
+        {
+          id: fixture.siteRole,
+          orgId: fixture.orgA,
+          tenantId: fixture.siteA,
+          name: `Effective permission site role ${fixture.siteRole}`,
+          scope: "site",
+          createdById: fixture.allowedUser,
+          updatedById: fixture.allowedUser,
+        },
       ],
     });
     await prisma.orgRolePermission.createMany({
@@ -168,6 +208,11 @@ describe("effective permission RLS resolution", () => {
           roleDefinitionId: fixture.orgBRole,
           permissionKey: "ace.pace.read",
           grantedById: fixture.crossOrgUser,
+        },
+        {
+          roleDefinitionId: fixture.siteRole,
+          permissionKey: "attendance.manage",
+          grantedById: fixture.allowedUser,
         },
       ],
     });
@@ -187,6 +232,14 @@ describe("effective permission RLS resolution", () => {
           assignedById: fixture.crossOrgUser,
           startsAt: new Date("2026-07-01T00:00:00.000Z"),
         },
+        {
+          orgId: fixture.orgA,
+          tenantId: fixture.siteA,
+          userId: fixture.allowedUser,
+          roleDefinitionId: fixture.siteRole,
+          assignedById: fixture.allowedUser,
+          startsAt: new Date("2026-07-01T00:00:00.000Z"),
+        },
       ],
     });
 
@@ -199,28 +252,47 @@ describe("effective permission RLS resolution", () => {
       .useValue(effectivePermissionsContext)
       .compile();
     service = moduleRef.get(EffectivePermissionsService);
+
+    transactionalModuleRef = await Test.createTestingModule({
+      imports: [AccessControlModule],
+    }).compile();
+    transactionalService = transactionalModuleRef.get(
+      EffectivePermissionsService,
+    );
   });
 
   afterAll(async () => {
     if (isDatabaseAvailable()) {
       await prisma.userRoleAssignment.deleteMany({
         where: {
-          roleDefinitionId: { in: [fixture.orgARole, fixture.orgBRole] },
+          roleDefinitionId: {
+            in: [fixture.orgARole, fixture.orgBRole, fixture.siteRole],
+          },
         },
       });
       await prisma.orgRolePermission.deleteMany({
         where: {
-          roleDefinitionId: { in: [fixture.orgARole, fixture.orgBRole] },
+          roleDefinitionId: {
+            in: [fixture.orgARole, fixture.orgBRole, fixture.siteRole],
+          },
         },
       });
       await prisma.orgRoleDefinition.deleteMany({
-        where: { id: { in: [fixture.orgARole, fixture.orgBRole] } },
+        where: {
+          id: { in: [fixture.orgARole, fixture.orgBRole, fixture.siteRole] },
+        },
       });
       await prisma.orgVertical.deleteMany({
         where: { orgId: { in: [fixture.orgA, fixture.orgB] } },
       });
+      await prisma.siteMembership.deleteMany({
+        where: { tenantId: { in: [fixture.siteA, fixture.siteB] } },
+      });
       await prisma.orgMembership.deleteMany({
         where: { userId: { in: [fixture.allowedUser, fixture.crossOrgUser] } },
+      });
+      await prisma.tenant.deleteMany({
+        where: { id: { in: [fixture.siteA, fixture.siteB] } },
       });
       await prisma.user.deleteMany({
         where: { id: { in: [fixture.allowedUser, fixture.crossOrgUser] } },
@@ -230,6 +302,7 @@ describe("effective permission RLS resolution", () => {
       });
     }
     await moduleRef?.close();
+    await transactionalModuleRef?.close();
   });
 
   it("exposes the requested organisation membership in an org RLS context", async () => {
@@ -277,6 +350,107 @@ describe("effective permission RLS resolution", () => {
       allowed: true,
       reason: "allowed",
       sourceRoleIds: [fixture.orgARole],
+    });
+  });
+
+  it("reads uncommitted retirement changes instead of a cached assignment", async () => {
+    const cutoverService = transactionalService;
+    if (!cutoverService) return;
+    await expect(
+      cutoverService.listForUserWithSources(
+        fixture.allowedUser,
+        fixture.orgA,
+        undefined,
+        NOW,
+      ),
+    ).resolves.toEqual([
+      { permissionKey: "ace.pace.read", sourceRoleIds: [fixture.orgARole] },
+    ]);
+
+    const rollback = new Error("roll back transaction-aware access test");
+    await expect(
+      runTransaction(async (tx) => {
+        if (rlsRoleIsConfigured) {
+          await tx.$executeRawUnsafe(`SET LOCAL ROLE "${CI_RLS_ROLE}"`);
+          await tx.$executeRawUnsafe(
+            "SELECT set_config('app.assignment_org_read', 'on', true)",
+          );
+        }
+        await applyTenantContext(tx, "", fixture.orgA);
+        const before = await cutoverService.listForUserWithSourcesInTransaction(
+          fixture.allowedUser,
+          fixture.orgA,
+          undefined,
+          NOW,
+          tx,
+        );
+        expect(before).toHaveLength(1);
+
+        await tx.userRoleAssignment.updateMany({
+          where: {
+            orgId: fixture.orgA,
+            userId: fixture.allowedUser,
+            roleDefinitionId: fixture.orgARole,
+            revokedAt: null,
+          },
+          data: { revokedAt: NOW, revokedById: fixture.allowedUser },
+        });
+        const after = await cutoverService.listForUserWithSourcesInTransaction(
+          fixture.allowedUser,
+          fixture.orgA,
+          undefined,
+          NOW,
+          tx,
+        );
+        expect(after).toEqual([]);
+        throw rollback;
+      }),
+    ).rejects.toBe(rollback);
+
+    await expect(
+      prisma.userRoleAssignment.findFirst({
+        where: {
+          orgId: fixture.orgA,
+          userId: fixture.allowedUser,
+          roleDefinitionId: fixture.orgARole,
+        },
+        select: { revokedAt: true },
+      }),
+    ).resolves.toEqual({ revokedAt: null });
+  });
+
+  it("switches site RLS context between transaction-aware reads", async () => {
+    const cutoverService = transactionalService;
+    if (!cutoverService) return;
+
+    await runTransaction(async (tx) => {
+      if (rlsRoleIsConfigured) {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${CI_RLS_ROLE}"`);
+        await tx.$executeRawUnsafe(
+          "SELECT set_config('app.assignment_org_read', 'on', true)",
+        );
+      }
+      const siteA = await cutoverService.listForUserWithSourcesInTransaction(
+        fixture.allowedUser,
+        fixture.orgA,
+        fixture.siteA,
+        NOW,
+        tx,
+      );
+      const siteB = await cutoverService.listForUserWithSourcesInTransaction(
+        fixture.allowedUser,
+        fixture.orgA,
+        fixture.siteB,
+        NOW,
+        tx,
+      );
+      expect(siteA.map(({ permissionKey }) => permissionKey)).toEqual([
+        "ace.pace.read",
+        "attendance.manage",
+      ]);
+      expect(siteB.map(({ permissionKey }) => permissionKey)).toEqual([
+        "ace.pace.read",
+      ]);
     });
   });
 

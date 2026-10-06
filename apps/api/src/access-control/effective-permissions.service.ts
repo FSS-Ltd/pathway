@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import type { Prisma } from "@pathway/db";
 import type { PermissionKey } from "@pathway/platform";
 import type {
   AccessDecision,
@@ -63,6 +64,7 @@ export interface EffectivePermissionsContext {
     orgId: string,
     tenantId: string | undefined,
     operation: () => Promise<T>,
+    transaction?: Prisma.TransactionClient,
   ): Promise<T>;
 }
 
@@ -116,6 +118,29 @@ export class EffectivePermissionsService {
   ): Promise<EffectivePermissionWithSources[]> {
     return this.context.run(orgId, tenantId, () =>
       this.listForUserWithSourcesInContext(userId, orgId, tenantId, now),
+    );
+  }
+
+  /** Read uncommitted access changes for an audited cutover in the caller's transaction. */
+  async listForUserWithSourcesInTransaction(
+    userId: string,
+    orgId: string,
+    tenantId: string | undefined,
+    now: Date,
+    transaction: Prisma.TransactionClient,
+  ): Promise<EffectivePermissionWithSources[]> {
+    return this.context.run(
+      orgId,
+      tenantId,
+      () =>
+        this.listForUserWithSourcesInContext(
+          userId,
+          orgId,
+          tenantId,
+          now,
+          true,
+        ),
+      transaction,
     );
   }
 
@@ -261,8 +286,15 @@ export class EffectivePermissionsService {
     orgId: string,
     tenantId: string | undefined,
     now: Date,
+    bypassCache = false,
   ): Promise<EffectivePermissionWithSources[]> {
-    const snapshot = await this.loadSnapshot(userId, orgId, tenantId, now);
+    const snapshot = await this.loadSnapshot(
+      userId,
+      orgId,
+      tenantId,
+      now,
+      bypassCache,
+    );
     if (!snapshot.hasMembership) {
       return [];
     }
@@ -339,6 +371,7 @@ export class EffectivePermissionsService {
     orgId: string,
     tenantId: string | undefined,
     now: Date,
+    bypassCache = false,
   ): Promise<EffectiveAccessSnapshot> {
     const hasMembership = await this.reader.getOrganisationMembership(
       userId,
@@ -349,9 +382,11 @@ export class EffectivePermissionsService {
     }
     const [capabilities, grants] = await Promise.all([
       this.capabilityReader.get(orgId),
-      this.cache.getOrLoad({ userId, orgId, tenantId }, () =>
-        this.reader.findAssignments(userId, orgId, tenantId, now),
-      ),
+      bypassCache
+        ? this.reader.findAssignments(userId, orgId, tenantId, now)
+        : this.cache.getOrLoad({ userId, orgId, tenantId }, () =>
+            this.reader.findAssignments(userId, orgId, tenantId, now),
+          ),
     ]);
     return { hasMembership, capabilities, grants };
   }
