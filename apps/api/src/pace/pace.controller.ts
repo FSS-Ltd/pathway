@@ -18,12 +18,18 @@ import {
   paceRosterQuerySchema,
 } from "./dto/pace-query.dto";
 import { createPaceAssessmentSchema } from "./dto/create-pace-assessment.dto";
+import {
+  paceDiagnosticIdSchema,
+  recordPaceDiagnosticSchema,
+  retractPaceDiagnosticSchema,
+} from "./dto/pace-diagnostic-command.dto";
 import { paceDiagnosticQuerySchema } from "./dto/pace-diagnostic-query.dto";
 import {
   paceAssessmentCorrectionSchema,
   pacePolicyOverrideSchema,
 } from "./dto/pace-correction.dto";
 import { PaceCommandService } from "./pace-command.service";
+import { PaceDiagnosticCommandService } from "./pace-diagnostic-command.service";
 import { PaceDiagnosticQueryService } from "./pace-diagnostic-query.service";
 import { PaceExceptionsService } from "./pace-exceptions.service";
 import { PaceQueryService } from "./pace-query.service";
@@ -34,6 +40,7 @@ export class PaceController {
   constructor(
     private readonly service: PaceQueryService,
     private readonly commandService: PaceCommandService,
+    private readonly diagnosticCommandService: PaceDiagnosticCommandService,
     private readonly diagnosticQueryService: PaceDiagnosticQueryService,
     private readonly exceptionsService: PaceExceptionsService,
     private readonly requestContext: PathwayRequestContext,
@@ -76,6 +83,37 @@ export class PaceController {
       return await this.diagnosticQueryService.list(
         this.actor(),
         await paceDiagnosticQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Post("diagnostics")
+  @RequirePermission("ace.pace.diagnostics.manage")
+  async recordDiagnostic(@Body() body: unknown) {
+    try {
+      return await this.diagnosticCommandService.record(
+        this.actor(),
+        await recordPaceDiagnosticSchema.parseAsync(body),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Post("diagnostics/:id/retraction")
+  @RequirePermission("ace.pace.diagnostics.manage")
+  async retractDiagnostic(@Param("id") id: string, @Body() body: unknown) {
+    try {
+      return await this.diagnosticCommandService.retract(
+        this.actor(),
+        await paceDiagnosticIdSchema.parseAsync(id),
+        await retractPaceDiagnosticSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError)

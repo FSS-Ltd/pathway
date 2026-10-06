@@ -38,9 +38,11 @@ that projection and its rebuild baseline before a diagnostic can offer an
   `ace.pace.diagnostics.manage` ACE-core permissions for fixed Organisation
   Head and Site Lead templates. Add them to the existing `pace-full-access`
   tag only when the C05b API's site and child checks and the actor-held
-  delegation tests pass. Staff, parents, and students have no diagnostic
-  access through their fixed roles. The ACE vertical must be active for both
-  permissions to take effect.
+  delegation tests pass **and existing grants can be reviewed**. Expanding a
+  live tag would immediately widen current holders' access without a new
+  grantor decision; the source database is unavailable for that inventory.
+  Staff, parents, and students have no diagnostic access through their fixed
+  roles. The ACE vertical must be active for both permissions to take effect.
 - Every API query and command uses the trusted active site from the request
   context. Recording requires an active child/subject enrollment in that
   site; retraction can correct a historical result after its enrollment ends
