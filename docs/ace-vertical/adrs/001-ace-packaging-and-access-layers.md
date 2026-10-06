@@ -10,7 +10,7 @@
 
 ## Context
 
-ACE extends the existing NexSteps modular monolith. It must reuse organisation/site tenancy, the vertical/module entitlement engine, Auth0 request context, typed guards, private storage, audit/outbox patterns, and PostgreSQL RLS. It must not import Oasis authentication, fixed roles, single-centre tenancy, or route conventions.
+ACE extends the existing NexSteps modular monolith. It must reuse organisation/site tenancy, the vertical/module entitlement engine, Auth0 request context, typed guards, private storage, audit/outbox patterns, and PostgreSQL RLS. Oasis fixed-role and access-tag concepts are adapted to NexSteps; its authentication, single-centre tenancy, and route conventions are not imported.
 
 Commercial enablement and actor authorisation answer different questions. A paid or vertically included capability does not grant a person access. A role permission does not activate a product. Neither can bypass a guardian/student relationship, a domain assignment, a release state, or tenant isolation.
 
@@ -22,7 +22,7 @@ The governing sources define 68 exact routes in sections 8.2 through 8.4. Sectio
 
 `OrgVertical` and active, unexpired `OrgModule` records remain the sole commercial inputs. The existing capability resolver is extended rather than duplicated. Missing, inactive, expired, inapplicable, or commercially unapproved entitlements fail closed.
 
-ACE core includes PACE, behaviour, homework/evidence, Faith Corner, site reporting, trips and permission slips, and organisation-toggleable Student Community. Attendance, mobile, messaging, safeguarding, configurable roles, and typed permissions are platform core.
+ACE core includes PACE, behaviour, homework/evidence, Faith Corner, site reporting, trips and permission slips, and organisation-toggleable Student Community. Attendance, mobile, messaging, safeguarding, fixed roles, scoped access tags, and typed permissions are platform core.
 
 Finance, Clubs, Child Merit Market, and Advanced Reporting remain separate entitlements:
 
@@ -57,7 +57,7 @@ The layers have separate inputs and denial reasons:
 | Authentication | Auth0/session and trusted request identity | a role, entitlement, or tenant selector |
 | Active membership | active organisation/site context | proof of a record relationship |
 | Commercial capability | `OrgVertical` plus active `OrgModule` records | a role label or feature toggle |
-| Typed permission | compile-time registry plus effective role assignments | a customer-created executable string |
+| Typed permission | compile-time registry plus fixed-role assignments and active scoped access-tag grants | a customer-created executable string |
 | Included feature | `OrgFeatureSetting` for included optional features | a paid entitlement |
 | Relationship/domain assignment | guardian-child, StudentIdentity, active-site record scope, derived Community membership, or scoped lead assignment | a broad role permission |
 | Release/visibility | published/frozen, audience, revocation, field-visibility, and moderation policy | a UI-only check |
@@ -71,13 +71,13 @@ An organisation head with an active organisation membership may select any site 
 
 A site-scoped role remains valid only while its site assignment is active for the selected site. Organisation membership does not manufacture a site assignment. Site switches invalidate or reload access-aware state.
 
-### 4. Keep permission keys platform-owned
+### 4. Keep permission keys and roles platform-owned
 
 Capability and permission keys are compile-time registry literals. Database permission definitions are a searchable metadata mirror, not an executable authority source. Display names, labels, fixed role names, navigation items, and route strings never decide access.
 
-Organisation heads may create role definitions from active, delegable keys they hold. They cannot create keys, activate a vertical/module, grant protected ownership/support/entitlement administration, bypass relationships, remove the final active organisation head, or lock themselves out in the same request.
+The product decision withdraws customer role creation, cloning, editing, permission replacement, and retirement in every sector. The runtime cutover is pending; platform-owned fixed templates remain. An organisation head may grant a catalogue access tag only when every mapped permission is active, delegable, and held by the actor in the requested scope. A grant cannot activate a vertical or paid module, widen a child or site relationship, bypass safeguarding rules, or remove the final organisation head's access.
 
-Existing fixed-role decisions remain a shadow/rollback compatibility path only until the route-by-route `ACE-F14` cutover.
+Existing custom assignments remain readable until an audited inventory maps each user to fixed roles and tags, compares effective access without widening it, resolves exceptions, and retires the old assignments. The legacy role-write routes must reject mutations once the cutover lands. Access-tag APIs and the exact transition state are tracked in the source and access matrix.
 
 ### 5. Treat Community as an included feature, not a module
 
@@ -125,7 +125,7 @@ The matrix records the blocking PRs and release gates for every open decision.
 ## Consequences
 
 - Later ACE work has a single route-level source for capability, permission, persona, membership, relationship, release, feature, sensitivity, and RLS rules.
-- A custom role cannot enable a paid product or widen a record relationship.
+- An access tag cannot enable a paid product or widen a record relationship.
 - Parent, guardian, and student routes require server-derived relationships after permission checks.
 - Organisation-head cross-site selection and site-assignment semantics become consistent across authentication paths.
 - Add-on controller work pauses at its route-contract gate instead of inventing an API.

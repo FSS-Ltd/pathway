@@ -14,14 +14,16 @@ deployment is claimed by this record.
 
 ## Delivery steps
 
-| Step | Scope                                                 | State   | PR and base                                                     | Checked revision and CI                                                                                                                            | Merge evidence                             |
-| ---- | ----------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| 1.1  | Require manual release and validate migration target  | Merged  | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `07cd5eeb4432a7400297865166564acb9a8032ab`; all five jobs passed in [run 37317265932](https://github.com/FSS-Ltd/pathway/actions/runs/37317265932) | `d27b9df77e4416dc2cd472abf59dc2a6568b7b2a` |
-| 1.2a | Scoped access-tag grant storage and RLS               | PR open | [#347](https://github.com/FSS-Ltd/pathway/pull/347) to `master` | CI pending on current PR revision                                                                                                                  | Pending                                    |
-| 1.2b | Fixed-role catalogue, delegation and effective access | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
-| 1.3  | ACE core web journeys                                 | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
-| 1.4  | Paid add-ons and entitlement billing                  | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
-| 1.5  | Shared web UI and messaging finish                    | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| Step | Scope                                                | State   | PR and base                                                     | Checked revision and CI                                                                                                                            | Merge evidence                             |
+| ---- | ---------------------------------------------------- | ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| 1.1  | Require manual release and validate migration target | Merged  | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `07cd5eeb4432a7400297865166564acb9a8032ab`; all five jobs passed in [run 37317265932](https://github.com/FSS-Ltd/pathway/actions/runs/37317265932) | `d27b9df77e4416dc2cd472abf59dc2a6568b7b2a` |
+| 1.2a | Scoped access-tag grant storage and RLS              | Merged  | [#347](https://github.com/FSS-Ltd/pathway/pull/347) to `master` | `143a7bd507127556c5322184a1c2000108fc0346`; all five jobs passed in [run 37322499197](https://github.com/FSS-Ltd/pathway/actions/runs/37322499197) | `f1674f41a39e80abb0b1cc4282056a808f83b425` |
+| 1.2b | Typed access-tag catalogue and access decision docs  | PR open | [#348](https://github.com/FSS-Ltd/pathway/pull/348) to `master` | CI pending on current PR revision                                                                                                                  | Pending                                    |
+| 1.2c | Delegation, grant/revoke and effective-access APIs   | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.2d | Legacy custom-role retirement and parity migration   | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.3  | ACE core web journeys                                | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.4  | Paid add-ons and entitlement billing                 | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.5  | Shared web UI and messaging finish                   | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 
 Step 1.1 makes production deployment explicit and accepts only the configured
 Supabase project's direct database endpoint or shared session pooler on port
@@ -43,6 +45,13 @@ organisation or site scoped RLS. It does not enable any tag or change effective
 permissions. The catalogue, delegation checks, APIs and custom-role migration
 remain for later delivery steps. Its migration is committed for later staging
 and production application; no live Supabase migration is being attempted now.
+
+Step 1.2b records the product-owner decision to retire customer-created roles
+across all sectors. Its typed catalogue matches all 17 Oasis tag names. Five
+currently map to delegable NexSteps permissions; twelve remain unavailable
+until their missing permission, module, or record-scope rules are delivered.
+The catalogue alone does not grant access. Grant/revoke and effective-access
+work is the next build step after this PR passes CI and merges.
 
 ## Release gate
 
