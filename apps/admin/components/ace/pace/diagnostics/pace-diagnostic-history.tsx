@@ -1,12 +1,23 @@
 import React from "react";
 import { Badge, Button, Card } from "@pathway/ui";
 import type { PagedSiteResults } from "@/components/ace/pace/use-site-paged-results";
-import type { PaceDiagnosticResult } from "@/lib/pace-diagnostic-api";
+import type {
+  PaceDiagnosticResult,
+  PaceDiagnosticRetractionResult,
+} from "@/lib/pace-diagnostic-api";
+import { PaceDiagnosticRetraction } from "./pace-diagnostic-retraction";
 
 type Props = {
   history: PagedSiteResults<PaceDiagnosticResult>;
   includeRetracted: boolean;
   onIncludeRetractedChange: (value: boolean) => void;
+  retraction?: {
+    onRetract: (
+      resultId: string,
+      reason: string,
+    ) => Promise<PaceDiagnosticRetractionResult>;
+    onRetracted: () => void;
+  };
 };
 
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -18,6 +29,7 @@ export function PaceDiagnosticHistory({
   history,
   includeRetracted,
   onIncludeRetractedChange,
+  retraction,
 }: Props) {
   return (
     <Card
@@ -102,6 +114,13 @@ export function PaceDiagnosticHistory({
                   by {result.retraction.retractedBy.displayName}. Reason:{" "}
                   {result.retraction.reason}
                 </p>
+              ) : null}
+              {!result.retraction && retraction ? (
+                <PaceDiagnosticRetraction
+                  result={result}
+                  onRetract={retraction.onRetract}
+                  onRetracted={retraction.onRetracted}
+                />
               ) : null}
             </li>
           ))}

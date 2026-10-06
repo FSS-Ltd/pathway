@@ -37,6 +37,60 @@ export type PaceDiagnosticHistoryQuery = {
   signal?: AbortSignal;
 };
 
+export type RecordPaceDiagnosticInput = {
+  childId: string;
+  subjectId: string;
+  level: number;
+  outcome: "PASS" | "FAIL";
+};
+
+export type RetractPaceDiagnosticInput = { reason: string };
+
+export type PaceDiagnosticCommandResult = { id: string; recordedAt: string };
+
+export type PaceDiagnosticRetractionResult = {
+  id: string;
+  resultId: string;
+  retractedAt: string;
+};
+
+export async function recordPaceDiagnostic(
+  input: RecordPaceDiagnosticInput,
+): Promise<PaceDiagnosticCommandResult> {
+  return diagnosticCommand<PaceDiagnosticCommandResult>(
+    "/ace/pace/diagnostics",
+    input,
+  );
+}
+
+export async function retractPaceDiagnostic(
+  resultId: string,
+  input: RetractPaceDiagnosticInput,
+): Promise<PaceDiagnosticRetractionResult> {
+  return diagnosticCommand<PaceDiagnosticRetractionResult>(
+    `/ace/pace/diagnostics/${encodeURIComponent(resultId)}/retraction`,
+    input,
+  );
+}
+
+async function diagnosticCommand<T>(
+  path: string,
+  body: RecordPaceDiagnosticInput | RetractPaceDiagnosticInput,
+): Promise<T> {
+  if (isUsingMockApi()) {
+    throw new Error("PACE diagnostic changes are not available in mock mode.");
+  }
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw await paceRequestError(response);
+  return response.json() as Promise<T>;
+}
+
 export async function fetchPaceDiagnosticHistory({
   childId,
   subjectId,

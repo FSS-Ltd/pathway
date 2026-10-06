@@ -43,7 +43,8 @@ deployment is claimed by this record.
 | DB-1     | New-project migration inventory and blocker            | Merged  | [#370](https://github.com/FSS-Ltd/pathway/pull/370) to `master` | `b311080af365db1bf6bf35cedb4b81c6e69d1ae2`; all five jobs passed in [run 37516949020](https://github.com/FSS-Ltd/pathway/actions/runs/37516949020)             | `56b91b29f515e713fc931e27efa3b398850c8fe0` |
 | 1.3c3    | Bounded diagnostic history API                         | Merged  | [#371](https://github.com/FSS-Ltd/pathway/pull/371) to `master` | `a475914c06e26a9d25484a99c57e8246eb022e28`; all five jobs passed in [run 37520082279](https://github.com/FSS-Ltd/pathway/actions/runs/37520082279)             | `4aa865fa1dcc1d192e372ae7a8a537ab7526bd4e` |
 | 1.3c4    | Audited diagnostic record and retraction API           | Merged  | [#372](https://github.com/FSS-Ltd/pathway/pull/372) to `master` | `e4a8faa3a4d891be0cff9bc811824117db2763df`; all five jobs passed in [run 37523331326](https://github.com/FSS-Ltd/pathway/actions/runs/37523331326)             | `85a3743b90b6e297a9a661943a64ef87525edf53` |
-| 1.3c5a   | Read-only diagnostic history web journey               | PR open | [#373](https://github.com/FSS-Ltd/pathway/pull/373) to `master` | Initial revision `ab8fbd5d`; current-revision CI pending                                                                                                       | Pending                                    |
+| 1.3c5a   | Read-only diagnostic history web journey               | Merged  | [#373](https://github.com/FSS-Ltd/pathway/pull/373) to `master` | `121c0b77ca26e1fd53f29b1a93b051ffaef42878`; all five jobs passed in [run 37527866517](https://github.com/FSS-Ltd/pathway/actions/runs/37527866517)             | `55f1a7a55496c07ccacc765819a9b0cf2c1fc770` |
+| 1.3c5b   | Diagnostic record and retraction web controls          | PR open | [#375](https://github.com/FSS-Ltd/pathway/pull/375) to `master` | Initial revision `f5395b4f`; current-revision CI pending                                                                                                       | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -128,6 +129,12 @@ and [project transfer](https://supabase.com/docs/guides/platform/project-transfe
   remained `ACTIVE_HEALTHY`. The target-scoped Supabase MCP server is installed
   in Codex; its OAuth login attempt timed out, so authentication has not been
   verified. This does not change the source-data blocker above.
+- A later manual OAuth attempt reached the Supabase sign-in choice, but Codex's
+  automatic approval review blocked selecting the existing identity because
+  that would share account profile details with Supabase. The user has been
+  asked to approve that specific sign-in action. MCP authentication remains
+  unverified; the connector's read-only project checks do not establish a
+  complete source backup.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and

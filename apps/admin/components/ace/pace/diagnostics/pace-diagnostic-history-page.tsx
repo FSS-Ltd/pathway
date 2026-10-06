@@ -6,8 +6,11 @@ import { NoAccessCard } from "@/components/no-access-card";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import { useSitePagedResults } from "@/components/ace/pace/use-site-paged-results";
 import { PaceDiagnosticHistory } from "./pace-diagnostic-history";
+import { PaceDiagnosticRecordForm } from "./pace-diagnostic-record-form";
 import {
   fetchPaceDiagnosticHistory,
+  recordPaceDiagnostic,
+  retractPaceDiagnostic,
   type PaceDiagnosticPage,
 } from "@/lib/pace-diagnostic-api";
 import { useAdminAccess } from "@/lib/use-admin-access";
@@ -25,6 +28,8 @@ export function PaceDiagnosticHistoryPage({
   const { status: sessionStatus } = useSession();
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
   const canRead = permissions?.includes("ace.pace.diagnostics.read") === true;
+  const canManage =
+    permissions?.includes("ace.pace.diagnostics.manage") === true;
   const [includeRetracted, setIncludeRetracted] = React.useState(false);
   const [selectionValidForSite, setSelectionValidForSite] =
     React.useState(true);
@@ -69,9 +74,10 @@ export function PaceDiagnosticHistoryPage({
       </header>
       {selected && childId && subjectId ? (
         <SelectedDiagnosticHistory
-          key={`${childId}:${subjectId}:${includeRetracted}`}
+          key={`${childId}:${subjectId}`}
           childId={childId}
           subjectId={subjectId}
+          canManage={canManage}
           includeRetracted={includeRetracted}
           onIncludeRetractedChange={setIncludeRetracted}
         />
@@ -88,17 +94,20 @@ export function PaceDiagnosticHistoryPage({
 function SelectedDiagnosticHistory({
   childId,
   subjectId,
+  canManage,
   includeRetracted,
   onIncludeRetractedChange,
 }: {
   childId: string;
   subjectId: string;
+  canManage: boolean;
   includeRetracted: boolean;
   onIncludeRetractedChange: (value: boolean) => void;
 }) {
   const [selection, setSelection] = React.useState<
     PaceDiagnosticPage["selection"] | null
   >(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
   const fetchPage = React.useCallback(
     async ({ cursor, signal }: { cursor?: string; signal?: AbortSignal }) => {
       const page = await fetchPaceDiagnosticHistory({
@@ -121,14 +130,48 @@ function SelectedDiagnosticHistory({
   return (
     <div className="space-y-4">
       {selection ? (
-        <p className="text-sm font-medium text-text-primary">
-          {selection.child.displayName} · {selection.subject.name}
+        <>
+          <p className="text-sm font-medium text-text-primary">
+            {selection.child.displayName} · {selection.subject.name}
+          </p>
+          {canManage ? (
+            <PaceDiagnosticRecordForm
+              childId={childId}
+              subjectId={subjectId}
+              childName={selection.child.displayName}
+              subjectName={selection.subject.name}
+              onRecord={recordPaceDiagnostic}
+              onRecorded={history.retry}
+            />
+          ) : null}
+        </>
+      ) : null}
+      {notice ? (
+        <p
+          role="status"
+          className="rounded-lg bg-status-ok/10 px-4 py-3 text-sm text-status-ok"
+        >
+          {notice}
         </p>
       ) : null}
       <PaceDiagnosticHistory
         history={history}
         includeRetracted={includeRetracted}
         onIncludeRetractedChange={onIncludeRetractedChange}
+        retraction={
+          canManage
+            ? {
+                onRetract: (resultId, reason) =>
+                  retractPaceDiagnostic(resultId, { reason }),
+                onRetracted: () => {
+                  setNotice(
+                    "Diagnostic retracted. The original result remains in history.",
+                  );
+                  history.retry();
+                },
+              }
+            : undefined
+        }
       />
     </div>
   );
