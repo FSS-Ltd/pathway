@@ -62,7 +62,9 @@ events; a foreign or missing row returns the same not-found response. Return
 only the status transition, reason, actor display name, timestamp, legacy
 marker, and next cursor. Do not expose general audit metadata. The cursor is
 scoped to tenant and attendance row, has a fixed maximum page size, and rejects
-tampering.
+tampering. Sign the cursor with the API's required `INTERNAL_AUTH_SECRET` using
+an attendance-specific HMAC domain; key rotation invalidates issued cursors and
+clients restart at the first page.
 
 The session register shows a history action only for an existing attendance
 row. Staff with read access can inspect it; only managers can correct a status.

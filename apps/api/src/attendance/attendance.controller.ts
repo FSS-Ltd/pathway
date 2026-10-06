@@ -12,6 +12,8 @@ import {
   Inject,
 } from "@nestjs/common";
 import { AttendanceService } from "./attendance.service";
+import { AttendanceHistoryService } from "./attendance-history.service";
+import { attendanceHistoryQuerySchema } from "./dto/attendance-history-query.dto";
 import {
   createAttendanceDto,
   CreateAttendanceDto,
@@ -21,7 +23,7 @@ import {
   UpdateAttendanceDto,
 } from "./dto/update-attendance.dto";
 import { upsertSessionAttendanceDto } from "./dto/upsert-session-attendance.dto";
-import { CurrentTenant } from "@pathway/auth";
+import { CurrentOrg, CurrentTenant } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
@@ -37,7 +39,12 @@ function parseDateOrThrow(label: string, value?: string): Date {
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("attendance")
 export class AttendanceController {
-  constructor(@Inject(AttendanceService) private readonly attendanceService: AttendanceService) {}
+  constructor(
+    @Inject(AttendanceService)
+    private readonly attendanceService: AttendanceService,
+    @Inject(AttendanceHistoryService)
+    private readonly historyService: AttendanceHistoryService,
+  ) {}
 
   @Get()
   @RequirePermission("attendance.read")
@@ -101,6 +108,21 @@ export class AttendanceController {
     @CurrentTenant("tenantId") tenantId: string,
   ) {
     return this.attendanceService.getById(id, tenantId);
+  }
+
+  @Get(":id/history")
+  @RequirePermission("attendance.read")
+  async history(
+    @Param("id") id: string,
+    @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Query() query: unknown,
+  ) {
+    const parsed = attendanceHistoryQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.format());
+    }
+    return this.historyService.list(id, tenantId, orgId, parsed.data);
   }
 
   @Post()
