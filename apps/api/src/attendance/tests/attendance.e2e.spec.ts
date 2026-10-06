@@ -49,6 +49,23 @@ describe("Attendance (e2e)", () => {
   let typedRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
   let createdOrgVertical = false;
 
+  async function clearFixtureCorrectionEvents(): Promise<void> {
+    const tenantId = TENANT_A_ID;
+    const orgId = ORG_ID;
+    if (!tenantId || !orgId) {
+      throw new Error("Attendance E2E tenant context is unavailable");
+    }
+    await withTenantRlsContext(tenantId, orgId, async (tx) => {
+      // Test teardown only: bypass the append-only trigger for these fixtures.
+      await tx.$executeRawUnsafe(
+        "SET LOCAL session_replication_role = replica",
+      );
+      await tx.attendanceCorrectionEvent.deleteMany({
+        where: { childId: { in: [ids.child, ids.child2, ids.child3] } },
+      });
+    });
+  }
+
   function directAttendanceService(actorUserId = authUserId) {
     const tenantId = TENANT_A_ID;
     const orgId = ORG_ID;
@@ -90,11 +107,10 @@ describe("Attendance (e2e)", () => {
     app = moduleRef.createNestApplication();
     await app.init();
 
+    await clearFixtureCorrectionEvents();
     // Seed inside RLS-aware context for each tenant
     await withTenantRlsContext(TENANT_A_ID, ORG_ID, async (tx) => {
       // cleanup for deterministic runs
-      // The immutable event trigger requires truncation in this dedicated E2E database.
-      await tx.$executeRaw`TRUNCATE TABLE "AttendanceCorrectionEvent"`;
       await tx.attendance.deleteMany({
         where: {
           OR: [
@@ -215,7 +231,7 @@ describe("Attendance (e2e)", () => {
       await prisma.staffActivity.deleteMany({
         where: { staffUserId: authUserId },
       });
-      await prisma.$executeRaw`TRUNCATE TABLE "AttendanceCorrectionEvent"`;
+      await clearFixtureCorrectionEvents();
       await prisma.attendance.deleteMany({
         where: { groupId: { in: [ids.group, ids.group2] } },
       });
@@ -645,16 +661,26 @@ describe("Attendance (e2e)", () => {
       where: { attendanceId: createdId },
     });
     const nextStatus = before.status === "PRESENT" ? "ABSENT" : "PRESENT";
-    const { service, recordActivityForCurrentUser } =
-      directAttendanceService(randomUUID());
-
-    await expect(
-      service.update(
-        createdId,
-        { status: nextStatus, correctionReason: "Invalid actor" },
-        TENANT_A_ID,
-      ),
-    ).rejects.toThrow();
+    const { service, recordActivityForCurrentUser } = directAttendanceService();
+    await prisma.$executeRaw`
+      ALTER TABLE "AttendanceCorrectionEvent"
+      ADD CONSTRAINT "AttendanceCorrectionEvent_e2e_reject_insert"
+      CHECK (false) NOT VALID
+    `;
+    try {
+      await expect(
+        service.update(
+          createdId,
+          { status: nextStatus, correctionReason: "Event insert blocked" },
+          TENANT_A_ID,
+        ),
+      ).rejects.toBeDefined();
+    } finally {
+      await prisma.$executeRaw`
+        ALTER TABLE "AttendanceCorrectionEvent"
+        DROP CONSTRAINT "AttendanceCorrectionEvent_e2e_reject_insert"
+      `;
+    }
     expect(
       await prisma.attendance.findUniqueOrThrow({
         where: { id: createdId },

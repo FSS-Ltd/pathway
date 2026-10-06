@@ -6,7 +6,7 @@ import {
   Optional,
   UnauthorizedException,
 } from "@nestjs/common";
-import { Prisma, prisma, withTenantRlsContext } from "@pathway/db";
+import { prisma, withTenantRlsContext, type Prisma } from "@pathway/db";
 import { PathwayRequestContext } from "@pathway/auth";
 import { Av30ActivityType } from "@pathway/types/av30";
 import { Av30ActivityService } from "../av30/av30-activity.service";
@@ -280,7 +280,11 @@ export class AttendanceService {
             JOIN "Child" AS child ON child.id = attendance."childId"
             WHERE attendance."sessionId" = ${sessionId}
               AND child."tenantId" = ${tenantId}
-              AND attendance."childId" IN (${Prisma.join(childIds)})
+              AND attendance."childId" IN (
+                SELECT requested."childId"
+                FROM jsonb_array_elements_text(${JSON.stringify(childIds)}::jsonb)
+                  AS requested("childId")
+              )
             ORDER BY attendance.id
             FOR UPDATE OF attendance
           `;
