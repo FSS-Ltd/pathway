@@ -12,6 +12,7 @@ import { PaceInventoryController } from "./pace-inventory.controller";
 import { PaceInventoryQueryService } from "./pace-inventory-query.service";
 import { PaceInventoryCommandsController } from "./pace-inventory-commands.controller";
 import { PaceInventoryOrderCommandService } from "./pace-inventory-order-command.service";
+import { PaceInventoryStockCommandService } from "./pace-inventory-stock-command.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
@@ -28,6 +29,7 @@ import { PaceInventoryOrderCommandService } from "./pace-inventory-order-command
     PaceExceptionsService,
     PaceInventoryQueryService,
     PaceInventoryOrderCommandService,
+    PaceInventoryStockCommandService,
   ],
 })
 export class PaceModule {}

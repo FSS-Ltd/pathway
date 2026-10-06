@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const createPaceInventoryOrdersSchema = z
+export const paceInventoryBulkSchema = z
   .object({
     childId: z.string().uuid(),
     subjectId: z.string().uuid(),
@@ -14,6 +14,4 @@ export const createPaceInventoryOrdersSchema = z
   })
   .strict();
 
-export type CreatePaceInventoryOrdersDto = z.infer<
-  typeof createPaceInventoryOrdersSchema
->;
+export type PaceInventoryBulkDto = z.infer<typeof paceInventoryBulkSchema>;

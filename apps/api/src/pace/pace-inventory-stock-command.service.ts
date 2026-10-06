@@ -8,26 +8,27 @@ import { withAvailableInventoryPlacement } from "./pace-inventory-command-contex
 import type { PaceQueryActor } from "./pace-query.service";
 
 @Injectable()
-export class PaceInventoryOrderCommandService {
+export class PaceInventoryStockCommandService {
   constructor(
     @Inject(OutboxService)
     private readonly outbox: OutboxService,
   ) {}
 
-  async createOrders(
+  async addCurrentStock(
     actor: PaceQueryActor,
     command: PaceInventoryBulkDto,
-  ): Promise<{ batchId: string; orderIds: string[]; created: number }> {
+  ): Promise<{ batchId: string; supplyIds: string[]; created: number }> {
     return withAvailableInventoryPlacement(actor, command, async (tx) => {
       const batchId = randomUUID();
-      const orderIds = command.paceNumbers.map(() => randomUUID());
-      await tx.paceInventoryOrder.createMany({
+      const supplyIds = command.paceNumbers.map(() => randomUUID());
+      await tx.paceInventorySupply.createMany({
         data: command.paceNumbers.map((paceNumber, index) => ({
-          id: orderIds[index],
+          id: supplyIds[index],
           tenantId: actor.tenantId,
           childId: command.childId,
           subjectId: command.subjectId,
           paceNumber,
+          source: "CURRENT_STOCK",
           createdByUserId: actor.userId,
         })),
       });
@@ -39,27 +40,27 @@ export class PaceInventoryOrderCommandService {
         entityId: batchId,
         action: AuditAction.CREATED,
         metadata: {
-          event: "pace_inventory_orders_created",
+          event: "pace_inventory_current_stock_added",
           childId: command.childId,
           subjectId: command.subjectId,
           paceNumbers: command.paceNumbers,
-          orderIds,
+          supplyIds,
         },
       });
       await this.outbox.enqueue(tx, {
-        aggregateType: "pace_inventory_order_batch",
+        aggregateType: "pace_inventory_supply_batch",
         aggregateId: batchId,
-        eventType: "ace.pace.inventory.orders.created",
+        eventType: "ace.pace.inventory.current-stock.added",
         payload: {
           tenantId: actor.tenantId,
           childId: command.childId,
           subjectId: command.subjectId,
-          orderIds,
+          supplyIds,
         },
-        idempotencyKey: `ace-pace-inventory-orders:${batchId}`,
+        idempotencyKey: `ace-pace-inventory-current-stock:${batchId}`,
       });
 
-      return { batchId, orderIds, created: orderIds.length };
+      return { batchId, supplyIds, created: supplyIds.length };
     });
   }
 }

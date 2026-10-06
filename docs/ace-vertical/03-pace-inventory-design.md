@@ -29,6 +29,12 @@ existing physical supply and pending orders inside a serializable tenant
 transaction, then creates the order rows and audit/outbox facts atomically.
 Current-stock entry and delivery transitions follow in later PRs.
 
+Step 1.3b2b2 records 1–24 distinct catalogue PACEs as existing physical stock
+for one active child/subject placement. It shares the order command's
+serializable site, placement, supplied-number, and pending-order checks. Each
+accepted number becomes one `CURRENT_STOCK` supply row, with batch audit and
+outbox facts in the same transaction. This does not change an order's status.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,
