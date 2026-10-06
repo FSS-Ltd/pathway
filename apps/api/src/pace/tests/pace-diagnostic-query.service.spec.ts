@@ -20,8 +20,17 @@ const recordedAt = new Date("2026-10-06T08:00:00.000Z");
 function setup() {
   const tx = {
     tenant: { findFirst: jest.fn().mockResolvedValue({ id: actor.tenantId }) },
-    child: { findFirst: jest.fn().mockResolvedValue({ id: childId }) },
-    subject: { findFirst: jest.fn().mockResolvedValue({ id: subjectId }) },
+    child: {
+      findFirst: jest.fn().mockResolvedValue({
+        id: childId,
+        firstName: "Jordan",
+        lastName: "Smith",
+        preferredName: null,
+      }),
+    },
+    subject: {
+      findFirst: jest.fn().mockResolvedValue({ id: subjectId, name: "Maths" }),
+    },
     paceDiagnosticResult: { findMany: jest.fn().mockResolvedValue([]) },
   };
   jest
@@ -78,6 +87,10 @@ describe("PACE diagnostic history", () => {
 
     const result = await service.list(actor, { childId, subjectId, limit: 1 });
 
+    expect(result.selection).toEqual({
+      child: { id: childId, displayName: "Jordan Smith" },
+      subject: { id: subjectId, name: "Maths" },
+    });
     expect(result.items).toEqual([
       {
         id: "result-1",
