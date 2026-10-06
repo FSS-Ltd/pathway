@@ -16,6 +16,7 @@ import { formatAssignmentWindow, parseCodedError } from "@/lib/roles";
 export type AssignmentPanelProps = {
   roles: AdminRoleDefinition[];
   people: PersonRow[];
+  activeSiteId: string | null;
 };
 
 function roleName(roles: AdminRoleDefinition[], roleId: string): string {
@@ -27,7 +28,14 @@ function personLabel(people: PersonRow[], userId: string): string {
   return person ? `${person.name} (${person.email})` : userId;
 }
 
-export function AssignmentPanel({ roles, people }: AssignmentPanelProps) {
+export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanelProps) {
+  const assignableRoles = roles.filter(
+    (role) =>
+      role.isSystem &&
+      role.isActive &&
+      (role.scope === "organisation" ||
+        (activeSiteId !== null && role.tenantId === activeSiteId)),
+  );
   const [assignments, setAssignments] = React.useState<AdminRoleAssignment[]>([]);
   const [nextCursor, setNextCursor] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -40,6 +48,10 @@ export function AssignmentPanel({ roles, people }: AssignmentPanelProps) {
   const [expiresAt, setExpiresAt] = React.useState("");
   const [isAssigning, setIsAssigning] = React.useState(false);
   const [assignError, setAssignError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setAssignRoleId("");
+  }, [activeSiteId]);
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -166,7 +178,7 @@ export function AssignmentPanel({ roles, people }: AssignmentPanelProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card title="Assign a role" description="Grant a role to a person in this organisation">
+      <Card title="Assign a fixed role" description="Grant a platform role to a person in this organisation">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Label htmlFor="assign-person">Person</Label>
@@ -189,9 +201,10 @@ export function AssignmentPanel({ roles, people }: AssignmentPanelProps) {
               id="assign-role"
               value={assignRoleId}
               onChange={(e) => setAssignRoleId(e.target.value)}
+              disabled={assignableRoles.length === 0}
             >
               <option value="">Select a role</option>
-              {roles.map((r) => (
+              {assignableRoles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
@@ -217,11 +230,16 @@ export function AssignmentPanel({ roles, people }: AssignmentPanelProps) {
             />
           </div>
         </div>
+        {assignableRoles.length === 0 && (
+          <p className="mt-2 text-sm text-text-muted" role="status">
+            No fixed roles are available for assignment.
+          </p>
+        )}
         {assignError && (
           <p className="mt-2 text-sm text-status-danger">{assignError}</p>
         )}
         <div className="mt-4">
-          <Button size="sm" onClick={handleAssign} disabled={isAssigning}>
+          <Button size="sm" onClick={handleAssign} disabled={isAssigning || assignableRoles.length === 0}>
             {isAssigning ? "Assigning…" : "Assign role"}
           </Button>
         </div>

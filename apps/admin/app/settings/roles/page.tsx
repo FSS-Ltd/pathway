@@ -11,6 +11,7 @@ import {
   type PersonRow,
 } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
+import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import { hasPermission } from "@/lib/access";
 import { NoAccessCard } from "@/components/no-access-card";
 import { RoleListTable } from "./role-list-table";
@@ -25,13 +26,16 @@ export default function RolesAdminPage() {
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
   const canAccess = hasPermission(permissions, "platform.access.roles.read");
   const [orgId, setOrgId] = React.useState<string | null>(null);
+  const [activeSiteId, setActiveSiteId] = React.useState<string | null>(null);
   const [roles, setRoles] = React.useState<AdminRoleDefinition[]>([]);
   const [people, setPeople] = React.useState<PersonRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState<Tab>("roles");
+  const loadVersion = React.useRef(0);
 
   const load = React.useCallback(async () => {
+    const version = ++loadVersion.current;
     setIsLoading(true);
     setError(null);
     try {
@@ -40,7 +44,6 @@ export default function RolesAdminPage() {
         state.sites.find((s) => s.id === state.activeSiteId)?.orgId ??
         state.sites[0]?.orgId ??
         null;
-      setOrgId(resolvedOrgId);
       if (!resolvedOrgId) {
         throw new Error("Active organisation not found.");
       }
@@ -48,16 +51,24 @@ export default function RolesAdminPage() {
         fetchRoles(),
         fetchPeopleForOrg(resolvedOrgId),
       ]);
+      if (version !== loadVersion.current) return;
+      setActiveSiteId(state.activeSiteId);
+      setOrgId(resolvedOrgId);
       setRoles(rolesData);
       setPeople(peopleData);
     } catch (err) {
+      if (version !== loadVersion.current) return;
+      setOrgId(null);
+      setActiveSiteId(null);
+      setRoles([]);
+      setPeople([]);
       setError(
         err instanceof Error
           ? err.message
           : "Failed to load roles & access data",
       );
     } finally {
-      setIsLoading(false);
+      if (version === loadVersion.current) setIsLoading(false);
     }
   }, []);
 
@@ -65,6 +76,13 @@ export default function RolesAdminPage() {
     if (sessionStatus !== "authenticated" || !session) return;
     if (isLoadingAccess || !canAccess) return;
     void load();
+    const unsubscribe = subscribeToActiveSiteChanges(() => {
+      void load();
+    });
+    return () => {
+      loadVersion.current += 1;
+      unsubscribe();
+    };
   }, [sessionStatus, session, isLoadingAccess, canAccess, load]);
 
   if (isLoadingAccess) {
@@ -147,7 +165,11 @@ export default function RolesAdminPage() {
             </Card>
           )}
           {activeTab === "assignments" && (
-            <AssignmentPanel roles={roles} people={people} />
+            <AssignmentPanel
+              roles={roles}
+              people={people}
+              activeSiteId={activeSiteId}
+            />
           )}
           {activeTab === "effective-access" && (
             <EffectiveAccessPanel roles={roles} people={people} />

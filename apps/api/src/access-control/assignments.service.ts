@@ -226,13 +226,13 @@ export class AssignmentsService {
         id: command.roleDefinitionId,
         orgId: actor.orgId,
         isActive: true,
+        isSystem: true,
       },
       select: {
         id: true,
         orgId: true,
         tenantId: true,
         scope: true,
-        isActive: true,
       },
     });
     if (!role) {

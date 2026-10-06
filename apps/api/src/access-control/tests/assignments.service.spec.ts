@@ -47,6 +47,7 @@ function buildHarness(options: {
     tenantId: string | null;
     scope: "organisation" | "site" | "relationship";
     isActive: boolean;
+    isSystem: boolean;
   } | null;
   invalidateUser?: jest.Mock;
   outboxCreateMany?: jest.Mock;
@@ -93,6 +94,7 @@ function buildHarness(options: {
               tenantId: "site-1",
               scope: "site",
               isActive: true,
+              isSystem: true,
             }
           : options.role,
       ),
@@ -290,6 +292,7 @@ describe("AssignmentsService", () => {
         tenantId: "site-2",
         scope: "site",
         isActive: true,
+        isSystem: true,
       },
     });
 
@@ -306,13 +309,13 @@ describe("AssignmentsService", () => {
         id: "role-1",
         orgId: "org-1",
         isActive: true,
+        isSystem: true,
       },
       select: {
         id: true,
         orgId: true,
         tenantId: true,
         scope: true,
-        isActive: true,
       },
     });
   });
@@ -325,6 +328,7 @@ describe("AssignmentsService", () => {
         tenantId: "site-1",
         scope: "relationship",
         isActive: true,
+        isSystem: true,
       },
     });
 
@@ -333,6 +337,29 @@ describe("AssignmentsService", () => {
         statusCode: 400,
         code: "ROLE_NOT_ASSIGNABLE",
         requestId: actor.requestId,
+      },
+    });
+    expect(tx.userRoleAssignment.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an ordinary custom role before any assignment write", async () => {
+    const { service, tx } = buildHarness({ role: null });
+
+    await expect(service.assign([command], actor)).rejects.toMatchObject({
+      response: { statusCode: 400, code: "ROLE_NOT_ASSIGNABLE" },
+    });
+    expect(tx.orgRoleDefinition.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: command.roleDefinitionId,
+        orgId: actor.orgId,
+        isActive: true,
+        isSystem: true,
+      },
+      select: {
+        id: true,
+        orgId: true,
+        tenantId: true,
+        scope: true,
       },
     });
     expect(tx.userRoleAssignment.create).not.toHaveBeenCalled();
@@ -481,6 +508,7 @@ describe("AssignmentsService", () => {
                 tenantId: null,
                 scope: "organisation",
                 isActive: true,
+                isSystem: true,
               }
             : {
                 id: siteCommand.roleDefinitionId,
@@ -488,6 +516,7 @@ describe("AssignmentsService", () => {
                 tenantId: actor.tenantId,
                 scope: "site",
                 isActive: true,
+                isSystem: true,
               },
         ),
     );
