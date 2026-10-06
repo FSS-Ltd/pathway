@@ -7,7 +7,11 @@ role definitions or assignment rows.
 
 ## Read-only inventory (step 1.2d3a)
 
-Run with a database identity permitted to read the selected organisation.
+Run with an approved maintenance database identity that has RLS bypass. The
+current tenant and role-definition policies hide other sites from ordinary RLS
+identities; the command rejects that identity rather than returning an
+incomplete inventory. Use a direct or session-pooler connection, never the
+transaction pooler, because the scan uses transactions and session context.
 Set `DATABASE_URL` through the approved secret store. Keep the report outside
 the repository with owner-only file permissions:
 
@@ -16,7 +20,8 @@ umask 077
 pnpm --silent --filter @pathway/api access:inventory --org-id <organisation-uuid> > /private/tmp/custom-role-inventory.ndjson
 ```
 
-The command requires one organisation ID and uses read-only RLS transactions.
+The command requires one organisation ID and uses read-only transactions with
+organisation context.
 It lists assignments active at its capture time, including assignments to
 inactive custom roles. Each row contains the assignment and user IDs, role
 scope, validity window, raw role permissions, and candidate fixed roles and
@@ -52,7 +57,7 @@ allowed, but uncovered raw keys fail parity. Example:
 }
 ```
 
-Run the non-mutating preview with a read-only database identity after freezing
+Run the non-mutating preview with the same maintenance identity after freezing
 role, tag, membership, entitlement and site changes:
 
 ```sh
@@ -83,15 +88,32 @@ cache so a comparison after mutation sees uncommitted changes. It sets the
 organisation and selected site RLS context for every read. This read path alone
 does not mutate assignments (step 1.2d3b2a).
 
-For each affected user, compare effective access at every applicable site
-before and after a proposed mapping, including existing fixed roles and
-tags. Preserve assignment windows. Resolve every uncovered or widened key
-without granting additional access. Recheck protected access and the final
-Organisation Head invariant. Only then issue approved replacements, revoke
-the old assignment through an audited transaction, and verify the resulting
-effective access. Retain revoked assignments, role revisions, and audit facts.
+After a verified backup and write freeze, run a fresh inventory and parity
+preview. Review every mapping and exception, then run the maintenance command
+with an active fixed Organisation Head as the audit actor:
+
+```sh
+umask 077
+pnpm --silent --filter @pathway/api access:retire --plan /private/tmp/custom-role-plan.json --actor-user-id <fixed-head-uuid> > /private/tmp/custom-role-retirement.ndjson
+```
+
+For each affected user, the command re-reads the assignments, checks the
+actor's delegation ceiling and the Organisation Head invariant, and compares
+effective access at organisation scope and every site. It preserves replacement
+validity windows, writes grants and revocations with audit and outbox facts,
+and commits that user's transaction only when effective permission keys match.
+Revoked assignments and historical role definitions remain in place. A
+`user-committed` row confirms one committed user; only a final `complete` row
+and zero exit status confirm that all active custom assignments were retired.
+
+If the command stops after committed users, retain its report and do not replay
+the old plan. Investigate the error, run a fresh inventory, resolve exceptions,
+and preview a new plan for the remaining assignments under the write freeze.
+The command rejects scheduled custom assignments and a partial site inventory.
+Keep the backup, freeze, and post-run parity evidence with the release record.
 
 No production inventory or retirement is claimed while the source Supabase
-project is unavailable. A new-project database move needs its own backup,
-Storage-copy, configuration, and cutover verification before this runbook is
-used against production.
+project is unavailable. The planned move to a new project in a new Supabase
+organisation needs its own source recovery or export, database backup/restore,
+Storage copy, Auth and secrets configuration, and cutover verification before
+this runbook is used against production.

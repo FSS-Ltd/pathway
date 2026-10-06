@@ -19,6 +19,7 @@
     "access:backfill": "tsx scripts/backfill-org-head-assignments.ts",
     "access:inventory": "tsx scripts/inventory-custom-role-assignments.ts",
     "access:parity": "tsx scripts/preview-custom-role-cutover.ts",
+    "access:retire": "tsx scripts/retire-custom-role-assignments.ts",
     "stripe:provision:phase0": "tsx scripts/stripe-provision-phase0-plans.ts",
     "stripe:provision:learning": "tsx scripts/stripe-provision-learning-module.ts",
     "db:generate": "pnpm --filter @pathway/db run prisma:generate",

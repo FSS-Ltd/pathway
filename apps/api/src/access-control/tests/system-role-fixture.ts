@@ -1,6 +1,7 @@
 import { prisma, type Prisma } from "@pathway/db";
 
-const TRIGGER = '"OrgRoleDefinition_protect_system_template"';
+const DEFINITION_TRIGGER = '"OrgRoleDefinition_protect_system_template"';
+const PERMISSION_TRIGGER = '"OrgRolePermission_protect_system_template"';
 
 /** Allows disposable integration fixtures to model fixed roles without changing production seeding. */
 export async function withSystemRoleFixtureWrites<T>(
@@ -13,11 +14,17 @@ export async function withSystemRoleFixtureWrites<T>(
 
   return prisma.$transaction(async (tx) => {
     await tx.$executeRawUnsafe(
-      `ALTER TABLE "OrgRoleDefinition" DISABLE TRIGGER ${TRIGGER}`,
+      `ALTER TABLE "OrgRoleDefinition" DISABLE TRIGGER ${DEFINITION_TRIGGER}`,
+    );
+    await tx.$executeRawUnsafe(
+      `ALTER TABLE "OrgRolePermission" DISABLE TRIGGER ${PERMISSION_TRIGGER}`,
     );
     const result = await write(tx);
     await tx.$executeRawUnsafe(
-      `ALTER TABLE "OrgRoleDefinition" ENABLE TRIGGER ${TRIGGER}`,
+      `ALTER TABLE "OrgRolePermission" ENABLE TRIGGER ${PERMISSION_TRIGGER}`,
+    );
+    await tx.$executeRawUnsafe(
+      `ALTER TABLE "OrgRoleDefinition" ENABLE TRIGGER ${DEFINITION_TRIGGER}`,
     );
     return result;
   });

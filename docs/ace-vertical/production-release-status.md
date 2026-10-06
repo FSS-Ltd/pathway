@@ -24,8 +24,8 @@ deployment is claimed by this record.
 | 1.2d2    | Fixed-role-only assignment cutover                    | Merged  | [#351](https://github.com/FSS-Ltd/pathway/pull/351) to `master` | `a9493ed9c5d05fa86a6a96afcd077ba6004cad71`; all five jobs passed in [run 37418692392](https://github.com/FSS-Ltd/pathway/actions/runs/37418692392)             | `a1f8bbbe19bc056e4e28138657f1acdd2de7bfd5` |
 | 1.2d3a   | Read-only custom-assignment inventory                 | Merged  | [#352](https://github.com/FSS-Ltd/pathway/pull/352) to `master` | `9be47a8aed1bcbb808e392fb8db02df54737e6c2`; all five jobs passed in [run 37420486397](https://github.com/FSS-Ltd/pathway/actions/runs/37420486397)             | `053743614742c4acec9b2180604d294f3102d2e4` |
 | 1.2d3b1  | Effective-access parity preview for proposed mappings | Merged  | [#353](https://github.com/FSS-Ltd/pathway/pull/353) to `master` | `5ddb58ea9cbf49c369590b5efa852f4b8ab20dd1`; all five jobs passed in [run 37424373226](https://github.com/FSS-Ltd/pathway/actions/runs/37424373226)             | `8eaaa1c0d29a80b391855a0836931487296ed248` |
-| 1.2d3b2a | Fresh effective-access reads in a write transaction   | PR open | [#354](https://github.com/FSS-Ltd/pathway/pull/354) to `master` | `0b8e19c8`; CI pending                                                                                                                                         | Pending                                    |
-| 1.2d3b2b | Audited assignment retirement                         | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
+| 1.2d3b2a | Fresh effective-access reads in a write transaction   | Merged  | [#354](https://github.com/FSS-Ltd/pathway/pull/354) to `master` | `1fd7a972908141892215bbb937d00535e41f2c0e`; all five jobs passed in [run 37428121362](https://github.com/FSS-Ltd/pathway/actions/runs/37428121362)             | `62e3db49cd4372e3a5908e4674f7fb7fe2185fe2` |
+| 1.2d3b2b | Audited assignment retirement                         | PR open | [#355](https://github.com/FSS-Ltd/pathway/pull/355) to `master` | `9400c0dd4adcb2efbf07ad28e490315eb57afe14`; CI pending                                                                                                         | Pending                                    |
 | 1.3      | ACE core web journeys                                 | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                  | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                    | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -124,15 +124,27 @@ unverified while the source Supabase project is unavailable.
 Step 1.2d3b2a adds a transaction-aware effective-access read for the audited
 retirement command. It must use the caller's write transaction and bypass the
 shared assignment cache so before-and-after comparisons see uncommitted
-changes. Step 1.2d3b2b will validate the mapping and actor, issue replacements,
-revoke each custom assignment with audit and outbox records, and reject any
-effective-access difference before committing.
+changes.
 Local verification: repository lint and typecheck passed 16/16 packages each;
 API unit tests passed 133/133 suites (1007 tests); API integration tests
 passed 54/54 suites (361 tests) against a disposable PostgreSQL 17 database
 configured to UTC. The focused RLS suite passed 7/7 tests. API build,
 targeted Prettier, `git diff --check`, and `graphify update .` passed. Live
 Supabase migration and production smoke tests remain deferred.
+
+Step 1.2d3b2b validates the mapping and actor, issues replacements, revokes each
+custom assignment with audit and outbox records, and rejects any effective-access
+difference before committing. The maintenance command requires a database
+identity with RLS bypass because the current tenant and role-definition policies
+hide other sites from an ordinary RLS identity. It rejects a partial inventory
+rather than treating it as a successful cutover.
+Local verification: repository lint and typecheck passed 16/16 packages each;
+API unit tests passed 133/133 suites (1007 tests); API integration tests passed
+55/55 suites (364 tests) against a disposable PostgreSQL 17 database with all
+93 migrations and CI's RLS roles; API build, targeted formatting, and diff
+checks passed. The focused suite also verifies that a restricted database
+identity cannot run the inventory. Live Supabase migration, inventory, and
+production smoke tests remain deferred.
 
 ## Release gate
 
