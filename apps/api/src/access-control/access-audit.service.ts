@@ -11,6 +11,7 @@ import {
 const AUDIT_ENTITY_TYPES: readonly AuditEntityType[] = [
   AuditEntityType.ORG_ROLE,
   AuditEntityType.ROLE_ASSIGNMENT,
+  AuditEntityType.ACCESS_TAG_GRANT,
 ];
 
 const DEFAULT_AUDIT_LIST_LIMIT = 50;
@@ -19,7 +20,7 @@ const MAX_AUDIT_LIST_LIMIT = 50;
 export interface AuditListQuery {
   limit?: number;
   cursor?: string;
-  entityType?: "ORG_ROLE" | "ROLE_ASSIGNMENT";
+  entityType?: "ORG_ROLE" | "ROLE_ASSIGNMENT" | "ACCESS_TAG_GRANT";
 }
 
 @Injectable()

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { getOrgCapabilities } from "@pathway/platform";
+import { fromStoredAccessTagKey } from "./access-tag-keys";
 import {
   EffectivePermissionsService,
   type EffectivePermissionWithSources,
@@ -34,6 +35,15 @@ export interface AccessSummaryResult {
   tenantId: string | null;
   organisationMembership: { role: string } | null;
   assignments: AccessSummaryAssignment[];
+  tagGrants: {
+    id: string;
+    tagKey: string;
+    tenantId: string | null;
+    grantedById: string;
+    startsAt: Date;
+    expiresAt: Date | null;
+    isActive: boolean;
+  }[];
   organisationCapabilities: string[];
 }
 
@@ -73,7 +83,7 @@ export class AccessUsersService {
     actor: RoleActorContext,
   ): Promise<AccessSummaryResult> {
     return this.transaction.run(actor, async (tx) => {
-      const [membership, assignments, capabilities] = await Promise.all([
+      const [membership, assignments, tagGrants, capabilities] = await Promise.all([
         tx.orgMembership.findUnique({
           where: {
             orgId_userId: { orgId: actor.orgId, userId: targetUserId },
@@ -92,6 +102,26 @@ export class AccessUsersService {
             startsAt: true,
             expiresAt: true,
             roleDefinition: { select: { id: true, name: true, scope: true } },
+          },
+          orderBy: { startsAt: "desc" },
+        }),
+        tx.accessTagGrant.findMany({
+          where: {
+            orgId: actor.orgId,
+            userId: targetUserId,
+            revokedAt: null,
+            OR: [
+              { tenantId: null },
+              ...(actor.tenantId ? [{ tenantId: actor.tenantId }] : []),
+            ],
+          },
+          select: {
+            id: true,
+            tagKey: true,
+            tenantId: true,
+            grantedById: true,
+            startsAt: true,
+            expiresAt: true,
           },
           orderBy: { startsAt: "desc" },
         }),
@@ -115,6 +145,17 @@ export class AccessUsersService {
           isActive:
             assignment.startsAt <= now &&
             (assignment.expiresAt === null || assignment.expiresAt > now),
+        })),
+        tagGrants: tagGrants.map((grant) => ({
+          id: grant.id,
+          tagKey: fromStoredAccessTagKey(grant.tagKey),
+          tenantId: grant.tenantId,
+          grantedById: grant.grantedById,
+          startsAt: grant.startsAt,
+          expiresAt: grant.expiresAt,
+          isActive:
+            grant.startsAt <= now &&
+            (grant.expiresAt === null || grant.expiresAt > now),
         })),
         organisationCapabilities: capabilities,
       };

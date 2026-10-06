@@ -313,6 +313,7 @@ describe("RolesService", () => {
             revokedAt: null,
           }] satisfies EffectivePermissionGrant[];
         }),
+        findTagGrants: jest.fn().mockResolvedValue([]),
       };
       const resolver = new EffectivePermissionsService(
         reader,

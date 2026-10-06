@@ -44,15 +44,15 @@ describe("configureCiRlsRole", () => {
       statements.push(statement.trim());
     });
 
-    expect(statements).toHaveLength(54);
+    expect(statements).toHaveLength(60);
     expect(statements[0]).toContain('CREATE ROLE "pathway_e2e_rls"');
-    expect(statements[16]).toContain(
+    expect(statements[18]).toContain(
       'CREATE ROLE "pathway_e2e_outbox_denied"',
     );
-    expect(statements[32]).toContain(
+    expect(statements[36]).toContain(
       'CREATE ROLE "pathway_e2e_audit_denied"',
     );
-    expect(statements[48]).toContain(
+    expect(statements[54]).toContain(
       'CREATE ROLE "pathway_e2e_tenant_rls"',
     );
     expect(statements).toEqual(
@@ -63,12 +63,14 @@ describe("configureCiRlsRole", () => {
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleDefinition" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO "pathway_e2e_rls";',
+        'GRANT SELECT, INSERT, UPDATE ON TABLE "AccessTagGrant" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleRevision" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT ON TABLE "AuditEvent" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT ON TABLE "OutboxEvent" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "Tenant" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "PermissionDefinition" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgMembership" TO "pathway_e2e_rls";',
+        'GRANT SELECT ON TABLE "SiteMembership" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgVertical" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgModule" TO "pathway_e2e_rls";',
         'GRANT "pathway_e2e_rls" TO "pathway_test_user";',
@@ -91,8 +93,6 @@ describe("configureCiRlsRole", () => {
     expect(statements.join("\n")).not.toContain(
       'GRANT SELECT, INSERT ON TABLE "AuditEvent" TO "pathway_e2e_audit_denied";',
     );
-    expect(statements.join("\n")).not.toMatch(
-      /"SiteMembership"|"User"/,
-    );
+    expect(statements.join("\n")).not.toMatch(/"User"/);
   });
 });

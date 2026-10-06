@@ -1,4 +1,5 @@
 import { AccessUsersService } from "../access-users.service";
+import { AccessTagKey } from "@prisma/client";
 import { EffectivePermissionsService } from "../effective-permissions.service";
 import type { RoleActorContext, RolesTransactionBoundary } from "../roles.service";
 
@@ -30,6 +31,7 @@ const allowedTx = {
   orgVertical: { findUnique: jest.fn().mockResolvedValue({ vertical: "ACE_SCHOOL" }) },
   orgModule: { findMany: jest.fn().mockResolvedValue([]) },
   userRoleAssignment: { findMany: jest.fn().mockResolvedValue([]) },
+  accessTagGrant: { findMany: jest.fn().mockResolvedValue([]) },
 };
 
 describe("AccessUsersService", () => {
@@ -71,6 +73,18 @@ describe("AccessUsersService", () => {
           },
         ]),
       },
+      accessTagGrant: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "tag-grant-1",
+            tagKey: AccessTagKey.ATTENDANCE_RECORDER,
+            tenantId: "site-1",
+            grantedById: "actor-1",
+            startsAt: new Date("2026-07-01T00:00:00.000Z"),
+            expiresAt: null,
+          },
+        ]),
+      },
     };
     const { service } = serviceWith(tx);
     jest.useFakeTimers().setSystemTime(now);
@@ -90,6 +104,17 @@ describe("AccessUsersService", () => {
             roleName: "Organisation Head",
             scope: "organisation",
             tenantId: null,
+            startsAt: new Date("2026-07-01T00:00:00.000Z"),
+            expiresAt: null,
+            isActive: true,
+          },
+        ],
+        tagGrants: [
+          {
+            id: "tag-grant-1",
+            tagKey: "attendance-recorder",
+            tenantId: "site-1",
+            grantedById: "actor-1",
             startsAt: new Date("2026-07-01T00:00:00.000Z"),
             expiresAt: null,
             isActive: true,

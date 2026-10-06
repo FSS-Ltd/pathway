@@ -8,6 +8,7 @@ import {
   EffectivePermissionsService,
   ORG_CAPABILITIES_READER,
   type EffectivePermissionsReader,
+  type EffectiveTagPermissionGrant,
   type EffectivePermissionsContext,
   type FeatureAvailabilityReader,
   type OrgCapabilitiesReader,
@@ -44,20 +45,38 @@ function grant(overrides: Partial<Grant> = {}): Grant {
   };
 }
 
+function tagGrant(
+  overrides: Partial<EffectiveTagPermissionGrant> = {},
+): EffectiveTagPermissionGrant {
+  return {
+    tagGrantId: "tag-grant-1",
+    tenantId: null,
+    permissionKey: "ace.pace.read",
+    permissionIsActive: true,
+    startsAt: new Date("2026-07-28T11:00:00.000Z"),
+    expiresAt: null,
+    revokedAt: null,
+    ...overrides,
+  };
+}
+
 function createService({
   hasMembership = true,
   grants = [grant()],
+  tagGrants = [],
   capabilities = ["ace.pace.read" as PermissionKey],
   available = true,
 }: {
   hasMembership?: boolean;
   grants?: readonly Grant[];
+  tagGrants?: readonly EffectiveTagPermissionGrant[];
   capabilities?: readonly PermissionKey[];
   available?: boolean;
 } = {}): EffectivePermissionsService {
   const reader: EffectivePermissionsReader = {
     getOrganisationMembership: async () => hasMembership,
     findAssignments: async () => grants,
+    findTagGrants: async () => tagGrants,
   };
   const capabilityReader: OrgCapabilitiesReader = {
     get: async () => capabilities,
@@ -157,6 +176,7 @@ describe("EffectivePermissionsService", () => {
         requestedTenantIds.push(tenantId);
         return [grant({ roleScope: "site", roleTenantId: SITE_ID })];
       },
+      findTagGrants: async () => [],
     };
     const service = new EffectivePermissionsService(
       reader,
@@ -177,7 +197,7 @@ describe("EffectivePermissionsService", () => {
     const findAssignments = jest.fn().mockResolvedValue([grant()]);
     const cache = new AccessCacheService();
     const service = new EffectivePermissionsService(
-      { getOrganisationMembership, findAssignments },
+      { getOrganisationMembership, findAssignments, findTagGrants: async () => [] },
       { get: async () => ["ace.pace.read"] },
       { isAvailable: async () => true },
       testPermissionsContext,
@@ -186,13 +206,13 @@ describe("EffectivePermissionsService", () => {
 
     await resolve(service, { tenantId: SITE_ID });
     await resolve(service, { tenantId: SITE_ID });
-    expect(getOrganisationMembership).toHaveBeenCalledTimes(1);
+    expect(getOrganisationMembership).toHaveBeenCalledTimes(2);
     expect(findAssignments).toHaveBeenCalledTimes(1);
 
     await cache.invalidateUser(USER_ID, ORG_ID);
     await resolve(service, { tenantId: SITE_ID });
 
-    expect(getOrganisationMembership).toHaveBeenCalledTimes(2);
+    expect(getOrganisationMembership).toHaveBeenCalledTimes(3);
     expect(findAssignments).toHaveBeenCalledTimes(2);
   });
 
@@ -205,6 +225,7 @@ describe("EffectivePermissionsService", () => {
       {
         getOrganisationMembership: async () => true,
         findAssignments,
+        findTagGrants: async () => [],
       },
       { get: async () => ["ace.pace.read"] },
       { isAvailable: async () => true },
@@ -315,6 +336,7 @@ describe("EffectivePermissionsService", () => {
       .useValue({
         getOrganisationMembership: async () => true,
         findAssignments: async () => [grant()],
+        findTagGrants: async () => [],
       } satisfies EffectivePermissionsReader)
       .overrideProvider(ORG_CAPABILITIES_READER)
       .useValue({
@@ -349,6 +371,7 @@ describe("EffectivePermissionsService", () => {
         findAssignments: async () => [
           grant({ permissionKey: "unregistered.key" as PermissionKey }),
         ],
+        findTagGrants: async () => [],
       } satisfies EffectivePermissionsReader)
       .overrideProvider(ORG_CAPABILITIES_READER)
       .useValue({
@@ -511,5 +534,94 @@ describe("EffectivePermissionsService", () => {
       { permissionKey: "ace.behaviour.read", sourceRoleIds: ["role-other-permission"] },
       { permissionKey: "ace.pace.read", sourceRoleIds: ["role-a", "role-z"] },
     ]);
+  });
+
+  it("allows an active tag without claiming it came from a role", async () => {
+    const service = createService({ grants: [], tagGrants: [tagGrant()] });
+
+    await expect(resolve(service)).resolves.toEqual({
+      allowed: true,
+      reason: "allowed",
+      sourceRoleIds: [],
+      sourceTagGrantIds: ["tag-grant-1"],
+    });
+    await expect(service.listForUser(USER_ID, ORG_ID)).resolves.toEqual([
+      "ace.pace.read",
+    ]);
+    await expect(service.listForUserWithSources(USER_ID, ORG_ID)).resolves.toEqual([
+      {
+        permissionKey: "ace.pace.read",
+        sourceRoleIds: [],
+        sourceTagGrantIds: ["tag-grant-1"],
+      },
+    ]);
+  });
+
+  it("denies a site tag outside its selected site", async () => {
+    const service = createService({
+      grants: [],
+      tagGrants: [tagGrant({ tenantId: SITE_ID })],
+    });
+
+    await expect(resolve(service)).resolves.toEqual({
+      allowed: false,
+      reason: "permission-missing",
+      sourceRoleIds: [],
+    });
+    await expect(resolve(service, { tenantId: OTHER_SITE_ID })).resolves.toEqual({
+      allowed: false,
+      reason: "permission-missing",
+      sourceRoleIds: [],
+    });
+    await expect(resolve(service, { tenantId: SITE_ID })).resolves.toMatchObject({
+      allowed: true,
+      sourceTagGrantIds: ["tag-grant-1"],
+    });
+  });
+
+  it.each([
+    ["future", { startsAt: new Date(NOW.getTime() + 1_000) }],
+    ["expired", { expiresAt: NOW }],
+    ["revoked", { revokedAt: NOW }],
+  ] as const)("denies a %s tag", async (_name, fields) => {
+    const service = createService({ grants: [], tagGrants: [tagGrant(fields)] });
+
+    await expect(resolve(service)).resolves.toEqual({
+      allowed: false,
+      reason: "permission-missing",
+      sourceRoleIds: [],
+    });
+  });
+
+  it("checks tag revocation and module expiry without relying on the role cache", async () => {
+    let tags: EffectiveTagPermissionGrant[] = [tagGrant()];
+    let capabilities: PermissionKey[] = ["ace.pace.read"];
+    const findTagGrants = jest.fn().mockImplementation(async () => tags);
+    const reader: EffectivePermissionsReader = {
+      getOrganisationMembership: async () => true,
+      findAssignments: async () => [],
+      findTagGrants,
+    };
+    const service = new EffectivePermissionsService(
+      reader,
+      { get: async () => capabilities },
+      { isAvailable: async () => true },
+      testPermissionsContext,
+      new AccessCacheService(),
+    );
+
+    await expect(resolve(service)).resolves.toMatchObject({ allowed: true });
+    tags = [];
+    await expect(resolve(service)).resolves.toMatchObject({
+      allowed: false,
+      reason: "permission-missing",
+    });
+    tags = [tagGrant()];
+    capabilities = [];
+    await expect(resolve(service)).resolves.toMatchObject({
+      allowed: false,
+      reason: "capability-missing",
+    });
+    expect(findTagGrants).toHaveBeenCalledTimes(2);
   });
 });

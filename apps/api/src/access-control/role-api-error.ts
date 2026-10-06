@@ -45,6 +45,17 @@ const SAFE_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_PERMISSIONS_REQUEST: "The permissions request is invalid.",
   PERMISSIONS_API_ACCESS_DENIED:
     "You are not allowed to view delegable permissions.",
+  INVALID_ACCESS_TAG_REQUEST: "The access-tag request is invalid.",
+  INVALID_ACCESS_TAG_WINDOW: "The access-tag validity window is invalid.",
+  ACCESS_TAG_UNAVAILABLE: "This access tag is not available.",
+  ACCESS_TAG_ACTOR_NOT_HEAD: "Only an organisation head can manage access tags.",
+  ACCESS_TAG_ASSIGNEE_NOT_IN_SITE:
+    "The selected user is not a member of this site.",
+  ACCESS_TAG_CANNOT_DELEGATE:
+    "You cannot delegate this access tag in the selected scope.",
+  ACCESS_TAG_ALREADY_GRANTED: "This access tag has already been granted.",
+  ACCESS_TAG_GRANT_NOT_FOUND: "The access-tag grant was not found.",
+  ACCESS_TAG_ALREADY_REVOKED: "This access-tag grant is already revoked.",
 };
 
 export function roleApiError(
