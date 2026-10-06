@@ -42,6 +42,12 @@ transition and audit/outbox facts atomically, and creates one linked
 `DELIVERED_ORDER` supply row only on delivery. A skipped, repeated, or stale
 transition fails without changing order or supply history.
 
+Step 1.3b2c1 adds the permission-gated ACE web route for site-scoped stock
+attention, all active placements' physical stock, and order history. Each list
+uses the bounded API cursor and reloads after an active-site change. It
+provides loading, empty, retry, and accessible status states. Order, stock,
+and delivery write controls follow in the next web step.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,
