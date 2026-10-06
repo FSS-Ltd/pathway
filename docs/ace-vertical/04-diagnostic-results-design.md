@@ -47,6 +47,10 @@ that projection and its rebuild baseline before a diagnostic can offer an
   but must verify that the result belongs to the active site. The fact, audit
   event, and outbox event commit together. Retraction never deletes the fact.
 
+The C05a2 migration serializes a result insert with an enrollment status
+change by locking the active enrollment row. It stamps result and retraction
+times at the database boundary and rejects updates or deletes to either fact.
+
 ## API and web journey
 
 Provide a bounded `GET /ace/pace/diagnostics` filtered by child and subject,
@@ -66,9 +70,9 @@ reconciliation is verified.
 
 ## Delivery and verification
 
-1. C05a1 adds typed ACE-core permissions to the registry and fixed leader
-   templates, without adding them to a delegable tag. Verify vertical gating
-   and role mappings. C05a2 adds schema, forced RLS, and actor constraints.
+1. C05a1 added typed ACE-core permissions to the registry and fixed leader
+   templates in PR #368, without adding them to a delegable tag. C05a2 adds
+   schema, forced RLS, and actor constraints.
    Verify same-site allow and cross-site/organisation denial on disposable
    PostgreSQL, plus migration and role-grant checks.
 2. C05b adds bounded reads and audited record/retract commands. Test invalid

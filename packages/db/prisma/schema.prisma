@@ -340,6 +340,11 @@ enum PaceAssessmentResult {
   FAILED
 }
 
+enum PaceDiagnosticOutcome {
+  PASS
+  FAIL
+}
+
 enum PaceTrackStatus {
   AHEAD
   ON_TRACK
@@ -863,6 +868,8 @@ model Tenant {
   subjectEnrollments     StudentSubjectEnrollment[]
   paceAssessments        PaceAssessment[]
   paceProgress           PaceProgress[]
+  paceDiagnosticResults  PaceDiagnosticResult[]
+  paceDiagnosticRetractions PaceDiagnosticRetraction[]
   paceInventoryOrders    PaceInventoryOrder[]
   paceInventorySupplies  PaceInventorySupply[]
   pacePolicies           PacePolicy[]
@@ -1044,6 +1051,8 @@ model User {
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
   paceInventoryOrdersCreated PaceInventoryOrder[] @relation("PaceInventoryOrderCreatedBy")
   paceInventorySuppliesCreated PaceInventorySupply[] @relation("PaceInventorySupplyCreatedBy")
+  paceDiagnosticResultsRecorded PaceDiagnosticResult[] @relation("PaceDiagnosticResultRecordedBy")
+  paceDiagnosticRetractionsRecorded PaceDiagnosticRetraction[] @relation("PaceDiagnosticRetractionRecordedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
   requestedDataExports    DataExportRequest[]      @relation("DataExportRequestRequestedBy")
   requestedAccountDeletions AccountDeletionRequest[] @relation("AccountDeletionRequestRequestedBy")
@@ -1463,6 +1472,7 @@ model Child {
   subjectEnrollments         StudentSubjectEnrollment[]
   paceAssessments            PaceAssessment[]
   paceProgress               PaceProgress[]
+  paceDiagnosticResults      PaceDiagnosticResult[]
   paceInventoryOrders        PaceInventoryOrder[]
   paceInventorySupplies      PaceInventorySupply[]
   pacePolicyOverrides        PacePolicyOverride[]
@@ -2375,6 +2385,7 @@ model Subject {
   subjectEnrollments  StudentSubjectEnrollment[]
   paceAssessments     PaceAssessment[]
   paceProgress        PaceProgress[]
+  paceDiagnosticResults PaceDiagnosticResult[]
   paceInventoryOrders PaceInventoryOrder[]
   paceInventorySupplies PaceInventorySupply[]
   pacePolicyOverrides PacePolicyOverride[]
@@ -2698,12 +2709,53 @@ model StudentSubjectEnrollment {
   targetPace       Int
   recordedByUserId String
   recordedBy       User                           @relation("StudentSubjectEnrollmentRecordedBy", fields: [recordedByUserId], references: [id])
+  diagnosticResults PaceDiagnosticResult[]
   reason           String                         @db.Text
   createdAt        DateTime                       @default(now())
   updatedAt        DateTime                       @default(now()) @updatedAt
 
   @@unique([id, tenantId])
+  @@unique([id, tenantId, childId, subjectId])
   @@index([tenantId, status, subjectId, childId])
+}
+
+// Append-only diagnostic facts. A retraction is a separate fact; recording
+// never changes the enrolled PACE or assessment progress.
+model PaceDiagnosticResult {
+  id               String                @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId          String
+  child            Child                 @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  subjectId        String
+  subject          Subject               @relation(fields: [subjectId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  enrollmentId     String
+  enrollment       StudentSubjectEnrollment @relation(fields: [enrollmentId, tenantId, childId, subjectId], references: [id, tenantId, childId, subjectId], onDelete: Restrict)
+  level            Int
+  outcome          PaceDiagnosticOutcome
+  recordedByUserId String
+  recordedBy       User                  @relation("PaceDiagnosticResultRecordedBy", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  recordedAt       DateTime              @default(now())
+  retraction       PaceDiagnosticRetraction?
+
+  @@unique([id, tenantId])
+  @@index([tenantId, childId, subjectId, recordedAt, id])
+}
+
+model PaceDiagnosticRetraction {
+  id                String                @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  resultId          String
+  result            PaceDiagnosticResult  @relation(fields: [resultId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reason            String                @db.Text
+  retractedByUserId String
+  retractedBy       User                  @relation("PaceDiagnosticRetractionRecordedBy", fields: [retractedByUserId], references: [id], onDelete: Restrict)
+  retractedAt       DateTime              @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([resultId, tenantId])
+  @@index([tenantId, retractedAt, id])
 }
 
 // Immutable assessment facts. Corrections are complete successor facts linked
