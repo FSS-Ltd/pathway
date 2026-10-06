@@ -66,7 +66,9 @@ reconciliation is verified.
 
 ## Delivery and verification
 
-1. C05a adds schema, forced RLS, actor constraints, and typed permissions.
+1. C05a1 adds typed ACE-core permissions to the registry and fixed leader
+   templates, without adding them to a delegable tag. Verify vertical gating
+   and role mappings. C05a2 adds schema, forced RLS, and actor constraints.
    Verify same-site allow and cross-site/organisation denial on disposable
    PostgreSQL, plus migration and role-grant checks.
 2. C05b adds bounded reads and audited record/retract commands. Test invalid

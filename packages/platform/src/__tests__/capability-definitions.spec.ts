@@ -4,16 +4,14 @@ import {
   type Capability,
   type PermissionKey,
 } from "../capability-definitions";
-import {
-  MODULE_CAPABILITIES,
-  VERTICAL_CAPABILITIES,
-} from "../capability-maps";
+import { MODULE_CAPABILITIES, VERTICAL_CAPABILITIES } from "../capability-maps";
 
 type Assert<T extends true> = T;
 type AssertFalse<T extends false> = T;
 type Equal<Left, Right> =
-  (<Value>() => Value extends Left ? 1 : 2) extends <Value>() =>
-    Value extends Right ? 1 : 2
+  (<Value>() => Value extends Left ? 1 : 2) extends <
+    Value,
+  >() => Value extends Right ? 1 : 2
     ? true
     : false;
 
@@ -77,6 +75,8 @@ const SECTION_5_2_KEYS = [
   "ace.pace.override",
   "ace.pace.inventory.read",
   "ace.pace.inventory.manage",
+  "ace.pace.diagnostics.read",
+  "ace.pace.diagnostics.manage",
   "ace.behaviour.read",
   "ace.behaviour.record",
   "ace.behaviour.sensitive.read",
@@ -170,8 +170,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 111 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(111);
+  it("contains exactly the 113 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(113);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
@@ -179,10 +179,7 @@ describe("capability definitions", () => {
 
   it.each(APPROVED_REGISTRY_KEYS)("registers %s", (capability) => {
     expect(
-      Object.prototype.hasOwnProperty.call(
-        CAPABILITY_DEFINITIONS,
-        capability,
-      ),
+      Object.prototype.hasOwnProperty.call(CAPABILITY_DEFINITIONS, capability),
     ).toBe(true);
   });
 
@@ -223,9 +220,9 @@ describe("capability definitions", () => {
     )) {
       expect(CAPABILITY_DEFINITIONS[key].delegable).toBe(false);
     }
-    expect(
-      CAPABILITY_DEFINITIONS["safeguarding.concerns.read"].delegable,
-    ).toBe(false);
+    expect(CAPABILITY_DEFINITIONS["safeguarding.concerns.read"].delegable).toBe(
+      false,
+    );
     expect(
       CAPABILITY_DEFINITIONS["safeguarding.concerns.manage"].delegable,
     ).toBe(false);
@@ -270,6 +267,9 @@ describe("capability definitions", () => {
     );
     expect(
       CAPABILITY_DEFINITIONS["ace.pace.inventory.manage"].requiredVertical,
+    ).toBe(Vertical.ACE_SCHOOL);
+    expect(
+      CAPABILITY_DEFINITIONS["ace.pace.diagnostics.manage"].requiredVertical,
     ).toBe(Vertical.ACE_SCHOOL);
 
     for (const key of [
