@@ -66,6 +66,15 @@ while read-only actors see no write control. An in-flight result from a
 previous active site cannot display a success or error in the new site.
 Delivery transitions remain a separate web step.
 
+Step 1.3b2c4 exposes the existing forward-only order command to permitted
+managers in order history. An ordered PACE can be confirmed in transit; an
+in-transit PACE can be confirmed delivered, which creates the physical supply
+record. The web control shows the next action only, requires explicit
+confirmation, blocks repeat submission, reports conflicts, and refreshes both
+orders and stock after success. Read-only actors have no transition control;
+results from a previous active site are ignored. The server remains the
+authority for placement, site, and transition validity.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,

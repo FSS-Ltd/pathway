@@ -1,6 +1,7 @@
 import React from "react";
 import { Badge, Button, Card } from "@pathway/ui";
 import type {
+  PaceInventoryNextOrderStatus,
   PaceInventoryOrderItem,
   PaceInventoryStockItem,
 } from "@/lib/pace-inventory-api";
@@ -9,6 +10,7 @@ import {
   type PaceInventoryBulkAction,
 } from "./pace-inventory-bulk-form";
 import type { PagedInventory } from "./use-pace-inventory-page";
+import { PaceInventoryOrderTransition } from "./pace-inventory-order-transition";
 
 type InventoryWorkspaceProps = {
   stock: PagedInventory<PaceInventoryStockItem>;
@@ -17,6 +19,9 @@ type InventoryWorkspaceProps = {
   orders: PagedInventory<PaceInventoryOrderItem>;
   orderCreation?: { onCreated: (created: number) => void };
   stockEntry?: { onCreated: (created: number) => void };
+  orderTransition?: {
+    onAdvanced: (status: PaceInventoryNextOrderStatus) => void;
+  };
   notice?: string | null;
 };
 
@@ -32,6 +37,7 @@ export function PaceInventoryWorkspace({
   orders,
   orderCreation,
   stockEntry,
+  orderTransition,
   notice,
 }: InventoryWorkspaceProps) {
   const showAllStock = stockView === "all";
@@ -108,7 +114,13 @@ export function PaceInventoryWorkspace({
           page={orders}
           emptyMessage="No physical PACE orders have been recorded for this site."
           loadMoreLabel="Load more orders"
-          renderItem={(item) => <OrderRow key={item.id} item={item} />}
+          renderItem={(item) => (
+            <OrderRow
+              key={item.id}
+              item={item}
+              onAdvanced={orderTransition?.onAdvanced}
+            />
+          )}
         />
       </Card>
     </main>
@@ -287,7 +299,13 @@ function StockRow({
   );
 }
 
-function OrderRow({ item }: { item: PaceInventoryOrderItem }) {
+function OrderRow({
+  item,
+  onAdvanced,
+}: {
+  item: PaceInventoryOrderItem;
+  onAdvanced?: (status: PaceInventoryNextOrderStatus) => void;
+}) {
   const status = {
     ORDERED: { label: "Ordered", variant: "default" },
     IN_TRANSIT: { label: "In transit", variant: "accent" },
@@ -308,9 +326,14 @@ function OrderRow({ item }: { item: PaceInventoryOrderItem }) {
           UTC
         </p>
       </div>
-      <Badge variant={status[item.status].variant} className="self-start">
-        {status[item.status].label}
-      </Badge>
+      <div className="flex flex-col items-start gap-2">
+        <Badge variant={status[item.status].variant}>
+          {status[item.status].label}
+        </Badge>
+        {onAdvanced && item.status !== "DELIVERED" ? (
+          <PaceInventoryOrderTransition order={item} onAdvanced={onAdvanced} />
+        ) : null}
+      </div>
     </li>
   );
 }

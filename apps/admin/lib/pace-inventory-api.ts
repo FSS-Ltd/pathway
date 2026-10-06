@@ -55,6 +55,38 @@ export type PaceInventoryStockResult = {
   created: number;
 };
 
+export type PaceInventoryNextOrderStatus = "IN_TRANSIT" | "DELIVERED";
+
+export type PaceInventoryOrderStatusResult = {
+  orderId: string;
+  status: PaceInventoryNextOrderStatus;
+  reachedAt: string;
+  supplyId: string | null;
+};
+
+export async function advancePaceInventoryOrder(
+  orderId: string,
+  status: PaceInventoryNextOrderStatus,
+): Promise<PaceInventoryOrderStatusResult> {
+  if (isUsingMockApi()) {
+    throw new Error(
+      "Physical PACE inventory changes are not available in mock mode.",
+    );
+  }
+  const response = await fetch(
+    `${API_BASE_URL}/ace/pace/inventory/orders/${encodeURIComponent(orderId)}/status`,
+    {
+      method: "PATCH",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      body: JSON.stringify({ status }),
+    },
+  );
+  if (!response.ok) throw await paceRequestError(response);
+  return response.json() as Promise<PaceInventoryOrderStatusResult>;
+}
+
 export async function createPaceInventoryOrders(
   input: PaceInventoryBulkInput,
 ): Promise<PaceInventoryOrderResult> {
