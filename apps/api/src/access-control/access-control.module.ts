@@ -2,7 +2,9 @@ import { Module } from "@nestjs/common";
 import { prisma, withOrgRlsContext, withTenantRlsContext } from "@pathway/db";
 import {
   CAPABILITY_DEFINITIONS,
+  accessTagPermissionKeys,
   getOrgCapabilities,
+  isAccessTagAvailable,
   type CapabilityDefinition,
   type PermissionKey,
 } from "@pathway/platform";
@@ -33,6 +35,9 @@ import { AccessPermissionsController } from "./access-permissions.controller";
 import { AccessPermissionsService } from "./access-permissions.service";
 import { AccessUsersController } from "./access-users.controller";
 import { AccessUsersService } from "./access-users.service";
+import { AccessTagsController } from "./access-tags.controller";
+import { AccessTagsService } from "./access-tags.service";
+import { fromStoredAccessTagKey } from "./access-tag-keys";
 import { AssignmentsController } from "./assignments.controller";
 import { AssignmentsService } from "./assignments.service";
 import { RolesController } from "./roles.controller";
@@ -104,6 +109,67 @@ const effectivePermissionsReader: EffectivePermissionsReader = {
       })),
     );
   },
+
+  async findTagGrants(userId, orgId, tenantId, now) {
+    const [grants, siteMembership] = await Promise.all([
+      prisma.accessTagGrant.findMany({
+        where: {
+          orgId,
+          userId,
+          revokedAt: null,
+          OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+          AND: [
+            {
+              OR: [
+                { tenantId: null },
+                ...(tenantId ? [{ tenantId }] : []),
+              ],
+            },
+          ],
+        },
+        select: {
+          id: true,
+          tenantId: true,
+          tagKey: true,
+          startsAt: true,
+          expiresAt: true,
+          revokedAt: true,
+        },
+      }),
+      tenantId
+        ? prisma.siteMembership.findUnique({
+            where: { tenantId_userId: { tenantId, userId } },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    const visible = grants
+      .filter((grant) => grant.tenantId === null || siteMembership !== null)
+      .map((grant) => ({
+        grant,
+        publicKey: fromStoredAccessTagKey(grant.tagKey),
+      }))
+      .filter(({ publicKey }) => isAccessTagAvailable(publicKey));
+    const keys = [...new Set(visible.flatMap(({ publicKey }) =>
+      accessTagPermissionKeys(publicKey),
+    ))];
+    const metadata = await prisma.permissionDefinition.findMany({
+      where: { key: { in: keys } },
+      select: { key: true, isActive: true },
+    });
+    const activeByKey = new Map(metadata.map(({ key, isActive }) => [key, isActive]));
+    return visible.flatMap(({ grant, publicKey }) =>
+      accessTagPermissionKeys(publicKey).map((permissionKey) => ({
+        tagGrantId: grant.id,
+        tenantId: grant.tenantId,
+        permissionKey,
+        permissionIsActive: activeByKey.get(permissionKey) === true,
+        startsAt: grant.startsAt,
+        expiresAt: grant.expiresAt,
+        revokedAt: grant.revokedAt,
+      })),
+    );
+  },
 };
 
 const orgCapabilitiesReader: OrgCapabilitiesReader = {
@@ -138,6 +204,7 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
     AssignmentsController,
     RolesController,
     AccessUsersController,
+    AccessTagsController,
     AccessAuditController,
     AccessPermissionsController,
   ],
@@ -145,6 +212,7 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
     AssignmentsService,
     RolesService,
     AccessUsersService,
+    AccessTagsService,
     AccessAuditService,
     AccessPermissionsService,
     RoleSafetyService,

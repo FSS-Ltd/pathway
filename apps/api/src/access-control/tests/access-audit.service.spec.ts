@@ -44,7 +44,7 @@ const events = [
 ];
 
 describe("AccessAuditService", () => {
-  it("defaults to role and assignment entity types and returns a stable page", async () => {
+  it("defaults to role, assignment, and tag entity types and returns a stable page", async () => {
     const findMany = jest.fn().mockResolvedValue(events);
     const service = serviceWith({ ...allowedTx, auditEvent: { findMany } });
 
@@ -54,7 +54,7 @@ describe("AccessAuditService", () => {
       expect.objectContaining({
         where: {
           orgId: "org-1",
-          entityType: { in: [AuditEntityType.ORG_ROLE, AuditEntityType.ROLE_ASSIGNMENT] },
+          entityType: { in: [AuditEntityType.ORG_ROLE, AuditEntityType.ROLE_ASSIGNMENT, AuditEntityType.ACCESS_TAG_GRANT] },
         },
       }),
     );

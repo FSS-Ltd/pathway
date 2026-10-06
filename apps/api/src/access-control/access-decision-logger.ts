@@ -39,6 +39,7 @@ export class AccessDecisionLogger {
       decision: decision.allowed ? "allowed" : "denied",
       reason: decision.reason,
       sourceRoleIds: decision.sourceRoleIds,
+      sourceTagGrantIds: decision.sourceTagGrantIds,
       requestId,
       route,
     });

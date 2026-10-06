@@ -18,7 +18,7 @@ approval to keep customer role writes. The target contract is:
 | R02, R04-R07 role creation, editing, cloning, permission replacement, and retirement | Reject legacy writes; fixed role templates remain read-only. |
 | R09-R11 assignments | Assign only platform-owned fixed roles, preserve historical custom assignments during audited parity migration, and retain one-way revocation. |
 | R12-R14 effective access and audit | Include active, scoped tag grants after delegation and entitlement checks; preserve tenant, relationship, and safeguarding boundaries. |
-| New access-tag catalogue, grant, revoke, and effective-access routes | Resolve exact paths and guards in the API step; no client-defined permission key or paid-module activation. |
+| Access-tag catalogue, grant, revoke, and effective-access routes | Use the exact paths and guards below; no client-defined permission key or paid-module activation. |
 
 The tag catalogue contains all 17 Oasis concepts. Concepts without a matching
 typed permission, entitlement, or record-scope guard remain unavailable. A tag
@@ -27,6 +27,20 @@ the issued scope cannot exceed the actor's scope. The grant record retains
 grantor, validity, one-way revocation, and audit facts. Access reads must ignore
 expired and revoked grants and re-evaluate on site switches. Until the API and
 migration steps merge, the existing R01-R14 behavior below remains live.
+
+Step 1.2c adds these routes outside the original 68-route ACE contract. Each
+uses the authenticated request's organisation and selected site. Grant and
+revoke require an active fixed Organisation Head assignment; a legacy role
+claim alone cannot authorise either operation. Reads show organisation grants
+and grants for the selected site only. R12, R13, R14, and R69 include active
+tag sources or their audit/summary records when step 1.2c is deployed.
+
+| Method | Path | Permission | Boundary |
+| --- | --- | --- | --- |
+| GET | `/access/tags/catalogue` | `platform.access.permissions.read` | Fixed catalogue; unavailable tags cannot be granted. |
+| GET | `/access/tags/grants` | `platform.access.assignments.read` | Organisation and selected-site scope; cursor pagination; historical revocations remain readable. |
+| POST | `/access/tags/grants` | `platform.access.assignments.manage` | Fixed head; current delegable actor-held permissions, active entitlement, recipient membership, validity window. |
+| DELETE | `/access/tags/grants/:grantId` | `platform.access.assignments.manage` | Fixed head; organisation and selected-site scope; one-way audited revocation. |
 
 ## Contract boundaries
 

@@ -20,4 +20,5 @@ export interface AccessDecision {
     | "release-denied"
     | "tenant-denied";
   sourceRoleIds: string[];
+  sourceTagGrantIds?: string[];
 }

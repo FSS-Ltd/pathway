@@ -9,6 +9,7 @@ import { AccessCacheService } from "./access-cache.service";
 export interface EffectivePermissionWithSources {
   permissionKey: PermissionKey;
   sourceRoleIds: string[];
+  sourceTagGrantIds?: string[];
 }
 
 export interface EffectivePermissionGrant {
@@ -16,6 +17,16 @@ export interface EffectivePermissionGrant {
   roleScope: "organisation" | "site" | "relationship";
   roleTenantId: string | null;
   roleIsActive: boolean;
+  permissionKey: PermissionKey;
+  permissionIsActive: boolean;
+  startsAt: Date;
+  expiresAt: Date | null;
+  revokedAt: Date | null;
+}
+
+export interface EffectiveTagPermissionGrant {
+  tagGrantId: string;
+  tenantId: string | null;
   permissionKey: PermissionKey;
   permissionIsActive: boolean;
   startsAt: Date;
@@ -31,6 +42,12 @@ export interface EffectivePermissionsReader {
     tenantId: string | undefined,
     now: Date,
   ): Promise<readonly EffectivePermissionGrant[]>;
+  findTagGrants(
+    userId: string,
+    orgId: string,
+    tenantId: string | undefined,
+    now: Date,
+  ): Promise<readonly EffectiveTagPermissionGrant[]>;
 }
 
 export interface OrgCapabilitiesReader {
@@ -128,13 +145,28 @@ export class EffectivePermissionsService {
       return denied("feature-disabled");
     }
 
+    const tagGrants = await this.reader.findTagGrants(
+      request.userId,
+      request.orgId,
+      request.tenantId,
+      request.now,
+    );
+
     const candidates = snapshot.grants.filter(
       (grant) =>
         grant.permissionKey === request.permission &&
         appliesToScope(grant, request.tenantId),
     );
+    const tagCandidates = tagGrants.filter(
+      (grant) =>
+        grant.permissionKey === request.permission &&
+        appliesToTagScope(grant, request.tenantId),
+    );
 
-    if (candidates.some((grant) => !grant.permissionIsActive)) {
+    if (
+      candidates.some((grant) => !grant.permissionIsActive) ||
+      tagCandidates.some((grant) => !grant.permissionIsActive)
+    ) {
       return denied("feature-disabled");
     }
 
@@ -147,9 +179,21 @@ export class EffectivePermissionsService {
       )
       .map((grant) => grant.roleId);
     const uniqueSourceRoleIds = [...new Set(sourceRoleIds)].sort();
+    const sourceTagGrantIds = [
+      ...new Set(
+        tagCandidates
+          .filter((grant) => isTagGrantActive(grant, request.now))
+          .map((grant) => grant.tagGrantId),
+      ),
+    ].sort();
 
-    return uniqueSourceRoleIds.length > 0
-      ? { allowed: true, reason: "allowed", sourceRoleIds: uniqueSourceRoleIds }
+    return uniqueSourceRoleIds.length > 0 || sourceTagGrantIds.length > 0
+      ? {
+          allowed: true,
+          reason: "allowed",
+          sourceRoleIds: uniqueSourceRoleIds,
+          ...(sourceTagGrantIds.length > 0 ? { sourceTagGrantIds } : {}),
+        }
       : denied("permission-missing");
   }
 
@@ -164,10 +208,17 @@ export class EffectivePermissionsService {
       return [];
     }
 
+    const tagGrants = await this.reader.findTagGrants(
+      userId,
+      orgId,
+      tenantId,
+      now,
+    );
+
     const availableCapabilities = new Set(snapshot.capabilities);
     const permissionKeys = [
-      ...new Set(
-        snapshot.grants
+      ...new Set([
+        ...snapshot.grants
           .filter(
             (grant) =>
               grant.roleIsActive &&
@@ -177,7 +228,16 @@ export class EffectivePermissionsService {
               availableCapabilities.has(grant.permissionKey),
           )
           .map((grant) => grant.permissionKey),
-      ),
+        ...tagGrants
+          .filter(
+            (grant) =>
+              grant.permissionIsActive &&
+              isTagGrantActive(grant, now) &&
+              appliesToTagScope(grant, tenantId) &&
+              availableCapabilities.has(grant.permissionKey),
+          )
+          .map((grant) => grant.permissionKey),
+      ]),
     ].sort();
 
     const availability = await Promise.all(
@@ -206,8 +266,16 @@ export class EffectivePermissionsService {
       return [];
     }
 
+    const tagGrants = await this.reader.findTagGrants(
+      userId,
+      orgId,
+      tenantId,
+      now,
+    );
+
     const availableCapabilities = new Set(snapshot.capabilities);
     const roleIdsByKey = new Map<PermissionKey, Set<string>>();
+    const tagIdsByKey = new Map<PermissionKey, Set<string>>();
     for (const grant of snapshot.grants) {
       if (
         !grant.roleIsActive ||
@@ -223,7 +291,23 @@ export class EffectivePermissionsService {
       roleIdsByKey.set(grant.permissionKey, roleIds);
     }
 
-    const permissionKeys = [...roleIdsByKey.keys()].sort();
+    for (const grant of tagGrants) {
+      if (
+        !grant.permissionIsActive ||
+        !isTagGrantActive(grant, now) ||
+        !appliesToTagScope(grant, tenantId) ||
+        !availableCapabilities.has(grant.permissionKey)
+      ) {
+        continue;
+      }
+      const tagIds = tagIdsByKey.get(grant.permissionKey) ?? new Set<string>();
+      tagIds.add(grant.tagGrantId);
+      tagIdsByKey.set(grant.permissionKey, tagIds);
+    }
+
+    const permissionKeys = [
+      ...new Set([...roleIdsByKey.keys(), ...tagIdsByKey.keys()]),
+    ].sort();
     const availability = await Promise.all(
       permissionKeys.map(async (permission) => ({
         permission,
@@ -239,28 +323,32 @@ export class EffectivePermissionsService {
       .map(({ permission }) => ({
         permissionKey: permission,
         sourceRoleIds: [...(roleIdsByKey.get(permission) ?? [])].sort(),
+        ...(tagIdsByKey.has(permission)
+          ? { sourceTagGrantIds: [...(tagIdsByKey.get(permission) ?? [])].sort() }
+          : {}),
       }));
   }
 
-  private loadSnapshot(
+  private async loadSnapshot(
     userId: string,
     orgId: string,
     tenantId: string | undefined,
     now: Date,
   ): Promise<EffectiveAccessSnapshot> {
-    return this.cache.getOrLoad({ userId, orgId, tenantId }, async () => {
-      const hasMembership =
-        await this.reader.getOrganisationMembership(userId, orgId);
-      if (!hasMembership) {
-        return { hasMembership, capabilities: [], grants: [] };
-      }
-
-      const [capabilities, grants] = await Promise.all([
-        this.capabilityReader.get(orgId),
+    const hasMembership = await this.reader.getOrganisationMembership(
+      userId,
+      orgId,
+    );
+    if (!hasMembership) {
+      return { hasMembership, capabilities: [], grants: [] };
+    }
+    const [capabilities, grants] = await Promise.all([
+      this.capabilityReader.get(orgId),
+      this.cache.getOrLoad({ userId, orgId, tenantId }, () =>
         this.reader.findAssignments(userId, orgId, tenantId, now),
-      ]);
-      return { hasMembership, capabilities, grants };
-    });
+      ),
+    ]);
+    return { hasMembership, capabilities, grants };
   }
 }
 
@@ -282,6 +370,21 @@ function appliesToScope(
     tenantId !== undefined &&
     grant.roleScope === "site" &&
     grant.roleTenantId === tenantId
+  );
+}
+
+function appliesToTagScope(
+  grant: EffectiveTagPermissionGrant,
+  tenantId: string | undefined,
+): boolean {
+  return grant.tenantId === null || grant.tenantId === tenantId;
+}
+
+function isTagGrantActive(grant: EffectiveTagPermissionGrant, now: Date): boolean {
+  return (
+    grant.startsAt <= now &&
+    (grant.expiresAt === null || grant.expiresAt > now) &&
+    grant.revokedAt === null
   );
 }
 

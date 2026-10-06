@@ -8,7 +8,9 @@ export const auditListQueryDto = z
       .transform(Number)
       .optional(),
     cursor: z.string().min(1).max(512).optional(),
-    entityType: z.enum(["ORG_ROLE", "ROLE_ASSIGNMENT"]).optional(),
+    entityType: z
+      .enum(["ORG_ROLE", "ROLE_ASSIGNMENT", "ACCESS_TAG_GRANT"])
+      .optional(),
   })
   .strict();
 
