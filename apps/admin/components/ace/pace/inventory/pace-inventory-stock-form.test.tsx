@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { buildAuthHeaders, setApiClientToken } from "@/lib/api-client";
+import { setApiClientToken } from "@/lib/api-client";
+import { notifyActiveSiteChanged } from "@/lib/active-site-events";
 import type { PaceInventoryStockItem } from "@/lib/pace-inventory-api";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -45,8 +46,8 @@ function deferred<T>(): {
 
 async function run(): Promise<void> {
   const { PaceInventoryBulkForm } = await import("./pace-inventory-bulk-form");
-  const { createRoot } = await import("react-dom/client");
   const { PaceInventoryWorkspace } = await import("./pace-inventory-workspace");
+  const { createRoot } = await import("react-dom/client");
   const emptyPage = {
     items: [],
     nextCursor: null,
@@ -57,42 +58,24 @@ async function run(): Promise<void> {
     retry: () => undefined,
     loadMore: () => undefined,
   };
-  const readOnly = renderToStaticMarkup(
-    <PaceInventoryWorkspace
-      stock={{ ...emptyPage, items: [stock] }}
-      stockView="attention"
-      onStockViewChange={() => undefined}
-      orders={emptyPage}
-    />,
-  );
-  const manager = renderToStaticMarkup(
-    <PaceInventoryWorkspace
-      stock={{ ...emptyPage, items: [stock] }}
-      stockView="attention"
-      onStockViewChange={() => undefined}
-      orders={emptyPage}
-      orderCreation={{ onCreated: () => undefined }}
-    />,
-  );
-  assert.doesNotMatch(readOnly, /Create order/);
-  assert.match(manager, /Create order/);
+  const workspace = (canManage: boolean) =>
+    renderToStaticMarkup(
+      <PaceInventoryWorkspace
+        stock={{ ...emptyPage, items: [stock] }}
+        stockView="attention"
+        onStockViewChange={() => undefined}
+        orders={emptyPage}
+        stockEntry={canManage ? { onCreated: () => undefined } : undefined}
+      />,
+    );
+  assert.doesNotMatch(workspace(false), /Add stock/);
+  assert.match(workspace(true), /Add stock/);
 
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
-  const response = deferred<Response>();
-  const requests: Array<{ url: string; init: RequestInit }> = [];
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (input, init) => {
-    requests.push({ url: String(input), init: init ?? {} });
-    return response.promise;
-  };
   setApiClientToken("test-token");
-  assert.equal(
-    new Headers(buildAuthHeaders()).get("Authorization"),
-    "Bearer test-token",
-  );
-  let created = 0;
 
   try {
     await act(async () =>
@@ -102,13 +85,13 @@ async function run(): Promise<void> {
           stockView="attention"
           onStockViewChange={() => undefined}
           orders={emptyPage}
-          orderCreation={{ onCreated: () => undefined }}
+          stockEntry={{ onCreated: () => undefined }}
         />,
       ),
     );
     await act(async () =>
       [...container.querySelectorAll("button")]
-        .find((button) => button.textContent === "Create order")
+        .find((button) => button.textContent === "Add stock")
         ?.click(),
     );
     assert.equal(document.activeElement?.tagName, "FIELDSET");
@@ -117,44 +100,51 @@ async function run(): Promise<void> {
         .find((button) => button.textContent === "Cancel")
         ?.click(),
     );
-    assert.equal(document.activeElement?.textContent, "Create order");
+    assert.equal(document.activeElement?.textContent, "Add stock");
 
+    const response = deferred<Response>();
+    const requests: Array<{ url: string; init: RequestInit }> = [];
+    globalThis.fetch = (input, init) => {
+      requests.push({ url: String(input), init: init ?? {} });
+      return response.promise;
+    };
+    let added = 0;
     await act(async () =>
       root.render(
         <PaceInventoryBulkForm
-          action="order"
+          action="stock"
           item={stock}
           onCancel={() => undefined}
           onCreated={(count) => {
-            created = count;
+            added = count;
           }}
         />,
       ),
     );
-    const choices = [
-      ...container.querySelectorAll<HTMLInputElement>("input[type=checkbox]"),
-    ];
+    const choices = container.querySelectorAll<HTMLInputElement>(
+      "input[type=checkbox]",
+    );
     assert.equal(choices.length, 12);
     assert.equal(choices[0].disabled, true);
     await act(async () => choices[1].click());
-    assert.match(container.textContent ?? "", /1 selected/);
     await act(async () =>
       container
         .querySelector<HTMLButtonElement>("button[type=submit]")
         ?.click(),
     );
     assert.equal(requests.length, 1);
-    assert.equal(requests[0].url, "http://api.test/ace/pace/inventory/orders");
+    assert.equal(requests[0].url, "http://api.test/ace/pace/inventory/stock");
     assert.equal(requests[0].init.method, "POST");
-    assert.deepEqual(requests[0].init.headers, {
-      "Content-Type": "application/json",
-      Authorization: "Bearer test-token",
-    });
+    assert.equal(
+      new Headers(requests[0].init.headers).get("Authorization"),
+      "Bearer test-token",
+    );
     assert.deepEqual(JSON.parse(String(requests[0].init.body)), {
       childId: "child-1",
       subjectId: "subject-1",
       paceNumbers: [1006],
     });
+    assert.match(container.textContent ?? "", /Adding stock…/);
     assert.equal(
       container.querySelector<HTMLButtonElement>("button[type=submit]")
         ?.disabled,
@@ -165,28 +155,31 @@ async function run(): Promise<void> {
         new Response(
           JSON.stringify({
             batchId: "batch-1",
-            orderIds: ["order-1"],
+            supplyIds: ["supply-1"],
             created: 1,
           }),
           { status: 201 },
         ),
       ),
     );
-    assert.equal(created, 1);
+    assert.equal(added, 1);
 
     globalThis.fetch = async () =>
       new Response(
-        JSON.stringify({ message: "A requested PACE is already on order" }),
+        JSON.stringify({ message: "A requested PACE is already supplied" }),
         { status: 409 },
       );
+    let conflictAdded = false;
     await act(async () =>
       root.render(
         <PaceInventoryBulkForm
-          action="order"
+          action="stock"
           key="conflict"
           item={stock}
           onCancel={() => undefined}
-          onCreated={() => assert.fail("Conflicting order must not succeed")}
+          onCreated={() => {
+            conflictAdded = true;
+          }}
         />,
       ),
     );
@@ -202,8 +195,80 @@ async function run(): Promise<void> {
     );
     assert.match(
       container.querySelector('[role="alert"]')?.textContent ?? "",
-      /already on order/,
+      /already supplied/,
     );
+    assert.equal(conflictAdded, false);
+
+    const staleResponse = deferred<Response>();
+    globalThis.fetch = () => staleResponse.promise;
+    let staleAdded = false;
+    await act(async () =>
+      root.render(
+        <PaceInventoryBulkForm
+          action="stock"
+          key="site-switch"
+          item={stock}
+          onCancel={() => undefined}
+          onCreated={() => {
+            staleAdded = true;
+          }}
+        />,
+      ),
+    );
+    await act(async () =>
+      container
+        .querySelectorAll<HTMLInputElement>("input[type=checkbox]")[1]
+        .click(),
+    );
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>("button[type=submit]")
+        ?.click(),
+    );
+    await act(async () => notifyActiveSiteChanged());
+    await act(async () =>
+      staleResponse.resolve(
+        new Response(
+          JSON.stringify({
+            batchId: "batch-2",
+            supplyIds: ["supply-2"],
+            created: 1,
+          }),
+          { status: 201 },
+        ),
+      ),
+    );
+    assert.equal(staleAdded, false);
+
+    await act(async () =>
+      root.render(
+        <PaceInventoryBulkForm
+          action="stock"
+          key="selection-limit"
+          item={{ ...stock, currentPace: 1119, futurePaceNumbers: [] }}
+          onCancel={() => undefined}
+          onCreated={() => undefined}
+        />,
+      ),
+    );
+    for (let page = 0; page < 2; page += 1) {
+      await act(async () =>
+        [...container.querySelectorAll("button")]
+          .find((button) => button.textContent === "Show next PACEs")
+          ?.click(),
+      );
+    }
+    const limitChoices = container.querySelectorAll<HTMLInputElement>(
+      "input[type=checkbox]",
+    );
+    assert.equal(limitChoices.length, 25);
+    for (let index = 0; index < 24; index += 1) {
+      await act(async () => limitChoices[index].click());
+    }
+    assert.equal(limitChoices[24].disabled, true);
+    assert.match(container.textContent ?? "", /24 selected/);
+    await act(async () => limitChoices[0].click());
+    assert.equal(limitChoices[24].disabled, false);
   } finally {
     await act(async () => root.unmount());
     container.remove();

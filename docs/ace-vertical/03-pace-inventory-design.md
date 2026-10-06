@@ -57,6 +57,15 @@ conflict leaves the form open with feedback. Successful creation refreshes
 stock attention and order history. Stock entry and delivery actions remain
 separate web steps.
 
+Step 1.3b2c3 lets the same permitted managers add existing physical stock
+for an active child/subject placement. It uses the shared bounded catalogue
+picker and submits future numbers to the guarded `POST /ace/pace/inventory/stock`
+command. Supplied numbers are disabled; the server also rejects pending
+orders and concurrent changes. Success refreshes stock and order history,
+while read-only actors see no write control. An in-flight result from a
+previous active site cannot display a success or error in the new site.
+Delivery transitions remain a separate web step.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,

@@ -37,7 +37,7 @@ export type InventoryPageQuery = {
   signal?: AbortSignal;
 };
 
-export type PaceInventoryOrderInput = {
+export type PaceInventoryBulkInput = {
   childId: string;
   subjectId: string;
   paceNumbers: number[];
@@ -49,13 +49,34 @@ export type PaceInventoryOrderResult = {
   created: number;
 };
 
+export type PaceInventoryStockResult = {
+  batchId: string;
+  supplyIds: string[];
+  created: number;
+};
+
 export async function createPaceInventoryOrders(
-  input: PaceInventoryOrderInput,
+  input: PaceInventoryBulkInput,
 ): Promise<PaceInventoryOrderResult> {
+  return writeInventoryBatch<PaceInventoryOrderResult>("orders", input);
+}
+
+export async function addPaceInventoryCurrentStock(
+  input: PaceInventoryBulkInput,
+): Promise<PaceInventoryStockResult> {
+  return writeInventoryBatch<PaceInventoryStockResult>("stock", input);
+}
+
+async function writeInventoryBatch<T>(
+  view: "orders" | "stock",
+  input: PaceInventoryBulkInput,
+): Promise<T> {
   if (isUsingMockApi()) {
-    throw new Error("Physical PACE orders are not available in mock mode.");
+    throw new Error(
+      "Physical PACE inventory changes are not available in mock mode.",
+    );
   }
-  const response = await fetch(`${API_BASE_URL}/ace/pace/inventory/orders`, {
+  const response = await fetch(`${API_BASE_URL}/ace/pace/inventory/${view}`, {
     method: "POST",
     headers: buildAuthHeaders(),
     credentials: "include",
@@ -63,7 +84,7 @@ export async function createPaceInventoryOrders(
     body: JSON.stringify(input),
   });
   if (!response.ok) throw await paceRequestError(response);
-  return response.json() as Promise<PaceInventoryOrderResult>;
+  return response.json() as Promise<T>;
 }
 
 export function fetchPaceInventoryAttention({
