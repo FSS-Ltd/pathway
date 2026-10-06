@@ -8,15 +8,22 @@ import { PaceController } from "./pace.controller";
 import { PaceQueryService } from "./pace-query.service";
 import { PaceCommandService } from "./pace-command.service";
 import { PaceExceptionsService } from "./pace-exceptions.service";
+import { PaceInventoryController } from "./pace-inventory.controller";
+import { PaceInventoryQueryService } from "./pace-inventory-query.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [StudentSubjectsController, PaceController],
+  controllers: [
+    StudentSubjectsController,
+    PaceController,
+    PaceInventoryController,
+  ],
   providers: [
     StudentSubjectsService,
     PaceQueryService,
     PaceCommandService,
     PaceExceptionsService,
+    PaceInventoryQueryService,
   ],
 })
 export class PaceModule {}

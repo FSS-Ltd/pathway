@@ -27,7 +27,8 @@ deployment is claimed by this record.
 | 1.2d3b2a | Fresh effective-access reads in a write transaction    | Merged  | [#354](https://github.com/FSS-Ltd/pathway/pull/354) to `master` | `1fd7a972908141892215bbb937d00535e41f2c0e`; all five jobs passed in [run 37428121362](https://github.com/FSS-Ltd/pathway/actions/runs/37428121362)             | `62e3db49cd4372e3a5908e4674f7fb7fe2185fe2` |
 | 1.2d3b2b | Audited assignment retirement                          | Merged  | [#355](https://github.com/FSS-Ltd/pathway/pull/355) to `master` | `6ec5a07b779e4e091a4d41002bf404f63fa79e4d`; all five jobs passed in [run 37433372134](https://github.com/FSS-Ltd/pathway/actions/runs/37433372134)             | `a7227df78a5bcc068ce2374ce88d5ba620a4b518` |
 | 1.3a     | Oasis-to-NexSteps web journey parity contract          | Merged  | [#356](https://github.com/FSS-Ltd/pathway/pull/356) to `master` | `9fe3b714e5d9c131275a827db72ced62efe235a8`; all five jobs passed in [run 37435850091](https://github.com/FSS-Ltd/pathway/actions/runs/37435850091)             | `676cb7bc5f3a0e3eb895ddd3fcd145ba0ec6b2d5` |
-| 1.3b1    | Physical PACE inventory data and permission foundation | PR open | [#357](https://github.com/FSS-Ltd/pathway/pull/357) to `master` | Initial revision `9aea58d2a592da6db3f08d1cb2d7c6cc89dc0b14`; current-revision CI pending                                                                       | Pending                                    |
+| 1.3b1    | Physical PACE inventory data and permission foundation | Merged  | [#357](https://github.com/FSS-Ltd/pathway/pull/357) to `master` | `554302c0f97e18296c6c8d705b2aaa299f9b9b36`; all five jobs passed in [run 37444424579](https://github.com/FSS-Ltd/pathway/actions/runs/37444424579)             | `9aa51c88c7091974017169c0ac0a08f6dce50838` |
+| 1.3b2a   | Guarded physical PACE inventory reads                  | In work | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -170,6 +171,17 @@ platform, and auth tests, API/auth builds, targeted formatting, diff review,
 and Graphify refresh passed. Production migration remains deferred until the
 source Supabase project is available or a verified new-project migration is
 ready.
+
+Step 1.3b2a adds read-only, site-scoped physical PACE order and stock pages.
+Both routes use the typed ACE inventory read permission and bounded,
+filter-scoped cursors. Stock uses active enrolments and supplied rows, with
+explicit zero-stock state and pending-order suppression for one/two-PACE
+attention. The order and stock command API and admin journey remain in later
+steps. Local verification: all 94 migrations applied on disposable PostgreSQL
+17; the affected request/RLS suite passed 8/8 with a no-bypass database role;
+the API unit suite passed 134/134 (1,012 tests); repository lint and typecheck
+passed 16/16 packages each; and the API build passed. Production migration and
+live source-data checks remain deferred under the product owner's instruction.
 
 ## Release gate
 

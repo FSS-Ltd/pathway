@@ -15,6 +15,14 @@ The first PR, 1.3b1, delivers the tenant-safe tables, typed permissions, and
 PACE-number normalization. Later C04 PRs deliver the guarded API and web
 journey; C04 is not complete until those are merged and verified.
 
+Step 1.3b2a adds read-only `GET /ace/pace/inventory/orders` and
+`GET /ace/pace/inventory/stock`. Both require the ACE inventory read permission.
+Orders are bounded by site, child filter, status filter, and a scoped cursor.
+Stock pages include active child/subject choices, normalized current PACE,
+future supplied numbers, pending-order state, and an optional attention filter.
+The stock response keeps zero stock visible even when an order is pending.
+Writing orders, stock, or status transitions remains a separate step.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,
