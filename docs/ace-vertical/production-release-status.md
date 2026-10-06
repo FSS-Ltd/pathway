@@ -73,8 +73,10 @@ verified.
 3. Copy Supabase Storage objects separately, then compare bucket inventories
    and representative object checksums. Recreate project-specific settings,
    keys, functions, Realtime configuration, and any Auth settings in use.
-   Keep scheduled jobs and webhook delivery disabled or isolated until their
-   external effects are understood; a database restore can reactivate them.
+   Inspect scheduled jobs and webhook destinations before restore. A physical
+   restore starts copied `pg_cron`, `pg_net` and other external operations
+   immediately, with no pause option; use a logical restore if they must be
+   inspected or removed before activation.
 4. In staging, compare table counts and sampled records, verify tenant RLS,
    fixed-role and tag access, linked-child scope, uploads/downloads, workers,
    billing webhooks and critical API/admin/configurator journeys. Record the
