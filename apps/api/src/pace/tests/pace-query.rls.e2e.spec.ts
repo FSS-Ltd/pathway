@@ -575,6 +575,183 @@ describe("ACE PACE roster RLS", () => {
     }
   });
 
+  it("records current stock and exposes it in the inventory read model", async () => {
+    if (!app || !fixture) return;
+    const { childAId, subjectAId } = fixture;
+    const response = await request(app.getHttpServer())
+      .post("/ace/pace/inventory/stock")
+      .set("Authorization", authHeader)
+      .send({
+        childId: childAId,
+        subjectId: subjectAId,
+        paceNumbers: [1003, 1004],
+      });
+    expect(response.status).toBe(201);
+    expect(response.body).toEqual({
+      batchId: expect.any(String),
+      supplyIds: [expect.any(String), expect.any(String)],
+      created: 2,
+    });
+    const { batchId, supplyIds } = response.body as {
+      batchId: string;
+      supplyIds: string[];
+    };
+    try {
+      const [stock, supplied, audit, outbox] = await Promise.all([
+        request(app.getHttpServer())
+          .get("/ace/pace/inventory/stock")
+          .set("Authorization", authHeader),
+        withPaceRlsContext(tenantAId, orgId, (tx) =>
+          tx.paceInventorySupply.findMany({ where: { id: { in: supplyIds } } }),
+        ),
+        withPaceRlsContext(tenantAId, orgId, (tx) =>
+          tx.auditEvent.findFirst({ where: { entityId: batchId } }),
+        ),
+        withPaceRlsContext(tenantAId, orgId, (tx) =>
+          tx.outboxEvent.findFirst({ where: { aggregateId: batchId } }),
+        ),
+      ]);
+      expect(stock.status).toBe(200);
+      expect(stock.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            child: expect.objectContaining({ id: childAId }),
+            futurePaceNumbers: [1003, 1004],
+            availableCount: 2,
+          }),
+        ]),
+      );
+      expect(supplied).toHaveLength(2);
+      expect(supplied.every((item) => item.source === "CURRENT_STOCK")).toBe(
+        true,
+      );
+      expect(audit?.actorUserId).toBe(authUserId);
+      expect(outbox?.eventType).toBe("ace.pace.inventory.current-stock.added");
+
+      for (const paceNumber of [1002, 1003]) {
+        const duplicate = await request(app.getHttpServer())
+          .post("/ace/pace/inventory/stock")
+          .set("Authorization", authHeader)
+          .send({
+            childId: childAId,
+            subjectId: subjectAId,
+            paceNumbers: [paceNumber],
+          });
+        expect(duplicate.status).toBe(409);
+      }
+      const mixedBatch = await request(app.getHttpServer())
+        .post("/ace/pace/inventory/stock")
+        .set("Authorization", authHeader)
+        .send({
+          childId: childAId,
+          subjectId: subjectAId,
+          paceNumbers: [1002, 1005],
+        });
+      expect(mixedBatch.status).toBe(409);
+      const partialSupply = await withPaceRlsContext(tenantAId, orgId, (tx) =>
+        tx.paceInventorySupply.count({
+          where: {
+            tenantId: tenantAId,
+            childId: childAId,
+            subjectId: subjectAId,
+            paceNumber: 1005,
+          },
+        }),
+      );
+      expect(partialSupply).toBe(0);
+    } finally {
+      await withPaceRlsContext(tenantAId, orgId, async (tx) => {
+        await tx.outboxEvent.deleteMany({ where: { aggregateId: batchId } });
+        await tx.auditEvent.deleteMany({ where: { entityId: batchId } });
+        await tx.paceInventorySupply.deleteMany({
+          where: { id: { in: supplyIds } },
+        });
+      });
+    }
+  });
+
+  it("denies cross-site, staff, and invalid current-stock requests", async () => {
+    if (!app || !fixture) return;
+    const valid = {
+      childId: fixture.childAId,
+      subjectId: fixture.subjectAId,
+      paceNumbers: [1003],
+    };
+    const crossSite = await request(app.getHttpServer())
+      .post("/ace/pace/inventory/stock")
+      .set("Authorization", authHeader)
+      .send({
+        ...valid,
+        childId: fixture.childBId,
+        subjectId: fixture.subjectBId,
+      });
+    expect(crossSite.status).toBe(404);
+
+    requestUserId = staffUserId;
+    try {
+      const denied = await request(app.getHttpServer())
+        .post("/ace/pace/inventory/stock")
+        .set("Authorization", staffAuthHeader)
+        .send(valid);
+      expect(denied.status).toBe(403);
+    } finally {
+      requestUserId = authUserId;
+    }
+
+    for (const paceNumbers of [[1003, 1003], [1145], Array(25).fill(1003)]) {
+      const invalid = await request(app.getHttpServer())
+        .post("/ace/pace/inventory/stock")
+        .set("Authorization", authHeader)
+        .send({ ...valid, paceNumbers });
+      expect(invalid.status).toBe(400);
+    }
+  });
+
+  it("rolls back current stock when its outbox write fails", async () => {
+    if (!app || !fixture) return;
+    const { childAId, subjectAId } = fixture;
+    const enqueue = jest
+      .spyOn(OutboxService.prototype, "enqueue")
+      .mockRejectedValueOnce(new Error("Forced stock outbox failure"));
+    try {
+      const response = await request(app.getHttpServer())
+        .post("/ace/pace/inventory/stock")
+        .set("Authorization", authHeader)
+        .send({
+          childId: childAId,
+          subjectId: subjectAId,
+          paceNumbers: [1005],
+        });
+      expect(response.status).toBe(500);
+      const [supply, audit] = await withPaceRlsContext(tenantAId, orgId, (tx) =>
+        Promise.all([
+          tx.paceInventorySupply.count({
+            where: {
+              tenantId: tenantAId,
+              childId: childAId,
+              subjectId: subjectAId,
+              paceNumber: 1005,
+            },
+          }),
+          tx.auditEvent.count({
+            where: {
+              tenantId: tenantAId,
+              entityType: "ACE_RECORD",
+              metadata: {
+                path: ["event"],
+                equals: "pace_inventory_current_stock_added",
+              },
+            },
+          }),
+        ]),
+      );
+      expect(supply).toBe(0);
+      expect(audit).toBe(0);
+    } finally {
+      enqueue.mockRestore();
+    }
+  });
+
   it("rolls back orders and audit when the outbox write fails", async () => {
     if (!app || !fixture) return;
     const { childAId, subjectAId } = fixture;
