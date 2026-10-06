@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Badge, Button, Card } from "@pathway/ui";
 import type {
   AdminPaceExceptionItem,
@@ -12,6 +13,7 @@ type PaceRosterProps = {
   error: string | null;
   canRecord: boolean;
   canCorrect: boolean;
+  canReadDiagnostics: boolean;
   onRecord: (item: AdminPaceRosterItem) => void;
   onCorrect: (assessmentId: string, item: AdminPaceRosterItem) => void;
   onRetry: () => void;
@@ -47,6 +49,7 @@ export function PaceRoster({
   error,
   canRecord,
   canCorrect,
+  canReadDiagnostics,
   onRecord,
   onCorrect,
   onRetry,
@@ -107,10 +110,22 @@ export function PaceRoster({
                         {item.group ? ` · ${item.group.name}` : ""}
                       </p>
                     </div>
-                    {canRecord ? (
-                      <Button type="button" onClick={() => onRecord(item)}>
-                        Record assessment
-                      </Button>
+                    {canReadDiagnostics || canRecord ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canReadDiagnostics ? (
+                          <Link
+                            href={`/ace/pace/diagnostics?${new URLSearchParams({ childId: item.child.id, subjectId: item.subject.id })}`}
+                            className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-accent-strong underline-offset-4 hover:underline focus-visible:underline"
+                          >
+                            Diagnostic history
+                          </Link>
+                        ) : null}
+                        {canRecord ? (
+                          <Button type="button" onClick={() => onRecord(item)}>
+                            Record assessment
+                          </Button>
+                        ) : null}
+                      </div>
                     ) : null}
                   </div>
                 </li>

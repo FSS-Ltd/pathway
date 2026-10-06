@@ -51,11 +51,16 @@ export class PaceDiagnosticQueryService {
         }),
         tx.child.findFirst({
           where: { id: query.childId, tenantId: actor.tenantId },
-          select: { id: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            preferredName: true,
+          },
         }),
         tx.subject.findFirst({
           where: { id: query.subjectId, tenantId: actor.tenantId },
-          select: { id: true },
+          select: { id: true, name: true },
         }),
       ]);
       if (!site) throw new NotFoundException("Active site not found");
@@ -102,6 +107,15 @@ export class PaceDiagnosticQueryService {
       const page = rows.slice(0, limit);
       const last = page.at(-1);
       return {
+        selection: {
+          child: {
+            id: child.id,
+            displayName:
+              child.preferredName?.trim() ||
+              `${child.firstName} ${child.lastName}`.trim(),
+          },
+          subject: { id: subject.id, name: subject.name },
+        },
         items: page.map((row) => ({
           id: row.id,
           enrollmentId: row.enrollmentId,

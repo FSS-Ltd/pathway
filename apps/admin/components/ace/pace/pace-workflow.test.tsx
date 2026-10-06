@@ -13,6 +13,7 @@ const dom = new JSDOM("<!doctype html><html><body></body></html>", {
 
 Object.assign(globalThis, {
   window: dom.window,
+  self: dom.window,
   document: dom.window.document,
   HTMLElement: dom.window.HTMLElement,
   HTMLInputElement: dom.window.HTMLInputElement,
@@ -127,6 +128,7 @@ async function run(): Promise<void> {
         error={null}
         canRecord={false}
         canCorrect={false}
+        canReadDiagnostics={false}
         onRecord={() => undefined}
         onCorrect={() => undefined}
         onRetry={() => undefined}
@@ -146,6 +148,7 @@ async function run(): Promise<void> {
         error="PACE roster is temporarily unavailable."
         canRecord={false}
         canCorrect={false}
+        canReadDiagnostics={false}
         onRecord={() => undefined}
         onCorrect={() => undefined}
         onRetry={() => undefined}
@@ -155,6 +158,70 @@ async function run(): Promise<void> {
     assert.ok(
       container.querySelector('button[type="button"]'),
       "offers a retry after a recoverable roster failure",
+    );
+
+    await render(
+      root,
+      <PaceRoster
+        isLoading={false}
+        items={[
+          {
+            child: { id: childId, displayName: "Jordan Smith" },
+            subject: { id: subjectId, name: "Maths" },
+            group: null,
+            currentPace: 1001,
+            targetPace: 1010,
+            status: null,
+            currentLevel: 1,
+            rebuiltAt: null,
+          },
+        ]}
+        exceptions={[]}
+        error={null}
+        canRecord={false}
+        canCorrect={false}
+        canReadDiagnostics
+        onRecord={() => undefined}
+        onCorrect={() => undefined}
+        onRetry={() => undefined}
+      />,
+    );
+    assert.equal(
+      container
+        .querySelector('a[href^="/ace/pace/diagnostics?"]')
+        ?.getAttribute("href"),
+      "/ace/pace/diagnostics?childId=" + childId + "&subjectId=" + subjectId,
+    );
+    await render(
+      root,
+      <PaceRoster
+        isLoading={false}
+        items={[
+          {
+            child: { id: childId, displayName: "Jordan Smith" },
+            subject: { id: subjectId, name: "Maths" },
+            group: null,
+            currentPace: 1001,
+            targetPace: 1010,
+            status: null,
+            currentLevel: 1,
+            rebuiltAt: null,
+          },
+        ]}
+        exceptions={[]}
+        error={null}
+        canRecord={false}
+        canCorrect={false}
+        canReadDiagnostics={false}
+        onRecord={() => undefined}
+        onCorrect={() => undefined}
+        onRetry={() => undefined}
+      />,
+    );
+    assert.equal(
+      container.querySelector('a[href^="/ace/pace/diagnostics?"]'),
+      null,
+      "hides diagnostic history without its typed permission",
     );
 
     await render(

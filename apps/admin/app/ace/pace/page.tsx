@@ -39,6 +39,8 @@ export default function PacePage() {
   const canRead = hasPermission(permissions, "ace.pace.read");
   const canRecord = hasPermission(permissions, "ace.pace.record");
   const canCorrect = hasPermission(permissions, "ace.pace.correct");
+  const canReadDiagnostics =
+    permissions?.includes("ace.pace.diagnostics.read") === true;
   const canOverride = hasPermission(permissions, "ace.pace.override");
   const [roster, setRoster] = React.useState<AdminPaceRosterItem[]>([]);
   const [exceptions, setExceptions] = React.useState<AdminPaceExceptionItem[]>(
@@ -116,6 +118,7 @@ export default function PacePage() {
         error={error}
         canRecord={canRecord}
         canCorrect={canCorrect}
+        canReadDiagnostics={canReadDiagnostics}
         onRecord={setEntryTarget}
         onCorrect={(assessmentId, rosterItem) =>
           setCorrectionTarget({ assessmentId, rosterItem })

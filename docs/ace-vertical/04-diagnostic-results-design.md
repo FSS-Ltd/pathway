@@ -58,8 +58,10 @@ times at the database boundary and rejects updates or deletes to either fact.
 Provide a bounded `GET /ace/pace/diagnostics` filtered by child and subject,
 `POST /ace/pace/diagnostics`, and
 `POST /ace/pace/diagnostics/:id/retraction`. Use a cursor scoped to tenant,
-child, subject, and retraction filter. Return only the fields needed by the
-leader's web screen; never accept tenant, site, or actor IDs from the client.
+child, subject, and retraction filter. Return the site-scoped child and subject
+labels with each history page so staff can verify the selected record. Return
+only the fields needed by the leader's web screen; never accept tenant, site,
+or actor IDs from the client.
 No endpoint changes the assignment PACE as a side effect.
 
 The admin journey uses the active site's child/subject selection, a clearly
@@ -81,9 +83,11 @@ reconciliation is verified.
    record/retract commands. Test invalid level/outcome, inactive enrollment,
    denied personas, stale site, duplicate retraction, cursor scope, and
    audit/outbox rollback across the two steps.
-3. C05c adds the ACE web journey and tests keyboard, loading, empty, conflict,
-   success, and site-switch states. C05 closes only when API and web outcomes
-   are merged and verified.
+3. C05c1 adds the read-only ACE history journey with roster selection, bounded
+   pagination, retracted-result visibility, and site-switch cancellation.
+   C05c2 adds record/retract controls and tests keyboard, conflict, success,
+   and site-switch states. C05 closes only when API and web outcomes are merged
+   and verified.
 
 The production migration remains deferred while the source Supabase project
 is unavailable. Apply in staging and smoke-test the API and admin journey
