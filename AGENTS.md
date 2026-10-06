@@ -22,6 +22,14 @@ After changes, every agent must run `graphify update .` when code files changed,
 
 ---
 
+## Branch naming
+
+Never create or push a branch with the `codex/` prefix. Use the repository's
+standard branch names in `BUILD.md`, such as `feature/`, `fix/`, `hotfix/`, or
+`docs/`, followed by a short description of the change.
+
+---
+
 ## 0. Core Architecture
 
 **This system has two agent roles, not two agent models.**
