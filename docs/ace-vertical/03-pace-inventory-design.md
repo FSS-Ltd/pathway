@@ -35,6 +35,13 @@ serializable site, placement, supplied-number, and pending-order checks. Each
 accepted number becomes one `CURRENT_STOCK` supply row, with batch audit and
 outbox facts in the same transaction. This does not change an order's status.
 
+Step 1.3b2b3 accepts one forward order transition at a time: `ORDERED` to
+`IN_TRANSIT`, then `IN_TRANSIT` to `DELIVERED`. The command locks the site-scoped
+order and active placement in a serializable tenant transaction, records the
+transition and audit/outbox facts atomically, and creates one linked
+`DELIVERED_ORDER` supply row only on delivery. A skipped, repeated, or stale
+transition fails without changing order or supply history.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,

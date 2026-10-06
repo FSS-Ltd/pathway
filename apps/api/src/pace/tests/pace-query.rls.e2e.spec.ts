@@ -800,6 +800,138 @@ describe("ACE PACE roster RLS", () => {
     }
   });
 
+  it("advances an order forward and adds linked supply only on delivery", async () => {
+    if (!app || !fixture) return;
+    const { inventoryOrderAId, inventoryOrderBId, childAId } = fixture;
+    const server = app.getHttpServer();
+    const transition = (orderId: string, status: string) =>
+      request(server)
+        .patch(`/ace/pace/inventory/orders/${orderId}/status`)
+        .set("Authorization", authHeader)
+        .send({ status });
+
+    expect((await transition(inventoryOrderBId, "IN_TRANSIT")).status).toBe(
+      404,
+    );
+    expect((await transition(inventoryOrderAId, "DELIVERED")).status).toBe(409);
+    expect((await transition("not-an-id", "IN_TRANSIT")).status).toBe(400);
+    expect((await transition(inventoryOrderAId, "ORDERED")).status).toBe(400);
+    requestUserId = staffUserId;
+    try {
+      const denied = await request(app.getHttpServer())
+        .patch(`/ace/pace/inventory/orders/${inventoryOrderAId}/status`)
+        .set("Authorization", staffAuthHeader)
+        .send({ status: "IN_TRANSIT" });
+      expect(denied.status).toBe(403);
+    } finally {
+      requestUserId = authUserId;
+    }
+
+    let supplyId: string | null = null;
+    try {
+      const inTransit = await transition(inventoryOrderAId, "IN_TRANSIT");
+      expect(inTransit.status).toBe(200);
+      expect(inTransit.body).toEqual({
+        orderId: inventoryOrderAId,
+        status: "IN_TRANSIT",
+        reachedAt: expect.any(String),
+        supplyId: null,
+      });
+      expect((await transition(inventoryOrderAId, "IN_TRANSIT")).status).toBe(
+        409,
+      );
+
+      const enqueue = jest
+        .spyOn(OutboxService.prototype, "enqueue")
+        .mockRejectedValueOnce(new Error("Forced delivery outbox failure"));
+      try {
+        expect((await transition(inventoryOrderAId, "DELIVERED")).status).toBe(
+          500,
+        );
+      } finally {
+        enqueue.mockRestore();
+      }
+      const afterFailure = await withPaceRlsContext(
+        tenantAId,
+        orgId,
+        async (tx) => ({
+          order: await tx.paceInventoryOrder.findUnique({
+            where: { id: inventoryOrderAId },
+          }),
+          supply: await tx.paceInventorySupply.findFirst({
+            where: { sourceOrderId: inventoryOrderAId },
+          }),
+        }),
+      );
+      expect(afterFailure.order?.status).toBe("IN_TRANSIT");
+      expect(afterFailure.supply).toBeNull();
+
+      const delivered = await transition(inventoryOrderAId, "DELIVERED");
+      expect(delivered.status).toBe(200);
+      supplyId = delivered.body.supplyId;
+      expect(supplyId).toEqual(expect.any(String));
+      const [supply, orders, stock, auditCount, outboxCount] =
+        await Promise.all([
+          withPaceRlsContext(tenantAId, orgId, (tx) =>
+            tx.paceInventorySupply.findFirst({
+              where: { sourceOrderId: inventoryOrderAId },
+            }),
+          ),
+          request(app.getHttpServer())
+            .get(`/ace/pace/inventory/orders?childId=${childAId}`)
+            .set("Authorization", authHeader),
+          request(app.getHttpServer())
+            .get("/ace/pace/inventory/stock")
+            .set("Authorization", authHeader),
+          withPaceRlsContext(tenantAId, orgId, (tx) =>
+            tx.auditEvent.count({ where: { entityId: inventoryOrderAId } }),
+          ),
+          withPaceRlsContext(tenantAId, orgId, (tx) =>
+            tx.outboxEvent.count({ where: { aggregateId: inventoryOrderAId } }),
+          ),
+        ]);
+      expect(supply).toMatchObject({
+        id: supplyId,
+        source: "DELIVERED_ORDER",
+        sourceOrderId: inventoryOrderAId,
+        paceNumber: 1002,
+      });
+      expect(orders.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: inventoryOrderAId,
+            status: "DELIVERED",
+          }),
+        ]),
+      );
+      expect(stock.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            child: expect.objectContaining({ id: childAId }),
+            futurePaceNumbers: [1002],
+          }),
+        ]),
+      );
+      expect(auditCount).toBe(2);
+      expect(outboxCount).toBe(2);
+      expect((await transition(inventoryOrderAId, "DELIVERED")).status).toBe(
+        409,
+      );
+    } finally {
+      await withPaceRlsContext(tenantAId, orgId, async (tx) => {
+        await tx.outboxEvent.deleteMany({
+          where: { aggregateId: inventoryOrderAId },
+        });
+        await tx.auditEvent.deleteMany({
+          where: { entityId: inventoryOrderAId },
+        });
+        await tx.paceInventorySupply.deleteMany({
+          where: { sourceOrderId: inventoryOrderAId },
+        });
+      });
+    }
+  });
+
   it("rejects unbounded and unknown inventory query parameters", async () => {
     if (!app) return;
     const [tooLarge, unknown] = await Promise.all([
