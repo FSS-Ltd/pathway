@@ -6,6 +6,7 @@ import { StudentSubjectsController } from "./student-subjects.controller";
 import { StudentSubjectsService } from "./student-subjects.service";
 import { PaceController } from "./pace.controller";
 import { PaceQueryService } from "./pace-query.service";
+import { PaceDiagnosticQueryService } from "./pace-diagnostic-query.service";
 import { PaceCommandService } from "./pace-command.service";
 import { PaceExceptionsService } from "./pace-exceptions.service";
 import { PaceInventoryController } from "./pace-inventory.controller";
@@ -26,6 +27,7 @@ import { PaceInventoryOrderStatusService } from "./pace-inventory-order-status.s
   providers: [
     StudentSubjectsService,
     PaceQueryService,
+    PaceDiagnosticQueryService,
     PaceCommandService,
     PaceExceptionsService,
     PaceInventoryQueryService,

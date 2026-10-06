@@ -18,11 +18,13 @@ import {
   paceRosterQuerySchema,
 } from "./dto/pace-query.dto";
 import { createPaceAssessmentSchema } from "./dto/create-pace-assessment.dto";
+import { paceDiagnosticQuerySchema } from "./dto/pace-diagnostic-query.dto";
 import {
   paceAssessmentCorrectionSchema,
   pacePolicyOverrideSchema,
 } from "./dto/pace-correction.dto";
 import { PaceCommandService } from "./pace-command.service";
+import { PaceDiagnosticQueryService } from "./pace-diagnostic-query.service";
 import { PaceExceptionsService } from "./pace-exceptions.service";
 import { PaceQueryService } from "./pace-query.service";
 
@@ -32,6 +34,7 @@ export class PaceController {
   constructor(
     private readonly service: PaceQueryService,
     private readonly commandService: PaceCommandService,
+    private readonly diagnosticQueryService: PaceDiagnosticQueryService,
     private readonly exceptionsService: PaceExceptionsService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
@@ -45,7 +48,8 @@ export class PaceController {
         await paceRosterQuerySchema.parseAsync(query),
       );
     } catch (error) {
-      if (error instanceof z.ZodError) throw new BadRequestException(error.flatten());
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
       throw error;
     }
   }
@@ -59,7 +63,23 @@ export class PaceController {
         await paceExceptionsQuerySchema.parseAsync(query),
       );
     } catch (error) {
-      if (error instanceof z.ZodError) throw new BadRequestException(error.flatten());
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Get("diagnostics")
+  @RequirePermission("ace.pace.diagnostics.read")
+  async diagnostics(@Query() query: unknown) {
+    try {
+      return await this.diagnosticQueryService.list(
+        this.actor(),
+        await paceDiagnosticQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
       throw error;
     }
   }
@@ -73,7 +93,8 @@ export class PaceController {
         this.actor(),
       );
     } catch (error) {
-      if (error instanceof z.ZodError) throw new BadRequestException(error.flatten());
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
       throw error;
     }
   }

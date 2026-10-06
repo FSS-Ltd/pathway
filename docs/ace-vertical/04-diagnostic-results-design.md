@@ -75,9 +75,10 @@ reconciliation is verified.
    schema, forced RLS, and actor constraints.
    Verify same-site allow and cross-site/organisation denial on disposable
    PostgreSQL, plus migration and role-grant checks.
-2. C05b adds bounded reads and audited record/retract commands. Test invalid
-   level/outcome, inactive enrollment, denied personas, stale site, duplicate
-   retraction, cursor scope, and audit/outbox rollback.
+2. C05b1 adds bounded, site-scoped history reads. C05b2 adds audited
+   record/retract commands. Test invalid level/outcome, inactive enrollment,
+   denied personas, stale site, duplicate retraction, cursor scope, and
+   audit/outbox rollback across the two steps.
 3. C05c adds the ACE web journey and tests keyboard, loading, empty, conflict,
    success, and site-switch states. C05 closes only when API and web outcomes
    are merged and verified.
