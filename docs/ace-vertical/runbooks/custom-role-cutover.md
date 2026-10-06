@@ -32,7 +32,49 @@ and validity window. Reports can become stale if assignments change during
 the paged scan. Run a fresh inventory under the cutover write freeze before
 the eventual migration.
 
-## Parity and retirement (step 1.2d3b)
+## Parity preview (step 1.2d3b1)
+
+Create a proposed mapping file outside the repository. Name every active
+custom assignment from a fresh inventory exactly once. Select only fixed-role
+IDs and tag keys shown as candidates for that assignment. An empty choice is
+allowed, but uncovered raw keys fail parity. Example:
+
+```json
+{
+  "orgId": "00000000-0000-4000-8000-000000000000",
+  "mappings": [
+    {
+      "assignmentId": "00000000-0000-4000-8000-000000000001",
+      "fixedRoleIds": [],
+      "tagKeys": ["attendance-recorder"]
+    }
+  ]
+}
+```
+
+Run the non-mutating preview with a read-only database identity after freezing
+role, tag, membership, entitlement and site changes:
+
+```sh
+umask 077
+pnpm --silent --filter @pathway/api access:parity --plan /private/tmp/custom-role-plan.json > /private/tmp/custom-role-parity.ndjson
+```
+
+The preview validates same-scope candidates, organisation and site membership,
+and raw permission coverage. Scheduled future custom assignments block the
+preview until resolved. It compares effective permission keys for each
+affected user at organisation scope and every site. Existing fixed roles and
+tags remain in the projected result. A final `complete` row with
+`parityMatched: true` means current-state parity only; a nonzero exit or a
+missing `complete` row blocks retirement. Preserve the source assignment's
+validity window when creating replacements.
+
+The preview does not grant or revoke access. It does not prove that the chosen
+actor can delegate every tag, that a replacement avoids grant conflicts, or
+that future role definitions and entitlements remain unchanged. Recheck these
+conditions and parity in the audited retirement transaction.
+
+## Audited retirement (step 1.2d3b2)
 
 For each affected user, compare effective access at every applicable site
 before and after a proposed mapping, including existing fixed roles and

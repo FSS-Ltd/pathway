@@ -112,9 +112,10 @@ export class EffectivePermissionsService {
     userId: string,
     orgId: string,
     tenantId?: string,
+    now = new Date(),
   ): Promise<EffectivePermissionWithSources[]> {
     return this.context.run(orgId, tenantId, () =>
-      this.listForUserWithSourcesInContext(userId, orgId, tenantId),
+      this.listForUserWithSourcesInContext(userId, orgId, tenantId, now),
     );
   }
 
@@ -258,9 +259,9 @@ export class EffectivePermissionsService {
   private async listForUserWithSourcesInContext(
     userId: string,
     orgId: string,
-    tenantId?: string,
+    tenantId: string | undefined,
+    now: Date,
   ): Promise<EffectivePermissionWithSources[]> {
-    const now = new Date();
     const snapshot = await this.loadSnapshot(userId, orgId, tenantId, now);
     if (!snapshot.hasMembership) {
       return [];
@@ -324,7 +325,11 @@ export class EffectivePermissionsService {
         permissionKey: permission,
         sourceRoleIds: [...(roleIdsByKey.get(permission) ?? [])].sort(),
         ...(tagIdsByKey.has(permission)
-          ? { sourceTagGrantIds: [...(tagIdsByKey.get(permission) ?? [])].sort() }
+          ? {
+              sourceTagGrantIds: [
+                ...(tagIdsByKey.get(permission) ?? []),
+              ].sort(),
+            }
           : {}),
       }));
   }
@@ -380,7 +385,10 @@ function appliesToTagScope(
   return grant.tenantId === null || grant.tenantId === tenantId;
 }
 
-function isTagGrantActive(grant: EffectiveTagPermissionGrant, now: Date): boolean {
+function isTagGrantActive(
+  grant: EffectiveTagPermissionGrant,
+  now: Date,
+): boolean {
   return (
     grant.startsAt <= now &&
     (grant.expiresAt === null || grant.expiresAt > now) &&
