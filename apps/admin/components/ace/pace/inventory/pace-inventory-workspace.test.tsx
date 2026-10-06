@@ -25,6 +25,10 @@ Object.assign(globalThis, {
   Event: dom.window.Event,
   IS_REACT_ACT_ENVIRONMENT: true,
 });
+Object.defineProperty(globalThis, "navigator", {
+  configurable: true,
+  value: dom.window.navigator,
+});
 
 const stock: PaceInventoryStockItem = {
   child: { id: "child-1", displayName: "Amina Yusuf" },
