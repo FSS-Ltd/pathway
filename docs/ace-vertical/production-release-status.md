@@ -41,7 +41,8 @@ deployment is claimed by this record.
 | 1.3c1    | Diagnostic permission registry and fixed-role mappings | Merged  | [#368](https://github.com/FSS-Ltd/pathway/pull/368) to `master` | `838d6b08aec5297d0689a170343704b5a395718f`; all five jobs passed in [run 37509331904](https://github.com/FSS-Ltd/pathway/actions/runs/37509331904)             | `e8661fa9cf9e86c1fcb6ad97ecbc919af6a7a3a4` |
 | 1.3c2    | Diagnostic facts and tenant RLS                        | Merged  | [#369](https://github.com/FSS-Ltd/pathway/pull/369) to `master` | `4a74e073ef7835248cffdcd5b9e5480a4b2fa523`; all five jobs passed in [run 37513470766](https://github.com/FSS-Ltd/pathway/actions/runs/37513470766)             | `c88b553840cbe165558144a2bb8f07bdcfda6a68` |
 | DB-1     | New-project migration inventory and blocker            | Merged  | [#370](https://github.com/FSS-Ltd/pathway/pull/370) to `master` | `b311080af365db1bf6bf35cedb4b81c6e69d1ae2`; all five jobs passed in [run 37516949020](https://github.com/FSS-Ltd/pathway/actions/runs/37516949020)             | `56b91b29f515e713fc931e27efa3b398850c8fe0` |
-| 1.3c3    | Bounded diagnostic history API                         | PR open | [#371](https://github.com/FSS-Ltd/pathway/pull/371) to `master` | Initial revision `55141685`; current-revision CI pending                                                                                                       | Pending                                    |
+| 1.3c3    | Bounded diagnostic history API                         | Merged  | [#371](https://github.com/FSS-Ltd/pathway/pull/371) to `master` | `a475914c06e26a9d25484a99c57e8246eb022e28`; all five jobs passed in [run 37520082279](https://github.com/FSS-Ltd/pathway/actions/runs/37520082279)             | `4aa865fa1dcc1d192e372ae7a8a537ab7526bd4e` |
+| 1.3c4    | Audited diagnostic record and retraction API           | In work | Pending                                                         | Local verification in progress                                                                                                                                 | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -122,6 +123,10 @@ and [project transfer](https://supabase.com/docs/guides/platform/project-transfe
   moved. Resume only when the source organisation can restore the project or a
   complete, verified database backup **and** Storage export are available.
   Then follow the cutover conditions above, starting with a disposable restore.
+- After PR #371 merged, source project status remained `INACTIVE` and the target
+  remained `ACTIVE_HEALTHY`. The target-scoped Supabase MCP server is installed
+  in Codex; its OAuth login attempt timed out, so authentication has not been
+  verified. This does not change the source-data blocker above.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and
