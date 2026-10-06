@@ -21,8 +21,9 @@ deployment is claimed by this record.
 | 1.2b | Typed access-tag catalogue and access decision docs  | Merged  | [#348](https://github.com/FSS-Ltd/pathway/pull/348) to `master` | `a975bc89e36a12f5a5e2e3526d222e310777b1bc`; all five jobs passed in [run 37369195079](https://github.com/FSS-Ltd/pathway/actions/runs/37369195079) (attempt 4) | `173420159825f2d029c685e4b2c19a7ba07e5970` |
 | 1.2c | Delegation, grant/revoke and effective-access APIs   | Merged  | [#349](https://github.com/FSS-Ltd/pathway/pull/349) to `master` | `ff0d294709cece7f19974697ad57b0fd28f632de`; all five jobs passed in [run 37413254333](https://github.com/FSS-Ltd/pathway/actions/runs/37413254333) | `784f261ec9e2463a9a7b519328cb7d8b27560f8f` |
 | 1.2d1 | Retire customer role write routes and editor         | Merged  | [#350](https://github.com/FSS-Ltd/pathway/pull/350) to `master` | `1de73eeb12a71882740f8d6dce1b8d8f7d731151`; all five jobs passed in [run 37415925535](https://github.com/FSS-Ltd/pathway/actions/runs/37415925535) | `de2ce169476b5809c3f0b46b1567b619cac6b75d` |
-| 1.2d2 | Fixed-role-only assignment cutover                    | Draft PR | [#351](https://github.com/FSS-Ltd/pathway/pull/351) to `master` | Current-revision CI pending                                                                                                                        | Pending                                    |
-| 1.2d3 | Custom-assignment inventory and parity migration     | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.2d2 | Fixed-role-only assignment cutover                    | Merged | [#351](https://github.com/FSS-Ltd/pathway/pull/351) to `master` | `a9493ed9c5d05fa86a6a96afcd077ba6004cad71`; all five jobs passed in [run 37418692392](https://github.com/FSS-Ltd/pathway/actions/runs/37418692392) | `a1f8bbbe19bc056e4e28138657f1acdd2de7bfd5` |
+| 1.2d3a | Read-only custom-assignment inventory                 | In progress | Pending                                                   | Local verification in progress                                                                                                                     | Pending                                    |
+| 1.2d3b | Effective-access parity and audited retirement       | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 | 1.3  | ACE core web journeys                                | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 | 1.4  | Paid add-ons and entitlement billing                 | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 | 1.5  | Shared web UI and messaging finish                   | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
@@ -91,9 +92,21 @@ Local lint and typecheck passed 16/16 packages, API unit tests passed
 The two affected database integration suites passed 12/12 tests after a
 disposable local database reset. The full local integration run passed 54/54
 suites (359/359 tests) when configured with the dedicated RLS roles used by
-CI. Current-revision CI must also pass before this step can merge.
-`graphify update .`, targeted
-Prettier checks, and `git diff --check` passed.
+CI. `graphify update .`, targeted Prettier checks, and `git diff --check`
+passed. All five CI jobs then passed on the final PR revision, and GitHub
+confirmed the merge.
+
+Step 1.2d3a inventories currently valid custom-role assignments for one
+organisation through read-only, organisation-scoped pages. It reports raw
+permission keys and conservative fixed-role/tag candidates without issuing
+or revoking grants. Live source data, effective-access parity, and audited
+retirement remain for step 1.2d3b when the database is available.
+Local verification: repository lint and typecheck passed 16/16 packages;
+API unit tests passed 131/131 suites (1001 tests); the API build and targeted
+formatting passed. A populated disposable Postgres smoke run reported a
+custom assignment and candidate tag, then the fixture was removed and its
+absence verified. The script also rejects an invalid organisation ID before
+opening a database connection. No production inventory was run.
 
 ## Release gate
 
