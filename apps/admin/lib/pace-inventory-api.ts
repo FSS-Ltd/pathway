@@ -37,6 +37,35 @@ export type InventoryPageQuery = {
   signal?: AbortSignal;
 };
 
+export type PaceInventoryOrderInput = {
+  childId: string;
+  subjectId: string;
+  paceNumbers: number[];
+};
+
+export type PaceInventoryOrderResult = {
+  batchId: string;
+  orderIds: string[];
+  created: number;
+};
+
+export async function createPaceInventoryOrders(
+  input: PaceInventoryOrderInput,
+): Promise<PaceInventoryOrderResult> {
+  if (isUsingMockApi()) {
+    throw new Error("Physical PACE orders are not available in mock mode.");
+  }
+  const response = await fetch(`${API_BASE_URL}/ace/pace/inventory/orders`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await paceRequestError(response);
+  return response.json() as Promise<PaceInventoryOrderResult>;
+}
+
 export function fetchPaceInventoryAttention({
   cursor,
   signal,

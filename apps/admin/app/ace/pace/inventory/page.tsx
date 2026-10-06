@@ -2,6 +2,7 @@
 
 import React from "react";
 import { NoAccessCard } from "@/components/no-access-card";
+import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import { PaceInventoryWorkspace } from "@/components/ace/pace/inventory/pace-inventory-workspace";
 import { usePaceInventoryPage } from "@/components/ace/pace/inventory/use-pace-inventory-page";
 import { useAdminAccess } from "@/lib/use-admin-access";
@@ -21,7 +22,9 @@ export default function PaceInventoryPage() {
   const [stockView, setStockView] = React.useState<"attention" | "all">(
     "attention",
   );
+  const [orderNotice, setOrderNotice] = React.useState<string | null>(null);
   const canRead = permissions?.includes("ace.pace.inventory.read") === true;
+  const canManage = permissions?.includes("ace.pace.inventory.manage") === true;
   const enabled =
     sessionStatus === "authenticated" &&
     session !== null &&
@@ -31,6 +34,10 @@ export default function PaceInventoryPage() {
     fetchPaceInventoryOrders,
     enabled,
     "Unable to load PACE orders.",
+  );
+  React.useEffect(
+    () => subscribeToActiveSiteChanges(() => setOrderNotice(null)),
+    [],
   );
 
   if (isLoadingAccess || sessionStatus === "loading") {
@@ -55,6 +62,9 @@ export default function PaceInventoryPage() {
         )
       }
       orders={orders}
+      canManage={canManage}
+      orderNotice={orderNotice}
+      onOrderNotice={setOrderNotice}
     />
   );
 }
@@ -63,10 +73,16 @@ function PaceInventoryStockView({
   stockView,
   onStockViewChange,
   orders,
+  canManage,
+  orderNotice,
+  onOrderNotice,
 }: {
   stockView: "attention" | "all";
   onStockViewChange: () => void;
   orders: PagedInventory<PaceInventoryOrderItem>;
+  canManage: boolean;
+  orderNotice: string | null;
+  onOrderNotice: (notice: string) => void;
 }) {
   const fetchStockPage = React.useCallback(
     (query: InventoryPageQuery) =>
@@ -87,6 +103,20 @@ function PaceInventoryStockView({
       stockView={stockView}
       onStockViewChange={onStockViewChange}
       orders={orders}
+      notice={orderNotice}
+      orderCreation={
+        canManage
+          ? {
+              onCreated: (created) => {
+                onOrderNotice(
+                  `Created ${created} physical PACE ${created === 1 ? "order" : "orders"}.`,
+                );
+                stock.retry();
+                orders.retry();
+              },
+            }
+          : undefined
+      }
     />
   );
 }

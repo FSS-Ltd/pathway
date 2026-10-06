@@ -48,6 +48,15 @@ uses the bounded API cursor and reloads after an active-site change. It
 provides loading, empty, retry, and accessible status states. Order, stock,
 and delivery write controls follow in the next web step.
 
+Step 1.3b2c2 adds order creation for actors with
+`ace.pace.inventory.manage`. The web form selects future catalogue PACEs for
+an active child/subject placement, excludes numbers already in physical stock,
+and submits at most 24 distinct numbers to the guarded batch command. The
+server checks existing orders and stock in a site-scoped transaction; a
+conflict leaves the form open with feedback. Successful creation refreshes
+stock attention and order history. Stock entry and delivery actions remain
+separate web steps.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,

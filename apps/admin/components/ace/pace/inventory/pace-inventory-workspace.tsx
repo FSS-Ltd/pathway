@@ -4,6 +4,7 @@ import type {
   PaceInventoryOrderItem,
   PaceInventoryStockItem,
 } from "@/lib/pace-inventory-api";
+import { PaceInventoryOrderForm } from "./pace-inventory-order-form";
 import type { PagedInventory } from "./use-pace-inventory-page";
 
 type InventoryWorkspaceProps = {
@@ -11,6 +12,8 @@ type InventoryWorkspaceProps = {
   stockView: "attention" | "all";
   onStockViewChange: () => void;
   orders: PagedInventory<PaceInventoryOrderItem>;
+  orderCreation?: { onCreated: (created: number) => void };
+  notice?: string | null;
 };
 
 const orderDateFormatter = new Intl.DateTimeFormat("en-GB", {
@@ -23,6 +26,8 @@ export function PaceInventoryWorkspace({
   stockView,
   onStockViewChange,
   orders,
+  orderCreation,
+  notice,
 }: InventoryWorkspaceProps) {
   const showAllStock = stockView === "all";
   return (
@@ -39,6 +44,15 @@ export function PaceInventoryWorkspace({
           </p>
         </div>
       </header>
+
+      {notice ? (
+        <p
+          role="status"
+          className="rounded-lg bg-status-success/10 px-4 py-3 text-sm text-status-success"
+        >
+          {notice}
+        </p>
+      ) : null}
 
       <Card
         title={showAllStock ? "Physical stock" : "Stock attention"}
@@ -70,7 +84,11 @@ export function PaceInventoryWorkspace({
             showAllStock ? "Load more placements" : "Load more stock attention"
           }
           renderItem={(item) => (
-            <StockRow key={`${item.child.id}:${item.subject.id}`} item={item} />
+            <StockRow
+              key={`${item.child.id}:${item.subject.id}`}
+              item={item}
+              onOrderCreated={orderCreation?.onCreated}
+            />
           )}
         />
       </Card>
@@ -164,37 +182,79 @@ function InventoryList<T>({
   );
 }
 
-function StockRow({ item }: { item: PaceInventoryStockItem }) {
+function StockRow({
+  item,
+  onOrderCreated,
+}: {
+  item: PaceInventoryStockItem;
+  onOrderCreated?: (created: number) => void;
+}) {
+  const [isOrdering, setIsOrdering] = React.useState(false);
+  const orderTrigger = React.useRef<HTMLButtonElement>(null);
+  const wasOrdering = React.useRef(false);
+  React.useEffect(() => {
+    if (wasOrdering.current && !isOrdering) orderTrigger.current?.focus();
+    wasOrdering.current = isOrdering;
+  }, [isOrdering]);
+  const current =
+    item.currentPace < 1000 ? item.currentPace + 1000 : item.currentPace;
   return (
-    <li className="flex flex-col gap-2 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0 space-y-1">
-        <p className="font-medium text-text-primary">
-          {item.child.displayName} · {item.subject.name}
-        </p>
-        <p className="text-sm leading-6 text-text-muted">
-          Current PACE {item.currentPace} · Available next:{" "}
-          {item.futurePaceNumbers.length > 0
-            ? item.futurePaceNumbers.join(", ")
-            : "none"}
-        </p>
-        {item.hasPendingOrder ? (
-          <p className="text-sm text-text-muted">A future PACE is on order.</p>
-        ) : null}
+    <li className="py-4 first:pt-0 last:pb-0">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <p className="font-medium text-text-primary">
+            {item.child.displayName} · {item.subject.name}
+          </p>
+          <p className="text-sm leading-6 text-text-muted">
+            Current PACE {item.currentPace} · Available next:{" "}
+            {item.futurePaceNumbers.length > 0
+              ? item.futurePaceNumbers.join(", ")
+              : "none"}
+          </p>
+          {item.hasPendingOrder ? (
+            <p className="text-sm text-text-muted">
+              A future PACE is on order.
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-start gap-2">
+          <Badge
+            variant={
+              item.stockState === "NO_STOCK"
+                ? "danger"
+                : item.stockState === "LOW_STOCK"
+                  ? "warning"
+                  : "success"
+            }
+            className="self-start"
+          >
+            {item.stockState === "NO_STOCK"
+              ? "No stock"
+              : `${item.availableCount} available`}
+          </Badge>
+          {onOrderCreated && current < 1144 && !isOrdering ? (
+            <Button
+              ref={orderTrigger}
+              type="button"
+              variant="secondary"
+              className="min-h-11"
+              onClick={() => setIsOrdering(true)}
+            >
+              Create order
+            </Button>
+          ) : null}
+        </div>
       </div>
-      <Badge
-        variant={
-          item.stockState === "NO_STOCK"
-            ? "danger"
-            : item.stockState === "LOW_STOCK"
-              ? "warning"
-              : "success"
-        }
-        className="self-start"
-      >
-        {item.stockState === "NO_STOCK"
-          ? "No stock"
-          : `${item.availableCount} available`}
-      </Badge>
+      {isOrdering && onOrderCreated ? (
+        <PaceInventoryOrderForm
+          item={item}
+          onCancel={() => setIsOrdering(false)}
+          onCreated={(created) => {
+            setIsOrdering(false);
+            onOrderCreated(created);
+          }}
+        />
+      ) : null}
     </li>
   );
 }
