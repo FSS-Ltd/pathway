@@ -89,10 +89,10 @@ step 1.2d3 can compare and retire them without widening user access.
 Local lint and typecheck passed 16/16 packages, API unit tests passed
 130/130 suites (998 tests), admin tests passed, and API/admin builds passed.
 The two affected database integration suites passed 12/12 tests after a
-disposable local database reset. The full local integration run passed 53/54
-suites; its four failures are in the untouched cross-tenant RLS suite and
-the local test login has `BYPASSRLS`. Current-revision CI must confirm the
-full suite before this step can merge. `graphify update .`, targeted
+disposable local database reset. The full local integration run passed 54/54
+suites (359/359 tests) when configured with the dedicated RLS roles used by
+CI. Current-revision CI must also pass before this step can merge.
+`graphify update .`, targeted
 Prettier checks, and `git diff --check` passed.
 
 ## Release gate
