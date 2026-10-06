@@ -45,7 +45,8 @@ deployment is claimed by this record.
 | 1.3c4    | Audited diagnostic record and retraction API           | Merged  | [#372](https://github.com/FSS-Ltd/pathway/pull/372) to `master` | `e4a8faa3a4d891be0cff9bc811824117db2763df`; all five jobs passed in [run 37523331326](https://github.com/FSS-Ltd/pathway/actions/runs/37523331326)             | `85a3743b90b6e297a9a661943a64ef87525edf53` |
 | 1.3c5a   | Read-only diagnostic history web journey               | Merged  | [#373](https://github.com/FSS-Ltd/pathway/pull/373) to `master` | `121c0b77ca26e1fd53f29b1a93b051ffaef42878`; all five jobs passed in [run 37527866517](https://github.com/FSS-Ltd/pathway/actions/runs/37527866517)             | `55f1a7a55496c07ccacc765819a9b0cf2c1fc770` |
 | 1.3c5b   | Diagnostic record and retraction web controls          | Merged  | [#375](https://github.com/FSS-Ltd/pathway/pull/375) to `master` | `53822bb064603e033ccfe4ebf7bbf0517c530f40`; all eight checks passed (runs below)                                                                               | `eae1e4bb2649a952d603c52a6bff2d29317d4ed7` |
-| 1.3d0    | Attendance correction history and site-scope contract  | PR open | [#376](https://github.com/FSS-Ltd/pathway/pull/376) to `master` | `dc9209d0`; current-revision CI pending                                                                                                                        | Pending                                    |
+| 1.3d0    | Attendance correction history and site-scope contract  | Merged  | [#376](https://github.com/FSS-Ltd/pathway/pull/376) to `master` | `ad074caa2ade8440bc327da02a866e7836de0c1c`; all eight checks passed (runs below)                                                                               | `b63718871fe4ac3f84758a7594056e2e7f39a012` |
+| 1.3d1    | Attendance correction-event storage and RLS            | In work | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -53,6 +54,9 @@ deployment is claimed by this record.
 For step 1.3c5b, all eight checks passed on the checked revision in
 [CI run 37532490552](https://github.com/FSS-Ltd/pathway/actions/runs/37532490552)
 and [CodeQL run 37532483173](https://github.com/FSS-Ltd/pathway/actions/runs/37532483173).
+For step 1.3d0, all eight checks passed on the checked revision in
+[CI run 37534452075](https://github.com/FSS-Ltd/pathway/actions/runs/37534452075)
+and [CodeQL run 37534447405](https://github.com/FSS-Ltd/pathway/actions/runs/37534447405).
 
 Step 1.1 makes production deployment explicit and accepts only the configured
 Supabase project's direct database endpoint or shared session pooler on port
@@ -61,6 +65,10 @@ and a project mismatch before Prisma starts.
 The production credentials, connection and schema status still need verification
 when Supabase is available. Later steps start only after the preceding PR has
 passing CI on its current revision and is merged into `master`.
+
+The 1.3d1 attendance event migration and its following atomic-writer step must
+reach production in the same gated release. Corrections made after the one-time
+legacy backfill but before the writer is deployed would otherwise lack events.
 
 ## New Supabase project cutover conditions
 
