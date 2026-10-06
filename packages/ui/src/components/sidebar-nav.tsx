@@ -27,6 +27,7 @@ import {
   Gauge,
   Award,
   PieChart,
+  PackageSearch,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -86,6 +87,7 @@ const iconComponents: LucideIcon[] = [
   Gauge, // 22 PACE workflow
   Award, // 23 Behaviour capture
   PieChart, // 24 ACE overview
+  PackageSearch, // 25 Physical PACE inventory
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.

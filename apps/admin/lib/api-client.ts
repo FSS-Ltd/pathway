@@ -25,7 +25,7 @@ if (!publicApiUrl && !useMockApiExplicit) {
 
 export const API_BASE_URL = publicApiUrl ?? "http://localhost:3333";
 
-const isUsingMockApi = (): boolean => {
+export const isUsingMockApi = (): boolean => {
   return useMockApiExplicit;
 };
 
@@ -631,7 +631,7 @@ export function setApiClientToken(token?: string | null) {
   accessTokenOverride = token ?? null;
 }
 
-function buildAuthHeaders(accessToken?: string | null): HeadersInit {
+export function buildAuthHeaders(accessToken?: string | null): HeadersInit {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
   };
@@ -1100,7 +1100,7 @@ function paceQueryString(query: Record<string, string | number | undefined>) {
   return encoded ? `?${encoded}` : "";
 }
 
-async function paceRequestError(
+export async function paceRequestError(
   response: Response,
 ): Promise<AdminPaceApiError> {
   const fallback = `PACE request failed: ${response.status}`;
