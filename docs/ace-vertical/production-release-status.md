@@ -35,7 +35,8 @@ deployment is claimed by this record.
 | 1.3b2c1  | Read-only physical PACE inventory web journey          | Merged  | [#362](https://github.com/FSS-Ltd/pathway/pull/362) to `master` | `8d99ae4ca11661a5331905726cb6a01048ae6b9f`; all five jobs passed in [run 37487356359](https://github.com/FSS-Ltd/pathway/actions/runs/37487356359)             | `ae7b9aa17174b0831fbbe9ae3bfba23047a10a27` |
 | 1.3b2c2  | Physical PACE order creation web control               | Merged  | [#363](https://github.com/FSS-Ltd/pathway/pull/363) to `master` | `3214a41c930edb7bfae2e18deadaf003dfab5ddb`; all five jobs passed in [run 37492380380](https://github.com/FSS-Ltd/pathway/actions/runs/37492380380)             | `9b8e2d1b91f5adb34f3711ad3c2186008dfb8009` |
 | 1.3b2c2r | Prior merge record and new-project cutover conditions  | Merged  | [#364](https://github.com/FSS-Ltd/pathway/pull/364) to `master` | `117f2b2fe75a38a997ffbe0fa4152ee3ced5761d`; all five jobs passed in [run 37496153641](https://github.com/FSS-Ltd/pathway/actions/runs/37496153641)             | `6240e5baed782d95aa59fa6c4de16e4c87ebca61` |
-| 1.3b2c3  | Physical PACE current-stock entry web control          | PR open | [#365](https://github.com/FSS-Ltd/pathway/pull/365) to `master` | Initial revision `ab7a0ec0d9af398e414e38ca12e86ff4b74ae4a6`; current-revision CI pending                                                                       | Pending                                    |
+| 1.3b2c3  | Physical PACE current-stock entry web control          | Merged  | [#365](https://github.com/FSS-Ltd/pathway/pull/365) to `master` | `613b2ab0f63fe8f262684121c298758df4029a0b`; all five jobs passed in [run 37499827535](https://github.com/FSS-Ltd/pathway/actions/runs/37499827535)             | `6bb854387a010d8e65230a8342fbcedd6fdebceb` |
+| 1.3b2c4  | Physical PACE delivery transition web control          | PR open | [#366](https://github.com/FSS-Ltd/pathway/pull/366) to `master` | Initial revision `f40725e95b4706f0c4cd4a8b896a42f0a8dd91e3`; current-revision CI pending                                                                       | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -237,6 +238,14 @@ steps. Local verification: all 94 migrations applied on disposable PostgreSQL
 the API unit suite passed 134/134 (1,012 tests); repository lint and typecheck
 passed 16/16 packages each; and the API build passed. Production migration and
 live source-data checks remain deferred under the product owner's instruction.
+
+Step 1.3b2c4 adds a manager-only, confirmed forward transition control to ACE
+PACE order history. The existing API remains responsible for site, placement,
+and status validation. Local verification passed the full admin test suite,
+repository lint and typecheck (16/16 packages each), direct ESLint for changed
+web files, the admin production build, targeted formatting, diff checks, and
+Graphify code graph refresh. Live Supabase migration and production smoke tests
+remain deferred under the product owner's instruction.
 
 ## Release gate
 

@@ -13,6 +13,7 @@ import {
   fetchPaceInventoryStock,
   type InventoryPageQuery,
   type PaceInventoryOrderItem,
+  type PaceInventoryNextOrderStatus,
 } from "@/lib/pace-inventory-api";
 import type { PagedInventory } from "@/components/ace/pace/inventory/use-pace-inventory-page";
 
@@ -109,6 +110,16 @@ function PaceInventoryStockView({
     orders.retry();
   }
 
+  function handleAdvanced(status: PaceInventoryNextOrderStatus) {
+    onInventoryNotice(
+      status === "DELIVERED"
+        ? "PACE order marked delivered. Physical stock has been updated."
+        : "PACE order marked in transit.",
+    );
+    stock.retry();
+    orders.retry();
+  }
+
   return (
     <PaceInventoryWorkspace
       stock={stock}
@@ -128,6 +139,7 @@ function PaceInventoryStockView({
           ? { onCreated: (created) => handleCreated("stock", created) }
           : undefined
       }
+      orderTransition={canManage ? { onAdvanced: handleAdvanced } : undefined}
     />
   );
 }
