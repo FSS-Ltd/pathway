@@ -763,6 +763,11 @@ enum AttendanceStatus {
   LATE
 }
 
+enum AttendanceCorrectionOrigin {
+  LIVE
+  LEGACY_BACKFILL
+}
+
 enum StaffAttendanceStatus {
   PRESENT
   ABSENT
@@ -870,6 +875,7 @@ model Tenant {
   paceProgress           PaceProgress[]
   paceDiagnosticResults  PaceDiagnosticResult[]
   paceDiagnosticRetractions PaceDiagnosticRetraction[]
+  attendanceCorrectionEvents AttendanceCorrectionEvent[]
   paceInventoryOrders    PaceInventoryOrder[]
   paceInventorySupplies  PaceInventorySupply[]
   pacePolicies           PacePolicy[]
@@ -1069,6 +1075,7 @@ model User {
   authorisedPaceOverrides    PacePolicyOverride[]        @relation("PacePolicyOverrideAuthorisedBy")
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
   correctedAttendance       Attendance[]                 @relation("AttendanceCorrectedBy")
+  attendanceCorrectionEvents AttendanceCorrectionEvent[] @relation("AttendanceCorrectionEventRecordedBy")
   createdBehaviourCategories BehaviourCategory[]         @relation("BehaviourCategoryCreatedBy")
   createdDemeritPolicies     DemeritPolicy[]             @relation("DemeritPolicyCreatedBy")
   authorisedDemeritOverrides DemeritStageOverride[]      @relation("DemeritStageOverrideAuthorisedBy")
@@ -1467,6 +1474,7 @@ model Child {
   disabilities               String[]                    @default([])
   concerns                   Concern[]
   attendance                 Attendance[]
+  attendanceCorrectionEvents AttendanceCorrectionEvent[]
   childNotes                 ChildNote[]
   learningLogs               LearningLog[]
   subjectEnrollments         StudentSubjectEnrollment[]
@@ -2206,12 +2214,33 @@ model Attendance {
   correctedByUserId   String?
   correctedByUser     User?            @relation("AttendanceCorrectedBy", fields: [correctedByUserId], references: [id], onDelete: Restrict)
   correctionReason    String?
+  correctionEvents    AttendanceCorrectionEvent[]
 
+  @@unique([id, childId])
   @@index([childId])
   @@index([sessionId])
   @@index([groupId])
   @@index([sessionId, status])
   @@index([correctedByUserId, correctedAt])
+}
+
+model AttendanceCorrectionEvent {
+  id                String                     @id @default(uuid())
+  tenantId          String
+  tenant            Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId           String
+  child             Child                      @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  attendanceId      String
+  attendance        Attendance                 @relation(fields: [attendanceId, childId], references: [id, childId], onDelete: Restrict)
+  previousStatus    AttendanceStatus?
+  newStatus         AttendanceStatus
+  reason            String                     @db.Text
+  correctedByUserId String
+  correctedBy       User                       @relation("AttendanceCorrectionEventRecordedBy", fields: [correctedByUserId], references: [id], onDelete: Restrict)
+  correctedAt       DateTime                   @default(now())
+  origin            AttendanceCorrectionOrigin
+
+  @@index([tenantId, attendanceId, correctedAt, id])
 }
 
 // summary/details are encrypted at rest — see packages/db/src/pii-encryption.ts.
