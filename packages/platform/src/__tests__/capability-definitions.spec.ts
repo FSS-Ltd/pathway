@@ -75,6 +75,8 @@ const SECTION_5_2_KEYS = [
   "ace.pace.record",
   "ace.pace.correct",
   "ace.pace.override",
+  "ace.pace.inventory.read",
+  "ace.pace.inventory.manage",
   "ace.behaviour.read",
   "ace.behaviour.record",
   "ace.behaviour.sensitive.read",
@@ -168,8 +170,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 109 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(109);
+  it("contains exactly the 111 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(111);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
@@ -266,6 +268,9 @@ describe("capability definitions", () => {
     expect(CAPABILITY_DEFINITIONS["ace.pace.read"].requiredVertical).toBe(
       Vertical.ACE_SCHOOL,
     );
+    expect(
+      CAPABILITY_DEFINITIONS["ace.pace.inventory.manage"].requiredVertical,
+    ).toBe(Vertical.ACE_SCHOOL);
 
     for (const key of [
       "learning.log.read",

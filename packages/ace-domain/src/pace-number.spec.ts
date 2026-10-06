@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { comparePaceNumbers, nextPaceNumber, parsePaceNumber } from "./index";
+import {
+  comparePaceNumbers,
+  nextPaceNumber,
+  parsePaceNumber,
+  toCataloguePaceNumber,
+} from "./index";
 
 test("parsePaceNumber rejects invalid PACE numbers", () => {
   for (const raw of [
@@ -65,4 +70,12 @@ test("nextPaceNumber advances within and across levels while preserving numberin
   );
   assert.throws(() => nextPaceNumber(parsePaceNumber(144)), RangeError);
   assert.throws(() => nextPaceNumber(parsePaceNumber(1144)), RangeError);
+});
+
+test("toCataloguePaceNumber normalizes either accepted PACE form", () => {
+  assert.equal(toCataloguePaceNumber(1), 1001);
+  assert.equal(toCataloguePaceNumber(144), 1144);
+  assert.equal(toCataloguePaceNumber(1001), 1001);
+  assert.equal(toCataloguePaceNumber(1144), 1144);
+  assert.throws(() => toCataloguePaceNumber(1000), RangeError);
 });

@@ -20,6 +20,11 @@ export function parsePaceNumber(raw: number): PaceNumber {
   };
 }
 
+export function toCataloguePaceNumber(raw: number): number {
+  parsePaceNumber(raw);
+  return raw <= SHORT_PACE_END ? raw + 1000 : raw;
+}
+
 export function comparePaceNumbers(a: PaceNumber, b: PaceNumber): number {
   const left = parsePaceNumber(a.raw);
   const right = parsePaceNumber(b.raw);

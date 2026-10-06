@@ -348,6 +348,17 @@ enum PaceTrackStatus {
   BLOCKED
 }
 
+enum PaceInventoryOrderStatus {
+  ORDERED
+  IN_TRANSIT
+  DELIVERED
+}
+
+enum PaceInventorySupplySource {
+  CURRENT_STOCK
+  DELIVERED_ORDER
+}
+
 enum BehaviourType {
   MERIT
   DEMERIT
@@ -852,6 +863,8 @@ model Tenant {
   subjectEnrollments     StudentSubjectEnrollment[]
   paceAssessments        PaceAssessment[]
   paceProgress           PaceProgress[]
+  paceInventoryOrders    PaceInventoryOrder[]
+  paceInventorySupplies  PaceInventorySupply[]
   pacePolicies           PacePolicy[]
   pacePolicyOverrides    PacePolicyOverride[]
   behaviourEntries       BehaviourEntry[]
@@ -1029,6 +1042,8 @@ model User {
   handoverLogVersions     HandoverLogVersion[]    @relation("HandoverLogVersionEditedBy")
   loggedLearningLogs      LearningLog[]           @relation("LearningLogLoggedBy")
   uploadedEvidence        Evidence[]              @relation("EvidenceUploadedBy")
+  paceInventoryOrdersCreated PaceInventoryOrder[] @relation("PaceInventoryOrderCreatedBy")
+  paceInventorySuppliesCreated PaceInventorySupply[] @relation("PaceInventorySupplyCreatedBy")
   requestedReportBundles  ReportBundle[]          @relation("ReportBundleRequestedBy")
   requestedDataExports    DataExportRequest[]      @relation("DataExportRequestRequestedBy")
   requestedAccountDeletions AccountDeletionRequest[] @relation("AccountDeletionRequestRequestedBy")
@@ -1448,6 +1463,8 @@ model Child {
   subjectEnrollments         StudentSubjectEnrollment[]
   paceAssessments            PaceAssessment[]
   paceProgress               PaceProgress[]
+  paceInventoryOrders        PaceInventoryOrder[]
+  paceInventorySupplies      PaceInventorySupply[]
   pacePolicyOverrides        PacePolicyOverride[]
   behaviourEntries           BehaviourEntry[]
   demeritStageOverrides      DemeritStageOverride[]
@@ -2358,6 +2375,8 @@ model Subject {
   subjectEnrollments  StudentSubjectEnrollment[]
   paceAssessments     PaceAssessment[]
   paceProgress        PaceProgress[]
+  paceInventoryOrders PaceInventoryOrder[]
+  paceInventorySupplies PaceInventorySupply[]
   pacePolicyOverrides PacePolicyOverride[]
   createdAt           DateTime                   @default(now())
   updatedAt           DateTime                   @updatedAt
@@ -2746,6 +2765,52 @@ model PaceProgress {
   @@unique([tenantId, childId, subjectId])
   @@index([tenantId, childId])
   @@index([tenantId, trackStatus])
+}
+
+model PaceInventoryOrder {
+  id              String                   @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId         String
+  child           Child                    @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  subjectId       String
+  subject         Subject                  @relation(fields: [subjectId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  paceNumber      Int
+  status          PaceInventoryOrderStatus @default(ORDERED)
+  orderedAt       DateTime                 @default(now())
+  inTransitAt     DateTime?
+  deliveredAt     DateTime?
+  createdByUserId String
+  createdBy       User                     @relation("PaceInventoryOrderCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  supply          PaceInventorySupply?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, childId, subjectId, paceNumber])
+  @@index([tenantId, childId, subjectId, status, paceNumber])
+  @@index([tenantId, status, createdAt])
+}
+
+model PaceInventorySupply {
+  id              String                    @id @default(uuid())
+  tenantId        String
+  tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId         String
+  child           Child                     @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  subjectId       String
+  subject         Subject                   @relation(fields: [subjectId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  paceNumber      Int
+  source          PaceInventorySupplySource
+  sourceOrderId   String?
+  sourceOrder     PaceInventoryOrder?       @relation(fields: [sourceOrderId, tenantId, childId, subjectId, paceNumber], references: [id, tenantId, childId, subjectId, paceNumber], onDelete: Restrict)
+  createdByUserId String
+  createdBy       User                      @relation("PaceInventorySupplyCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime                  @default(now())
+
+  @@unique([tenantId, childId, subjectId, paceNumber])
+  @@unique([sourceOrderId, tenantId, childId, subjectId, paceNumber])
+  @@index([tenantId, childId, subjectId])
 }
 
 // Append-only policy versions. The effective version is selected by time.

@@ -499,6 +499,22 @@ export const CAPABILITY_DEFINITIONS = {
     true,
     aceRequirement,
   ),
+  "ace.pace.inventory.read": defineCapability(
+    "View PACE inventory",
+    "View physical PACE stock and orders for the active site",
+    "site",
+    "sensitive",
+    true,
+    aceRequirement,
+  ),
+  "ace.pace.inventory.manage": defineCapability(
+    "Manage PACE inventory",
+    "Record physical PACE stock and delivery for the active site",
+    "site",
+    "sensitive",
+    true,
+    aceRequirement,
+  ),
   "ace.behaviour.read": defineCapability(
     "View behaviour",
     "View behaviour records and policy",
