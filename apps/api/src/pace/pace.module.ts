@@ -10,6 +10,8 @@ import { PaceCommandService } from "./pace-command.service";
 import { PaceExceptionsService } from "./pace-exceptions.service";
 import { PaceInventoryController } from "./pace-inventory.controller";
 import { PaceInventoryQueryService } from "./pace-inventory-query.service";
+import { PaceInventoryCommandsController } from "./pace-inventory-commands.controller";
+import { PaceInventoryOrderCommandService } from "./pace-inventory-order-command.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
@@ -17,6 +19,7 @@ import { PaceInventoryQueryService } from "./pace-inventory-query.service";
     StudentSubjectsController,
     PaceController,
     PaceInventoryController,
+    PaceInventoryCommandsController,
   ],
   providers: [
     StudentSubjectsService,
@@ -24,6 +27,7 @@ import { PaceInventoryQueryService } from "./pace-inventory-query.service";
     PaceCommandService,
     PaceExceptionsService,
     PaceInventoryQueryService,
+    PaceInventoryOrderCommandService,
   ],
 })
 export class PaceModule {}

@@ -23,6 +23,12 @@ future supplied numbers, pending-order state, and an optional attention filter.
 The stock response keeps zero stock visible even when an order is pending.
 Writing orders, stock, or status transitions remains a separate step.
 
+Step 1.3b2b1 accepts a bounded set of distinct catalogue PACE numbers for one
+active child/subject placement. A site leader's guarded request checks for
+existing physical supply and pending orders inside a serializable tenant
+transaction, then creates the order rows and audit/outbox facts atomically.
+Current-stock entry and delivery transitions follow in later PRs.
+
 ## Data and rules
 
 - `PaceInventoryOrder` stores one catalogue PACE (`1001–1144`) for one child,
