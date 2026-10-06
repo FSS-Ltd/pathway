@@ -27,7 +27,7 @@ deployment is claimed by this record.
 | 1.2d3b2a | Fresh effective-access reads in a write transaction    | Merged  | [#354](https://github.com/FSS-Ltd/pathway/pull/354) to `master` | `1fd7a972908141892215bbb937d00535e41f2c0e`; all five jobs passed in [run 37428121362](https://github.com/FSS-Ltd/pathway/actions/runs/37428121362)             | `62e3db49cd4372e3a5908e4674f7fb7fe2185fe2` |
 | 1.2d3b2b | Audited assignment retirement                          | Merged  | [#355](https://github.com/FSS-Ltd/pathway/pull/355) to `master` | `6ec5a07b779e4e091a4d41002bf404f63fa79e4d`; all five jobs passed in [run 37433372134](https://github.com/FSS-Ltd/pathway/actions/runs/37433372134)             | `a7227df78a5bcc068ce2374ce88d5ba620a4b518` |
 | 1.3a     | Oasis-to-NexSteps web journey parity contract          | Merged  | [#356](https://github.com/FSS-Ltd/pathway/pull/356) to `master` | `9fe3b714e5d9c131275a827db72ced62efe235a8`; all five jobs passed in [run 37435850091](https://github.com/FSS-Ltd/pathway/actions/runs/37435850091)             | `676cb7bc5f3a0e3eb895ddd3fcd145ba0ec6b2d5` |
-| 1.3b1    | Physical PACE inventory data and permission foundation | In work | PR pending                                                      | Local checks in progress                                                                                                                                       | Pending                                    |
+| 1.3b1    | Physical PACE inventory data and permission foundation | PR open | [#357](https://github.com/FSS-Ltd/pathway/pull/357) to `master` | Initial revision `9aea58d2a592da6db3f08d1cb2d7c6cc89dc0b14`; current-revision CI pending                                                                       | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -158,6 +158,18 @@ Step 1.3a records the implemented Oasis web journeys, corresponding NexSteps
 surfaces, unresolved outcomes, and acceptance checks in
 `02-oasis-web-journey-parity.md`. It makes physical PACE ordering the first
 core implementation slice and keeps its stock tracking outside paid add-ons.
+
+Step 1.3b1 adds physical PACE order and supply tables, ACE-core inventory
+permissions for fixed Organisation Head and Site Lead roles, and catalogue
+PACE-number normalization. It does not expose an API or web journey. Local
+verification applied all 94 migrations from scratch on disposable PostgreSQL
+17 and passed tenant/actor/constraint smoke checks; Prisma reported no drift
+for the new tables. The permission registry synchronized and checked with zero
+drift. Repository lint and typecheck passed 16/16 packages each; ACE domain,
+platform, and auth tests, API/auth builds, targeted formatting, diff review,
+and Graphify refresh passed. Production migration remains deferred until the
+source Supabase project is available or a verified new-project migration is
+ready.
 
 ## Release gate
 
