@@ -2,6 +2,7 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { BadRequestException } from "@nestjs/common";
 import { AttendanceController } from "../attendance.controller";
 import { AttendanceService } from "../attendance.service";
+import { AttendanceHistoryService } from "../attendance-history.service";
 import { CreateAttendanceDto } from "../dto/create-attendance.dto";
 import { UpdateAttendanceDto } from "../dto/update-attendance.dto";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
@@ -37,15 +38,19 @@ const updateMock: jest.Mock<
 const getSessionSummariesMock = jest.fn();
 const getSessionAttendanceDetailMock = jest.fn();
 const upsertSessionAttendanceMock = jest.fn();
+const historyMock = jest.fn();
 
 const mockService: AttendanceService = {
   list: listMock as unknown as AttendanceService["list"],
   getById: getByIdMock as unknown as AttendanceService["getById"],
   create: createMock as unknown as AttendanceService["create"],
   update: updateMock as unknown as AttendanceService["update"],
-  getSessionSummaries: getSessionSummariesMock as unknown as AttendanceService["getSessionSummaries"],
-  getSessionAttendanceDetail: getSessionAttendanceDetailMock as unknown as AttendanceService["getSessionAttendanceDetail"],
-  upsertSessionAttendance: upsertSessionAttendanceMock as unknown as AttendanceService["upsertSessionAttendance"],
+  getSessionSummaries:
+    getSessionSummariesMock as unknown as AttendanceService["getSessionSummaries"],
+  getSessionAttendanceDetail:
+    getSessionAttendanceDetailMock as unknown as AttendanceService["getSessionAttendanceDetail"],
+  upsertSessionAttendance:
+    upsertSessionAttendanceMock as unknown as AttendanceService["upsertSessionAttendance"],
 } as AttendanceService;
 
 describe("AttendanceController", () => {
@@ -57,7 +62,10 @@ describe("AttendanceController", () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AttendanceController],
-      providers: [{ provide: AttendanceService, useValue: mockService }],
+      providers: [
+        { provide: AttendanceService, useValue: mockService },
+        { provide: AttendanceHistoryService, useValue: { list: historyMock } },
+      ],
     })
       .overrideGuard(AuthUserGuard)
       .useValue({ canActivate: () => true })
@@ -103,6 +111,21 @@ describe("AttendanceController", () => {
     const res = await controller.getById("att-2", tenantId);
     expect(res).toBe(row);
     expect(getByIdMock).toHaveBeenCalledWith("att-2", tenantId);
+  });
+
+  it("validates bounded history queries and passes the selected scope", async () => {
+    historyMock.mockResolvedValueOnce({ items: [], nextCursor: null });
+    await expect(
+      controller.history("att-2", tenantId, "org-1", { limit: "2" }),
+    ).resolves.toEqual({ items: [], nextCursor: null });
+    expect(historyMock).toHaveBeenCalledWith("att-2", tenantId, "org-1", {
+      limit: 2,
+    });
+
+    await expect(
+      controller.history("att-2", tenantId, "org-1", { limit: "51" }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(historyMock).toHaveBeenCalledTimes(1);
   });
 
   it("create should validate and call service", async () => {
