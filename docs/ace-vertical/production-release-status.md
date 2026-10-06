@@ -39,7 +39,8 @@ deployment is claimed by this record.
 | 1.3b2c4  | Physical PACE delivery transition web control          | Merged  | [#366](https://github.com/FSS-Ltd/pathway/pull/366) to `master` | `24ac60112e1527dbb1d23b28bf44c4e69fa9dec5`; all five jobs passed in [run 37502864680](https://github.com/FSS-Ltd/pathway/actions/runs/37502864680)             | `99044b3cde7f25e1c22313117768da48dc15b8af` |
 | 1.3c0    | Diagnostic-results reference and design                | Merged  | [#367](https://github.com/FSS-Ltd/pathway/pull/367) to `master` | `3a957697b7b315ba94d317c46ac6fcd74f14db61`; all five jobs passed in [run 37506409613](https://github.com/FSS-Ltd/pathway/actions/runs/37506409613)             | `9390d7e23375ed3c5ceb2efe3b5c7d8c94e5d1dc` |
 | 1.3c1    | Diagnostic permission registry and fixed-role mappings | Merged  | [#368](https://github.com/FSS-Ltd/pathway/pull/368) to `master` | `838d6b08aec5297d0689a170343704b5a395718f`; all five jobs passed in [run 37509331904](https://github.com/FSS-Ltd/pathway/actions/runs/37509331904)             | `e8661fa9cf9e86c1fcb6ad97ecbc919af6a7a3a4` |
-| 1.3c2    | Diagnostic facts and tenant RLS                        | PR open | [#369](https://github.com/FSS-Ltd/pathway/pull/369) to `master` | Initial revision `56e2978e`; current-revision CI pending                                                                                                       | Pending                                    |
+| 1.3c2    | Diagnostic facts and tenant RLS                        | Merged  | [#369](https://github.com/FSS-Ltd/pathway/pull/369) to `master` | `4a74e073ef7835248cffdcd5b9e5480a4b2fa523`; all five jobs passed in [run 37513470766](https://github.com/FSS-Ltd/pathway/actions/runs/37513470766)             | `c88b553840cbe165558144a2bb8f07bdcfda6a68` |
+| DB-1     | New-project migration inventory and blocker            | In work | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -105,6 +106,21 @@ Supabase references: [backup and restore into a new
 project](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore),
 [physical restore limits](https://supabase.com/docs/guides/platform/clone-project),
 and [project transfer](https://supabase.com/docs/guides/platform/project-transfer).
+
+### Migration checkpoint — 2026-10-06
+
+- Source `fkajodqkxysfcnfhizwn` (`nexsteps`, Ireland `eu-west-1`) matches the
+  local production configuration. Supabase reports it `INACTIVE`; a read query
+  timed out. Its restore endpoint rejected the request because the source
+  organisation has unpaid invoices. No verified source snapshot was accessible
+  for parity checks or export.
+- Target `jzofykdzpuslpdyfovxp` (`NexSteps`, London `eu-west-2`) is healthy.
+  Read-only inventory found zero `app` tables, Supabase Auth users, Storage
+  buckets and Storage objects. Auth0 remains the application's identity provider.
+- No data, migrations, Storage objects, deployment secrets, or traffic were
+  moved. Resume only when the source organisation can restore the project or a
+  complete, verified database backup **and** Storage export are available.
+  Then follow the cutover conditions above, starting with a disposable restore.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and
