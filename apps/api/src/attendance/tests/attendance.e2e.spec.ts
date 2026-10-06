@@ -49,7 +49,7 @@ describe("Attendance (e2e)", () => {
   let typedRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
   let createdOrgVertical = false;
 
-  function directAttendanceService() {
+  function directAttendanceService(actorUserId = authUserId) {
     const tenantId = TENANT_A_ID;
     const orgId = ORG_ID;
     if (!tenantId || !orgId) {
@@ -58,7 +58,7 @@ describe("Attendance (e2e)", () => {
     const context = new PathwayRequestContext({} as Request);
     const authContext: AuthContext = {
       user: {
-        userId: authUserId,
+        userId: actorUserId,
         email: "attendance-e2e@example.com",
         authProvider: "auth0",
       },
@@ -93,6 +93,8 @@ describe("Attendance (e2e)", () => {
     // Seed inside RLS-aware context for each tenant
     await withTenantRlsContext(TENANT_A_ID, ORG_ID, async (tx) => {
       // cleanup for deterministic runs
+      // The immutable event trigger requires truncation in this dedicated E2E database.
+      await tx.$executeRaw`TRUNCATE TABLE "AttendanceCorrectionEvent"`;
       await tx.attendance.deleteMany({
         where: {
           OR: [
@@ -213,6 +215,7 @@ describe("Attendance (e2e)", () => {
       await prisma.staffActivity.deleteMany({
         where: { staffUserId: authUserId },
       });
+      await prisma.$executeRaw`TRUNCATE TABLE "AttendanceCorrectionEvent"`;
       await prisma.attendance.deleteMany({
         where: { groupId: { in: [ids.group, ids.group2] } },
       });
@@ -355,6 +358,37 @@ describe("Attendance (e2e)", () => {
       correctedByUserId: authUserId,
       correctionReason: "Transport delay",
     });
+    const events = await prisma.attendanceCorrectionEvent.findMany({
+      where: { attendanceId: createdId },
+      select: {
+        previousStatus: true,
+        newStatus: true,
+        reason: true,
+        correctedByUserId: true,
+        origin: true,
+      },
+    });
+    expect(events).toEqual([
+      {
+        previousStatus: "PRESENT",
+        newStatus: "LATE",
+        reason: "Transport delay",
+        correctedByUserId: authUserId,
+        origin: "LIVE",
+      },
+    ]);
+
+    const sameStatus = await request(app.getHttpServer())
+      .patch(`/attendance/${createdId}`)
+      .send({ status: "LATE" })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+    expect(sameStatus.status).toBe(200);
+    expect(
+      await prisma.attendanceCorrectionEvent.count({
+        where: { attendanceId: createdId },
+      }),
+    ).toBe(1);
   });
 
   it("PUT /attendance/session/:id creates Late and corrects existing statuses", async () => {
@@ -408,11 +442,49 @@ describe("Attendance (e2e)", () => {
         }),
       ]),
     );
+    const attendance = await prisma.attendance.findFirstOrThrow({
+      where: { sessionId: ids.session, childId: ids.child2 },
+      select: { id: true },
+    });
+    expect(
+      await prisma.attendanceCorrectionEvent.findMany({
+        where: { attendanceId: attendance.id },
+        select: { previousStatus: true, newStatus: true, reason: true },
+      }),
+    ).toEqual([
+      {
+        previousStatus: "LATE",
+        newStatus: "ABSENT",
+        reason: "Marked in error",
+      },
+    ]);
+  });
+
+  it("accepts an empty session save without creating a correction", async () => {
+    if (!app) return;
+    const before = await prisma.attendanceCorrectionEvent.count({
+      where: { tenantId: TENANT_A_ID },
+    });
+    const response = await request(app.getHttpServer())
+      .put(`/attendance/session/${ids.session}`)
+      .send({ rows: [] })
+      .set("content-type", "application/json")
+      .set("Authorization", authHeader);
+    expect(response.status).toBe(200);
+    expect(response.body.rows).toEqual(expect.any(Array));
+    expect(
+      await prisma.attendanceCorrectionEvent.count({
+        where: { tenantId: TENANT_A_ID },
+      }),
+    ).toBe(before);
   });
 
   it("rolls back an earlier valid correction when a later batch row is invalid", async () => {
     if (!app || !isDatabaseAvailable()) return;
     const { service, recordActivityForCurrentUser } = directAttendanceService();
+    const eventCount = await prisma.attendanceCorrectionEvent.count({
+      where: { childId: { in: [ids.child, ids.child2] } },
+    });
 
     await expect(
       service.upsertSessionAttendance(ids.session, TENANT_A_ID, {
@@ -443,6 +515,11 @@ describe("Attendance (e2e)", () => {
         { childId: ids.child2, status: "ABSENT" },
       ]),
     );
+    expect(
+      await prisma.attendanceCorrectionEvent.count({
+        where: { childId: { in: [ids.child, ids.child2] } },
+      }),
+    ).toBe(eventCount);
     expect(recordActivityForCurrentUser).not.toHaveBeenCalled();
   });
 
@@ -521,6 +598,75 @@ describe("Attendance (e2e)", () => {
         },
       ]),
     );
+  });
+
+  it("serializes concurrent corrections against the latest committed status", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+    const before = await prisma.attendanceCorrectionEvent.count({
+      where: { attendanceId: createdId },
+    });
+
+    const responses = await Promise.all(
+      (["LATE", "PRESENT"] as const).map((status) =>
+        request(app.getHttpServer())
+          .patch(`/attendance/${createdId}`)
+          .send({ status, correctionReason: `Concurrent ${status}` })
+          .set("content-type", "application/json")
+          .set("Authorization", authHeader),
+      ),
+    );
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+
+    const events = await prisma.attendanceCorrectionEvent.findMany({
+      where: { attendanceId: createdId },
+      orderBy: [{ correctedAt: "asc" }, { id: "asc" }],
+      select: { previousStatus: true, newStatus: true },
+    });
+    const concurrentEvents = events.slice(before);
+    expect(concurrentEvents).toHaveLength(2);
+    expect(concurrentEvents[0]?.previousStatus).toBe("ABSENT");
+    expect(concurrentEvents[1]?.previousStatus).toBe(
+      concurrentEvents[0]?.newStatus,
+    );
+    const latest = await prisma.attendance.findUniqueOrThrow({
+      where: { id: createdId },
+      select: { status: true },
+    });
+    expect(latest.status).toBe(concurrentEvents[1]?.newStatus);
+  });
+
+  it("rolls back the row update when the correction event cannot be written", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+    const before = await prisma.attendance.findUniqueOrThrow({
+      where: { id: createdId },
+      select: { status: true, correctionReason: true },
+    });
+    const eventCount = await prisma.attendanceCorrectionEvent.count({
+      where: { attendanceId: createdId },
+    });
+    const nextStatus = before.status === "PRESENT" ? "ABSENT" : "PRESENT";
+    const { service, recordActivityForCurrentUser } =
+      directAttendanceService(randomUUID());
+
+    await expect(
+      service.update(
+        createdId,
+        { status: nextStatus, correctionReason: "Invalid actor" },
+        TENANT_A_ID,
+      ),
+    ).rejects.toThrow();
+    expect(
+      await prisma.attendance.findUniqueOrThrow({
+        where: { id: createdId },
+        select: { status: true, correctionReason: true },
+      }),
+    ).toEqual(before);
+    expect(
+      await prisma.attendanceCorrectionEvent.count({
+        where: { attendanceId: createdId },
+      }),
+    ).toBe(eventCount);
+    expect(recordActivityForCurrentUser).not.toHaveBeenCalled();
   });
 
   it("exports Late using the authoritative status", async () => {

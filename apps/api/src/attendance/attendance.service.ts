@@ -6,7 +6,7 @@ import {
   Optional,
   UnauthorizedException,
 } from "@nestjs/common";
-import { prisma, withTenantRlsContext } from "@pathway/db";
+import { Prisma, prisma, withTenantRlsContext } from "@pathway/db";
 import { PathwayRequestContext } from "@pathway/auth";
 import { Av30ActivityType } from "@pathway/types/av30";
 import { Av30ActivityService } from "../av30/av30-activity.service";
@@ -35,6 +35,12 @@ const SELECT = {
 type AttendanceStatusInput = {
   status?: AttendanceStatus;
   present?: boolean;
+};
+
+type CorrectionMetadata = {
+  correctedAt: Date;
+  correctedByUserId: string;
+  correctionReason: string;
 };
 
 function requestedAttendanceStatus(
@@ -162,7 +168,15 @@ export class AttendanceService {
 
   /** Full detail for one session: session, children in session groups, attendance rows. */
   async getSessionAttendanceDetail(sessionId: string, tenantId: string) {
-    const session = await prisma.session.findFirst({
+    return this.readSessionAttendanceDetail(prisma, sessionId, tenantId);
+  }
+
+  private async readSessionAttendanceDetail(
+    tx: Prisma.TransactionClient,
+    sessionId: string,
+    tenantId: string,
+  ) {
+    const session = await tx.session.findFirst({
       where: { id: sessionId, tenantId },
       select: {
         id: true,
@@ -177,7 +191,7 @@ export class AttendanceService {
     const groupIds = session.groups.map((g) => g.id);
     const [children, rows] = await Promise.all([
       groupIds.length > 0
-        ? prisma.child.findMany({
+        ? tx.child.findMany({
             where: { tenantId, groupId: { in: groupIds } },
             select: {
               id: true,
@@ -187,7 +201,7 @@ export class AttendanceService {
             orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
           })
         : [],
-      prisma.attendance.findMany({
+      tx.attendance.findMany({
         where: { sessionId, child: { tenantId } },
         select: SELECT,
       }),
@@ -241,8 +255,7 @@ export class AttendanceService {
         "childId must be unique within an attendance batch",
       );
     }
-    const now = new Date();
-    const detail = await withTenantRlsContext(
+    const { detail, recordedAt } = await withTenantRlsContext(
       tenantId,
       this.requestContext.currentOrgId,
       async (tx) => {
@@ -252,6 +265,26 @@ export class AttendanceService {
         });
         if (!session) throw new NotFoundException("Session not found");
         const groupIds = new Set(session.groups.map((group) => group.id));
+
+        // Serialize initial marks as well as corrections for this session.
+        await tx.$queryRaw`
+          SELECT id FROM "Session"
+          WHERE id = ${sessionId} AND "tenantId" = ${tenantId}
+          FOR NO KEY UPDATE
+        `;
+
+        if (childIds.length > 0) {
+          await tx.$queryRaw`
+            SELECT attendance.id
+            FROM "Attendance" AS attendance
+            JOIN "Child" AS child ON child.id = attendance."childId"
+            WHERE attendance."sessionId" = ${sessionId}
+              AND child."tenantId" = ${tenantId}
+              AND attendance."childId" IN (${Prisma.join(childIds)})
+            ORDER BY attendance.id
+            FOR UPDATE OF attendance
+          `;
+        }
 
         const [existing, children] = await Promise.all([
           tx.attendance.findMany({
@@ -278,6 +311,7 @@ export class AttendanceService {
         const childrenById = new Map(
           children.map((child) => [child.id, child]),
         );
+        const now = new Date();
 
         const plannedRows = input.rows.map((row) => {
           const child = childrenById.get(row.childId);
@@ -305,7 +339,7 @@ export class AttendanceService {
                 row.correctionReason,
                 now,
               )
-            : {};
+            : null;
           return {
             correction,
             existingRow,
@@ -323,10 +357,21 @@ export class AttendanceService {
                 status: plan.requestedStatus,
                 present: presentFromAttendanceStatus(plan.requestedStatus),
                 timestamp: now,
-                ...plan.correction,
+                ...(plan.correction ?? {}),
               },
               select: SELECT,
             });
+            if (plan.correction) {
+              await this.recordCorrection(
+                tx,
+                tenantId,
+                plan.existingRow.id,
+                plan.row.childId,
+                effectiveAttendanceStatus(plan.existingRow),
+                plan.requestedStatus,
+                plan.correction,
+              );
+            }
           } else {
             await tx.attendance.create({
               data: {
@@ -342,7 +387,14 @@ export class AttendanceService {
           }
         }
 
-        return this.getSessionAttendanceDetail(sessionId, tenantId);
+        return {
+          detail: await this.readSessionAttendanceDetail(
+            tx,
+            sessionId,
+            tenantId,
+          ),
+          recordedAt: now,
+        };
       },
     );
 
@@ -351,7 +403,7 @@ export class AttendanceService {
         .recordActivityForCurrentUser(
           this.requestContext,
           Av30ActivityType.ATTENDANCE_RECORDED,
-          now,
+          recordedAt,
         )
         .catch((err) => {
           console.error("Failed to record AV30 activity for attendance", err);
@@ -447,11 +499,54 @@ export class AttendanceService {
   }
 
   async update(id: string, input: UpdateAttendanceDto, tenantId: string) {
-    // Ensure row exists (also used to infer tenant via relations if needed)
-    const current = await prisma.attendance.findFirst({
+    if (this.requestContext.currentTenantId !== tenantId) {
+      throw new UnauthorizedException(
+        "An authenticated site actor is required to record attendance",
+      );
+    }
+    const updated = await withTenantRlsContext(
+      tenantId,
+      this.requestContext.currentOrgId,
+      async (tx) => this.updateInTransaction(tx, id, input, tenantId),
+    );
+
+    // Record AV30 activity: staff user updated attendance
+    if (this.av30ActivityService) {
+      await this.av30ActivityService
+        .recordActivityForCurrentUser(
+          this.requestContext,
+          Av30ActivityType.ATTENDANCE_RECORDED,
+          input.timestamp ?? updated.timestamp,
+        )
+        .catch((err) => {
+          console.error(
+            "Failed to record AV30 activity for attendance update",
+            err,
+          );
+        });
+    }
+
+    return toAttendanceResponse(updated);
+  }
+
+  private async updateInTransaction(
+    tx: Prisma.TransactionClient,
+    id: string,
+    input: UpdateAttendanceDto,
+    tenantId: string,
+  ) {
+    await tx.$queryRaw`
+      SELECT attendance.id
+      FROM "Attendance" AS attendance
+      JOIN "Child" AS child ON child.id = attendance."childId"
+      WHERE attendance.id = ${id} AND child."tenantId" = ${tenantId}
+      FOR UPDATE OF attendance
+    `;
+    const current = await tx.attendance.findFirst({
       where: { id, child: { tenantId } },
       select: {
         id: true,
+        childId: true,
         groupId: true,
         present: true,
         status: true,
@@ -462,7 +557,7 @@ export class AttendanceService {
 
     // If groupId is changing, ensure cross-tenant safety with the child's tenant
     if (input.groupId) {
-      const group = await prisma.group.findUnique({
+      const group = await tx.group.findUnique({
         where: { id: input.groupId },
         select: { id: true, tenantId: true },
       });
@@ -478,7 +573,7 @@ export class AttendanceService {
 
     // Optional: validate session exists and is consistent
     if (input.sessionId) {
-      const session = await prisma.session.findUnique({
+      const session = await tx.session.findUnique({
         where: { id: input.sessionId },
         select: { id: true, tenantId: true, groups: { select: { id: true } } },
       });
@@ -504,8 +599,8 @@ export class AttendanceService {
           input.correctionReason,
           new Date(),
         )
-      : {};
-    const updated = await prisma.attendance.update({
+      : null;
+    const updated = await tx.attendance.update({
       where: { id },
       data: {
         status: requestedStatus,
@@ -514,31 +609,48 @@ export class AttendanceService {
             ? undefined
             : presentFromAttendanceStatus(requestedStatus),
         timestamp: input.timestamp ?? undefined,
-        ...correction,
+        ...(correction ?? {}),
         groupId: input.groupId ?? undefined,
         sessionId: input.sessionId ?? undefined,
       },
       select: SELECT,
     });
 
-    // Record AV30 activity: staff user updated attendance
-    if (this.av30ActivityService) {
-      await this.av30ActivityService
-        .recordActivityForCurrentUser(
-          this.requestContext,
-          Av30ActivityType.ATTENDANCE_RECORDED,
-          input.timestamp ?? updated.timestamp,
-        )
-        .catch((err) => {
-          // Log but don't fail the attendance update if AV30 recording fails
-          console.error(
-            "Failed to record AV30 activity for attendance update",
-            err,
-          );
-        });
+    if (correction && requestedStatus) {
+      await this.recordCorrection(
+        tx,
+        tenantId,
+        id,
+        current.childId,
+        effectiveAttendanceStatus(current),
+        requestedStatus,
+        correction,
+      );
     }
+    return updated;
+  }
 
-    return toAttendanceResponse(updated);
+  private async recordCorrection(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    attendanceId: string,
+    childId: string,
+    previousStatus: AttendanceStatus,
+    newStatus: AttendanceStatus,
+    correction: CorrectionMetadata,
+  ): Promise<void> {
+    await tx.attendanceCorrectionEvent.create({
+      data: {
+        tenantId,
+        childId,
+        attendanceId,
+        previousStatus,
+        newStatus,
+        reason: correction.correctionReason,
+        correctedByUserId: correction.correctedByUserId,
+        origin: "LIVE",
+      },
+    });
   }
 
   private correctionData(
@@ -547,14 +659,8 @@ export class AttendanceService {
     requestedStatus: AttendanceStatus,
     correctionReason: string | undefined,
     correctedAt: Date,
-  ):
-    | {
-        correctedAt: Date;
-        correctedByUserId: string;
-        correctionReason: string;
-      }
-    | Record<string, never> {
-    if (currentStatus === requestedStatus) return {};
+  ): CorrectionMetadata | null {
+    if (currentStatus === requestedStatus) return null;
 
     const normalizedReason = correctionReason?.trim();
     if (!normalizedReason) {

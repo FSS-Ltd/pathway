@@ -16,6 +16,12 @@ import { upsertSessionAttendanceDto } from "../dto/upsert-session-attendance.dto
 jest.mock("@pathway/db", () => {
   const actual =
     jest.requireActual<typeof import("@pathway/db")>("@pathway/db");
+  const transactionClient = new Proxy(actual.prisma, {
+    get(target, property, receiver) {
+      if (property === "$queryRaw") return jest.fn().mockResolvedValue([]);
+      return Reflect.get(target, property, receiver);
+    },
+  });
   return {
     ...actual,
     withTenantRlsContext: jest.fn(
@@ -23,7 +29,7 @@ jest.mock("@pathway/db", () => {
         _tenantId: string,
         _orgId: string | null,
         callback: Parameters<typeof actual.withTenantRlsContext>[2],
-      ) => callback(actual.prisma),
+      ) => callback(transactionClient),
     ),
   };
 });
@@ -33,6 +39,7 @@ const aFindMany = jest.spyOn(prisma.attendance, "findMany");
 const aFindFirst = jest.spyOn(prisma.attendance, "findFirst");
 const aCreate = jest.spyOn(prisma.attendance, "create");
 const aUpdate = jest.spyOn(prisma.attendance, "update");
+const eventCreate = jest.spyOn(prisma.attendanceCorrectionEvent, "create");
 
 const cFindUnique = jest.spyOn(prisma.child, "findUnique");
 const cFindMany = jest.spyOn(prisma.child, "findMany");
@@ -129,6 +136,19 @@ describe("AttendanceService", () => {
     aFindFirst.mockReset();
     aCreate.mockReset();
     aUpdate.mockReset();
+    eventCreate.mockReset();
+    eventCreate.mockResolvedValue({
+      id: "event-1",
+      tenantId: "tenant-123",
+      childId: "c1",
+      attendanceId: "attendance-1",
+      previousStatus: "ABSENT",
+      newStatus: "LATE",
+      reason: "Correction",
+      correctedByUserId: "user-123",
+      correctedAt: new Date(),
+      origin: "LIVE",
+    });
     cFindUnique.mockReset();
     cFindMany.mockReset();
     gFindUnique.mockReset();
@@ -464,7 +484,7 @@ describe("AttendanceService", () => {
     it("throws NotFound if attendance missing", async () => {
       aFindFirst.mockResolvedValueOnce(null);
       await expect(
-        svc.update(id, { present: false }, "t1"),
+        svc.update(id, { present: false }, "tenant-123"),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -474,7 +494,7 @@ describe("AttendanceService", () => {
         groupId: "g1",
         present: false,
         status: "ABSENT",
-        child: { tenantId: "t1" },
+        child: { tenantId: "tenant-123" },
       } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
       aUpdate.mockResolvedValueOnce({
         id,
@@ -489,7 +509,7 @@ describe("AttendanceService", () => {
         correctionReason: null,
       });
 
-      const res = await svc.update(id, { present: false }, "t1");
+      const res = await svc.update(id, { present: false }, "tenant-123");
       expect(res.present).toBe(false);
       expect(aUpdate).toHaveBeenCalledWith({
         where: { id },
@@ -502,6 +522,7 @@ describe("AttendanceService", () => {
         },
         select: attendanceSelect,
       });
+      expect(eventCreate).not.toHaveBeenCalled();
       // Verify AV30 activity was recorded
       expect(
         mockAv30Service.recordActivityForCurrentUser,
@@ -514,7 +535,7 @@ describe("AttendanceService", () => {
         groupId: "g1",
         present: true,
         status: "PRESENT",
-        child: { tenantId: "t1" },
+        child: { tenantId: "tenant-123" },
       } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
       gFindUnique.mockResolvedValueOnce({
         ...makeGroup("t2"),
@@ -522,7 +543,7 @@ describe("AttendanceService", () => {
       } as Awaited<ReturnType<typeof prisma.group.findUnique>>);
 
       await expect(
-        svc.update(id, { groupId: newGroup }, "t1"),
+        svc.update(id, { groupId: newGroup }, "tenant-123"),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -532,10 +553,10 @@ describe("AttendanceService", () => {
         groupId: "g1",
         present: true,
         status: "PRESENT",
-        child: { tenantId: "t1" },
+        child: { tenantId: "tenant-123" },
       } as unknown as Awaited<ReturnType<typeof prisma.attendance.findFirst>>);
       gFindUnique.mockResolvedValueOnce({
-        ...makeGroup("t1"),
+        ...makeGroup("tenant-123"),
         id: newGroup,
       } as Awaited<ReturnType<typeof prisma.group.findUnique>>);
       aUpdate.mockResolvedValueOnce({
@@ -551,7 +572,7 @@ describe("AttendanceService", () => {
         correctionReason: null,
       });
 
-      await svc.update(id, { groupId: newGroup }, "t1");
+      await svc.update(id, { groupId: newGroup }, "tenant-123");
       expect(aUpdate).toHaveBeenCalledWith({
         where: { id },
         data: {
@@ -634,6 +655,18 @@ describe("AttendanceService", () => {
           }),
         }),
       );
+      expect(eventCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            tenantId: "tenant-123",
+            attendanceId: id,
+            previousStatus: "ABSENT",
+            newStatus: "LATE",
+            reason: "Bus arrived late",
+            origin: "LIVE",
+          }),
+        }),
+      );
       jest.useRealTimers();
     });
 
@@ -690,6 +723,7 @@ describe("AttendanceService", () => {
       expect(updateCall?.data).not.toHaveProperty("correctedAt");
       expect(updateCall?.data).not.toHaveProperty("correctedByUserId");
       expect(updateCall?.data).not.toHaveProperty("correctionReason");
+      expect(eventCreate).not.toHaveBeenCalled();
     });
   });
 
@@ -716,11 +750,15 @@ describe("AttendanceService", () => {
       aUpdate.mockResolvedValueOnce(
         {} as Awaited<ReturnType<typeof prisma.attendance.update>>,
       );
-      jest
-        .spyOn(svc, "getSessionAttendanceDetail")
-        .mockResolvedValueOnce({ rows: [] } as unknown as Awaited<
-          ReturnType<AttendanceService["getSessionAttendanceDetail"]>
-        >);
+      sFindFirst.mockResolvedValueOnce({
+        id: "session-1",
+        title: "Session",
+        startsAt: new Date(),
+        endsAt: new Date(),
+        groups: [{ id: "group-1", name: "Group" }],
+      } as unknown as Awaited<ReturnType<typeof prisma.session.findFirst>>);
+      cFindMany.mockResolvedValueOnce([]);
+      aFindMany.mockResolvedValueOnce([]);
 
       await svc.upsertSessionAttendance("session-1", "tenant-123", {
         rows: [
@@ -748,6 +786,17 @@ describe("AttendanceService", () => {
         "tenant-123",
         "org-123",
         expect.any(Function),
+      );
+      expect(eventCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            attendanceId: "attendance-1",
+            previousStatus: "ABSENT",
+            newStatus: "LATE",
+            reason: "Traffic delay",
+            origin: "LIVE",
+          }),
+        }),
       );
     });
   });
