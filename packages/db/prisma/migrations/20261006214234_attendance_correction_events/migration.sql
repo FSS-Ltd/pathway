@@ -78,8 +78,9 @@ BEGIN
     WHERE attendance."id" = NEW."attendanceId"
       AND attendance."childId" = NEW."childId"
       AND child."tenantId" = NEW."tenantId"
+      AND attendance."status" = NEW."newStatus"
   ) THEN
-    RAISE EXCEPTION 'Attendance correction scope does not match the attendance row'
+    RAISE EXCEPTION 'Attendance correction scope or status does not match the attendance row'
       USING ERRCODE = 'foreign_key_violation';
   END IF;
 
