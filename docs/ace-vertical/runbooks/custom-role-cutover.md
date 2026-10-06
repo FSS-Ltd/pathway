@@ -74,7 +74,14 @@ actor can delegate every tag, that a replacement avoids grant conflicts, or
 that future role definitions and entitlements remain unchanged. Recheck these
 conditions and parity in the audited retirement transaction.
 
-## Audited retirement (step 1.2d3b2)
+## Audited retirement (steps 1.2d3b2a and 1.2d3b2b)
+
+The retirement command must compare access inside its own write transaction.
+The transaction-aware read uses the same entitlement, role, tag, membership,
+and feature rules as normal effective access, but bypasses the shared assignment
+cache so a comparison after mutation sees uncommitted changes. It sets the
+organisation and selected site RLS context for every read. This read path alone
+does not mutate assignments (step 1.2d3b2a).
 
 For each affected user, compare effective access at every applicable site
 before and after a proposed mapping, including existing fixed roles and
