@@ -36,12 +36,25 @@ const emptyHistory: PagedSiteResults<PaceDiagnosticResult> = {
 function markup(
   history: PagedSiteResults<PaceDiagnosticResult>,
   includeRetracted = false,
+  canRetract = false,
 ): string {
   return renderToStaticMarkup(
     <PaceDiagnosticHistory
       history={history}
       includeRetracted={includeRetracted}
       onIncludeRetractedChange={noAction}
+      retraction={
+        canRetract
+          ? {
+              onRetract: async () => ({
+                id: "retraction-1",
+                resultId: result.id,
+                retractedAt: result.recordedAt,
+              }),
+              onRetracted: noAction,
+            }
+          : undefined
+      }
     />,
   );
 }
@@ -74,30 +87,36 @@ assert.match(activeMarkup, /Level 3 · Pass/);
 assert.match(activeMarkup, /Recorded .* by Casey/);
 assert.match(activeMarkup, /Load more results/);
 assert.match(activeMarkup, /More results unavailable/);
+assert.doesNotMatch(activeMarkup, /Retract result/);
+assert.match(
+  markup({ ...emptyHistory, items: [result] }, false, true),
+  /Retract result/,
+);
 
-const retractedMarkup = markup(
-  {
-    ...emptyHistory,
-    items: [
-      {
-        ...result,
-        retraction: {
-          id: "66666666-6666-4666-8666-666666666666",
-          reason: "Recorded for the wrong test",
-          retractedAt: "2026-10-06T11:00:00.000Z",
-          retractedBy: {
-            id: "77777777-7777-4777-8777-777777777777",
-            displayName: "Morgan",
-          },
-        },
-      },
-    ],
+const retractedResult: PaceDiagnosticResult = {
+  ...result,
+  retraction: {
+    id: "66666666-6666-4666-8666-666666666666",
+    reason: "Recorded for the wrong test",
+    retractedAt: "2026-10-06T11:00:00.000Z",
+    retractedBy: {
+      id: "77777777-7777-4777-8777-777777777777",
+      displayName: "Morgan",
+    },
   },
+};
+const retractedMarkup = markup(
+  { ...emptyHistory, items: [retractedResult] },
   true,
 );
 assert.match(retractedMarkup, /Retracted/);
 assert.match(retractedMarkup, /Recorded for the wrong test/);
 assert.match(retractedMarkup, /by Morgan/);
+assert.doesNotMatch(retractedMarkup, /Retract result/);
+assert.doesNotMatch(
+  markup({ ...emptyHistory, items: [retractedResult] }, true, true),
+  /Retract result/,
+);
 
 async function testHistoryRequest(): Promise<void> {
   const originalFetch = globalThis.fetch;
