@@ -4,7 +4,10 @@ import type {
   PaceInventoryOrderItem,
   PaceInventoryStockItem,
 } from "@/lib/pace-inventory-api";
-import { PaceInventoryOrderForm } from "./pace-inventory-order-form";
+import {
+  PaceInventoryBulkForm,
+  type PaceInventoryBulkAction,
+} from "./pace-inventory-bulk-form";
 import type { PagedInventory } from "./use-pace-inventory-page";
 
 type InventoryWorkspaceProps = {
@@ -13,6 +16,7 @@ type InventoryWorkspaceProps = {
   onStockViewChange: () => void;
   orders: PagedInventory<PaceInventoryOrderItem>;
   orderCreation?: { onCreated: (created: number) => void };
+  stockEntry?: { onCreated: (created: number) => void };
   notice?: string | null;
 };
 
@@ -27,6 +31,7 @@ export function PaceInventoryWorkspace({
   onStockViewChange,
   orders,
   orderCreation,
+  stockEntry,
   notice,
 }: InventoryWorkspaceProps) {
   const showAllStock = stockView === "all";
@@ -88,6 +93,7 @@ export function PaceInventoryWorkspace({
               key={`${item.child.id}:${item.subject.id}`}
               item={item}
               onOrderCreated={orderCreation?.onCreated}
+              onStockAdded={stockEntry?.onCreated}
             />
           )}
         />
@@ -185,17 +191,26 @@ function InventoryList<T>({
 function StockRow({
   item,
   onOrderCreated,
+  onStockAdded,
 }: {
   item: PaceInventoryStockItem;
   onOrderCreated?: (created: number) => void;
+  onStockAdded?: (created: number) => void;
 }) {
-  const [isOrdering, setIsOrdering] = React.useState(false);
+  const [activeAction, setActiveAction] =
+    React.useState<PaceInventoryBulkAction | null>(null);
   const orderTrigger = React.useRef<HTMLButtonElement>(null);
-  const wasOrdering = React.useRef(false);
+  const stockTrigger = React.useRef<HTMLButtonElement>(null);
+  const previousAction = React.useRef<PaceInventoryBulkAction | null>(null);
   React.useEffect(() => {
-    if (wasOrdering.current && !isOrdering) orderTrigger.current?.focus();
-    wasOrdering.current = isOrdering;
-  }, [isOrdering]);
+    if (previousAction.current && !activeAction) {
+      (previousAction.current === "order"
+        ? orderTrigger
+        : stockTrigger
+      ).current?.focus();
+    }
+    previousAction.current = activeAction;
+  }, [activeAction]);
   const current =
     item.currentPace < 1000 ? item.currentPace + 1000 : item.currentPace;
   return (
@@ -232,26 +247,39 @@ function StockRow({
               ? "No stock"
               : `${item.availableCount} available`}
           </Badge>
-          {onOrderCreated && current < 1144 && !isOrdering ? (
+          {onStockAdded && current < 1144 && !activeAction ? (
+            <Button
+              ref={stockTrigger}
+              type="button"
+              variant="secondary"
+              className="min-h-11"
+              onClick={() => setActiveAction("stock")}
+            >
+              Add stock
+            </Button>
+          ) : null}
+          {onOrderCreated && current < 1144 && !activeAction ? (
             <Button
               ref={orderTrigger}
               type="button"
               variant="secondary"
               className="min-h-11"
-              onClick={() => setIsOrdering(true)}
+              onClick={() => setActiveAction("order")}
             >
               Create order
             </Button>
           ) : null}
         </div>
       </div>
-      {isOrdering && onOrderCreated ? (
-        <PaceInventoryOrderForm
+      {activeAction && (onOrderCreated || onStockAdded) ? (
+        <PaceInventoryBulkForm
+          action={activeAction}
           item={item}
-          onCancel={() => setIsOrdering(false)}
+          onCancel={() => setActiveAction(null)}
           onCreated={(created) => {
-            setIsOrdering(false);
-            onOrderCreated(created);
+            setActiveAction(null);
+            if (activeAction === "order") onOrderCreated?.(created);
+            else onStockAdded?.(created);
           }}
         />
       ) : null}

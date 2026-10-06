@@ -2,30 +2,55 @@
 
 import * as React from "react";
 import { Button } from "@pathway/ui";
+import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import { AdminPaceApiError } from "@/lib/api-client";
 import {
+  addPaceInventoryCurrentStock,
   createPaceInventoryOrders,
   type PaceInventoryStockItem,
 } from "@/lib/pace-inventory-api";
 
 const CATALOGUE_END = 1144;
 const PAGE_SIZE = 12;
-const MAX_ORDER_SIZE = 24;
+const MAX_BATCH_SIZE = 24;
 
-export function PaceInventoryOrderForm({
+export type PaceInventoryBulkAction = "order" | "stock";
+
+const ACTION_COPY = {
+  order: {
+    legend: "Order future PACEs for",
+    hint: "Choose up to 24 future PACEs. Supplied numbers are unavailable; existing orders are checked when you submit.",
+    submit: "Create order",
+    pending: "Creating order…",
+    error: "Unable to create this PACE order. Please try again.",
+  },
+  stock: {
+    legend: "Add existing physical stock for",
+    hint: "Choose up to 24 future PACEs already held for this placement. Supplied numbers are unavailable; pending orders are checked when you submit.",
+    submit: "Add stock",
+    pending: "Adding stock…",
+    error: "Unable to add this PACE stock. Please try again.",
+  },
+} as const;
+
+export function PaceInventoryBulkForm({
+  action,
   item,
   onCancel,
   onCreated,
 }: {
+  action: PaceInventoryBulkAction;
   item: PaceInventoryStockItem;
   onCancel: () => void;
   onCreated: (created: number) => void;
 }) {
+  const copy = ACTION_COPY[action];
   const [selected, setSelected] = React.useState<number[]>([]);
   const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const submitting = React.useRef(false);
+  const siteGeneration = React.useRef(0);
   const selectionRef = React.useRef<HTMLFieldSetElement>(null);
   const hintId = React.useId();
   const current =
@@ -37,29 +62,47 @@ export function PaceInventoryOrderForm({
   const supplied = new Set(item.futurePaceNumbers);
 
   React.useEffect(() => selectionRef.current?.focus(), []);
+  React.useEffect(() => {
+    const unsubscribe = subscribeToActiveSiteChanges(() => {
+      siteGeneration.current += 1;
+    });
+    return () => {
+      siteGeneration.current += 1;
+      unsubscribe();
+    };
+  }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting.current || selected.length === 0 || pending) return;
     submitting.current = true;
+    const requestSiteGeneration = siteGeneration.current;
     setPending(true);
     setError(null);
     try {
-      const result = await createPaceInventoryOrders({
+      const input = {
         childId: item.child.id,
         subjectId: item.subject.id,
         paceNumbers: selected,
-      });
-      onCreated(result.created);
+      };
+      const result =
+        action === "order"
+          ? await createPaceInventoryOrders(input)
+          : await addPaceInventoryCurrentStock(input);
+      if (requestSiteGeneration === siteGeneration.current) {
+        onCreated(result.created);
+      }
     } catch (cause) {
-      setError(
-        cause instanceof AdminPaceApiError && cause.status < 500
-          ? cause.message
-          : "Unable to create this PACE order. Please try again.",
-      );
+      if (requestSiteGeneration === siteGeneration.current) {
+        setError(
+          cause instanceof AdminPaceApiError && cause.status < 500
+            ? cause.message
+            : copy.error,
+        );
+      }
     } finally {
       submitting.current = false;
-      setPending(false);
+      if (requestSiteGeneration === siteGeneration.current) setPending(false);
     }
   }
 
@@ -84,11 +127,10 @@ export function PaceInventoryOrderForm({
         aria-describedby={hintId}
       >
         <legend className="font-medium text-text-primary">
-          Order future PACEs for {item.child.displayName} · {item.subject.name}
+          {copy.legend} {item.child.displayName} · {item.subject.name}
         </legend>
         <p id={hintId} className="mt-1 text-sm leading-6 text-text-muted">
-          Choose up to 24 future PACEs. Supplied numbers are unavailable;
-          existing orders are checked when you submit.
+          {copy.hint}
         </p>
         {future.length === 0 ? (
           <p className="mt-3 text-sm text-text-muted">
@@ -108,7 +150,7 @@ export function PaceInventoryOrderForm({
                     checked={selected.includes(number)}
                     disabled={
                       inStock ||
-                      (selected.length >= MAX_ORDER_SIZE &&
+                      (selected.length >= MAX_BATCH_SIZE &&
                         !selected.includes(number))
                     }
                     onChange={() => toggle(number)}
@@ -145,7 +187,7 @@ export function PaceInventoryOrderForm({
       ) : null}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending || selected.length === 0}>
-          {pending ? "Creating order…" : "Create order"}
+          {pending ? copy.pending : copy.submit}
         </Button>
         <Button
           type="button"

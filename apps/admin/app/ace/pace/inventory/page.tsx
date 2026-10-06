@@ -22,7 +22,9 @@ export default function PaceInventoryPage() {
   const [stockView, setStockView] = React.useState<"attention" | "all">(
     "attention",
   );
-  const [orderNotice, setOrderNotice] = React.useState<string | null>(null);
+  const [inventoryNotice, setInventoryNotice] = React.useState<string | null>(
+    null,
+  );
   const canRead = permissions?.includes("ace.pace.inventory.read") === true;
   const canManage = permissions?.includes("ace.pace.inventory.manage") === true;
   const enabled =
@@ -36,7 +38,7 @@ export default function PaceInventoryPage() {
     "Unable to load PACE orders.",
   );
   React.useEffect(
-    () => subscribeToActiveSiteChanges(() => setOrderNotice(null)),
+    () => subscribeToActiveSiteChanges(() => setInventoryNotice(null)),
     [],
   );
 
@@ -63,8 +65,8 @@ export default function PaceInventoryPage() {
       }
       orders={orders}
       canManage={canManage}
-      orderNotice={orderNotice}
-      onOrderNotice={setOrderNotice}
+      inventoryNotice={inventoryNotice}
+      onInventoryNotice={setInventoryNotice}
     />
   );
 }
@@ -74,15 +76,15 @@ function PaceInventoryStockView({
   onStockViewChange,
   orders,
   canManage,
-  orderNotice,
-  onOrderNotice,
+  inventoryNotice,
+  onInventoryNotice,
 }: {
   stockView: "attention" | "all";
   onStockViewChange: () => void;
   orders: PagedInventory<PaceInventoryOrderItem>;
   canManage: boolean;
-  orderNotice: string | null;
-  onOrderNotice: (notice: string) => void;
+  inventoryNotice: string | null;
+  onInventoryNotice: (notice: string) => void;
 }) {
   const fetchStockPage = React.useCallback(
     (query: InventoryPageQuery) =>
@@ -97,24 +99,33 @@ function PaceInventoryStockView({
     "Unable to load physical PACE stock.",
   );
 
+  function handleCreated(action: "order" | "stock", created: number) {
+    onInventoryNotice(
+      action === "order"
+        ? `Created ${created} physical PACE ${created === 1 ? "order" : "orders"}.`
+        : `Added ${created} physical ${created === 1 ? "PACE" : "PACEs"} to stock.`,
+    );
+    stock.retry();
+    orders.retry();
+  }
+
   return (
     <PaceInventoryWorkspace
       stock={stock}
       stockView={stockView}
       onStockViewChange={onStockViewChange}
       orders={orders}
-      notice={orderNotice}
+      notice={inventoryNotice}
       orderCreation={
         canManage
           ? {
-              onCreated: (created) => {
-                onOrderNotice(
-                  `Created ${created} physical PACE ${created === 1 ? "order" : "orders"}.`,
-                );
-                stock.retry();
-                orders.retry();
-              },
+              onCreated: (created) => handleCreated("order", created),
             }
+          : undefined
+      }
+      stockEntry={
+        canManage
+          ? { onCreated: (created) => handleCreated("stock", created) }
           : undefined
       }
     />
