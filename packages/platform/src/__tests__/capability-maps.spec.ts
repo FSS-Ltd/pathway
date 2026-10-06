@@ -38,6 +38,8 @@ const ACE_CORE_KEYS = [
   "ace.pace.record",
   "ace.pace.correct",
   "ace.pace.override",
+  "ace.pace.inventory.read",
+  "ace.pace.inventory.manage",
   "ace.behaviour.read",
   "ace.behaviour.record",
   "ace.behaviour.sensitive.read",
