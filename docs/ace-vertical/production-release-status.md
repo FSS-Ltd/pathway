@@ -25,8 +25,9 @@ deployment is claimed by this record.
 | 1.2d3a   | Read-only custom-assignment inventory                 | Merged  | [#352](https://github.com/FSS-Ltd/pathway/pull/352) to `master` | `9be47a8aed1bcbb808e392fb8db02df54737e6c2`; all five jobs passed in [run 37420486397](https://github.com/FSS-Ltd/pathway/actions/runs/37420486397)             | `053743614742c4acec9b2180604d294f3102d2e4` |
 | 1.2d3b1  | Effective-access parity preview for proposed mappings | Merged  | [#353](https://github.com/FSS-Ltd/pathway/pull/353) to `master` | `5ddb58ea9cbf49c369590b5efa852f4b8ab20dd1`; all five jobs passed in [run 37424373226](https://github.com/FSS-Ltd/pathway/actions/runs/37424373226)             | `8eaaa1c0d29a80b391855a0836931487296ed248` |
 | 1.2d3b2a | Fresh effective-access reads in a write transaction   | Merged  | [#354](https://github.com/FSS-Ltd/pathway/pull/354) to `master` | `1fd7a972908141892215bbb937d00535e41f2c0e`; all five jobs passed in [run 37428121362](https://github.com/FSS-Ltd/pathway/actions/runs/37428121362)             | `62e3db49cd4372e3a5908e4674f7fb7fe2185fe2` |
-| 1.2d3b2b | Audited assignment retirement                         | PR open | [#355](https://github.com/FSS-Ltd/pathway/pull/355) to `master` | `9400c0dd4adcb2efbf07ad28e490315eb57afe14`; CI pending                                                                                                         | Pending                                    |
-| 1.3      | ACE core web journeys                                 | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
+| 1.2d3b2b | Audited assignment retirement                         | Merged  | [#355](https://github.com/FSS-Ltd/pathway/pull/355) to `master` | `6ec5a07b779e4e091a4d41002bf404f63fa79e4d`; all five jobs passed in [run 37433372134](https://github.com/FSS-Ltd/pathway/actions/runs/37433372134)             | `a7227df78a5bcc068ce2374ce88d5ba620a4b518` |
+| 1.3a     | Oasis-to-NexSteps web journey parity contract         | In work | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
+| 1.3b+    | ACE core web journey slices                           | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                  | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                    | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 
@@ -145,6 +146,11 @@ API unit tests passed 133/133 suites (1007 tests); API integration tests passed
 checks passed. The focused suite also verifies that a restricted database
 identity cannot run the inventory. Live Supabase migration, inventory, and
 production smoke tests remain deferred.
+
+Step 1.3a records the implemented Oasis web journeys, corresponding NexSteps
+surfaces, unresolved outcomes, and acceptance checks in
+`02-oasis-web-journey-parity.md`. It makes physical PACE ordering the first
+core implementation slice and keeps its stock tracking outside paid add-ons.
 
 ## Release gate
 
