@@ -155,17 +155,16 @@ describe("ACE dashboard daily operations", () => {
           .then(() => undefined),
       );
       await cleanUp(() =>
-        prisma.attendance
-          .deleteMany({
-            where: { childId: fixture!.childId },
-          })
-          .then(() => undefined),
-      );
-      await cleanUp(() =>
         withTenantRlsContext(fixture!.tenantId, fixture!.orgId, async (tx) => {
           await tx.$executeRawUnsafe(
             "SET LOCAL session_replication_role = replica",
           );
+          await tx.attendanceCorrectionEvent.deleteMany({
+            where: { childId: fixture!.childId },
+          });
+          await tx.attendance.deleteMany({
+            where: { childId: fixture!.childId },
+          });
           await tx.paceProgress.deleteMany({
             where: { tenantId: fixture!.tenantId },
           });

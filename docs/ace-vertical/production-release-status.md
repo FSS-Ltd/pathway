@@ -46,7 +46,8 @@ deployment is claimed by this record.
 | 1.3c5a   | Read-only diagnostic history web journey               | Merged  | [#373](https://github.com/FSS-Ltd/pathway/pull/373) to `master` | `121c0b77ca26e1fd53f29b1a93b051ffaef42878`; all five jobs passed in [run 37527866517](https://github.com/FSS-Ltd/pathway/actions/runs/37527866517)             | `55f1a7a55496c07ccacc765819a9b0cf2c1fc770` |
 | 1.3c5b   | Diagnostic record and retraction web controls          | Merged  | [#375](https://github.com/FSS-Ltd/pathway/pull/375) to `master` | `53822bb064603e033ccfe4ebf7bbf0517c530f40`; all eight checks passed (runs below)                                                                               | `eae1e4bb2649a952d603c52a6bff2d29317d4ed7` |
 | 1.3d0    | Attendance correction history and site-scope contract  | Merged  | [#376](https://github.com/FSS-Ltd/pathway/pull/376) to `master` | `ad074caa2ade8440bc327da02a866e7836de0c1c`; all eight checks passed (runs below)                                                                               | `b63718871fe4ac3f84758a7594056e2e7f39a012` |
-| 1.3d1    | Attendance correction-event storage and RLS            | PR open | [#377](https://github.com/FSS-Ltd/pathway/pull/377) to `master` | `3d9bac24` initial PR revision; current-revision CI pending                                                                                                    | Pending                                    |
+| 1.3d1    | Attendance correction-event storage and RLS            | Merged  | [#377](https://github.com/FSS-Ltd/pathway/pull/377) to `master` | `cd9122205a7ba1f34d8c2b68c9b58d3a5957e80d`; all eight checks passed (runs below)                                                                               | `a3895633db6553a01bab4d9f07ef62aa71c21561` |
+| 1.3d2    | Atomic attendance correction writers                   | PR open | [#378](https://github.com/FSS-Ltd/pathway/pull/378) to `master` | `9c6e51d4` initial PR revision; current-revision CI pending                                                                                                    | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -57,6 +58,9 @@ and [CodeQL run 37532483173](https://github.com/FSS-Ltd/pathway/actions/runs/375
 For step 1.3d0, all eight checks passed on the checked revision in
 [CI run 37534452075](https://github.com/FSS-Ltd/pathway/actions/runs/37534452075)
 and [CodeQL run 37534447405](https://github.com/FSS-Ltd/pathway/actions/runs/37534447405).
+For step 1.3d1, all eight checks passed on the checked revision in
+[CI run 37538708174](https://github.com/FSS-Ltd/pathway/actions/runs/37538708174)
+and [CodeQL run 37538703699](https://github.com/FSS-Ltd/pathway/actions/runs/37538703699).
 
 Step 1.1 makes production deployment explicit and accepts only the configured
 Supabase project's direct database endpoint or shared session pooler on port
