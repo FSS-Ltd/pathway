@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
 import { useSession } from "@/lib/use-session-compat";
 import { Button, Card } from "@pathway/ui";
 import {
@@ -52,7 +51,11 @@ export default function RolesAdminPage() {
       setRoles(rolesData);
       setPeople(peopleData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load roles & access data");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to load roles & access data",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -90,18 +93,13 @@ export default function RolesAdminPage() {
             Roles & Access
           </h1>
           <p className="text-sm text-text-muted">
-            Create custom roles, assign them, and review access and audit history
+            Review fixed roles, access assignments, and audit history
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={load}>
             Refresh
           </Button>
-          {activeTab === "roles" && (
-            <Button asChild size="sm">
-              <Link href="/settings/roles/new">+ New role</Link>
-            </Button>
-          )}
         </div>
       </div>
 
@@ -142,10 +140,10 @@ export default function RolesAdminPage() {
         <>
           {activeTab === "roles" && (
             <Card
-              title="Custom roles"
-              description="Roles created for this organisation"
+              title="Role definitions"
+              description="Platform roles and historical custom roles"
             >
-              <RoleListTable roles={roles} onChanged={load} />
+              <RoleListTable roles={roles} />
             </Card>
           )}
           {activeTab === "assignments" && (

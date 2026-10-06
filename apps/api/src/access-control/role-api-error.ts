@@ -16,14 +16,17 @@ const SAFE_MESSAGES: Readonly<Record<string, string>> = {
   ROLE_NAME_CONFLICT: "A role with this name already exists in this scope.",
   ROLE_VERSION_CONFLICT: "The role was changed by another request.",
   SYSTEM_ROLE_PROTECTED: "System roles cannot be changed.",
-  LAST_HEAD_PROTECTED:
-    "The final active organisation head cannot be removed.",
+  CUSTOM_ROLES_RETIRED:
+    "Custom roles are no longer available. Use fixed roles and access tags.",
+  LAST_HEAD_PROTECTED: "The final active organisation head cannot be removed.",
   SELF_LOCKOUT_PROTECTED:
     "This change would remove your access-management authority.",
   UNKNOWN_PERMISSION_KEY: "One or more permission keys are unknown.",
   INACTIVE_PERMISSION_KEY: "One or more permission keys are unavailable.",
-  NON_DELEGABLE_PERMISSION_KEY: "One or more permission keys cannot be delegated.",
-  ILLEGAL_ROLE_SCOPE: "One or more permissions are incompatible with this role scope.",
+  NON_DELEGABLE_PERMISSION_KEY:
+    "One or more permission keys cannot be delegated.",
+  ILLEGAL_ROLE_SCOPE:
+    "One or more permissions are incompatible with this role scope.",
   ACTOR_CANNOT_DELEGATE: "You cannot delegate one or more permissions.",
   INVALID_ASSIGNMENT_REQUEST: "The assignment request is invalid.",
   ASSIGNMENT_API_ACCESS_DENIED:
@@ -48,7 +51,8 @@ const SAFE_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_ACCESS_TAG_REQUEST: "The access-tag request is invalid.",
   INVALID_ACCESS_TAG_WINDOW: "The access-tag validity window is invalid.",
   ACCESS_TAG_UNAVAILABLE: "This access tag is not available.",
-  ACCESS_TAG_ACTOR_NOT_HEAD: "Only an organisation head can manage access tags.",
+  ACCESS_TAG_ACTOR_NOT_HEAD:
+    "Only an organisation head can manage access tags.",
   ACCESS_TAG_ASSIGNEE_NOT_IN_SITE:
     "The selected user is not a member of this site.",
   ACCESS_TAG_CANNOT_DELEGATE:
