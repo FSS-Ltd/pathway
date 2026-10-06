@@ -6981,89 +6981,6 @@ export async function fetchRoles(): Promise<AdminRoleDefinition[]> {
   return res.json();
 }
 
-export async function fetchRole(roleId: string): Promise<AdminRoleDefinition | null> {
-  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}`, {
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-  });
-  if (res.status === 404) return null;
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch role: ${res.status} ${body}`);
-  }
-  return res.json();
-}
-
-export async function createRole(input: {
-  name: string;
-  description?: string;
-  scope: "organisation" | "site";
-  permissionKeys: string[];
-}): Promise<AdminRoleDefinition> {
-  const res = await fetch(`${API_BASE_URL}/access/roles`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to create role: ${res.status} ${body}`);
-  }
-  return res.json();
-}
-
-export async function updateRole(
-  roleId: string,
-  input: {
-    expectedVersion: number;
-    name: string;
-    description?: string;
-    permissionKeys: string[];
-  },
-): Promise<AdminRoleDefinition> {
-  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}`, {
-    method: "PATCH",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) return throwCodedRoleApiError(res, "Failed to update role");
-  return res.json();
-}
-
-export async function cloneRole(
-  roleId: string,
-  input: { name: string; description?: string },
-): Promise<AdminRoleDefinition> {
-  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}/clone`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    body: JSON.stringify(input),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to clone role: ${res.status} ${body}`);
-  }
-  return res.json();
-}
-
-export async function retireRole(
-  roleId: string,
-  expectedVersion: number,
-): Promise<AdminRoleDefinition> {
-  const res = await fetch(`${API_BASE_URL}/access/roles/${roleId}/retire`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    body: JSON.stringify({ expectedVersion }),
-  });
-  if (!res.ok) return throwCodedRoleApiError(res, "Failed to retire role");
-  return res.json();
-}
-
 export async function fetchRoleAssignments(params?: {
   cursor?: string;
   limit?: number;
@@ -7168,18 +7085,4 @@ export async function fetchAccessAuditEvents(params?: {
     throw new Error(`Failed to fetch audit events: ${res.status} ${body}`);
   }
   return res.json();
-}
-
-export async function fetchDelegablePermissionKeys(): Promise<string[]> {
-  const res = await fetch(`${API_BASE_URL}/access/permissions`, {
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch delegable permissions: ${res.status} ${body}`);
-  }
-  const { delegableKeys } = (await res.json()) as { delegableKeys: string[] };
-  return delegableKeys;
 }

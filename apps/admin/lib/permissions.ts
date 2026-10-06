@@ -97,7 +97,6 @@ export type AdminAction =
   | "billing:access"
   | "safeguarding:access"
   | "safeguarding:create"
-  | "roles:manage"
   | "assignments:manage";
 
 /**
@@ -131,8 +130,6 @@ export function canPerform(
       return canAccessSafeguardingAdmin(role);
     case "safeguarding:create":
       return true; // Any staff can create concerns
-    case "roles:manage":
-      return hasPermission(permissions ?? null, "platform.access.roles.manage");
     case "assignments:manage":
       return hasPermission(
         permissions ?? null,

@@ -66,7 +66,9 @@ describe("access route matrix (e2e)", () => {
         .deleteMany({ where: { orgId: orgWithVertical } })
         .catch(() => undefined);
       await prisma.org
-        .deleteMany({ where: { id: { in: [orgWithVertical, orgWithoutVertical] } } })
+        .deleteMany({
+          where: { id: { in: [orgWithVertical, orgWithoutVertical] } },
+        })
         .catch(() => undefined);
     }
     await app?.close();
@@ -166,6 +168,35 @@ describe("access route matrix (e2e)", () => {
         await clearE2eTypedRole(role, orgWithVertical);
       }
     });
+  });
+
+  it("retires custom role creation after the normal access guards", async () => {
+    if (!app) return;
+    const subject = `access-matrix-role-retired-${randomUUID()}`;
+    const { userId, authorization } = await seedE2eAuthUser({
+      subject,
+      orgId: orgWithVertical,
+      orgRole: "ORG_MEMBER",
+    });
+    seededUserIds.push(userId);
+    const role = await seedE2eTypedRole({
+      orgId: orgWithVertical,
+      userId,
+      scope: "organisation",
+      permissionKeys: ["platform.access.roles.manage"],
+    });
+
+    try {
+      const response = await request(app.getHttpServer())
+        .post("/access/roles")
+        .set("Authorization", authorization)
+        .send({ name: "Unsupported role" });
+
+      expect(response.status).toBe(410);
+      expect(response.body).toMatchObject({ code: "CUSTOM_ROLES_RETIRED" });
+    } finally {
+      await clearE2eTypedRole(role, orgWithVertical);
+    }
   });
 
   describe("POST /access/assignments (R10)", () => {

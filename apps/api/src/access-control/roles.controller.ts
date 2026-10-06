@@ -1,7 +1,7 @@
 import {
-  Body,
   Controller,
   Get,
+  HttpStatus,
   Inject,
   Param,
   Patch,
@@ -13,33 +13,21 @@ import {
 import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import {
-  cloneRoleDto,
-  createRoleDto,
-  retireRoleDto,
-  updateRoleDto,
-} from "./dto/role.dto";
 import { PermissionGuard } from "./permission.guard";
 import { RequirePermission } from "./require-permission.decorator";
 import { RolesService, type RoleActorContext } from "./roles.service";
 import { roleApiError } from "./role-api-error";
-import {
-  getOrCreateRequestId,
-  type RequestWithRequestId,
-} from "./request-id";
+import { getOrCreateRequestId, type RequestWithRequestId } from "./request-id";
 
 const roleIdParam = z.object({ roleId: z.string().uuid() });
-const replacePermissionsDto = z.object({
-  expectedVersion: z.number().int().positive(),
-  permissionKeys: z.array(z.string().min(1)).min(1),
-}).strict();
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("access/roles")
 export class RolesController {
   constructor(
     @Inject(RolesService) private readonly roles: RolesService,
-    @Inject(PathwayRequestContext) private readonly requestContext: PathwayRequestContext,
+    @Inject(PathwayRequestContext)
+    private readonly requestContext: PathwayRequestContext,
   ) {}
 
   @Get()
@@ -50,12 +38,8 @@ export class RolesController {
 
   @Post()
   @RequirePermission("platform.access.roles.manage")
-  async create(@Body() body: unknown, @Req() request: RequestWithRequestId) {
-    const requestId = getOrCreateRequestId(request);
-    return this.roles.create(
-      parse(createRoleDto, body, requestId),
-      this.actor(request, requestId),
-    );
+  create(@Req() request: RequestWithRequestId): never {
+    return this.rejectLegacyWrite(request);
   }
 
   @Get(":roleId")
@@ -70,66 +54,33 @@ export class RolesController {
 
   @Patch(":roleId")
   @RequirePermission("platform.access.roles.manage")
-  async update(
-    @Param() params: unknown,
-    @Body() body: unknown,
-    @Req() request: RequestWithRequestId,
-  ) {
-    const requestId = getOrCreateRequestId(request);
-    return this.roles.update({
-      roleId: parse(roleIdParam, params, requestId).roleId,
-      ...parse(updateRoleDto, body, requestId),
-    }, this.actor(request, requestId));
+  update(@Req() request: RequestWithRequestId): never {
+    return this.rejectLegacyWrite(request);
   }
 
   @Post(":roleId/clone")
   @RequirePermission("platform.access.roles.manage")
-  async clone(
-    @Param() params: unknown,
-    @Body() body: unknown,
-    @Req() request: RequestWithRequestId,
-  ) {
-    const requestId = getOrCreateRequestId(request);
-    return this.roles.clone(
-      parse(roleIdParam, params, requestId).roleId,
-      parse(cloneRoleDto, body, requestId),
-      this.actor(request, requestId),
-    );
+  clone(@Req() request: RequestWithRequestId): never {
+    return this.rejectLegacyWrite(request);
   }
 
   @Put(":roleId/permissions")
   @RequirePermission("platform.access.roles.manage")
-  async replacePermissions(
-    @Param() params: unknown,
-    @Body() body: unknown,
-    @Req() request: RequestWithRequestId,
-  ) {
-    const requestId = getOrCreateRequestId(request);
-    const roleId = parse(roleIdParam, params, requestId).roleId;
-    const replacement = parse(replacePermissionsDto, body, requestId);
-    const actor = this.actor(request, requestId);
-    const current = await this.roles.get(roleId, actor);
-    return this.roles.update({
-      roleId,
-      expectedVersion: replacement.expectedVersion,
-      name: current.name,
-      description: current.description ?? undefined,
-      permissionKeys: replacement.permissionKeys,
-    }, actor);
+  replacePermissions(@Req() request: RequestWithRequestId): never {
+    return this.rejectLegacyWrite(request);
   }
 
   @Post(":roleId/retire")
   @RequirePermission("platform.access.roles.manage")
-  async retire(
-    @Param() params: unknown,
-    @Body() body: unknown,
-    @Req() request: RequestWithRequestId,
-  ) {
-    const requestId = getOrCreateRequestId(request);
-    return this.roles.retire(
-      parse(roleIdParam, params, requestId).roleId,
-      parse(retireRoleDto, body, requestId),
-      this.actor(request, requestId),
+  retire(@Req() request: RequestWithRequestId): never {
+    return this.rejectLegacyWrite(request);
+  }
+
+  private rejectLegacyWrite(request: RequestWithRequestId): never {
+    throw roleApiError(
+      HttpStatus.GONE,
+      "CUSTOM_ROLES_RETIRED",
+      getOrCreateRequestId(request),
     );
   }
 

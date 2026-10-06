@@ -10,8 +10,8 @@
 
 The product owner replaced customer-created roles in every sector with fixed
 platform roles and scoped access tags. The route matrix below describes the
-previously implemented ACE-F14 role API until its runtime cutover; it is not
-approval to keep customer role writes. The target contract is:
+previously implemented ACE-F14 role API during its staged runtime cutover. The
+target contract is:
 
 | Existing route family | Target behavior |
 | --- | --- |
@@ -25,8 +25,10 @@ typed permission, entitlement, or record-scope guard remain unavailable. A tag
 may be issued only for permissions the actor currently holds and may delegate;
 the issued scope cannot exceed the actor's scope. The grant record retains
 grantor, validity, one-way revocation, and audit facts. Access reads must ignore
-expired and revoked grants and re-evaluate on site switches. Until the API and
-migration steps merge, the existing R01-R14 behavior below remains live.
+expired and revoked grants and re-evaluate on site switches. The access-tag
+APIs are merged; the role-write retirement and assignment migration remain
+separate delivery steps. The original R01-R14 rows below are historical where
+they describe customer role mutations.
 
 Step 1.2c adds these routes outside the original 68-route ACE contract. Each
 uses the authenticated request's organisation and selected site. Grant and
@@ -81,14 +83,9 @@ route asserts a legacy role name, and no bootstrap remains: the full formula
 matrix row above where the `capability` and `permission` columns are the
 same key.
 
-For create, clone, update, and permission replacement, grantable keys are
-the intersection of the acting user's own effective permissions, the
-organisation's active capabilities, and active delegable permission
-metadata (`resolveDelegableCeiling`, `apps/api/src/access-control/roles.service.ts`).
-R05 may use a protected system template as a read-only clone source. It
-never mutates that template, and the clone still passes source
-organisation/site and grantable-key checks. R04, R06, and R07 continue to
-reject mutation or retirement of system roles. R09 is organisation-scoped
+R02 and R04-R07 return request-correlated `410 CUSTOM_ROLES_RETIRED` after
+authentication and permission checks when step 1.2d1 is released. Historical
+role reads remain available for migration parity. R09 is organisation-scoped
 and returns an opaque `{ items, nextCursor }` creation-order page with a
 default and maximum of 50 rows. R10 derives organisation and selected-site
 scope from trusted context for one assignment or an atomic bulk request of
@@ -101,8 +98,8 @@ just-revoked actor's next read. Other processes and failed direct
 invalidations converge through that same TTL.
 
 ACE-F12's transactional last-organisation-head and same-request
-self-lockout enforcement remains required for R04, R06, R07, R10, and R11
-and is unaffected by this cutover.
+self-lockout enforcement remains required for R10 and R11. R04, R06, and R07
+no longer mutate roles after step 1.2d1 is released.
 
 `none` means the layer is genuinely inapplicable to that route. It never means undecided.
 

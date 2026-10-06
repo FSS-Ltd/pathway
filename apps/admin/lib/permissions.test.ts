@@ -95,10 +95,6 @@ function runTests() {
     "SITE_ADMIN by role name alone, with no typed permission, cannot access /settings/roles",
   );
   assert(!canAccessRoute("/settings/roles", staffRole, []), "STAFF cannot access /settings/roles");
-  assert(
-    canAccessRoute("/settings/roles/new", orgAdminRole, rolesReadPermission),
-    "a user holding platform.access.roles.read can access /settings/roles/new",
-  );
 
   console.log("canPerform");
   assert(!canPerform("people:invite", staffRole), "STAFF cannot people:invite");
@@ -110,18 +106,6 @@ function runTests() {
   assert(canPerform("safeguarding:access", safeguardingLeadRole), "SAFEGUARDING_LEAD can safeguarding:access");
   assert(canPerform("safeguarding:access", orgAdminRole), "ORG_ADMIN can safeguarding:access");
   assert(canPerform("safeguarding:create", staffRole), "STAFF can safeguarding:create");
-  assert(
-    !canPerform("roles:manage", siteAdminRole, []),
-    "SITE_ADMIN with no typed permission cannot roles:manage",
-  );
-  assert(
-    canPerform("roles:manage", orgAdminRole, ["platform.access.roles.manage"]),
-    "a user holding platform.access.roles.manage can roles:manage",
-  );
-  assert(
-    !canPerform("roles:manage", orgAdminRole, []),
-    "ORG_ADMIN by role name alone, with no typed permission, cannot roles:manage",
-  );
   assert(
     !canPerform("assignments:manage", staffRole, []),
     "STAFF with no typed permission cannot assignments:manage",

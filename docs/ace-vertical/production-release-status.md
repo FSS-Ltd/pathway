@@ -19,8 +19,10 @@ deployment is claimed by this record.
 | 1.1  | Require manual release and validate migration target | Merged  | [#346](https://github.com/FSS-Ltd/pathway/pull/346) to `master` | `07cd5eeb4432a7400297865166564acb9a8032ab`; all five jobs passed in [run 37317265932](https://github.com/FSS-Ltd/pathway/actions/runs/37317265932) | `d27b9df77e4416dc2cd472abf59dc2a6568b7b2a` |
 | 1.2a | Scoped access-tag grant storage and RLS              | Merged  | [#347](https://github.com/FSS-Ltd/pathway/pull/347) to `master` | `143a7bd507127556c5322184a1c2000108fc0346`; all five jobs passed in [run 37322499197](https://github.com/FSS-Ltd/pathway/actions/runs/37322499197) | `f1674f41a39e80abb0b1cc4282056a808f83b425` |
 | 1.2b | Typed access-tag catalogue and access decision docs  | Merged  | [#348](https://github.com/FSS-Ltd/pathway/pull/348) to `master` | `a975bc89e36a12f5a5e2e3526d222e310777b1bc`; all five jobs passed in [run 37369195079](https://github.com/FSS-Ltd/pathway/actions/runs/37369195079) (attempt 4) | `173420159825f2d029c685e4b2c19a7ba07e5970` |
-| 1.2c | Delegation, grant/revoke and effective-access APIs   | PR open | [#349](https://github.com/FSS-Ltd/pathway/pull/349) to `master` | CI pending on current PR revision | Pending |
-| 1.2d | Legacy custom-role retirement and parity migration   | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.2c | Delegation, grant/revoke and effective-access APIs   | Merged  | [#349](https://github.com/FSS-Ltd/pathway/pull/349) to `master` | `ff0d294709cece7f19974697ad57b0fd28f632de`; all five jobs passed in [run 37413254333](https://github.com/FSS-Ltd/pathway/actions/runs/37413254333) | `784f261ec9e2463a9a7b519328cb7d8b27560f8f` |
+| 1.2d1 | Retire customer role write routes and editor         | Draft PR | [#350](https://github.com/FSS-Ltd/pathway/pull/350) to `master` | Implementation revision `0b6a7c9febb016237f1f6f457d8341852ba264f3`; final CI pending | Pending                                    |
+| 1.2d2 | Fixed-role-only assignment cutover                    | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
+| 1.2d3 | Custom-assignment inventory and parity migration     | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 | 1.3  | ACE core web journeys                                | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 | 1.4  | Paid add-ons and entitlement billing                 | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
 | 1.5  | Shared web UI and messaging finish                   | Planned | Pending                                                         | Pending                                                                                                                                            | Pending                                    |
@@ -51,7 +53,7 @@ across all sectors. Its typed catalogue matches all 17 Oasis tag names. Five
 currently map to delegable NexSteps permissions; twelve remain unavailable
 until their missing permission, module, or record-scope rules are delivered.
 The catalogue alone does not grant access. Grant/revoke and effective-access
-work is step 1.2c; it has not been merged or deployed.
+APIs merged in step 1.2c but have not been deployed.
 
 Step 1.2c local verification: API unit tests 994/994, API integration tests
 357/357 against disposable Postgres, repository lint and typecheck 16/16 each,
@@ -60,6 +62,23 @@ and `graphify update .` passed. The RLS gate used the repository's documented
 public-table exposure acceptance; the three pre-existing tables it reports
 remain a separate production concern. Live Supabase migration and production
 smoke tests remain deferred under the product owner's instruction.
+
+Step 1.2d1 removes customer-facing role creation, editing, cloning,
+permission replacement, and retirement from the shared admin application.
+The corresponding API routes return a request-correlated `410` after the
+existing authentication and permission guards. Historical role definitions
+and assignments remain readable. Assigning only fixed roles, auditing parity
+and retiring legacy assignments belong to steps 1.2d2 and 1.2d3. The
+database's dedicated system-role seed identity remains mandatory; test
+fixtures must use that path rather than relabel customer roles as fixed roles.
+Local verification: repository lint and typecheck 16/16 each; API unit
+tests, admin tests, API and admin builds, and 20 focused API integration
+tests passed. The admin build used a non-secret mock API mode and test Clerk
+publishable key. The full local integration suite had 43 passing and 11
+failing suites because the disposable test database login has superuser/RLS
+bypass privileges and retained conflicting fixtures; current-revision CI
+must provide the clean full-suite result. `graphify update .`, targeted
+Prettier checks, and `git diff --check` passed.
 
 ## Release gate
 
