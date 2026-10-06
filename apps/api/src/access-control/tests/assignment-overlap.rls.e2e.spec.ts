@@ -15,6 +15,7 @@ import {
   isDatabaseAvailable,
   requireDatabase,
 } from "../../../test-helpers.e2e";
+import { withSystemRoleFixtureWrites } from "./system-role-fixture";
 
 const ORG_ID = process.env.E2E_ORG_ID as string;
 const SITE_ID = process.env.E2E_TENANT_ID as string;
@@ -114,27 +115,31 @@ describe("assignment overlap integration", () => {
       update: { vertical: "ACE_SCHOOL" },
       create: { orgId: ORG_ID, vertical: "ACE_SCHOOL" },
     });
-    await prisma.orgRoleDefinition.createMany({
-      data: [
-        {
-          id: siteRoleDefinitionId,
-          orgId: ORG_ID,
-          tenantId: SITE_ID,
-          name: `Overlap site role ${siteRoleDefinitionId}`,
-          scope: "site",
-          createdById: actorUserId,
-          updatedById: actorUserId,
-        },
-        {
-          id: organisationRoleDefinitionId,
-          orgId: ORG_ID,
-          tenantId: null,
-          name: `Overlap org role ${organisationRoleDefinitionId}`,
-          scope: "organisation",
-          createdById: actorUserId,
-          updatedById: actorUserId,
-        },
-      ],
+    await withSystemRoleFixtureWrites(async (tx) => {
+      await tx.orgRoleDefinition.createMany({
+        data: [
+          {
+            id: siteRoleDefinitionId,
+            orgId: ORG_ID,
+            tenantId: SITE_ID,
+            name: `Overlap site role ${siteRoleDefinitionId}`,
+            scope: "site",
+            isSystem: true,
+            createdById: actorUserId,
+            updatedById: actorUserId,
+          },
+          {
+            id: organisationRoleDefinitionId,
+            orgId: ORG_ID,
+            tenantId: null,
+            name: `Overlap org role ${organisationRoleDefinitionId}`,
+            scope: "organisation",
+            isSystem: true,
+            createdById: actorUserId,
+            updatedById: actorUserId,
+          },
+        ],
+      });
     });
   });
 
@@ -154,10 +159,12 @@ describe("assignment overlap integration", () => {
           },
         },
       });
-      await prisma.orgRoleDefinition.deleteMany({
-        where: {
-          id: { in: [siteRoleDefinitionId, organisationRoleDefinitionId] },
-        },
+      await withSystemRoleFixtureWrites(async (tx) => {
+        await tx.orgRoleDefinition.deleteMany({
+          where: {
+            id: { in: [siteRoleDefinitionId, organisationRoleDefinitionId] },
+          },
+        });
       });
       await prisma.orgMembership.deleteMany({
         where: { userId: { in: [actorUserId, assigneeUserId] } },

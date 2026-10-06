@@ -12,6 +12,7 @@ import {
   isDatabaseAvailable,
   requireDatabase,
 } from "../../../test-helpers.e2e";
+import { withSystemRoleFixtureWrites } from "./system-role-fixture";
 
 const ORG_ID = process.env.E2E_ORG_ID as string;
 const SITE_ID = process.env.E2E_TENANT_ID as string;
@@ -59,6 +60,7 @@ describe("assignment API transaction and forced-RLS integration", () => {
   const assigneeUserId = randomUUID();
   const roleDefinitionId = randomUUID();
   const secondSiteRoleDefinitionId = randomUUID();
+  const customRoleDefinitionId = randomUUID();
   const secondSiteAssignmentId = randomUUID();
   const originalOrgVerticalNotCaptured = Symbol(
     "originalOrgVerticalNotCaptured",
@@ -109,23 +111,38 @@ describe("assignment API transaction and forced-RLS integration", () => {
       update: { vertical: "ACE_SCHOOL" },
       create: { orgId: ORG_ID, vertical: "ACE_SCHOOL" },
     });
-    await prisma.orgRoleDefinition.create({
-      data: {
-        id: roleDefinitionId,
-        orgId: ORG_ID,
-        tenantId: SITE_ID,
-        name: `Assignment API role ${roleDefinitionId}`,
-        scope: "site",
-        createdById: actorUserId,
-        updatedById: actorUserId,
-      },
+    await withSystemRoleFixtureWrites(async (tx) => {
+      await tx.orgRoleDefinition.createMany({
+        data: [
+          {
+            id: roleDefinitionId,
+            orgId: ORG_ID,
+            tenantId: SITE_ID,
+            name: `Assignment API role ${roleDefinitionId}`,
+            scope: "site",
+            isSystem: true,
+            createdById: actorUserId,
+            updatedById: actorUserId,
+          },
+          {
+            id: secondSiteRoleDefinitionId,
+            orgId: ORG_ID,
+            tenantId: SECOND_SITE_ID,
+            name: `Assignment API second-site role ${secondSiteRoleDefinitionId}`,
+            scope: "site",
+            isSystem: true,
+            createdById: actorUserId,
+            updatedById: actorUserId,
+          },
+        ],
+      });
     });
     await prisma.orgRoleDefinition.create({
       data: {
-        id: secondSiteRoleDefinitionId,
+        id: customRoleDefinitionId,
         orgId: ORG_ID,
-        tenantId: SECOND_SITE_ID,
-        name: `Assignment API second-site role ${secondSiteRoleDefinitionId}`,
+        tenantId: SITE_ID,
+        name: `Assignment API legacy role ${customRoleDefinitionId}`,
         scope: "site",
         createdById: actorUserId,
         updatedById: actorUserId,
@@ -156,12 +173,26 @@ describe("assignment API transaction and forced-RLS integration", () => {
       await prisma.userRoleAssignment.deleteMany({
         where: {
           roleDefinitionId: {
-            in: [roleDefinitionId, secondSiteRoleDefinitionId],
+            in: [
+              roleDefinitionId,
+              secondSiteRoleDefinitionId,
+              customRoleDefinitionId,
+            ],
           },
         },
       });
-      await prisma.orgRoleDefinition.deleteMany({
-        where: { id: { in: [roleDefinitionId, secondSiteRoleDefinitionId] } },
+      await withSystemRoleFixtureWrites(async (tx) => {
+        await tx.orgRoleDefinition.deleteMany({
+          where: {
+            id: {
+              in: [
+                roleDefinitionId,
+                secondSiteRoleDefinitionId,
+                customRoleDefinitionId,
+              ],
+            },
+          },
+        });
       });
       await prisma.orgMembership.deleteMany({
         where: { userId: { in: [actorUserId, assigneeUserId] } },
@@ -235,6 +266,57 @@ describe("assignment API transaction and forced-RLS integration", () => {
         }),
       ).resolves.toBe(1);
     });
+  });
+
+  it("keeps a legacy custom assignment readable but rejects a new grant", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const historicalAssignmentId = randomUUID();
+    await prisma.userRoleAssignment.create({
+      data: {
+        id: historicalAssignmentId,
+        orgId: ORG_ID,
+        tenantId: SITE_ID,
+        userId: assigneeUserId,
+        roleDefinitionId: customRoleDefinitionId,
+        assignedById: actorUserId,
+        startsAt: new Date("2020-01-01T00:00:00.000Z"),
+      },
+    });
+
+    try {
+      const before = await service.list(actor);
+      expect(before.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: historicalAssignmentId }),
+        ]),
+      );
+      await expect(
+        service.assign(
+          [
+            {
+              userId: assigneeUserId,
+              roleDefinitionId: customRoleDefinitionId,
+              orgId: ORG_ID,
+              tenantId: SITE_ID,
+              startsAt: new Date("2040-01-01T00:00:00.000Z"),
+            },
+          ],
+          actor,
+        ),
+      ).rejects.toMatchObject({
+        response: { statusCode: 400, code: "ROLE_NOT_ASSIGNABLE" },
+      });
+      await expect(
+        prisma.userRoleAssignment.count({
+          where: { roleDefinitionId: customRoleDefinitionId },
+        }),
+      ).resolves.toBe(1);
+    } finally {
+      await prisma.userRoleAssignment.delete({
+        where: { id: historicalAssignmentId },
+      });
+    }
   });
 
   it("lists assignments across the organisation only after R09 bootstrap succeeds", async () => {
