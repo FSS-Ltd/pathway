@@ -515,6 +515,22 @@ export const CAPABILITY_DEFINITIONS = {
     true,
     aceRequirement,
   ),
+  "ace.pace.diagnostics.read": defineCapability(
+    "View PACE diagnostic results",
+    "View diagnostic results for children at the active site",
+    "site",
+    "sensitive",
+    true,
+    aceRequirement,
+  ),
+  "ace.pace.diagnostics.manage": defineCapability(
+    "Manage PACE diagnostic results",
+    "Record and retract diagnostic results for children at the active site",
+    "site",
+    "sensitive",
+    true,
+    aceRequirement,
+  ),
   "ace.behaviour.read": defineCapability(
     "View behaviour",
     "View behaviour records and policy",

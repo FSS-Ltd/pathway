@@ -55,6 +55,8 @@ export const VERTICAL_CAPABILITIES = {
     "ace.pace.override",
     "ace.pace.inventory.read",
     "ace.pace.inventory.manage",
+    "ace.pace.diagnostics.read",
+    "ace.pace.diagnostics.manage",
     "ace.behaviour.read",
     "ace.behaviour.record",
     "ace.behaviour.sensitive.read",
@@ -93,21 +95,13 @@ export const VERTICAL_CAPABILITIES = {
     "parents.read",
     "reports.read",
   ],
-  NURSERY: [
-    ...PLATFORM_CORE_CAPABILITIES,
-    "children.manage",
-    "parents.read",
-  ],
+  NURSERY: [...PLATFORM_CORE_CAPABILITIES, "children.manage", "parents.read"],
   CHARITY: [
     ...PLATFORM_CORE_CAPABILITIES,
     "volunteers.manage",
     "calendar.read",
   ],
-  CLUB: [
-    ...PLATFORM_CORE_CAPABILITIES,
-    "members.manage",
-    "calendar.read",
-  ],
+  CLUB: [...PLATFORM_CORE_CAPABILITIES, "members.manage", "calendar.read"],
   HOME_EDUCATION: [
     ...PLATFORM_CORE_CAPABILITIES,
     "learning.log.read",
