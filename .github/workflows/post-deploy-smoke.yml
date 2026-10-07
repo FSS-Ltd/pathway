@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       admin_url:
-        description: Admin app URL, for example https://app.nexsteps.dev
+        description: Exact admin deployment URL, for example https://nexsteps-admin-abc123.vercel.app
         required: true
         type: string
 
@@ -20,6 +20,7 @@ jobs:
   smoke:
     name: Smoke test deployed apps
     runs-on: ubuntu-22.04
+    environment: production
     permissions:
       contents: read
     steps:
@@ -43,9 +44,22 @@ jobs:
 
       - name: Check admin app responds
         shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_ADMIN_PROJECT_ID }}
+          ADMIN_DEPLOYMENT_URL: ${{ inputs.admin_url }}
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error --location --max-time 20 \
-            --output /tmp/nexsteps-admin.html \
-            "${{ inputs.admin_url }}"
-          test -s /tmp/nexsteps-admin.html
+          test -n "$VERCEL_TOKEN"
+          test -n "$VERCEL_ORG_ID"
+          test -n "$VERCEL_PROJECT_ID"
+          npx --yes vercel@54.13.0 curl / \
+            --deployment "$ADMIN_DEPLOYMENT_URL" \
+            --non-interactive -- \
+            --silent --show-error --max-time 20 \
+            --dump-header /tmp/nexsteps-admin-headers.txt \
+            --output /tmp/nexsteps-admin-response.txt
+          grep -Eiq '^HTTP/[^ ]+ 307' /tmp/nexsteps-admin-headers.txt
+          grep -Eiq '^location: https://accounts\.nexsteps\.dev/sign-in([?\r]|$)' \
+            /tmp/nexsteps-admin-headers.txt
