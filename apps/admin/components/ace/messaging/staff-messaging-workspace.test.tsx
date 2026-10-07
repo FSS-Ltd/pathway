@@ -74,6 +74,7 @@ async function run(): Promise<void> {
   const originalFetch = globalThis.fetch;
   let site = 1;
   let postCount = 0;
+  let readCursorSaved = false;
   const sentRequestIds: string[] = [];
   const recipientSearches: string[] = [];
   let alexSearchFailed = false;
@@ -87,6 +88,7 @@ async function run(): Promise<void> {
       "Bearer test-token",
     );
     if (url.pathname.endsWith("/read-cursor")) {
+      readCursorSaved = true;
       return jsonResponse({ lastReadSequence: 2 });
     }
     if (url.pathname.endsWith("/recipients")) {
@@ -177,6 +179,7 @@ async function run(): Promise<void> {
                 title: "Sam Adeyemi",
                 latestMessage: { preview: "Good morning", createdAt: date },
                 updatedAt: date,
+                unreadCount: readCursorSaved ? 0 : 1,
               },
             ]
           : [],
@@ -196,7 +199,9 @@ async function run(): Promise<void> {
       container.querySelectorAll("button"),
     ).find((button) => button.textContent?.includes("Sam Adeyemi"));
     assert.ok(conversationButton);
+    assert.match(conversationButton.textContent ?? "", /1 unread message/);
     await act(async () => conversationButton.click());
+    assert.doesNotMatch(container.textContent ?? "", /unread message/);
     assert.match(container.textContent ?? "", /Welcome/);
     assert.match(container.textContent ?? "", /Good morning/);
     assert.equal(

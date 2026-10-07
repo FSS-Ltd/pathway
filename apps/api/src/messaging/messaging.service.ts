@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { withTenantRlsContext } from "@pathway/db";
+import { Prisma, withTenantRlsContext } from "@pathway/db";
 import type {
   ConversationQuery,
   MessageQuery,
@@ -90,6 +90,33 @@ export class MessagingService {
       });
       const page = rows.slice(0, limit);
       const last = page.at(-1);
+      const unreadRows = page.length
+        ? await tx.$queryRaw<
+            Array<{ conversationId: string; unreadCount: bigint }>
+          >(Prisma.sql`
+            SELECT message."conversationId" AS "conversationId",
+                   COUNT(*) AS "unreadCount"
+            FROM "Message" AS message
+            JOIN "MessageParticipant" AS participant
+              ON participant."tenantId" = message."tenantId"
+             AND participant."conversationId" = message."conversationId"
+             AND participant."userId" = ${actor.userId}
+             AND participant."kind" = 'STAFF'::"MessageParticipantKind"
+             AND participant."removedAt" IS NULL
+            LEFT JOIN "MessageParticipantReadCursor" AS read_cursor
+              ON read_cursor."tenantId" = message."tenantId"
+             AND read_cursor."conversationId" = message."conversationId"
+             AND read_cursor."participantId" = participant."id"
+            WHERE message."tenantId" = ${actor.tenantId}
+              AND message."conversationId" IN (${Prisma.join(page.map((row) => row.id))})
+              AND message."senderParticipantId" <> participant."id"
+              AND message."sequence" > COALESCE(read_cursor."lastReadSequence", 0)
+            GROUP BY message."conversationId"
+          `)
+        : [];
+      const unreadByConversation = new Map(
+        unreadRows.map((row) => [row.conversationId, Number(row.unreadCount)]),
+      );
       return {
         items: page.map((row) => {
           const other = row.participants.find(
@@ -115,6 +142,7 @@ export class MessagingService {
                 }
               : null,
             updatedAt: row.updatedAt.toISOString(),
+            unreadCount: unreadByConversation.get(row.id) ?? 0,
           };
         }),
         nextCursor:

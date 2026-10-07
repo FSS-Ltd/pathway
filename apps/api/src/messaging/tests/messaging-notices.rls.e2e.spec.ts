@@ -1506,6 +1506,58 @@ describe("ACE parent/staff messaging and notices storage", () => {
     ).toBe(latest?.body);
   });
 
+  it("counts only received messages after the caller's read cursor", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const staffA = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const staffB = { ...staffA, userId: fixture.staffBId };
+    const opened = await new MessagingConversationService().openStaffDirect(
+      staffA,
+      { kind: "STAFF_DIRECT", recipientUserId: fixture.staffBId },
+    );
+    const command = new MessagingCommandService();
+    const own = await command.sendStaffMessage(staffA, opened.id, {
+      clientRequestId: randomUUID(),
+      body: "Own message",
+    });
+    const received = await command.sendStaffMessage(staffB, opened.id, {
+      clientRequestId: randomUUID(),
+      body: "Reply",
+    });
+    const service = new MessagingService();
+    const unread = async (actor: typeof staffA) =>
+      (await service.listStaffConversations(actor, {})).items.find(
+        (item) => item.id === opened.id,
+      )?.unreadCount;
+
+    expect(await unread(staffA)).toBe(1);
+    expect(await unread(staffB)).toBe(1);
+    await service.advanceStaffReadCursor(staffA, opened.id, {
+      sequence: received.sequence,
+    });
+    expect(await unread(staffA)).toBe(0);
+    expect(await unread(staffB)).toBe(1);
+
+    await command.sendStaffMessage(staffB, opened.id, {
+      clientRequestId: randomUUID(),
+      body: "Another reply",
+    });
+    expect(await unread(staffA)).toBe(1);
+    expect(own.sequence).toBeLessThan(received.sequence);
+    expect(
+      (
+        await service.listStaffConversations(
+          { ...staffA, userId: fixture.staffCId },
+          {},
+        )
+      ).items.find((item) => item.id === opened.id),
+    ).toBeUndefined();
+  });
+
   it("advances only an active staff participant's read cursor without regression", async () => {
     if (!isDatabaseAvailable()) return;
 
