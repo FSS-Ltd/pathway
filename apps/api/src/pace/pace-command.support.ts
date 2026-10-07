@@ -328,7 +328,7 @@ export function rebuildProgressRecord(
     targetPace: number;
   },
   facts: readonly AssessmentRecord[],
-  policy: PacePolicyResult,
+  policy: PacePolicyResult | undefined,
   rebuiltAt: Date,
 ): ProgressRecord {
   const domainFacts = toTerminalDomainFacts(facts);
@@ -342,7 +342,7 @@ export function rebuildProgressRecord(
     targetPace: enrollment.targetPace,
     completedPaces: completedPaceCount(domainFacts),
     trackStatus: toTrackStatus(rebuilt.currentPace.raw, enrollment.targetPace),
-    blockCode: policy.decision === "warn" ? policy.code : null,
+    blockCode: policy?.decision === "warn" ? policy.code : null,
     lastAssessmentId: domainFacts.at(-1)?.id ?? null,
     rebuiltAt,
   };

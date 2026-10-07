@@ -11,6 +11,7 @@ interface EnrollmentFixture {
   tenantId: string;
   childId: string;
   subjectId: string;
+  startsOn: Date;
   startingPace: number;
   currentPace: number;
   targetPace: number;
@@ -52,8 +53,9 @@ const defaultEnrollment: EnrollmentFixture = {
   tenantId: tenant.id,
   childId: "child-1",
   subjectId: "subject-1",
+  startsOn: new Date("2026-08-01T12:00:00.000Z"),
   startingPace: 1,
-  currentPace: 3,
+  currentPace: 1,
   targetPace: 12,
 };
 
@@ -128,11 +130,13 @@ function createHarness(options: HarnessOptions = {}) {
   const tx = {
     studentSubjectEnrollment: {
       findMany: jest.fn(async ({ where, take }: Record<string, unknown>) => {
-        const afterId = (where as { id?: { gt?: string } } | undefined)?.id?.gt;
-        const page = afterId
-          ? enrollments.filter((item) => item.id > afterId)
-          : enrollments;
-        return page.slice(0, take as number);
+        const ids = (where as { id?: { gt?: string; in?: string[] } })?.id;
+        const matching = enrollments.filter(
+          (item) =>
+            (!ids?.gt || item.id > ids.gt) &&
+            (!ids?.in || ids.in.includes(item.id)),
+        );
+        return take ? matching.slice(0, take as number) : matching;
       }),
     },
     paceAssessment: {
@@ -251,6 +255,49 @@ describe("RebuildPaceProgressJob", () => {
     expect((projection?.rebuiltAt as Date).getTime()).toBeGreaterThanOrEqual(
       factCreatedAt.getTime(),
     );
+  });
+
+  it("uses the revised current PACE and only facts from its start date", async () => {
+    const revisedStart = new Date("2026-08-10T12:00:00.000Z");
+    const harness = createHarness({
+      enrollments: [
+        {
+          ...defaultEnrollment,
+          startsOn: revisedStart,
+          currentPace: 3,
+        },
+      ],
+      assessments: [
+        {
+          ...defaultAssessments[2],
+          id: "new-placement-final",
+          paceNumber: 3,
+          correctsAssessmentId: null,
+        },
+      ],
+    });
+    const job = new RebuildPaceProgressJob(
+      harness.client,
+      harness.withTenantContext,
+    );
+
+    await job.run({ batchSize: 1 });
+
+    expect(harness.storedProgress.get("child-1:subject-1")).toEqual(
+      expect.objectContaining({
+        currentPace: 4,
+        completedPaces: 1,
+        lastAssessmentId: "new-placement-final",
+      }),
+    );
+    const factQuery = harness.tx.$queryRaw.mock.calls[0][0] as {
+      strings: readonly string[];
+      values: readonly unknown[];
+    };
+    expect(factQuery.strings.join("?")).toContain(
+      'fact."assessedOn" >= requested."startsOn"',
+    );
+    expect(factQuery.values).toContain(revisedStart);
   });
 
   it("preserves and reports blocked and warning projections on repeated runs", async () => {
@@ -396,7 +443,7 @@ describe("RebuildPaceProgressJob", () => {
       }),
     );
     expect(
-      harness.tx.studentSubjectEnrollment.findMany.mock.calls[1][0],
+      harness.tx.studentSubjectEnrollment.findMany.mock.calls[2][0],
     ).toEqual(
       expect.objectContaining({
         where: {
@@ -413,9 +460,26 @@ describe("RebuildPaceProgressJob", () => {
     );
     expect(harness.tx.$executeRaw).toHaveBeenCalledTimes(1);
     expect(harness.tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
-      harness.tx.paceProgress.findMany.mock.invocationCallOrder[0],
+      harness.tx.studentSubjectEnrollment.findMany.mock.invocationCallOrder[1],
     );
     expect(harness.tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not rebuild an enrollment revised while its child lock was pending", async () => {
+    const harness = createHarness();
+    harness.tx.studentSubjectEnrollment.findMany
+      .mockResolvedValueOnce([defaultEnrollment])
+      .mockResolvedValueOnce([]);
+    const job = new RebuildPaceProgressJob(
+      harness.client,
+      harness.withTenantContext,
+    );
+
+    await expect(job.run({ batchSize: 1 })).resolves.toMatchObject({
+      scanned: 1,
+      rebuilt: 0,
+    });
+    expect(harness.tx.paceProgress.upsert).not.toHaveBeenCalled();
   });
 
   it("rejects an unbounded batch size before tenant discovery", async () => {

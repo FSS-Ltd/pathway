@@ -82,6 +82,7 @@ the later merged messaging steps have not been deployed.
 | 1.3e3b2  | Scoped staff direct conversation web control           | Merged  | [#408](https://github.com/FSS-Ltd/pathway/pull/408) to `master` | `cfc654754a680baeffb0b93e5151e321b970d320`; all eight checks passed: CI run 37652063721, CodeQL run 37652056053.                                                                                                | `99f671de57e0031c80ea6b7d48907924643d7608` |
 | 1.3e3c   | Scoped staff unread counts and list badges             | Merged  | [#409](https://github.com/FSS-Ltd/pathway/pull/409) to `master` | `87214821eb625ee211945d5a26717c92d9e12266`; all eight checks passed: CI run 37656203634, CodeQL run 37656189481.                                                                                                | `aac2f36551a793b56cf6fdbeb5a56eaa268b18ac` |
 | 1.3e3d   | Scoped direct-message read feedback                    | Merged  | [#411](https://github.com/FSS-Ltd/pathway/pull/411) to `master` | `223df300078c50882000fd6271c4fe7fec3a440f`; all eight checks passed: CI run 37661038756, CodeQL run 37661033054.                                                                                                | `ac1d2feb66e24d1b5e5f4f27669d30a6e550b03e` |
+| 1.3f1    | C02 subject placement progress baseline                | PR open | [#413](https://github.com/FSS-Ltd/pathway/pull/413) to `master` | CI pending on the final PR revision; local lint, typecheck, unit suites, API/workers builds, formatting, and Graphify passed. Database integration ran locally but skipped without disposable PostgreSQL.       | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -93,6 +94,11 @@ Step 1.3e3d was merged in [PR #411](https://github.com/FSS-Ltd/pathway/pull/411)
 after all eight checks passed, including 59 integration suites and 401 tests
 against CI Postgres. Its direct-message read feedback is also awaiting the
 next gated manual production deployment.
+
+Step 1.3f1 is open in [PR #413](https://github.com/FSS-Ltd/pathway/pull/413).
+Its C02 placement/projection work cannot advance to the next build step until
+CI is green on the final revision and the PR is confirmed merged. Production
+remains on the earlier manual deployment.
 
 For step 1.3c5b, all eight checks passed on the checked revision in
 [CI run 37532490552](https://github.com/FSS-Ltd/pathway/actions/runs/37532490552)
