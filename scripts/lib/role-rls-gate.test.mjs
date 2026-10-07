@@ -96,6 +96,21 @@ const reviewedPolicies = [
     { command: "w" },
   ),
 ];
+const publicQualifiedRolePermissionPolicies = reviewedPolicies.map((entry) =>
+  entry.table_name === "OrgRolePermission"
+    ? {
+        ...entry,
+        using_qualifier: entry.using_qualifier.replaceAll(
+          '"OrgRoleDefinition"',
+          'public."OrgRoleDefinition"',
+        ),
+        check_qualifier: entry.check_qualifier.replaceAll(
+          '"OrgRoleDefinition"',
+          'public."OrgRoleDefinition"',
+        ),
+      }
+    : entry,
+);
 
 function policy(table_name, policy_name, qualifier, overrides = {}) {
   return {
@@ -158,6 +173,22 @@ test("identifies PUBLIC grants on required tables", () => {
 
 test("accepts only the complete reviewed role policy set", () => {
   assert.deepEqual(findUnreviewedRolePolicies(reviewedPolicies), []);
+});
+
+test("accepts reviewed role-permission policies with public qualification", () => {
+  assert.deepEqual(findUnreviewedRolePolicies(publicQualifiedRolePermissionPolicies), []);
+});
+
+test("rejects a widened public-qualified role-permission predicate", () => {
+  const policies = publicQualifiedRolePermissionPolicies.map((entry) =>
+    entry.policy_name === "OrgRolePermission_rls"
+      ? { ...entry, using_qualifier: `(true OR ${entry.using_qualifier})` }
+      : entry,
+  );
+
+  assert.deepEqual(findUnreviewedRolePolicies(policies), [
+    "OrgRolePermission.OrgRolePermission_rls",
+  ]);
 });
 
 test("rejects an extra permissive SELECT policy beside a reviewed ALL policy", () => {
