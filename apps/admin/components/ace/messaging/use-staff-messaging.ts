@@ -6,9 +6,11 @@ import {
   advanceStaffReadCursor,
   fetchStaffConversations,
   fetchStaffMessages,
+  openStaffDirectConversation,
   sendStaffMessage,
   type StaffConversation,
   type StaffMessage,
+  type StaffRecipient,
 } from "@/lib/ace-messaging-api";
 
 export function useStaffMessaging(currentUserId: string) {
@@ -34,30 +36,35 @@ export function useStaffMessaging(currentUserId: string) {
   const siteGeneration = React.useRef(0);
   const threadGeneration = React.useRef(0);
   const selectedIdRef = React.useRef(selectedId);
+  const openedConversation = React.useRef<StaffConversation | null>(null);
   const requestIds = React.useRef<Record<string, string>>({});
   selectedIdRef.current = selectedId;
 
-  React.useEffect(
-    () =>
-      subscribeToActiveSiteChanges(() => {
-        siteGeneration.current += 1;
-        threadGeneration.current += 1;
-        selectedIdRef.current = null;
-        setConversations([]);
-        setNextCursor(null);
-        setSelectedId(null);
-        setMessages([]);
-        setNextBefore(null);
-        setListError(null);
-        setThreadError(null);
-        setSendError(null);
-        setListMoreLoading(false);
-        setThreadMoreLoading(false);
-        setSendingId(null);
-        setSiteRevision((revision) => revision + 1);
-      }),
-    [],
-  );
+  React.useEffect(() => {
+    const unsubscribe = subscribeToActiveSiteChanges(() => {
+      siteGeneration.current += 1;
+      threadGeneration.current += 1;
+      selectedIdRef.current = null;
+      openedConversation.current = null;
+      setConversations([]);
+      setNextCursor(null);
+      setSelectedId(null);
+      setMessages([]);
+      setNextBefore(null);
+      setListError(null);
+      setThreadError(null);
+      setSendError(null);
+      setListMoreLoading(false);
+      setThreadMoreLoading(false);
+      setSendingId(null);
+      setSiteRevision((revision) => revision + 1);
+    });
+    return () => {
+      siteGeneration.current += 1;
+      threadGeneration.current += 1;
+      unsubscribe();
+    };
+  }, []);
 
   React.useEffect(() => {
     let active = true;
@@ -68,7 +75,12 @@ export function useStaffMessaging(currentUserId: string) {
     void fetchStaffConversations({ signal: controller.signal })
       .then((page) => {
         if (!active || generation !== siteGeneration.current) return;
-        setConversations(page.items);
+        const opened = openedConversation.current;
+        setConversations(
+          opened && !page.items.some((item) => item.id === opened.id)
+            ? [opened, ...page.items]
+            : page.items,
+        );
         setNextCursor(page.nextCursor);
       })
       .catch((error: unknown) => {
@@ -136,7 +148,10 @@ export function useStaffMessaging(currentUserId: string) {
     try {
       const page = await fetchStaffConversations({ cursor: nextCursor });
       if (generation !== siteGeneration.current) return;
-      setConversations((current) => [...current, ...page.items]);
+      setConversations((current) => {
+        const seen = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !seen.has(item.id))];
+      });
       setNextCursor(page.nextCursor);
     } catch (error) {
       if (generation === siteGeneration.current) {
@@ -223,23 +238,52 @@ export function useStaffMessaging(currentUserId: string) {
     }
   }
 
+  function selectConversation(id: string | null) {
+    threadGeneration.current += 1;
+    selectedIdRef.current = id;
+    setSelectedId(id);
+    setMessages([]);
+    setNextBefore(null);
+    setThreadError(null);
+    setThreadMoreLoading(false);
+    setSendError(null);
+  }
+
+  async function startDirectConversation(
+    recipient: StaffRecipient,
+  ): Promise<boolean> {
+    const site = siteGeneration.current;
+    const opened = await openStaffDirectConversation(recipient.id);
+    if (site !== siteGeneration.current) return false;
+    const summary: StaffConversation = {
+      id: opened.id,
+      kind: opened.kind,
+      title: recipient.displayName,
+      latestMessage: null,
+      updatedAt: new Date().toISOString(),
+    };
+    openedConversation.current =
+      conversations.find((conversation) => conversation.id === opened.id) ??
+      summary;
+    setConversations((current) =>
+      current.some((conversation) => conversation.id === opened.id)
+        ? current
+        : [summary, ...current],
+    );
+    selectConversation(opened.id);
+    return true;
+  }
+
   return {
+    siteRevision,
     conversations,
     nextCursor,
     listLoading,
     listError,
     listMoreLoading,
     selectedId,
-    select: (id: string | null) => {
-      threadGeneration.current += 1;
-      selectedIdRef.current = id;
-      setSelectedId(id);
-      setMessages([]);
-      setNextBefore(null);
-      setThreadError(null);
-      setThreadMoreLoading(false);
-      setSendError(null);
-    },
+    select: selectConversation,
+    startDirectConversation,
     messages,
     nextBefore,
     threadLoading,

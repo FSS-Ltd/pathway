@@ -120,9 +120,15 @@ changes clear the visible conversation and messages before new site data
 loads. Navigation and the page require both staff read permissions; sending
 has its own permission check. The current API does not return unread counts or
 delivery/read state, so this screen does not display those indicators yet.
-Staff direct creation and staff room creation controls are also outside this
-slice; existing conversations can be read and replied to. Parent and notice
-journeys remain separate gated work.
+Staff direct creation and staff room creation controls are also outside that
+slice; existing conversations can be read and replied to. Step 1.3e3b2 adds
+the direct creation control: staff with `messaging.conversations.create` can
+search current-site staff by name, open or reuse a direct conversation, and
+continue in the existing thread view. The inline search requires two
+characters, caps results at 20, and clearly states its site scope. It handles
+loading, no match, error, and pending creation. A site switch clears the
+search and ignores a late creation response. Room, parent, and notice journeys
+remain separate gated work.
 
 ## Web design intent
 

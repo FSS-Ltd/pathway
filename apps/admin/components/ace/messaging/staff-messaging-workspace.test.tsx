@@ -24,8 +24,12 @@ Object.defineProperty(globalThis, "navigator", {
 });
 
 const conversationId = "a2f14e28-9fc3-477e-9ca2-83eef5ac1d09";
+const newConversationId = "19fce9a7-7cd2-4d3c-99cd-a7ffcedf43e8";
+const pendingConversationId = "aa7fb6d8-2bbc-4401-8d64-680f9876ff10";
 const staffId = "d2136e0b-76fa-4ad0-b605-819c4d80a322";
 const peerId = "e71be020-929e-4799-bc15-a8062437832a";
+const alexId = "c4a1e236-a2a9-4a44-8af7-7069c5859ddc";
+const bobId = "f9775dd1-5a4d-4e5c-90b9-384b92de0d40";
 const date = "2026-10-07T10:00:00.000Z";
 
 function jsonResponse(value: unknown, status = 200): Response {
@@ -47,6 +51,21 @@ async function changeDraft(element: HTMLTextAreaElement, value: string) {
   });
 }
 
+async function changeSearch(element: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(
+    Object.getPrototypeOf(element),
+    "value",
+  )?.set;
+  assert.ok(setter);
+  await act(async () => {
+    setter.call(element, value);
+    element.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  });
+}
+
 async function run(): Promise<void> {
   const { createRoot } = await import("react-dom/client");
   const container = document.createElement("div");
@@ -56,6 +75,9 @@ async function run(): Promise<void> {
   let site = 1;
   let postCount = 0;
   const sentRequestIds: string[] = [];
+  const recipientSearches: string[] = [];
+  let alexSearchFailed = false;
+  let resolvePendingCreate: ((response: Response) => void) | null = null;
 
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
@@ -66,6 +88,40 @@ async function run(): Promise<void> {
     );
     if (url.pathname.endsWith("/read-cursor")) {
       return jsonResponse({ lastReadSequence: 2 });
+    }
+    if (url.pathname.endsWith("/recipients")) {
+      const search = url.searchParams.get("search") ?? "";
+      recipientSearches.push(search);
+      assert.equal(url.searchParams.get("limit"), "20");
+      if (search === "Al" && !alexSearchFailed) {
+        alexSearchFailed = true;
+        return jsonResponse({ message: "temporary error" }, 500);
+      }
+      return jsonResponse({
+        items:
+          search === "Al"
+            ? [{ id: alexId, displayName: "Alex Morgan" }]
+            : [{ id: bobId, displayName: "Bob Lee" }],
+        hasMore: false,
+      });
+    }
+    if (method === "POST" && url.pathname.endsWith("/conversations")) {
+      const body = JSON.parse(String(init?.body)) as {
+        kind: string;
+        recipientUserId: string;
+      };
+      assert.equal(body.kind, "STAFF_DIRECT");
+      if (body.recipientUserId === bobId) {
+        return new Promise<Response>((resolve) => {
+          resolvePendingCreate = resolve;
+        });
+      }
+      assert.equal(body.recipientUserId, alexId);
+      return jsonResponse({
+        id: newConversationId,
+        kind: "STAFF_DIRECT",
+        created: true,
+      });
     }
     if (method === "POST") {
       postCount += 1;
@@ -88,6 +144,9 @@ async function run(): Promise<void> {
           });
     }
     if (url.pathname.endsWith("/messages")) {
+      if (url.pathname.includes(newConversationId)) {
+        return jsonResponse({ items: [], nextBefore: null });
+      }
       return jsonResponse({
         items: [
           {
@@ -128,7 +187,9 @@ async function run(): Promise<void> {
 
   try {
     await act(async () =>
-      root.render(<StaffMessagingWorkspace currentUserId={staffId} canSend />),
+      root.render(
+        <StaffMessagingWorkspace currentUserId={staffId} canSend canCreate />,
+      ),
     );
     assert.match(container.textContent ?? "", /Sam Adeyemi/);
     const conversationButton = Array.from(
@@ -184,11 +245,67 @@ async function run(): Promise<void> {
       "clears the draft only after server confirmation",
     );
 
+    const newMessage = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("New message"),
+    );
+    assert.ok(newMessage);
+    await act(async () => newMessage.click());
+    const search = container.querySelector<HTMLInputElement>(
+      "#staff-recipient-search",
+    );
+    assert.ok(search);
+    await changeSearch(search, "A");
+    assert.deepEqual(recipientSearches, [], "one character does not search");
+    await changeSearch(search, "Al");
+    assert.deepEqual(recipientSearches, ["Al"]);
+    const retrySearch = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Retry search"),
+    );
+    assert.ok(retrySearch);
+    await act(async () => retrySearch.click());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    assert.deepEqual(recipientSearches, ["Al", "Al"]);
+    const alex = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Alex Morgan"),
+    );
+    assert.ok(alex);
+    await act(async () => alex.click());
+    assert.match(container.textContent ?? "", /Alex Morgan/);
+    assert.match(container.textContent ?? "", /Start the conversation below/);
+
+    const anotherMessage = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.includes("New message"));
+    assert.ok(anotherMessage);
+    await act(async () => anotherMessage.click());
+    const secondSearch = container.querySelector<HTMLInputElement>(
+      "#staff-recipient-search",
+    );
+    assert.ok(secondSearch);
+    await changeSearch(secondSearch, "Bo");
+    const bob = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.includes("Bob Lee"),
+    );
+    assert.ok(bob);
+    await act(async () => bob.click());
+    assert.ok(resolvePendingCreate);
+
     site = 2;
     await act(async () => notifyActiveSiteChanged(dom.window));
+    await act(async () =>
+      resolvePendingCreate?.(
+        jsonResponse({
+          id: pendingConversationId,
+          kind: "STAFF_DIRECT",
+          created: true,
+        }),
+      ),
+    );
     assert.doesNotMatch(
       container.textContent ?? "",
-      /Welcome|Good morning|Hello team/,
+      /Welcome|Good morning|Hello team|Alex Morgan|Bob Lee/,
     );
     assert.match(
       container.textContent ?? "",
@@ -198,7 +315,11 @@ async function run(): Promise<void> {
     site = 1;
     await act(async () =>
       root.render(
-        <StaffMessagingWorkspace currentUserId={staffId} canSend={false} />,
+        <StaffMessagingWorkspace
+          currentUserId={staffId}
+          canSend={false}
+          canCreate={false}
+        />,
       ),
     );
     await act(async () => notifyActiveSiteChanged(dom.window));
@@ -209,6 +330,7 @@ async function run(): Promise<void> {
     await act(async () => readOnlyConversation.click());
     assert.equal(container.querySelector("textarea"), null);
     assert.match(container.textContent ?? "", /do not have permission to send/);
+    assert.doesNotMatch(container.textContent ?? "", /New message/);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;

@@ -35,8 +35,13 @@ export default function AceMessagesPage() {
 
   return (
     <StaffMessagingWorkspace
+      key={access.userId}
       currentUserId={access.userId}
       canSend={hasPermission(access.permissions, "messaging.messages.send")}
+      canCreate={hasPermission(
+        access.permissions,
+        "messaging.conversations.create",
+      )}
     />
   );
 }

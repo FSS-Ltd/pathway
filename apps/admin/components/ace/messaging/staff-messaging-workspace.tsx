@@ -1,19 +1,29 @@
 "use client";
 
 import React from "react";
+import { SquarePen } from "lucide-react";
+import { Button } from "@pathway/ui";
 import { useStaffMessaging } from "./use-staff-messaging";
 
 import { ConversationList } from "./conversation-list";
 import { ConversationDetail } from "./conversation-detail";
+import { NewStaffConversation } from "./new-staff-conversation";
 
 export function StaffMessagingWorkspace({
   currentUserId,
   canSend,
+  canCreate,
 }: {
   currentUserId: string;
   canSend: boolean;
+  canCreate: boolean;
 }) {
   const messaging = useStaffMessaging(currentUserId);
+  const [composing, setComposing] = React.useState(false);
+  React.useEffect(
+    () => setComposing(false),
+    [messaging.siteRevision, canCreate],
+  );
   const selected = messaging.conversations.find(
     (conversation) => conversation.id === messaging.selectedId,
   );
@@ -35,21 +45,51 @@ export function StaffMessagingWorkspace({
       <div className="grid min-h-[34rem] overflow-hidden rounded-3xl border border-border-subtle bg-surface shadow-sm md:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)]">
         <section
           aria-label="Conversations"
-          className={`${messaging.selectedId ? "hidden md:flex" : "flex"} min-w-0 flex-col border-border-subtle md:border-r`}
+          className={`${messaging.selectedId && !composing ? "hidden md:flex" : "flex"} min-w-0 flex-col border-border-subtle md:border-r`}
         >
-          <div className="border-b border-border-subtle px-5 py-4">
-            <h2 className="font-heading text-lg font-semibold text-text-primary">
-              Conversations
-            </h2>
-          </div>
-          <ConversationList messaging={messaging} />
+          {composing && canCreate ? (
+            <NewStaffConversation
+              key={messaging.siteRevision}
+              onCancel={() => setComposing(false)}
+              onOpen={async (recipient) => {
+                const opened =
+                  await messaging.startDirectConversation(recipient);
+                if (opened) setComposing(false);
+                return opened;
+              }}
+            />
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
+                <h2 className="font-heading text-lg font-semibold text-text-primary">
+                  Conversations
+                </h2>
+                {canCreate ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="min-h-11"
+                    onClick={() => {
+                      messaging.select(null);
+                      setComposing(true);
+                    }}
+                  >
+                    <SquarePen className="h-4 w-4" aria-hidden="true" />
+                    New message
+                  </Button>
+                ) : null}
+              </div>
+              <ConversationList messaging={messaging} />
+            </>
+          )}
         </section>
 
         <section
           aria-label={
             selected ? `Conversation with ${selected.title}` : "Message detail"
           }
-          className={`${messaging.selectedId ? "flex" : "hidden md:flex"} min-w-0 flex-col bg-shell/70`}
+          className={`${messaging.selectedId && !composing ? "flex" : "hidden md:flex"} min-w-0 flex-col bg-shell/70`}
         >
           {selected ? (
             <ConversationDetail
