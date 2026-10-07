@@ -1,6 +1,6 @@
 # New Supabase project backup restore
 
-**Status:** The restored target has 106 finished Prisma migrations, 1,475
+**Status:** The restored target has 107 finished Prisma migrations, 1,475
 archived application rows, and all 32 Storage objects. Application traffic and
 production configuration have not moved.
 Follow the [production release and cutover conditions](../production-release-status.md)
@@ -198,9 +198,14 @@ validated against the target Storage API: it listed exactly
 reports healthy in London and has no Edge Functions. A security advisor run
 found public API-role execution grants on the `public.rls_auto_enable()`
 `SECURITY DEFINER` event-trigger function. DB-2e2 removed those grants after
-its PR gate. The four mutable-search-path function warnings are addressed by
-the pending DB-2h migration; its target rehearsal changed no persistent rows
-or functions.
+its PR gate. After [PR #405](https://github.com/FSS-Ltd/pathway/pull/405)
+merged with all eight checks passing, DB-2h applied successfully through
+`prisma migrate deploy`. The four affected trigger functions have
+`search_path = ''`; all 11 learning membership triggers remain attached. The
+security advisor no longer reports the four mutable-search-path warnings. The
+target has 107 finished Prisma migration records, while `prisma migrate
+status` exits nonzero because the two missing historical migration files
+remain unresolved.
 
 **Remaining release blockers:** Migration-history provenance, project-specific
 configuration, staging verification, and production deployment access remain
