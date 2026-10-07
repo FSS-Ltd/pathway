@@ -34,6 +34,9 @@ assignment table's schema or the restored `public` schema.
 Step 1.3g2 adds dated school enrolment with composite site references,
 academic-year bounds, a guest-child write guard, and non-overlapping child
 date ranges. It does not infer enrolment from legacy `Child.yearGroup` text.
+Step 1.3g3 adds one explicit teaching-date decision per site/date within an
+academic year. Holidays, closures, and exceptional openings require a reason;
+an unconfigured date remains closed to future daily-mark writes.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
