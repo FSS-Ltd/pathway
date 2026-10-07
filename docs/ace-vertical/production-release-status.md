@@ -52,7 +52,7 @@ deployment is claimed by this record.
 | 1.3d4    | Staff attendance correction history web journey        | Merged   | [#380](https://github.com/FSS-Ltd/pathway/pull/380) to `master` | `a65252e3c0211cfb6aa78f0d0d06bd9abda35e93`; all eight checks passed (runs below)                                                                                                             | `cf0f1d9ac20c25cd97305bae0f72c6ad5cacd0be` |
 | 1.3d5    | Daily attendance register contract                     | Merged   | [#381](https://github.com/FSS-Ltd/pathway/pull/381) to `master` | `8d98fb4a4a70a0d8c7ffd45ef02b7304acbec070`; all eight checks passed (runs below)                                                                                                             | `2319e7af3dcd83f6775fe906cb0c4208fbc4250d` |
 | DB-2a    | New-project backup and Storage restore preflight       | Merged   | [#382](https://github.com/FSS-Ltd/pathway/pull/382) to `master` | `1292f15d45c708d1bb260cea9a8ccdbdb8b1c504`; all eight checks passed (runs below)                                                                                                             | `4b04a946134c1b16e42cacb719814e1368c2660b` |
-| DB-2b    | Candidate database and Storage restore                 | Draft PR | [#383](https://github.com/FSS-Ltd/pathway/pull/383) to `master` | `507ddad150ce1b1bd24bb3bea85421781280efb4` prior revision; all eight checks passed in [run 37557427104](https://github.com/FSS-Ltd/pathway/actions/runs/37557427104); target restore pending | Pending                                    |
+| DB-2b    | Candidate database and Storage restore                 | Draft PR | [#383](https://github.com/FSS-Ltd/pathway/pull/383) to `master` | `507ddad150ce1b1bd24bb3bea85421781280efb4` prior revision; all eight checks passed in [run 37557427104](https://github.com/FSS-Ltd/pathway/actions/runs/37557427104); target restored; risks | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
@@ -86,9 +86,10 @@ Step 1.1 makes production deployment explicit and accepts only the configured
 Supabase project's direct database endpoint or shared session pooler on port
 5432 for migrations. It rejects a transaction pooler URL, missing credentials
 and a project mismatch before Prisma starts.
-The production credentials, connection and schema status still need verification
-when Supabase is available. Later steps start only after the preceding PR has
-passing CI on its current revision and is merged into `master`.
+The old production project remains inaccessible. The new project has data and
+migrations, with release blockers recorded below. Later steps start only after
+the preceding PR has passing CI on its current revision and is merged into
+`master`.
 
 The 1.3d1 attendance event migration and its following atomic-writer step must
 reach production in the same gated release. Corrections made after the one-time
@@ -192,13 +193,24 @@ attempted.
 Step DB-2b has rehearsed the target-scoped SQL in disposable local Postgres 17:
 all 1,820 archived rows matched across the 165 available table sections. The
 empty Vault section was unavailable locally; Vault is installed on the target.
-The target remains empty. Confirmation of snapshot freshness and a new-project
-Storage upload credential are pending before target data movement.
-The checked replay helper now produces the same target-scoped SQL in a private
-temporary file and rejects archive drift or unexpected `psql` commands.
-The Storage restore command passed a dry run against the exact ZIP and checked
-all 32 paths without contacting the target. Its upload and download checks are
-covered by local tests; target bytes remain pending the new-project key.
+The owner confirmed this is the latest available database and Storage backup
+pair, and supplied the new-project Storage credential in the ignored root
+`.env`. The source remains unavailable for an independent post-snapshot delta.
+The checked replay helper produces target-scoped SQL in a private temporary
+file and rejects archive drift or unexpected `psql` commands. The Storage
+restore command validated all 32 paths and its transfer tests passed.
+
+The [DB-2b target restore evidence](runbooks/new-project-backup-restore.md#target-restore-evidence--7-october-2026)
+records the live result: all 131 archived application table sections matched,
+all 32 Storage files were uploaded and downloaded with matching hashes, and
+four pending Prisma migrations applied. The application still uses the old
+production project. The new target is not approved for traffic: migration
+history differs from the repository, the strict RLS gate expects most tables
+in `app` while the restored source stores them in `public`, and seven trigger
+functions reference absent `app` relations. Resolve and test these issues,
+review environment-specific settings and secrets, then follow the separate
+staging and cutover gate. No production deployment or configuration switch is
+claimed.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and

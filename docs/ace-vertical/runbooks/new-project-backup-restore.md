@@ -1,18 +1,19 @@
 # New Supabase project backup restore
 
-**Status:** DB-2a preflight on 7 October 2026. No database rows, Storage bytes,
-secrets, application traffic, or production configuration have been moved.
+**Status:** DB-2b target restore on 7 October 2026. Database rows, Storage
+bytes, and four pending Prisma migrations are in the new project. Application
+traffic and production configuration have not moved.
 Follow the [production release and cutover conditions](../production-release-status.md)
 before treating the new project as production.
 
 ## Candidate snapshot and target
 
-| Item             | Verified result                                                                                                                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Source           | `fkajodqkxysfcnfhizwn`, Ireland `eu-west-1`; Supabase reports `INACTIVE` and a database read times out.                                                                                                |
-| Target           | `jzofykdzpuslpdyfovxp`, London `eu-west-2`; `ACTIVE_HEALTHY`, with no application tables, Storage buckets or objects, or Supabase migration records.                                                   |
-| Database archive | `db_cluster-07-09-2026@02-40-10.backup.gz`; SHA-256 `2dc22e100b0778d470ccb73f1c668978d604ad87bbcdf596de9617de2e449c6a`; gzip integrity passed; 1,468,015 uncompressed bytes of plain SQL.              |
-| Storage archive  | `fkajodqkxysfcnfhizwn.storage.zip`; SHA-256 `699c1303bfe03202b97735aafbb11ba8c8bb4bf1ea8606d64a134cb3c4127756`; ZIP CRC passed; 32 files, no unsafe paths, symlinks, encryption, or duplicate entries. |
+| Item                  | Verified result                                                                                                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Source                | `fkajodqkxysfcnfhizwn`, Ireland `eu-west-1`; Supabase reports `INACTIVE` and a database read times out.                                                                                                |
+| Target before restore | `jzofykdzpuslpdyfovxp`, London `eu-west-2`; `ACTIVE_HEALTHY`, with no application tables, Storage buckets or objects, or Supabase migration records.                                                   |
+| Database archive      | `db_cluster-07-09-2026@02-40-10.backup.gz`; SHA-256 `2dc22e100b0778d470ccb73f1c668978d604ad87bbcdf596de9617de2e449c6a`; gzip integrity passed; 1,468,015 uncompressed bytes of plain SQL.              |
+| Storage archive       | `fkajodqkxysfcnfhizwn.storage.zip`; SHA-256 `699c1303bfe03202b97735aafbb11ba8c8bb4bf1ea8606d64a134cb3c4127756`; ZIP CRC passed; 32 files, no unsafe paths, symlinks, encryption, or duplicate entries. |
 
 The SQL contains 166 `COPY` sections and 1,820 data rows, including 121
 `public` table sections, 95 `public._prisma_migrations` rows, 28
@@ -28,9 +29,9 @@ path. Every file matches the recorded size and MD5 ETag. This proves the two
 provided archives agree with each other; it does **not** prove that the SQL
 snapshot includes all writes made before the source became inactive. The
 filename suggests 7 September in UK date notation, and the newest blog row
-was updated on 2 September. The actual snapshot time and whether later writes
-exist require confirmation. Do not describe this as a complete current-data
-migration until that is resolved.
+was updated on 2 September. The owner confirmed these are the latest available
+backups. The source remains inaccessible, so later writes cannot be ruled out
+by an independent source comparison.
 
 ## Local restore rehearsal
 
@@ -51,10 +52,65 @@ during the restore. The archive creates its application triggers after all
 `COPY` data, but target platform trigger effects still require verification.
 These checks are rehearsal evidence, not a target restore.
 
+## Target restore evidence — 7 October 2026
+
+The target was rechecked immediately before replay: zero `public` tables, zero
+Storage buckets and objects, and no Prisma migration table. The checksum-pinned
+helper produced the reviewed 166-section, 1,820-row target-scoped SQL. The
+`psql` replay completed, but reported 478 errors while encountering existing or
+protected Supabase-managed objects and the two omitted application-owned roles.
+The latter roles were created with their source attributes and narrow grants;
+`app.publish_approved_ace_report()` was assigned to its source owner. All
+application `COPY` sections loaded, and the role-dependent grant and ownership
+errors were repaired. The seed role has no password in the logical
+backup and still needs a managed secret before seed commands can authenticate.
+
+Every archived application data section matched its target row count: 121 in
+`public` and ten in `app`. The other four initial differences were the three
+Supabase-managed migration tables, whose target versions differ, and
+`storage.objects`, where direct SQL insert was denied. The Storage API then
+uploaded all 32 archived files into the two restored buckets and downloaded
+each one with matching length and SHA-256. The target now has 31 public and one
+private Storage object. Representative counts remain 28 blog posts, one master
+organisation, 71 users, six tenants, and 276 attendance rows. Source-side
+parity after the snapshot is still unverified.
+
+After data movement, Prisma applied the four pending repository migrations:
+access-tag grants, physical PACE inventory, PACE diagnostic facts, and
+attendance correction events. There are now 98 finished migration records and
+one historical rolled-back attempt. All `app` and `public` tables have RLS
+enabled; the new access-tag, PACE, and attendance-event tables force it. All
+application constraints are validated. Read-only queries under both `anon` and
+`authenticated` returned zero organisation rows.
+
+**Release blockers:** `prisma migrate status` now reports up to date, but a
+manual history comparison found two applied source migrations
+(`20260811143000_fix_ace_trigger_schema_references` and
+`20260811150000_fix_faith_audience_version_guard`) have no files in this
+checkout. The applied `20260613000000_lock_supabase_public_rls` and
+`20260728120000_org_role_revisions` checksums also differ from their repository
+files. Recover and review the original SQL; do not invent a
+replacement or edit the restored migration ledger. The strict repository RLS
+gate also fails: it requires 64 application tables in `app`, while this source
+snapshot stores them in `public`. Seven restored or newly migrated trigger
+functions refer to application relations that do not exist in `app`:
+`assert_ace_notice_audience_member_eligibility`,
+`assert_message_conversation_creator`, `assert_message_participant`,
+`require_ace_record_actor_membership`,
+`require_active_pace_diagnostic_enrollment`,
+`require_attendance_correction_scope`, and
+`require_student_portal_link_policy`. Their schema references need a reviewed
+migration and functional tests before live
+writes. Reconcile the database schema and RLS gate without weakening tenant
+isolation. Project-specific Auth, encryption, webhook, deployment-secret, and
+production smoke checks remain. This target is **not ready for traffic**.
+
 ## Restore gate and procedure
 
 1. Confirm that these are the latest complete database and Storage exports,
-   or obtain a later consistent pair. Keep the source project untouched. The
+   or obtain a later consistent pair. The owner confirmed the supplied pair is
+   the latest available, but the source cannot be queried for a delta. Keep the
+   source project untouched. The
    supplied backup files and any extracted data stay outside Git and in an
    approved secret location. Confirm that moving from Ireland to London meets
    the organisation's data residency decision.
@@ -65,8 +121,8 @@ These checks are rehearsal evidence, not a target restore.
    Prisma-only `pgbouncer` and `connection_limit` query parameters. Remove
    those parameters in memory for `psql`, leaving the secret file unchanged.
    Do not paste the URL or password into a PR, log, or chat.
-3. Recheck that the target has no application data. Restore the downloaded
-   logical SQL with `psql`, following Supabase's
+3. On a fresh target only, recheck that it has no application data. Restore
+   the downloaded logical SQL with `psql`, following Supabase's
    [dashboard-backup guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/dashboard-restore).
    This is a cluster-style SQL dump with global role statements and
    `\connect template1` / `\connect postgres` commands. Run
@@ -109,8 +165,8 @@ These checks are rehearsal evidence, not a target restore.
    Verify relevant functions, workers, billing callbacks, and uploads in
    staging before changing any deployment secret or production traffic.
 
-**Exit evidence:** confirmed snapshot freshness; target row-count and sample
-parity; 32/32 object downloads with matching hashes; migration baseline and
-RLS checks; configuration inventory; and a separate authorised cutover plan.
-If any comparison fails, leave traffic on the old configuration and preserve
-the target for diagnosis. This preflight alone does not satisfy the exit gate.
+**Exit evidence for cutover:** independent source freshness or an agreed write
+freeze and final delta; resolved migration history and schema/RLS blockers;
+configuration inventory; staging journeys; and a separately authorised cutover
+plan. The target row-count comparison and 32/32 object checks are complete.
+Leave traffic on the old configuration until every release blocker is resolved.
