@@ -16,17 +16,17 @@ authentication, fixed-role/access-tag, and site-tenancy boundaries.
 NexSteps already has `MessageConversation`, `MessageParticipant`, `Message`,
 read-cursor and delivery tables, encrypted message bodies, tenant RLS, and
 creator/participant eligibility triggers. Step 1.3e1a adds a read-only staff
-conversation-list route. Step 1.3e1b adds read-only staff message history;
-message sending, parent access, and web journeys remain pending. Step 1.3e2a
-adds staff direct conversation creation only; staff rooms remain a later write
-slice. The existing `PARENT_STAFF` uniqueness constraint allows **one
-conversation per guardian identity per site**, so the first web journey is a
-school-team conversation, not one separate thread per staff contact. A site's
-staff membership alone is too broad to make every staff member a parent-message
-responder. The student role lists message permissions, but the current database
-triggers prohibit student conversation creation and participation; student
-messaging is unavailable until a separate safeguarding decision and schema
-change are reviewed.
+conversation-list route. Step 1.3e1b adds read-only staff message history.
+Step 1.3e2a adds staff direct conversation creation, and step 1.3e2b adds
+staff direct and room message sending. Parent access, staff room creation, and
+web journeys remain pending. The existing `PARENT_STAFF` uniqueness constraint
+allows **one conversation per guardian identity per site**, so the first web
+journey is a school-team conversation, not one separate thread per staff
+contact. A site's staff membership alone is too broad to make every staff
+member a parent-message responder. The student role lists message permissions,
+but the current database triggers prohibit student conversation creation and
+participation; student messaging is unavailable until a separate safeguarding
+decision and schema change are reviewed.
 
 ## Access and API contract
 
@@ -83,15 +83,25 @@ returns bounded newest-first pages and a 160-character message preview. Step
 participation; reads do not move read cursors. Step 1.3e1c adds explicit,
 forward-only read-cursor writes for a sequence in the caller's staff
 conversation. Unread counts and parent/staff threads wait for later slices.
-The send slice must update conversation
-`updatedAt` after the database allocates a message sequence so the list's
-activity order remains correct.
+Step 1.3e2b updates conversation `updatedAt` using database time after the
+database allocates a message sequence so the list's activity order remains
+correct.
 
 Step 1.3e2a opens or reuses one `STAFF_DIRECT` conversation for two current,
 active staff members in the selected site. It checks the recipient's site
 membership and excludes student identities, serializes the pair under a
 transaction lock, and audits new conversations. Parent, room, and student
 creation remain unavailable through this route.
+
+Step 1.3e2b sends a bounded, nonblank staff message with a UUID client request
+ID through an active `STAFF_DIRECT` or `STAFF_ROOM` conversation. The sender
+and every active participant must still be an active staff member of the
+selected site. The transaction serializes retries for the same sender and
+request ID, returns the original result for a matching retry, writes one
+delivery for each recipient, and audits the new message without its body.
+The existing Prisma encryption layer protects the body at rest. A reused ID
+with different text is rejected; parent and student messages are unavailable
+through this route.
 
 ## Web design intent
 

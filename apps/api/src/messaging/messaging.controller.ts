@@ -16,7 +16,10 @@ import { z } from "zod";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { createStaffDirectConversationSchema } from "./dto/messaging-command.dto";
+import {
+  createStaffDirectConversationSchema,
+  sendStaffMessageSchema,
+} from "./dto/messaging-command.dto";
 import {
   conversationIdSchema,
   conversationQuerySchema,
@@ -25,6 +28,7 @@ import {
 } from "./dto/messaging-query.dto";
 import { MessagingService } from "./messaging.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
+import { MessagingCommandService } from "./messaging-command.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("ace/messages/conversations")
@@ -32,6 +36,7 @@ export class MessagingController {
   constructor(
     private readonly service: MessagingService,
     private readonly conversations: MessagingConversationService,
+    private readonly commands: MessagingCommandService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -74,6 +79,23 @@ export class MessagingController {
         this.actor(),
         await conversationIdSchema.parseAsync(id),
         await messageQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Post(":id/messages")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission("messaging.messages.send")
+  async send(@Param("id") id: string, @Body() body: unknown) {
+    try {
+      return await this.commands.sendStaffMessage(
+        this.actor(),
+        await conversationIdSchema.parseAsync(id),
+        await sendStaffMessageSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError)
