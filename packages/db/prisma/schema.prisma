@@ -872,6 +872,7 @@ model Tenant {
   academicPeriods        AcademicPeriod[]
   aceYearBands           AceYearBand[]
   aceStaffYearBandAssignments AceStaffYearBandAssignment[]
+  aceSchoolEnrollments   AceSchoolEnrollment[]
   subjectEnrollments     StudentSubjectEnrollment[]
   paceAssessments        PaceAssessment[]
   paceProgress           PaceProgress[]
@@ -1480,6 +1481,7 @@ model Child {
   attendanceCorrectionEvents AttendanceCorrectionEvent[]
   childNotes                 ChildNote[]
   learningLogs               LearningLog[]
+  aceSchoolEnrollments       AceSchoolEnrollment[]
   subjectEnrollments         StudentSubjectEnrollment[]
   paceAssessments            PaceAssessment[]
   paceProgress               PaceProgress[]
@@ -2438,6 +2440,7 @@ model AcademicYear {
   endsOn    DateTime           @db.Date
   status    AcademicYearStatus @default(ACTIVE)
   periods   AcademicPeriod[]
+  schoolEnrollments AceSchoolEnrollment[]
   createdAt DateTime           @default(now())
   updatedAt DateTime           @default(now()) @updatedAt
 
@@ -2473,6 +2476,7 @@ model AceYearBand {
   sortOrder        Int                          @default(0)
   isActive         Boolean                      @default(true)
   staffAssignments AceStaffYearBandAssignment[]
+  schoolEnrollments AceSchoolEnrollment[]
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
 
@@ -2498,6 +2502,27 @@ model AceStaffYearBandAssignment {
   @@unique([tenantId, userId, yearBandId, startsOn])
   @@index([tenantId, userId, startsOn, endsOn])
   @@index([tenantId, yearBandId, startsOn, endsOn])
+}
+
+model AceSchoolEnrollment {
+  id             String       @id @default(uuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId        String
+  child          Child        @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  yearBandId     String
+  yearBand       AceYearBand  @relation(fields: [yearBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  startsOn       DateTime     @db.Date
+  endsOn         DateTime?    @db.Date
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, childId, startsOn])
+  @@index([tenantId, yearBandId, startsOn, endsOn])
+  @@index([tenantId, childId, startsOn, endsOn])
 }
 
 model AceTermReport {
