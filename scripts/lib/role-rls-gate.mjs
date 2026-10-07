@@ -208,6 +208,7 @@ function canonicalizeQualifier(qualifier) {
     .replaceAll("app.current_org_id", "current_org_id")
     .replaceAll("app.current_tenant_id", "current_tenant_id")
     .replaceAll('app."OrgRoleDefinition"', '"OrgRoleDefinition"')
+    .replaceAll('public."OrgRoleDefinition"', '"OrgRoleDefinition"')
     .replace(/\s+/g, " ")
     .trim();
 }

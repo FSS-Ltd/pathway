@@ -140,16 +140,30 @@ individual `PUBLIC`/`anon`/`authenticated` table-privilege entries and 16
 `postgres` default-table-privilege entries to zero; rollback restored both
 counts and preserved the 28 blog and one organisation rows.
 
-**Release blockers:** At merged PR #390, no repository migration was pending,
-but DB-2d2 now proposes a new grant-removal migration. Independently,
+After [PR #391](https://github.com/FSS-Ltd/pathway/pull/391) merged with all
+eight checks passing, the reviewed grant-removal migration was applied to the
+target. Direct `PUBLIC`/`anon`/`authenticated` table-privilege entries in
+`public` and `app` fell from 1,694 to zero, and `postgres` default table-grant
+entries fell from 16 to zero. The target now has 105 finished Prisma migration
+records. Counts remain 28 blog posts, one organisation, 71 users, six sites,
+276 attendance rows, and 32 Storage objects. Direct privilege checks deny
+`anon` a blog read and `authenticated` an organisation read while retaining
+`postgres` access. The strict RLS gate passes with `schema=public`. A
+read-only `schema=app` run of the merged gate flags two unchanged
+`OrgRolePermission` policies because PostgreSQL renders their referenced
+table as `public."OrgRoleDefinition"` under that search path. DB-2d3 corrects
+this comparison; its read-only target probe passes both schemas without an
+acceptance flag. Traffic and deployment configuration remain unchanged.
+
+**Release blockers:** No repository migration is pending after PR #391, but
 `prisma migrate status` exits nonzero because two applied source migrations
 (`20260811143000_fix_ace_trigger_schema_references` and
 `20260811150000_fix_faith_audience_version_guard`) have no files in this
 checkout. The applied `20260613000000_lock_supabase_public_rls` and
 `20260728120000_org_role_revisions` checksums also differ from their repository
 files. Recover and review the original SQL; do not invent a replacement or
-edit the restored migration ledger. The corrected strict RLS gate remains
-blocked by restored direct table grants until DB-2d2 is merged and applied.
+edit the restored migration ledger. The `schema=app` strict RLS gate requires
+the DB-2d3 comparison fix before both schema modes can be signed off.
 No repository Data API table client was found, but external consumers require
 review before cutover. A read-only catalog audit found no remaining static
 function references to application relations missing from `app` but present
