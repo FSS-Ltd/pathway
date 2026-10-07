@@ -205,6 +205,18 @@ Added by ACE-F14 to give the admin nav a source for the caller's own effective p
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | R70 | GET | `/ace/dashboard` | `ace.dashboard.read` | `ace.dashboard.read` | organisation-head, site-lead | active selected-site context | active-site aggregate domain | staff-only | none | standard | trusted organisation/site context; tenant-scoped RLS |
 
+## ACE core subject catalogue routes
+
+Subject setup is part of ACE core. These routes do not require the paid Learning
+module, and they do not grant access to Learning logs or evidence.
+
+| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R71 | GET | `/ace/subjects` | `ace.settings.read` | `ace.settings.read` | organisation-head, site-lead, staff | active selected-site context | active-site subject domain | staff-only | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+| R72 | POST | `/ace/subjects` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | active-site subject domain | audited subject creation | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+| R73 | PATCH | `/ace/subjects/:id` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | subject belongs to active site | audited subject rename | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+| R74 | POST | `/ace/subjects/:id/deactivate` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | subject belongs to active site | audited deactivation; existing placements retained | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+
 ## NexSteps legacy surface (Batch A)
 
 Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cutover, using `platform.access.*`-family keys already active in `PLATFORM_CORE_CAPABILITIES` for every vertical. Not part of the 68 exact ACE routes; recorded separately so that count stays accurate. Migration is bounded to the two controllers that authorised from no role check at all (announcements, attendance) - see the ACE-F14 build plan for the controllers still blocked on a missing permission key or a commercial-entitlement decision (children, classes, parents, lessons, orgs, staff, session assignments, learning).
