@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { withTenantRlsContext, type Prisma } from "@pathway/db";
-import type { ConversationQuery } from "./dto/messaging-query.dto";
+import type {
+  ConversationQuery,
+  MessageQuery,
+} from "./dto/messaging-query.dto";
 import {
   decodeConversationCursor,
   encodeConversationCursor,
@@ -118,6 +121,75 @@ export class MessagingQueryService {
           rows.length > limit && last
             ? encodeConversationCursor(last, actor.tenantId, actor.userId)
             : null,
+      };
+    });
+  }
+
+  async listStaffMessages(
+    actor: MessagingActor,
+    conversationId: string,
+    query: MessageQuery,
+  ) {
+    assertActor(actor);
+    const limit = query.limit ?? DEFAULT_LIMIT;
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      await requireCurrentStaff(tx, actor);
+      const conversation = await tx.messageConversation.findFirst({
+        where: {
+          id: conversationId,
+          tenantId: actor.tenantId,
+          kind: { in: [...STAFF_KINDS] },
+          participants: {
+            some: {
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              kind: "STAFF",
+              removedAt: null,
+            },
+          },
+        },
+        select: { id: true },
+      });
+      if (!conversation) throw new NotFoundException("Conversation not found");
+
+      const rows = await tx.message.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          conversationId,
+          ...(query.before ? { sequence: { lt: query.before } } : {}),
+        },
+        select: {
+          id: true,
+          sequence: true,
+          bodyEncrypted: true,
+          createdAt: true,
+          sender: {
+            select: {
+              userId: true,
+              user: { select: { displayName: true, name: true } },
+            },
+          },
+        },
+        orderBy: { sequence: "desc" },
+        take: limit + 1,
+      });
+      const page = rows.slice(0, limit);
+      return {
+        items: page.map((row) => ({
+          id: row.id,
+          sequence: row.sequence,
+          body: row.bodyEncrypted,
+          createdAt: row.createdAt.toISOString(),
+          sender: {
+            id: row.sender.userId,
+            displayName:
+              row.sender.user.displayName?.trim() ||
+              row.sender.user.name?.trim() ||
+              "Staff member",
+          },
+        })),
+        nextBefore:
+          rows.length > limit ? (page.at(-1)?.sequence ?? null) : null,
       };
     });
   }
