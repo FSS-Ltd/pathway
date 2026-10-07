@@ -39,11 +39,13 @@ migration until that is resolved.
    supplied backup files and any extracted data stay outside Git and in an
    approved secret location. Confirm that moving from Ireland to London meets
    the organisation's data residency decision.
-2. Obtain the target's Postgres session-pooler connection string on port 5432
-   through a local secret file or approved secret store. Verify its project ref
-   before connecting. `psql` 17.7 is installed. No target password or URL is
-   currently available in the shell, `.pgpass`, or the inspected local project
-   environment files; do not paste credentials into a PR, log, or chat.
+2. The target's Postgres session-pooler URL is now stored as
+   `NEW_DATABASE_URL` in the ignored, untracked root `.env`. Its project ref,
+   port 5432, and `postgres` database were checked; a read-only `psql` query
+   connected and confirmed the application `Org` table is absent. The URL has
+   Prisma-only `pgbouncer` and `connection_limit` query parameters. Remove
+   those parameters in memory for `psql`, leaving the secret file unchanged.
+   Do not paste the URL or password into a PR, log, or chat.
 3. Recheck that the target has no application data. Restore the downloaded
    logical SQL with `psql`, following Supabase's
    [dashboard-backup guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/dashboard-restore).

@@ -180,8 +180,10 @@ their integrity, row and object inventory, target checks, restore procedure,
 and acceptance evidence. The archives agree on all 32 Storage objects. The
 database contains 28 published blog posts and a Victorious Kids master
 organisation. The archive filename suggests 7 September; snapshot freshness
-has not been established, and the target Postgres credential is not yet
-available. No database or Storage restore has been attempted.
+has not been established. The target Postgres URL is now in an ignored local
+`.env`, and a read-only `psql` query verified the target connection and absence
+of the application `Org` table. No database or Storage restore has been
+attempted.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and
