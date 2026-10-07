@@ -99,7 +99,15 @@ disablement, rejected disabled and missing tenant policies, and left no fixture
 schema behind. The target has 100 finished Prisma migration records. Traffic
 and deployment configuration remain unchanged.
 
-**Release blockers:** No repository migration is pending after PR #385, but
+After [PR #386](https://github.com/FSS-Ltd/pathway/pull/386) merged with all
+eight checks passing, the ACE actor-membership trigger migration was applied.
+A rollback-only target fixture accepted site membership, legacy tenant role,
+and active organisation-role paths; it rejected wrong-tenant, revoked, expired,
+inactive-role, inactive-permission, outsider, and missing-actor cases. The
+fixture schema was absent after rollback. The target has 101 finished Prisma
+migration records. No traffic or deployment configuration changed.
+
+**Release blockers:** No repository migration is pending after PR #386, but
 `prisma migrate status` exits nonzero because two applied source migrations
 (`20260811143000_fix_ace_trigger_schema_references` and
 `20260811150000_fix_faith_audience_version_guard`) have no files in this
@@ -117,8 +125,9 @@ functions referring to application relations that do not exist in `app`:
 `require_attendance_correction_scope`, and
 `require_student_portal_link_policy`. The two fact triggers and student portal
 policy trigger were corrected and tested by PRs #384 and #385. Four earlier
-functions still need reviewed migrations and functional tests before live
-writes. Reconcile the database schema and RLS gate without weakening tenant
+functions remained at that point. PR #386 corrected the ACE actor trigger;
+three messaging and notice functions still need reviewed migrations and tests
+before live writes. Reconcile the database schema and RLS gate without weakening tenant
 isolation. Project-specific Auth, encryption, webhook, deployment-secret, and
 production smoke checks remain. This target is **not ready for traffic**.
 
