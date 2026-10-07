@@ -133,6 +133,12 @@ other participants after the caller's forward-only read cursor; it does not
 load full histories or count the caller's own messages. The web list shows a
 numbered, screen-reader-labelled badge and refreshes after the cursor save
 succeeds. Room, parent, and notice journeys remain separate gated work.
+Step 1.3e3d adds read feedback to the latest outgoing message in an active
+staff-direct thread. The API compares that message's sequence with the active
+recipient's forward-only read cursor; it returns no receipt for incoming or
+staff-room messages. The web shows “Sent” only after the server confirms the
+message and “Read” after a later thread fetch observes the recipient cursor.
+It does not claim device delivery or live receipt updates.
 
 ## Web design intent
 

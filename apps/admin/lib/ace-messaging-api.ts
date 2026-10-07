@@ -15,6 +15,7 @@ export type StaffMessage = {
   body: string;
   createdAt: string;
   sender: { id: string; displayName: string };
+  recipientRead: boolean | null;
 };
 
 export type StaffRecipient = { id: string; displayName: string };

@@ -157,6 +157,7 @@ async function run(): Promise<void> {
             body: "Good morning",
             createdAt: date,
             sender: { id: staffId, displayName: "You" },
+            recipientRead: true,
           },
           {
             id: "message-1",
@@ -164,6 +165,7 @@ async function run(): Promise<void> {
             body: "Welcome",
             createdAt: date,
             sender: { id: peerId, displayName: "Sam" },
+            recipientRead: null,
           },
         ],
         nextBefore: null,
@@ -204,6 +206,7 @@ async function run(): Promise<void> {
     assert.doesNotMatch(container.textContent ?? "", /unread message/);
     assert.match(container.textContent ?? "", /Welcome/);
     assert.match(container.textContent ?? "", /Good morning/);
+    assert.match(container.querySelector("ol")?.textContent ?? "", /Read/);
     assert.equal(
       container.querySelectorAll('ol[aria-live="polite"] li').length,
       2,
@@ -244,6 +247,11 @@ async function run(): Promise<void> {
       "retries use one client request ID",
     );
     assert.match(container.textContent ?? "", /Hello team/);
+    assert.match(container.querySelector("ol")?.textContent ?? "", /Sent/);
+    assert.doesNotMatch(
+      container.querySelector("ol")?.textContent ?? "",
+      /Read/,
+    );
     assert.equal(
       textarea.value,
       "",

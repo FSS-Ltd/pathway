@@ -116,6 +116,14 @@ function MessageList({
   currentUserId: string;
 }) {
   let previousDate = "";
+  const latestOutgoingId = messages.reduce<string | null>(
+    (latest, message) =>
+      message.sender.id === currentUserId &&
+      typeof message.recipientRead === "boolean"
+        ? message.id
+        : latest,
+    null,
+  );
   return (
     <ol className="space-y-3" aria-live="polite" aria-relevant="additions text">
       {messages.map((message) => {
@@ -133,24 +141,31 @@ function MessageList({
             <div
               className={`flex ${outgoing ? "justify-end" : "justify-start"}`}
             >
-              <div
-                className={`max-w-[min(85%,34rem)] rounded-2xl px-4 py-2.5 shadow-sm ${outgoing ? "rounded-br-md bg-accent-strong text-white" : "rounded-bl-md border border-border-subtle bg-surface text-text-primary"}`}
-              >
-                {!outgoing ? (
-                  <p className="mb-1 text-xs font-semibold opacity-75">
-                    {message.sender.displayName}
+              <div className="max-w-[min(85%,34rem)]">
+                <div
+                  className={`rounded-2xl px-4 py-2.5 shadow-sm ${outgoing ? "rounded-br-md bg-accent-strong text-white" : "rounded-bl-md border border-border-subtle bg-surface text-text-primary"}`}
+                >
+                  {!outgoing ? (
+                    <p className="mb-1 text-xs font-semibold opacity-75">
+                      {message.sender.displayName}
+                    </p>
+                  ) : null}
+                  <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                    {outgoing ? <span className="sr-only">You: </span> : null}
+                    {message.body}
+                  </p>
+                  <time
+                    dateTime={message.createdAt}
+                    className={`mt-1 block text-right text-xs ${outgoing ? "text-white/80" : "text-text-muted"}`}
+                  >
+                    {shortTime.format(new Date(message.createdAt))}
+                  </time>
+                </div>
+                {message.id === latestOutgoingId ? (
+                  <p className="mt-1 text-right text-xs text-text-muted">
+                    {message.recipientRead ? "Read" : "Sent"}
                   </p>
                 ) : null}
-                <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                  {outgoing ? <span className="sr-only">You: </span> : null}
-                  {message.body}
-                </p>
-                <time
-                  dateTime={message.createdAt}
-                  className={`mt-1 block text-right text-xs ${outgoing ? "text-white/80" : "text-text-muted"}`}
-                >
-                  {shortTime.format(new Date(message.createdAt))}
-                </time>
               </div>
             </div>
           </li>

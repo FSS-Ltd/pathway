@@ -233,6 +233,11 @@ export function useStaffMessaging(currentUserId: string) {
                   body: sent.body,
                   createdAt: sent.createdAt,
                   sender: { id: currentUserId, displayName: "You" },
+                  recipientRead:
+                    conversations.find((item) => item.id === conversationId)
+                      ?.kind === "STAFF_DIRECT"
+                      ? false
+                      : null,
                 },
               ],
         );
