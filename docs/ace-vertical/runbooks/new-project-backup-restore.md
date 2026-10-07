@@ -130,35 +130,30 @@ rejected cross-tenant, identity, membership, student, and ended-relationship
 cases, and left no fixture rows. The target has 104 finished Prisma migration
 records. Traffic and deployment configuration remain unchanged.
 
-**Release blockers:** No repository migration is pending after PR #389, but
+After [PR #390](https://github.com/FSS-Ltd/pathway/pull/390) merged with all
+eight checks passing, the strict RLS gate was run against both restored
+schemas. It found all 74 required tables exactly once with forced RLS and the
+15 reviewed role policies, but correctly failed on grants to `anon` or
+`authenticated` on 63 required tables. No target privilege changed. A
+rollback-only rehearsal of the proposed DB-2d2 migration reduced 1,694
+individual `PUBLIC`/`anon`/`authenticated` table-privilege entries and 16
+`postgres` default-table-privilege entries to zero; rollback restored both
+counts and preserved the 28 blog and one organisation rows.
+
+**Release blockers:** At merged PR #390, no repository migration was pending,
+but DB-2d2 now proposes a new grant-removal migration. Independently,
 `prisma migrate status` exits nonzero because two applied source migrations
 (`20260811143000_fix_ace_trigger_schema_references` and
 `20260811150000_fix_faith_audience_version_guard`) have no files in this
 checkout. The applied `20260613000000_lock_supabase_public_rls` and
 `20260728120000_org_role_revisions` checksums also differ from their repository
-files. Recover and review the original SQL; do not invent a
-replacement or edit the restored migration ledger. The strict repository RLS
-gate also fails: it requires 64 application tables in `app`, while this source
-snapshot stores them in `public`. The restore initially exposed seven trigger
-functions referring to application relations that do not exist in `app`:
-`assert_ace_notice_audience_member_eligibility`,
-`assert_message_conversation_creator`, `assert_message_participant`,
-`require_ace_record_actor_membership`,
-`require_active_pace_diagnostic_enrollment`,
-`require_attendance_correction_scope`, and
-`require_student_portal_link_policy`. The two fact triggers and student portal
-policy trigger were corrected and tested by PRs #384 and #385. Four earlier
-functions remained at that point. PR #386 corrected the ACE actor trigger and
-PR #387 corrected the message creator trigger, PR #388 corrected the message
-participant trigger, and PR #389 corrected notice audience eligibility. A
-read-only catalog audit found no remaining static function references to
-application relations missing from `app` but present in `public`. The strict
-RLS gate still assumes all required tables are in `app`. In the target, 64 are
-in `public` and 10 in `app`; all 74 are forced RLS tables and the 15 reviewed
-role policies match. However, 63 required tables still have `anon` or
-`authenticated` grants, so changing only the gate's schema lookup must not
-make it pass. Review direct Data API consumers and remove unnecessary grants
-through a separate migration. Project-specific Auth, encryption, webhook,
+files. Recover and review the original SQL; do not invent a replacement or
+edit the restored migration ledger. The corrected strict RLS gate remains
+blocked by restored direct table grants until DB-2d2 is merged and applied.
+No repository Data API table client was found, but external consumers require
+review before cutover. A read-only catalog audit found no remaining static
+function references to application relations missing from `app` but present
+in `public`. Project-specific Auth, encryption, webhook,
 deployment-secret, and production smoke checks remain. This target is **not
 ready for traffic**.
 
