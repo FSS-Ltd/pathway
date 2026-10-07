@@ -107,7 +107,15 @@ inactive-role, inactive-permission, outsider, and missing-actor cases. The
 fixture schema was absent after rollback. The target has 101 finished Prisma
 migration records. No traffic or deployment configuration changed.
 
-**Release blockers:** No repository migration is pending after PR #386, but
+After [PR #387](https://github.com/FSS-Ltd/pathway/pull/387) merged with all
+eight checks passing, the message conversation creator trigger migration was
+applied. A rollback-only target fixture accepted same-tenant staff and linked
+guardians, rejected students, unrelated or missing guardians, and cross-tenant
+staff. The fixture schema was absent after rollback. The target has 102
+finished Prisma migration records. Traffic and deployment configuration remain
+unchanged.
+
+**Release blockers:** No repository migration is pending after PR #387, but
 `prisma migrate status` exits nonzero because two applied source migrations
 (`20260811143000_fix_ace_trigger_schema_references` and
 `20260811150000_fix_faith_audience_version_guard`) have no files in this
@@ -125,8 +133,9 @@ functions referring to application relations that do not exist in `app`:
 `require_attendance_correction_scope`, and
 `require_student_portal_link_policy`. The two fact triggers and student portal
 policy trigger were corrected and tested by PRs #384 and #385. Four earlier
-functions remained at that point. PR #386 corrected the ACE actor trigger;
-three messaging and notice functions still need reviewed migrations and tests
+functions remained at that point. PR #386 corrected the ACE actor trigger and
+PR #387 corrected the message creator trigger. The message participant and
+notice audience eligibility functions still need reviewed migrations and tests
 before live writes. Reconcile the database schema and RLS gate without weakening tenant
 isolation. Project-specific Auth, encryption, webhook, deployment-secret, and
 production smoke checks remain. This target is **not ready for traffic**.
