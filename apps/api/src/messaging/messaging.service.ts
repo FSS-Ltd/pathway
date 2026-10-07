@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { withTenantRlsContext, type Prisma } from "@pathway/db";
+import { withTenantRlsContext } from "@pathway/db";
 import type {
   ConversationQuery,
   MessageQuery,
@@ -15,15 +14,14 @@ import {
   decodeConversationCursor,
   encodeConversationCursor,
 } from "./messaging-cursor";
+import {
+  assertMessagingActor,
+  requireCurrentStaff,
+  STAFF_CONVERSATION_KINDS,
+  type MessagingActor,
+} from "./messaging-access";
 
 const DEFAULT_LIMIT = 20;
-const STAFF_KINDS = ["STAFF_DIRECT", "STAFF_ROOM"] as const;
-
-export interface MessagingActor {
-  tenantId: string;
-  orgId: string;
-  userId: string;
-}
 
 @Injectable()
 export class MessagingService {
@@ -31,7 +29,7 @@ export class MessagingService {
     actor: MessagingActor,
     query: ConversationQuery,
   ) {
-    assertActor(actor);
+    assertMessagingActor(actor);
     let cursor: ReturnType<typeof decodeConversationCursor> | undefined;
     if (query.cursor) {
       try {
@@ -51,7 +49,7 @@ export class MessagingService {
       const rows = await tx.messageConversation.findMany({
         where: {
           tenantId: actor.tenantId,
-          kind: { in: [...STAFF_KINDS] },
+          kind: { in: [...STAFF_CONVERSATION_KINDS] },
           participants: {
             some: {
               tenantId: actor.tenantId,
@@ -132,7 +130,7 @@ export class MessagingService {
     conversationId: string,
     query: MessageQuery,
   ) {
-    assertActor(actor);
+    assertMessagingActor(actor);
     const limit = query.limit ?? DEFAULT_LIMIT;
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await requireCurrentStaff(tx, actor);
@@ -140,7 +138,7 @@ export class MessagingService {
         where: {
           id: conversationId,
           tenantId: actor.tenantId,
-          kind: { in: [...STAFF_KINDS] },
+          kind: { in: [...STAFF_CONVERSATION_KINDS] },
           participants: {
             some: {
               tenantId: actor.tenantId,
@@ -201,7 +199,7 @@ export class MessagingService {
     conversationId: string,
     input: ReadCursorInput,
   ) {
-    assertActor(actor);
+    assertMessagingActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await requireCurrentStaff(tx, actor);
       const participant = await tx.messageParticipant.findFirst({
@@ -211,7 +209,7 @@ export class MessagingService {
           userId: actor.userId,
           kind: "STAFF",
           removedAt: null,
-          conversation: { kind: { in: [...STAFF_KINDS] } },
+          conversation: { kind: { in: [...STAFF_CONVERSATION_KINDS] } },
         },
         select: { id: true },
       });
@@ -245,46 +243,4 @@ export class MessagingService {
       return { lastReadSequence: rows[0].lastReadSequence };
     });
   }
-}
-
-function assertActor(actor: MessagingActor): void {
-  if (
-    !actor.tenantId?.trim() ||
-    !actor.orgId?.trim() ||
-    !actor.userId?.trim()
-  ) {
-    throw new BadRequestException("A complete active-site actor is required");
-  }
-}
-
-async function requireCurrentStaff(
-  tx: Prisma.TransactionClient,
-  actor: MessagingActor,
-): Promise<void> {
-  const [site, membership, student, user] = await Promise.all([
-    tx.tenant.findFirst({
-      where: { id: actor.tenantId, orgId: actor.orgId },
-      select: { id: true },
-    }),
-    tx.siteMembership.findUnique({
-      where: {
-        tenantId_userId: { tenantId: actor.tenantId, userId: actor.userId },
-        role: { in: ["SITE_ADMIN", "STAFF"] },
-      },
-      select: { id: true },
-    }),
-    tx.studentIdentity.findUnique({
-      where: {
-        tenantId_userId: { tenantId: actor.tenantId, userId: actor.userId },
-      },
-      select: { id: true },
-    }),
-    tx.user.findFirst({
-      where: { id: actor.userId, isActive: true },
-      select: { id: true },
-    }),
-  ]);
-  if (!site) throw new NotFoundException("Active site not found");
-  if (!membership || student || !user)
-    throw new ForbiddenException("Staff messaging unavailable");
 }

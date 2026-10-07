@@ -12,6 +12,7 @@ import {
   requireDatabase,
 } from "../../../test-helpers.e2e";
 import { MessagingService } from "../messaging.service";
+import { MessagingConversationService } from "../messaging-conversation.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -1108,6 +1109,9 @@ describe("ACE parent/staff messaging and notices storage", () => {
   afterEach(async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     await deleteMessagingRowsIfPresent(prisma);
+    await prisma.auditEvent.deleteMany({
+      where: { orgId: fixture.orgAId, entityType: "ACE_MESSAGE" },
+    });
     await prisma.guardianChildRelationship.updateMany({
       where: { id: fixture.guardianARelationshipId },
       data: {
@@ -1267,6 +1271,68 @@ describe("ACE parent/staff messaging and notices storage", () => {
     );
     await expect(
       service.listStaffMessages(unjoined, created.conversationId, {}),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("opens one audited direct conversation for two current site staff", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const service = new MessagingConversationService();
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const reverseActor = { ...actor, userId: fixture.staffBId };
+    const [first, second] = await Promise.all([
+      service.openStaffDirect(actor, {
+        kind: "STAFF_DIRECT",
+        recipientUserId: fixture.staffBId,
+      }),
+      service.openStaffDirect(reverseActor, {
+        kind: "STAFF_DIRECT",
+        recipientUserId: fixture.staffAId,
+      }),
+    ]);
+
+    expect(first.id).toBe(second.id);
+    expect([first.created, second.created].sort()).toEqual([false, true]);
+    const conversation = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.messageConversation.findUnique({
+          where: { id: first.id },
+          select: {
+            participants: { select: { userId: true } },
+          },
+        }),
+    );
+    expect(
+      conversation?.participants.map((item) => item.userId).sort(),
+    ).toEqual([fixture.staffAId, fixture.staffBId].sort());
+    expect(
+      await prisma.auditEvent.count({
+        where: {
+          orgId: fixture.orgAId,
+          entityType: "ACE_MESSAGE",
+          entityId: first.id,
+          action: "CREATED",
+        },
+      }),
+    ).toBe(1);
+
+    await expect(
+      service.openStaffDirect(actor, {
+        kind: "STAFF_DIRECT",
+        recipientUserId: fixture.studentUserId,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.openStaffDirect(actor, {
+        kind: "STAFF_DIRECT",
+        recipientUserId: fixture.tenantBOnlyUserId,
+      }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
