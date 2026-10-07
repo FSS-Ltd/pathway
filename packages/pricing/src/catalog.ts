@@ -18,7 +18,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxChildrenIncluded: 50,
     maxSitesIncluded: 1,
     features: [
-      "Up to 15 staff / volunteers",
+      "Up to 15 active staff and volunteers",
       "Up to 50 children",
       "1 site",
       "Attendance tracking",
@@ -35,7 +35,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
       },
     ],
-    doesNotInclude: ["Capacity add-ons (extra Active People and extra sites)"],
+    doesNotInclude: ["Capacity add-ons (extra staff and site capacity)"],
     upgradeWhen:
       "You need higher staff capacity, more children capacity, or multi-site support.",
     bestFor: "Organisations that need Starter workflows at a smaller operating size.",
@@ -53,7 +53,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxChildrenIncluded: 50,
     maxSitesIncluded: 1,
     features: [
-      "Up to 15 staff / volunteers",
+      "Up to 15 active staff and volunteers",
       "Up to 50 children",
       "1 site",
       "Attendance tracking",
@@ -70,7 +70,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
         description: "Additional storage available (100GB, 200GB, or 1TB packs)",
       },
     ],
-    doesNotInclude: ["Capacity add-ons (extra Active People and extra sites)"],
+    doesNotInclude: ["Capacity add-ons (extra staff and site capacity)"],
     upgradeWhen:
       "You need higher staff capacity, more children capacity, or multi-site support.",
     bestFor: "Organisations that need Starter workflows at a smaller operating size.",
@@ -88,7 +88,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxChildrenIncluded: null,
     maxSitesIncluded: 1,
     features: [
-      "Up to 50 active staff / volunteers",
+      "Up to 50 active staff and volunteers",
       "1 site",
       "Attendance tracking",
       "Rota and timetable management",
@@ -124,7 +124,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxChildrenIncluded: null,
     maxSitesIncluded: 1,
     features: [
-      "Up to 50 active staff / volunteers",
+      "Up to 50 active staff and volunteers",
       "1 site",
       "Attendance tracking",
       "Rota and timetable management",
@@ -160,7 +160,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxChildrenIncluded: null,
     maxSitesIncluded: 3,
     features: [
-      "Up to 200 active staff / volunteers",
+      "Up to 200 active staff and volunteers",
       "3 sites",
       "Everything in Starter",
       "Multi-site management",
@@ -198,7 +198,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxChildrenIncluded: null,
     maxSitesIncluded: 3,
     features: [
-      "Up to 200 active staff / volunteers",
+      "Up to 200 active staff and volunteers",
       "3 sites",
       "Everything in Starter",
       "Multi-site management",
@@ -235,7 +235,7 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     maxChildrenIncluded: null,
     maxSitesIncluded: null,
     features: [
-      "Unlimited staff / volunteers",
+      "Unlimited active staff and volunteers",
       "Unlimited sites",
       "Everything in Growth",
       "Dedicated account manager",
@@ -263,11 +263,11 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     pricePerMonth: 49,
     currency: "GBP",
     selfServe: true,
-    av30Included: 250,
+    av30Included: 100,
     maxChildrenIncluded: null,
     maxSitesIncluded: 1,
     features: [
-      "Up to 250 active staff / volunteers",
+      "Up to 100 active staff and volunteers",
       "1 site",
       "Attendance tracking",
       "Rota and timetable management",
@@ -299,11 +299,11 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     pricePerYear: 490,
     currency: "GBP",
     selfServe: true,
-    av30Included: 250,
+    av30Included: 100,
     maxChildrenIncluded: null,
     maxSitesIncluded: 1,
     features: [
-      "Up to 250 active staff / volunteers",
+      "Up to 100 active staff and volunteers",
       "1 site",
       "Attendance tracking",
       "Rota and timetable management",
@@ -335,11 +335,11 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     pricePerMonth: 99,
     currency: "GBP",
     selfServe: true,
-    av30Included: 750,
+    av30Included: 200,
     maxChildrenIncluded: null,
     maxSitesIncluded: 2,
     features: [
-      "Up to 750 active staff / volunteers",
+      "Up to 200 active staff and volunteers",
       "2 sites",
       "Everything in Starter",
       "Multi-site management",
@@ -369,11 +369,11 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     pricePerYear: 990,
     currency: "GBP",
     selfServe: true,
-    av30Included: 750,
+    av30Included: 200,
     maxChildrenIncluded: null,
     maxSitesIncluded: 2,
     features: [
-      "Up to 750 active staff / volunteers",
+      "Up to 200 active staff and volunteers",
       "2 sites",
       "Everything in Starter",
       "Multi-site management",
@@ -405,11 +405,11 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     pricePerMonth: 149,
     currency: "GBP",
     selfServe: true,
-    av30Included: 2000,
+    av30Included: 500,
     maxChildrenIncluded: null,
     maxSitesIncluded: 5,
     features: [
-      "Up to 2,000 active staff / volunteers",
+      "Up to 500 active staff and volunteers",
       "Up to 5 sites",
       "Everything in Growth",
       "Advanced reporting",
@@ -438,11 +438,11 @@ export const PLANS: Readonly<Record<PlanCode, PlanDefinition>> = {
     pricePerYear: 1490,
     currency: "GBP",
     selfServe: true,
-    av30Included: 2000,
+    av30Included: 500,
     maxChildrenIncluded: null,
     maxSitesIncluded: 5,
     features: [
-      "Up to 2,000 active staff / volunteers",
+      "Up to 500 active staff and volunteers",
       "Up to 5 sites",
       "Everything in Growth",
       "Advanced reporting",
@@ -508,7 +508,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     question: "Are there any hidden fees?",
     answer:
-      "No. The price you see is the price you pay. There are no setup fees, no per-user fees beyond your plan's included Active People, and no surprise charges. Storage is the only add-on, clearly priced and optional.",
+      "No. The price you see is the price you pay. There are no setup fees, no per-user fees beyond your plan's included active staff and volunteers, and no surprise charges. Storage is the only add-on, clearly priced and optional.",
   },
   {
     question: "Can I cancel my subscription?",
@@ -521,9 +521,9 @@ export const PRICING_FAQS: PricingFaq[] = [
       "You keep control of your data. You can export all your data at any time through the admin interface. We support Data Subject Access Requests (DSARs) and can provide exports in standard formats. After cancellation, data is retained according to your organisation's retention policy, then securely deleted.",
   },
   {
-    question: "What are Active People (AV30)?",
+    question: "How is the active staff and volunteer allowance counted?",
     answer:
-      "Active People (AV30) are unique staff or volunteer users who have been active in the last 30 days. Activity includes being scheduled on a rota, responding to assignments, or recording attendance. Only staff/volunteer roles count toward AV30; parents do not.",
+      "The allowance counts unique staff and volunteers with qualifying activity in the previous 30 days. Activity includes being scheduled on a rota, responding to assignments, or recording attendance. Parent accounts do not count.",
   },
   {
     question: "Can I change plans later?",
@@ -538,6 +538,6 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     question: "What's included in each plan?",
     answer:
-      "All plans include secure, GDPR-compliant data handling. Starter includes 250 Active People and 1 site. Growth includes 750 Active People and 2 sites. Professional includes 2,000 Active People and up to 5 sites. Enterprise is customised to your needs.",
+      "All plans include secure, GDPR-compliant data handling. Starter includes up to 100 active staff and volunteers at 1 site. Growth includes up to 200 active staff and volunteers at 2 sites. Professional includes up to 500 active staff and volunteers at up to 5 sites. Enterprise is customised to your needs.",
   },
 ];

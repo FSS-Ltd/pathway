@@ -256,7 +256,7 @@ export default function BillingPage() {
           )}
           {planInfo && (
             <p className="text-sm text-text-muted">
-              Includes up to {planInfo.av30Included ?? "unlimited"} active staff/volunteers (AV30)
+              Includes {planInfo.av30Included ?? "unlimited"} active staff and volunteers per rolling 30-day period
             </p>
           )}
         </div>
@@ -274,11 +274,11 @@ export default function BillingPage() {
   );
 
   const av30Card = (
-    <Card title="AV30 Usage">
+    <Card title="Active staff and volunteers (last 30 days)">
       {isLoading ? (
         loadingBlock
       ) : error ? (
-        <p className="text-sm text-status-danger">Unable to load AV30 usage.</p>
+        <p className="text-sm text-status-danger">Unable to load active staff and volunteer usage.</p>
       ) : isMasterOrg ? (
         <p className="text-sm text-text-muted">Unlimited — no limits apply to this organisation.</p>
       ) : data ? (
@@ -351,7 +351,7 @@ export default function BillingPage() {
           </div>
         </div>
       ) : (
-        <p className="text-sm text-text-muted">No AV30 data available.</p>
+        <p className="text-sm text-text-muted">No active staff and volunteer activity data available.</p>
       )}
     </Card>
   );

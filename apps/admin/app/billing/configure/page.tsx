@@ -453,7 +453,7 @@ function PlanComparison({
           next={newPlan?.displayName ?? "—"}
         />
         <Row
-          label="Active People"
+          label="Active staff and volunteers"
           current={fmt(overview?.av30Cap)}
           next={fmt(newPlan?.av30Included)}
         />

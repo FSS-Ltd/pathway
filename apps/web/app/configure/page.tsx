@@ -262,11 +262,11 @@ export default function ConfigurePage() {
               How pricing works
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-text-muted">
-              Each plan includes a site limit and an Active People allowance.
-              Active People are unique staff or volunteers who have qualifying
-              activity during the previous 30 days; parent accounts do not
-              count. Storage is the optional usage add-on. Monthly and annual
-              totals are shown before checkout.
+              Each plan includes a site limit and an allowance for active staff
+              and volunteers. The allowance counts unique staff and volunteers
+              with qualifying activity during the previous 30 days; parent
+              accounts do not count. Storage is the optional usage add-on.
+              Monthly and annual totals are shown before checkout.
             </p>
           </section>
           {pricingWarning ? (

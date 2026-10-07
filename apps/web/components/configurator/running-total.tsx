@@ -283,7 +283,7 @@ function EntitlementPreview({
       <h3 className="font-semibold text-text-primary">Included capacity</h3>
       <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
         <div>
-          <dt className="text-text-muted">Active People</dt>
+          <dt className="text-text-muted">Active staff and volunteers</dt>
           <dd className="mt-1 font-semibold text-text-primary">
             {preview.effectiveCaps.av30Cap?.toLocaleString("en-GB") ?? "—"}
           </dd>

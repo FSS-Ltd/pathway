@@ -118,7 +118,7 @@ export default function ReportsPage() {
   const av30Label =
     kpis?.av30Used !== undefined && kpis?.av30Cap !== undefined
       ? `${kpis.av30Used ?? "-"} / ${kpis.av30Cap ?? "-"}`
-      : "AV30 not available yet";
+      : "Active staff and volunteer data not available yet";
 
   const concernsBadge =
     typeof kpis?.openConcerns === "number" && kpis.openConcerns > 0 ? (
@@ -167,7 +167,7 @@ export default function ReportsPage() {
                 "View safeguarding",
                 concernsBadge,
               )}
-              {renderKpiCard("AV30 usage", av30Label, "/billing", "View billing")}
+              {renderKpiCard("Active staff and volunteers (last 30 days)", av30Label, "/billing", "View billing")}
             </>
           )}
       </div>
@@ -241,7 +241,7 @@ export default function ReportsPage() {
                 Plan tier: {kpis?.planTier ?? "Not available yet."}
               </p>
               <p>
-                AV30 usage: {av30Label}
+                Active staff and volunteers: {av30Label}
               </p>
               <Link
                 href="/billing"

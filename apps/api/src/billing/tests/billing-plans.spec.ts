@@ -77,28 +77,31 @@ describe("billing-plans catalogue", () => {
       expect(getPlanDefinition("GROWTH_MONTHLY")?.maxSitesIncluded).toBe(3);
     });
 
-    it("STARTER_49_MONTHLY/YEARLY: £49/250 Active People, 1 site", () => {
+    it("STARTER_49_MONTHLY/YEARLY: £49/100 active staff and volunteers, 1 site", () => {
       expect(getPlanDefinition("STARTER_49_MONTHLY")?.tier).toBe("starter");
-      expect(getPlanDefinition("STARTER_49_MONTHLY")?.av30Included).toBe(250);
+      expect(getPlanDefinition("STARTER_49_MONTHLY")?.av30Included).toBe(100);
       expect(getPlanDefinition("STARTER_49_MONTHLY")?.maxSitesIncluded).toBe(1);
       expect(getPlanDefinition("STARTER_49_YEARLY")?.tier).toBe("starter");
-      expect(getPlanDefinition("STARTER_49_YEARLY")?.av30Included).toBe(250);
+      expect(getPlanDefinition("STARTER_49_YEARLY")?.av30Included).toBe(100);
+      expect(getPlanDefinition("STARTER_49_YEARLY")?.maxSitesIncluded).toBe(1);
     });
 
-    it("GROWTH_99_MONTHLY/YEARLY: £99/750 Active People, 2 sites", () => {
+    it("GROWTH_99_MONTHLY/YEARLY: £99/200 active staff and volunteers, 2 sites", () => {
       expect(getPlanDefinition("GROWTH_99_MONTHLY")?.tier).toBe("growth");
-      expect(getPlanDefinition("GROWTH_99_MONTHLY")?.av30Included).toBe(750);
+      expect(getPlanDefinition("GROWTH_99_MONTHLY")?.av30Included).toBe(200);
       expect(getPlanDefinition("GROWTH_99_MONTHLY")?.maxSitesIncluded).toBe(2);
       expect(getPlanDefinition("GROWTH_99_YEARLY")?.tier).toBe("growth");
-      expect(getPlanDefinition("GROWTH_99_YEARLY")?.av30Included).toBe(750);
+      expect(getPlanDefinition("GROWTH_99_YEARLY")?.av30Included).toBe(200);
+      expect(getPlanDefinition("GROWTH_99_YEARLY")?.maxSitesIncluded).toBe(2);
     });
 
-    it("PROFESSIONAL_149_MONTHLY/YEARLY: £149/2000 Active People, new professional tier", () => {
+    it("PROFESSIONAL_149_MONTHLY/YEARLY: £149/500 active staff and volunteers, new professional tier", () => {
       expect(getPlanDefinition("PROFESSIONAL_149_MONTHLY")?.tier).toBe("professional");
-      expect(getPlanDefinition("PROFESSIONAL_149_MONTHLY")?.av30Included).toBe(2000);
+      expect(getPlanDefinition("PROFESSIONAL_149_MONTHLY")?.av30Included).toBe(500);
       expect(getPlanDefinition("PROFESSIONAL_149_MONTHLY")?.maxSitesIncluded).toBe(5);
       expect(getPlanDefinition("PROFESSIONAL_149_YEARLY")?.tier).toBe("professional");
-      expect(getPlanDefinition("PROFESSIONAL_149_YEARLY")?.av30Included).toBe(2000);
+      expect(getPlanDefinition("PROFESSIONAL_149_YEARLY")?.av30Included).toBe(500);
+      expect(getPlanDefinition("PROFESSIONAL_149_YEARLY")?.maxSitesIncluded).toBe(5);
     });
 
     it("all six new codes are self-serve", () => {
