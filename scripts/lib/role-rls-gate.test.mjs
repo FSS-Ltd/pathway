@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  findRequiredTableCopies,
   findRequiredTableEntries,
   findUnreviewedRolePolicies,
   hasRequiredRolePolicyQualifiers,
@@ -118,6 +119,30 @@ test("identifies disabled required tables without treating unrelated tables as r
   assert.deepEqual(findRequiredTableEntries(disabled, REQUIRED_TABLES), [
     { table_name: "OrgRoleDefinition" },
   ]);
+});
+
+test("accepts required tables split between app and public", () => {
+  const tables = [
+    { schema_name: "public", table_name: "OrgRoleDefinition" },
+    { schema_name: "app", table_name: "MessageConversation" },
+  ];
+
+  assert.deepEqual(
+    findRequiredTableCopies(tables, ["OrgRoleDefinition", "MessageConversation"]),
+    { missing: [], duplicate: [] },
+  );
+});
+
+test("rejects missing and duplicate required physical tables", () => {
+  const tables = [
+    { schema_name: "public", table_name: "OrgRoleDefinition" },
+    { schema_name: "app", table_name: "OrgRoleDefinition" },
+  ];
+
+  assert.deepEqual(
+    findRequiredTableCopies(tables, ["OrgRoleDefinition", "MessageConversation"]),
+    { missing: ["MessageConversation"], duplicate: ["OrgRoleDefinition"] },
+  );
 });
 
 test("identifies PUBLIC grants on required tables", () => {

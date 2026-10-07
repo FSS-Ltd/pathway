@@ -123,7 +123,14 @@ cases, then allowed removal after access ended. The fixture schema was absent
 after rollback. The target has 103 finished Prisma migration records. Traffic
 and deployment configuration remain unchanged.
 
-**Release blockers:** No repository migration is pending after PR #388, but
+After [PR #389](https://github.com/FSS-Ltd/pathway/pull/389) merged with all
+eight checks passing, the notice eligibility migration was applied. A
+rollback-only target fixture accepted valid guardian and staff recipients,
+rejected cross-tenant, identity, membership, student, and ended-relationship
+cases, and left no fixture rows. The target has 104 finished Prisma migration
+records. Traffic and deployment configuration remain unchanged.
+
+**Release blockers:** No repository migration is pending after PR #389, but
 `prisma migrate status` exits nonzero because two applied source migrations
 (`20260811143000_fix_ace_trigger_schema_references` and
 `20260811150000_fix_faith_audience_version_guard`) have no files in this
@@ -142,13 +149,18 @@ functions referring to application relations that do not exist in `app`:
 `require_student_portal_link_policy`. The two fact triggers and student portal
 policy trigger were corrected and tested by PRs #384 and #385. Four earlier
 functions remained at that point. PR #386 corrected the ACE actor trigger and
-PR #387 corrected the message creator trigger, and PR #388 corrected the
-message participant trigger. A catalog audit found the notice audience
-eligibility helper still references two guardian relations missing from `app`
-but present in `public`. It needs a reviewed migration and tests before live
-writes. Reconcile the database schema and RLS gate without weakening tenant
-isolation. Project-specific Auth, encryption, webhook, deployment-secret, and
-production smoke checks remain. This target is **not ready for traffic**.
+PR #387 corrected the message creator trigger, PR #388 corrected the message
+participant trigger, and PR #389 corrected notice audience eligibility. A
+read-only catalog audit found no remaining static function references to
+application relations missing from `app` but present in `public`. The strict
+RLS gate still assumes all required tables are in `app`. In the target, 64 are
+in `public` and 10 in `app`; all 74 are forced RLS tables and the 15 reviewed
+role policies match. However, 63 required tables still have `anon` or
+`authenticated` grants, so changing only the gate's schema lookup must not
+make it pass. Review direct Data API consumers and remove unnecessary grants
+through a separate migration. Project-specific Auth, encryption, webhook,
+deployment-secret, and production smoke checks remain. This target is **not
+ready for traffic**.
 
 ## Restore gate and procedure
 
