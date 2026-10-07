@@ -28,6 +28,7 @@ import {
   Award,
   PieChart,
   PackageSearch,
+  MessageCircle,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -88,6 +89,7 @@ const iconComponents: LucideIcon[] = [
   Award, // 23 Behaviour capture
   PieChart, // 24 ACE overview
   PackageSearch, // 25 Physical PACE inventory
+  MessageCircle, // 26 Staff messages
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.

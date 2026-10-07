@@ -107,6 +107,27 @@ assert.match(
   /href="\/ace\/behaviour"[^>]*>[\s\S]*?Behaviour/,
   "Behaviour navigation renders after ace.behaviour.read is loaded",
 );
+const messagingNavigation = (permissions: string[]) =>
+  resolveAdminNavItems({
+    role: staffRole,
+    currentOrgIsMasterOrg: false,
+    capabilities: [],
+    permissions,
+    ui: { labels: {} },
+  }).some((item) => item.href === "/ace/messages");
+assert.equal(
+  messagingNavigation(["messaging.conversations.read"]),
+  false,
+  "messages navigation needs both conversation and message read permissions",
+);
+assert.equal(
+  messagingNavigation([
+    "messaging.conversations.read",
+    "messaging.messages.read",
+  ]),
+  true,
+  "messages navigation appears for staff with both read permissions",
+);
 
 // ACE-F14: Roles & Access must be gated by the typed permission, not a role
 // display name - no `access:` string on this entry.

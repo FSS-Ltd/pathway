@@ -20,6 +20,7 @@ const navItemsWithAccess: (SidebarNavItem & {
   access?: AccessRequirement;
   capability?: Capability;
   permission?: PermissionKey;
+  additionalPermission?: PermissionKey;
 })[] = [
   { ...defaultSidebarItems[0], access: "staff-or-admin" }, // Dashboard
   {
@@ -97,6 +98,15 @@ const navItemsWithAccess: (SidebarNavItem & {
     group: "Communication",
   }, // Notices & Announcements (admins only)
   {
+    label: "Messages",
+    href: "/ace/messages",
+    iconIndex: 26,
+    access: "staff-or-admin",
+    permission: "messaging.conversations.read",
+    additionalPermission: "messaging.messages.read",
+    group: "Communication",
+  },
+  {
     label: "Guest pass",
     href: "/guest-pass",
     iconIndex: 15,
@@ -169,7 +179,8 @@ export function resolveAdminNavItems({
           currentOrgIsMasterOrg,
         }) &&
         hasCapability(capabilities, item.capability) &&
-        hasPermission(permissions, item.permission),
+        hasPermission(permissions, item.permission) &&
+        hasPermission(permissions, item.additionalPermission),
     )
     .map((item) => ({ ...item, label: orgLabel(ui, item.href, item.label) }));
 }
