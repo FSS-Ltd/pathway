@@ -14,6 +14,7 @@ import { useAdminAccess } from "@/lib/use-admin-access";
 import { useSession } from "@/lib/use-session-compat";
 import { AcademicCalendarForm } from "./academic-calendar-form";
 import { PacePolicySettings } from "./pace-policy-settings";
+import { SubjectSettings } from "./subject-settings";
 
 export default function AcademicCalendarPage() {
   const { data: session, status: sessionStatus } = useSession();
@@ -122,7 +123,8 @@ export default function AcademicCalendarPage() {
           Academic setup
         </h1>
         <p className="text-sm text-text-muted">
-          Set the academic year and PACE assessment rules for the active site.
+          Set the academic year, subjects, and PACE assessment rules for the
+          active site.
         </p>
       </div>
       <AcademicCalendarForm
@@ -136,6 +138,7 @@ export default function AcademicCalendarPage() {
         timezone={calendar?.timezone ?? null}
         onSave={save}
       />
+      <SubjectSettings canManage={canManage} />
       <PacePolicySettings canManage={canManage} />
     </div>
   );
