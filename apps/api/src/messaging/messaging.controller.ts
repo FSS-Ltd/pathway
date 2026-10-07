@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Param,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -10,7 +11,11 @@ import { z } from "zod";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { conversationQuerySchema } from "./dto/messaging-query.dto";
+import {
+  conversationIdSchema,
+  conversationQuerySchema,
+  messageQuerySchema,
+} from "./dto/messaging-query.dto";
 import { MessagingQueryService } from "./messaging-query.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
@@ -28,6 +33,22 @@ export class MessagingController {
       return await this.service.listStaffConversations(
         this.actor(),
         await conversationQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Get(":id/messages")
+  @RequirePermission("messaging.messages.read")
+  async messages(@Param("id") id: string, @Query() query: unknown) {
+    try {
+      return await this.service.listStaffMessages(
+        this.actor(),
+        await conversationIdSchema.parseAsync(id),
+        await messageQuerySchema.parseAsync(query),
       );
     } catch (error) {
       if (error instanceof z.ZodError)

@@ -1,9 +1,16 @@
 import "reflect-metadata";
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
 import { MessagingController } from "../messaging.controller";
-import { conversationQuerySchema } from "../dto/messaging-query.dto";
+import {
+  conversationQuerySchema,
+  messageQuerySchema,
+} from "../dto/messaging-query.dto";
 import { encodeConversationCursor } from "../messaging-cursor";
 import { MessagingQueryService } from "../messaging-query.service";
 
@@ -22,7 +29,9 @@ function setup() {
     user: { findFirst: jest.fn().mockResolvedValue({ id: actor.userId }) },
     messageConversation: {
       findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue({ id: "conversation" }),
     },
+    message: { findMany: jest.fn().mockResolvedValue([]) },
   };
   jest
     .mocked(withTenantRlsContext)
@@ -42,12 +51,25 @@ describe("staff messaging reads", () => {
         MessagingController.prototype.list,
       ),
     ).toBe("messaging.conversations.read");
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSION,
+        MessagingController.prototype.messages,
+      ),
+    ).toBe("messaging.messages.read");
   });
 
   it("requires bounded query inputs", () => {
     expect(conversationQuerySchema.safeParse({ limit: "51" }).success).toBe(
       false,
     );
+    expect(messageQuerySchema.safeParse({ before: "0" }).success).toBe(false);
+    expect(messageQuerySchema.safeParse({ before: "2147483648" }).success).toBe(
+      false,
+    );
+    expect(
+      messageQuerySchema.safeParse({ limit: "2", before: "10" }).data,
+    ).toEqual({ limit: 2, before: 10 });
   });
 
   it("lists only the selected site's active staff conversations", async () => {
@@ -162,5 +184,73 @@ describe("staff messaging reads", () => {
       service.listStaffConversations(actor, { cursor }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(tx.messageConversation.findMany).not.toHaveBeenCalled();
+  });
+
+  it("hides foreign or unjoined conversations and their message data", async () => {
+    const { tx, service } = setup();
+    tx.messageConversation.findFirst.mockResolvedValue(null);
+    await expect(
+      service.listStaffMessages(
+        actor,
+        "a5a3fdf3-203a-456c-9966-8e012da355bc",
+        {},
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.message.findMany).not.toHaveBeenCalled();
+    expect(tx.messageConversation.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          participants: {
+            some: {
+              tenantId: actor.tenantId,
+              userId: actor.userId,
+              kind: "STAFF",
+              removedAt: null,
+            },
+          },
+        }),
+      }),
+    );
+  });
+
+  it("returns a bounded message page after participant access succeeds", async () => {
+    const { tx, service } = setup();
+    tx.message.findMany.mockResolvedValue([
+      {
+        id: "message-2",
+        sequence: 2,
+        bodyEncrypted: "Reply",
+        createdAt: time,
+        sender: { userId: "staff-b", user: { displayName: "Bob", name: null } },
+      },
+      { id: "message-1", sequence: 1 },
+    ]);
+
+    const result = await service.listStaffMessages(actor, "conversation-a", {
+      limit: 1,
+      before: 3,
+    });
+
+    expect(result.items).toEqual([
+      {
+        id: "message-2",
+        sequence: 2,
+        body: "Reply",
+        createdAt: time.toISOString(),
+        sender: { id: "staff-b", displayName: "Bob" },
+      },
+    ]);
+    expect(result.nextBefore).toBe(2);
+    expect(tx.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          conversationId: "conversation-a",
+          sequence: { lt: 3 },
+        },
+        take: 2,
+      }),
+    );
   });
 });

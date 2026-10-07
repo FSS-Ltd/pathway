@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { NotFoundException } from "@nestjs/common";
 import {
   Prisma,
   prisma,
@@ -1217,7 +1218,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
     });
   });
 
-  it("lists only joined staff conversations through the query service", async () => {
+  it("reads only joined staff conversations and their messages through the query service", async () => {
     if (!isDatabaseAvailable()) return;
 
     const created = await withMessagingRlsContext(
@@ -1255,9 +1256,18 @@ describe("ACE parent/staff messaging and notices storage", () => {
       list.items.find((item) => item.id === created.conversationId)
         ?.latestMessage?.preview,
     ).toBe("Staff-only update");
+    const page = await service.listStaffMessages(
+      joined,
+      created.conversationId,
+      {},
+    );
+    expect(page.items.map((item) => item.body)).toEqual(["Staff-only update"]);
     expect((await service.listStaffConversations(unjoined, {})).items).toEqual(
       [],
     );
+    await expect(
+      service.listStaffMessages(unjoined, created.conversationId, {}),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it("permits one general parent conversation per guardian and valid staff conversation kinds", async () => {
