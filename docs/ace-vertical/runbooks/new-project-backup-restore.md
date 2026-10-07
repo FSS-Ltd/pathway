@@ -1,10 +1,11 @@
 # New Supabase project backup restore
 
-**Status:** The restored target has 107 finished Prisma migrations, 1,475
-archived application rows, and all 32 Storage objects. Application traffic and
-production configuration have not moved.
-Follow the [production release and cutover conditions](../production-release-status.md)
-before treating the new project as production.
+**Status (7 October 2026):** The restored London project has 107 finished
+Prisma migrations, 1,475 archived application rows, and all 32 Storage
+objects. The production API now uses this project after the successful manual
+[deployment run](https://github.com/FSS-Ltd/pathway/actions/runs/37645052412).
+See the [production release record](../production-release-status.md) for the
+deployed commit, smoke checks, and remaining verification limits.
 
 ## Candidate snapshot and target
 
@@ -207,16 +208,15 @@ target has 107 finished Prisma migration records, while `prisma migrate
 status` exits nonzero because the two missing historical migration files
 remain unresolved.
 
-**Remaining release blockers:** Migration-history provenance, project-specific
-configuration, staging verification, and production deployment access remain
-unresolved. The owner accepted the backup as final despite the unverified
-post-snapshot write gap.
-No repository Data API table client was found, but external consumers require
-review before cutover. A read-only catalog audit found no remaining static
-function references to application relations missing from `app` but present
-in `public`. Project-specific Auth, encryption, webhook,
-deployment-secret, and production smoke checks remain. This target is **not
-ready for traffic**.
+**Remaining verification work after cutover:** The three migration-history
+provenance exceptions, authenticated admin and staging journeys, billing
+callbacks, background workers, and external Data API consumers have not been
+fully verified. The owner accepted the backup as final despite the unverified
+post-snapshot write gap. No repository Data API table client was found. A
+read-only catalog audit found no remaining static function references to
+application relations missing from `app` but present in `public`. Retain the
+inactive source and both archives for reconciliation; do not assume later
+source writes were included.
 
 ## Restored-data checkpoint — 7 October 2026
 
@@ -298,8 +298,10 @@ exceptions and staging/cutover checks above remain open.
    Verify relevant functions, workers, billing callbacks, and uploads in
    staging before changing any deployment secret or production traffic.
 
-**Exit evidence for cutover:** independent source freshness or an agreed write
-freeze and final delta; resolved migration history and schema/RLS blockers;
-configuration inventory; staging journeys; and a separately authorised cutover
-plan. The target row-count comparison and 32/32 object checks are complete.
-Leave traffic on the old configuration until every release blocker is resolved.
+**Cutover evidence and gaps:** The owner accepted the 7 September archives as
+final because the inactive source could not be compared. Target row counts,
+32/32 Storage object checks, strict RLS, and the production migration job
+passed. The 7 October cutover was authorised and the three app deployment jobs
+passed, but the migration-history exceptions and complete staging and
+authenticated production journeys remain open. See the release record for
+specific smoke checks and follow-up risks.

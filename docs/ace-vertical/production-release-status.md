@@ -1,16 +1,12 @@
 # ACE production release status
 
-Checked on 7 October 2026. Step 1.1 merged into `master` as
-`d27b9df77e4416dc2cd472abf59dc2a6568b7b2a`. The earlier [production deployment](https://github.com/FSS-Ltd/pathway/actions/runs/34189600516)
-failed during Prisma migration; the API, admin and web deploy jobs were skipped.
-The last successful deployment was
-[`ea7c44c6edd043889f90e62935bf851505ebb5df`](https://github.com/FSS-Ltd/pathway/actions/runs/31965820501).
-
-The product owner has directed us to continue implementation while Supabase is
-unavailable, then run migrations and resolve database issues at the end. The
-production workflow therefore requires manual dispatch; merging to `master`
-does not start migrations or app deployment. No production migration or
-deployment is claimed by this record.
+Checked on 7 October 2026. The manual [production deployment](https://github.com/FSS-Ltd/pathway/actions/runs/37645052412)
+completed its migration, API, admin, and web jobs successfully at merged commit
+`a41e09aac3fde40f646e0242b0b8e3f0191e0122`. The API production
+configuration now selects the restored London Supabase project. The prior
+[failed deployment](https://github.com/FSS-Ltd/pathway/actions/runs/34189600516)
+stopped at Prisma migration and skipped all three apps. Production deployment
+remains manual; merging to `master` does not deploy automatically.
 
 ## Delivery steps
 
@@ -74,7 +70,8 @@ deployment is claimed by this record.
 | DB-2g    | Project-safe production environment preparation        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master` | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master` | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master` | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
-| 1.3e3b1  | Scoped staff recipient discovery API                   | PR open | [#406](https://github.com/FSS-Ltd/pathway/pull/406) to `master` | Local lint, typecheck, API unit and RLS integration suites, API build, formatting, diff review, Graphify and commit-hook checks passed. CI pending.                                                             | Pending                                    |
+| 1.3e3b1  | Scoped staff recipient discovery API                   | Merged  | [#406](https://github.com/FSS-Ltd/pathway/pull/406) to `master` | `c35f07c90326683389c8a5a9b808516f17369331`; all eight checks passed: CI run 37643791257, CodeQL run 37643776507.                                                                                                | `a41e09aac3fde40f646e0242b0b8e3f0191e0122` |
+| DB-2i    | New-project production cutover                         | Open    | Pending                                                         | Deploy run 37645052412 passed at `a41e09a`; documentation PR and CI pending.                                                                                                                                    | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -122,8 +119,8 @@ historical checksum documented in the restore runbook. The direct execution gran
 its enabled RLS event trigger and owner execution remain. Four trigger
 functions now use an empty search path, with all 11 learning membership
 triggers attached. The strict public and app RLS gates pass. The 28 blog
-posts, Victorious Kids organisation, 71 users, and 32 Storage objects remain
-intact. No production configuration or traffic was switched.
+posts, Victorious Kids organisation, 71 users, and 32 Storage objects remained
+intact at that off-traffic checkpoint. Production was switched in DB-2i below.
 
 The 1.3d1 attendance event migration and its following atomic-writer step must
 reach production in the same gated release. Corrections made after the one-time
@@ -142,9 +139,8 @@ verified.
 The owner chose the 7 September database and Storage archives as the final
 source snapshot on 7 October, accepting that later writes cannot be checked
 against the inactive source and may be absent. The target matches the archived
-application row counts and Storage bytes; this acceptance allows release
-preparation to continue, but does not establish current-source parity or put
-production on the new project.
+application row counts and Storage bytes. Production was switched to the new
+project on 7 October; current-source parity remains unverified.
 
 1. Record the source and target project refs, region, required extensions,
    database roles, migration history, storage buckets and object counts, Auth
@@ -405,19 +401,39 @@ remain deferred under the product owner's instruction.
 
 ## Release gate
 
-The off-traffic London target has DB-2h applied and verified, but production
-still uses the old project. On 7 October, the Vercel connection gained
-environment-variable access and accepted updates to the `nexsteps-api`
-production `DATABASE_URL` (target transaction pooler), `SUPABASE_URL`, and
-`SUPABASE_SECRET_KEY`; read-back showed new update timestamps for all three.
-No Vercel app was redeployed, so no traffic switch is claimed. The GitHub
-production environment `DATABASE_URL`, `DIRECT_URL`, and
-`SUPABASE_SECRET_KEY`, plus the repository `SUPABASE_URL`, still predate the
-new project. Synchronize those values before a deployment and complete
-staging, manual deployment, and production smoke checks.
+### DB-2i production cutover — 7 October 2026
 
-After implementation, restore the Supabase connection; inspect migration status
-and pending SQL; apply and test migrations in staging; then deploy the verified
-`master` commit. Record the migration and app job IDs, smoke-test the API,
-authenticated admin and public configurator, and check production errors before
-marking the release complete.
+The Vercel connection updated `nexsteps-api` production `DATABASE_URL` to the
+new project's transaction pooler, `SUPABASE_URL` to
+`jzofykdzpuslpdyfovxp`, and `SUPABASE_SECRET_KEY` to its service key. Vercel
+read-back confirmed fresh update timestamps, but returned encrypted values, so
+the plaintext could not be compared independently. The admin and web Vercel
+projects have no database or Supabase environment variables. The GitHub
+**production environment** secrets `DIRECT_URL` (session pooler),
+`DATABASE_URL` (worker session pooler), `SUPABASE_URL`, and
+`SUPABASE_SECRET_KEY` were also updated and their timestamps checked. The
+repository-level older secrets were left untouched; production workflows use
+the environment-scoped values.
+
+The [manual deployment run](https://github.com/FSS-Ltd/pathway/actions/runs/37645052412)
+used `master` commit `a41e09aac3fde40f646e0242b0b8e3f0191e0122`.
+Migration job 112873548825, API job 112873938667, admin job 112873938894,
+and web job 112873938543 all succeeded. Vercel reports all three production
+deployments READY on that commit, with `app.nexsteps.dev` assigned to the
+admin deployment. The live API `/health` returned 200 with a database time;
+`/health/env` reported the database and Supabase settings present; and
+`/public/blog/posts?limit=1` returned one restored post and a next cursor.
+The marketing site and `/configure` returned 200. Vercel's authenticated
+fetch of `app.nexsteps.dev` returned the expected 307 Clerk sign-in redirect.
+Unauthenticated command-line access to that domain hits a Cloudflare challenge
+instead. Vercel reported no runtime errors for the API, admin, or web project
+in the cutover window checked from 15:33 UTC.
+
+The authenticated admin journey, billing callbacks, background workers, and a
+full staging journey suite have not been verified after cutover. The existing
+GitHub post-deploy smoke workflow was not dispatched because its unauthenticated
+admin `curl` would fail at Cloudflare. The old source remains inactive and
+untouched; the accepted post-snapshot write gap and three migration-history
+exceptions remain. Monitor production and reconcile any discovered missing
+records through audited corrections; do not silently overwrite new writes by
+restoring the old snapshot.
