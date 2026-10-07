@@ -353,6 +353,7 @@ jobs:
           jest --config jest.config.ts --runInBand --runTestsByPath
           src/__tests__/role-trigger-schema.integration.spec.ts
           src/__tests__/portable-ace-fact-triggers.integration.spec.ts
+          src/__tests__/portable-student-portal-policy.integration.spec.ts
 
   organisation-role-rls:
     name: Organisation Role RLS

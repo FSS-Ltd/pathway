@@ -53,7 +53,8 @@ deployment is claimed by this record.
 | 1.3d5    | Daily attendance register contract                     | Merged   | [#381](https://github.com/FSS-Ltd/pathway/pull/381) to `master` | `8d98fb4a4a70a0d8c7ffd45ef02b7304acbec070`; all eight checks passed (runs below)                                                                                                             | `2319e7af3dcd83f6775fe906cb0c4208fbc4250d` |
 | DB-2a    | New-project backup and Storage restore preflight       | Merged   | [#382](https://github.com/FSS-Ltd/pathway/pull/382) to `master` | `1292f15d45c708d1bb260cea9a8ccdbdb8b1c504`; all eight checks passed (runs below)                                                                                                             | `4b04a946134c1b16e42cacb719814e1368c2660b` |
 | DB-2b    | Candidate database and Storage restore                 | Merged   | [#383](https://github.com/FSS-Ltd/pathway/pull/383) to `master` | `744001b253fab7131e492ad43723b283a2573e4a` checked head; all eight checks passed: [CI run 37579404044](https://github.com/FSS-Ltd/pathway/actions/runs/37579404044), CodeQL run 37579399674. | `f3301adedbe9521280463eda8e983b88fdaab3e5` |
-| DB-2c1   | Portable ACE fact trigger checks                       | PR open  | [#384](https://github.com/FSS-Ltd/pathway/pull/384)             | `cb4c4090` submitted; CI pending. Disposable public/app trigger tests passed; target application follows merge.                                                                              | Pending                                    |
+| DB-2c1   | Portable ACE fact trigger checks                       | Merged   | [#384](https://github.com/FSS-Ltd/pathway/pull/384) to `master` | `d617c093120206611f59bf709f84c447c06834c3`; all eight checks passed: CI run 37581566481, CodeQL run 37581562551. Target migration and rollback probe passed.                                 | `e7a804fb14658ee8c309b3d02080d64cd6c8479f` |
+| DB-2c2   | Portable student portal policy trigger                 | PR open  | [#385](https://github.com/FSS-Ltd/pathway/pull/385)             | `7ca1afbc` submitted; CI pending. Disposable public/app migrations and trigger tests passed; target rollback syntax check passed.                                                            | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
@@ -207,11 +208,12 @@ all 32 Storage files were uploaded and downloaded with matching hashes, and
 four pending Prisma migrations applied. The application still uses the old
 production project. The new target is not approved for traffic: migration
 history differs from the repository, the strict RLS gate expects most tables
-in `app` while the restored source stores them in `public`, and seven trigger
-functions reference absent `app` relations. Resolve and test these issues,
-review environment-specific settings and secrets, then follow the separate
-staging and cutover gate. No production deployment or configuration switch is
-claimed.
+in `app` while the restored source stores them in `public`, and five older
+trigger functions reference absent `app` relations. The two new fact triggers
+were corrected, applied, and verified on the target after PR #384 merged.
+Resolve and test these issues, review environment-specific settings and
+secrets, then follow the separate staging and cutover gate. No production
+deployment or configuration switch is claimed.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and
