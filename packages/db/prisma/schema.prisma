@@ -870,6 +870,8 @@ model Tenant {
   calendarItems          CalendarItem[]
   academicYears          AcademicYear[]
   academicPeriods        AcademicPeriod[]
+  aceYearBands           AceYearBand[]
+  aceStaffYearBandAssignments AceStaffYearBandAssignment[]
   subjectEnrollments     StudentSubjectEnrollment[]
   paceAssessments        PaceAssessment[]
   paceProgress           PaceProgress[]
@@ -1071,6 +1073,7 @@ model User {
   createdCorrespondence   Correspondence[]        @relation("CorrespondenceCreatedBy")
   recordedSubjectEnrollments StudentSubjectEnrollment[] @relation("StudentSubjectEnrollmentRecordedBy")
   recordedPaceAssessments    PaceAssessment[]            @relation("PaceAssessmentRecordedBy")
+  aceYearBandAssignments     AceStaffYearBandAssignment[]
   createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
   authorisedPaceOverrides    PacePolicyOverride[]        @relation("PacePolicyOverrideAuthorisedBy")
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
@@ -2460,6 +2463,41 @@ model AcademicPeriod {
   @@unique([id, tenantId])
   @@unique([tenantId, academicYearId, name])
   @@index([tenantId, status, startsOn])
+}
+
+model AceYearBand {
+  id               String                       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  name             String
+  sortOrder        Int                          @default(0)
+  isActive         Boolean                      @default(true)
+  staffAssignments AceStaffYearBandAssignment[]
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive, sortOrder])
+}
+
+model AceStaffYearBandAssignment {
+  id         String      @id @default(uuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  yearBandId String
+  yearBand   AceYearBand @relation(fields: [yearBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  startsOn   DateTime    @db.Date
+  endsOn     DateTime?   @db.Date
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, userId, yearBandId, startsOn])
+  @@index([tenantId, userId, startsOn, endsOn])
+  @@index([tenantId, yearBandId, startsOn, endsOn])
 }
 
 model AceTermReport {

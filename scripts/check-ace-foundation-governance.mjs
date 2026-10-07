@@ -33,6 +33,8 @@ const storage = readFileSync(
 const requiredTables = [
   "AcademicYear",
   "AcademicPeriod",
+  "AceYearBand",
+  "AceStaffYearBandAssignment",
   "StudentSubjectEnrollment",
   "PaceAssessment",
   "PaceProgress",

@@ -25,6 +25,11 @@ not establish that each date is an operating day.
 
 ## Decision and data boundaries
 
+Step 1.3g1 establishes the site year-band catalogue and dated staff-band
+assignments first. It adds no daily marks or roster endpoint. The assignment
+write guard requires an active site member; later reads must recheck current
+membership, typed permission, and the assignment's date range.
+
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
    timestamps. Enforce one row per `(tenantId, childId, date)` and composite

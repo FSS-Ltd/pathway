@@ -29,6 +29,8 @@ const REQUIRED_RLS_TABLES = [
   "OutboxEvent",
   "AcademicYear",
   "AcademicPeriod",
+  "AceYearBand",
+  "AceStaffYearBandAssignment",
   "StudentSubjectEnrollment",
   "PaceAssessment",
   "PaceProgress",
