@@ -102,7 +102,7 @@ async function pressArrow(
 }
 
 async function run(): Promise<void> {
-  delete process.env.NEXT_PUBLIC_USE_MOCK_API;
+  process.env.NEXT_PUBLIC_USE_MOCK_API = "true";
   delete process.env.NEXT_PUBLIC_API_URL;
   delete process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -119,6 +119,7 @@ async function run(): Promise<void> {
     await render(
       root,
       <AttendanceRegister
+        canManage
         detail={initialDetail}
         onSave={async (rows) => {
           submissions.push(rows);
@@ -259,6 +260,7 @@ async function run(): Promise<void> {
     await render(
       root,
       <AttendanceRegister
+        canManage
         key="network-commit"
         detail={initialDetail}
         onReconcile={async () => {
@@ -318,6 +320,7 @@ async function run(): Promise<void> {
     await render(
       root,
       <AttendanceRegister
+        canManage
         key="initial-mark"
         detail={unmarkedDetail}
         onSave={async (rows) => {
