@@ -117,6 +117,7 @@ function arrange() {
     );
   tx.tenant.findFirst.mockResolvedValue({ timezone: "Pacific/Auckland" });
   tx.studentSubjectEnrollment.findFirst.mockResolvedValue({
+    startsOn: new Date("2026-08-01T12:00:00.000Z"),
     startingPace: 1001,
     currentPace: 1001,
     targetPace: 1002,
@@ -309,6 +310,13 @@ describe("PACE correction and override commands", () => {
         }),
       }),
     );
+    expect(tx.paceAssessment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          assessedOn: { gte: new Date("2026-08-01T12:00:00.000Z") },
+        }),
+      }),
+    );
   });
 
   it("rejects a denied actor or correction outside the active child and subject scope", async () => {
@@ -459,7 +467,9 @@ describe("PACE correction and override commands", () => {
 
   it("keeps correction audit and outbox in the same RLS transaction", async () => {
     const { service, tx } = arrange();
-    tx.outboxEvent.createMany.mockRejectedValue(new Error("outbox unavailable"));
+    tx.outboxEvent.createMany.mockRejectedValue(
+      new Error("outbox unavailable"),
+    );
 
     await expect(
       service.correct("assessment-original", correction(), actor),

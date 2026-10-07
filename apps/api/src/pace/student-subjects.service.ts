@@ -12,6 +12,11 @@ import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { OutboxService } from "../common/outbox/outbox.service";
 import {
+  assessmentSelect,
+  rebuildProgressRecord,
+  type AssessmentRecord,
+} from "./pace-command.support";
+import {
   isDateOnly,
   type CreateStudentSubjectDto,
 } from "./dto/student-subject.dto";
@@ -105,6 +110,7 @@ export class StudentSubjectsService {
         actor.orgId,
         async (tx) => {
           await this.requireSiteAndChild(tx, childId, actor);
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ace-pace-assessment:${actor.tenantId}:${childId}`}, 0))`;
           const subject = await tx.subject.findFirst({
             where: {
               id: command.subjectId,
@@ -184,6 +190,38 @@ export class StudentSubjectsService {
             },
             select: studentSubjectEnrollmentSelect,
           });
+          const facts = (await tx.paceAssessment.findMany({
+            where: {
+              tenantId: actor.tenantId,
+              childId,
+              subjectId: subject.id,
+              assessedOn: { gte: toDatabaseDate(command.startsOn) },
+            },
+            orderBy: [{ assessedOn: "asc" }, { id: "asc" }],
+            select: assessmentSelect,
+          })) as AssessmentRecord[];
+          const progress = rebuildProgressRecord(
+            enrollment,
+            facts,
+            undefined,
+            new Date(),
+          );
+          await tx.paceProgress.upsert({
+            where: {
+              tenantId_childId_subjectId: {
+                tenantId: actor.tenantId,
+                childId,
+                subjectId: subject.id,
+              },
+            },
+            create: {
+              tenantId: actor.tenantId,
+              childId,
+              subjectId: subject.id,
+              ...progress,
+            },
+            update: progress,
+          });
           await recordAuditEventInTransaction(tx, {
             actorUserId: actor.userId,
             tenantId: actor.tenantId,
@@ -194,7 +232,13 @@ export class StudentSubjectsService {
             metadata: {
               subjectId: subject.id,
               placementType: replacement ? "REVISION" : "INITIAL",
+              replacesEnrollmentId: replacement?.id ?? null,
               reason: command.reason.trim(),
+              progress: {
+                currentPace: progress.currentPace,
+                targetPace: progress.targetPace,
+                completedPaces: progress.completedPaces,
+              },
             },
           });
           await this.outbox.enqueue(tx, {

@@ -94,6 +94,7 @@ function arrange() {
     );
   tx.tenant.findFirst.mockResolvedValue({ timezone: "America/New_York" });
   tx.studentSubjectEnrollment.findFirst.mockResolvedValue({
+    startsOn: new Date("2026-08-01T12:00:00.000Z"),
     startingPace: 1001,
     currentPace: 1001,
     targetPace: 1002,
@@ -239,6 +240,44 @@ describe("PaceCommandService", () => {
     });
   });
 
+  it("rebuilds an assessment from the revised placement rather than earlier placement facts", async () => {
+    const { service, tx } = arrange();
+    const revisedStart = new Date("2026-08-09T12:00:00.000Z");
+    tx.studentSubjectEnrollment.findFirst.mockResolvedValue({
+      startsOn: revisedStart,
+      startingPace: 1002,
+      currentPace: 1002,
+      targetPace: 1003,
+    });
+    tx.paceAssessment.findMany.mockResolvedValue([
+      assessment({
+        id: "new-placement-self-test",
+        paceNumber: 1002,
+        assessmentType: "SELF_TEST",
+        assessedOn: revisedStart,
+      }),
+    ]);
+    tx.paceAssessment.create.mockResolvedValue(
+      assessment({ paceNumber: 1002 }),
+    );
+
+    await service.record(command({ paceNumber: 1002 }), actor);
+
+    expect(tx.paceAssessment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ assessedOn: { gte: revisedStart } }),
+      }),
+    );
+    expect(tx.paceProgress.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          currentPace: 1003,
+          completedPaces: 1,
+        }),
+      }),
+    );
+  });
+
   it("returns a stable duplicate result without a second fact, projection, audit, or intent", async () => {
     const { service, tx } = arrange();
     tx.outboxEvent.findFirst.mockResolvedValue({
@@ -380,10 +419,7 @@ describe("PaceCommandService", () => {
     );
 
     await expect(
-      service.record(
-        command({ score: 70, policyOverrideId }),
-        actor,
-      ),
+      service.record(command({ score: 70, policyOverrideId }), actor),
     ).resolves.toMatchObject({
       policy: { decision: "allow", code: "allowed" },
     });
@@ -420,7 +456,9 @@ describe("PaceCommandService", () => {
         actor,
       ),
     ).rejects.toMatchObject({
-      response: expect.objectContaining({ code: "PACE_POLICY_OVERRIDE_INVALID" }),
+      response: expect.objectContaining({
+        code: "PACE_POLICY_OVERRIDE_INVALID",
+      }),
     });
     expect(tx.paceAssessment.create).not.toHaveBeenCalled();
   });

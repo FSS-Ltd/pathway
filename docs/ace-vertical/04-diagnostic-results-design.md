@@ -14,12 +14,12 @@ preserve that rule. A diagnostic outcome does not determine a unique PACE
 number, so applying a placement requires a separate, explicit decision and
 reason.
 
-The existing subject-placement revision is not yet a safe shortcut for that
-decision after assessments exist: `StudentSubjectsService.place` creates a new
-active enrollment, while `PaceQueryService.getChildProgress` prefers the
-existing `PaceProgress` row for the same child and subject. C02 must reconcile
-that projection and its rebuild baseline before a diagnostic can offer an
-"Apply placement" action. C05 does not write enrollment or progress.
+The C02 subject-placement revision ends the old enrollment and atomically
+rebuilds `PaceProgress` from the new starting PACE and assessment facts dated
+on or after the revised placement. Later assessment commands use the same
+date boundary. A diagnostic still does not change placement automatically;
+staff must make an explicit placement decision with a reason. C05 does not
+write enrollment or progress.
 
 ## Data and access
 

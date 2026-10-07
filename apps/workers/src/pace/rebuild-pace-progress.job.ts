@@ -24,9 +24,22 @@ interface EnrollmentRecord {
   tenantId: string;
   childId: string;
   subjectId: string;
+  startsOn: Date;
   startingPace: number;
+  currentPace: number;
   targetPace: number;
 }
+
+const enrollmentSelect = {
+  id: true,
+  tenantId: true,
+  childId: true,
+  subjectId: true,
+  startsOn: true,
+  startingPace: true,
+  currentPace: true,
+  targetPace: true,
+} satisfies Prisma.StudentSubjectEnrollmentSelect;
 
 interface AssessmentRecord {
   id: string;
@@ -162,7 +175,7 @@ async function rebuildBatch(
   lastEnrollmentId: string | null,
   batchSize: number,
 ): Promise<BatchResult> {
-  const enrollments = await tx.studentSubjectEnrollment.findMany({
+  const page = await tx.studentSubjectEnrollment.findMany({
     where: {
       tenantId,
       status: "ACTIVE",
@@ -170,16 +183,9 @@ async function rebuildBatch(
     },
     orderBy: { id: "asc" },
     take: batchSize,
-    select: {
-      id: true,
-      tenantId: true,
-      childId: true,
-      subjectId: true,
-      startingPace: true,
-      targetPace: true,
-    },
+    select: enrollmentSelect,
   });
-  if (enrollments.length === 0) {
+  if (page.length === 0) {
     return {
       scanned: 0,
       rebuilt: 0,
@@ -189,7 +195,18 @@ async function rebuildBatch(
     };
   }
 
-  await acquireAggregateLocks(tx, tenantId, enrollments);
+  await acquireAggregateLocks(tx, tenantId, page);
+  // A placement can be revised while the batch waits for the child lock.
+  // Re-read under that lock so an ended enrollment cannot overwrite its successor.
+  const enrollments = await tx.studentSubjectEnrollment.findMany({
+    where: {
+      tenantId,
+      status: "ACTIVE",
+      id: { in: page.map(({ id }) => id) },
+    },
+    orderBy: { id: "asc" },
+    select: enrollmentSelect,
+  });
   const existingProjections = await tx.paceProgress.findMany({
     where: {
       tenantId,
@@ -231,7 +248,7 @@ async function rebuildBatch(
     const terminalFacts = terminalFactsFrom(domainFacts);
     const projection = rebuildPaceProgress({
       assignedLevel: parsePaceNumber(enrollment.startingPace).level,
-      startingPace: enrollment.startingPace,
+      startingPace: enrollment.currentPace,
       assessmentFacts: domainFacts,
     });
     const data = {
@@ -266,11 +283,11 @@ async function rebuildBatch(
   }
 
   return {
-    scanned: enrollments.length,
+    scanned: page.length,
     rebuilt,
     skippedUnrebuildable: unrebuildableKeys.size,
     skippedFactHistory: oversizedHistoryKeys.size,
-    lastEnrollmentId: enrollments.at(-1)?.id ?? null,
+    lastEnrollmentId: page.at(-1)?.id ?? null,
   };
 }
 
@@ -297,12 +314,12 @@ async function readBoundedAssessmentFacts(
 ): Promise<AssessmentRecord[]> {
   const requestedPairs = Prisma.join(
     enrollments.map(
-      ({ childId, subjectId }) =>
-        Prisma.sql`(${childId}::text, ${subjectId}::text)`,
+      ({ childId, subjectId, startsOn }) =>
+        Prisma.sql`(${childId}::text, ${subjectId}::text, CAST(${startsOn} AS date))`,
     ),
   );
   return tx.$queryRaw<AssessmentRecord[]>(Prisma.sql`
-    WITH requested("childId", "subjectId") AS (
+    WITH requested("childId", "subjectId", "startsOn") AS (
       VALUES ${requestedPairs}
     ), ranked AS (
       SELECT
@@ -325,6 +342,7 @@ async function readBoundedAssessmentFacts(
         ON requested."childId" = fact."childId"
         AND requested."subjectId" = fact."subjectId"
       WHERE fact."tenantId" = ${tenantId}
+        AND fact."assessedOn" >= requested."startsOn"
     )
     SELECT
       ranked.id,

@@ -143,6 +143,7 @@ export class PaceCommandService {
           OR: [{ endsOn: null }, { endsOn: { gte: assessedOnDate } }],
         },
         select: {
+          startsOn: true,
           startingPace: true,
           currentPace: true,
           targetPace: true,
@@ -176,6 +177,7 @@ export class PaceCommandService {
           tenantId: actor.tenantId,
           childId: command.childId,
           subjectId: command.subjectId,
+          assessedOn: { gte: enrollment.startsOn },
         },
         orderBy: [{ assessedOn: "asc" }, { id: "asc" }],
         select: assessmentSelect,
@@ -390,6 +392,7 @@ export class PaceCommandService {
           OR: [{ endsOn: null }, { endsOn: { gte: assessedOnDate } }],
         },
         select: {
+          startsOn: true,
           startingPace: true,
           currentPace: true,
           targetPace: true,
@@ -422,6 +425,7 @@ export class PaceCommandService {
           tenantId: actor.tenantId,
           childId: command.childId,
           subjectId: command.subjectId,
+          assessedOn: { gte: enrollment.startsOn },
         },
         orderBy: [{ assessedOn: "asc" }, { id: "asc" }],
         select: assessmentSelect,
@@ -895,7 +899,9 @@ export class PaceCommandService {
     const authenticatedAt = actor.stepUp
       ? new Date(actor.stepUp.authenticatedAt)
       : null;
-    const age = authenticatedAt ? now.getTime() - authenticatedAt.getTime() : NaN;
+    const age = authenticatedAt
+      ? now.getTime() - authenticatedAt.getTime()
+      : NaN;
     if (
       !actor.stepUp?.secondFactor ||
       !authenticatedAt ||
@@ -914,7 +920,11 @@ export class PaceCommandService {
   private parseOverrideExpiry(value: string, now: Date): Date {
     const expiresAt = new Date(value);
     const ttl = expiresAt.getTime() - now.getTime();
-    if (Number.isNaN(expiresAt.getTime()) || ttl <= 0 || ttl > OVERRIDE_MAX_TTL_MS) {
+    if (
+      Number.isNaN(expiresAt.getTime()) ||
+      ttl <= 0 ||
+      ttl > OVERRIDE_MAX_TTL_MS
+    ) {
       throw new BadRequestException(
         "PACE policy override expiry must be within 15 minutes",
       );
