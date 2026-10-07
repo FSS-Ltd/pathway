@@ -106,6 +106,19 @@ export function findRequiredTableEntries(entries, requiredTableNames) {
   return entries.filter((entry) => required.has(entry.table_name));
 }
 
+export function findRequiredTableCopies(entries, requiredTableNames) {
+  const copies = new Map(requiredTableNames.map((name) => [name, 0]));
+  for (const entry of entries) {
+    if (copies.has(entry.table_name)) {
+      copies.set(entry.table_name, copies.get(entry.table_name) + 1);
+    }
+  }
+  return {
+    missing: requiredTableNames.filter((name) => copies.get(name) === 0),
+    duplicate: requiredTableNames.filter((name) => copies.get(name) > 1),
+  };
+}
+
 export function hasRequiredRolePolicyQualifiers(tableName, policy) {
   return (
     hasRequiredPolicyQualifier(tableName, policy.using_qualifier) &&
