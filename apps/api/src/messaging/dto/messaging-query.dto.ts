@@ -23,6 +23,12 @@ export const messageQuerySchema = z
   .strict();
 
 export const conversationIdSchema = z.string().uuid();
+export const readCursorSchema = z
+  .object({
+    sequence: z.number().int().positive().max(2_147_483_647),
+  })
+  .strict();
 
 export type ConversationQuery = z.infer<typeof conversationQuerySchema>;
 export type MessageQuery = z.infer<typeof messageQuerySchema>;
+export type ReadCursorInput = z.infer<typeof readCursorSchema>;

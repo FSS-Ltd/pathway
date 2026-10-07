@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
+  Put,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -15,14 +17,15 @@ import {
   conversationIdSchema,
   conversationQuerySchema,
   messageQuerySchema,
+  readCursorSchema,
 } from "./dto/messaging-query.dto";
-import { MessagingQueryService } from "./messaging-query.service";
+import { MessagingService } from "./messaging.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("ace/messages/conversations")
 export class MessagingController {
   constructor(
-    private readonly service: MessagingQueryService,
+    private readonly service: MessagingService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -49,6 +52,22 @@ export class MessagingController {
         this.actor(),
         await conversationIdSchema.parseAsync(id),
         await messageQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Put(":id/read-cursor")
+  @RequirePermission("messaging.messages.read")
+  async readCursor(@Param("id") id: string, @Body() body: unknown) {
+    try {
+      return await this.service.advanceStaffReadCursor(
+        this.actor(),
+        await conversationIdSchema.parseAsync(id),
+        await readCursorSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError)

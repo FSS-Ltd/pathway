@@ -11,7 +11,7 @@ import {
   isDatabaseAvailable,
   requireDatabase,
 } from "../../../test-helpers.e2e";
-import { MessagingQueryService } from "../messaging-query.service";
+import { MessagingService } from "../messaging.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -1242,7 +1242,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
         return conversation;
       },
     );
-    const service = new MessagingQueryService();
+    const service = new MessagingService();
     const joined = {
       tenantId: fixture.tenantAId,
       orgId: fixture.orgAId,
@@ -1268,6 +1268,83 @@ describe("ACE parent/staff messaging and notices storage", () => {
     await expect(
       service.listStaffMessages(unjoined, created.conversationId, {}),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("advances only an active staff participant's read cursor without regression", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createStaffConversation(
+          tx,
+          fixture,
+          "STAFF_DIRECT",
+        );
+        const messages = [];
+        for (const body of ["First", "Second"]) {
+          messages.push(
+            await tx.message.create({
+              data: {
+                tenantId: fixture.tenantAId,
+                conversationId: conversation.conversationId,
+                senderParticipantId: conversation.staffParticipantIds[0],
+                clientRequestId: randomUUID(),
+                bodyEncrypted: body,
+              },
+            }),
+          );
+        }
+        return { ...conversation, messages };
+      },
+    );
+    const service = new MessagingService();
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const [first, second] = created.messages;
+
+    await expect(
+      service.advanceStaffReadCursor(actor, created.conversationId, {
+        sequence: second.sequence,
+      }),
+    ).resolves.toEqual({ lastReadSequence: second.sequence });
+    await expect(
+      service.advanceStaffReadCursor(actor, created.conversationId, {
+        sequence: first.sequence,
+      }),
+    ).resolves.toEqual({ lastReadSequence: second.sequence });
+    await expect(
+      service.advanceStaffReadCursor(actor, created.conversationId, {
+        sequence: second.sequence + 1,
+      }),
+    ).rejects.toThrow("Message sequence not found");
+    await expect(
+      service.advanceStaffReadCursor(
+        { ...actor, userId: fixture.staffCId },
+        created.conversationId,
+        { sequence: first.sequence },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const cursors = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.messageParticipantReadCursor.findMany({
+          where: { conversationId: created.conversationId },
+          select: { participantId: true, lastReadSequence: true },
+        }),
+    );
+    expect(cursors).toEqual([
+      {
+        participantId: created.staffParticipantIds[0],
+        lastReadSequence: second.sequence,
+      },
+    ]);
   });
 
   it("permits one general parent conversation per guardian and valid staff conversation kinds", async () => {

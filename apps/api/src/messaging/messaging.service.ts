@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ForbiddenException,
@@ -8,6 +9,7 @@ import { withTenantRlsContext, type Prisma } from "@pathway/db";
 import type {
   ConversationQuery,
   MessageQuery,
+  ReadCursorInput,
 } from "./dto/messaging-query.dto";
 import {
   decodeConversationCursor,
@@ -24,7 +26,7 @@ export interface MessagingActor {
 }
 
 @Injectable()
-export class MessagingQueryService {
+export class MessagingService {
   async listStaffConversations(
     actor: MessagingActor,
     query: ConversationQuery,
@@ -191,6 +193,56 @@ export class MessagingQueryService {
         nextBefore:
           rows.length > limit ? (page.at(-1)?.sequence ?? null) : null,
       };
+    });
+  }
+
+  async advanceStaffReadCursor(
+    actor: MessagingActor,
+    conversationId: string,
+    input: ReadCursorInput,
+  ) {
+    assertActor(actor);
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      await requireCurrentStaff(tx, actor);
+      const participant = await tx.messageParticipant.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          conversationId,
+          userId: actor.userId,
+          kind: "STAFF",
+          removedAt: null,
+          conversation: { kind: { in: [...STAFF_KINDS] } },
+        },
+        select: { id: true },
+      });
+      if (!participant) throw new NotFoundException("Conversation not found");
+      const message = await tx.message.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          conversationId,
+          sequence: input.sequence,
+        },
+        select: { id: true },
+      });
+      if (!message) throw new BadRequestException("Message sequence not found");
+
+      const rows = await tx.$queryRaw<Array<{ lastReadSequence: number }>>`
+        INSERT INTO "MessageParticipantReadCursor" (
+          "id", "tenantId", "conversationId", "participantId", "lastReadSequence"
+        ) VALUES (
+          ${randomUUID()}, ${actor.tenantId}, ${conversationId},
+          ${participant.id}, ${input.sequence}
+        )
+        ON CONFLICT ("tenantId", "conversationId", "participantId")
+        DO UPDATE SET
+          "lastReadSequence" = GREATEST(
+            "MessageParticipantReadCursor"."lastReadSequence",
+            EXCLUDED."lastReadSequence"
+          ),
+          "updatedAt" = CURRENT_TIMESTAMP
+        RETURNING "lastReadSequence"
+      `;
+      return { lastReadSequence: rows[0].lastReadSequence };
     });
   }
 }
