@@ -31,6 +31,9 @@ write guard requires an active site member; later reads must recheck current
 membership, typed permission, and the assignment's date range.
 Step 1.3g1a makes that guard resolve membership and user rows in the
 assignment table's schema or the restored `public` schema.
+Step 1.3g2 adds dated school enrolment with composite site references,
+academic-year bounds, a guest-child write guard, and non-overlapping child
+date ranges. It does not infer enrolment from legacy `Child.yearGroup` text.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server

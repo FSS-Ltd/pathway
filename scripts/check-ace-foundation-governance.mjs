@@ -35,6 +35,7 @@ const requiredTables = [
   "AcademicPeriod",
   "AceYearBand",
   "AceStaffYearBandAssignment",
+  "AceSchoolEnrollment",
   "StudentSubjectEnrollment",
   "PaceAssessment",
   "PaceProgress",
