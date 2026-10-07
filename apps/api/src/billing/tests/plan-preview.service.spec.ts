@@ -20,6 +20,24 @@ describe("PlanPreviewService", () => {
     expect(result.notes.warnings).toContain("price_not_included");
   });
 
+  it.each([
+    ["STARTER_49_MONTHLY", 100, 1],
+    ["STARTER_49_YEARLY", 100, 1],
+    ["GROWTH_99_MONTHLY", 200, 2],
+    ["GROWTH_99_YEARLY", 200, 2],
+    ["PROFESSIONAL_149_MONTHLY", 500, 5],
+    ["PROFESSIONAL_149_YEARLY", 500, 5],
+  ] as const)(
+    "previews %s with its current staff allowance and site limit",
+    (planCode, staffCap, sites) => {
+      const result = service.preview({ planCode });
+
+      expect(result.base.av30Cap).toBe(staffCap);
+      expect(result.effectiveCaps.av30Cap).toBe(staffCap);
+      expect(result.effectiveCaps.maxSites).toBe(sites);
+    },
+  );
+
   it("adds AV30 blocks for Growth monthly", () => {
     const result = service.preview({
       planCode: "GROWTH_MONTHLY",

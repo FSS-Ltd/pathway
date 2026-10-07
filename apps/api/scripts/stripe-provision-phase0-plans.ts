@@ -40,19 +40,19 @@ type TierSpec = {
 const TIERS: TierSpec[] = [
   {
     product: "Nexsteps Starter",
-    av30Included: 250,
+    av30Included: 100,
     monthly: { code: "STARTER_49_MONTHLY", amountGbp: 49 },
     yearly: { code: "STARTER_49_YEARLY", amountGbp: 490 },
   },
   {
     product: "Nexsteps Growth",
-    av30Included: 750,
+    av30Included: 200,
     monthly: { code: "GROWTH_99_MONTHLY", amountGbp: 99 },
     yearly: { code: "GROWTH_99_YEARLY", amountGbp: 990 },
   },
   {
     product: "Nexsteps Professional",
-    av30Included: 2000,
+    av30Included: 500,
     monthly: { code: "PROFESSIONAL_149_MONTHLY", amountGbp: 149 },
     yearly: { code: "PROFESSIONAL_149_YEARLY", amountGbp: 1490 },
   },

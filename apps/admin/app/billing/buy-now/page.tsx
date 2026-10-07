@@ -35,7 +35,7 @@ const planOptions = [
     code: "STARTER",
     label: "Starter",
     description: "For single-site organisations getting started.",
-    baseAv30: 250,
+    baseAv30: 100,
     baseSites: 1,
     tier: "starter",
   },
@@ -43,7 +43,7 @@ const planOptions = [
     code: "GROWTH",
     label: "Growth",
     description: "For growing orgs with multiple groups/sites.",
-    baseAv30: 750,
+    baseAv30: 200,
     baseSites: 2,
     tier: "growth",
   },
@@ -51,7 +51,7 @@ const planOptions = [
     code: "PROFESSIONAL",
     label: "Professional",
     description: "For established, multi-site organisations.",
-    baseAv30: 2000,
+    baseAv30: 500,
     baseSites: 5,
     tier: "professional",
   },
@@ -417,7 +417,7 @@ export default function BuyNowPage() {
             Buy Now
           </h1>
           <p className="text-sm text-text-muted">
-            Choose a plan and capacity for your organisation. Pricing is shown in checkout.
+            Choose a plan and capacity for your organisation. The allowance counts unique staff and volunteers with qualifying activity over the previous 30 days. Pricing is shown in checkout.
           </p>
         </div>
         <Link
@@ -502,7 +502,7 @@ export default function BuyNowPage() {
                       </div>
                       <p className="text-xs text-text-muted">{plan.description}</p>
                       <p className="text-xs text-text-muted">
-                        AV30 included: {plan.baseAv30 ?? "Custom"} · Sites:{" "}
+                        Active staff and volunteers: {plan.baseAv30 ?? "Custom"} · Sites:{" "}
                         {plan.baseSites ?? "Custom"}
                       </p>
                       {cardPrice && (
@@ -644,7 +644,7 @@ export default function BuyNowPage() {
                     {selectedPlan?.label ?? preview.planCode ?? "Selected plan"}
                   </p>
                   <p className="text-text-muted">
-                    AV30 cap: {preview.effectiveAv30Cap ?? "Custom / pending"}
+                    Active staff and volunteers: {preview.effectiveAv30Cap ?? "Custom / pending"}
                   </p>
                   <p className="text-text-muted">
                     Sites: {preview.effectiveSitesCap ?? "Custom / pending"}

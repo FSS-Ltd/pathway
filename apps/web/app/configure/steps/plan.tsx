@@ -83,8 +83,8 @@ export function PlanStep({
                       {plan.displayName}
                     </span>
                     <span className="mt-1 block text-sm text-text-muted">
-                      Up to {plan.av30Included?.toLocaleString("en-GB")} Active
-                      People · {plan.maxSitesIncluded}{" "}
+                      Up to {plan.av30Included?.toLocaleString("en-GB")} active
+                      staff and volunteers · {plan.maxSitesIncluded}{" "}
                       {plan.maxSitesIncluded === 1 ? "site" : "sites"}
                     </span>
                   </span>

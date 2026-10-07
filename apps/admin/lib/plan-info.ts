@@ -117,7 +117,7 @@ export const PLAN_CATALOGUE: Record<string, PlanInfo> = {
     interval: "monthly",
     displayName: "Starter (Monthly)",
     priceDisplay: "£49 per month",
-    av30Included: 250,
+    av30Included: 100,
     priceInPounds: 49,
   },
   STARTER_49_YEARLY: {
@@ -126,7 +126,7 @@ export const PLAN_CATALOGUE: Record<string, PlanInfo> = {
     interval: "yearly",
     displayName: "Starter (Yearly)",
     priceDisplay: "£490 per year",
-    av30Included: 250,
+    av30Included: 100,
     priceInPounds: 490,
   },
   GROWTH_99_MONTHLY: {
@@ -135,7 +135,7 @@ export const PLAN_CATALOGUE: Record<string, PlanInfo> = {
     interval: "monthly",
     displayName: "Growth (Monthly)",
     priceDisplay: "£99 per month",
-    av30Included: 750,
+    av30Included: 200,
     priceInPounds: 99,
   },
   GROWTH_99_YEARLY: {
@@ -144,7 +144,7 @@ export const PLAN_CATALOGUE: Record<string, PlanInfo> = {
     interval: "yearly",
     displayName: "Growth (Yearly)",
     priceDisplay: "£990 per year",
-    av30Included: 750,
+    av30Included: 200,
     priceInPounds: 990,
   },
   PROFESSIONAL_149_MONTHLY: {
@@ -153,7 +153,7 @@ export const PLAN_CATALOGUE: Record<string, PlanInfo> = {
     interval: "monthly",
     displayName: "Professional (Monthly)",
     priceDisplay: "£149 per month",
-    av30Included: 2000,
+    av30Included: 500,
     priceInPounds: 149,
   },
   PROFESSIONAL_149_YEARLY: {
@@ -162,7 +162,7 @@ export const PLAN_CATALOGUE: Record<string, PlanInfo> = {
     interval: "yearly",
     displayName: "Professional (Yearly)",
     priceDisplay: "£1,490 per year",
-    av30Included: 2000,
+    av30Included: 500,
     priceInPounds: 1490,
   },
 };

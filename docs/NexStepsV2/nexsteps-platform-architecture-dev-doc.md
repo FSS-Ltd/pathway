@@ -153,14 +153,14 @@ Future modules plug into the same architecture without new application code, onl
 
 ### Core plans
 
-| Plan | Price | Active people |
+| Plan | Price | Active staff and volunteers (previous 30 days) |
 |---|---|---|
-| Starter | £49/month | 250 |
-| Growth | £99/month | 750 |
-| Professional | £149/month | 2,000 |
+| Starter | £49/month | 100 |
+| Growth | £99/month | 200 |
+| Professional | £149/month | 500 |
 | Enterprise | Custom | Unlimited, dedicated support, custom SLA |
 
-Storage is the only usage-based add-on. No SMS bundles, no Active People add-on packs.
+Storage is the only usage-based add-on. Staff and volunteer allowances count unique users with qualifying activity during the previous 30 days. No SMS bundles or staff allowance add-on packs.
 
 ### Purchase journey
 
@@ -170,7 +170,7 @@ Replace pricing cards with a guided configuration flow:
 2. **Vertical.** E.g. School narrows to ACE School, Independent School, State School, Nursery.
 3. **What's included.** Show every included core capability for the chosen vertical.
 4. **Optional modules.** Checkbox list, each showing description, monthly price, and included features.
-5. **Core plan.** Starter, Growth, Professional, Enterprise, with Active People allowance shown.
+5. **Core plan.** Starter, Growth, Professional, Enterprise, with the active staff and volunteer allowance shown.
 6. **Summary.** Vertical, plan, included capabilities, selected modules, storage, monthly total. Proceeds to Stripe Checkout.
 
 ### Stripe product structure

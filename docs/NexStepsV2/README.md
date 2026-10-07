@@ -85,13 +85,14 @@ Decisions made in the planning session that produced this doc set, plus decision
 |---|---|---|---|
 | D1 | NexSteps Home shape | Home-Education **vertical + plan + family surface + Community module**, same codebase, reusing the CEE TEACH Hub / Family Hub design (`docs/cee-vertical/01-architecture-overview.md`) | 07, 08 |
 | D2 | CEE features adopted | **Minimal**: Learning module + Community module only. Network tier, Postgres RLS, ABAC, Merit/rewards, the parent-portal publishing gate, and region pinning stay CEE-specific and are not built here | 04, 07, 08 |
-| D3 | Pricing / limits | Dev-doc target figures: Starter £49/250, Growth £99/750, Professional £149/2,000, Enterprise custom/unlimited | 00 |
+| D3 | Pricing / limits | Current packages: Starter £49/100, Growth £99/200, Professional £149/500 per month. The allowance counts unique staff and volunteers with qualifying activity in the previous 30 days; Enterprise remains custom/unlimited | Current pricing catalogue |
 | D4 | Versioning | Product semver in API `/health` + web/admin footers, plus git tags + GitHub releases. **No** `CHANGELOG.md`, **no** per-doc version headers | 00 |
-| D5 | Existing customers | Grandfathered on their current plan definitions; new signups get the new pricing; existing users migrate later via an upgrade flow (not built in this doc set) | 00 |
+| D5 | Existing customers | There are no paying subscribers to migrate; the master org remains unlimited. Keep legacy plan definitions for compatibility; any future migration uses a separate upgrade flow | 00 |
 | D6 | Capability grants | Config-driven (dev-doc's own recommendation): static TypeScript maps of `Vertical -> Capability[]` and `Module -> Capability[]` in `packages/platform` | 01 |
-| D7 | **Tier-name collision (grounding finding)** | Today's live `STARTER_MONTHLY`/`GROWTH_MONTHLY` plan codes (£149/50 AV30 and £399/200 AV30 by catalogue default) are **not** the same product as the target "Starter" (£49/250) and "Growth" (£99/750) — they only share a tier label. Phase 0 must introduce **new plan codes** for the four target tiers rather than repricing the existing codes in place, so grandfathered subscriptions keep resolving against their original definition | 00 |
+| D7 | **Tier-name collision (grounding finding)** | Existing STARTER_MONTHLY/GROWTH_MONTHLY codes at £149/50 and £399/200 remain distinct from the £49 Starter and £99 Growth packages. Separate codes preserve the existing plan definitions. | 00 |
 | D8 | `APP_VERSION` location (grounding finding) | `packages/util`, not `packages/config` — `packages/config` has no `src/` and stub scripts today; `packages/util` is a real, tested package | 00 |
 | D9 | **Stripe is the price authority, not the catalogue (grounding finding)** | `packages/pricing`/`billing-plans.ts`/`plan-info.ts` prices are display **fallbacks** only. The amount actually charged comes from a `STRIPE_PRICE_MAP` env var mapping each plan/add-on code to a Stripe Price ID (`apps/api/src/billing/billing-provider.config.ts`); checkout throws if a code has no entry. Introducing the four new tiers therefore has an operational half (create Stripe Prices, add them to the env var per environment) that no code PR alone can complete | 00 |
+| D10 | Customer-facing allowance wording | Use “active staff and volunteers”; count unique users with qualifying activity in the previous 30 days. Keep AV30 field and method names internal | Pricing and billing copy |
 
 ---
 
@@ -149,7 +150,6 @@ Collected here for visibility; each is repeated in its owning phase doc.
 3. **School → {Independent / ACE / State} default vertical during backfill** (Phase 1) — the live `OrgSector` enum has one `SCHOOL` value; the target `Vertical` enum splits it three ways. Dev-doc §14/§17 Q2 flags the same gap.
 4. **NexSteps Home plan pricing** (Phase 7) — a light family tier or free; not decided.
 5. **Community cross-tenant privacy and moderation model** (Phase 8) — needs its own design pass before PR 8.1 starts.
-6. **Whether AV30 is renamed to "Active People" in user-facing copy** while keeping the internal field name (`av30Included`, `checkAv30ForOrg`, etc.) unchanged — cosmetic, low priority, flagged in Phase 0.
 
 ---
 

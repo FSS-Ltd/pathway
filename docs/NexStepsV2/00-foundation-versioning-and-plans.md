@@ -10,7 +10,7 @@
 
 ## Goal
 
-Put a real product version on the platform, and get the pricing model to the dev doc's target — Starter / Growth / Professional / Enterprise at £49/250, £99/750, £149/2,000, custom/unlimited — without breaking a single existing subscriber or silently repricing anyone.
+Put a real product version on the platform, and set the current Starter / Growth / Professional / Enterprise pricing to £49/100, £99/200, £149/500, custom/unlimited — without breaking a single existing subscriber or silently repricing anyone.
 
 ## Why this phase exists and isn't in the dev doc
 
@@ -21,12 +21,12 @@ The dev doc (`nexsteps-platform-architecture-dev-doc.md`, §5) states the target
 
 **Also critical, and easy to miss from the code alone: the numbers below are not what customers are actually billed.** `packages/pricing/src/catalog.ts` and `apps/api/src/billing/billing-plans.ts` hold static **display/fallback** prices and limits. The amount Stripe actually charges is controlled entirely by a `STRIPE_PRICE_MAP` (and `STRIPE_PRICE_MAP_TEST`) environment variable — a JSON map of `PlanCode`/`AddonPriceCode` → Stripe Price ID (`apps/api/src/billing/billing-provider.config.ts:119-201`). `stripe-buy-now.provider.ts:41` reads `priceMap[planCode]` to build the checkout line item, and throws `"Price configuration missing for selected plan"` (line 47) if the map has no entry for that code. `BillingPricingService.listPrices()` (`pricing.service.ts:52-134`) fetches the live `unit_amount` from Stripe by that price ID for display, cached 5 minutes. So the table below states the catalogue's *fallback* numbers, which are assumed (not verified against the live Stripe dashboard — out of reach for a docs-only pass) to match what Stripe is actually configured to charge today:
 
-| Tier label | Catalogue fallback price/AV30 cap | Target price/AV30 cap |
+| Tier label | Existing catalogue fallback | Current target price and active staff/volunteer allowance |
 |---|---|---|
 | Core | £49.99/mo, 15 AV30, 50 children, 1 site | *(retired for new signups)* |
-| Starter | £149/mo, 50 AV30, 1 site | £49/mo, 250 |
-| Growth | £399/mo, 200 AV30, 3 sites | £99/mo, 750 |
-| *(none)* | — | £149/mo, 2,000 (**Professional**, new) |
+| Starter | £149/mo, 50 AV30, 1 site | £49/mo, 100 active staff and volunteers, 1 site |
+| Growth | £399/mo, 200 AV30, 3 sites | £99/mo, 200 active staff and volunteers, 2 sites |
+| *(none)* | — | £149/mo, 500 active staff and volunteers, 5 sites (**Professional**, new) |
 | Enterprise | Contact, no self-serve | Custom, unlimited |
 
 If PR 0.2 just edited `PLAN_CATALOGUE["STARTER_MONTHLY"]`'s display price in place, every existing Starter subscriber would still be billed their original Stripe price (Stripe, not the catalogue, is authoritative) — but the UI would now lie about what they're paying, and any new signup routed to the old code would get the old Stripe price under new-looking copy. That's the mistake this phase is built to avoid, on both the billing side (D7) and the display side. See Open Decision 1 below.
@@ -120,7 +120,7 @@ There's no product version anywhere today either: root `package.json` has no `ve
 - Until this step lands in a given environment, `createCheckoutSession()` in that environment throws `"Price configuration missing for selected plan"` for the new codes (`stripe-buy-now.provider.ts:47`) — expected and correct, not a bug, until Stripe setup is done.
 
 **Failing test first:**
-- Unit test asserting `getPlanDefinition("V2_STARTER_MONTHLY")` (or the chosen code) returns the new fallback display price/250-limit, and that `getPlanDefinition("STARTER_MONTHLY")` **still** returns its original definition unchanged.
+- Unit test asserting `getPlanDefinition("V2_STARTER_MONTHLY")` (or the chosen code) returns the new fallback display price/100-limit, and that `getPlanDefinition("STARTER_MONTHLY")` **still** returns its original definition unchanged.
 - `tierHierarchy` ordering test: `professional` sits strictly between `growth` and `enterprise`.
 - Integration test (staging, once the Stripe-side step is done): `GET` the pricing diagnostics endpoint (`pricing.controller.ts`) and confirm the four new codes appear in `keysExtracted`; a `STRIPE_TEST`-mode checkout for a new code succeeds end-to-end and the returned Stripe session's price matches what was configured.
 
@@ -209,6 +209,5 @@ There's no product version anywhere today either: root `package.json` has no `ve
 ## Open decisions
 
 1. **New plan-code naming** (PR 0.2) — needs a human decision before implementation starts; this is customer/Stripe-metadata-visible and becomes part of the `STRIPE_PRICE_MAP` env var's key names.
-2. **Whether "AV30" becomes "Active People" in user-facing copy** while the internal field/method names (`av30Included`, `checkAv30ForOrg`, `AV30_SOFT_CAP_RATIO`) stay as-is. Cosmetic, doesn't block any PR above; can be folded into PR 0.5 if decided in time.
-3. **`enforcePlanAddonPolicy()`'s exact post-PR-0.4 shape** (delete the dead AV30 branch vs. leave it inert) — an implementation-time call, not a design decision, flagged so it isn't missed.
-4. **Whether the catalogue's fallback prices for the four new tiers currently match what anyone has actually configured in Stripe** — this doc set has no visibility into the live Stripe dashboard. Confirm the real Price IDs/amounts with whoever owns Stripe before PR 0.2's operational half, rather than assuming the dev doc's figures are already set up there.
+2. **`enforcePlanAddonPolicy()`'s exact post-PR-0.4 shape** (delete the dead AV30 branch vs. leave it inert) — an implementation-time call, not a design decision, flagged so it isn't missed.
+3. **Whether the catalogue's fallback prices for the four new tiers currently match what anyone has actually configured in Stripe** — this doc set has no visibility into the live Stripe dashboard. Confirm the real Price IDs/amounts with whoever owns Stripe before PR 0.2's operational half, rather than assuming the dev doc's figures are already set up there.
