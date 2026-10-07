@@ -204,6 +204,26 @@ in `public`. Project-specific Auth, encryption, webhook,
 deployment-secret, and production smoke checks remain. This target is **not
 ready for traffic**.
 
+## Restored-data checkpoint — 7 October 2026
+
+After PR #399 merged, a fresh read-only check of the off-traffic London target
+compared the checksum-pinned SQL archive with every archived application data
+table. All 130 `public` and `app` data-table sections matched their row counts,
+covering 1,475 archived rows. The separate `_prisma_migrations` section was
+excluded from that count comparison because reviewed migrations have since
+been applied; the target has 106 finished migration records. Representative
+counts remain 28 blog posts, one Victorious Kids master organisation, 71 users,
+six tenants, and 276 attendance records. The target has zero Supabase Auth
+users, matching the archive; application identity uses Auth0.
+
+The target service key was used for read-only downloads of every archived
+Storage path. All 32 objects across the two buckets matched the archive's
+SHA-256 bytes, totalling 21,566,430 bytes. Strict RLS gates passed against
+both `public` and `app`. This checkpoint made no database, Storage, deployment,
+or production-traffic changes. The source remains unavailable for an
+independent post-snapshot delta; the three migration-history provenance
+exceptions and staging/cutover checks above remain open.
+
 ## Restore gate and procedure
 
 1. Confirm that these are the latest complete database and Storage exports,
