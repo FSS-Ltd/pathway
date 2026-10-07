@@ -13,6 +13,7 @@ import {
 } from "../../../test-helpers.e2e";
 import { MessagingService } from "../messaging.service";
 import { MessagingConversationService } from "../messaging-conversation.service";
+import { MessagingCommandService } from "../messaging-command.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -1334,6 +1335,137 @@ describe("ACE parent/staff messaging and notices storage", () => {
         recipientUserId: fixture.tenantBOnlyUserId,
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("sends one encrypted, audited message with one delivery across concurrent retries", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const opened = await new MessagingConversationService().openStaffDirect(
+      actor,
+      {
+        kind: "STAFF_DIRECT",
+        recipientUserId: fixture.staffBId,
+      },
+    );
+    const service = new MessagingCommandService();
+    const input = {
+      clientRequestId: randomUUID(),
+      body: "A private staff update",
+    };
+    const [first, second] = await Promise.all([
+      service.sendStaffMessage(actor, opened.id, input),
+      service.sendStaffMessage(actor, opened.id, input),
+    ]);
+    expect(first.id).toBe(second.id);
+    expect(first.sequence).toBe(1);
+    expect([first.reused, second.reused].sort()).toEqual([false, true]);
+
+    const evidence = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const [messages, deliveries, raw] = await Promise.all([
+          tx.message.findMany({ where: { conversationId: opened.id } }),
+          tx.messageDelivery.findMany({ where: { messageId: first.id } }),
+          tx.$queryRaw<Array<{ bodyEncrypted: string }>>`
+            SELECT "bodyEncrypted" FROM "Message" WHERE "id" = ${first.id}
+          `,
+        ]);
+        return { messages, deliveries, raw };
+      },
+    );
+    expect(evidence.messages).toHaveLength(1);
+    expect(evidence.messages[0].bodyEncrypted).toBe(input.body);
+    expect(evidence.raw[0].bodyEncrypted).toMatch(/^v1:/);
+    expect(evidence.deliveries).toHaveLength(1);
+    expect(evidence.deliveries[0].status).toBe("PENDING");
+    expect(
+      await prisma.auditEvent.count({
+        where: {
+          orgId: fixture.orgAId,
+          entityType: "ACE_MESSAGE",
+          entityId: first.id,
+          action: "CREATED",
+        },
+      }),
+    ).toBe(1);
+    expect(
+      (await new MessagingService().listStaffConversations(actor, {})).items[0]
+        .latestMessage?.preview,
+    ).toBe(input.body);
+    await expect(
+      service.sendStaffMessage(
+        { ...actor, userId: fixture.staffCId },
+        opened.id,
+        { ...input, clientRequestId: randomUUID() },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.sendStaffMessage(
+        {
+          tenantId: fixture.tenantBId,
+          orgId: fixture.orgBId,
+          userId: fixture.staffCId,
+        },
+        opened.id,
+        { ...input, clientRequestId: randomUUID() },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("allocates ordered staff-room sequences for distinct concurrent sends", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const room = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createStaffConversation(tx, fixture, "STAFF_ROOM"),
+    );
+    const service = new MessagingCommandService();
+    const results = await Promise.all(
+      ["First room update", "Second room update"].map((body) =>
+        service.sendStaffMessage(actor, room.conversationId, {
+          clientRequestId: randomUUID(),
+          body,
+        }),
+      ),
+    );
+    expect(results.map((item) => item.sequence).sort()).toEqual([1, 2]);
+    expect(results.every((item) => !item.reused)).toBe(true);
+    const roomState = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => ({
+        deliveries: await tx.messageDelivery.count({
+          where: { messageId: { in: results.map((item) => item.id) } },
+        }),
+        conversation: await tx.messageConversation.findUnique({
+          where: { id: room.conversationId },
+          select: { lastMessageSequence: true, updatedAt: true },
+        }),
+      }),
+    );
+    expect(roomState.deliveries).toBe(2);
+    expect(roomState.conversation?.lastMessageSequence).toBe(2);
+    expect(roomState.conversation?.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      Math.max(...results.map((item) => new Date(item.createdAt).getTime())),
+    );
+    const latest = results.find((item) => item.sequence === 2);
+    const list = await new MessagingService().listStaffConversations(actor, {});
+    expect(
+      list.items.find((item) => item.id === room.conversationId)?.latestMessage
+        ?.preview,
+    ).toBe(latest?.body);
   });
 
   it("advances only an active staff participant's read cursor without regression", async () => {
