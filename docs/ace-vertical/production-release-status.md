@@ -63,7 +63,8 @@ deployment is claimed by this record.
 | DB-2d2   | Revoke restored Data API table grants                  | Merged   | [#391](https://github.com/FSS-Ltd/pathway/pull/391) to `master` | `b8c91a200c8857ce9a51a3d35e04fc8e004ac198`; all eight checks passed: CI run 37596845150, CodeQL run 37596839569. Target migration applied; direct and default table grants are zero, with row counts unchanged. | `26041370c9048861fd577c7c5185141e0ad58b5f` |
 | DB-2d3   | Accept public-qualified reviewed role policy text      | Merged   | [#392](https://github.com/FSS-Ltd/pathway/pull/392) to `master` | `ba717d409e129390c5ee3e2a9475fb79fc92f3e4`; all eight checks passed: CI run 37598968312, CodeQL run 37598963345. Strict target gate passes both schemas. | `22a66d2e6eb7a8c5634fcc85d793ef6e3d29a173` |
 | DB-2e1   | Audit restored migration-history exceptions            | Merged   | [#393](https://github.com/FSS-Ltd/pathway/pull/393) to `master` | `a58a5a47ac035b94e43db0614d719a2e63cafa7c`; all eight checks passed: CI run 37601481964, CodeQL run 37601476750. | `1c299442a19e99a023366d315be0ee467d6a74ce` |
-| DB-2e2   | Restrict restored RLS event-trigger API execution      | PR open  | [#394](https://github.com/FSS-Ltd/pathway/pull/394) to `master` | `c7af0e3d29059e75e2db66a9ae870c14bc49f22a` submitted; CI pending. Local replay and target rollback-only probe passed; migration not yet applied to target. | Pending |
+| DB-2e2   | Restrict restored RLS event-trigger API execution      | Merged   | [#394](https://github.com/FSS-Ltd/pathway/pull/394) to `master` | `ffce7e00987fd7870a3b5456357c0b5b3e44d63e`; all eight checks passed: CI run 37604158878, CodeQL run 37604165904. Target migration applied and verified. | `6dd39e8f8f9d0ae6ac50a0fe77101e7c6b70e44b` |
+| 1.3e0    | ACE messaging API and web contract                     | In progress | Pending | Pending | Pending |
 | 1.3b2+   | ACE core web journey slices                            | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
@@ -101,6 +102,17 @@ The old production project remains inaccessible. The new project has data and
 migrations, with release blockers recorded below. Later steps start only after
 the preceding PR has passing CI on its current revision and is merged into
 `master`.
+
+After DB-2e2 merged, the reviewed migration was applied to the off-traffic new
+project. It has 106 finished migration records and 104 migration directories
+in this repository; Prisma reports up to date, but the two missing historical
+files and one changed historical checksum documented in the restore runbook
+remain provenance exceptions. The direct execution grants on
+`app.rls_auto_enable()` are gone for `PUBLIC`, `anon`, and `authenticated`;
+its enabled RLS event trigger and owner execution remain. The strict public
+and app RLS gates pass. The 28 blog posts, Victorious Kids organisation,
+71 users, and 32 Storage objects remain intact. No production configuration
+or traffic was switched.
 
 The 1.3d1 attendance event migration and its following atomic-writer step must
 reach production in the same gated release. Corrections made after the one-time
