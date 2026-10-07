@@ -70,7 +70,8 @@ deployment is claimed by this record.
 | 1.3e1b   | Scoped staff message history API                         | Merged | [#397](https://github.com/FSS-Ltd/pathway/pull/397) to `master` | `c8bd8ae5cb4da0ad9b908f7356d33d4e82656dd5`; all eight checks passed: CI run 37613024233, CodeQL run 37613023426. | `6e30ba5c7f84a4bd7e325f048e808f6ef5017244` |
 | 1.3e1c   | Scoped staff read-cursor API                              | Merged | [#398](https://github.com/FSS-Ltd/pathway/pull/398) to `master` | `af62295036f3a12c5140da3e41ddd1d89da5758c`; all eight checks passed: CI run 37615071206, CodeQL run 37615067768. | `cd673cb18b3beff7de00b3903c6b31567546ef11` |
 | 1.3e2a   | Idempotent staff direct conversation creation            | Merged | [#399](https://github.com/FSS-Ltd/pathway/pull/399) to `master` | `b2b640f5048cb9beec1157bb9f7e0750e5c07f07`; all eight checks passed: CI run 37617805922, CodeQL run 37617802053. | `d480172e7b1573544ceb39ff9550a28d53848211` |
-| 1.3e2b   | Scoped staff message send API                            | PR open | [#401](https://github.com/FSS-Ltd/pathway/pull/401) to `master` | `ccc8d534`; local lint, typecheck, API build, messaging unit/integration, formatting, diff and Graphify checks passed. CI pending. | Pending |
+| 1.3e2b   | Scoped staff message send API                            | Merged | [#401](https://github.com/FSS-Ltd/pathway/pull/401) to `master` | `77fe27f3a5a166d239318d91444a81dcfb41fb5c`; all eight checks passed: CI run 37623067709, CodeQL run 37623060227. | `f5e2f7e25a371d022db8bd67c619c087e60ff4cd` |
+| DB-2g    | Project-safe production environment preparation          | In progress | Pending | Local verification in progress. | Pending |
 | 1.3b2+   | ACE core web journey slices                            | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
@@ -163,9 +164,10 @@ verified.
 5. Schedule a write freeze, take and verify a final backup, replay any approved
    delta, and recheck parity. Update `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`,
    storage keys and relevant secrets in every deployment surface. In particular,
-   `scripts/prepare-production-env.mjs` currently supplies the old project URL
-   and a fixed pooler host; revise and test those defaults before generating
-   target credentials. The migration workflow validates that `DIRECT_URL` and
+   `scripts/prepare-production-env.mjs` now derives the project URL from
+   `DATABASE_URL` and requires a verified host before converting direct URLs;
+   prepare and verify target credentials before synchronization. The migration
+   workflow validates that `DIRECT_URL` and
    `SUPABASE_URL` select the same project and that migration uses port 5432.
 6. Dispatch the manual production workflow only after the staging gate and
    cutover authorization. Smoke-test the deployed commit and monitor errors,

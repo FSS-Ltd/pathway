@@ -253,13 +253,17 @@ file values. This allows one-off values such as `VERCEL_TOKEN` to stay out of
 the file if preferred. `pnpm env:production:prepare` copies an existing ignored
 `.env.production` or `.env.prod` fallback to ignored `env.production` without
 printing secret values. It also appends known non-secret deployment defaults
-such as the Vercel team ID, Supabase URL, and bucket names when they are missing.
+such as the Vercel team ID and bucket names when they are missing. It derives a
+missing `SUPABASE_URL` from `DATABASE_URL` and rejects a conflicting project URL
+or `DIRECT_URL` before changing the output file.
 For internal app-only secrets that do not come from a provider, it generates
-`REVALIDATE_SECRET` when missing. If `DATABASE_URL` is still the direct Supabase
-connection string and `DIRECT_URL` is missing, it copies that value into
-`DIRECT_URL` for migration workflows, then rewrites both values to use the
-verified Supavisor hosts for this project: transaction mode for `DATABASE_URL`
-and session mode for `DIRECT_URL`.
+`REVALIDATE_SECRET` when missing. If either database URL is still a direct
+Supabase connection string, provide `SUPABASE_POOLER_HOST` with that project's
+verified shared pooler host, or provide a matching session-pooler `DIRECT_URL`.
+The helper also accepts an existing session-pooler `DATABASE_URL` and derives
+the transaction-pooler runtime URL and session-pooler migration URL from it.
+A missing pooler host for a direct URL stops preparation rather than selecting
+a different project's region.
 
 Minimum launch sequence:
 
