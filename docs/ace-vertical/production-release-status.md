@@ -78,6 +78,14 @@ remains manual; merging to `master` does not deploy automatically.
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 
+Step 1.3e3c is locally verified and pushed as
+`43bd10dfc3791e16e498af212fa83f3f93d390eb` on
+`feature/ace-message-unread-counts`. As of 7 October 2026 at 16:59 UTC,
+GitHub returns HTTP 500 when creating its PR through the CLI, REST API,
+connector, and signed-in web form. No PR exists. Retry PR creation on this
+branch when the service recovers; require passing CI on the final revision and
+confirmed merge before starting the next build step.
+
 For step 1.3c5b, all eight checks passed on the checked revision in
 [CI run 37532490552](https://github.com/FSS-Ltd/pathway/actions/runs/37532490552)
 and [CodeQL run 37532483173](https://github.com/FSS-Ltd/pathway/actions/runs/37532483173).
