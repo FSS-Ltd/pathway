@@ -32,6 +32,25 @@ was updated on 2 September. The actual snapshot time and whether later writes
 exist require confirmation. Do not describe this as a complete current-data
 migration until that is resolved.
 
+## Local restore rehearsal
+
+On 7 October, a disposable Postgres 17 cluster was started on a private Unix
+socket with TCP disabled. A target-scoped replay omitted the archive's global
+role and `template1` sections and kept all 166 `COPY` sections. The replay
+completed with 13 errors caused by the local cluster lacking Supabase Vault.
+Every available table matched the archive row count: 165 of 166 sections and
+all 1,820 rows. The remaining section was `vault.secrets`, which has zero
+archive rows and is absent locally; the new Supabase project has the extension.
+The local server was stopped after this check. No backup data or replay SQL was
+added to Git.
+
+A read-only target query confirmed Postgres 17, zero `public` tables, zero
+Storage buckets and objects, and no Prisma migration table. The target login
+cannot set `session_replication_role`; its existing platform triggers will run
+during the restore. The archive creates its application triggers after all
+`COPY` data, but target platform trigger effects still require verification.
+These checks are rehearsal evidence, not a target restore.
+
 ## Restore gate and procedure
 
 1. Confirm that these are the latest complete database and Storage exports,

@@ -51,7 +51,8 @@ deployment is claimed by this record.
 | 1.3d3    | Bounded attendance correction history API              | Merged | [#379](https://github.com/FSS-Ltd/pathway/pull/379) to `master` | `6d7f2035be51c6d76f80a00e28f44651815cb013`; all eight checks passed (runs below) | `19c045381d856e0b6b3372f3929b63addf8bf40b` |
 | 1.3d4    | Staff attendance correction history web journey        | Merged | [#380](https://github.com/FSS-Ltd/pathway/pull/380) to `master` | `a65252e3c0211cfb6aa78f0d0d06bd9abda35e93`; all eight checks passed (runs below) | `cf0f1d9ac20c25cd97305bae0f72c6ad5cacd0be` |
 | 1.3d5    | Daily attendance register contract                     | Merged | [#381](https://github.com/FSS-Ltd/pathway/pull/381) to `master` | `8d98fb4a4a70a0d8c7ffd45ef02b7304acbec070`; all eight checks passed (runs below) | `2319e7af3dcd83f6775fe906cb0c4208fbc4250d` |
-| DB-2a    | New-project backup and Storage restore preflight       | PR open | [#382](https://github.com/FSS-Ltd/pathway/pull/382) to `master` | `a305e8fd9c7c857301036d1c03a6270e1d4f7d41` initial PR revision; local checks passed; current-revision CI pending | Pending |
+| DB-2a    | New-project backup and Storage restore preflight       | Merged | [#382](https://github.com/FSS-Ltd/pathway/pull/382) to `master` | `1292f15d45c708d1bb260cea9a8ccdbdb8b1c504`; all eight checks passed (runs below) | `4b04a946134c1b16e42cacb719814e1368c2660b` |
+| DB-2b    | Candidate database and Storage restore                | In progress | Pending | Local SQL rehearsal passed; source freshness and target Storage key pending | Pending |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                        | Pending                                    |
@@ -77,6 +78,9 @@ and [CodeQL run 37550765654](https://github.com/FSS-Ltd/pathway/actions/runs/375
 For step 1.3d5, all eight checks passed on the checked revision in
 [CI run 37553726682](https://github.com/FSS-Ltd/pathway/actions/runs/37553726682)
 and [CodeQL run 37553723755](https://github.com/FSS-Ltd/pathway/actions/runs/37553723755).
+For step DB-2a, all eight checks passed on the checked revision in
+[CI run 37555887584](https://github.com/FSS-Ltd/pathway/actions/runs/37555887584)
+and [CodeQL run 37555886228](https://github.com/FSS-Ltd/pathway/actions/runs/37555886228).
 
 Step 1.1 makes production deployment explicit and accepts only the configured
 Supabase project's direct database endpoint or shared session pooler on port
@@ -184,6 +188,12 @@ has not been established. The target Postgres URL is now in an ignored local
 `.env`, and a read-only `psql` query verified the target connection and absence
 of the application `Org` table. No database or Storage restore has been
 attempted.
+
+Step DB-2b has rehearsed the target-scoped SQL in disposable local Postgres 17:
+all 1,820 archived rows matched across the 165 available table sections. The
+empty Vault section was unavailable locally; Vault is installed on the target.
+The target remains empty. Confirmation of snapshot freshness and a new-project
+Storage upload credential are pending before target data movement.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and
