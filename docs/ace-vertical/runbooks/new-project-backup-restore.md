@@ -89,9 +89,16 @@ These checks are rehearsal evidence, not a target restore.
    deferred migrations and fixes until after data movement.
 5. Copy the 32 Storage files directly from the local archive into the two
    restored target buckets using the target's approved Storage credentials or
-   CLI session. Do not upload private files to an intermediary service. Fetch
-   each target object and compare its size and MD5 to the source archive;
-   metadata rows alone are not proof that bytes exist in Storage. Supabase's
+   CLI session. Run
+   `node scripts/restore-supabase-storage-archive.mjs <storage.zip>` first to
+   validate the exact archive and 32 object paths without uploading. After
+   adding `NEW_SUPABASE_SERVICE_ROLE_KEY` to an ignored local env file, run
+   `node scripts/restore-supabase-storage-archive.mjs <storage.zip> --apply <env-file>`.
+   The command uploads directly to the fixed new-project URL and downloads
+   each object to compare its bytes; it requires `unzip` locally and can be
+   rerun safely after a partial upload. Do not upload private files to an
+   intermediary service. Metadata rows alone are not proof that bytes exist
+   in Storage. Supabase's
    [paused-project restore guide](https://supabase.com/docs/guides/troubleshooting/restore-project-after-90-days-pause)
    confirms Storage objects require a separate copy.
 6. Review project-specific Auth, Realtime, Storage, webhook, and API-key

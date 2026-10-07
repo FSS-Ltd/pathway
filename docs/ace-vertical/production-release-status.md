@@ -196,6 +196,9 @@ The target remains empty. Confirmation of snapshot freshness and a new-project
 Storage upload credential are pending before target data movement.
 The checked replay helper now produces the same target-scoped SQL in a private
 temporary file and rejects archive drift or unexpected `psql` commands.
+The Storage restore command passed a dry run against the exact ZIP and checked
+all 32 paths without contacting the target. Its upload and download checks are
+covered by local tests; target bytes remain pending the new-project key.
 
 Local step 1.1 verification: migration URL tests 7/7; database deploy workflow
 tests 6/6; lint and typecheck 16/16 packages each; Prettier and
