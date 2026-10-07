@@ -16,6 +16,19 @@ export type StaffMessage = {
   sender: { id: string; displayName: string };
 };
 
+export type StaffRecipient = { id: string; displayName: string };
+
+export type StaffRecipientPage = {
+  items: StaffRecipient[];
+  hasMore: boolean;
+};
+
+export type OpenedStaffConversation = {
+  id: string;
+  kind: "STAFF_DIRECT";
+  created: boolean;
+};
+
 export type StaffConversationPage = {
   items: StaffConversation[];
   nextCursor: string | null;
@@ -37,6 +50,26 @@ export type SentStaffMessage = {
 };
 
 const basePath = "/ace/messages/conversations";
+
+export async function searchStaffRecipients(
+  search: string,
+  signal?: AbortSignal,
+): Promise<StaffRecipientPage> {
+  if (isUsingMockApi()) return { items: [], hasMore: false };
+  const query = new URLSearchParams({ search, limit: "20" });
+  return request(`${basePath}/recipients?${query}`, { signal });
+}
+
+export async function openStaffDirectConversation(
+  recipientUserId: string,
+): Promise<OpenedStaffConversation> {
+  if (isUsingMockApi())
+    throw new Error("Messaging is unavailable in mock mode.");
+  return request(basePath, {
+    method: "POST",
+    body: JSON.stringify({ kind: "STAFF_DIRECT", recipientUserId }),
+  });
+}
 
 export async function fetchStaffConversations(
   input: {
@@ -101,7 +134,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!response.ok) {
     throw new Error(
       response.status === 403 || response.status === 404
-        ? "This conversation is no longer available to you."
+        ? "Messaging is no longer available to you at this site."
         : "Unable to complete the messaging request. Try again.",
     );
   }
