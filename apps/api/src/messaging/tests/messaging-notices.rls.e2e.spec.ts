@@ -10,6 +10,7 @@ import {
   isDatabaseAvailable,
   requireDatabase,
 } from "../../../test-helpers.e2e";
+import { MessagingQueryService } from "../messaging-query.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -1214,6 +1215,49 @@ describe("ACE parent/staff messaging and notices storage", () => {
     await prisma.org.deleteMany({
       where: { id: { in: [fixture.orgAId, fixture.orgBId] } },
     });
+  });
+
+  it("lists only joined staff conversations through the query service", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createStaffConversation(
+          tx,
+          fixture,
+          "STAFF_DIRECT",
+        );
+        await tx.message.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            conversationId: conversation.conversationId,
+            senderParticipantId: conversation.staffParticipantIds[0],
+            clientRequestId: randomUUID(),
+            bodyEncrypted: "Staff-only update",
+          },
+        });
+        return conversation;
+      },
+    );
+    const service = new MessagingQueryService();
+    const joined = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const unjoined = { ...joined, userId: fixture.staffCId };
+
+    const list = await service.listStaffConversations(joined, {});
+    expect(list.items.map((item) => item.id)).toContain(created.conversationId);
+    expect(
+      list.items.find((item) => item.id === created.conversationId)
+        ?.latestMessage?.preview,
+    ).toBe("Staff-only update");
+    expect((await service.listStaffConversations(unjoined, {})).items).toEqual(
+      [],
+    );
   });
 
   it("permits one general parent conversation per guardian and valid staff conversation kinds", async () => {

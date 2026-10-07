@@ -1,8 +1,8 @@
 # ACE messaging web contract
 
 **Step 1.3e0.** This is the implementation contract for C12 in the
-[Oasis parity matrix](02-oasis-web-journey-parity.md). It adds no runtime API,
-web screen, database migration, or production release.
+[Oasis parity matrix](02-oasis-web-journey-parity.md). That design step added
+no runtime API, web screen, database migration, or production release.
 
 ## Reference and current boundary
 
@@ -15,9 +15,11 @@ authentication, fixed-role/access-tag, and site-tenancy boundaries.
 
 NexSteps already has `MessageConversation`, `MessageParticipant`, `Message`,
 read-cursor and delivery tables, encrypted message bodies, tenant RLS, and
-creator/participant eligibility triggers. It has no messaging service, route,
-or web journey. The existing `PARENT_STAFF` uniqueness constraint allows **one
-conversation per guardian identity per site**, so the first web journey is a
+creator/participant eligibility triggers. Step 1.3e1a adds a read-only staff
+conversation-list route. Message history, creation, sending, read-cursor
+writes, parent access, and web journeys remain pending. The existing
+`PARENT_STAFF` uniqueness constraint allows **one conversation per guardian
+identity per site**, so the first web journey is a
 school-team conversation, not one separate thread per staff contact. A site's
 staff membership alone is too broad to make every staff member a parent-message
 responder. The student role lists message permissions, but the current database
@@ -61,12 +63,24 @@ child in that site. A site leader assigns one or more approved staff responders
 before parent sending is enabled; ordinary staff cannot join, discover, or
 address parent conversations merely through site membership or a permission
 tag. The API slice must enforce that assignment operation. This is a real gap
-in the present schema, whose
-participant trigger checks membership but does not authorize **who added** a
-staff participant. Do not use Oasis's global staff-recipient list as the
-NexSteps authorization rule. Staff direct and room messaging remain confined
+in the present schema: its participant trigger checks membership but does not
+authorize **who added** a staff participant. Do not use Oasis's global
+staff-recipient list as the NexSteps authorization rule. Staff direct and room messaging remain confined
 to current site members and active participants. Notices use their separate
 audience/receipt models and a later C12 slice; they are not chat messages.
+
+The current request-context guard and effective-permission reader require an
+organisation or site membership path. A guardian relationship alone does not
+select a site or satisfy that reader. Parent routes need a separately reviewed
+relationship-aware context and permission path before they can be enabled;
+granting every guardian staff or organisation membership would widen access.
+Step 1.3e1a therefore lists `STAFF_DIRECT` and `STAFF_ROOM` conversations only. It
+requires an active user, a current selected-site `STAFF` or `SITE_ADMIN`
+membership, an active staff participant, and the typed read permission. It
+returns bounded newest-first pages and a 160-character message preview;
+history, unread counts, and parent/staff threads wait for later slices. The
+send slice must update conversation `updatedAt` after the database allocates a message sequence so the list's
+activity order remains correct.
 
 ## Web design intent
 
@@ -96,9 +110,8 @@ This adapts the Apple design skill's [split-view](https://developer.apple.com/de
 [typography](https://developer.apple.com/design/human-interface-guidelines/typography),
 [accessibility](https://developer.apple.com/design/human-interface-guidelines/accessibility),
 and [motion](https://developer.apple.com/design/human-interface-guidelines/motion)
-guidance to responsive web; these guidelines are design sources,
-not a runtime dependency or a claim that this web screen is an Apple platform
-screen.
+guidance to responsive web; these guidelines are design sources, not a runtime
+dependency or a claim that this web screen is an Apple platform screen.
 
 ## Delivery and verification
 
