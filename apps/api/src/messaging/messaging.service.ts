@@ -176,7 +176,7 @@ export class MessagingService {
             },
           },
         },
-        select: { id: true },
+        select: { id: true, kind: true },
       });
       if (!conversation) throw new NotFoundException("Conversation not found");
 
@@ -202,6 +202,40 @@ export class MessagingService {
         take: limit + 1,
       });
       const page = rows.slice(0, limit);
+      const recipient =
+        conversation.kind === "STAFF_DIRECT" &&
+        page.some((row) => row.sender.userId === actor.userId)
+          ? await tx.messageParticipant.findFirst({
+              where: {
+                tenantId: actor.tenantId,
+                conversationId,
+                userId: { not: actor.userId },
+                kind: "STAFF",
+                removedAt: null,
+                user: {
+                  isActive: true,
+                  siteMemberships: {
+                    some: {
+                      tenantId: actor.tenantId,
+                      role: { in: ["SITE_ADMIN", "STAFF"] },
+                    },
+                  },
+                  studentIdentities: {
+                    none: { tenantId: actor.tenantId },
+                  },
+                },
+              },
+              select: {
+                readCursors: {
+                  where: { tenantId: actor.tenantId, conversationId },
+                  select: { lastReadSequence: true },
+                  take: 1,
+                },
+              },
+            })
+          : null;
+      const recipientReadSequence =
+        recipient?.readCursors[0]?.lastReadSequence ?? 0;
       return {
         items: page.map((row) => ({
           id: row.id,
@@ -215,6 +249,10 @@ export class MessagingService {
               row.sender.user.name?.trim() ||
               "Staff member",
           },
+          recipientRead:
+            recipient && row.sender.userId === actor.userId
+              ? row.sequence <= recipientReadSequence
+              : null,
         })),
         nextBefore:
           rows.length > limit ? (page.at(-1)?.sequence ?? null) : null,

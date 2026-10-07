@@ -1558,6 +1558,75 @@ describe("ACE parent/staff messaging and notices storage", () => {
     ).toBeUndefined();
   });
 
+  it("reveals direct read state only to a current participant for their own messages", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const staffA = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const staffB = { ...staffA, userId: fixture.staffBId };
+    const opened = await new MessagingConversationService().openStaffDirect(
+      staffA,
+      { kind: "STAFF_DIRECT", recipientUserId: fixture.staffBId },
+    );
+    const command = new MessagingCommandService();
+    const first = await command.sendStaffMessage(staffA, opened.id, {
+      clientRequestId: randomUUID(),
+      body: "Please review this",
+    });
+    const service = new MessagingService();
+
+    expect(
+      (await service.listStaffMessages(staffA, opened.id, {})).items[0],
+    ).toMatchObject({ id: first.id, recipientRead: false });
+    expect(
+      (await service.listStaffMessages(staffB, opened.id, {})).items[0],
+    ).toMatchObject({ id: first.id, recipientRead: null });
+
+    await service.advanceStaffReadCursor(staffB, opened.id, {
+      sequence: first.sequence,
+    });
+    expect(
+      (await service.listStaffMessages(staffA, opened.id, {})).items[0],
+    ).toMatchObject({ id: first.id, recipientRead: true });
+
+    const second = await command.sendStaffMessage(staffA, opened.id, {
+      clientRequestId: randomUUID(),
+      body: "A later update",
+    });
+    expect(
+      (await service.listStaffMessages(staffA, opened.id, {})).items.map(
+        (message) => [message.id, message.recipientRead],
+      ),
+    ).toEqual([
+      [second.id, false],
+      [first.id, true],
+    ]);
+    await expect(
+      service.listStaffMessages(
+        { ...staffA, userId: fixture.staffCId },
+        opened.id,
+        {},
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    const room = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createStaffConversation(tx, fixture, "STAFF_ROOM"),
+    );
+    await command.sendStaffMessage(staffA, room.conversationId, {
+      clientRequestId: randomUUID(),
+      body: "Room update",
+    });
+    expect(
+      (await service.listStaffMessages(staffA, room.conversationId, {}))
+        .items[0].recipientRead,
+    ).toBeNull();
+  });
+
   it("advances only an active staff participant's read cursor without regression", async () => {
     if (!isDatabaseAvailable()) return;
 
