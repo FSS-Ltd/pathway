@@ -1,8 +1,8 @@
 # New Supabase project backup restore
 
-**Status:** DB-2b target restore on 7 October 2026. Database rows, Storage
-bytes, and four pending Prisma migrations are in the new project. Application
-traffic and production configuration have not moved.
+**Status:** The restored target has 106 finished Prisma migrations, 1,475
+archived application rows, and all 32 Storage objects. Application traffic and
+production configuration have not moved.
 Follow the [production release and cutover conditions](../production-release-status.md)
 before treating the new project as production.
 
@@ -32,6 +32,13 @@ filename suggests 7 September in UK date notation, and the newest blog row
 was updated on 2 September. The owner confirmed these are the latest available
 backups. The source remains inaccessible, so later writes cannot be ruled out
 by an independent source comparison.
+
+On 7 October, the owner chose to use this database and Storage pair as the
+**final source snapshot** despite that gap. Cutover planning may proceed from
+these archives. Any writes after the snapshot are unverified and may be absent
+from the new project; this is an accepted data-recovery limitation, not a
+claim that the source and target are current or identical. Keep the inactive
+source intact, and compare it before cutover if access is restored.
 
 ## Local restore rehearsal
 
@@ -190,13 +197,15 @@ validated against the target Storage API: it listed exactly
 `pathway-private` (private) and `pathway-public` (public). The target project
 reports healthy in London and has no Edge Functions. A security advisor run
 found public API-role execution grants on the `public.rls_auto_enable()`
-`SECURITY DEFINER` event-trigger function. DB-2e2 removes those grants after
-its PR gate; the target rollback-only rehearsal passed. Four separate
-mutable-search-path function warnings remain for review.
+`SECURITY DEFINER` event-trigger function. DB-2e2 removed those grants after
+its PR gate. The four mutable-search-path function warnings are addressed by
+the pending DB-2h migration; its target rehearsal changed no persistent rows
+or functions.
 
-**Remaining release blockers:** Migration-history provenance, source freshness
-and final delta, and project-specific configuration and staging verification
-remain unresolved.
+**Remaining release blockers:** Migration-history provenance, project-specific
+configuration, staging verification, and production deployment access remain
+unresolved. The owner accepted the backup as final despite the unverified
+post-snapshot write gap.
 No repository Data API table client was found, but external consumers require
 review before cutover. A read-only catalog audit found no remaining static
 function references to application relations missing from `app` but present
