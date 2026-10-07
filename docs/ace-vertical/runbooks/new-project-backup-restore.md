@@ -91,7 +91,15 @@ enrollment, tenant, status, origin and actor cases were rejected, and the
 fixture schema was absent after rollback. The target has 99 finished Prisma
 migration records. This did not switch traffic or resolve the older functions.
 
-**Release blockers:** No repository migration is pending after PR #384, but
+After [PR #385](https://github.com/FSS-Ltd/pathway/pull/385) merged with all
+eight checks passing, the student portal policy trigger migration was applied.
+A rollback-only target fixture accepted an active link under an enabled
+same-tenant policy, allowed closure and ended or revoked links after policy
+disablement, rejected disabled and missing tenant policies, and left no fixture
+schema behind. The target has 100 finished Prisma migration records. Traffic
+and deployment configuration remain unchanged.
+
+**Release blockers:** No repository migration is pending after PR #385, but
 `prisma migrate status` exits nonzero because two applied source migrations
 (`20260811143000_fix_ace_trigger_schema_references` and
 `20260811150000_fix_faith_audience_version_guard`) have no files in this
@@ -107,10 +115,10 @@ functions referring to application relations that do not exist in `app`:
 `require_ace_record_actor_membership`,
 `require_active_pace_diagnostic_enrollment`,
 `require_attendance_correction_scope`, and
-`require_student_portal_link_policy`. The two fact-trigger references were
-corrected and tested by PR #384. The five earlier functions still need reviewed
-migrations and functional tests before live writes. Reconcile the database
-schema and RLS gate without weakening tenant
+`require_student_portal_link_policy`. The two fact triggers and student portal
+policy trigger were corrected and tested by PRs #384 and #385. Four earlier
+functions still need reviewed migrations and functional tests before live
+writes. Reconcile the database schema and RLS gate without weakening tenant
 isolation. Project-specific Auth, encryption, webhook, deployment-secret, and
 production smoke checks remain. This target is **not ready for traffic**.
 
