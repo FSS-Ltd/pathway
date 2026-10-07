@@ -83,8 +83,16 @@ enabled; the new access-tag, PACE, and attendance-event tables force it. All
 application constraints are validated. Read-only queries under both `anon` and
 `authenticated` returned zero organisation rows.
 
-**Release blockers:** `prisma migrate status` now reports up to date, but a
-manual history comparison found two applied source migrations
+After [PR #384](https://github.com/FSS-Ltd/pathway/pull/384) merged with all
+eight checks passing, the single pending portable ACE fact-trigger migration
+was applied to this target. Its diagnostic and attendance functions were
+verified in a rollback-only target fixture: valid facts succeeded, invalid
+enrollment, tenant, status, origin and actor cases were rejected, and the
+fixture schema was absent after rollback. The target has 99 finished Prisma
+migration records. This did not switch traffic or resolve the older functions.
+
+**Release blockers:** No repository migration is pending after PR #384, but
+`prisma migrate status` exits nonzero because two applied source migrations
 (`20260811143000_fix_ace_trigger_schema_references` and
 `20260811150000_fix_faith_audience_version_guard`) have no files in this
 checkout. The applied `20260613000000_lock_supabase_public_rls` and
@@ -92,16 +100,17 @@ checkout. The applied `20260613000000_lock_supabase_public_rls` and
 files. Recover and review the original SQL; do not invent a
 replacement or edit the restored migration ledger. The strict repository RLS
 gate also fails: it requires 64 application tables in `app`, while this source
-snapshot stores them in `public`. Seven restored or newly migrated trigger
-functions refer to application relations that do not exist in `app`:
+snapshot stores them in `public`. The restore initially exposed seven trigger
+functions referring to application relations that do not exist in `app`:
 `assert_ace_notice_audience_member_eligibility`,
 `assert_message_conversation_creator`, `assert_message_participant`,
 `require_ace_record_actor_membership`,
 `require_active_pace_diagnostic_enrollment`,
 `require_attendance_correction_scope`, and
-`require_student_portal_link_policy`. Their schema references need a reviewed
-migration and functional tests before live
-writes. Reconcile the database schema and RLS gate without weakening tenant
+`require_student_portal_link_policy`. The two fact-trigger references were
+corrected and tested by PR #384. The five earlier functions still need reviewed
+migrations and functional tests before live writes. Reconcile the database
+schema and RLS gate without weakening tenant
 isolation. Project-specific Auth, encryption, webhook, deployment-secret, and
 production smoke checks remain. This target is **not ready for traffic**.
 
