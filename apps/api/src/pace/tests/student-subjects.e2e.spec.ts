@@ -222,7 +222,7 @@ describe("ACE subject placement progress baseline", () => {
         paceNumber: 1003,
         assessmentType: "FinalTest",
         score: 90,
-        assessedAt: "2026-08-11T13:00:00.000Z",
+        assessedAt: "2026-08-12T13:00:00.000Z",
         reason: "Completed after placement revision",
       },
       actor,
