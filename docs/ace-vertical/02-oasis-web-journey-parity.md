@@ -43,6 +43,11 @@ matrix remains the permission contract; this matrix tracks end-to-end work.
 | C16 | Parent portal: `apps/web/src/app/(parent)/parent/page.tsx` and linked-child pages                                                                                     | **Missing:** NexSteps admin has parent records, but no ACE parent web portal.                                                                                                                       | Parent sees only linked children and released PACE, attendance, reports, homework, messages, and slips.                                                                                                                          |
 | C17 | Student portal: `apps/api/src/routers/student.ts`, `apps/web/src/app/(student)/student/page.tsx`                                                                      | **Missing:** NexSteps has `StudentIdentity` storage, but no ACE student web portal.                                                                                                                 | Student sees only self-safe PACE, timetable, homework, Faith, and enabled Community.                                                                                                                                             |
 
+C06 also requires the separate [daily register contract](06-daily-attendance-register-design.md):
+site-local operating dates, enrolled year-band rosters, absence reasons,
+scoped staff marking, correction history, and later linked-child/self history
+and authorised exports. Session attendance does not satisfy those outcomes.
+
 ## Paid add-ons and release boundaries
 
 These are tracked here so core journeys cannot quietly absorb paid features.
