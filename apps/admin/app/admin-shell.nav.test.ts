@@ -76,6 +76,14 @@ assert.ok(
   "expected PACE navigation to require the ace.pace.read permission",
 );
 
+const academicSetupNavEntry = navigationSource.match(
+  /label:\s*"Academic setup"[\s\S]*?href:\s*"\/ace\/settings\/academic"[\s\S]*?permission:\s*"ace\.settings\.read"[\s\S]*?group:\s*"Teaching",?\s*\},/,
+);
+assert.ok(
+  academicSetupNavEntry,
+  "expected ACE academic setup navigation to require ace.settings.read",
+);
+
 const staffRole = {
   isOrgAdmin: false,
   isOrgOwner: false,
@@ -107,6 +115,16 @@ assert.match(
   /href="\/ace\/behaviour"[^>]*>[\s\S]*?Behaviour/,
   "Behaviour navigation renders after ace.behaviour.read is loaded",
 );
+const academicSetupNavigation = (permissions: string[]) =>
+  resolveAdminNavItems({
+    role: staffRole,
+    currentOrgIsMasterOrg: false,
+    capabilities: [],
+    permissions,
+    ui: { labels: {} },
+  }).some((item) => item.href === "/ace/settings/academic");
+assert.equal(academicSetupNavigation([]), false);
+assert.equal(academicSetupNavigation(["ace.settings.read"]), true);
 const messagingNavigation = (permissions: string[]) =>
   resolveAdminNavItems({
     role: staffRole,

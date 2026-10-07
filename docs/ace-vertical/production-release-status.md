@@ -14,6 +14,9 @@ project's production `DATABASE_URL` and `SUPABASE_URL` both reference
 Admin and web use API URLs rather than direct database credentials. All three
 production deployments remain READY at `a41e09aac3fde40f646e0242b0b8e3f0191e0122`;
 the later merged messaging steps have not been deployed.
+The connected Vercel readback confirmed both API production URLs reference the
+new project, their updates predate the READY API deployment, and that
+deployment's `/health` returned 200 with a database timestamp on 7 October.
 
 ## Delivery steps
 
@@ -83,6 +86,7 @@ the later merged messaging steps have not been deployed.
 | 1.3e3c   | Scoped staff unread counts and list badges             | Merged  | [#409](https://github.com/FSS-Ltd/pathway/pull/409) to `master` | `87214821eb625ee211945d5a26717c92d9e12266`; all eight checks passed: CI run 37656203634, CodeQL run 37656189481.                                                                                                | `aac2f36551a793b56cf6fdbeb5a56eaa268b18ac` |
 | 1.3e3d   | Scoped direct-message read feedback                    | Merged  | [#411](https://github.com/FSS-Ltd/pathway/pull/411) to `master` | `223df300078c50882000fd6271c4fe7fec3a440f`; all eight checks passed: CI run 37661038756, CodeQL run 37661033054.                                                                                                | `ac1d2feb66e24d1b5e5f4f27669d30a6e550b03e` |
 | 1.3f1    | C02 subject placement progress baseline                | Merged  | [#413](https://github.com/FSS-Ltd/pathway/pull/413) to `master` | `677860b0f7dc9e00dfdd38806a7a7a71137c7470`; all eight checks passed: CI run 37668386401, CodeQL run 37668381804.                                                                                                | `3b5a86bc4887bca1b0f7e49b7e92c0318bb0de69` |
+| 1.3f2    | C01 PACE policy web settings                           | In PR   | Pending                                                         | Local verification in progress; CI pending.                                                                                                                                                                     | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
