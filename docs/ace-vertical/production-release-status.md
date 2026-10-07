@@ -88,7 +88,7 @@ deployment's `/health` returned 200 with a database timestamp on 7 October.
 | 1.3e3d   | Scoped direct-message read feedback                    | Merged  | [#411](https://github.com/FSS-Ltd/pathway/pull/411) to `master` | `223df300078c50882000fd6271c4fe7fec3a440f`; all eight checks passed: CI run 37661038756, CodeQL run 37661033054.                                                                                                | `ac1d2feb66e24d1b5e5f4f27669d30a6e550b03e` |
 | 1.3f1    | C02 subject placement progress baseline                | Merged  | [#413](https://github.com/FSS-Ltd/pathway/pull/413) to `master` | `677860b0f7dc9e00dfdd38806a7a7a71137c7470`; all eight checks passed: CI run 37668386401, CodeQL run 37668381804.                                                                                                | `3b5a86bc4887bca1b0f7e49b7e92c0318bb0de69` |
 | 1.3f2    | C01 PACE policy web settings                           | Merged  | [#415](https://github.com/FSS-Ltd/pathway/pull/415) to `master` | `6b4c85663b22c5faa8b9e825a2f056e84281a6f1`; all eight checks passed: CI run 37674606330, CodeQL run 37674600785.                                                                                                | `47b11a8ec3461db3d0bfeb03475b8e8dbae6231a` |
-| 1.3f3a   | ACE core site-scoped subject catalogue API             | In PR   | [#419](https://github.com/FSS-Ltd/pathway/pull/419) to `master` | API lint, typecheck, build and full local commit hook passed; isolated DB integration skipped locally (Postgres unavailable); CI pending.                                                                       | Pending                                    |
+| 1.3f3a   | ACE core site-scoped subject catalogue API             | Merged  | [#419](https://github.com/FSS-Ltd/pathway/pull/419) to `master` | `8b0f384ec92a7b8191a0fd6293129fc13e384d6f`; all eight checks passed: CI run 37683959404, CodeQL run 37683952847.                                                                                                | `84f2a8a76492dac78618b67234eaddfd5932c412` |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -110,8 +110,14 @@ Step 1.3f2 was merged in [PR #415](https://github.com/FSS-Ltd/pathway/pull/415)
 after all eight checks passed on its final revision. Academic setup now exposes
 the existing audited, site-scoped PACE policy, with permission-aware editing,
 optimistic conflict recovery, and site-switch resets. ACE core subject setup
-remains the next C01 implementation slice; authenticated staging and production
-verification are still required before release.
+continues with its Academic setup web screen; authenticated staging and
+production verification are still required before release.
+
+Step 1.3f3a was merged in [PR #419](https://github.com/FSS-Ltd/pathway/pull/419)
+after all eight checks passed on its final revision, including the PostgreSQL
+integration suite. The core site-scoped subject API is merged but is not yet in
+the current manual production deployment. The Academic setup web screen is the
+next C01 slice.
 
 Release step REL-1 was merged in [PR #417](https://github.com/FSS-Ltd/pathway/pull/417)
 after all eight checks passed on its final revision. The manual smoke workflow
