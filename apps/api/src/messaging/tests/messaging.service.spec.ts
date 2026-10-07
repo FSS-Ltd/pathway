@@ -10,9 +10,10 @@ import { MessagingController } from "../messaging.controller";
 import {
   conversationQuerySchema,
   messageQuerySchema,
+  readCursorSchema,
 } from "../dto/messaging-query.dto";
 import { encodeConversationCursor } from "../messaging-cursor";
-import { MessagingQueryService } from "../messaging-query.service";
+import { MessagingService } from "../messaging.service";
 
 jest.mock("@pathway/db", () => ({ withTenantRlsContext: jest.fn() }));
 
@@ -31,20 +32,27 @@ function setup() {
       findMany: jest.fn().mockResolvedValue([]),
       findFirst: jest.fn().mockResolvedValue({ id: "conversation" }),
     },
-    message: { findMany: jest.fn().mockResolvedValue([]) },
+    message: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue({ id: "message-2" }),
+    },
+    messageParticipant: {
+      findFirst: jest.fn().mockResolvedValue({ id: "participant-a" }),
+    },
+    $queryRaw: jest.fn().mockResolvedValue([{ lastReadSequence: 2 }]),
   };
   jest
     .mocked(withTenantRlsContext)
     .mockImplementation(async (_tenant, _org, operation) =>
       operation(tx as never),
     );
-  return { tx, service: new MessagingQueryService() };
+  return { tx, service: new MessagingService() };
 }
 
-describe("staff messaging reads", () => {
+describe("staff messaging service", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("guards the list route with its typed messaging permission", () => {
+  it("guards each route with its typed messaging permission", () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSION,
@@ -55,6 +63,12 @@ describe("staff messaging reads", () => {
       Reflect.getMetadata(
         REQUIRED_PERMISSION,
         MessagingController.prototype.messages,
+      ),
+    ).toBe("messaging.messages.read");
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSION,
+        MessagingController.prototype.readCursor,
       ),
     ).toBe("messaging.messages.read");
   });
@@ -70,6 +84,9 @@ describe("staff messaging reads", () => {
     expect(
       messageQuerySchema.safeParse({ limit: "2", before: "10" }).data,
     ).toEqual({ limit: 2, before: 10 });
+    expect(readCursorSchema.safeParse({ sequence: 0 }).success).toBe(false);
+    expect(readCursorSchema.safeParse({ sequence: 2.5 }).success).toBe(false);
+    expect(readCursorSchema.safeParse({ sequence: 2 }).success).toBe(true);
   });
 
   it("lists only the selected site's active staff conversations", async () => {
@@ -252,5 +269,50 @@ describe("staff messaging reads", () => {
         take: 2,
       }),
     );
+  });
+
+  it("rejects a missing participant or sequence before writing a read cursor", async () => {
+    const { tx, service } = setup();
+    tx.messageParticipant.findFirst.mockResolvedValue(null);
+    await expect(
+      service.advanceStaffReadCursor(actor, "conversation-a", { sequence: 1 }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+
+    tx.messageParticipant.findFirst.mockResolvedValue({ id: "participant-a" });
+    tx.message.findFirst.mockResolvedValue(null);
+    await expect(
+      service.advanceStaffReadCursor(actor, "conversation-a", { sequence: 1 }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("advances only the active staff participant's cursor", async () => {
+    const { tx, service } = setup();
+
+    await expect(
+      service.advanceStaffReadCursor(actor, "conversation-a", { sequence: 2 }),
+    ).resolves.toEqual({ lastReadSequence: 2 });
+    expect(tx.messageParticipant.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: actor.tenantId,
+          conversationId: "conversation-a",
+          userId: actor.userId,
+          removedAt: null,
+          conversation: { kind: { in: ["STAFF_DIRECT", "STAFF_ROOM"] } },
+        }),
+      }),
+    );
+    expect(tx.message.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          conversationId: "conversation-a",
+          sequence: 2,
+        },
+      }),
+    );
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
   });
 });

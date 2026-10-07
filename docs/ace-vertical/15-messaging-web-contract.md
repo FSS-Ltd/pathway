@@ -17,7 +17,7 @@ NexSteps already has `MessageConversation`, `MessageParticipant`, `Message`,
 read-cursor and delivery tables, encrypted message bodies, tenant RLS, and
 creator/participant eligibility triggers. Step 1.3e1a adds a read-only staff
 conversation-list route. Step 1.3e1b adds read-only staff message history;
-creation, sending, read-cursor writes, parent access, and web journeys remain
+creation, sending, parent access, and web journeys remain
 pending. The existing
 `PARENT_STAFF` uniqueness constraint allows **one conversation per guardian
 identity per site**, so the first web journey is a
@@ -80,8 +80,10 @@ requires an active user, a current selected-site `STAFF` or `SITE_ADMIN`
 membership, an active staff participant, and the typed read permission. It
 returns bounded newest-first pages and a 160-character message preview. Step
 1.3e1b adds bounded history by message sequence after rechecking active staff
-participation; reads do not move read cursors. Unread counts and parent/staff
-threads wait for later slices. The send slice must update conversation
+participation; reads do not move read cursors. Step 1.3e1c adds explicit,
+forward-only read-cursor writes for a sequence in the caller's staff
+conversation. Unread counts and parent/staff threads wait for later slices.
+The send slice must update conversation
 `updatedAt` after the database allocates a message sequence so the list's
 activity order remains correct.
 
