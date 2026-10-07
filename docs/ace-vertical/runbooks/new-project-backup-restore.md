@@ -69,9 +69,12 @@ These checks are rehearsal evidence, not a target restore.
    logical SQL with `psql`, following Supabase's
    [dashboard-backup guide](https://supabase.com/docs/guides/platform/migrating-within-supabase/dashboard-restore).
    This is a cluster-style SQL dump with global role statements and
-   `\connect template1` / `\connect postgres` commands. Prepare and review a
-   target-scoped replay before using `psql`: preserve the target's managed
-   roles and settings, omit the `template1` section, and recreate only the two
+   `\connect template1` / `\connect postgres` commands. Run
+   `node scripts/prepare-supabase-backup-replay.mjs <backup.gz>` and review its
+   target-scoped output before using `psql`. The helper requires this archive's
+   SHA-256 and 166 sections/1,820 rows, removes global roles and the
+   `template1` section, and writes SQL in a private temporary directory.
+   Preserve the target's managed roles and settings, and recreate only the two
    application-owned roles and their required grants after checking their
    intended privileges. Do not pipe the unmodified archive into the managed
    target. Keep the replay and transcript in a permission-restricted temporary
