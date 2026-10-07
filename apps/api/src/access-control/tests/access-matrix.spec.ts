@@ -56,6 +56,10 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R31: "migrated",
   R69: { pending: "self-scoped; no capability/permission layer by design" },
   R70: "migrated",
+  R71: "migrated",
+  R72: "migrated",
+  R73: "migrated",
+  R74: "migrated",
 };
 
 for (let n = 15; n <= 68; n += 1) {
@@ -150,5 +154,14 @@ describe("access route matrix", () => {
       capability: "ace.dashboard.read",
       permission: "ace.dashboard.read",
     });
+  });
+
+  it("gives core subject setup its ACE settings permissions", () => {
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+
+    expect(byId.R71).toMatchObject({ method: "GET", path: "/ace/subjects", permission: "ace.settings.read" });
+    expect(byId.R72).toMatchObject({ method: "POST", path: "/ace/subjects", permission: "ace.settings.manage" });
+    expect(byId.R73).toMatchObject({ method: "PATCH", path: "/ace/subjects/:id", permission: "ace.settings.manage" });
+    expect(byId.R74).toMatchObject({ method: "POST", path: "/ace/subjects/:id/deactivate", permission: "ace.settings.manage" });
   });
 });
