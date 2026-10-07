@@ -8,6 +8,13 @@ configuration now selects the restored London Supabase project. The prior
 stopped at Prisma migration and skipped all three apps. Production deployment
 remains manual; merging to `master` does not deploy automatically.
 
+On 7 October, the connected Vercel API confirmed that the API
+project's production `DATABASE_URL` and `SUPABASE_URL` both reference
+`jzofykdzpuslpdyfovxp`. Its production Supabase secret key is present.
+Admin and web use API URLs rather than direct database credentials. All three
+production deployments remain READY at `a41e09aac3fde40f646e0242b0b8e3f0191e0122`;
+the later merged messaging steps have not been deployed.
+
 ## Delivery steps
 
 | Step     | Scope                                                  | State   | PR and base                                                     | Checked revision and CI                                                                                                                                                                                         | Merge evidence                             |
@@ -73,14 +80,14 @@ remains manual; merging to `master` does not deploy automatically.
 | 1.3e3b1  | Scoped staff recipient discovery API                   | Merged  | [#406](https://github.com/FSS-Ltd/pathway/pull/406) to `master` | `c35f07c90326683389c8a5a9b808516f17369331`; all eight checks passed: CI run 37643791257, CodeQL run 37643776507.                                                                                                | `a41e09aac3fde40f646e0242b0b8e3f0191e0122` |
 | DB-2i    | New-project production cutover                         | Merged  | [#407](https://github.com/FSS-Ltd/pathway/pull/407) to `master` | `a45bfb654344cc04042a7b0aa0ecf08457c036de`; all eight checks passed: CI run 37647704662, CodeQL run 37647698814. Production deploy run 37645052412 passed.                                                      | `9483ea3f84736e169f96638eb08f14d16ebd7718` |
 | 1.3e3b2  | Scoped staff direct conversation web control           | Merged  | [#408](https://github.com/FSS-Ltd/pathway/pull/408) to `master` | `cfc654754a680baeffb0b93e5151e321b970d320`; all eight checks passed: CI run 37652063721, CodeQL run 37652056053.                                                                                                | `99f671de57e0031c80ea6b7d48907924643d7608` |
-| 1.3e3c   | Scoped staff unread counts and list badges             | Review  | [#409](https://github.com/FSS-Ltd/pathway/pull/409) to `master` | Locally verified; CI and merge pending on the final PR revision.                                                                                                                                                | Pending                                    |
+| 1.3e3c   | Scoped staff unread counts and list badges             | Merged  | [#409](https://github.com/FSS-Ltd/pathway/pull/409) to `master` | `87214821eb625ee211945d5a26717c92d9e12266`; all eight checks passed: CI run 37656203634, CodeQL run 37656189481.                                                                                                | `aac2f36551a793b56cf6fdbeb5a56eaa268b18ac` |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 
-Step 1.3e3c is locally verified in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
-on `feature/ace-message-unread-counts`. Require passing CI on its final revision
-and confirmed merge before starting the next build step.
+Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
+after all eight checks passed on its final revision. Its staff unread-count
+journey is merged but is not in the current manual production deployment.
 
 For step 1.3c5b, all eight checks passed on the checked revision in
 [CI run 37532490552](https://github.com/FSS-Ltd/pathway/actions/runs/37532490552)
