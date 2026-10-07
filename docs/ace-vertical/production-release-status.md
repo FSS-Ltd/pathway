@@ -74,7 +74,7 @@ deployment is claimed by this record.
 | DB-2g    | Project-safe production environment preparation        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master` | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master` | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master` | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
-| 1.3e3b1  | Scoped staff recipient discovery API                   | In work | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
+| 1.3e3b1  | Scoped staff recipient discovery API                   | PR open | [#406](https://github.com/FSS-Ltd/pathway/pull/406) to `master` | Local lint, typecheck, API unit and RLS integration suites, API build, formatting, diff review, Graphify and commit-hook checks passed. CI pending.                                                             | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -406,12 +406,15 @@ remain deferred under the product owner's instruction.
 ## Release gate
 
 The off-traffic London target has DB-2h applied and verified, but production
-still uses the old project. The GitHub production environment secrets and
-repository Supabase URL predate the new project. The Vercel connection can
-list the three NexSteps projects but receives HTTP 403 when reading their
-environment variables; the owner selected the connection-access route, and
-the grant had not taken effect at the last check. Staging, secret cutover,
-manual deployment, and production smoke checks remain pending.
+still uses the old project. On 7 October, the Vercel connection gained
+environment-variable access and accepted updates to the `nexsteps-api`
+production `DATABASE_URL` (target transaction pooler), `SUPABASE_URL`, and
+`SUPABASE_SECRET_KEY`; read-back showed new update timestamps for all three.
+No Vercel app was redeployed, so no traffic switch is claimed. The GitHub
+production environment `DATABASE_URL`, `DIRECT_URL`, and
+`SUPABASE_SECRET_KEY`, plus the repository `SUPABASE_URL`, still predate the
+new project. Synchronize those values before a deployment and complete
+staging, manual deployment, and production smoke checks.
 
 After implementation, restore the Supabase connection; inspect migration status
 and pending SQL; apply and test migrations in staging; then deploy the verified
