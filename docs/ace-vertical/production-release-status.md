@@ -72,7 +72,8 @@ deployment is claimed by this record.
 | 1.3e2a   | Idempotent staff direct conversation creation            | Merged | [#399](https://github.com/FSS-Ltd/pathway/pull/399) to `master` | `b2b640f5048cb9beec1157bb9f7e0750e5c07f07`; all eight checks passed: CI run 37617805922, CodeQL run 37617802053. | `d480172e7b1573544ceb39ff9550a28d53848211` |
 | 1.3e2b   | Scoped staff message send API                            | Merged | [#401](https://github.com/FSS-Ltd/pathway/pull/401) to `master` | `77fe27f3a5a166d239318d91444a81dcfb41fb5c`; all eight checks passed: CI run 37623067709, CodeQL run 37623060227. | `f5e2f7e25a371d022db8bd67c619c087e60ff4cd` |
 | DB-2g    | Project-safe production environment preparation          | Merged | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master` | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019. | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
-| 1.3e3a   | Staff messaging web journey                              | PR open | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master` | `3888bf1dbb7bf7acc0837369b306e1e1dccc7787`; local lint, typecheck, admin tests, build, formatting, diff, Graphify, and commit-hook tests passed. CI pending. | Pending |
+| 1.3e3a   | Staff messaging web journey                            | Merged   | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master` | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                             | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
+| DB-2h    | Pin restored trigger-function search paths             | Pending  | Pending to `master`                                             | Target rollback-only migration and membership probe passed; local and CI checks pending.                                                                                                     | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned  | Pending                                                         | Pending                                                                                                                                                                                      | Pending                                    |
@@ -136,6 +137,13 @@ or cutover can be verified while the source is unavailable unless a complete,
 restorable backup and its storage objects have already been independently
 verified.
 
+The owner chose the 7 September database and Storage archives as the final
+source snapshot on 7 October, accepting that later writes cannot be checked
+against the inactive source and may be absent. The target matches the archived
+application row counts and Storage bytes; this acceptance allows release
+preparation to continue, but does not establish current-source parity or put
+production on the new project.
+
 1. Record the source and target project refs, region, required extensions,
    database roles, migration history, storage buckets and object counts, Auth
    configuration if used, scheduled jobs, Edge Functions and external webhook
@@ -162,9 +170,12 @@ verified.
    billing webhooks and critical API/admin/configurator journeys. Record the
    exact source snapshot and target migration status. Resolve differences
    before production cutover.
-5. Schedule a write freeze, take and verify a final backup, replay any approved
-   delta, and recheck parity. Update `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`,
-   storage keys and relevant secrets in every deployment surface. In particular,
+5. Keep the inactive source free of new writes. The owner accepted the verified
+   7 September archive pair as the final snapshot, so there is no later delta
+   to replay from current evidence. If source access returns before cutover,
+   stop and compare later writes before switching traffic. Update
+   `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, storage keys and relevant
+   secrets in every deployment surface. In particular,
    `scripts/prepare-production-env.mjs` now derives the project URL from
    `DATABASE_URL` and requires a verified host before converting direct URLs;
    prepare and verify target credentials before synchronization. The migration
