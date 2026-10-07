@@ -357,6 +357,7 @@ jobs:
           src/__tests__/portable-ace-actor-membership.integration.spec.ts
           src/__tests__/portable-message-creator.integration.spec.ts
           src/__tests__/portable-message-participant.integration.spec.ts
+          src/__tests__/portable-notice-guardian-eligibility.integration.spec.ts
 
   organisation-role-rls:
     name: Organisation Role RLS
@@ -427,6 +428,15 @@ jobs:
           E2E_TENANT_ID: "00000000-0000-0000-0000-00000000000a"
           E2E_TENANT2_ID: "00000000-0000-0000-0000-00000000000b"
         run: pnpm --filter @pathway/api test:integration -- --runInBand access-control.rls role-assignment.rls effective-permissions.rls role-api-transaction.rls
+
+      - name: Run app-schema notice eligibility smoke
+        env:
+          DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_role_rls_ci?schema=app
+          PATHWAY_RUN_DB_INTEGRATION_TESTS: "1"
+        run: >-
+          pnpm --filter @pathway/db exec
+          jest --config jest.config.ts --runInBand --runTestsByPath
+          src/__tests__/portable-notice-guardian-eligibility.integration.spec.ts
 
       - name: Test organisation role RLS policy gate contract
         run: node --test scripts/lib/role-rls-gate.test.mjs
