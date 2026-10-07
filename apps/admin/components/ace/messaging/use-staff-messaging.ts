@@ -118,13 +118,24 @@ export function useStaffMessaging(currentUserId: string) {
         setNextBefore(page.nextBefore);
         const newest = page.items[0];
         if (newest) {
-          void advanceStaffReadCursor(selectedId, newest.sequence).catch(() => {
-            if (active && generation === threadGeneration.current) {
-              setThreadError(
-                "Messages loaded, but read status could not be saved.",
-              );
-            }
-          });
+          void advanceStaffReadCursor(selectedId, newest.sequence)
+            .then(() => {
+              if (!active || generation !== threadGeneration.current) return;
+              if (openedConversation.current?.id === selectedId) {
+                openedConversation.current = {
+                  ...openedConversation.current,
+                  unreadCount: 0,
+                };
+              }
+              setListRevision((revision) => revision + 1);
+            })
+            .catch(() => {
+              if (active && generation === threadGeneration.current) {
+                setThreadError(
+                  "Messages loaded, but read status could not be saved.",
+                );
+              }
+            });
         }
       })
       .catch((error: unknown) => {
@@ -261,6 +272,7 @@ export function useStaffMessaging(currentUserId: string) {
       title: recipient.displayName,
       latestMessage: null,
       updatedAt: new Date().toISOString(),
+      unreadCount: 0,
     };
     openedConversation.current =
       conversations.find((conversation) => conversation.id === opened.id) ??

@@ -83,7 +83,7 @@ returns bounded newest-first pages and a 160-character message preview. Step
 1.3e1b adds bounded history by message sequence after rechecking active staff
 participation; reads do not move read cursors. Step 1.3e1c adds explicit,
 forward-only read-cursor writes for a sequence in the caller's staff
-conversation. Unread counts and parent/staff threads wait for later slices.
+conversation. Parent/staff threads wait for later slices.
 Step 1.3e2b updates conversation `updatedAt` using database time after the
 database allocates a message sequence so the list's activity order remains
 correct.
@@ -118,7 +118,7 @@ labelled composer. It keeps a failed draft and reuses the same client request
 ID on retry; a sent bubble appears only after the API confirms it. Site
 changes clear the visible conversation and messages before new site data
 loads. Navigation and the page require both staff read permissions; sending
-has its own permission check. The current API does not return unread counts or
+has its own permission check. The current API does not return individual
 delivery/read state, so this screen does not display those indicators yet.
 Staff direct creation and staff room creation controls are also outside that
 slice; existing conversations can be read and replied to. Step 1.3e3b2 adds
@@ -127,8 +127,12 @@ search current-site staff by name, open or reuse a direct conversation, and
 continue in the existing thread view. The inline search requires two
 characters, caps results at 20, and clearly states its site scope. It handles
 loading, no match, error, and pending creation. A site switch clears the
-search and ignores a late creation response. Room, parent, and notice journeys
-remain separate gated work.
+search and ignores a late creation response. Step 1.3e3c adds unread counts
+for each bounded staff conversation page. The count includes messages from
+other participants after the caller's forward-only read cursor; it does not
+load full histories or count the caller's own messages. The web list shows a
+numbered, screen-reader-labelled badge and refreshes after the cursor save
+succeeds. Room, parent, and notice journeys remain separate gated work.
 
 ## Web design intent
 

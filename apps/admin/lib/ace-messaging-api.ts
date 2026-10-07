@@ -6,6 +6,7 @@ export type StaffConversation = {
   title: string;
   latestMessage: { preview: string; createdAt: string } | null;
   updatedAt: string;
+  unreadCount: number;
 };
 
 export type StaffMessage = {

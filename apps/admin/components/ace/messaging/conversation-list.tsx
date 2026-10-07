@@ -114,8 +114,23 @@ function ConversationRow({
             {shortDate.format(new Date(conversation.updatedAt))}
           </time>
         </span>
-        <span className="mt-1 block truncate text-sm text-text-muted">
-          {conversation.latestMessage?.preview || "No messages yet"}
+        <span className="mt-1 flex items-center justify-between gap-2">
+          <span className="min-w-0 truncate text-sm text-text-muted">
+            {conversation.latestMessage?.preview || "No messages yet"}
+          </span>
+          {conversation.unreadCount > 0 ? (
+            <span className="flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-accent-strong px-1.5 text-xs font-semibold text-white">
+              <span aria-hidden="true">
+                {conversation.unreadCount > 99
+                  ? "99+"
+                  : conversation.unreadCount}
+              </span>
+              <span className="sr-only">
+                {conversation.unreadCount} unread
+                {conversation.unreadCount === 1 ? " message" : " messages"}
+              </span>
+            </span>
+          ) : null}
         </span>
       </span>
     </button>

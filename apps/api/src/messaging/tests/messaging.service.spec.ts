@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { withTenantRlsContext } from "@pathway/db";
+import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
 import { MessagingController } from "../messaging.controller";
 import {
@@ -15,7 +15,16 @@ import {
 import { encodeConversationCursor } from "../messaging-cursor";
 import { MessagingService } from "../messaging.service";
 
-jest.mock("@pathway/db", () => ({ withTenantRlsContext: jest.fn() }));
+jest.mock("@pathway/db", () => ({
+  withTenantRlsContext: jest.fn(),
+  Prisma: {
+    sql: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings: [...strings],
+      values,
+    })),
+    join: jest.fn((values: unknown[]) => values),
+  },
+}));
 
 const actor = { tenantId: "tenant-a", orgId: "org-a", userId: "staff-a" };
 const time = new Date("2026-10-07T09:00:00.000Z");
@@ -91,6 +100,9 @@ describe("staff messaging service", () => {
 
   it("lists only the selected site's active staff conversations", async () => {
     const { tx, service } = setup();
+    tx.$queryRaw.mockResolvedValue([
+      { conversationId: "conversation-a", unreadCount: 2n },
+    ]);
     tx.messageConversation.findMany.mockResolvedValue([
       {
         id: "conversation-a",
@@ -117,6 +129,7 @@ describe("staff messaging service", () => {
           createdAt: time.toISOString(),
         },
         updatedAt: time.toISOString(),
+        unreadCount: 2,
       },
     ]);
     expect(result.nextCursor).toEqual(expect.any(String));
@@ -142,6 +155,18 @@ describe("staff messaging service", () => {
       actor.orgId,
       expect.any(Function),
     );
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(Prisma.join).toHaveBeenCalledWith(["conversation-a"]);
+  });
+
+  it("does not query unread messages when the page is empty", async () => {
+    const { tx, service } = setup();
+
+    await expect(service.listStaffConversations(actor, {})).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("denies staff reads after membership ends or for a student identity", async () => {
