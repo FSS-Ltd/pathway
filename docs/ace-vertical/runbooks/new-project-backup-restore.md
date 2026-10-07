@@ -185,6 +185,15 @@ Recover and review the three exceptional original SQL files, or approve a
 reviewed forward baseline for repeatable future restores. Do not invent their
 contents or edit the restored migration ledger to make checks pass.
 
+The new `NEW_SUPABASE_SERVICE_ROLE_KEY` in the ignored local env file was
+validated against the target Storage API: it listed exactly
+`pathway-private` (private) and `pathway-public` (public). The target project
+reports healthy in London and has no Edge Functions. A security advisor run
+found public API-role execution grants on the `public.rls_auto_enable()`
+`SECURITY DEFINER` event-trigger function. DB-2e2 removes those grants after
+its PR gate; the target rollback-only rehearsal passed. Four separate
+mutable-search-path function warnings remain for review.
+
 **Remaining release blockers:** Migration-history provenance, source freshness
 and final delta, and project-specific configuration and staging verification
 remain unresolved.
