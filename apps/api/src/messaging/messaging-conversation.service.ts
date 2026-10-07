@@ -7,6 +7,7 @@ import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import type { CreateStaffDirectConversationInput } from "./dto/messaging-command.dto";
+import type { StaffRecipientQuery } from "./dto/messaging-query.dto";
 import {
   assertMessagingActor,
   requireCurrentStaff,
@@ -15,6 +16,45 @@ import {
 
 @Injectable()
 export class MessagingConversationService {
+  async listStaffRecipients(actor: MessagingActor, query: StaffRecipientQuery) {
+    assertMessagingActor(actor);
+    const limit = query.limit ?? 20;
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      await requireCurrentStaff(tx, actor);
+      const rows = await tx.siteMembership.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          userId: { not: actor.userId },
+          role: { in: ["SITE_ADMIN", "STAFF"] },
+          user: {
+            isActive: true,
+            studentIdentities: { none: { tenantId: actor.tenantId } },
+            OR: [
+              { displayName: { contains: query.search, mode: "insensitive" } },
+              { name: { contains: query.search, mode: "insensitive" } },
+            ],
+          },
+        },
+        select: {
+          userId: true,
+          user: { select: { displayName: true, name: true } },
+        },
+        orderBy: [{ user: { displayName: "asc" } }, { userId: "asc" }],
+        take: limit + 1,
+      });
+      return {
+        items: rows.slice(0, limit).map((row) => ({
+          id: row.userId,
+          displayName:
+            row.user.displayName?.trim() ||
+            row.user.name?.trim() ||
+            "Staff member",
+        })),
+        hasMore: rows.length > limit,
+      };
+    });
+  }
+
   async openStaffDirect(
     actor: MessagingActor,
     input: CreateStaffDirectConversationInput,

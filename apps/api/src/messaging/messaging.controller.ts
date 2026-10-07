@@ -25,6 +25,7 @@ import {
   conversationQuerySchema,
   messageQuerySchema,
   readCursorSchema,
+  staffRecipientQuerySchema,
 } from "./dto/messaging-query.dto";
 import { MessagingService } from "./messaging.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
@@ -63,6 +64,21 @@ export class MessagingController {
       return await this.conversations.openStaffDirect(
         this.actor(),
         await createStaffDirectConversationSchema.parseAsync(body),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Get("recipients")
+  @RequirePermission("messaging.conversations.create")
+  async recipients(@Query() query: unknown) {
+    try {
+      return await this.conversations.listStaffRecipients(
+        this.actor(),
+        await staffRecipientQuerySchema.parseAsync(query),
       );
     } catch (error) {
       if (error instanceof z.ZodError)

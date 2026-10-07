@@ -1337,6 +1337,44 @@ describe("ACE parent/staff messaging and notices storage", () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it("discovers only eligible same-site staff through the tenant query", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const candidates = [
+      fixture.staffAId,
+      fixture.staffBId,
+      fixture.studentUserId,
+      fixture.tenantBOnlyUserId,
+    ];
+    try {
+      await prisma.user.updateMany({
+        where: { id: { in: candidates } },
+        data: { displayName: "Recipient search match" },
+      });
+      const result =
+        await new MessagingConversationService().listStaffRecipients(
+          {
+            tenantId: fixture.tenantAId,
+            orgId: fixture.orgAId,
+            userId: fixture.staffAId,
+          },
+          { search: "Recipient search" },
+        );
+
+      expect(result).toEqual({
+        items: [
+          { id: fixture.staffBId, displayName: "Recipient search match" },
+        ],
+        hasMore: false,
+      });
+    } finally {
+      await prisma.user.updateMany({
+        where: { id: { in: candidates } },
+        data: { displayName: null },
+      });
+    }
+  });
+
   it("sends one encrypted, audited message with one delivery across concurrent retries", async () => {
     if (!isDatabaseAvailable()) return;
 

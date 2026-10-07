@@ -43,6 +43,7 @@ or message metadata in a denial.
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /ace/messages/conversations?cursor=&limit=`              | `messaging.conversations.read`                                                 | Only conversations where the caller is an active participant in the selected site; bounded, newest-first page.                                                      |
 | `POST /ace/messages/conversations`                            | `messaging.conversations.create`                                               | Parent opens or reuses their own `PARENT_STAFF` school-team conversation; staff direct/room creation requires current site membership and approved recipient scope. |
+| `GET /ace/messages/conversations/recipients?search=&limit=`   | `messaging.conversations.create`                                               | Current active staff in the selected site only; excludes the caller and student identities. Search needs 2–80 characters and returns at most 20 names and IDs.      |
 | `GET /ace/messages/conversations/:id/messages?before=&limit=` | `messaging.messages.read`                                                      | Recheck participant and relationship/membership; bounded sequence page, with only necessary sender display names and delivery facts.                                |
 | `POST /ace/messages/conversations/:id/messages`               | `messaging.messages.send`                                                      | Active participant, nonblank bounded body, client request ID; atomic sequence allocation, message, recipient deliveries, and audit.                                 |
 | `PUT /ace/messages/conversations/:id/read-cursor`             | `messaging.messages.read`                                                      | Advance only the caller's cursor to a sequence that exists in this conversation; never move it backward.                                                            |
@@ -92,6 +93,14 @@ active staff members in the selected site. It checks the recipient's site
 membership and excludes student identities, serializes the pair under a
 transaction lock, and audits new conversations. Parent, room, and student
 creation remain unavailable through this route.
+
+Step 1.3e3b1 adds recipient discovery for that staff-direct route. The
+server checks the create permission and current staff membership, searches
+active staff only in the selected site, and returns display names and user IDs
+without email or other profile details. The result is capped at 20; callers
+refine the search to find additional people. Discovery does not authorize
+conversation creation, which rechecks recipient eligibility in its own
+transaction.
 
 Step 1.3e2b sends a bounded, nonblank staff message with a UUID client request
 ID through an active `STAFF_DIRECT` or `STAFF_ROOM` conversation. The sender
