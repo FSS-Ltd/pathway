@@ -325,6 +325,13 @@ enum AcademicPeriodStatus {
   ARCHIVED
 }
 
+enum AceTeachingDateKind {
+  TEACHING
+  EXCEPTIONAL_OPEN
+  HOLIDAY
+  CLOSED
+}
+
 enum StudentSubjectEnrollmentStatus {
   ACTIVE
   ENDED
@@ -873,6 +880,7 @@ model Tenant {
   aceYearBands           AceYearBand[]
   aceStaffYearBandAssignments AceStaffYearBandAssignment[]
   aceSchoolEnrollments   AceSchoolEnrollment[]
+  aceTeachingDates       AceTeachingDate[]
   subjectEnrollments     StudentSubjectEnrollment[]
   paceAssessments        PaceAssessment[]
   paceProgress           PaceProgress[]
@@ -2441,6 +2449,7 @@ model AcademicYear {
   status    AcademicYearStatus @default(ACTIVE)
   periods   AcademicPeriod[]
   schoolEnrollments AceSchoolEnrollment[]
+  teachingDates AceTeachingDate[]
   createdAt DateTime           @default(now())
   updatedAt DateTime           @default(now()) @updatedAt
 
@@ -2523,6 +2532,23 @@ model AceSchoolEnrollment {
   @@unique([tenantId, childId, startsOn])
   @@index([tenantId, yearBandId, startsOn, endsOn])
   @@index([tenantId, childId, startsOn, endsOn])
+}
+
+model AceTeachingDate {
+  id             String              @id @default(uuid())
+  tenantId       String
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYearId String
+  academicYear   AcademicYear        @relation(fields: [academicYearId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  date           DateTime            @db.Date
+  kind           AceTeachingDateKind
+  reason         String?             @db.VarChar(240)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, date])
+  @@index([tenantId, academicYearId, date])
 }
 
 model AceTermReport {
