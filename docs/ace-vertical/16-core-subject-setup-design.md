@@ -8,11 +8,30 @@ site, but its only subject-management API is under the paid Learning module.
 ACE staff need a core subject catalogue to place students into PACE subjects
 without purchasing Learning.
 
-This slice adds ACE subject catalogue APIs. The Academic setup screen follows
-in the next web slice. Learning logs, evidence, and report bundles keep their
+The API step adds ACE subject catalogue routes; the following web step adds
+the Academic setup screen. Learning logs, evidence, and report bundles keep their
 existing paid entitlement. Subject codes in Oasis are display identifiers;
 NexSteps uses a unique name per site and stable UUID references, so no code
 column or schema migration is needed for the same catalogue outcome.
+
+## Academic setup web journey
+
+The ACE Academic setup page adds a Subjects card beside the existing calendar
+and PACE policy. It shows active subjects first and inactive subjects with a
+text status. School leads with `ace.settings.manage` can create or rename a
+subject, or deactivate one after entering a reason; readers can inspect the
+catalogue without seeing write controls. Deactivation uses an inline
+confirmation because there is no reactivation command, while existing PACE
+placements remain visible. A unique name replaces Oasis's separate code field.
+
+The card uses shared NexSteps components and tokens: a scannable list, one
+prominent create action, quiet secondary row actions, labelled fields, keyboard
+submit and cancel controls, and text as well as colour for status. Loading,
+empty, validation, request-error, pending, and success states stay near the
+relevant form or list. Buttons remain comfortable touch targets and motion is
+limited to shared reduced-motion-aware component styles. Active-site changes
+clear the catalogue and form state, abort the prior read, and ignore responses
+from the previous site. Writes rely on the API's trusted site context.
 
 ## Contract and security
 
@@ -35,8 +54,7 @@ column or schema migration is needed for the same catalogue outcome.
 ## Rollout and verification
 
 The existing `Subject` table and RLS policy remain unchanged. API and UI can
-deploy separately: until the web slice lands, the new endpoints are unused by
-the admin app. Verify permitted and denied roles, site switches, duplicate
+deploy separately. Verify permitted and denied roles, site switches, duplicate
 names, deactivation with existing placements, audit rollback, and expired/absent
 Learning add-ons. Stage before production and use the manual release workflow;
 disable the ACE screen if a later web release fails. Existing subject and PACE

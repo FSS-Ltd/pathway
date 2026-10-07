@@ -31,6 +31,14 @@ export type UpdateAcePacePolicyInput = {
   pacePolicy: AcePacePolicyChange;
 };
 
+export type AceSubject = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
+export type AceSubjectChange = { name: string; reason: string };
+
 export class AceSettingsRequestError extends Error {
   constructor(
     message: string,
@@ -72,6 +80,59 @@ export async function updateAcePacePolicy(
   });
   if (!response.ok) throw await settingsRequestError(response);
   return response.json() as Promise<AceSettings>;
+}
+
+export async function fetchAceSubjects(
+  signal?: AbortSignal,
+): Promise<AceSubject[]> {
+  if (isUsingMockApi()) return [];
+  const response = await fetch(`${API_BASE_URL}/ace/subjects`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    signal,
+  });
+  if (!response.ok) throw await settingsRequestError(response);
+  return response.json() as Promise<AceSubject[]>;
+}
+
+export function createAceSubject(input: AceSubjectChange): Promise<AceSubject> {
+  return writeAceSubject("", "POST", input);
+}
+
+export function renameAceSubject(
+  id: string,
+  input: AceSubjectChange,
+): Promise<AceSubject> {
+  return writeAceSubject(`/${encodeURIComponent(id)}`, "PATCH", input);
+}
+
+export function deactivateAceSubject(
+  id: string,
+  reason: string,
+): Promise<AceSubject> {
+  return writeAceSubject(`/${encodeURIComponent(id)}/deactivate`, "POST", {
+    reason,
+  });
+}
+
+async function writeAceSubject(
+  path: string,
+  method: "POST" | "PATCH",
+  input: AceSubjectChange | { reason: string },
+): Promise<AceSubject> {
+  if (isUsingMockApi()) {
+    throw new Error("ACE subject changes are not available in mock mode.");
+  }
+  const response = await fetch(`${API_BASE_URL}/ace/subjects${path}`, {
+    method,
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await settingsRequestError(response);
+  return response.json() as Promise<AceSubject>;
 }
 
 async function settingsRequestError(
