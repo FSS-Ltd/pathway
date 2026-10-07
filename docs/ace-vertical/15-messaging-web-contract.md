@@ -17,10 +17,10 @@ NexSteps already has `MessageConversation`, `MessageParticipant`, `Message`,
 read-cursor and delivery tables, encrypted message bodies, tenant RLS, and
 creator/participant eligibility triggers. Step 1.3e1a adds a read-only staff
 conversation-list route. Step 1.3e1b adds read-only staff message history;
-creation, sending, parent access, and web journeys remain
-pending. The existing
-`PARENT_STAFF` uniqueness constraint allows **one conversation per guardian
-identity per site**, so the first web journey is a
+message sending, parent access, and web journeys remain pending. Step 1.3e2a
+adds staff direct conversation creation only; staff rooms remain a later write
+slice. The existing `PARENT_STAFF` uniqueness constraint allows **one
+conversation per guardian identity per site**, so the first web journey is a
 school-team conversation, not one separate thread per staff contact. A site's
 staff membership alone is too broad to make every staff member a parent-message
 responder. The student role lists message permissions, but the current database
@@ -86,6 +86,12 @@ conversation. Unread counts and parent/staff threads wait for later slices.
 The send slice must update conversation
 `updatedAt` after the database allocates a message sequence so the list's
 activity order remains correct.
+
+Step 1.3e2a opens or reuses one `STAFF_DIRECT` conversation for two current,
+active staff members in the selected site. It checks the recipient's site
+membership and excludes student identities, serializes the pair under a
+transaction lock, and audits new conversations. Parent, room, and student
+creation remain unavailable through this route.
 
 ## Web design intent
 

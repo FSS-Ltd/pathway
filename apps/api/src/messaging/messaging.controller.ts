@@ -3,7 +3,10 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
+  Post,
   Put,
   Query,
   UseGuards,
@@ -13,6 +16,7 @@ import { z } from "zod";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
+import { createStaffDirectConversationSchema } from "./dto/messaging-command.dto";
 import {
   conversationIdSchema,
   conversationQuerySchema,
@@ -20,12 +24,14 @@ import {
   readCursorSchema,
 } from "./dto/messaging-query.dto";
 import { MessagingService } from "./messaging.service";
+import { MessagingConversationService } from "./messaging-conversation.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("ace/messages/conversations")
 export class MessagingController {
   constructor(
     private readonly service: MessagingService,
+    private readonly conversations: MessagingConversationService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -36,6 +42,22 @@ export class MessagingController {
       return await this.service.listStaffConversations(
         this.actor(),
         await conversationQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Post()
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission("messaging.conversations.create")
+  async create(@Body() body: unknown) {
+    try {
+      return await this.conversations.openStaffDirect(
+        this.actor(),
+        await createStaffDirectConversationSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError)
