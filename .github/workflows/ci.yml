@@ -344,7 +344,7 @@ jobs:
           PATHWAY_PERMISSION_DEFINITION_DB_SMOKE_DESTRUCTIVE_TOKEN: destroy-permission-definitions-in-disposable-database
         run: pnpm --filter @pathway/platform test:unit -- permission-definition-database.integration
 
-      - name: Run production-schema organisation role smoke
+      - name: Run production-schema trigger smoke
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_permission_definition_smoke_ci?schema=public
           PATHWAY_RUN_DB_INTEGRATION_TESTS: "1"
@@ -352,6 +352,7 @@ jobs:
           pnpm --filter @pathway/db exec
           jest --config jest.config.ts --runInBand --runTestsByPath
           src/__tests__/role-trigger-schema.integration.spec.ts
+          src/__tests__/portable-ace-fact-triggers.integration.spec.ts
 
   organisation-role-rls:
     name: Organisation Role RLS
