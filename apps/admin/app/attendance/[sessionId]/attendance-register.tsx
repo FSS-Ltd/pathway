@@ -15,6 +15,7 @@ import type {
   SaveAttendanceRow,
 } from "../../../lib/api-client";
 import { AdminAttendanceSaveError } from "../../../lib/attendance-save-error";
+import { subscribeToActiveSiteChanges } from "../../../lib/active-site-events";
 import { getInitials } from "../../../lib/names";
 import {
   AttendanceStatusControls,
@@ -22,6 +23,7 @@ import {
   type AttendanceDisplayStatus,
   type AttendanceMarkStatus,
 } from "./attendance-status-controls";
+import { AttendanceHistoryPanel } from "./attendance-history-panel";
 
 type AttendanceDisplayRow = AdminAttendanceDetail["rows"][number];
 
@@ -48,6 +50,7 @@ const PROGRESS_TONE: Record<
 
 type AttendanceRegisterProps = {
   detail: AdminAttendanceDetail;
+  canManage: boolean;
   onSave: (rows: SaveAttendanceRow[]) => Promise<AdminAttendanceDetail>;
   onReconcile?: () => Promise<AdminAttendanceDetail>;
   onRefresh?: () => Promise<void> | void;
@@ -55,6 +58,7 @@ type AttendanceRegisterProps = {
 
 export function AttendanceRegister({
   detail,
+  canManage,
   onSave,
   onReconcile,
   onRefresh,
@@ -76,6 +80,11 @@ export function AttendanceRegister({
     "all" | AttendanceDisplayStatus
   >("all");
   const [childSearch, setChildSearch] = React.useState("");
+  const [selectedHistory, setSelectedHistory] = React.useState<{
+    attendanceId: string;
+    childName: string;
+  } | null>(null);
+  const [historyVersion, setHistoryVersion] = React.useState(0);
   const successRef = React.useRef<HTMLDivElement>(null);
   const submissionGate = React.useRef(false);
   const uncertainRowsRef = React.useRef<SaveAttendanceRow[] | null>(null);
@@ -101,6 +110,11 @@ export function AttendanceRegister({
   React.useEffect(() => {
     if (saveSuccess) successRef.current?.focus();
   }, [saveSuccess]);
+
+  React.useEffect(
+    () => subscribeToActiveSiteChanges(() => setSelectedHistory(null)),
+    [],
+  );
 
   const changes = React.useMemo(
     () =>
@@ -174,6 +188,7 @@ export function AttendanceRegister({
         }
         uncertainRowsRef.current = null;
         setNeedsReconciliation(false);
+        setHistoryVersion((version) => version + 1);
       } catch {
         uncertainRowsRef.current = rows;
         setNeedsReconciliation(true);
@@ -216,6 +231,7 @@ export function AttendanceRegister({
       setValidation({});
       setNeedsReconciliation(false);
       uncertainRowsRef.current = null;
+      setHistoryVersion((version) => version + 1);
       setSaveSuccess("Attendance saved from the server response.");
     } catch (cause) {
       if (
@@ -261,37 +277,71 @@ export function AttendanceRegister({
         header: "Attendance status",
         cell: (row) => {
           const selected = draftStatus.get(row.childId) ?? row.status;
+          const attendanceId = row.attendanceId;
           return (
-            <AttendanceStatusControls
-              disabled={isSaving || needsReconciliation}
-              onReasonChange={(value) => {
-                setReasons((current) => ({
-                  ...current,
-                  [row.childId]: value,
-                }));
-                setValidation((current) => ({
-                  ...current,
-                  [row.childId]: "",
-                }));
-                setSaveError(null);
-              }}
-              onSelect={(status) => selectStatus(row.childId, status)}
-              reason={reasons[row.childId] ?? ""}
-              row={row}
-              selected={selected}
-              validation={validation[row.childId]}
-            />
+            <div className="space-y-2">
+              {canManage ? (
+                <AttendanceStatusControls
+                  disabled={isSaving || needsReconciliation}
+                  onReasonChange={(value) => {
+                    setReasons((current) => ({
+                      ...current,
+                      [row.childId]: value,
+                    }));
+                    setValidation((current) => ({
+                      ...current,
+                      [row.childId]: "",
+                    }));
+                    setSaveError(null);
+                  }}
+                  onSelect={(status) => selectStatus(row.childId, status)}
+                  reason={reasons[row.childId] ?? ""}
+                  row={row}
+                  selected={selected}
+                  validation={validation[row.childId]}
+                />
+              ) : (
+                <span className="text-sm font-medium text-text-primary">
+                  {STATUS_LABEL[row.status]}
+                </span>
+              )}
+              {attendanceId ? (
+                <Button
+                  aria-controls={
+                    selectedHistory?.attendanceId === attendanceId
+                      ? "attendance-history-panel"
+                      : undefined
+                  }
+                  aria-expanded={selectedHistory?.attendanceId === attendanceId}
+                  className="min-h-11"
+                  id={`attendance-history-${row.childId}`}
+                  onClick={() =>
+                    setSelectedHistory({
+                      attendanceId,
+                      childName: row.childName,
+                    })
+                  }
+                  size="sm"
+                  type="button"
+                  variant="secondary"
+                >
+                  View history
+                </Button>
+              ) : null}
+            </div>
           );
         },
         width: "520px",
       },
     ],
     [
+      canManage,
       draftStatus,
       isSaving,
       needsReconciliation,
       reasons,
       selectStatus,
+      selectedHistory?.attendanceId,
       validation,
     ],
   );
@@ -345,17 +395,19 @@ export function AttendanceRegister({
                   Refresh
                 </Button>
               ) : null}
-              <Button
-                className="min-h-11"
-                disabled={
-                  changes.length === 0 || isSaving || needsReconciliation
-                }
-                id="attendance-save"
-                onClick={() => void save()}
-                type="button"
-              >
-                {isSaving ? "Saving…" : "Save register"}
-              </Button>
+              {canManage ? (
+                <Button
+                  className="min-h-11"
+                  disabled={
+                    changes.length === 0 || isSaving || needsReconciliation
+                  }
+                  id="attendance-save"
+                  onClick={() => void save()}
+                  type="button"
+                >
+                  {isSaving ? "Saving…" : "Save register"}
+                </Button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -435,25 +487,31 @@ export function AttendanceRegister({
             placeholder="Search by child name…"
             value={childSearch}
           />
-          <Button
-            className="min-h-11"
-            disabled={isSaving || needsReconciliation}
-            onClick={markAllPresent}
-            type="button"
-            variant="outline"
-          >
-            Mark all present
-          </Button>
-          <Button
-            className="min-h-11 gap-2"
-            disabled={changes.length === 0 || isSaving || needsReconciliation}
-            onClick={resetChanges}
-            type="button"
-            variant="outline"
-          >
-            <RotateCcw aria-hidden className="h-4 w-4" />
-            Reset changes
-          </Button>
+          {canManage ? (
+            <>
+              <Button
+                className="min-h-11"
+                disabled={isSaving || needsReconciliation}
+                onClick={markAllPresent}
+                type="button"
+                variant="outline"
+              >
+                Mark all present
+              </Button>
+              <Button
+                className="min-h-11 gap-2"
+                disabled={
+                  changes.length === 0 || isSaving || needsReconciliation
+                }
+                onClick={resetChanges}
+                type="button"
+                variant="outline"
+              >
+                <RotateCcw aria-hidden className="h-4 w-4" />
+                Reset changes
+              </Button>
+            </>
+          ) : null}
         </div>
         <DataTable
           columns={columns}
@@ -466,6 +524,24 @@ export function AttendanceRegister({
           isLoading={false}
         />
       </Card>
+      {selectedHistory ? (
+        <AttendanceHistoryPanel
+          attendanceId={selectedHistory.attendanceId}
+          childName={selectedHistory.childName}
+          key={`${selectedHistory.attendanceId}:${historyVersion}`}
+          onClose={() => {
+            const trigger = authoritative.rows.find(
+              (row) => row.attendanceId === selectedHistory.attendanceId,
+            );
+            setSelectedHistory(null);
+            if (trigger) {
+              document
+                .getElementById(`attendance-history-${trigger.childId}`)
+                ?.focus();
+            }
+          }}
+        />
+      ) : null}
     </div>
   );
 }
