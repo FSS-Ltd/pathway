@@ -151,19 +151,43 @@ records. Counts remain 28 blog posts, one organisation, 71 users, six sites,
 `postgres` access. The strict RLS gate passes with `schema=public`. A
 read-only `schema=app` run of the merged gate flags two unchanged
 `OrgRolePermission` policies because PostgreSQL renders their referenced
-table as `public."OrgRoleDefinition"` under that search path. DB-2d3 corrects
-this comparison; its read-only target probe passes both schemas without an
-acceptance flag. Traffic and deployment configuration remain unchanged.
+table as `public."OrgRoleDefinition"` under that search path. After
+[PR #392](https://github.com/FSS-Ltd/pathway/pull/392) merged with all eight
+checks passing, the corrected strict gate passed read-only target runs with
+both `schema=public` and `schema=app`, with no acceptance flag. Traffic and
+deployment configuration remain unchanged.
 
-**Release blockers:** No repository migration is pending after PR #391, but
-`prisma migrate status` exits nonzero because two applied source migrations
-(`20260811143000_fix_ace_trigger_schema_references` and
-`20260811150000_fix_faith_audience_version_guard`) have no files in this
-checkout. The applied `20260613000000_lock_supabase_public_rls` and
-`20260728120000_org_role_revisions` checksums also differ from their repository
-files. Recover and review the original SQL; do not invent a replacement or
-edit the restored migration ledger. The `schema=app` strict RLS gate requires
-the DB-2d3 comparison fix before both schema modes can be signed off.
+**Migration-history audit — 7 October 2026:** The target has 105 finished
+Prisma migrations and one rolled-back attempt; Git has 103 migration files.
+A read-only comparison of every finished ledger checksum against the local SQL
+found 102 exact matches and no pending repository migrations. `prisma migrate
+status` exits zero and reports the schema up to date, so that command alone
+does not reveal the three history exceptions:
+
+| Migration                                          | Restored ledger           | Repository evidence                                                                        |
+| -------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------ |
+| `20260613000000_lock_supabase_public_rls`          | Finished checksum differs | The only version in local Git history matches the current file, not the restored checksum. |
+| `20260811143000_fix_ace_trigger_schema_references` | Finished                  | No file in the checkout or local Git history.                                              |
+| `20260811150000_fix_faith_audience_version_guard`  | Finished                  | No file in the checkout or local Git history.                                              |
+
+The restored lock-migration checksum is
+`41d067cc411861425dc07f6a5bb548b0b0782e53eb8a6195b8798ca15f6c5ff3`;
+the Git file hashes to
+`28145a3b9b5b565ecf25b49337562886656377bd7a49ab531fbb4339ded445e8`.
+The two missing migration records have checksums
+`4f4ddb816b6b1e5e51f694f723c6ceaae54d4b33e7f31ed35f0caccdf7edb23e`
+and `6ba558cc74a4971ef9ce256de4d361bd32e93c65652de3c789edc0321349d25b`,
+respectively.
+
+The rolled-back `20260728120000_org_role_revisions` attempt matches its first
+Git version; its finished ledger checksum matches the current repository file.
+Recover and review the three exceptional original SQL files, or approve a
+reviewed forward baseline for repeatable future restores. Do not invent their
+contents or edit the restored migration ledger to make checks pass.
+
+**Remaining release blockers:** Migration-history provenance, source freshness
+and final delta, and project-specific configuration and staging verification
+remain unresolved.
 No repository Data API table client was found, but external consumers require
 review before cutover. A read-only catalog audit found no remaining static
 function references to application relations missing from `app` but present
