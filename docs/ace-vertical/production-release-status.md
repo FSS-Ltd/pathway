@@ -86,7 +86,7 @@ deployment's `/health` returned 200 with a database timestamp on 7 October.
 | 1.3e3c   | Scoped staff unread counts and list badges             | Merged  | [#409](https://github.com/FSS-Ltd/pathway/pull/409) to `master` | `87214821eb625ee211945d5a26717c92d9e12266`; all eight checks passed: CI run 37656203634, CodeQL run 37656189481.                                                                                                | `aac2f36551a793b56cf6fdbeb5a56eaa268b18ac` |
 | 1.3e3d   | Scoped direct-message read feedback                    | Merged  | [#411](https://github.com/FSS-Ltd/pathway/pull/411) to `master` | `223df300078c50882000fd6271c4fe7fec3a440f`; all eight checks passed: CI run 37661038756, CodeQL run 37661033054.                                                                                                | `ac1d2feb66e24d1b5e5f4f27669d30a6e550b03e` |
 | 1.3f1    | C02 subject placement progress baseline                | Merged  | [#413](https://github.com/FSS-Ltd/pathway/pull/413) to `master` | `677860b0f7dc9e00dfdd38806a7a7a71137c7470`; all eight checks passed: CI run 37668386401, CodeQL run 37668381804.                                                                                                | `3b5a86bc4887bca1b0f7e49b7e92c0318bb0de69` |
-| 1.3f2    | C01 PACE policy web settings                           | In PR   | [#415](https://github.com/FSS-Ltd/pathway/pull/415) to `master` | Local checks passed; CI pending on PR head.                                                                                                                                                                     | Pending                                    |
+| 1.3f2    | C01 PACE policy web settings                           | Merged  | [#415](https://github.com/FSS-Ltd/pathway/pull/415) to `master` | `6b4c85663b22c5faa8b9e825a2f056e84281a6f1`; all eight checks passed: CI run 37674606330, CodeQL run 37674600785.                                                                                                | `47b11a8ec3461db3d0bfeb03475b8e8dbae6231a` |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -103,6 +103,13 @@ Step 1.3f1 was merged in [PR #413](https://github.com/FSS-Ltd/pathway/pull/413)
 after all eight checks passed on its final revision, including PostgreSQL
 integration coverage for the placement/projection reset. Its C02 work is merged
 but remains outside the earlier manual production deployment.
+
+Step 1.3f2 was merged in [PR #415](https://github.com/FSS-Ltd/pathway/pull/415)
+after all eight checks passed on its final revision. Academic setup now exposes
+the existing audited, site-scoped PACE policy, with permission-aware editing,
+optimistic conflict recovery, and site-switch resets. ACE core subject setup
+remains the next C01 implementation slice; authenticated staging and production
+verification are still required before release.
 
 For step 1.3c5b, all eight checks passed on the checked revision in
 [CI run 37532490552](https://github.com/FSS-Ltd/pathway/actions/runs/37532490552)
