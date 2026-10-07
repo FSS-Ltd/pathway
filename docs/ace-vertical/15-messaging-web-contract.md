@@ -103,6 +103,18 @@ The existing Prisma encryption layer protects the body at rest. A reused ID
 with different text is rejected; parent and student messages are unavailable
 through this route.
 
+Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive
+conversation list and thread, paged history, explicit read cursor, and a
+labelled composer. It keeps a failed draft and reuses the same client request
+ID on retry; a sent bubble appears only after the API confirms it. Site
+changes clear the visible conversation and messages before new site data
+loads. Navigation and the page require both staff read permissions; sending
+has its own permission check. The current API does not return unread counts or
+delivery/read state, so this screen does not display those indicators yet.
+Staff direct creation and staff room creation controls are also outside this
+slice; existing conversations can be read and replied to. Parent and notice
+journeys remain separate gated work.
+
 ## Web design intent
 
 Build the web surface on shared `@pathway/ui` tokens and the NexSteps teal,
