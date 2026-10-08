@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { SquarePen } from "lucide-react";
+import { MessagesSquare, SquarePen } from "lucide-react";
 import { Button } from "@pathway/ui";
 import { useStaffMessaging } from "./use-staff-messaging";
 
@@ -38,7 +38,7 @@ export function StaffMessagingWorkspace({
           Messages
         </h1>
         <p className="text-sm leading-6 text-text-muted">
-          Private staff conversations for your active site.
+          Private staff conversations and your site staff room.
         </p>
       </header>
 
@@ -60,26 +60,48 @@ export function StaffMessagingWorkspace({
             />
           ) : (
             <>
-              <div className="flex items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
                 <h2 className="font-heading text-lg font-semibold text-text-primary">
                   Conversations
                 </h2>
                 {canCreate ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="min-h-11"
-                    onClick={() => {
-                      messaging.select(null);
-                      setComposing(true);
-                    }}
-                  >
-                    <SquarePen className="h-4 w-4" aria-hidden="true" />
-                    New message
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="min-h-11"
+                      disabled={messaging.roomOpening}
+                      onClick={() => void messaging.startStaffRoom()}
+                    >
+                      <MessagesSquare className="h-4 w-4" aria-hidden="true" />
+                      {messaging.roomOpening ? "Opening…" : "Staff room"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="min-h-11"
+                      disabled={messaging.roomOpening}
+                      onClick={() => {
+                        messaging.select(null);
+                        setComposing(true);
+                      }}
+                    >
+                      <SquarePen className="h-4 w-4" aria-hidden="true" />
+                      New message
+                    </Button>
+                  </div>
                 ) : null}
               </div>
+              {messaging.roomError ? (
+                <p
+                  role="alert"
+                  className="px-5 py-3 text-sm text-status-danger"
+                >
+                  {messaging.roomError}
+                </p>
+              ) : null}
               <ConversationList messaging={messaging} />
             </>
           )}

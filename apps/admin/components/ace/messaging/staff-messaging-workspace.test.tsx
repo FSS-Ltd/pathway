@@ -25,6 +25,7 @@ Object.defineProperty(globalThis, "navigator", {
 
 const conversationId = "a2f14e28-9fc3-477e-9ca2-83eef5ac1d09";
 const newConversationId = "19fce9a7-7cd2-4d3c-99cd-a7ffcedf43e8";
+const roomConversationId = "edb94bc2-5c1a-4860-b54d-ab7d7429bead";
 const pendingConversationId = "aa7fb6d8-2bbc-4401-8d64-680f9876ff10";
 const staffId = "d2136e0b-76fa-4ad0-b605-819c4d80a322";
 const peerId = "e71be020-929e-4799-bc15-a8062437832a";
@@ -74,11 +75,13 @@ async function run(): Promise<void> {
   const originalFetch = globalThis.fetch;
   let site = 1;
   let postCount = 0;
+  let roomOpenCount = 0;
   let readCursorSaved = false;
   const sentRequestIds: string[] = [];
   const recipientSearches: string[] = [];
   let alexSearchFailed = false;
   let resolvePendingCreate: ((response: Response) => void) | null = null;
+  let resolvePendingRoom: ((response: Response) => void) | null = null;
 
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
@@ -110,8 +113,25 @@ async function run(): Promise<void> {
     if (method === "POST" && url.pathname.endsWith("/conversations")) {
       const body = JSON.parse(String(init?.body)) as {
         kind: string;
-        recipientUserId: string;
+        recipientUserId?: string;
       };
+      if (body.kind === "STAFF_ROOM") {
+        assert.equal(body.recipientUserId, undefined);
+        roomOpenCount += 1;
+        if (roomOpenCount === 1) {
+          return jsonResponse({ message: "temporary error" }, 500);
+        }
+        if (roomOpenCount === 3) {
+          return new Promise<Response>((resolve) => {
+            resolvePendingRoom = resolve;
+          });
+        }
+        return jsonResponse({
+          id: roomConversationId,
+          kind: "STAFF_ROOM",
+          created: true,
+        });
+      }
       assert.equal(body.kind, "STAFF_DIRECT");
       if (body.recipientUserId === bobId) {
         return new Promise<Response>((resolve) => {
@@ -146,7 +166,10 @@ async function run(): Promise<void> {
           });
     }
     if (url.pathname.endsWith("/messages")) {
-      if (url.pathname.includes(newConversationId)) {
+      if (
+        url.pathname.includes(newConversationId) ||
+        url.pathname.includes(roomConversationId)
+      ) {
         return jsonResponse({ items: [], nextBefore: null });
       }
       return jsonResponse({
@@ -277,6 +300,26 @@ async function run(): Promise<void> {
       "clears the draft only after server confirmation",
     );
 
+    const staffRoom = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Staff room",
+    );
+    assert.ok(staffRoom);
+    await act(async () => staffRoom.click());
+    assert.match(
+      container.querySelector('[role="alert"]')?.textContent ?? "",
+      /Unable to complete the messaging request/,
+    );
+    await act(async () => staffRoom.click());
+    assert.equal(roomOpenCount, 2);
+    assert.match(container.textContent ?? "", /Start the conversation below/);
+    assert.ok(
+      Array.from(
+        container.querySelectorAll(
+          'ul[aria-label="Staff conversations"] button',
+        ),
+      ).some((button) => button.textContent?.includes("Staff room")),
+    );
+
     const newMessage = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("New message"),
     );
@@ -339,12 +382,45 @@ async function run(): Promise<void> {
       container.textContent ?? "",
       /Welcome|Good morning|Hello team|Alex Morgan|Bob Lee/,
     );
+    assert.doesNotMatch(
+      container.querySelector('ul[aria-label="Staff conversations"]')
+        ?.textContent ?? "",
+      /Staff room/,
+    );
     assert.match(
       container.textContent ?? "",
       /No staff conversations are available/,
     );
 
+    const pendingRoomButton = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.trim() === "Staff room");
+    assert.ok(pendingRoomButton);
+    await act(async () => pendingRoomButton.click());
+    assert.ok(resolvePendingRoom);
+    assert.equal(pendingRoomButton.disabled, true);
+    const pendingNewMessage = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.trim() === "New message");
+    assert.ok(pendingNewMessage?.disabled);
+
     site = 1;
+    await act(async () => notifyActiveSiteChanged(dom.window));
+    await act(async () =>
+      resolvePendingRoom?.(
+        jsonResponse({
+          id: roomConversationId,
+          kind: "STAFF_ROOM",
+          created: true,
+        }),
+      ),
+    );
+    assert.doesNotMatch(
+      container.querySelector('ul[aria-label="Staff conversations"]')
+        ?.textContent ?? "",
+      /Staff room/,
+    );
+
     await act(async () =>
       root.render(
         <StaffMessagingWorkspace
@@ -363,6 +439,7 @@ async function run(): Promise<void> {
     assert.equal(container.querySelector("textarea"), null);
     assert.match(container.textContent ?? "", /do not have permission to send/);
     assert.doesNotMatch(container.textContent ?? "", /New message/);
+    assert.doesNotMatch(container.textContent ?? "", /Staff room/);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;
