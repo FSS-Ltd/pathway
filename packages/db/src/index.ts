@@ -230,8 +230,8 @@ export async function applyTenantContext(
 }
 
 /**
- * Run an interactive transaction using the base Prisma client.
- * Use this when prisma.$transaction fails (e.g. with the Proxy in some environments).
+ * Join the active writable request transaction, or create one when none exists.
+ * A nested callback participates in the outer transaction's rollback boundary.
  */
 export async function runTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
