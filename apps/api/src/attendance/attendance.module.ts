@@ -8,6 +8,7 @@ import { AttendanceService } from "./attendance.service";
 import { AttendanceHistoryService } from "./attendance-history.service";
 import { DailyAttendanceController } from "./daily-attendance.controller";
 import { DailyAttendanceService } from "./daily-attendance.service";
+import { DailyAttendanceHistoryService } from "./daily-attendance-history.service";
 import { DailyAttendanceWriteService } from "./daily-attendance-write.service";
 
 @Module({
@@ -17,6 +18,7 @@ import { DailyAttendanceWriteService } from "./daily-attendance-write.service";
     AttendanceService,
     AttendanceHistoryService,
     DailyAttendanceService,
+    DailyAttendanceHistoryService,
     DailyAttendanceWriteService,
   ],
   exports: [AttendanceService],

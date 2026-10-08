@@ -3,8 +3,9 @@
 **Status:** C06 contract in the
 [Oasis parity matrix](02-oasis-web-journey-parity.md). Steps 1.3g1–1.3g4
 established the schema. Step 1.3g5 adds the scoped staff roster read API.
-Step 1.3g6 adds atomic daily mark and correction writes. The web journey,
-history read API, and production migration remain open.
+Step 1.3g6 adds atomic daily mark and correction writes. Step 1.3g7 adds the
+bounded staff correction-history read. The web journey and production migration
+remain open.
 
 ## Source behaviour and current gap
 
@@ -51,6 +52,10 @@ Step 1.3g6 exposes one child/date mark write. It serialises initial marks and
 corrections per site/child/date, rechecks the actor's manage permission and
 dated band scope, and records a changed fact, correction event, and audit in
 one transaction. An identical save leaves the history unchanged.
+Step 1.3g7 reads the append-only daily correction events only after resolving
+the selected-site fact and the actor's dated band scope. Pages are newest
+first, bounded to 50, and use a signed cursor bound to the site and fact. A
+corrected teaching calendar does not hide a previously issued fact's history.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
