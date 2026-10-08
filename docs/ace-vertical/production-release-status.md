@@ -1,10 +1,10 @@
 # ACE production release status
 
 Checked on 8 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `e41574943aba178d6b4f63a5cb81e5db384ce970`.
+to READY deployments at merged commit `dec83b36bf11a2418ac1beceb73efcc6d501ef64`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-6 are now served by all three apps.
+changes through REL-7 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -120,14 +120,33 @@ health, environment health, public blog, and web configurator reads returned
 HTTP 200; anonymous admin messaging redirected to sign-in. Signed-in family
 and message data loading is still unverified.
 
-REL-7 prepares immediate staff recipient discovery in Messages. A read-only
+REL-7 added immediate staff recipient discovery in Messages. A read-only
 production check found five active staff memberships and one role-qualified
-parent-message responder at Demo ACE School. The new-message picker currently
-requires a search before listing anyone. This step will show the site's
-current staff immediately while retaining the existing site, role, student,
-and permission checks. It does not enable the parent portal or approve
-historical guardian links. A fresh signed-in production journey is still
-required to distinguish an expired browser session from a server rejection.
+parent-message responder at Demo ACE School. The new-message picker now shows
+the site's current staff before search while retaining site, role, student,
+and permission checks. [PR #511](https://github.com/FSS-Ltd/pathway/pull/511)
+passed all eight required checks on `9bf2231660bccae0ecab18a64db2315f4c033406`
+(CI run 37853218498, CodeQL run 37853216229) and merged as
+`dec83b36bf11a2418ac1beceb73efcc6d501ef64`. [Production run
+37854200900](https://github.com/FSS-Ltd/pathway/actions/runs/37854200900)
+passed migrations and all three deployments. Vercel reports READY API
+`dpl_H6WVEuyVW5RhvVvPUSnnitcRdoNj`, admin
+`dpl_6KARBDSkC51Df6FNTtf1EbjeVsGP`, and web
+`dpl_DzwBmn8xVycvr2urqf1UypBRt3zH` on the production domains. Live API
+health, environment health, public blog, and web configurator reads returned
+HTTP 200; anonymous admin messaging redirected to sign-in. Signed-in message
+and family data loading remains unverified. REL-7 does not enable the parent
+portal or approve historical guardian links.
+
+REL-8 addresses a separate admin API routing failure. Production runtime logs
+show Clerk could not find its middleware context in the child-photo route;
+both child-photo and staff-avatar routes returned HTTP 500 for anonymous
+requests on 8 October. Both route handlers already return 401 when no token is
+available, but the production middleware matcher excludes all `/api` paths.
+REL-8 runs Clerk middleware for those paths while leaving authentication to
+the route handlers. Local production-build smoke tests returned JSON HTTP 401
+for both anonymous routes. A fresh signed-in
+production journey is still needed to diagnose the Messages session error.
 
 ## Delivery steps
 
