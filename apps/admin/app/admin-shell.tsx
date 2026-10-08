@@ -371,7 +371,12 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               ) : adminState.status === "no-active-site" ? (
                 <p>Select a site from the menu to continue.</p>
               ) : adminState.status === "unauthenticated" ? (
-                <p>Sign in to continue.</p>
+                <p>
+                  <Link href="/login" className="text-accent-strong underline">
+                    Sign in
+                  </Link>{" "}
+                  to continue.
+                </p>
               ) : (
                 <p role="status">Loading your admin context…</p>
               )}

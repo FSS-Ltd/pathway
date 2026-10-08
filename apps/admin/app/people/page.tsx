@@ -26,20 +26,35 @@ import {
 import { getSafeDisplayName } from "../../lib/names";
 import { useAdminAccess } from "../../lib/use-admin-access";
 import { canPerform } from "../../lib/permissions";
+import { requestFailure, type RequestFailure } from "../../lib/request-error";
+import { NoAccessCard } from "../../components/no-access-card";
 
 export default function PeoplePage() {
   const router = useRouter();
   const { state: adminState } = useAdminContext();
-  const { role, userId: apiUserId, isLoading: isLoadingAccess } = useAdminAccess();
+  const {
+    role,
+    userId: apiUserId,
+    isLoading: isLoadingAccess,
+  } = useAdminAccess();
   const canDeletePeople = role.isOrgAdmin;
+  const canInvite = role.isOrgAdmin || role.isOrgOwner || role.isSiteAdmin;
   const [people, setPeople] = React.useState<PersonRow[]>([]);
-  const [deletedPeople, setDeletedPeople] = React.useState<DeletedPersonRow[]>([]);
+  const [deletedPeople, setDeletedPeople] = React.useState<DeletedPersonRow[]>(
+    [],
+  );
   const [invites, setInvites] = React.useState<InviteRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [deletingUserId, setDeletingUserId] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
-  const orgId = adminState.status === "ready" ? adminState.snapshot.activeOrgId : null;
+  const [deletingUserId, setDeletingUserId] = React.useState<string | null>(
+    null,
+  );
+  const [error, setError] = React.useState<RequestFailure | null>(null);
+  const [loadError, setLoadError] = React.useState<RequestFailure | null>(null);
+  const [successMessage, setSuccessMessage] = React.useState<string | null>(
+    null,
+  );
+  const orgId =
+    adminState.status === "ready" ? adminState.snapshot.activeOrgId : null;
   const [searchQuery, setSearchQuery] = React.useState("");
   const [activeTab, setActiveTab] = React.useState<
     "people" | "invites" | "deleted"
@@ -47,7 +62,7 @@ export default function PeoplePage() {
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       if (!orgId) {
         throw new Error("Active organisation not found.");
@@ -55,88 +70,102 @@ export default function PeoplePage() {
       const [peopleData, deletedPeopleData, invitesData] = await Promise.all([
         fetchPeopleForOrg(orgId),
         canDeletePeople ? fetchDeletedPeopleForOrg(orgId) : Promise.resolve([]),
-        fetchInvitesForOrg(orgId, "pending"),
+        canInvite ? fetchInvitesForOrg(orgId, "pending") : Promise.resolve([]),
       ]);
       setPeople(peopleData);
       setDeletedPeople(deletedPeopleData);
       setInvites(invitesData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load data");
+      setPeople([]);
+      setDeletedPeople([]);
+      setInvites([]);
+      setLoadError(requestFailure(err, "Unable to load people."));
     } finally {
       setIsLoading(false);
     }
-  }, [canDeletePeople, orgId]);
+  }, [canDeletePeople, canInvite, orgId]);
 
   React.useEffect(() => {
     if (!orgId) return;
     void load();
   }, [orgId, load]);
 
-  const handleResendInvite = React.useCallback(async (inviteId: string) => {
-    try {
-      if (!orgId) {
-        throw new Error("Active organisation not found.");
+  const handleResendInvite = React.useCallback(
+    async (inviteId: string) => {
+      try {
+        if (!orgId) {
+          throw new Error("Active organisation not found.");
+        }
+        await resendInvite(orgId, inviteId);
+        await load();
+      } catch (err) {
+        setError(requestFailure(err, "Unable to resend invitation."));
       }
-      await resendInvite(orgId, inviteId);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to resend invite");
-    }
-  }, [orgId, load]);
+    },
+    [orgId, load],
+  );
 
-  const handleRevokeInvite = React.useCallback(async (inviteId: string) => {
-    if (!confirm("Are you sure you want to revoke this invite?")) return;
-    try {
-      if (!orgId) {
-        throw new Error("Active organisation not found.");
+  const handleRevokeInvite = React.useCallback(
+    async (inviteId: string) => {
+      if (!confirm("Are you sure you want to revoke this invite?")) return;
+      try {
+        if (!orgId) {
+          throw new Error("Active organisation not found.");
+        }
+        await revokeInvite(orgId, inviteId);
+        await load();
+      } catch (err) {
+        setError(requestFailure(err, "Unable to revoke invitation."));
       }
-      await revokeInvite(orgId, inviteId);
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke invite");
-    }
-  }, [orgId, load]);
+    },
+    [orgId, load],
+  );
 
-  const handleDeletePerson = React.useCallback(async (person: PersonRow) => {
-    const displayName = getSafeDisplayName({
-      displayName: person.displayName,
-      name: person.name,
-      email: person.email,
-    });
-    const confirmed = confirm(
-      `Remove ${displayName} from this organisation? They will lose org and site access, but historical records will be kept.`,
-    );
-    if (!confirmed) return;
-    setDeletingUserId(person.id);
-    setError(null);
-    setSuccessMessage(null);
-    try {
-      if (!orgId) {
-        throw new Error("Active organisation not found.");
+  const handleDeletePerson = React.useCallback(
+    async (person: PersonRow) => {
+      const displayName = getSafeDisplayName({
+        displayName: person.displayName,
+        name: person.name,
+        email: person.email,
+      });
+      const confirmed = confirm(
+        `Remove ${displayName} from this organisation? They will lose org and site access, but historical records will be kept.`,
+      );
+      if (!confirmed) return;
+      setDeletingUserId(person.id);
+      setError(null);
+      setSuccessMessage(null);
+      try {
+        if (!orgId) {
+          throw new Error("Active organisation not found.");
+        }
+        await deletePersonFromOrg(orgId, person.id);
+        await load();
+        setSuccessMessage(`${displayName} has been moved to deleted users.`);
+        setActiveTab("deleted");
+      } catch (err) {
+        setError(requestFailure(err, "Unable to remove this person."));
+      } finally {
+        setDeletingUserId(null);
       }
-      await deletePersonFromOrg(orgId, person.id);
-      await load();
-      setSuccessMessage(`${displayName} has been moved to deleted users.`);
-      setActiveTab("deleted");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete person");
-    } finally {
-      setDeletingUserId(null);
-    }
-  }, [orgId, load]);
+    },
+    [orgId, load],
+  );
 
   const filteredPeople = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     if (!query) return people;
-    return people.filter(
-      (p) => {
-        const displayName = getSafeDisplayName({ displayName: p.displayName, name: p.name, email: p.email });
-        return (
-          displayName.toLowerCase().includes(query) ||
-          p.email.toLowerCase().includes(query)
-        );
-      },
-    );
+    return people.filter((p) => {
+      const displayName = getSafeDisplayName({
+        displayName: p.displayName,
+        name: p.name,
+        email: p.email,
+      });
+      return (
+        displayName.toLowerCase().includes(query) ||
+        p.email.toLowerCase().includes(query)
+      );
+    });
   }, [people, searchQuery]);
 
   const filteredInvites = React.useMemo(() => {
@@ -165,77 +194,81 @@ export default function PeoplePage() {
   const sessionUserId = apiUserId;
   const currentUserId = sessionUserId || apiUserId || null;
 
-  const peopleColumns = React.useMemo<ColumnDef<PersonRow>[]>(
-    () => {
-      const cols: ColumnDef<PersonRow>[] = [
-        {
-          id: "name",
-          header: "Name",
-          cell: (row) => (
-            <div className="flex flex-col">
-              <span className="font-semibold text-text-primary">
-                {getSafeDisplayName({ displayName: row.displayName, name: row.name, email: row.email })}
-              </span>
-              <span className="text-sm text-text-muted">{row.email}</span>
-            </div>
-          ),
-        },
-        {
-          id: "orgRole",
-          header: "Org role",
-          cell: (row) => (
-            <Badge variant="default">{row.orgRole}</Badge>
-          ),
-          width: "140px",
-        },
-        {
-          id: "siteAccess",
-          header: "Site access",
-          cell: (row) => (
-            <span className="text-sm text-text-secondary">
-              {row.siteAccessSummary.allSites
-                ? "All sites"
-                : `${row.siteAccessSummary.siteCount} site(s)`}
+  const peopleColumns = React.useMemo<ColumnDef<PersonRow>[]>(() => {
+    const cols: ColumnDef<PersonRow>[] = [
+      {
+        id: "name",
+        header: "Name",
+        cell: (row) => (
+          <div className="flex flex-col">
+            <span className="font-semibold text-text-primary">
+              {getSafeDisplayName({
+                displayName: row.displayName,
+                name: row.name,
+                email: row.email,
+              })}
             </span>
-          ),
-          width: "140px",
-        },
-      ];
-      if (canEditPeople) {
-        cols.push({
-          id: "actions",
-          header: "",
-          cell: (row) => {
-            const isCurrentUser =
-              !!currentUserId && currentUserId === row.id;
-            const href = isCurrentUser ? "/staff/profile" : `/people/${row.id}`;
-            return (
-              <div className="flex items-center justify-end gap-2">
-                <Button asChild variant="secondary" size="sm">
-                  <Link href={href}>Profile</Link>
+            <span className="text-sm text-text-muted">{row.email}</span>
+          </div>
+        ),
+      },
+      {
+        id: "orgRole",
+        header: "Org role",
+        cell: (row) => <Badge variant="default">{row.orgRole}</Badge>,
+        width: "140px",
+      },
+      {
+        id: "siteAccess",
+        header: "Site access",
+        cell: (row) => (
+          <span className="text-sm text-text-secondary">
+            {row.siteAccessSummary.allSites
+              ? "All sites"
+              : `${row.siteAccessSummary.siteCount} site(s)`}
+          </span>
+        ),
+        width: "140px",
+      },
+    ];
+    if (canEditPeople) {
+      cols.push({
+        id: "actions",
+        header: "",
+        cell: (row) => {
+          const isCurrentUser = !!currentUserId && currentUserId === row.id;
+          const href = isCurrentUser ? "/staff/profile" : `/people/${row.id}`;
+          return (
+            <div className="flex items-center justify-end gap-2">
+              <Button asChild variant="secondary" size="sm">
+                <Link href={href}>Profile</Link>
+              </Button>
+              {canDeletePeople && !isCurrentUser && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={deletingUserId === row.id}
+                  onClick={() => handleDeletePerson(row)}
+                  className="border-status-danger/30 text-status-danger hover:bg-status-danger/5"
+                >
+                  {deletingUserId === row.id ? "Deleting..." : "Delete"}
                 </Button>
-                {canDeletePeople && !isCurrentUser && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={deletingUserId === row.id}
-                    onClick={() => handleDeletePerson(row)}
-                    className="border-status-danger/30 text-status-danger hover:bg-status-danger/5"
-                  >
-                    {deletingUserId === row.id ? "Deleting..." : "Delete"}
-                  </Button>
-                )}
-              </div>
-            );
-          },
-          width: canDeletePeople ? "180px" : "100px",
-        });
-      }
-      return cols;
-    },
-    [canDeletePeople, canEditPeople, currentUserId, deletingUserId, handleDeletePerson],
-  );
+              )}
+            </div>
+          );
+        },
+        width: canDeletePeople ? "180px" : "100px",
+      });
+    }
+    return cols;
+  }, [
+    canDeletePeople,
+    canEditPeople,
+    currentUserId,
+    deletingUserId,
+    handleDeletePerson,
+  ]);
 
   const inviteColumns = React.useMemo<ColumnDef<InviteRow>[]>(
     () => [
@@ -364,7 +397,9 @@ export default function PeoplePage() {
     );
   }
 
-  const canInvite = canPerform("people:invite", role);
+  if (loadError?.kind === "denied") {
+    return <NoAccessCard title="People" message={loadError.message} />;
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -393,7 +428,7 @@ export default function PeoplePage() {
       {/* Error */}
       {error && (
         <div className="rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-sm text-status-danger">
-          {error}
+          {error.message}
         </div>
       )}
       {successMessage && (
@@ -414,16 +449,18 @@ export default function PeoplePage() {
         >
           People ({people.length})
         </button>
-        <button
-          onClick={() => setActiveTab("invites")}
-          className={`pb-2 px-1 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === "invites"
-              ? "border-accent text-accent"
-              : "border-transparent text-text-muted hover:text-text-primary"
-          }`}
-        >
-          Pending invites ({invites.length})
-        </button>
+        {canInvite ? (
+          <button
+            onClick={() => setActiveTab("invites")}
+            className={`pb-2 px-1 text-sm font-medium transition-colors border-b-2 ${
+              activeTab === "invites"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-primary"
+            }`}
+          >
+            Pending invites ({invites.length})
+          </button>
+        ) : null}
         {canDeletePeople ? (
           <button
             onClick={() => setActiveTab("deleted")}
@@ -466,6 +503,21 @@ export default function PeoplePage() {
         {isLoading ? (
           <div className="py-8 text-center text-sm text-text-muted">
             Loading...
+          </div>
+        ) : loadError ? (
+          <div
+            role="alert"
+            className="space-y-3 py-6 text-sm text-status-danger"
+          >
+            <p>{loadError.message}</p>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void load()}
+            >
+              Retry
+            </Button>
           </div>
         ) : activeTab === "people" ? (
           <DataTable

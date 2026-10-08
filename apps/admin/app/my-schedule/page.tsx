@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useAdminContext } from "@/lib/admin-context";
 import { Badge, Button, Card, Select } from "@pathway/ui";
 import {
@@ -15,6 +16,7 @@ import {
   declineSwapRequest,
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
+import { requestFailure, type RequestFailure } from "../../lib/request-error";
 
 const assignmentStatusCopy: Record<AdminAssignmentRow["status"], string> = {
   pending: "Pending",
@@ -87,7 +89,13 @@ export default function MySchedulePage() {
     [],
   );
   const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [loadError, setLoadError] = React.useState<RequestFailure | null>(null);
+  const [actionError, setActionError] = React.useState<RequestFailure | null>(
+    null,
+  );
+  const [staffError, setStaffError] = React.useState<RequestFailure | null>(
+    null,
+  );
   const [swapFormAssignmentId, setSwapFormAssignmentId] = React.useState<
     string | null
   >(null);
@@ -104,7 +112,9 @@ export default function MySchedulePage() {
   const loadData = React.useCallback(async () => {
     if (!userId) return;
     setLoading(true);
-    setError(null);
+    setLoadError(null);
+    setActionError(null);
+    setStaffError(null);
     try {
       const [assignmentsRes, swapsRes, staffRes] = await Promise.all([
         fetchMyAssignments({
@@ -114,15 +124,20 @@ export default function MySchedulePage() {
           status: statusFilter === "all" ? undefined : statusFilter,
         }),
         fetchMySwapRequests(userId),
-        fetchStaff().catch(() => []),
+        fetchStaff().catch((cause: unknown) => {
+          setStaffError(
+            requestFailure(cause, "Unable to load staff for swaps."),
+          );
+          return [];
+        }),
       ]);
       setAssignments(assignmentsRes);
       setSwaps(swapsRes);
       setStaff(staffRes.map((s) => ({ id: s.id, fullName: s.fullName })));
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load your schedule",
-      );
+      setAssignments([]);
+      setSwaps([]);
+      setLoadError(requestFailure(err, "Unable to load your schedule."));
     } finally {
       setLoading(false);
     }
@@ -140,9 +155,7 @@ export default function MySchedulePage() {
       await updateAssignmentStatus(assignmentId, "confirmed");
       await loadData();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to accept assignment",
-      );
+      setActionError(requestFailure(err, "Unable to accept the assignment."));
     } finally {
       setActionLoadingId(null);
     }
@@ -154,9 +167,7 @@ export default function MySchedulePage() {
       await updateAssignmentStatus(assignmentId, "declined");
       await loadData();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to decline assignment",
-      );
+      setActionError(requestFailure(err, "Unable to decline the assignment."));
     } finally {
       setActionLoadingId(null);
     }
@@ -180,9 +191,7 @@ export default function MySchedulePage() {
       setSwapToUserId("");
       await loadData();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to create swap request",
-      );
+      setActionError(requestFailure(err, "Unable to create the swap request."));
     } finally {
       setSwapSubmitting(false);
     }
@@ -194,7 +203,7 @@ export default function MySchedulePage() {
       await acceptSwapRequest(swapId);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to accept swap");
+      setActionError(requestFailure(err, "Unable to accept the swap."));
     } finally {
       setActionLoadingId(null);
     }
@@ -206,7 +215,7 @@ export default function MySchedulePage() {
       await declineSwapRequest(swapId);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to decline swap");
+      setActionError(requestFailure(err, "Unable to decline the swap."));
     } finally {
       setActionLoadingId(null);
     }
@@ -227,6 +236,9 @@ export default function MySchedulePage() {
         <p className="text-sm text-text-muted">
           Sign in to see your schedule and accept or decline assignments.
         </p>
+        <Link href="/login" className="text-sm text-accent-strong underline">
+          Sign in
+        </Link>
       </div>
     );
   }
@@ -312,10 +324,15 @@ export default function MySchedulePage() {
           </div>
         }
       >
-        {error ? (
+        {actionError ? (
+          <p role="alert" className="text-sm text-status-danger">
+            {actionError.message}
+          </p>
+        ) : null}
+        {loadError ? (
           <div className="flex flex-col gap-2 rounded-md bg-status-danger/5 p-4 text-sm text-status-danger">
-            <span className="font-semibold">Something went wrong</span>
-            <span>{error}</span>
+            <span className="font-semibold">Schedule unavailable</span>
+            <span>{loadError.message}</span>
             <Button size="sm" variant="secondary" onClick={loadData}>
               Retry
             </Button>
@@ -397,12 +414,21 @@ export default function MySchedulePage() {
                   </div>
                   {isSwapForm && (
                     <div className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-border-subtle bg-surface p-3">
+                      {staffError ? (
+                        <p
+                          role="alert"
+                          className="w-full text-sm text-status-danger"
+                        >
+                          {staffError.message}
+                        </p>
+                      ) : null}
                       <label className="flex flex-col gap-1 text-sm">
                         <span className="text-text-muted">Swap with</span>
                         <Select
                           value={swapToUserId}
                           onChange={(e) => setSwapToUserId(e.target.value)}
                           className="min-w-[180px]"
+                          disabled={Boolean(staffError)}
                         >
                           <option value="">Select staff…</option>
                           {staffOptions.map((s) => (
@@ -415,7 +441,9 @@ export default function MySchedulePage() {
                       <Button
                         size="sm"
                         onClick={handleSwapSubmit}
-                        disabled={!swapToUserId || swapSubmitting}
+                        disabled={
+                          !swapToUserId || swapSubmitting || Boolean(staffError)
+                        }
                       >
                         Submit request
                       </Button>
@@ -442,7 +470,11 @@ export default function MySchedulePage() {
         title="Swap requests"
         description="Inbound requests you can accept or decline; outbound requests you sent."
       >
-        {loading ? (
+        {loadError ? (
+          <p role="alert" className="text-sm text-status-danger">
+            Swap requests are unavailable. Retry the schedule above.
+          </p>
+        ) : loading ? (
           <div className="h-12 animate-pulse rounded-md bg-muted" />
         ) : inboundSwaps.length === 0 && outboundSwaps.length === 0 ? (
           <p className="text-sm text-text-muted">No swap requests right now.</p>

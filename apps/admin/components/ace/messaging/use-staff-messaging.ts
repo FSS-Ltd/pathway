@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { requestFailure } from "@/lib/request-error";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import {
   advanceStaffReadCursor,
@@ -353,5 +354,5 @@ export function useStaffMessaging(currentUserId: string) {
 }
 
 function messageFrom(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return requestFailure(error, fallback).message;
 }

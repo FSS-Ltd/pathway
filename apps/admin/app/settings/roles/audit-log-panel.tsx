@@ -8,6 +8,7 @@ import {
   type PersonRow,
 } from "@/lib/api-client";
 import { formatAuditTimestamp } from "@/lib/roles";
+import { requestFailure } from "@/lib/request-error";
 
 export type AuditLogPanelProps = {
   people: PersonRow[];
@@ -40,7 +41,7 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
       setEvents(result.items);
       setNextCursor(result.nextCursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load the audit log");
+      setError(requestFailure(err, "Unable to load the audit log.").message);
     } finally {
       setIsLoading(false);
     }
@@ -58,7 +59,9 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
       setEvents((prev) => [...prev, ...result.items]);
       setNextCursor(result.nextCursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load more audit events");
+      setError(
+        requestFailure(err, "Unable to load more audit events.").message,
+      );
     } finally {
       setIsLoadingMore(false);
     }
@@ -69,14 +72,20 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
       id: "when",
       header: "When",
       cell: (row) => (
-        <span className="text-sm text-text-secondary">{formatAuditTimestamp(row.createdAt)}</span>
+        <span className="text-sm text-text-secondary">
+          {formatAuditTimestamp(row.createdAt)}
+        </span>
       ),
       width: "160px",
     },
     {
       id: "actor",
       header: "Actor",
-      cell: (row) => <span className="text-sm text-text-primary">{actorLabel(people, row.actorUserId)}</span>,
+      cell: (row) => (
+        <span className="text-sm text-text-primary">
+          {actorLabel(people, row.actorUserId)}
+        </span>
+      ),
     },
     {
       id: "entityType",
@@ -91,7 +100,11 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
     {
       id: "action",
       header: "Action",
-      cell: (row) => <span className="text-sm text-text-secondary">{actionLabel(row.action)}</span>,
+      cell: (row) => (
+        <span className="text-sm text-text-secondary">
+          {actionLabel(row.action)}
+        </span>
+      ),
       width: "160px",
     },
   ];
@@ -104,13 +117,24 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
         </div>
       )}
       {isLoading ? (
-        <div className="py-8 text-center text-sm text-text-muted">Loading...</div>
+        <div className="py-8 text-center text-sm text-text-muted">
+          Loading...
+        </div>
       ) : (
         <>
-          <DataTable columns={columns} data={events} emptyMessage="No audit events yet." />
+          <DataTable
+            columns={columns}
+            data={events}
+            emptyMessage="No audit events yet."
+          />
           {nextCursor && (
             <div className="mt-3 flex justify-center">
-              <Button variant="secondary" size="sm" onClick={handleLoadMore} disabled={isLoadingMore}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+              >
                 {isLoadingMore ? "Loading…" : "Load more"}
               </Button>
             </div>

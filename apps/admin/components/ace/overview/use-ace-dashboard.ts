@@ -3,6 +3,7 @@
 import * as React from "react";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import { fetchAceDashboard, type AceDashboardResponse } from "@/lib/api-client";
+import { requestFailure } from "@/lib/request-error";
 
 export type UseAceDashboardResult = {
   dashboard: AceDashboardResponse | null;
@@ -46,7 +47,7 @@ export function useAceDashboard(enabled: boolean): UseAceDashboardResult {
         return;
       }
       setDashboard(nextDashboard);
-    } catch {
+    } catch (cause) {
       if (
         generation !== requestGeneration.current ||
         controller.signal.aborted
@@ -54,7 +55,9 @@ export function useAceDashboard(enabled: boolean): UseAceDashboardResult {
         return;
       }
       setDashboard(null);
-      setError("Unable to load the ACE overview.");
+      setError(
+        requestFailure(cause, "Unable to load the ACE overview.").message,
+      );
     } finally {
       if (generation === requestGeneration.current) {
         activeController.current = null;

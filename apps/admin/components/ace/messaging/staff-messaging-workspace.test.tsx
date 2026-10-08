@@ -307,7 +307,7 @@ async function run(): Promise<void> {
     await act(async () => staffRoom.click());
     assert.match(
       container.querySelector('[role="alert"]')?.textContent ?? "",
-      /Unable to complete the messaging request/,
+      /Unable to open the staff room/,
     );
     await act(async () => staffRoom.click());
     assert.equal(roomOpenCount, 2);
