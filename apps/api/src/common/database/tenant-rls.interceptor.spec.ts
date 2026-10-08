@@ -1,4 +1,6 @@
 import type { CallHandler } from "@nestjs/common";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { Reflector } from "@nestjs/core";
 import { ExecutionContextHost } from "@nestjs/core/helpers/execution-context-host";
 import { firstValueFrom, of } from "rxjs";
@@ -17,6 +19,36 @@ class OwnTransactionController {
 }
 
 describe("TenantRlsInterceptor", () => {
+  it("serves a public request through the production tsx loader", () => {
+    const script = `
+      const { Controller, Get, Module } = require('@nestjs/common');
+      const { APP_INTERCEPTOR, NestFactory } = require('@nestjs/core');
+      const { ExpressAdapter } = require('@nestjs/platform-express');
+      const request = require('supertest');
+      const { TenantRlsInterceptor } = require('./src/common/database/tenant-rls.interceptor.ts');
+      class ProbeController { health() { return { status: 'ok' }; } }
+      Get('env')(ProbeController.prototype, 'health', Object.getOwnPropertyDescriptor(ProbeController.prototype, 'health'));
+      Controller('health')(ProbeController);
+      class TestModule {}
+      Module({ controllers: [ProbeController], providers: [{ provide: APP_INTERCEPTOR, useClass: TenantRlsInterceptor }] })(TestModule);
+      NestFactory.create(TestModule, new ExpressAdapter(), { logger: false })
+        .then(async (app) => {
+          await app.init();
+          const response = await request(app.getHttpServer()).get('/health/env');
+          await app.close();
+          process.exitCode = response.status === 200 && response.body.status === 'ok' ? 0 : 1;
+        })
+        .catch((error) => { console.error(error); process.exitCode = 1; });
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ["-r", "tsx/cjs", "-r", "reflect-metadata", "-e", script],
+      { cwd: path.resolve(__dirname, "../../.."), encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(0);
+  });
+
   it("keeps post-commit access actions and serializable inventory commands outside the request transaction", () => {
     for (const controller of [
       AssignmentsController,

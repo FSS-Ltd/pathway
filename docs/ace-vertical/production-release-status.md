@@ -23,9 +23,20 @@ passed an undefined `HttpAdapterHost` during startup. Vercel runtime logs
 confirmed the failure. The API, admin, and web aliases were rolled back to
 the prior READY deployments at `a41e09a`; the API recovered to HTTP 200,
 marketing and `/configure` returned HTTP 200, and admin redirected to Clerk
-sign-in. Current step **REL-3** fixes the API bootstrap with a production-loader
-regression test, then repeats CI, deployment, and live smoke checks. A green
-GitHub deploy job or READY Vercel state alone does not close this release gate.
+sign-in.
+
+REL-3 merged in [PR #505](https://github.com/FSS-Ltd/pathway/pull/505) as
+`9e09089cf84c41649e62bfebc10907768aef6e98`. All eight checks passed on
+`cdfce7d5617883be34e64d34c483e5e11642c021`. Its
+[production run 37840055622](https://github.com/FSS-Ltd/pathway/actions/runs/37840055622)
+passed migration and all three app jobs. The new API deployment boots but its
+protected `/health` and `/health/env` both return HTTP 500. A production-loader
+local request reproduces the second cause: `TenantRlsInterceptor` receives an
+undefined `Reflector` because TSX does not emit constructor injection metadata.
+The three public aliases remain pinned to the prior healthy deployments. Current
+step **REL-4** adds explicit interceptor injection and a real HTTP regression
+test before another deploy and smoke check. A green GitHub deploy job or READY
+Vercel state alone does not close this release gate.
 
 ## Delivery steps
 
@@ -105,6 +116,7 @@ GitHub deploy job or READY Vercel state alone does not close this release gate.
 | 1.3e5c1  | Full guardian eligibility for ACE notice audiences                     | Merged  | [#502](https://github.com/FSS-Ltd/pathway/pull/502) to `master`                     | `7d11c7a253984777f32a9aad738f30d7dfd6c5da`; all eight checks passed: CI run 37828070800, CodeQL run 37828063709.                                                                                                | `1bf510c6fc01e3ddbfdcb4c90ce3963b26ca9e38` |
 | 1.3e5c2  | ACE notice expiry, withdrawal, immutable publication and read receipts | Merged  | [#503](https://github.com/FSS-Ltd/pathway/pull/503) to `master`                     | `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`; all eight checks passed: CI run 37833550859, CodeQL run 37833546948.                                                                                                | `70cc53502f37da07a0e449e5604ce51ee862c015` |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
+| REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
