@@ -1,4 +1,9 @@
-import { API_BASE_URL, buildAuthHeaders, isUsingMockApi } from "./api-client";
+import {
+  API_BASE_URL,
+  apiFetch,
+  buildAuthHeaders,
+  isUsingMockApi,
+} from "./api-client";
 
 export type FamilyDailyAttendanceHistory = {
   siteId: string;
@@ -37,7 +42,7 @@ export async function fetchFamilyDailyAttendance(
       ? `/ace/student/sites/${site}/attendance/daily`
       : `/ace/parent/sites/${site}/children/${encodeURIComponent(scope.childId)}/attendance/daily`;
   const params = new URLSearchParams(dates);
-  const response = await fetch(`${API_BASE_URL}${path}?${params}`, {
+  const response = await apiFetch(`${API_BASE_URL}${path}?${params}`, {
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",

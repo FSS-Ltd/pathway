@@ -28,7 +28,8 @@ if (!publicApiUrl && !useMockApiExplicit) {
 export const API_BASE_URL = publicApiUrl ?? "http://localhost:3333";
 
 // Existing API functions share one request-time authentication transport.
-const fetch = createApiFetch(API_BASE_URL);
+export const apiFetch = createApiFetch(API_BASE_URL);
+const fetch = apiFetch;
 
 export const isUsingMockApi = (): boolean => {
   return useMockApiExplicit;

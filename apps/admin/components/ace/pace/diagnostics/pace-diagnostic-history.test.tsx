@@ -157,7 +157,9 @@ async function testHistoryRequest(): Promise<void> {
     assert.equal(url.searchParams.get("includeRetracted"), "true");
     assert.equal(url.searchParams.get("limit"), "50");
     assert.equal(url.searchParams.get("cursor"), "cursor-2");
-    assert.equal(requestedSignal, controller.signal);
+    assert.ok(requestedSignal);
+    controller.abort();
+    assert.equal(requestedSignal.aborted, true);
     assert.deepEqual(page.items, [result]);
     assert.equal(page.selection.child.displayName, "Jordan Smith");
   } finally {

@@ -1,4 +1,9 @@
-import { API_BASE_URL, buildAuthHeaders, isUsingMockApi } from "./api-client";
+import {
+  API_BASE_URL,
+  apiFetch,
+  buildAuthHeaders,
+  isUsingMockApi,
+} from "./api-client";
 import { apiErrorFromResponse } from "./api-transport";
 
 export type StaffConversation = {
@@ -194,7 +199,7 @@ export async function request<T>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await apiFetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: buildAuthHeaders(),
     credentials: "include",

@@ -1,4 +1,9 @@
-import { API_BASE_URL, buildAuthHeaders, isUsingMockApi } from "./api-client";
+import {
+  API_BASE_URL,
+  apiFetch,
+  buildAuthHeaders,
+  isUsingMockApi,
+} from "./api-client";
 
 export type FamilyContext = {
   kind: "parent" | "student";
@@ -14,7 +19,7 @@ export async function fetchFamilyContexts(
   if (isUsingMockApi()) {
     throw new Error("Family access is unavailable in mock mode.");
   }
-  const response = await fetch(`${API_BASE_URL}/ace/family/contexts`, {
+  const response = await apiFetch(`${API_BASE_URL}/ace/family/contexts`, {
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",

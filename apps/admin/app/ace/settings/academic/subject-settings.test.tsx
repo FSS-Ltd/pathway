@@ -107,7 +107,7 @@ async function run() {
     assert.ok(path.startsWith("/ace/subjects"));
     assert.equal(init?.credentials, "include");
     assert.equal(
-      (init?.headers as Record<string, string>).Authorization,
+      new Headers(init?.headers).get("Authorization"),
       "Bearer test-token",
     );
     if (!init?.method || init.method === "GET") {

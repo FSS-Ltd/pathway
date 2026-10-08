@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useSession } from "@/lib/use-session-compat";
 import { Card, Badge, Button } from "@pathway/ui";
-import { API_BASE_URL } from "@/lib/api-client";
+import { API_BASE_URL, apiFetch } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { meetsAccessRequirement } from "@/lib/access";
 
@@ -197,11 +197,7 @@ export default function HandoverPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const token = (session as { accessToken?: string })?.accessToken ?? "";
-        const res = await fetch(`${API_BASE_URL}/handover/my-next`, {
-          headers: {
-            Authorization: token ? `Bearer ${token}` : "",
-          },
+        const res = await apiFetch(`${API_BASE_URL}/handover/my-next`, {
           signal: controller.signal,
         });
         if (!res.ok) {
