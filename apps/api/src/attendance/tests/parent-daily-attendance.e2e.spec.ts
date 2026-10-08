@@ -224,6 +224,29 @@ describe("ACE parent daily attendance history", () => {
     }
   });
 
+  it("rechecks the organisation parent portal switch on each read", async () => {
+    if (!app) return;
+    await prisma.org.update({
+      where: { id: orgId },
+      data: { parentPortalEnabled: false },
+    });
+    try {
+      const disabled = await request(app.getHttpServer())
+        .get(route)
+        .set("Authorization", fullAuthorization);
+      expect(disabled.status).toBe(404);
+    } finally {
+      await prisma.org.update({
+        where: { id: orgId },
+        data: { parentPortalEnabled: true },
+      });
+    }
+    const enabled = await request(app.getHttpServer())
+      .get(route)
+      .set("Authorization", fullAuthorization);
+    expect(enabled.status).toBe(200);
+  });
+
   it("rechecks relationship start, end and revocation on each read", async () => {
     if (!app) return;
     const server = app.getHttpServer();

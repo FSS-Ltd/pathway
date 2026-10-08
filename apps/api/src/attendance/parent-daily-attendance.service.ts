@@ -25,9 +25,15 @@ export class ParentDailyAttendanceService {
     }
     const site = await prisma.tenant.findUnique({
       where: { id: siteId },
-      select: { orgId: true, timezone: true },
+      select: {
+        orgId: true,
+        timezone: true,
+        org: { select: { parentPortalEnabled: true } },
+      },
     });
-    if (!site) throw new NotFoundException("Daily attendance not found");
+    if (!site?.org.parentPortalEnabled) {
+      throw new NotFoundException("Daily attendance not found");
+    }
 
     return withTenantRlsContext(siteId, site.orgId, async (tx) => {
       const relationship = await tx.guardianChildRelationship.findFirst({
