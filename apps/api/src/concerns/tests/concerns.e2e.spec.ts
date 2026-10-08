@@ -153,6 +153,21 @@ describe("Concerns (e2e)", () => {
   });
 
   describe("CRUD", () => {
+    it("serves concurrent scoped reads through the complete request pipeline", async () => {
+      if (!app) return;
+      const paths = ["/concerns", "/notes", "/access/users/me/permissions"];
+      const responses = await Promise.all(
+        paths.map((path) =>
+          request(app.getHttpServer())
+            .get(path)
+            .set("Authorization", authHeader),
+        ),
+      );
+      expect(responses.map((response) => response.status)).toEqual([
+        200, 200, 200,
+      ]);
+    });
+
     it("POST /concerns creates a concern when child exists", async () => {
       if (!app) return;
       const res = await request(app.getHttpServer())

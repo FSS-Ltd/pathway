@@ -5,7 +5,9 @@ import {
   NestInterceptor,
 } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
+import { Reflector } from "@nestjs/core";
 import { from, lastValueFrom } from "rxjs";
+import { INDEPENDENT_TRANSACTION } from "./independent-transaction.decorator";
 
 interface RequestWithContext {
   __pathwayContext?: {
@@ -20,7 +22,17 @@ interface RequestWithContext {
  */
 @Injectable()
 export class TenantRlsInterceptor implements NestInterceptor {
+  constructor(private readonly reflector: Reflector) {}
+
   intercept(context: ExecutionContext, next: CallHandler) {
+    if (
+      this.reflector.getAllAndOverride<boolean>(INDEPENDENT_TRANSACTION, [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
+      return next.handle();
+    }
     const request = context.switchToHttp().getRequest<RequestWithContext>();
     const pathwayContext = request.__pathwayContext;
 
@@ -39,4 +51,3 @@ export class TenantRlsInterceptor implements NestInterceptor {
     );
   }
 }
-

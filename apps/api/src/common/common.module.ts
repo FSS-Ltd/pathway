@@ -1,7 +1,8 @@
 import { Module } from "@nestjs/common";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
 import { PathwayAuthModule } from "@pathway/auth";
 import { TenantRlsInterceptor } from "./database/tenant-rls.interceptor";
+import { DatabaseAvailabilityFilter } from "./database/database-availability.filter";
 import { LoggingService } from "./logging/logging.service";
 import { SupabaseStorageService } from "./storage/supabase-storage.service";
 import { OutboxModule } from "./outbox/outbox.module";
@@ -14,6 +15,10 @@ import { OutboxModule } from "./outbox/outbox.module";
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantRlsInterceptor,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: DatabaseAvailabilityFilter,
     },
   ],
   exports: [

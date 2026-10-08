@@ -2,8 +2,8 @@ import { BadRequestException, UnauthorizedException } from "@nestjs/common";
 import { OrgPeopleService } from "../org-people.service";
 import { OrgRole } from "@pathway/db";
 
-jest.mock("@pathway/db", () => ({
-  prisma: (() => {
+jest.mock("@pathway/db", () => {
+  const prisma = (() => {
     const tx = {
       orgDeletedUser: { create: jest.fn() },
       orgMembership: { deleteMany: jest.fn() },
@@ -39,17 +39,21 @@ jest.mock("@pathway/db", () => ({
         findMany: jest.fn(),
         findUnique: jest.fn(),
       },
-      $transaction: jest.fn(async <T>(callback: (txClient: typeof tx) => Promise<T>) =>
-        callback(tx),
-      ),
     };
-  })(),
-  OrgRole: {
-    ORG_ADMIN: "ORG_ADMIN",
-    ORG_MEMBER: "ORG_MEMBER",
-    ORG_BILLING: "ORG_BILLING",
-  },
-}));
+  })();
+  return {
+    prisma,
+    runTransaction: jest.fn(
+      async <T>(callback: (txClient: typeof prisma.__tx) => Promise<T>) =>
+        callback(prisma.__tx),
+    ),
+    OrgRole: {
+      ORG_ADMIN: "ORG_ADMIN",
+      ORG_MEMBER: "ORG_MEMBER",
+      ORG_BILLING: "ORG_BILLING",
+    },
+  };
+});
 
 const { prisma: mockPrisma } = jest.requireMock("@pathway/db") as {
   prisma: {
@@ -68,7 +72,6 @@ const { prisma: mockPrisma } = jest.requireMock("@pathway/db") as {
     siteMembership: { findMany: jest.Mock };
     invite: { findMany: jest.Mock; findFirst: jest.Mock };
     user: { findMany: jest.Mock; findUnique: jest.Mock };
-    $transaction: jest.Mock;
   };
 };
 const mockTx = mockPrisma.__tx;

@@ -4,7 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { OrgRole, prisma } from "@pathway/db";
+import { OrgRole, prisma, runTransaction } from "@pathway/db";
 
 type PersonUser = {
   id: string;
@@ -194,7 +194,7 @@ export class OrgPeopleService {
       siteIds.includes(target.lastActiveTenantId);
     const deletedName = safeDisplayName(target);
 
-    return prisma.$transaction(async (tx) => {
+    return runTransaction(async (tx) => {
       const deletedUser = await tx.orgDeletedUser.create({
         data: {
           orgId,
