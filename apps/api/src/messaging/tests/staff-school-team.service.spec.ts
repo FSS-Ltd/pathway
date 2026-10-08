@@ -120,14 +120,18 @@ describe("staff school-team inbox", () => {
               },
             }),
           },
-          participants: {
-            some: {
-              tenantId: actor.tenantId,
-              userId: actor.userId,
-              kind: "STAFF",
-              removedAt: null,
+          AND: expect.arrayContaining([
+            {
+              participants: {
+                some: {
+                  tenantId: actor.tenantId,
+                  userId: actor.userId,
+                  kind: "STAFF",
+                  removedAt: null,
+                },
+              },
             },
-          },
+          ]),
         }),
         take: 2,
       }),
