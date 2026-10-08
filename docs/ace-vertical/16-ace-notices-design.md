@@ -32,10 +32,10 @@ repurpose or migrate existing announcements silently.
   site membership. Students cannot publish or receive this notice audience.
 - Parent reads use the fixed Parent relationship template plus a current
   **full-access**, non-guest guardian-child relationship in the selected site
-  and the enabled parent portal. Add the ACE-only, relationship-scoped
-  `ace.parent.notices.read` permission to the protected Parent template in its
-  own reviewed step. The existing `notices.read` key is site-scoped and cannot
-  seed onto a relationship role; changing its scope would widen access to the
+  and the enabled parent portal. The protected Parent template carries the
+  ACE-only, relationship-scoped `ace.parent.notices.read` permission. The
+  existing `notices.read` key is site-scoped and cannot seed onto a
+  relationship role; changing its scope would widen access to the
   product-wide `/announcements` API. The parent notice route checks its own
   permission, active definition, portal, site, guardian link, and recipient
   snapshot. A site membership alone never grants parent notice access; a

@@ -52,6 +52,7 @@ const ACE_CORE_KEYS = [
   "ace.reports.review",
   "ace.reports.publish",
   "ace.parent.progress.read",
+  "ace.parent.notices.read",
   "ace.student.self.read",
   "ace.faith.read",
   "ace.faith.manage",
