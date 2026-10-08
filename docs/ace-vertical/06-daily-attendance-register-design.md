@@ -3,7 +3,8 @@
 **Status:** C06 contract in the
 [Oasis parity matrix](02-oasis-web-journey-parity.md). Steps 1.3g1–1.3g4
 established the schema. Step 1.3g5 adds the scoped staff roster read API.
-The daily write API, web journey, and production migration remain open.
+Step 1.3g6 adds atomic daily mark and correction writes. The web journey,
+history read API, and production migration remain open.
 
 ## Source behaviour and current gap
 
@@ -46,6 +47,10 @@ a changed mark, its correction event, and the audit entry in one locked
 transaction; this schema step does not expose a daily-register API.
 Step 1.3g5 exposes only the bounded staff roster read. It reads existing marks
 without changing the session-attendance model or accepting daily writes.
+Step 1.3g6 exposes one child/date mark write. It serialises initial marks and
+corrections per site/child/date, rechecks the actor's manage permission and
+dated band scope, and records a changed fact, correction event, and audit in
+one transaction. An identical save leaves the history unchanged.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server

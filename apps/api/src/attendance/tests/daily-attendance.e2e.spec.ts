@@ -24,7 +24,7 @@ const otherChildId = randomUUID();
 const dateString = "2042-09-02";
 const date = new Date(`${dateString}T00:00:00.000Z`);
 
-describe("ACE daily attendance roster read", () => {
+describe("ACE daily attendance staff API", () => {
   let app: INestApplication | undefined;
   let staffAuthorization = "";
   let unassignedAuthorization = "";
@@ -112,10 +112,9 @@ describe("ACE daily attendance roster read", () => {
             createdById: creatorId,
             updatedById: creatorId,
             permissions: {
-              create: {
-                permissionKey: "attendance.read",
-                grantedById: creatorId,
-              },
+              create: ["attendance.read", "attendance.manage"].map(
+                (permissionKey) => ({ permissionKey, grantedById: creatorId }),
+              ),
             },
           },
         });
@@ -287,5 +286,179 @@ describe("ACE daily attendance roster read", () => {
         { tenantId: siteBId, orgId, userId: staffId },
       ),
     ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("writes an initial mark, then records an atomic correction and ignores an identical save", async () => {
+    if (!app) return;
+    const url = `/attendance/daily/${dateString}/children/${childBId}`;
+    const initial = await request(app.getHttpServer())
+      .put(url)
+      .set("Authorization", leadAuthorization)
+      .send({ status: "ABSENT", absenceReason: "SICK" });
+    expect(initial.status).toBe(200);
+    expect(initial.body).toMatchObject({
+      childId: childBId,
+      date: dateString,
+      status: "ABSENT",
+      absenceReason: "SICK",
+    });
+
+    const invalidCorrection = await request(app.getHttpServer())
+      .put(url)
+      .set("Authorization", leadAuthorization)
+      .send({ status: "LATE" });
+    expect(invalidCorrection.status).toBe(400);
+
+    const correction = await request(app.getHttpServer())
+      .put(url)
+      .set("Authorization", leadAuthorization)
+      .send({
+        status: "LATE",
+        absenceReason: "SICK",
+        correctionReason: "Parent confirmed arrival",
+      });
+    expect(correction.status).toBe(200);
+    expect(correction.body).toMatchObject({
+      id: initial.body.id,
+      status: "LATE",
+      absenceReason: null,
+      recordedAt: initial.body.recordedAt,
+    });
+
+    const identical = await request(app.getHttpServer())
+      .put(url)
+      .set("Authorization", leadAuthorization)
+      .send({ status: "LATE" });
+    expect(identical.status).toBe(200);
+    expect(identical.body).toMatchObject({
+      id: initial.body.id,
+      status: "LATE",
+    });
+
+    const { events, audits } = await withTenantRlsContext(
+      siteAId,
+      orgId,
+      async (tx) => ({
+        events: await tx.aceDailyAttendanceCorrectionEvent.findMany({
+          where: { tenantId: siteAId, dailyAttendanceId: initial.body.id },
+        }),
+        audits: await tx.auditEvent.findMany({
+          where: {
+            tenantId: siteAId,
+            entityId: initial.body.id,
+            entityType: "ACE_RECORD",
+          },
+        }),
+      }),
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      previousStatus: "ABSENT",
+      previousReason: "SICK",
+      newStatus: "LATE",
+      newReason: null,
+      correctionReason: "Parent confirmed arrival",
+      correctedByUserId: leadId,
+    });
+    expect(audits.map((audit) => audit.action).sort()).toEqual([
+      "CREATED",
+      "UPDATED",
+    ]);
+  });
+
+  it("serialises concurrent corrections against the actual preceding mark", async () => {
+    if (!app) return;
+    const url = `/attendance/daily/${dateString}/children/${childBId}`;
+    const [absent, present] = await Promise.all([
+      request(app.getHttpServer())
+        .put(url)
+        .set("Authorization", leadAuthorization)
+        .send({
+          status: "ABSENT",
+          absenceReason: "EXCUSED",
+          correctionReason: "Concurrent absence",
+        }),
+      request(app.getHttpServer())
+        .put(url)
+        .set("Authorization", leadAuthorization)
+        .send({ status: "PRESENT", correctionReason: "Concurrent arrival" }),
+    ]);
+    expect(absent.status).toBe(200);
+    expect(present.status).toBe(200);
+
+    const { events, mark } = await withTenantRlsContext(
+      siteAId,
+      orgId,
+      async (tx) => ({
+        events: await tx.aceDailyAttendanceCorrectionEvent.findMany({
+          where: {
+            tenantId: siteAId,
+            dailyAttendance: { childId: childBId, date },
+            correctionReason: { startsWith: "Concurrent" },
+          },
+        }),
+        mark: await tx.aceDailyAttendance.findUniqueOrThrow({
+          where: {
+            tenantId_childId_date: {
+              tenantId: siteAId,
+              childId: childBId,
+              date,
+            },
+          },
+        }),
+      }),
+    );
+    expect(events).toHaveLength(2);
+    const first = events.find((event) => event.previousStatus === "LATE");
+    const second = events.find((event) => event.id !== first?.id);
+    expect(first).toBeDefined();
+    expect(second?.previousStatus).toBe(first?.newStatus);
+    expect(second?.previousReason).toBe(first?.newReason);
+    expect(mark.status).toBe(second?.newStatus);
+    expect(mark.absenceReason).toBe(second?.newReason);
+  });
+
+  it("rejects out-of-scope, foreign-site, unassigned, and invalid writes", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const put = (childId: string, authorization: string, body: object) =>
+      request(server)
+        .put(`/attendance/daily/${dateString}/children/${childId}`)
+        .set("Authorization", authorization)
+        .send(body);
+    const mark = { status: "PRESENT" };
+    expect((await put(childBId, staffAuthorization, mark)).status).toBe(404);
+    expect((await put(otherChildId, leadAuthorization, mark)).status).toBe(404);
+    expect((await put(childAId, unassignedAuthorization, mark)).status).toBe(
+      404,
+    );
+    expect((await put(childAId, deniedAuthorization, mark)).status).toBe(403);
+    expect(
+      (await put(childAId, staffAuthorization, { status: "ABSENT" })).status,
+    ).toBe(400);
+    expect(
+      (await put(childAId, staffAuthorization, { status: "MISSING" })).status,
+    ).toBe(400);
+  });
+
+  it("rejects an unconfigured teaching date and an invalid calendar date", async () => {
+    if (!app) return;
+    const closed = await request(app.getHttpServer())
+      .put(`/attendance/daily/2042-09-03/children/${childAId}`)
+      .set("Authorization", staffAuthorization)
+      .send({ status: "PRESENT" });
+    expect(closed.status).toBe(409);
+
+    const foreignOnClosedDate = await request(app.getHttpServer())
+      .put(`/attendance/daily/2042-09-03/children/${otherChildId}`)
+      .set("Authorization", leadAuthorization)
+      .send({ status: "PRESENT" });
+    expect(foreignOnClosedDate.status).toBe(404);
+
+    const invalid = await request(app.getHttpServer())
+      .put(`/attendance/daily/2042-02-30/children/${childAId}`)
+      .set("Authorization", staffAuthorization)
+      .send({ status: "PRESENT" });
+    expect(invalid.status).toBe(400);
   });
 });

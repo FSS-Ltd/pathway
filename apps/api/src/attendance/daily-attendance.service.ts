@@ -55,6 +55,7 @@ export class DailyAttendanceService {
         tx,
         actor,
         date,
+        "attendance.read",
       );
       if (query.bandId && !bands.some((band) => band.id === query.bandId)) {
         throw new NotFoundException("Year band not found");

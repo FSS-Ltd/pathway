@@ -96,6 +96,7 @@ deployment's `/health` returned 200 with a database timestamp on 7 October.
 | 1.3g3    | Explicit site teaching dates                           | Merged  | [#429](https://github.com/FSS-Ltd/pathway/pull/429) to `master` | `a360d9ec66847780bd432e3a05914183cbd9c6c7`; all eight checks passed: CI run 37702284432, CodeQL run 37702280876.                                                                                                | `52f8c51d9a892d6067722d0dba02f036eb564960` |
 | 1.3g4    | Daily attendance fact and correction-event foundation  | Merged  | [#431](https://github.com/FSS-Ltd/pathway/pull/431) to `master` | `76fdaace01d5e7471daa626c00ab5b475422cff1`; all eight checks passed: CI run 37706815302, CodeQL run 37706809864.                                                                                                | `3095b3cdae419e4052b1e02a550c660a662fb864` |
 | 1.3g5    | Scoped daily-register staff read API                   | Merged  | [#433](https://github.com/FSS-Ltd/pathway/pull/433) to `master` | `06aad2c5ba687c5f9a66ecb48ac0f35eff9b628a`; all eight checks passed: CI run 37709708490, CodeQL run 37709703647.                                                                                                | `e0d43785eb9b592d0f2db4bcdfd4dee97d780c75` |
+| 1.3g6    | Atomic daily-register mark and correction write API    | Draft   | [#435](https://github.com/FSS-Ltd/pathway/pull/435) to `master` | `4a30e19da4571a963bb66fae87607c28d3da2bd6`; local checks passed; CI Integration must prove database behaviour before this step can merge.                                                                       | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -104,8 +105,9 @@ Step 1.3g4 is merged after the corrected integration assertions passed on the
 final PR revision. The daily fact and correction-event schema has not been
 applied to the production database; live migrations remain deferred as agreed.
 Step 1.3g5 is merged after disposable-Postgres integration verified the
-scoped staff roster and fixed-leader view. The next build step is atomic daily
-mark and correction writes with history; production migration remains deferred.
+scoped staff roster and fixed-leader view. Step 1.3g6 is in progress for
+atomic daily mark and correction writes. The bounded correction-history read
+remains a later step; production migration remains deferred.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
@@ -471,8 +473,9 @@ remain deferred under the product owner's instruction.
 The Vercel connection updated `nexsteps-api` production `DATABASE_URL` to the
 new project's transaction pooler, `SUPABASE_URL` to
 `jzofykdzpuslpdyfovxp`, and `SUPABASE_SECRET_KEY` to its service key. Vercel
-read-back confirmed fresh update timestamps, but returned encrypted values, so
-the plaintext could not be compared independently. The admin and web Vercel
+read-back through the connected Vercel project environment API confirmed both
+production URLs reference `jzofykdzpuslpdyfovxp`. The secret key is present;
+its value is not reproduced here. The admin and web Vercel
 projects have no database or Supabase environment variables. The GitHub
 **production environment** secrets `DIRECT_URL` (session pooler),
 `DATABASE_URL` (worker session pooler), `SUPABASE_URL`, and
