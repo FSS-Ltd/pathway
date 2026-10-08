@@ -1,10 +1,10 @@
 # ACE production release status
 
-Checked on 8 October 2026. Production API, admin, and web aliases currently
-point to READY deployments at `a41e09aac3fde40f646e0242b0b8e3f0191e0122`
-after a coordinated rollback. The API still connects to the restored London
-Supabase project `jzofykdzpuslpdyfovxp`; its live `/health` returned 200 with
-a database timestamp after rollback. The newer ACE app code is **not yet live**.
+Checked on 8 October 2026. Production API, admin, and web aliases now point
+to READY deployments at merged commit `193a569892c38be565ac6755456f41bcf498ed76`.
+The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
+live `/health` returned HTTP 200 with a database timestamp. The merged ACE
+changes through REL-4 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -33,10 +33,29 @@ passed migration and all three app jobs. The new API deployment boots but its
 protected `/health` and `/health/env` both return HTTP 500. A production-loader
 local request reproduces the second cause: `TenantRlsInterceptor` receives an
 undefined `Reflector` because TSX does not emit constructor injection metadata.
-The three public aliases remain pinned to the prior healthy deployments. Current
-step **REL-4** adds explicit interceptor injection and a real HTTP regression
-test before another deploy and smoke check. A green GitHub deploy job or READY
-Vercel state alone does not close this release gate.
+The three public aliases stayed pinned to the prior healthy deployments while
+REL-4 was prepared.
+
+REL-4 merged in [PR #506](https://github.com/FSS-Ltd/pathway/pull/506) as
+`193a569892c38be565ac6755456f41bcf498ed76`. All eight checks passed on
+`fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`. Its
+[production run 37842827452](https://github.com/FSS-Ltd/pathway/actions/runs/37842827452)
+passed migrations and all three app jobs. Vercel reported READY API deployment
+`dpl_5RzAB5eYw5KgyjiBmwkvMowzcRC7`, admin deployment
+`dpl_Gu7XpikKssZERkSpGz1spQ7HsE7x`, and web deployment
+`dpl_Ah2SmwVooat7AhYes8iMECFwDcZt`, all at that merge commit. Before
+promotion, the protected API deployment returned HTTP 200 for `/health`,
+`/health/env`, and `/public/blog/posts?limit=1`; protected marketing and
+configurator returned HTTP 200, and admin redirected to sign-in. The three
+aliases were then promoted and read back to those deployment IDs. Live routes
+repeated the same responses; unauthenticated family-context and messaging
+reads returned HTTP 401. Vercel reported no runtime error clusters for the
+three projects in the checked ten-minute window.
+
+This closes the production recovery smoke gate. Authenticated family and staff
+journeys, billing callbacks, background workers, and full staging journey tests
+were not exercised by these anonymous checks. Continue monitoring and verify
+those paths before treating broader ACE parity as complete.
 
 ## Delivery steps
 
@@ -117,6 +136,7 @@ Vercel state alone does not close this release gate.
 | 1.3e5c2  | ACE notice expiry, withdrawal, immutable publication and read receipts | Merged  | [#503](https://github.com/FSS-Ltd/pathway/pull/503) to `master`                     | `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`; all eight checks passed: CI run 37833550859, CodeQL run 37833546948.                                                                                                | `70cc53502f37da07a0e449e5604ce51ee862c015` |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                | `9e09089cf84c41649e62bfebc10907768aef6e98` |
+| REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                | `193a569892c38be565ac6755456f41bcf498ed76` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

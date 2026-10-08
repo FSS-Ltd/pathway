@@ -63,6 +63,9 @@ during Nest startup. The three app aliases were rolled back to their previous
 READY deployments; the API `/health` recovered to HTTP 200. REL-3 fixed that
 startup failure, but its new API deployment returned HTTP 500 on requests
 because the global RLS interceptor also lacked explicit TSX-compatible
-injection. REL-4 is the current app release repair; the public aliases remain
-on the prior healthy revision. Deployment and smoke-test evidence is recorded
-in the [production release status](../production-release-status.md).
+injection. REL-4 merged as `193a569892c38be565ac6755456f41bcf498ed76`.
+Its protected API, admin, and web deployments passed pre-promotion smoke tests;
+the three public aliases were promoted to that same revision and passed live
+health, public blog, marketing, configurator, sign-in redirect, and anonymous
+access-denial checks. Deployment and remaining authenticated-test limits are
+recorded in the [production release status](../production-release-status.md).
