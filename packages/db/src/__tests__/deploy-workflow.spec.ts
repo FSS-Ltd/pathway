@@ -71,12 +71,23 @@ describe("deploy workflow contract", () => {
     );
   });
 
-  it("requires manual dispatch for production deployment", () => {
-    expect(productionDeployWorkflow).toContain("workflow_dispatch:");
-    expect(productionDeployWorkflow).not.toMatch(/^\s+push:\s*$/m);
-    expect(productionDeployWorkflow).not.toContain(
-      "github.event_name == 'push'",
+  it("deploys the merged master revision after migrations", () => {
+    expect(productionDeployWorkflow).toMatch(
+      /on:\s*\n\s+push:\s*\n\s+branches:\s*\n\s+- master/,
     );
+    expect(productionDeployWorkflow).toContain("workflow_dispatch:");
+    expect(productionDeployWorkflow).toContain("ref: ${{ github.sha }}");
+
+    for (const app of ["web", "admin", "api"]) {
+      const job = productionDeployWorkflow
+        .split(`  deploy-${app}:`)[1]
+        ?.split(/\n {2}deploy-[a-z]+:/)[0];
+
+      expect(job).toContain("needs.deploy-db.result == 'success'");
+      expect(job).toContain("github.event_name == 'push'");
+      expect(job).toContain(`inputs.target == '${app}'`);
+      expect(job).toContain("ref: ${{ github.sha }}");
+    }
   });
 
   it("does not call deleted root package scripts during production migration deploys", () => {
