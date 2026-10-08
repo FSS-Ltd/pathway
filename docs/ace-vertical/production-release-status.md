@@ -1,6 +1,6 @@
 # ACE production release status
 
-Checked on 7 October 2026. The manual [production deployment](https://github.com/FSS-Ltd/pathway/actions/runs/37645052412)
+Checked on 8 October 2026. The manual [production deployment](https://github.com/FSS-Ltd/pathway/actions/runs/37645052412)
 completed its migration, API, admin, and web jobs successfully at merged commit
 `a41e09aac3fde40f646e0242b0b8e3f0191e0122`. The API production
 configuration now selects the restored London Supabase project. The prior
@@ -13,10 +13,16 @@ project's production `DATABASE_URL` and `SUPABASE_URL` both reference
 `jzofykdzpuslpdyfovxp`. Its production Supabase secret key is present.
 Admin and web use API URLs rather than direct database credentials. All three
 production deployments remain READY at `a41e09aac3fde40f646e0242b0b8e3f0191e0122`;
-the later merged messaging steps have not been deployed.
+the later merged ACE steps have not been deployed.
 The connected Vercel readback confirmed both API production URLs reference the
 new project, their updates predate the READY API deployment, and that
 deployment's `/health` returned 200 with a database timestamp on 7 October.
+On 8 October, the connected Vercel project readback reconfirmed the API
+`DATABASE_URL` targets the new project's London transaction pooler, its
+`SUPABASE_URL` selects the new project, and the production Supabase credential
+fingerprint matches the local new-project service credential. Admin and web
+both point to `https://api.nexsteps.dev`. The three READY deployments were
+created after the variable updates but still serve code commit `a41e09a`.
 
 ## Delivery steps
 
@@ -99,6 +105,7 @@ deployment's `/health` returned 200 with a database timestamp on 7 October.
 | 1.3g6    | Atomic daily-register mark and correction write API    | Merged  | [#435](https://github.com/FSS-Ltd/pathway/pull/435) to `master` | `27a814c792180cb15fbb7a67170528198c437563`; all eight checks passed: CI run 37712759665, CodeQL run 37712756595.                                                                                                | `69641dae68c1db991a4193d3b34ff6f5f9555ea4` |
 | 1.3g7    | Scoped daily correction-history read API               | Merged  | [#437](https://github.com/FSS-Ltd/pathway/pull/437) to `master` | `923a352f80476722d2b20a84448cd9c46850fa5d`; all eight checks passed: CI run 37715465693, CodeQL run 37715461713.                                                                                                | `be87f6344a694007315c8fcc2c7a2ddeae6ae866` |
 | 1.3g8    | ACE staff daily-register web journey                   | Merged  | [#439](https://github.com/FSS-Ltd/pathway/pull/439) to `master` | `3c3fd705446b388a198f297132285cb7082bf424`; all eight checks passed: CI run 37718515055, CodeQL run 37718511575.                                                                                                | `fff8e69087ef313ab80c640c625af5763b2d83c4` |
+| 1.3g9    | Student self-scoped daily mark history API             | Merged  | [#441](https://github.com/FSS-Ltd/pathway/pull/441) to `master` | `46cfbf3c464c4ad51fb4658577cf202b08018397`; all eight checks passed: CI run 37722060232, CodeQL run 37722057745.                                                                                                | `3000b27f2c0fdfd21c5649848c3afa0b8dbee696` |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -112,7 +119,10 @@ Postgres ran the daily write suite and all eight required checks passed. The
 bounded correction-history read in step 1.3g7 is merged after CI Postgres ran
 68 integration suites and 431 tests, including the daily history suite. Step
 1.3g8 adds the staff register web journey after the admin interaction test and
-all eight CI checks passed. Production migration and deployment remain deferred.
+all eight CI checks passed. Step 1.3g9 adds a student-only daily history read
+after its identity-link, portal-policy, date-boundary and cross-site integration
+checks passed on the corrected PR revision. Parent access, student web, exports,
+production migration and deployment remain deferred.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
