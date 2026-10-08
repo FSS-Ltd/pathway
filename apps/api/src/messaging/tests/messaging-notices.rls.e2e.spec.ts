@@ -20,6 +20,7 @@ import { MessagingConversationService } from "../messaging-conversation.service"
 import { MessagingCommandService } from "../messaging-command.service";
 import { ParentMessagingHistoryService } from "../parent-messaging-history.service";
 import { ParentMessagingConversationService } from "../parent-messaging-conversation.service";
+import { ParentMessagingCommandService } from "../parent-messaging-command.service";
 import { ParentMessagingReadCursorService } from "../parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "../parent-messaging.service";
 
@@ -2172,6 +2173,97 @@ describe("ACE parent/staff messaging and notices storage", () => {
           },
         },
       });
+    }
+  });
+
+  it("sends a linked parent's message only to a current school responder", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const conversation = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => createParentStaffConversation(tx, fixture),
+    );
+    const grant = await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.accessTagGrant.create({
+          data: {
+            orgId: fixture.orgAId,
+            tenantId: fixture.tenantAId,
+            userId: fixture.staffAId,
+            tagKey: "PARENT_MESSAGE_RESPONDER",
+            grantedById: fixture.staffAId,
+          },
+        }),
+    );
+    const service = new ParentMessagingCommandService();
+    const input = {
+      clientRequestId: randomUUID(),
+      body: "Could we discuss the trip arrangements?",
+    };
+    const send = (userId: string, siteId = fixture.tenantAId) =>
+      service.send(siteId, userId, conversation.conversationId, input);
+    try {
+      const sent = await send(fixture.guardianAUserId);
+      expect(sent).toMatchObject({ body: input.body, reused: false });
+      await expect(send(fixture.guardianAUserId)).resolves.toMatchObject({
+        id: sent.id,
+        reused: true,
+      });
+      await expect(send(fixture.guardianBUserId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await expect(
+        send(fixture.guardianAUserId, fixture.tenantBId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      const rows = await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        async (tx) => ({
+          messages: await tx.message.findMany({
+            where: {
+              conversationId: conversation.conversationId,
+              clientRequestId: input.clientRequestId,
+            },
+            select: { id: true, sequence: true },
+          }),
+          deliveries: await tx.messageDelivery.findMany({
+            where: { messageId: sent.id },
+            select: { recipientParticipantId: true },
+          }),
+        }),
+      );
+      expect(rows.messages).toEqual([{ id: sent.id, sequence: sent.sequence }]);
+      expect(rows.deliveries).toEqual([
+        { recipientParticipantId: conversation.staffParticipantIds[0] },
+      ]);
+
+      await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        tx.accessTagGrant.update({
+          where: { id: grant.id },
+          data: { revokedAt: new Date(), revokedById: fixture.staffAId },
+        }),
+      );
+      await expect(send(fixture.guardianAUserId)).resolves.toMatchObject({
+        id: sent.id,
+        reused: true,
+      });
+      await expect(
+        service.send(
+          fixture.tenantAId,
+          fixture.guardianAUserId,
+          conversation.conversationId,
+          {
+            ...input,
+            clientRequestId: randomUUID(),
+          },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    } finally {
+      await prisma.accessTagGrant.delete({ where: { id: grant.id } });
     }
   });
 

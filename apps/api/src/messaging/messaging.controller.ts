@@ -18,7 +18,7 @@ import { RequirePermission } from "../access-control/require-permission.decorato
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import {
   createStaffConversationSchema,
-  sendStaffMessageSchema,
+  sendMessageSchema,
 } from "./dto/messaging-command.dto";
 import {
   conversationIdSchema,
@@ -112,7 +112,7 @@ export class MessagingController {
       return await this.commands.sendStaffMessage(
         this.actor(),
         await conversationIdSchema.parseAsync(id),
-        await sendStaffMessageSchema.parseAsync(body),
+        await sendMessageSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError)
