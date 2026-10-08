@@ -124,7 +124,8 @@ after its identity-link, portal-policy, date-boundary and cross-site integration
 checks passed on the corrected PR revision. Parent access, student web, exports,
 production migration and deployment remain deferred.
 
-Step 1.3g10 is implementing the linked-parent daily history API. Local lint,
+Step 1.3g10 is in [PR #443](https://github.com/FSS-Ltd/pathway/pull/443),
+implementing the linked-parent daily history API. Local lint,
 typecheck, API build, unit and formatting checks passed. Its database request
 and RLS tests await CI because disposable PostgreSQL is unavailable locally.
 The step remains open until its PR has current-revision green CI and is merged.
