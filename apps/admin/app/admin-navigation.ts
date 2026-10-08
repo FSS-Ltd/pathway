@@ -54,6 +54,7 @@ const navItemsWithAccess: (SidebarNavItem & {
   {
     label: "ACE overview",
     href: "/ace",
+    matchMode: "exact",
     iconIndex: 24,
     access: "staff-or-admin",
     permission: "ace.dashboard.read",
