@@ -19,7 +19,9 @@ creator/participant eligibility triggers. Step 1.3e1a adds a read-only staff
 conversation-list route. Step 1.3e1b adds read-only staff message history.
 Step 1.3e2a adds staff direct conversation creation, step 1.3e2b adds
 staff direct and room message sending, and step 1.3e2c adds site staffroom
-opening. Parent access and the staffroom web control remain pending. The
+opening. Step 1.3e2d adds its web control, and step 1.3e4a adds a read-only
+parent conversation list. Parent creation, sending, and the web journey remain
+pending. The
 existing `PARENT_STAFF` uniqueness constraint
 allows **one conversation per guardian identity per site**, so the first web
 journey is a school-team conversation, not one separate thread per staff
@@ -43,6 +45,7 @@ or message metadata in a denial.
 | Planned route                                                 | Permission                                                                     | Additional boundary                                                                                                                                                 |
 | ------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /ace/messages/conversations?cursor=&limit=`              | `messaging.conversations.read`                                                 | Only conversations where the caller is an active participant in the selected site; bounded, newest-first page.                                                      |
+| `GET /ace/parent/sites/:siteId/messages/conversations`        | `messaging.conversations.read` from the fixed Parent template                  | Active full guardian relationship and participant in the requested site; parent portal enabled; at most one school-team thread.                                     |
 | `POST /ace/messages/conversations`                            | `messaging.conversations.create`                                               | Parent opens or reuses their own `PARENT_STAFF` school-team conversation; staff direct/room creation requires current site membership and approved recipient scope. |
 | `GET /ace/messages/conversations/recipients?search=&limit=`   | `messaging.conversations.create`                                               | Current active staff in the selected site only; excludes the caller and student identities. Search needs 2–80 characters and returns at most 20 names and IDs.      |
 | `GET /ace/messages/conversations/:id/messages?before=&limit=` | `messaging.messages.read`                                                      | Recheck participant and relationship/membership; bounded sequence page, with only necessary sender display names and delivery facts.                                |
@@ -74,9 +77,13 @@ audience/receipt models and a later C12 slice; they are not chat messages.
 
 The current request-context guard and effective-permission reader require an
 organisation or site membership path. A guardian relationship alone does not
-select a site or satisfy that reader. Parent routes need a separately reviewed
-relationship-aware context and permission path before they can be enabled;
-granting every guardian staff or organisation membership would widen access.
+select a site or satisfy that reader. The read-only parent list therefore uses
+an explicit site path, the fixed Parent template's typed read permission, and
+current full guardian relationship and participant checks. It does not give
+guardians staff or organisation membership. Parent creation, sending, and
+responder assignment still need their own relationship-aware and audited
+authorization path; granting every guardian staff or organisation membership
+would widen access.
 Step 1.3e1a therefore lists `STAFF_DIRECT` and `STAFF_ROOM` conversations only. It
 requires an active user, a current selected-site `STAFF` or `SITE_ADMIN`
 membership, an active staff participant, and the typed read permission. It
@@ -124,6 +131,16 @@ every active participant. The web control must call open on entry so ended
 members are reconciled before a staff member sends. Newly joined or returning
 staff can read earlier room messages while their current site membership and
 read permission hold; the staffroom is not a safeguarding case record.
+
+Step 1.3e4a lists the authenticated guardian's single `PARENT_STAFF`
+school-team conversation for an explicitly requested site. It requires an
+active, non-student user, the fixed Parent read permission and active
+permission definition, the parent portal switch, a current full relationship
+to a non-guest child, and an active guardian participant. It returns no
+conversation data for unlinked or removed people. A linked guardian with no
+thread receives an empty list. The list includes only the latest preview and
+unread count; creation, message history, read cursor, and sending remain
+unavailable to parents in this slice.
 
 Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive
 conversation list and thread, paged history, explicit read cursor, and a

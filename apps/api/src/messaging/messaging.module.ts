@@ -6,14 +6,17 @@ import { MessagingController } from "./messaging.controller";
 import { MessagingCommandService } from "./messaging-command.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingService } from "./messaging.service";
+import { ParentMessagingController } from "./parent-messaging.controller";
+import { ParentMessagingService } from "./parent-messaging.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [MessagingController],
+  controllers: [MessagingController, ParentMessagingController],
   providers: [
     MessagingService,
     MessagingConversationService,
     MessagingCommandService,
+    ParentMessagingService,
   ],
 })
 export class MessagingModule {}

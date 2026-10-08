@@ -18,6 +18,7 @@ import {
 import { MessagingService } from "../messaging.service";
 import { MessagingConversationService } from "../messaging-conversation.service";
 import { MessagingCommandService } from "../messaging-command.service";
+import { ParentMessagingService } from "../parent-messaging.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -1814,15 +1815,97 @@ describe("ACE parent/staff messaging and notices storage", () => {
   it("permits one general parent conversation per guardian and valid staff conversation kinds", async () => {
     if (!isDatabaseAvailable()) return;
 
-    await withMessagingRlsContext(
+    const parentConversation = await withMessagingRlsContext(
       fixture.tenantAId,
       fixture.orgAId,
       async (tx) => {
-        await createParentStaffConversation(tx, fixture);
+        const parent = await createParentStaffConversation(tx, fixture);
+        await tx.message.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            conversationId: parent.conversationId,
+            senderParticipantId: parent.staffParticipantIds[0],
+            clientRequestId: randomUUID(),
+            bodyEncrypted: "School team update",
+          },
+        });
         await createStaffConversation(tx, fixture, "STAFF_DIRECT");
         await createStaffConversation(tx, fixture, "STAFF_ROOM");
+        return parent;
       },
     );
+    const service = new ParentMessagingService();
+    const parentList = await service.list(
+      fixture.tenantAId,
+      fixture.guardianAUserId,
+    );
+    expect(parentList).toMatchObject({
+      items: [
+        {
+          id: parentConversation.conversationId,
+          kind: "PARENT_STAFF",
+          title: "School team",
+          latestMessage: { preview: "School team update" },
+          unreadCount: 1,
+        },
+      ],
+      nextCursor: null,
+    });
+    const guardianParticipantId = parentConversation.guardianParticipantId;
+    if (!guardianParticipantId) throw new Error("Missing guardian participant");
+    await prisma.messageParticipant.update({
+      where: { id: guardianParticipantId },
+      data: { removedAt: new Date() },
+    });
+    try {
+      expect(
+        (await service.list(fixture.tenantAId, fixture.guardianAUserId)).items,
+      ).toEqual([]);
+    } finally {
+      await prisma.messageParticipant.update({
+        where: { id: guardianParticipantId },
+        data: { removedAt: null },
+      });
+    }
+    expect(
+      (await service.list(fixture.tenantAId, fixture.guardianBUserId)).items,
+    ).toEqual([]);
+    await prisma.guardianChildRelationship.update({
+      where: { id: fixture.guardianBRelationshipId },
+      data: { endedAt: new Date() },
+    });
+    try {
+      await expect(
+        service.list(fixture.tenantAId, fixture.guardianBUserId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    } finally {
+      await prisma.guardianChildRelationship.update({
+        where: { id: fixture.guardianBRelationshipId },
+        data: { endedAt: null },
+      });
+    }
+    for (const userId of [fixture.staffAId, fixture.studentUserId]) {
+      await expect(
+        service.list(fixture.tenantAId, userId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    }
+    await expect(
+      service.list(fixture.tenantBId, fixture.guardianAUserId),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await prisma.org.update({
+      where: { id: fixture.orgAId },
+      data: { parentPortalEnabled: false },
+    });
+    try {
+      await expect(
+        service.list(fixture.tenantAId, fixture.guardianAUserId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    } finally {
+      await prisma.org.update({
+        where: { id: fixture.orgAId },
+        data: { parentPortalEnabled: true },
+      });
+    }
     await expectDatabaseRejection(
       () =>
         withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
