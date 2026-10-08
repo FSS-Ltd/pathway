@@ -96,6 +96,7 @@ does not release the new parent screen.
 | 1.3e4f   | Linked-parent school-team messaging web journey                        | Merged  | [#482](https://github.com/FSS-Ltd/pathway/pull/482) to `master`                     | `90b22698b93186e99055dae6be59e78b5b53107b`; all eight checks passed: CI run 37787308119, CodeQL run 37787303829.                                                                                                | `eb0dab891860a287144dbcd27bc6432658b3e0a7` |
 | 1.3e4g   | Scoped staff school-team conversation inbox API                        | Merged  | [#484](https://github.com/FSS-Ltd/pathway/pull/484) to `master`                     | `096b9ad0b5b1a1471f0b18be5f9a2e30dff4f8cb`; all eight checks passed: CI run 37792543851, CodeQL run 37792542324.                                                                                                | `b90d2594b0cbde4331bf987eb386802b34a800ff` |
 | 1.3e4h   | Scoped staff school-team message history API                           | Merged  | [#486](https://github.com/FSS-Ltd/pathway/pull/486) to `master`                     | `4dcb094ce32b0d561c351e053e013788338477c5`; all eight checks passed: CI run 37796800922, CodeQL run 37796796579.                                                                                                | `535c088bbd53539feea19648d7dadef738be61dc` |
+| 1.3e4i   | Scoped staff school-team read-cursor API                               | Merged  | [#488](https://github.com/FSS-Ltd/pathway/pull/488) to `master`                     | `d1dddb81d611af5ad1cd8997cf0b06cbc6a8c18b`; all eight checks passed: CI run 37801462309, CodeQL run 37801460439.                                                                                                | `76f64f3bbffeec60c1be1568f50996a389790e15` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -331,6 +332,16 @@ reuses the inbox's current site, responder, guardian-link and participant
 scope, and returns bounded message pages without changing read state. Staff
 read cursor, replies and web entry remain. The production apps still serve
 older code.
+
+Step 1.3e4i merged in [PR #488](https://github.com/FSS-Ltd/pathway/pull/488)
+at `76f64f3bbffeec60c1be1568f50996a389790e15`. All eight checks passed
+on head `d1dddb81d611af5ad1cd8997cf0b06cbc6a8c18b`, including the
+PostgreSQL messaging integration suite. A current approved staff responder
+can advance only their own school-team thread cursor to an existing sequence;
+revoked access, ended guardian links, disabled parent portal and site switches
+are denied. Staff replies and web entry remain. The production apps still
+serve older code. Estimated overall ACE update completion after this merge:
+**about 50%**.
 
 **Revised overall ACE update estimate: about 50%.** The earlier 91% estimate
 was too high for the full approved plan. The [journey matrix](02-oasis-web-journey-parity.md)
