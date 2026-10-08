@@ -5,8 +5,14 @@ completed its migration, API, admin, and web jobs successfully at merged commit
 `a41e09aac3fde40f646e0242b0b8e3f0191e0122`. The API production
 configuration now selects the restored London Supabase project. The prior
 [failed deployment](https://github.com/FSS-Ltd/pathway/actions/runs/34189600516)
-stopped at Prisma migration and skipped all three apps. Production deployment
-remains manual; merging to `master` does not deploy automatically.
+stopped at Prisma migration and skipped all three apps. PR #501 restored
+`master`-push deployment triggers on 8 October. Its first
+[automatic run](https://github.com/FSS-Ltd/pathway/actions/runs/37829217494)
+failed while applying `20261008020000_ace_family_context_discovery`:
+`app."StudentIdentity"` is a view in the restored database, and PostgreSQL
+cannot create its self-discovery policy on a view. API, admin, and web jobs
+were skipped. Migration recovery and a portable policy target are required
+before a newer app release can proceed.
 
 On 7 October, the connected Vercel API confirmed that the API
 project's production `DATABASE_URL` and `SUPABASE_URL` both reference
@@ -102,6 +108,7 @@ does not release the new parent screen.
 | 1.3e5a   | ACE site-notice audience and receipt contract                          | Merged  | [#494](https://github.com/FSS-Ltd/pathway/pull/494) to `master`                     | `7b67a3555c218f325d6e74ae051f435738803d14`; all eight checks passed: CI run 37813681749, CodeQL run 37813678605.                                                                                                | `b65c4e64f32d1ccab608fe8be9fcf31ae5642a66` |
 | 1.3e5a1  | Parent notice permission boundary correction                           | Merged  | [#499](https://github.com/FSS-Ltd/pathway/pull/499) to `master`                     | `9ee2322c1efd86a0ad974d060acad25224af7386`; all eight checks passed: CI run 37819210083, CodeQL run 37819205960.                                                                                                | `29a1780d4663840a6e19bce7aebfe1277e61e30e` |
 | 1.3e5b   | ACE parent notice relationship permission                              | Merged  | [#500](https://github.com/FSS-Ltd/pathway/pull/500) to `master`                     | `c5858bf00bba252d508b01f37526755d3ae46f31`; all eight checks passed: CI run 37821295904, CodeQL run 37821292163.                                                                                                | `e4f5e46ea274150b364cb2d99f370d21bbdda071` |
+| 1.3e5c1  | Full guardian eligibility for ACE notice audiences                     | Merged  | [#502](https://github.com/FSS-Ltd/pathway/pull/502) to `master`                     | `7d11c7a253984777f32a9aad738f30d7dfd6c5da`; all eight checks passed: CI run 37828070800, CodeQL run 37828063709.                                                                                                | `1bf510c6fc01e3ddbfdcb4c90ce3963b26ca9e38` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -402,6 +409,14 @@ permission definition, role seed, and RLS database jobs. It registered the
 ACE-only, relationship-scoped `ace.parent.notices.read` permission in the
 protected Parent template without changing site-scoped `notices.read` or the
 product-wide announcement route. No parent notice API is live yet; estimated
+completion remains **about 51%**.
+
+Step 1.3e5c1 merged in [PR #502](https://github.com/FSS-Ltd/pathway/pull/502)
+at `1bf510c6fc01e3ddbfdcb4c90ce3963b26ca9e38`. All eight checks passed
+on head `7d11c7a253984777f32a9aad738f30d7dfd6c5da`, including portable
+`app` and `public` database probes. The forward migration requires a current
+`FULL` guardian relationship to a non-guest child before including that user
+in an ACE notice audience. It has not been applied to production; estimated
 completion remains **about 51%**.
 
 **Revised overall ACE update estimate: about 51%.** The earlier 87% and 91%

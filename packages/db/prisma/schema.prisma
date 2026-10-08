@@ -1897,6 +1897,8 @@ model AceNotice {
   body            String            @db.Text
   audience        AceNoticeAudience
   publishedAt     DateTime?
+  expiresAt       DateTime?
+  withdrawnAt     DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -1907,6 +1909,7 @@ model AceNotice {
 
   @@unique([id, tenantId])
   @@index([tenantId, publishedAt])
+  @@index([tenantId, withdrawnAt, publishedAt(sort: Desc)])
 }
 
 model AceNoticeAudienceMember {
