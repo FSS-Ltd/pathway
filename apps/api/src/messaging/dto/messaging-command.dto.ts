@@ -11,6 +11,14 @@ export type CreateStaffDirectConversationInput = z.infer<
   typeof createStaffDirectConversationSchema
 >;
 
+export const createParentConversationSchema = z
+  .object({ recipientUserId: z.string().uuid() })
+  .strict();
+
+export type CreateParentConversationInput = z.infer<
+  typeof createParentConversationSchema
+>;
+
 export const createStaffRoomConversationSchema = z
   .object({ kind: z.literal("STAFF_ROOM") })
   .strict();

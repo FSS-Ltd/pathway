@@ -2,9 +2,10 @@ import { NotFoundException } from "@nestjs/common";
 import { SYSTEM_ROLE_TEMPLATES } from "@pathway/auth";
 import { Prisma, prisma, withTenantRlsContext } from "@pathway/db";
 
-type ParentMessagingReadPermission =
+type ParentMessagingPermission =
   | "messaging.conversations.read"
-  | "messaging.messages.read";
+  | "messaging.messages.read"
+  | "messaging.conversations.create";
 
 export function parentConversationScope(
   siteId: string,
@@ -30,8 +31,12 @@ export function parentConversationScope(
 export async function withParentMessagingAccess<T>(
   siteId: string,
   userId: string,
-  permissionKey: ParentMessagingReadPermission,
-  operation: (tx: Prisma.TransactionClient, guardianId: string) => Promise<T>,
+  permissionKey: ParentMessagingPermission,
+  operation: (
+    tx: Prisma.TransactionClient,
+    guardianId: string,
+    orgId: string,
+  ) => Promise<T>,
 ): Promise<T> {
   if (
     !siteId.trim() ||
@@ -88,6 +93,6 @@ export async function withParentMessagingAccess<T>(
     if (!user || !guardian || student || !permission?.isActive) {
       throw new NotFoundException("Messages not found");
     }
-    return operation(tx, guardian.id);
+    return operation(tx, guardian.id, site.orgId);
   });
 }

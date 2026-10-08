@@ -21,6 +21,17 @@ export const staffRecipientQuerySchema = z
   })
   .strict();
 
+export const parentRecipientQuerySchema = z
+  .object({
+    search: z.string().trim().min(2).max(80).optional(),
+    limit: z
+      .string()
+      .regex(/^(?:[1-9]|1\d|20)$/)
+      .transform(Number)
+      .optional(),
+  })
+  .strict();
+
 export const messageQuerySchema = z
   .object({
     limit,
@@ -42,5 +53,6 @@ export const readCursorSchema = z
 
 export type ConversationQuery = z.infer<typeof conversationQuerySchema>;
 export type StaffRecipientQuery = z.infer<typeof staffRecipientQuerySchema>;
+export type ParentRecipientQuery = z.infer<typeof parentRecipientQuerySchema>;
 export type MessageQuery = z.infer<typeof messageQuerySchema>;
 export type ReadCursorInput = z.infer<typeof readCursorSchema>;
