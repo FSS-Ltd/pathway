@@ -8,7 +8,7 @@ import { useSession } from "@/lib/use-session-compat";
 import { Menu, X, LifeBuoy } from "lucide-react";
 import { APP_VERSION } from "@pathway/util/version";
 import { TopBarActions } from "@/components/topbar-actions";
-import { SidebarNav, TopBar } from "@pathway/ui";
+import { SidebarNav, TopBar, type SidebarNavProps } from "@pathway/ui";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { useAdminContext } from "@/lib/admin-context";
 import { OnboardingModal } from "@/components/onboarding-modal";
@@ -36,8 +36,13 @@ const titleMap: Record<string, string> = {
   "/parents": "Parents & Guardians",
   "/lessons": "Lessons",
   "/learning": "Learning",
+  "/ace": "ACE overview",
   "/ace/pace": "PACE workflow",
+  "/ace/pace/inventory": "PACE inventory",
   "/ace/behaviour": "Behaviour capture",
+  "/ace/messages": "Messages",
+  "/ace/settings/academic": "Academic setup",
+  "/ace/attendance/daily": "Daily register",
   "/classes": "Classes",
   "/sessions": "Sessions & Rota",
   "/my-schedule": "My schedule",
@@ -64,6 +69,10 @@ const resolveTitle = (path: string): string => {
   const topSegment = `/${path.split("/").filter(Boolean)[0] ?? ""}`;
   return titleMap[topSegment] ?? "Admin";
 };
+
+const renderAdminNavLink: NonNullable<SidebarNavProps["renderLink"]> = (
+  props,
+) => <Link {...props} />;
 
 type AdminBrandLinkProps = {
   isCollapsed?: boolean;
@@ -283,6 +292,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           className="hidden lg:flex"
           items={visibleNavItems}
           currentPath={pathname}
+          renderLink={renderAdminNavLink}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           header={
@@ -402,6 +412,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               className="!h-full !w-full border-r-0 shadow-none"
               items={visibleNavItems}
               currentPath={pathname}
+              renderLink={renderAdminNavLink}
               header={null}
               footer={
                 <>
