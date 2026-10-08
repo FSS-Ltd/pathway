@@ -37,6 +37,12 @@ date ranges. It does not infer enrolment from legacy `Child.yearGroup` text.
 Step 1.3g3 adds one explicit teaching-date decision per site/date within an
 academic year. Holidays, closures, and exceptional openings require a reason;
 an unconfigured date remains closed to future daily-mark writes.
+Step 1.3g4 adds the separate daily fact and append-only correction-event
+tables with site, child, academic-year, teaching-date, recorder, and reason
+constraints. The original recorder and time stay on the fact, while each
+correction event stores its own actor and server time. The service must write
+a changed mark, its correction event, and the audit entry in one locked
+transaction; this schema step does not expose a daily-register API.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server

@@ -37,6 +37,8 @@ const requiredTables = [
   "AceStaffYearBandAssignment",
   "AceSchoolEnrollment",
   "AceTeachingDate",
+  "AceDailyAttendance",
+  "AceDailyAttendanceCorrectionEvent",
   "StudentSubjectEnrollment",
   "PaceAssessment",
   "PaceProgress",
