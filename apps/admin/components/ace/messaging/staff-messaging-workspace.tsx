@@ -42,10 +42,10 @@ export function StaffMessagingWorkspace({
         </p>
       </header>
 
-      <div className="grid min-h-[34rem] overflow-hidden rounded-3xl border border-border-subtle bg-surface shadow-sm md:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)]">
+      <div className="grid h-[min(75dvh,50rem)] min-h-[28rem] overflow-hidden rounded-3xl border border-border-subtle bg-surface shadow-card md:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)]">
         <section
           aria-label="Conversations"
-          className={`${messaging.selectedId && !composing ? "hidden md:flex" : "flex"} min-w-0 flex-col border-border-subtle md:border-r`}
+          className={`${messaging.selectedId && !composing ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-col border-border-subtle md:border-r`}
         >
           {composing && canCreate ? (
             <NewStaffConversation
@@ -89,7 +89,7 @@ export function StaffMessagingWorkspace({
           aria-label={
             selected ? `Conversation with ${selected.title}` : "Message detail"
           }
-          className={`${messaging.selectedId && !composing ? "flex" : "hidden md:flex"} min-w-0 flex-col bg-shell/70`}
+          className={`${messaging.selectedId && !composing ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-col bg-shell/70`}
         >
           {selected ? (
             <ConversationDetail

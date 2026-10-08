@@ -139,6 +139,13 @@ recipient's forward-only read cursor; it returns no receipt for incoming or
 staff-room messages. The web shows “Sent” only after the server confirms the
 message and “Read” after a later thread fetch observes the recipient cursor.
 It does not claim device delivery or live receipt updates.
+Step 1.3e3e refines the staff web conversation surface: the bounded pane keeps
+the composer in view, nearby same-sender messages form a visual group, and the
+selected thread has a persistent border marker. Each message still exposes its
+sender and time to assistive technology. The darker NexSteps teal used for
+outgoing bubbles, unread badges, and Send improves text contrast. This changes
+presentation only; participant, permission, read-cursor, and send behaviour
+remain governed by the existing API and client rules.
 
 ## Web design intent
 
