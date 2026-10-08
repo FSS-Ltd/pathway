@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { applyTenantContext } from "../index";
 import {
   activeTransaction,
   runWithTransaction,
@@ -78,5 +79,20 @@ describe("transaction context", () => {
         ),
       ).toThrow("Cannot replace an active");
     });
+  });
+
+  it("allows reapplying the same organisation context in a read-only transaction", async () => {
+    const execute = jest.fn(async () => 1);
+    const scopedClient = {
+      $executeRawUnsafe: execute,
+    } as unknown as Prisma.TransactionClient;
+    await runWithTransaction(
+      {
+        client: scopedClient,
+        scope: { kind: "org", orgId: "org-a", readOnly: true },
+      },
+      () => applyTenantContext(scopedClient, "", "org-a"),
+    );
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 });

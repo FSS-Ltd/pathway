@@ -214,7 +214,11 @@ export async function applyTenantContext(
     }
     const requested: TransactionScope = tenantId
       ? { kind: "tenant", tenantId, orgId: orgId ?? null, readOnly: false }
-      : { kind: "org", orgId: orgId ?? "", readOnly: false };
+      : {
+          kind: "org",
+          orgId: orgId ?? "",
+          readOnly: active.scope.readOnly,
+        };
     assertCompatibleScope(active, requested);
   }
   await tx.$executeRawUnsafe(
