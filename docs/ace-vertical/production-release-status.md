@@ -85,6 +85,7 @@ created after the variable updates but still serve code commit `a41e09a`.
 | 1.3e2b   | Scoped staff message send API                                          | Merged  | [#401](https://github.com/FSS-Ltd/pathway/pull/401) to `master`                     | `77fe27f3a5a166d239318d91444a81dcfb41fb5c`; all eight checks passed: CI run 37623067709, CodeQL run 37623060227.                                                                                                | `f5e2f7e25a371d022db8bd67c619c087e60ff4cd` |
 | 1.3e2c   | Scoped site staffroom open and reconciliation                          | Merged  | [#463](https://github.com/FSS-Ltd/pathway/pull/463) to `master`                     | `6d0619e712905078775beec602353f04e2051685`; all eight checks passed: CI run 37753028861, CodeQL run 37753023843.                                                                                                | `fa1c28afbd25ce0d1bf733103cfe31e4f01e3a60` |
 | 1.3e2d   | Permission-aware site staffroom web control                            | Merged  | [#467](https://github.com/FSS-Ltd/pathway/pull/467) to `master`                     | `9971601a584a787bebfd89fd41bc0d87eff85321`; all eight checks passed: CI run 37760588499, CodeQL run 37760585038.                                                                                                | `e3d4f32fb1a393e43b7b3e010db0d874c8b7c72e` |
+| 1.3e4a   | Linked-parent school-team conversation list API                        | Merged  | [#470](https://github.com/FSS-Ltd/pathway/pull/470) to `master`                     | `e2843e435f055c10df144a0986ad30da382a2694`; all eight checks passed: CI run 37766725458, CodeQL run 37766721567.                                                                                                | `5c5a47409ae10fae458fd7daa49982f7bc1af317` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -241,7 +242,17 @@ at `e3d4f32fb1a393e43b7b3e010db0d874c8b7c72e`. All eight checks passed
 on head `9971601a584a787bebfd89fd41bc0d87eff85321`. The web control
 opens the room for permitted staff, handles failures, and discards responses
 from a previous active site. It remains outside the manual production
-deployment. The next C12 slice may start after this evidence PR is merged.
+deployment.
+
+Step 1.3e4a merged in [PR #470](https://github.com/FSS-Ltd/pathway/pull/470)
+at `5c5a47409ae10fae458fd7daa49982f7bc1af317`. All eight checks passed
+on head `e2843e435f055c10df144a0986ad30da382a2694`, including the
+PostgreSQL integration suite. The read-only parent list checks the explicit
+site, current full guardian relationship, active participant, fixed Parent
+read permission, and parent-portal switch. Parent creation, history, sending,
+read cursor, and web access remain separate C12 work. This merged API is not
+in the current manual production deployment. Estimated overall ACE update
+completion after this merge: **89%**.
 
 Step 1.3f1 was merged in [PR #413](https://github.com/FSS-Ltd/pathway/pull/413)
 after all eight checks passed on its final revision, including PostgreSQL
