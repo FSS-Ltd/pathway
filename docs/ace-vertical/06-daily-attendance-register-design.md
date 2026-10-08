@@ -6,8 +6,10 @@ established the schema. Step 1.3g5 adds the scoped staff roster read API.
 Step 1.3g6 adds atomic daily mark and correction writes. Step 1.3g7 adds the
 bounded staff correction-history read. Step 1.3g8 adds the staff web register
 for marking, correction and history. Step 1.3g9 adds a student-only daily mark
-history API. Step 1.3g10 adds a linked-parent daily mark history API. Parent and
-student web, exports and production migration remain open.
+history API. Step 1.3g10 adds a linked-parent daily mark history API. Step
+1.3g11 adds parent and student web views for explicit site and child links.
+Self-service site and child discovery, exports and production migration remain
+open.
 
 ## Source behaviour and current gap
 
@@ -79,6 +81,14 @@ release switch. Issued daily facts are available immediately to a full-access
 guardian. Missing, future-starting, ended, revoked and cross-site links use
 the same not-found response. The shared bounded date and response contract
 omits staff identities and correction notes.
+
+Step 1.3g11 presents those scoped records in dedicated family web pages. The
+family shell does not mount staff navigation, role lookup or organisation UI
+requests. The student page takes a site ID and the parent page takes a site and
+child ID from an explicit link; both call the existing guarded API and show
+recorded-day counts without implying an attendance rate. These pages do not
+yet discover a signed-in person's linked sites or children. Navigation from an
+invitation or family landing page remains a separate step.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
