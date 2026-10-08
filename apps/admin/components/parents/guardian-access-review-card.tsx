@@ -4,6 +4,7 @@ import * as React from "react";
 import { Badge, Button, Card, Label, Select } from "@pathway/ui";
 import { toast } from "sonner";
 import { Checkbox } from "../ui/checkbox";
+import { GuardianAccessRevokeForm } from "./guardian-access-revoke-form";
 import { subscribeToActiveSiteChanges } from "../../lib/active-site-events";
 import {
   approveGuardianAccess,
@@ -153,6 +154,21 @@ export function GuardianAccessReviewCard({ parentId }: { parentId: string }) {
                         </Button>
                       )}
                     </div>
+                    {child.hasFullAccess ? (
+                      <div className="mt-3">
+                        <GuardianAccessRevokeForm
+                          parentId={parentId}
+                          childId={child.id}
+                          childName={child.fullName}
+                          onRevoked={() => {
+                            toast.success(
+                              "Guardian access revoked for this child.",
+                            );
+                            setRevision((value) => value + 1);
+                          }}
+                        />
+                      </div>
+                    ) : null}
                     {selected && canReview ? (
                       <div className="mt-4 space-y-3 border-t border-border-subtle pt-4">
                         <div>

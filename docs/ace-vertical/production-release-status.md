@@ -1,10 +1,10 @@
 # ACE production release status
 
 Checked on 9 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `65a67a8e2574182d2cc0b332b54deafabc6b288c`.
+to READY deployments at merged commit `43e47d69ccd840001d9cc3587fb5509ca4b366e9`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-8 are now served by all three apps.
+changes through REL-9 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -171,8 +171,25 @@ detail response directly instead of requiring a separate full child-list read.
 Removing a legacy link with current `FULL` guardian access is blocked until
 an audited revocation flow is delivered; unlinking alone cannot silently leave
 effective access behind.
-REL-9 is not yet
-merged or deployed. Production parent-to-staff messaging remains unverified.
+REL-9 merged in [PR #513](https://github.com/FSS-Ltd/pathway/pull/513) as
+`43e47d69ccd840001d9cc3587fb5509ca4b366e9`. All eight checks passed on
+head `6bd3a72b1b67823db7d74a2f7ce9adec5d2e6290`. [Production run
+37859521980](https://github.com/FSS-Ltd/pathway/actions/runs/37859521980)
+passed migrations, API, and admin on its first attempt. The web job passed on
+retry after a transient Nunito font-loader failure in an unchanged file. All
+three Vercel deployments are READY on their production aliases: API
+`dpl_8Zubo1ZKmSQBkUNzoPVqghsKPyP2`, admin
+`dpl_CPoLrTZ9enTBDjPAzjh4sPyEs4Eh`, and web
+`dpl_3J1aoMv3BLhERSKsFtSNYLWPNsdX`. Anonymous health, blog, admin sign-in
+redirect, and configurator smoke checks passed. Signed-in parent-to-staff
+messaging remains unverified.
+
+REL-10 adds organisation-admin revocation for an approved guardian-child
+relationship at the selected site. Revocation requires a reason, records the
+actor and time on the relationship, writes an audit event, and immediately
+removes that child's effective guardian access. A fixed Parent role can remain
+where the parent has other children. No historical links are approved or
+revoked automatically. This step is pending PR and production verification.
 
 ## Delivery steps
 

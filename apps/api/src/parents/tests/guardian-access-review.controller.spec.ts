@@ -9,7 +9,12 @@ jest.mock("../../orgs/org-admin-access", () => ({
 
 const approve = jest.fn();
 const list = jest.fn();
-const service = { approve, list } as unknown as GuardianAccessReviewService;
+const revoke = jest.fn();
+const service = {
+  approve,
+  list,
+  revoke,
+} as unknown as GuardianAccessReviewService;
 const controller = new GuardianAccessReviewController(service);
 const request = { authUserId: "reviewer-a" } as Parameters<
   GuardianAccessReviewController["approve"]
@@ -69,6 +74,57 @@ describe("GuardianAccessReviewController", () => {
       "parent-a",
       "child-a",
       "SCHOOL_RECORDS",
+    );
+  });
+
+  it("requires a meaningful revocation reason", async () => {
+    await expect(
+      controller.revoke(
+        "parent-a",
+        "child-a",
+        { reason: "short" },
+        request,
+        "site-a",
+        "org-a",
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(revoke).not.toHaveBeenCalled();
+  });
+
+  it("requires organisation admin access to revoke", async () => {
+    jest
+      .mocked(assertOrgAdminAccess)
+      .mockRejectedValueOnce(new ForbiddenException());
+    await expect(
+      controller.revoke(
+        "parent-a",
+        "child-a",
+        { reason: "Court order reviewed" },
+        request,
+        "site-a",
+        "org-a",
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(revoke).not.toHaveBeenCalled();
+  });
+
+  it("passes the scoped revocation to the service", async () => {
+    revoke.mockResolvedValueOnce({ id: "relationship-a" });
+    await controller.revoke(
+      "parent-a",
+      "child-a",
+      { reason: "  Court order reviewed  " },
+      request,
+      "site-a",
+      "org-a",
+    );
+    expect(revoke).toHaveBeenCalledWith(
+      "site-a",
+      "org-a",
+      "reviewer-a",
+      "parent-a",
+      "child-a",
+      "Court order reviewed",
     );
   });
 });

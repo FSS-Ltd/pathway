@@ -183,4 +183,67 @@ export class GuardianAccessReviewService {
       return { id: relationship.id, childId, created: true };
     });
   }
+
+  async revoke(
+    tenantId: string,
+    orgId: string,
+    actorUserId: string,
+    parentId: string,
+    childId: string,
+    reason: string,
+  ) {
+    return withTenantRlsContext(tenantId, orgId, async (tx) => {
+      const lockKey = `guardian-access-review:${tenantId}:${parentId}:${childId}`;
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+      );
+      const site = await tx.tenant.findFirst({
+        where: { id: tenantId, orgId },
+        select: { id: true },
+      });
+      if (!site) throw new NotFoundException("Site not found");
+
+      const relationship = await tx.guardianChildRelationship.findFirst({
+        where: {
+          tenantId,
+          childId,
+          child: { tenantId, tenant: { orgId } },
+          guardianIdentity: { tenantId, userId: parentId },
+          legalAccess: "FULL",
+          startsAt: { lte: new Date() },
+          endedAt: null,
+          revokedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!relationship) {
+        throw new NotFoundException("Active guardian access not found");
+      }
+
+      const revokedAt = new Date();
+      await tx.guardianChildRelationship.update({
+        where: { id: relationship.id },
+        data: {
+          revokedAt,
+          revokedByUserId: actorUserId,
+          revocationReason: reason,
+        },
+      });
+      await recordAuditEventInTransaction(tx, {
+        actorUserId,
+        tenantId,
+        orgId,
+        entityType: AuditEntityType.ACE_RECORD,
+        entityId: relationship.id,
+        action: AuditAction.UPDATED,
+        metadata: {
+          kind: "GUARDIAN_ACCESS_REVOKED",
+          parentUserId: parentId,
+          childId,
+          revokedAt: revokedAt.toISOString(),
+        },
+      });
+      return { id: relationship.id, childId, revokedAt };
+    });
+  }
 }
