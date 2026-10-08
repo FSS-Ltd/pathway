@@ -60,6 +60,9 @@ policies on `public` base tables, none on the view, and unchanged representative
 counts of zero guardian identities, zero student identities, and zero ACE
 notices. All three app jobs and Vercel builds passed, but the new API crashed
 during Nest startup. The three app aliases were rolled back to their previous
-READY deployments; the API `/health` recovered to HTTP 200. The app release
-remains open while REL-3 fixes the startup failure. Deployment and smoke-test
-evidence is recorded in the [production release status](../production-release-status.md).
+READY deployments; the API `/health` recovered to HTTP 200. REL-3 fixed that
+startup failure, but its new API deployment returned HTTP 500 on requests
+because the global RLS interceptor also lacked explicit TSX-compatible
+injection. REL-4 is the current app release repair; the public aliases remain
+on the prior healthy revision. Deployment and smoke-test evidence is recorded
+in the [production release status](../production-release-status.md).
