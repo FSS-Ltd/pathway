@@ -20,8 +20,9 @@ conversation-list route. Step 1.3e1b adds read-only staff message history.
 Step 1.3e2a adds staff direct conversation creation, step 1.3e2b adds
 staff direct and room message sending, and step 1.3e2c adds site staffroom
 opening. Step 1.3e2d adds its web control, step 1.3e4a adds a read-only
-parent conversation list, and step 1.3e4b adds read-only parent message history.
-Parent creation, sending, and the web journey remain pending. The existing
+parent conversation list, step 1.3e4b adds read-only parent message history,
+and step 1.3e4d adds parent responder discovery and school-team creation.
+Parent sending and the web journey remain pending. The existing
 `PARENT_STAFF` uniqueness constraint
 allows **one conversation per guardian identity per site**, so the first web
 journey is a school-team conversation, not one separate thread per staff
@@ -46,9 +47,11 @@ or message metadata in a denial.
 | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `GET /ace/messages/conversations?cursor=&limit=`                                   | `messaging.conversations.read`                                                 | Only conversations where the caller is an active participant in the selected site; bounded, newest-first page.                                                           |
 | `GET /ace/parent/sites/:siteId/messages/conversations`                             | `messaging.conversations.read` from the fixed Parent template                  | Active full guardian relationship and participant in the requested site; parent portal enabled; at most one school-team thread.                                          |
+| `GET /ace/parent/sites/:siteId/messages/conversations/recipients?search=&limit=`   | `messaging.conversations.create` from the fixed Parent template                | Current same-site staff with an active fixed Head/Lead role or parent-message-responder tag; return at most 20 names and IDs.                                            |
+| `POST /ace/parent/sites/:siteId/messages/conversations`                            | `messaging.conversations.create` from the fixed Parent template                | Parent selects a current approved responder; open one audited `PARENT_STAFF` thread for the guardian or reuse it without changing responders.                            |
 | `GET /ace/parent/sites/:siteId/messages/conversations/:id/messages?before=&limit=` | `messaging.messages.read` from the fixed Parent template                       | Only the requested school-team thread while the guardian relationship and participant remain current; bounded newest-first sequence page without moving the read cursor. |
 | `PUT /ace/parent/sites/:siteId/messages/conversations/:id/read-cursor`             | `messaging.messages.read` from the fixed Parent template                       | Only the current guardian participant in their own school-team thread may advance to an existing sequence; the cursor cannot move backward.                              |
-| `POST /ace/messages/conversations`                                                 | `messaging.conversations.create`                                               | Parent opens or reuses their own `PARENT_STAFF` school-team conversation; staff direct/room creation requires current site membership and approved recipient scope.      |
+| `POST /ace/messages/conversations`                                                 | `messaging.conversations.create`                                               | Staff direct/room creation requires current site membership and approved recipient scope.                                                                                |
 | `GET /ace/messages/conversations/recipients?search=&limit=`                        | `messaging.conversations.create`                                               | Current active staff in the selected site only; excludes the caller and student identities. Search needs 2–80 characters and returns at most 20 names and IDs.           |
 | `GET /ace/messages/conversations/:id/messages?before=&limit=`                      | `messaging.messages.read`                                                      | Recheck participant and relationship/membership; bounded sequence page, with only necessary sender display names and delivery facts.                                     |
 | `POST /ace/messages/conversations/:id/messages`                                    | `messaging.messages.send`                                                      | Active participant, nonblank bounded body, client request ID; atomic sequence allocation, message, recipient deliveries, and audit.                                      |
@@ -149,7 +152,15 @@ reading message bodies. It returns only sender display names from that thread
 and does not update read state. Step 1.3e4c adds an explicit parent read-cursor
 write for an existing message sequence in that thread. It rechecks the current
 guardian relationship, participant, portal, and fixed Parent read permission;
-the cursor advances atomically and cannot regress. Parent creation, sending,
+the cursor advances atomically and cannot regress. Step 1.3e4d lets the parent
+choose a current staff responder from their site. Eligibility requires an
+active fixed Organisation Head or Site Lead assignment, or a current scoped
+`parent-message-responder` tag, plus active staff membership and no student
+identity. Both discovery and creation recheck eligibility, the full guardian
+relationship, the parent portal, and the fixed Parent create permission. The
+open command serializes concurrent requests per guardian and audits a new
+thread. Reopening the existing thread never changes its staff participants;
+later responder assignment belongs to authorised site leaders. Parent sending
 and web access remain later slices.
 
 Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive

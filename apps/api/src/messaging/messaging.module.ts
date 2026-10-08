@@ -7,6 +7,7 @@ import { MessagingCommandService } from "./messaging-command.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingService } from "./messaging.service";
 import { ParentMessagingController } from "./parent-messaging.controller";
+import { ParentMessagingConversationService } from "./parent-messaging-conversation.service";
 import { ParentMessagingHistoryService } from "./parent-messaging-history.service";
 import { ParentMessagingReadCursorService } from "./parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "./parent-messaging.service";
@@ -19,6 +20,7 @@ import { ParentMessagingService } from "./parent-messaging.service";
     MessagingConversationService,
     MessagingCommandService,
     ParentMessagingService,
+    ParentMessagingConversationService,
     ParentMessagingHistoryService,
     ParentMessagingReadCursorService,
   ],

@@ -19,6 +19,7 @@ import { MessagingService } from "../messaging.service";
 import { MessagingConversationService } from "../messaging-conversation.service";
 import { MessagingCommandService } from "../messaging-command.service";
 import { ParentMessagingHistoryService } from "../parent-messaging-history.service";
+import { ParentMessagingConversationService } from "../parent-messaging-conversation.service";
 import { ParentMessagingReadCursorService } from "../parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "../parent-messaging.service";
 
@@ -2055,6 +2056,123 @@ describe("ACE parent/staff messaging and notices storage", () => {
         lastReadSequence: second.sequence,
       },
     ]);
+  });
+
+  it("opens one parent school-team thread only with a current tagged site responder", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const expiredGrant = await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.accessTagGrant.create({
+          data: {
+            orgId: fixture.orgAId,
+            tenantId: fixture.tenantAId,
+            userId: fixture.staffAId,
+            tagKey: "PARENT_MESSAGE_RESPONDER",
+            grantedById: fixture.staffAId,
+            startsAt: new Date(Date.now() - 120_000),
+            expiresAt: new Date(Date.now() - 60_000),
+          },
+        }),
+    );
+    let activeGrantId: string | null = null;
+    const service = new ParentMessagingConversationService();
+    const listRecipients = () =>
+      service.recipients(fixture.tenantAId, fixture.guardianAUserId, {});
+    const open = (recipientUserId: string) =>
+      service.open(fixture.tenantAId, fixture.guardianAUserId, {
+        recipientUserId,
+      });
+    try {
+      expect(
+        (await listRecipients()).items.some(
+          (item) => item.id === fixture.staffAId,
+        ),
+      ).toBe(false);
+      await expect(open(fixture.staffAId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        tx.accessTagGrant.update({
+          where: { id: expiredGrant.id },
+          data: { revokedAt: new Date(), revokedById: fixture.staffAId },
+        }),
+      );
+      const activeGrant = await withTenantRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        (tx) =>
+          tx.accessTagGrant.create({
+            data: {
+              orgId: fixture.orgAId,
+              tenantId: fixture.tenantAId,
+              userId: fixture.staffAId,
+              tagKey: "PARENT_MESSAGE_RESPONDER",
+              grantedById: fixture.staffAId,
+            },
+          }),
+      );
+      activeGrantId = activeGrant.id;
+      expect((await listRecipients()).items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: fixture.staffAId }),
+        ]),
+      );
+      const first = await open(fixture.staffAId);
+      expect(first).toMatchObject({ kind: "PARENT_STAFF", created: true });
+      await expect(open(fixture.staffAId)).resolves.toEqual({
+        id: first.id,
+        kind: "PARENT_STAFF",
+        created: false,
+      });
+      await expect(
+        service.open(fixture.tenantAId, fixture.guardianBUserId, {
+          recipientUserId: fixture.staffAId,
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      const participants = await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        (tx) =>
+          tx.messageParticipant.findMany({
+            where: { conversationId: first.id, removedAt: null },
+            select: { userId: true, kind: true },
+          }),
+      );
+      expect(participants).toEqual(
+        expect.arrayContaining([
+          { userId: fixture.guardianAUserId, kind: "GUARDIAN" },
+          { userId: fixture.staffAId, kind: "STAFF" },
+        ]),
+      );
+      expect(participants).toHaveLength(2);
+      await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        tx.accessTagGrant.update({
+          where: { id: activeGrant.id },
+          data: { revokedAt: new Date(), revokedById: fixture.staffAId },
+        }),
+      );
+      expect(
+        (await listRecipients()).items.some(
+          (item) => item.id === fixture.staffAId,
+        ),
+      ).toBe(false);
+      await expect(
+        service.open(fixture.tenantBId, fixture.guardianAUserId, {
+          recipientUserId: fixture.staffAId,
+        }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    } finally {
+      await prisma.accessTagGrant.deleteMany({
+        where: {
+          id: {
+            in: [expiredGrant.id, ...(activeGrantId ? [activeGrantId] : [])],
+          },
+        },
+      });
+    }
   });
 
   it("rejects guardians in staff conversations, student participants, and guardians without active relationships", async () => {
