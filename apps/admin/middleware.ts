@@ -15,7 +15,9 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isPublicRoute(req)) {
+  // API handlers authenticate themselves, but Clerk still needs to run here
+  // so their auth() calls can read the request context.
+  if (isPublicRoute(req) || req.nextUrl.pathname.startsWith("/api/")) {
     return NextResponse.next();
   }
 
@@ -27,8 +29,6 @@ export default clerkMiddleware(async (auth, req) => {
   return NextResponse.next();
 });
 
-// API routes do their own auth() check per-handler (see app/api/**/route.ts)
-// and are excluded here, matching the previous NextAuth middleware's scope.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon\\.ico|login).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|login).*)"],
 };
