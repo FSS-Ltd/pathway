@@ -143,7 +143,11 @@ re-enabled parent portal request test. The linked-child attendance read now
 rechecks this organisation release control on every request. Production
 deployment remains deferred.
 
-Step 1.3g11 is in progress on `feature/ace-family-daily-attendance-web`.
+Step 1.3g11 is in progress in
+[PR #447](https://github.com/FSS-Ltd/pathway/pull/447) on
+`feature/ace-family-daily-attendance-web`. Local admin build, unit tests,
+16-package lint and typecheck, formatting and Graphify passed; CI and merge
+evidence are pending.
 It adds dedicated student and full-guardian daily attendance pages behind
 their existing API boundaries, with a family shell that does not mount staff
 navigation or organisation UI requests. The parent page requires an explicit
