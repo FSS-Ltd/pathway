@@ -611,6 +611,14 @@ export const CAPABILITY_DEFINITIONS = {
     true,
     aceRequirement,
   ),
+  "ace.parent.notices.read": defineCapability(
+    "View family ACE notices",
+    "View notices addressed to a linked guardian at the active ACE site",
+    "relationship",
+    "sensitive",
+    false,
+    aceRequirement,
+  ),
   "ace.student.self.read": defineCapability(
     "View student ACE progress",
     "View the authenticated student's released ACE data",

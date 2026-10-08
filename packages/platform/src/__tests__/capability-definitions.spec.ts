@@ -128,6 +128,7 @@ const SECTION_5_2_KEYS = [
 
 const ADDITIONAL_MATRIX_KEYS = [
   "ace.attendance.export",
+  "ace.parent.notices.read",
   "platform.access.roles.read",
   "platform.access.roles.manage",
   "platform.access.permissions.read",
@@ -171,8 +172,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 114 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(114);
+  it("contains exactly the 115 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(115);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
@@ -217,6 +218,26 @@ describe("capability definitions", () => {
     )) {
       expect(VERTICAL_CAPABILITIES[vertical]).not.toContain(
         "ace.attendance.export",
+      );
+    }
+  });
+
+  it("makes parent notice reading ACE-only and relationship-scoped", () => {
+    expect(CAPABILITY_DEFINITIONS["ace.parent.notices.read"]).toMatchObject({
+      scope: "relationship",
+      sensitivity: "sensitive",
+      delegable: false,
+      requiredVertical: Vertical.ACE_SCHOOL,
+    });
+    expect(
+      CAPABILITY_DEFINITIONS["ace.parent.notices.read"],
+    ).not.toHaveProperty("requiredModule");
+    expect(CAPABILITY_DEFINITIONS["notices.read"].scope).toBe("site");
+    for (const vertical of Object.values(Vertical).filter(
+      (value) => value !== Vertical.ACE_SCHOOL,
+    )) {
+      expect(VERTICAL_CAPABILITIES[vertical]).not.toContain(
+        "ace.parent.notices.read",
       );
     }
   });

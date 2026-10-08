@@ -198,6 +198,7 @@ export const SYSTEM_ROLE_TEMPLATES = {
       "messaging.messages.send",
       "finance.family_invoices.read",
       "ace.parent.progress.read",
+      "ace.parent.notices.read",
       "ace.faith.read",
       "ace.faith.reflect",
       "school.permission_slips.read",
