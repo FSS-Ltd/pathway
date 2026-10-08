@@ -6,11 +6,17 @@ import { AccessControlModule } from "../access-control/access-control.module";
 import { AttendanceController } from "./attendance.controller";
 import { AttendanceService } from "./attendance.service";
 import { AttendanceHistoryService } from "./attendance-history.service";
+import { DailyAttendanceController } from "./daily-attendance.controller";
+import { DailyAttendanceService } from "./daily-attendance.service";
 
 @Module({
   imports: [CommonModule, Av30Module, AuthModule, AccessControlModule],
-  controllers: [AttendanceController],
-  providers: [AttendanceService, AttendanceHistoryService],
+  controllers: [DailyAttendanceController, AttendanceController],
+  providers: [
+    AttendanceService,
+    AttendanceHistoryService,
+    DailyAttendanceService,
+  ],
   exports: [AttendanceService],
 })
 export class AttendanceModule {}

@@ -180,6 +180,7 @@ export {
   OrgRole,
   SiteRole,
   AttendanceStatus,
+  AceDailyAbsenceReason,
   AttendanceCorrectionOrigin,
   StaffAttendanceStatus,
   ChildGuardianContactType,

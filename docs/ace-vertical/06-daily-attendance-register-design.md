@@ -1,8 +1,9 @@
 # ACE daily attendance register contract
 
-**Status:** Step 1.3d5 design contract for C06 in the
-[Oasis parity matrix](02-oasis-web-journey-parity.md). No daily-register schema,
-API, web journey, migration, or production release is claimed by this document.
+**Status:** C06 contract in the
+[Oasis parity matrix](02-oasis-web-journey-parity.md). Steps 1.3g1–1.3g4
+established the schema. Step 1.3g5 adds the scoped staff roster read API.
+The daily write API, web journey, and production migration remain open.
 
 ## Source behaviour and current gap
 
@@ -43,6 +44,8 @@ constraints. The original recorder and time stay on the fact, while each
 correction event stores its own actor and server time. The service must write
 a changed mark, its correction event, and the audit entry in one locked
 transaction; this schema step does not expose a daily-register API.
+Step 1.3g5 exposes only the bounded staff roster read. It reads existing marks
+without changing the session-attendance model or accepting daily writes.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
