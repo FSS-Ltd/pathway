@@ -1,10 +1,10 @@
 # ACE production release status
 
-Checked on 8 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `dec83b36bf11a2418ac1beceb73efcc6d501ef64`.
+Checked on 9 October 2026. Production API, admin, and web aliases now point
+to READY deployments at merged commit `65a67a8e2574182d2cc0b332b54deafabc6b288c`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-7 are now served by all three apps.
+changes through REL-8 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -144,9 +144,35 @@ both child-photo and staff-avatar routes returned HTTP 500 for anonymous
 requests on 8 October. Both route handlers already return 401 when no token is
 available, but the production middleware matcher excludes all `/api` paths.
 REL-8 runs Clerk middleware for those paths while leaving authentication to
-the route handlers. Local production-build smoke tests returned JSON HTTP 401
-for both anonymous routes. A fresh signed-in
-production journey is still needed to diagnose the Messages session error.
+the route handlers. [PR #512](https://github.com/FSS-Ltd/pathway/pull/512)
+passed all eight required checks on `c8727909ffb005d25fdcc48fc209f41e9c3b2ae0`
+(CI run 37855242849, CodeQL run 37855239066) and merged as
+`65a67a8e2574182d2cc0b332b54deafabc6b288c`. [Production run
+37856228849](https://github.com/FSS-Ltd/pathway/actions/runs/37856228849)
+passed migrations and all three app jobs. Vercel reports READY admin deployment
+`dpl_33ND5BreJ1eKaazcwZibQ2VbbiKm` on `app.nexsteps.dev`. Both anonymous
+admin API routes now return JSON HTTP 401 rather than 500; API health and the
+web configurator return HTTP 200. A fresh signed-in production journey is
+still needed to diagnose the Messages session error.
+
+REL-9 prepares a school-reviewed path for historical guardian access. The
+restored site has 30 active users across 60 legacy parent-child links, but no
+parent `UserIdentity`, Parent role, guardian relationship, or signup-consent
+record. An organisation admin may approve an existing same-site, non-guest
+link only after the parent has signed in with a verified identity and the
+school has checked legal access against records or a legal document. Each
+approval creates an audited `FULL` relationship and a fixed Parent role.
+The parent portal stays off until a separate school decision enables it.
+No historical link is approved automatically. The parent profile read also
+limits a parent's own child list to active, approved relationships, and
+reserves profile child creation for organisation admins; editing one site's
+links preserves links at other sites. The parent profile renders its scoped
+detail response directly instead of requiring a separate full child-list read.
+Removing a legacy link with current `FULL` guardian access is blocked until
+an audited revocation flow is delivered; unlinking alone cannot silently leave
+effective access behind.
+REL-9 is not yet
+merged or deployed. Production parent-to-staff messaging remains unverified.
 
 ## Delivery steps
 

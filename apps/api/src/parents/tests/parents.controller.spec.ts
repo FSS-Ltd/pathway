@@ -24,12 +24,14 @@ const listMock: jest.Mock<
 > = jest.fn();
 const getMock: jest.Mock<
   Promise<ParentDetailDto | null>,
-  [string, string, string]
+  [string, string, string, boolean]
 > = jest.fn();
+const updateMock = jest.fn();
 
 const mockService: ParentsService = {
   findAllForTenant: listMock as unknown as ParentsService["findAllForTenant"],
   findOneForTenant: getMock as unknown as ParentsService["findOneForTenant"],
+  updateForTenant: updateMock as ParentsService["updateForTenant"],
 } as ParentsService;
 
 const buildRequestContext = (roles?: {
@@ -106,7 +108,7 @@ describe("ParentsController", () => {
     const result = await controller.getOne("p1", mockReq, tenantId, orgId);
 
     expect(result).toEqual(detail);
-    expect(getMock).toHaveBeenCalledWith(tenantId, orgId, "p1");
+    expect(getMock).toHaveBeenCalledWith(tenantId, orgId, "p1", false);
   });
 
   it("404s when parent missing", async () => {
@@ -129,5 +131,43 @@ describe("ParentsController", () => {
       ForbiddenException,
     );
     expect(listMock).not.toHaveBeenCalled();
+  });
+
+  it("only shows approved children on a parent's own profile", async () => {
+    const ctx = requestContext as PathwayRequestContext & {
+      roles: { tenant: UserTenantRole[]; org: UserOrgRole[] };
+    };
+    ctx.roles = { tenant: [UserTenantRole.PARENT], org: [] };
+    getMock.mockResolvedValueOnce({
+      id: "p1",
+      fullName: "Parent One",
+      email: null,
+      children: [],
+    });
+
+    const mockReq = { authUserId: "p1" } as Parameters<
+      ParentsController["getOne"]
+    >[1];
+    await controller.getOne("p1", mockReq, tenantId, orgId);
+
+    expect(getMock).toHaveBeenCalledWith(tenantId, orgId, "p1", true);
+  });
+
+  it("rejects a parent's attempt to change child links", async () => {
+    const ctx = requestContext as PathwayRequestContext & {
+      roles: { tenant: UserTenantRole[]; org: UserOrgRole[] };
+    };
+    ctx.roles = { tenant: [UserTenantRole.PARENT], org: [] };
+
+    await expect(
+      controller.update(
+        "p1",
+        { childIds: ["bf1b7501-fb74-4f81-96ee-91139d5ccbb0"] },
+        { authUserId: "p1" } as Parameters<ParentsController["update"]>[2],
+        tenantId,
+        orgId,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });
