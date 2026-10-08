@@ -100,6 +100,7 @@ does not release the new parent screen.
 | 1.3e4j   | Scoped staff school-team reply API                                     | Merged  | [#490](https://github.com/FSS-Ltd/pathway/pull/490) to `master`                     | `89a37dbdf65a2caa4a267b6e0d2567b4a4a3db91`; all eight checks passed: CI run 37805483170, CodeQL run 37805478643.                                                                                                | `0a9f3f371badda8d895fb16f3c3aa17884208c16` |
 | 1.3e4k   | Staff school-team messaging web view                                   | Merged  | [#492](https://github.com/FSS-Ltd/pathway/pull/492) to `master`                     | `9474ba71d21c88e7ecc62a93f32096db971c6bcc`; all eight checks passed: CI run 37809894950, CodeQL run 37809889978.                                                                                                | `f85fa11a4fb8904d9bf64c8db2137fb2e4a38ef0` |
 | 1.3e5a   | ACE site-notice audience and receipt contract                          | Merged  | [#494](https://github.com/FSS-Ltd/pathway/pull/494) to `master`                     | `7b67a3555c218f325d6e74ae051f435738803d14`; all eight checks passed: CI run 37813681749, CodeQL run 37813678605.                                                                                                | `b65c4e64f32d1ccab608fe8be9fcf31ae5642a66` |
+| 1.3e5a1  | Parent notice permission boundary correction                           | Merged  | [#499](https://github.com/FSS-Ltd/pathway/pull/499) to `master`                     | `9ee2322c1efd86a0ad974d060acad25224af7386`; all eight checks passed: CI run 37819210083, CodeQL run 37819205960.                                                                                                | `29a1780d4663840a6e19bce7aebfe1277e61e30e` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -383,6 +384,15 @@ current site, guardian, entitlement, expiry, and publication checks. This
 design step added no live route; estimated overall completion remains
 **about 51%**. A subsequent design review found the parent notice permission
 must be relationship scoped, so the contract is being corrected before code.
+
+Step 1.3e5a1 merged in [PR #499](https://github.com/FSS-Ltd/pathway/pull/499)
+at `29a1780d4663840a6e19bce7aebfe1277e61e30e`. All eight checks passed
+on head `9ee2322c1efd86a0ad974d060acad25224af7386`. The corrected
+contract keeps the site-scoped `notices.read` key and generic announcements
+separate from future relationship-scoped parent notices. The parallel AR-6
+dashboard record was preserved and the missing PR #494 record restored. This
+documentation step added no live route; estimated completion remains
+**about 51%**.
 
 **Revised overall ACE update estimate: about 51%.** The earlier 87% and 91%
 estimates were too high for the full approved plan. The [journey matrix](02-oasis-web-journey-parity.md)

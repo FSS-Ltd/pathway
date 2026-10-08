@@ -219,6 +219,7 @@ describe("ACE system role templates", () => {
           "messaging.messages.send",
           "finance.family_invoices.read",
           "ace.parent.progress.read",
+          "ace.parent.notices.read",
           "ace.faith.read",
           "ace.faith.reflect",
           "school.permission_slips.read",
@@ -273,6 +274,18 @@ describe("ACE system role templates", () => {
         "ace.attendance.export",
       );
     }
+  });
+
+  it("keeps parent notice reading on the relationship role without site notice access", () => {
+    expect(SYSTEM_ROLE_TEMPLATES.parent.permissions).toContain(
+      "ace.parent.notices.read",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.parent.permissions).not.toContain(
+      "notices.read",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.student.permissions).not.toContain(
+      "ace.parent.notices.read",
+    );
   });
 
   it("gives every template except financeOperator at least one core (vertical-independent) permission", () => {

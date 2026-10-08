@@ -152,6 +152,7 @@ const APPROVED_GRANTS = {
   Parent: [
     "ace.faith.read",
     "ace.faith.reflect",
+    "ace.parent.notices.read",
     "ace.parent.progress.read",
     "messaging.conversations.create",
     "messaging.conversations.read",
