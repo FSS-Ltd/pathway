@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
@@ -25,6 +26,7 @@ import { ParentMessagingReadCursorService } from "../parent-messaging-read-curso
 import { ParentMessagingService } from "../parent-messaging.service";
 import { StaffSchoolTeamHistoryService } from "../staff-school-team-history.service";
 import { StaffSchoolTeamReadCursorService } from "../staff-school-team-read-cursor.service";
+import { StaffSchoolTeamCommandService } from "../staff-school-team-command.service";
 import { StaffSchoolTeamService } from "../staff-school-team.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
@@ -2204,6 +2206,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
     const service = new StaffSchoolTeamService();
     const history = new StaffSchoolTeamHistoryService();
     const cursor = new StaffSchoolTeamReadCursorService();
+    const replies = new StaffSchoolTeamCommandService();
     try {
       const created = await withMessagingRlsContext(
         fixture.tenantAId,
@@ -2250,6 +2253,45 @@ describe("ACE parent/staff messaging and notices storage", () => {
       await expect(
         cursor.advance(actor, created.conversationId, { sequence: 2 }),
       ).rejects.toBeInstanceOf(BadRequestException);
+      const replyInput = {
+        clientRequestId: randomUUID(),
+        body: "We will call you today",
+      };
+      const reply = await replies.send(
+        actor,
+        created.conversationId,
+        replyInput,
+      );
+      expect(reply).toMatchObject({ sequence: 2, reused: false });
+      await expect(
+        replies.send(actor, created.conversationId, replyInput),
+      ).resolves.toMatchObject({ id: reply.id, reused: true });
+      await expect(
+        replies.send(actor, created.conversationId, {
+          ...replyInput,
+          body: "Changed reply",
+        }),
+      ).rejects.toBeInstanceOf(ConflictException);
+      expect(
+        (
+          await new ParentMessagingService().list(
+            fixture.tenantAId,
+            fixture.guardianAUserId,
+          )
+        ).items[0]?.unreadCount,
+      ).toBe(1);
+      const deliveries = await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        (tx) =>
+          tx.messageDelivery.findMany({
+            where: { messageId: reply.id },
+            select: { recipientParticipantId: true },
+          }),
+      );
+      expect(deliveries).toEqual([
+        { recipientParticipantId: created.guardianParticipantId },
+      ]);
       expect(
         (await new MessagingService().listStaffConversations(actor, {})).items,
       ).toEqual([]);
@@ -2268,6 +2310,13 @@ describe("ACE parent/staff messaging and notices storage", () => {
           { ...actor, userId: fixture.staffBId },
           created.conversationId,
           { sequence: 1 },
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        replies.send(
+          { ...actor, userId: fixture.staffBId },
+          created.conversationId,
+          { ...replyInput, clientRequestId: randomUUID() },
         ),
       ).rejects.toBeInstanceOf(NotFoundException);
       await expect(
@@ -2290,6 +2339,13 @@ describe("ACE parent/staff messaging and notices storage", () => {
           { sequence: 1 },
         ),
       ).rejects.toBeInstanceOf(ForbiddenException);
+      await expect(
+        replies.send(
+          { ...actor, tenantId: fixture.tenantBId, orgId: fixture.orgBId },
+          created.conversationId,
+          { ...replyInput, clientRequestId: randomUUID() },
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
 
       await prisma.guardianChildRelationship.update({
         where: { id: fixture.guardianARelationshipId },
@@ -2301,6 +2357,12 @@ describe("ACE parent/staff messaging and notices storage", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       await expect(
         cursor.advance(actor, created.conversationId, { sequence: 1 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        replies.send(actor, created.conversationId, {
+          ...replyInput,
+          clientRequestId: randomUUID(),
+        }),
       ).rejects.toBeInstanceOf(NotFoundException);
       await prisma.guardianChildRelationship.update({
         where: { id: fixture.guardianARelationshipId },
@@ -2319,6 +2381,12 @@ describe("ACE parent/staff messaging and notices storage", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       await expect(
         cursor.advance(actor, created.conversationId, { sequence: 1 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        replies.send(actor, created.conversationId, {
+          ...replyInput,
+          clientRequestId: randomUUID(),
+        }),
       ).rejects.toBeInstanceOf(NotFoundException);
       await prisma.org.update({
         where: { id: fixture.orgAId },
@@ -2339,6 +2407,12 @@ describe("ACE parent/staff messaging and notices storage", () => {
       ).rejects.toBeInstanceOf(NotFoundException);
       await expect(
         cursor.advance(actor, created.conversationId, { sequence: 1 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        replies.send(actor, created.conversationId, {
+          ...replyInput,
+          clientRequestId: randomUUID(),
+        }),
       ).rejects.toBeInstanceOf(NotFoundException);
     } finally {
       await prisma.org.update({
