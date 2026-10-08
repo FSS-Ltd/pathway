@@ -1,10 +1,10 @@
 # ACE production release status
 
 Checked on 8 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `193a569892c38be565ac6755456f41bcf498ed76`.
+to READY deployments at merged commit `acd91f2e0421c60e553722cdde0ca9c6de1980ec`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-4 are now served by all three apps.
+changes through REL-5 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -68,6 +68,20 @@ the regression test changes the token after sign-in and checks staff and parent
 recipient discovery. A merged client fix still needs a signed-in production
 journey before the data-loading issue can be closed.
 
+REL-5 merged in [PR #509](https://github.com/FSS-Ltd/pathway/pull/509) as
+`acd91f2e0421c60e553722cdde0ca9c6de1980ec`. All eight PR checks passed
+on head `114e9e79c7fcb124d2cf4644d35d8e27d484e546`. [Production run
+37848091808](https://github.com/FSS-Ltd/pathway/actions/runs/37848091808)
+passed migrations and all three app jobs. Vercel reports READY API
+`dpl_9Yz6LwDuGLJzyfLVBbJpkkqV8Qif`, admin
+`dpl_BF7eiQyADYCjZyDMeh4RZJ7ecoRn`, and web
+`dpl_VNPsS9QGBq94zWvaz3upN11kxwUA` at that commit, each assigned its
+production domain. Live API health, environment health, and public blog reads
+returned HTTP 200; admin messaging redirected to sign-in; marketing and the
+configurator returned HTTP 200. No error events appeared for the new
+deployments in the first checked runtime-log window. This confirms release
+health, not signed-in data loading.
+
 Read-only queries against the new production database found 44 staff or site
 admin memberships, 60 legacy parent-child links, 14 guardian contact records,
 no `GuardianIdentity` or `GuardianChildRelationship` rows, no access-tag grants,
@@ -82,6 +96,16 @@ parent can discover a responder, open and send one school conversation, and
 that the same responder can read and reply. Repeat after tag revocation, child
 relationship end, and site switch. Until then, bidirectional production
 messaging is **not verified**.
+
+REL-6 addresses a separate signup gap: parent-portal registration created
+children and legacy links without the active guardian relationship required
+by family and messaging reads. New children registered through an enabled
+portal will receive a `FULL` relationship for the registering account. The
+existing-child link route will not create one; each of the 60 historical
+links needs a legal-access review before conversion. An unauthenticated
+signup for an email already in use must go through the verified existing-user
+route. This code step does not enable the production parent portal or change
+historical relationships.
 
 ## Delivery steps
 
