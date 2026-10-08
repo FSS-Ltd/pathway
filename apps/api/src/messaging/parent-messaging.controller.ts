@@ -15,7 +15,10 @@ import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
-import { createParentConversationSchema } from "./dto/messaging-command.dto";
+import {
+  createParentConversationSchema,
+  sendMessageSchema,
+} from "./dto/messaging-command.dto";
 import {
   conversationIdSchema,
   messageQuerySchema,
@@ -23,6 +26,7 @@ import {
   readCursorSchema,
 } from "./dto/messaging-query.dto";
 import { ParentMessagingHistoryService } from "./parent-messaging-history.service";
+import { ParentMessagingCommandService } from "./parent-messaging-command.service";
 import { ParentMessagingConversationService } from "./parent-messaging-conversation.service";
 import { ParentMessagingReadCursorService } from "./parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "./parent-messaging.service";
@@ -34,6 +38,7 @@ export class ParentMessagingController {
   constructor(
     private readonly service: ParentMessagingService,
     private readonly history: ParentMessagingHistoryService,
+    private readonly commands: ParentMessagingCommandService,
     private readonly conversations: ParentMessagingConversationService,
     private readonly readCursor: ParentMessagingReadCursorService,
     private readonly requestContext: PathwayRequestContext,
@@ -92,6 +97,28 @@ export class ParentMessagingController {
         this.requestContext.requireContext().user.userId,
         await conversationIdSchema.parseAsync(id),
         await messageQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(error.flatten());
+      }
+      throw error;
+    }
+  }
+
+  @Post(":id/messages")
+  @HttpCode(HttpStatus.OK)
+  async send(
+    @Param("siteId") siteId: string,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    try {
+      return await this.commands.send(
+        siteId,
+        this.requestContext.requireContext().user.userId,
+        await conversationIdSchema.parseAsync(id),
+        await sendMessageSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError) {

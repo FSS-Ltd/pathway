@@ -5,6 +5,7 @@ import { Prisma, prisma, withTenantRlsContext } from "@pathway/db";
 type ParentMessagingPermission =
   | "messaging.conversations.read"
   | "messaging.messages.read"
+  | "messaging.messages.send"
   | "messaging.conversations.create";
 
 export function parentConversationScope(

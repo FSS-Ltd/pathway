@@ -3,7 +3,7 @@ import { ConflictException, NotFoundException } from "@nestjs/common";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
 import { recordAuditEventInTransaction } from "../../audit/audit.service";
-import { sendStaffMessageSchema } from "../dto/messaging-command.dto";
+import { sendMessageSchema } from "../dto/messaging-command.dto";
 import { MessagingCommandService } from "../messaging-command.service";
 import { MessagingController } from "../messaging.controller";
 
@@ -90,17 +90,16 @@ describe("staff message send", () => {
         MessagingController.prototype.send,
       ),
     ).toBe("messaging.messages.send");
-    expect(sendStaffMessageSchema.safeParse(input).success).toBe(true);
+    expect(sendMessageSchema.safeParse(input).success).toBe(true);
+    expect(sendMessageSchema.safeParse({ ...input, body: "  " }).success).toBe(
+      false,
+    );
     expect(
-      sendStaffMessageSchema.safeParse({ ...input, body: "  " }).success,
+      sendMessageSchema.safeParse({ ...input, body: "x".repeat(4001) }).success,
     ).toBe(false);
-    expect(
-      sendStaffMessageSchema.safeParse({ ...input, body: "x".repeat(4001) })
-        .success,
-    ).toBe(false);
-    expect(
-      sendStaffMessageSchema.safeParse({ ...input, extra: true }).success,
-    ).toBe(false);
+    expect(sendMessageSchema.safeParse({ ...input, extra: true }).success).toBe(
+      false,
+    );
   });
 
   it("rejects an unjoined conversation and an ineligible recipient", async () => {

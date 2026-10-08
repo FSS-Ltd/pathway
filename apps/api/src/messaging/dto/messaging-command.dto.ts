@@ -28,11 +28,11 @@ export const createStaffConversationSchema = z.discriminatedUnion("kind", [
   createStaffRoomConversationSchema,
 ]);
 
-export const sendStaffMessageSchema = z
+export const sendMessageSchema = z
   .object({
     clientRequestId: z.string().uuid(),
     body: z.string().trim().min(1).max(4000),
   })
   .strict();
 
-export type SendStaffMessageInput = z.infer<typeof sendStaffMessageSchema>;
+export type SendMessageInput = z.infer<typeof sendMessageSchema>;

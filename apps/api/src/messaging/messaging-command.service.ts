@@ -6,7 +6,7 @@ import {
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
-import type { SendStaffMessageInput } from "./dto/messaging-command.dto";
+import type { SendMessageInput } from "./dto/messaging-command.dto";
 import {
   assertMessagingActor,
   requireCurrentStaff,
@@ -19,7 +19,7 @@ export class MessagingCommandService {
   async sendStaffMessage(
     actor: MessagingActor,
     conversationId: string,
-    input: SendStaffMessageInput,
+    input: SendMessageInput,
   ) {
     assertMessagingActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
