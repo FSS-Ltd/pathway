@@ -50,6 +50,13 @@ async function run() {
                   childName: "Ari Alpha",
                 },
                 {
+                  kind: "parent",
+                  siteId: "school-one",
+                  siteName: "Alpha School",
+                  childId: "child-three",
+                  childName: "Cia Alpha",
+                },
+                {
                   kind: "student",
                   siteId: "school-two",
                   siteName: "Bravo School",
@@ -68,6 +75,7 @@ async function run() {
     );
     assert.deepEqual(requested, ["http://api.test/ace/family/contexts"]);
     assert.match(container.textContent ?? "", /Ari Alpha/);
+    assert.match(container.textContent ?? "", /Cia Alpha/);
     assert.match(container.textContent ?? "", /Bea Bravo/);
     assert.deepEqual(
       Array.from(container.querySelectorAll("a[href*='/attendance']")).map(
@@ -75,8 +83,15 @@ async function run() {
       ),
       [
         "/ace/parent/sites/school-one/children/child-one/attendance",
+        "/ace/parent/sites/school-one/children/child-three/attendance",
         "/ace/student/sites/school-two/attendance",
       ],
+    );
+    assert.deepEqual(
+      Array.from(container.querySelectorAll('a[href$="/messages"]')).map(
+        (anchor) => anchor.getAttribute("href"),
+      ),
+      ["/ace/parent/sites/school-one/messages"],
     );
 
     mode = "denied";

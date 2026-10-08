@@ -60,6 +60,45 @@ function ContextList({
   );
 }
 
+function SchoolMessagesList({ contexts }: { contexts: FamilyContext[] }) {
+  const schools = Array.from(
+    new Map(
+      contexts.map(({ siteId, siteName }) => [siteId, siteName]),
+    ).entries(),
+  );
+  if (schools.length === 0) return null;
+  return (
+    <section aria-label="School messages" className="space-y-3">
+      <h2 className="font-heading text-xl font-semibold text-text-primary">
+        School messages
+      </h2>
+      <ul className="grid gap-3 sm:grid-cols-2">
+        {schools.map(([siteId, siteName]) => (
+          <li key={siteId}>
+            <Link
+              href={`/ace/parent/sites/${encodeURIComponent(siteId)}/messages`}
+              className="group flex min-h-20 items-center justify-between gap-4 rounded-xl border border-border-subtle bg-surface px-5 py-4 shadow-card transition-colors motion-reduce:transition-none hover:border-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+            >
+              <span>
+                <span className="block font-heading text-lg font-semibold text-text-primary">
+                  {siteName}
+                </span>
+                <span className="text-sm font-medium text-accent-strong">
+                  Message your school team
+                </span>
+              </span>
+              <ChevronRight
+                className="h-5 w-5 shrink-0 text-text-muted"
+                aria-hidden="true"
+              />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function FamilyLandingView({ status }: { status: SessionStatus }) {
   const [contexts, setContexts] = React.useState<FamilyContext[] | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -101,7 +140,7 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
         </h1>
         <p className="max-w-2xl text-base leading-7 text-text-muted">
           Choose a linked child or your own student record to see daily
-          attendance at that school.
+          attendance. Parents can also message their school team.
         </p>
       </header>
 
@@ -146,6 +185,7 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
       ) : (
         <div className="space-y-8">
           <ContextList title="Children linked to you" items={parentContexts} />
+          <SchoolMessagesList contexts={parentContexts} />
           <ContextList title="Your student access" items={studentContexts} />
         </div>
       )}
