@@ -23,7 +23,7 @@ checksum; operators must not reset or rewrite those databases to reconcile
 it. The two migration results have the same policy intent on their base
 tables.
 
-## Recovery after the fix is merged
+## Recovery procedure and 8 October execution
 
 1. Confirm the PR's exact-head CI and merge, no concurrent production migration,
    the new project's connection identity, the failed migration record, the
@@ -46,3 +46,20 @@ If migration replay fails, stop the app release, inspect the new failure and
 catalog state, and use an audited forward correction. Do not mark a partly
 applied migration successful or delete family identities. The last READY app
 deployments continue serving until the new release jobs complete.
+
+PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) passed all eight checks
+on `3154ba8f79f5397561643a6be3ce891972eea952` and merged as
+`26d43e4b6d194be5370bbc34f709bea4b025a351`. The preflight found the
+single failed migration, the expected `public` tables and `app` compatibility
+view, and no discovery policies. Prisma `migrate resolve --rolled-back` then
+marked only the failed attempt rolled back. Attempt 2 of [production run
+37837131918](https://github.com/FSS-Ltd/pathway/actions/runs/37837131918)
+successfully applied the corrected migration and all four other 8 October
+migrations. Read-only verification found a finished replay, both discovery
+policies on `public` base tables, none on the view, and unchanged representative
+counts of zero guardian identities, zero student identities, and zero ACE
+notices. All three app jobs and Vercel builds passed, but the new API crashed
+during Nest startup. The three app aliases were rolled back to their previous
+READY deployments; the API `/health` recovered to HTTP 200. The app release
+remains open while REL-3 fixes the startup failure. Deployment and smoke-test
+evidence is recorded in the [production release status](../production-release-status.md).
