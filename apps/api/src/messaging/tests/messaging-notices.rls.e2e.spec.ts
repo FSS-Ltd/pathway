@@ -1851,21 +1851,28 @@ describe("ACE parent/staff messaging and notices storage", () => {
       ],
       nextCursor: null,
     });
-    expect(
-      (await service.list(fixture.tenantAId, fixture.guardianBUserId)).items,
-    ).toEqual([]);
-    await prisma.guardianChildRelationship.update({
-      where: { id: fixture.guardianBRelationshipId },
-      data: { endedAt: new Date() },
+    const linkedGuardianB = await prisma.guardianChildRelationship.create({
+      data: {
+        tenantId: fixture.tenantAId,
+        guardianIdentityId: fixture.guardianBIdentityId,
+        childId: fixture.childAId,
+        legalAccess: "FULL",
+      },
     });
     try {
+      expect(
+        (await service.list(fixture.tenantAId, fixture.guardianBUserId)).items,
+      ).toEqual([]);
+      await prisma.guardianChildRelationship.update({
+        where: { id: linkedGuardianB.id },
+        data: { endedAt: new Date() },
+      });
       await expect(
         service.list(fixture.tenantAId, fixture.guardianBUserId),
       ).rejects.toBeInstanceOf(NotFoundException);
     } finally {
-      await prisma.guardianChildRelationship.update({
-        where: { id: fixture.guardianBRelationshipId },
-        data: { endedAt: null },
+      await prisma.guardianChildRelationship.delete({
+        where: { id: linkedGuardianB.id },
       });
     }
     for (const userId of [fixture.staffAId, fixture.studentUserId]) {
