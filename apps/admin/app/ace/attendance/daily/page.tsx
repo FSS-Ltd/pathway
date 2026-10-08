@@ -33,6 +33,7 @@ export default function AceDailyAttendancePage() {
   return (
     <DailyRegisterWorkspace
       canManage={permissions.includes("attendance.manage")}
+      canExport={permissions.includes("ace.attendance.export")}
     />
   );
 }

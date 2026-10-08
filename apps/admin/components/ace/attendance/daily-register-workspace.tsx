@@ -3,11 +3,18 @@
 import React from "react";
 import { Button, Card, Input, Label, Select } from "@pathway/ui";
 import type { DailyAttendanceRow } from "@/lib/daily-attendance-api";
+import { DailyRegisterExport } from "./daily-register-export";
 import { DailyRegisterHistory } from "./daily-register-history";
 import { DailyRegisterRow } from "./daily-register-row";
 import { useDailyRegister } from "./use-daily-register";
 
-export function DailyRegisterWorkspace({ canManage }: { canManage: boolean }) {
+export function DailyRegisterWorkspace({
+  canManage,
+  canExport,
+}: {
+  canManage: boolean;
+  canExport: boolean;
+}) {
   const register = useDailyRegister();
   const [history, setHistory] = React.useState<{
     factId: string;
@@ -102,6 +109,13 @@ export function DailyRegisterWorkspace({ canManage }: { canManage: boolean }) {
           </div>
         </div>
       </Card>
+
+      {canExport ? (
+        <DailyRegisterExport
+          key={`${register.siteRevision}:${register.date}`}
+          date={register.date}
+        />
+      ) : null}
 
       {notice ? (
         <p
