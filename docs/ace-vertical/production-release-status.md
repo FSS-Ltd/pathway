@@ -135,6 +135,12 @@ database-backed test command skipped assertions because its disposable
 PostgreSQL was unavailable. Parent and student web, exports, production
 migration and deployment remain open.
 
+Step 1.3g10a is in [PR #445](https://github.com/FSS-Ltd/pathway/pull/445),
+implementing the organisation parent-portal switch guard for the linked-child
+attendance read. The prior 1.3g10 route did not recheck this existing release
+control. The fix and its disabled/enabled request test await database-backed
+CI before merge.
+
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
 journey is merged but is not in the current manual production deployment.

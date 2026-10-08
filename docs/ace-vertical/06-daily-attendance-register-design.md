@@ -72,7 +72,9 @@ selected child at one explicit site. Every read requires an active guardian
 identity and a current `FULL` legal-access relationship to that non-guest
 child. `LIMITED` and `NONE` relationships do not receive absence reasons or
 marks because the model has no finer-grained attendance disclosure rule. The
-student portal policy applies to student links only; it is not a parent
+organisation's parent portal switch must also be enabled on each read. A
+disabled switch returns the same not-found response as an inaccessible child.
+The student portal policy applies to student links only; it is not a parent
 release switch. Issued daily facts are available immediately to a full-access
 guardian. Missing, future-starting, ended, revoked and cross-site links use
 the same not-found response. The shared bounded date and response contract
