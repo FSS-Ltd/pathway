@@ -11,15 +11,16 @@ import {
 } from "./family-daily-attendance-history";
 
 @Injectable()
-export class StudentDailyAttendanceService {
+export class ParentDailyAttendanceService {
   async list(
     siteId: string,
+    childId: string,
     query: FamilyDailyAttendanceQuery,
     userId: string,
   ): Promise<FamilyDailyAttendanceHistory> {
-    if (!siteId.trim() || !userId.trim()) {
+    if (!siteId.trim() || !childId.trim() || !userId.trim()) {
       throw new BadRequestException(
-        "A site and authenticated user are required",
+        "A site, child and authenticated user are required",
       );
     }
     const site = await prisma.tenant.findUnique({
@@ -29,31 +30,26 @@ export class StudentDailyAttendanceService {
     if (!site) throw new NotFoundException("Daily attendance not found");
 
     return withTenantRlsContext(siteId, site.orgId, async (tx) => {
-      const [policy, links] = await Promise.all([
-        tx.studentPortalPolicy.findUnique({
-          where: { tenantId: siteId },
-          select: { studentPortalEnabled: true },
-        }),
-        tx.studentIdentityLink.findMany({
-          where: {
-            tenantId: siteId,
-            endedAt: null,
-            revokedAt: null,
-            linkedAt: { lte: new Date() },
-            studentIdentity: { tenantId: siteId, userId },
-            child: { tenantId: siteId, isGuest: false },
-          },
-          select: { childId: true },
-          take: 2,
-        }),
-      ]);
-      if (!policy?.studentPortalEnabled || links.length !== 1) {
+      const relationship = await tx.guardianChildRelationship.findFirst({
+        where: {
+          tenantId: siteId,
+          childId,
+          legalAccess: "FULL",
+          startsAt: { lte: new Date() },
+          endedAt: null,
+          revokedAt: null,
+          guardianIdentity: { tenantId: siteId, userId },
+          child: { tenantId: siteId, isGuest: false },
+        },
+        select: { id: true },
+      });
+      if (!relationship) {
         throw new NotFoundException("Daily attendance not found");
       }
       return readFamilyDailyAttendanceHistory(
         tx,
         siteId,
-        links[0].childId,
+        childId,
         site.timezone,
         query,
       );
