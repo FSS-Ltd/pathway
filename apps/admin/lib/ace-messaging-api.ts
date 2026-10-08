@@ -69,7 +69,8 @@ export async function searchStaffRecipients(
   signal?: AbortSignal,
 ): Promise<StaffRecipientPage> {
   if (isUsingMockApi()) return { items: [], hasMore: false };
-  const query = new URLSearchParams({ search, limit: "20" });
+  const query = new URLSearchParams({ limit: "20" });
+  if (search.trim()) query.set("search", search.trim());
   return request(`${basePath}/recipients?${query}`, { signal });
 }
 

@@ -84,7 +84,7 @@ describe("staff direct conversations", () => {
     ).toBe(false);
   });
 
-  it("limits recipient discovery to valid, bounded search terms", () => {
+  it("accepts a site staff list and bounded search terms", () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSION,
@@ -94,14 +94,45 @@ describe("staff direct conversations", () => {
     expect(
       staffRecipientQuerySchema.parse({ search: "  Sam  ", limit: "2" }),
     ).toEqual({ search: "Sam", limit: 2 });
+    expect(staffRecipientQuerySchema.parse({ limit: "20" })).toEqual({
+      limit: 20,
+    });
+    expect(staffRecipientQuerySchema.parse({ search: "S" })).toEqual({
+      search: "S",
+    });
     for (const query of [
-      { search: "S" },
+      { search: "" },
       { search: "Sam", limit: "21" },
       { search: "Sam", limit: "0" },
       { search: "Sam", unexpected: "value" },
     ]) {
       expect(staffRecipientQuerySchema.safeParse(query).success).toBe(false);
     }
+  });
+
+  it("lists colleagues at the current site before a search is entered", async () => {
+    const { tx, service } = setup();
+    tx.siteMembership.findMany.mockResolvedValue([
+      { userId: recipientUserId, user: { displayName: "Sam", name: null } },
+    ]);
+
+    await expect(service.listStaffRecipients(actor, {})).resolves.toEqual({
+      items: [{ id: recipientUserId, displayName: "Sam" }],
+      hasMore: false,
+    });
+    expect(tx.siteMembership.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: actor.tenantId,
+          userId: { not: actor.userId },
+          role: { in: ["SITE_ADMIN", "STAFF"] },
+          user: {
+            isActive: true,
+            studentIdentities: { none: { tenantId: actor.tenantId } },
+          },
+        },
+      }),
+    );
   });
 
   it("finds active staff in the selected site without exposing other profile fields", async () => {
@@ -147,9 +178,9 @@ describe("staff direct conversations", () => {
     const { tx, service } = setup();
     tx.siteMembership.findUnique.mockResolvedValue(null);
 
-    await expect(
-      service.listStaffRecipients(actor, { search: "Sam" }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.listStaffRecipients(actor, {})).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(tx.siteMembership.findMany).not.toHaveBeenCalled();
   });
 

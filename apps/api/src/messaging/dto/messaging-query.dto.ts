@@ -12,7 +12,7 @@ export const conversationQuerySchema = z
 
 export const staffRecipientQuerySchema = z
   .object({
-    search: z.string().trim().min(2).max(80),
+    search: z.string().trim().min(1).max(80).optional(),
     limit: z
       .string()
       .regex(/^(?:[1-9]|1\d|20)$/)
