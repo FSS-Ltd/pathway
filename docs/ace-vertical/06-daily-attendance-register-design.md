@@ -8,8 +8,9 @@ bounded staff correction-history read. Step 1.3g8 adds the staff web register
 for marking, correction and history. Step 1.3g9 adds a student-only daily mark
 history API. Step 1.3g10 adds a linked-parent daily mark history API. Step
 1.3g11 adds parent and student web views for explicit site and child links.
-Step 1.3g12 adds authenticated family site and child discovery. A family
-landing page, exports and production migration remain open.
+Step 1.3g12 adds authenticated family site and child discovery. Step 1.3g13
+adds a family landing page for choosing those contexts. Exports and production
+migration remain open.
 
 ## Source behaviour and current gap
 
@@ -103,6 +104,13 @@ on every request. The discovery policy adds no table grant to browser database
 roles and no write permission. The read is limited to 100 identity sites per
 kind; an excess fails rather than silently omitting links. The migration must
 be applied before the endpoint can discover contexts in production.
+
+Step 1.3g13 presents the discovered contexts at `/ace/family` in the separate
+family shell. It groups parent and student access, links only to the existing
+guarded attendance pages, and provides sign-in, loading, empty, denied, and
+retry states. Its family-shell navigation never requests staff roles or
+organisation UI. It does not imply that the wider parent and student portal
+journeys are complete.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server

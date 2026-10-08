@@ -10,6 +10,8 @@ import { FamilyPortalShell } from "./family-portal-shell";
 function RouteShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   if (
+    pathname === "/ace/family" ||
+    pathname?.startsWith("/ace/family/") ||
     pathname?.startsWith("/ace/parent/") ||
     pathname?.startsWith("/ace/student/")
   ) {
