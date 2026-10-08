@@ -17,9 +17,10 @@ NexSteps already has `MessageConversation`, `MessageParticipant`, `Message`,
 read-cursor and delivery tables, encrypted message bodies, tenant RLS, and
 creator/participant eligibility triggers. Step 1.3e1a adds a read-only staff
 conversation-list route. Step 1.3e1b adds read-only staff message history.
-Step 1.3e2a adds staff direct conversation creation, and step 1.3e2b adds
-staff direct and room message sending. Parent access, staff room creation, and
-web journeys remain pending. The existing `PARENT_STAFF` uniqueness constraint
+Step 1.3e2a adds staff direct conversation creation, step 1.3e2b adds
+staff direct and room message sending, and step 1.3e2c adds site staffroom
+opening. Parent access and the staffroom web control remain pending. The
+existing `PARENT_STAFF` uniqueness constraint
 allows **one conversation per guardian identity per site**, so the first web
 journey is a school-team conversation, not one separate thread per staff
 contact. A site's staff membership alone is too broad to make every staff
@@ -111,6 +112,18 @@ delivery for each recipient, and audits the new message without its body.
 The existing Prisma encryption layer protects the body at rest. A reused ID
 with different text is rejected; parent and student messages are unavailable
 through this route.
+Step 1.3e2c opens or reuses one shared staffroom per selected site, as in the
+Oasis staffroom journey. It serializes opens for the site, requires the typed
+create permission and current staff membership, and includes only active,
+non-student staff with a current membership in that site. Opening an existing
+room adds new members, restores returning members, and ends participation for
+former members, with audited membership changes. At least two current staff
+are required. Duplicate pre-existing rooms fail closed for reconciliation;
+the command does not create arbitrary named group chats. A send still rechecks
+every active participant. The web control must call open on entry so ended
+members are reconciled before a staff member sends. Newly joined or returning
+staff can read earlier room messages while their current site membership and
+read permission hold; the staffroom is not a safeguarding case record.
 
 Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive
 conversation list and thread, paged history, explicit read cursor, and a

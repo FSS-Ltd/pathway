@@ -11,6 +11,15 @@ export type CreateStaffDirectConversationInput = z.infer<
   typeof createStaffDirectConversationSchema
 >;
 
+export const createStaffRoomConversationSchema = z
+  .object({ kind: z.literal("STAFF_ROOM") })
+  .strict();
+
+export const createStaffConversationSchema = z.discriminatedUnion("kind", [
+  createStaffDirectConversationSchema,
+  createStaffRoomConversationSchema,
+]);
+
 export const sendStaffMessageSchema = z
   .object({
     clientRequestId: z.string().uuid(),

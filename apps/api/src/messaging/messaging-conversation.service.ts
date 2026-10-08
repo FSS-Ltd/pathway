@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -156,6 +157,143 @@ export class MessagingConversationService {
         },
       });
       return { id: created.id, kind: "STAFF_DIRECT" as const, created: true };
+    });
+  }
+
+  async openStaffRoom(actor: MessagingActor) {
+    assertMessagingActor(actor);
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      await requireCurrentStaff(tx, actor);
+      const lockKey = `ace-staff-room:${actor.tenantId}`;
+      await tx.$executeRaw(
+        Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+      );
+
+      const memberships = await tx.siteMembership.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          role: { in: ["SITE_ADMIN", "STAFF"] },
+          user: {
+            isActive: true,
+            studentIdentities: { none: { tenantId: actor.tenantId } },
+          },
+        },
+        select: { userId: true },
+      });
+      const staffIds = memberships.map((member) => member.userId).sort();
+      if (staffIds.length < 2) {
+        throw new BadRequestException(
+          "At least two current staff members are required",
+        );
+      }
+
+      const rooms = await tx.messageConversation.findMany({
+        where: { tenantId: actor.tenantId, kind: "STAFF_ROOM" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        take: 2,
+        select: { id: true },
+      });
+      if (rooms.length > 1) {
+        throw new ConflictException("Staff room unavailable");
+      }
+      const room = rooms[0];
+      if (!room) {
+        const created = await tx.messageConversation.create({
+          data: {
+            kind: "STAFF_ROOM",
+            tenant: { connect: { id: actor.tenantId } },
+            createdBy: { connect: { id: actor.userId } },
+            participants: {
+              create: staffIds.map((userId) => ({
+                kind: "STAFF",
+                tenant: { connect: { id: actor.tenantId } },
+                user: { connect: { id: userId } },
+              })),
+            },
+          },
+          select: { id: true },
+        });
+        await recordAuditEventInTransaction(tx, {
+          actorUserId: actor.userId,
+          tenantId: actor.tenantId,
+          orgId: actor.orgId,
+          entityType: AuditEntityType.ACE_MESSAGE,
+          entityId: created.id,
+          action: AuditAction.CREATED,
+          metadata: { kind: "STAFF_ROOM", participantUserIds: staffIds },
+        });
+        return { id: created.id, kind: "STAFF_ROOM" as const, created: true };
+      }
+
+      const participants = await tx.messageParticipant.findMany({
+        where: { tenantId: actor.tenantId, conversationId: room.id },
+        select: { userId: true, removedAt: true },
+      });
+      const staffSet = new Set(staffIds);
+      const participantSet = new Set(participants.map((item) => item.userId));
+      const addedUserIds = staffIds.filter(
+        (userId) => !participantSet.has(userId),
+      );
+      const rejoinedUserIds = participants
+        .filter((item) => item.removedAt && staffSet.has(item.userId))
+        .map((item) => item.userId);
+      const removedUserIds = participants
+        .filter((item) => !item.removedAt && !staffSet.has(item.userId))
+        .map((item) => item.userId);
+
+      if (removedUserIds.length) {
+        await tx.messageParticipant.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            conversationId: room.id,
+            userId: { in: removedUserIds },
+            removedAt: null,
+          },
+          data: { removedAt: new Date() },
+        });
+      }
+      if (rejoinedUserIds.length) {
+        await tx.messageParticipant.updateMany({
+          where: {
+            tenantId: actor.tenantId,
+            conversationId: room.id,
+            userId: { in: rejoinedUserIds },
+            removedAt: { not: null },
+          },
+          data: { removedAt: null },
+        });
+      }
+      if (addedUserIds.length) {
+        await tx.messageParticipant.createMany({
+          data: addedUserIds.map((userId) => ({
+            tenantId: actor.tenantId,
+            conversationId: room.id,
+            userId,
+            kind: "STAFF",
+          })),
+        });
+      }
+      if (
+        addedUserIds.length ||
+        rejoinedUserIds.length ||
+        removedUserIds.length
+      ) {
+        await recordAuditEventInTransaction(tx, {
+          actorUserId: actor.userId,
+          tenantId: actor.tenantId,
+          orgId: actor.orgId,
+          entityType: AuditEntityType.ACE_MESSAGE,
+          entityId: room.id,
+          action: AuditAction.UPDATED,
+          metadata: {
+            kind: "STAFF_ROOM",
+            addedUserIds,
+            rejoinedUserIds,
+            removedUserIds,
+          },
+        });
+      }
+      return { id: room.id, kind: "STAFF_ROOM" as const, created: false };
     });
   }
 }

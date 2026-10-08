@@ -7,7 +7,10 @@ import {
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
 import { recordAuditEventInTransaction } from "../../audit/audit.service";
-import { createStaffDirectConversationSchema } from "../dto/messaging-command.dto";
+import {
+  createStaffConversationSchema,
+  createStaffDirectConversationSchema,
+} from "../dto/messaging-command.dto";
 import { staffRecipientQuerySchema } from "../dto/messaging-query.dto";
 import { MessagingConversationService } from "../messaging-conversation.service";
 import { MessagingController } from "../messaging.controller";
@@ -44,7 +47,13 @@ function setup() {
     user: { findFirst: jest.fn().mockResolvedValue({ id: actor.userId }) },
     messageConversation: {
       findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue({ id: "conversation-a" }),
+    },
+    messageParticipant: {
+      findMany: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
     $executeRaw: jest.fn().mockResolvedValue(1),
   };
@@ -227,5 +236,166 @@ describe("staff direct conversations", () => {
         metadata: { kind: "STAFF_DIRECT", recipientUserId },
       }),
     );
+  });
+});
+
+describe("site staff room", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("accepts only the room kind and uses the existing create permission", () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSION,
+        MessagingController.prototype.create,
+      ),
+    ).toBe("messaging.conversations.create");
+    expect(
+      createStaffConversationSchema.safeParse({ kind: "STAFF_ROOM" }).success,
+    ).toBe(true);
+    expect(
+      createStaffConversationSchema.safeParse({
+        kind: "STAFF_ROOM",
+        recipientUserId,
+      }).success,
+    ).toBe(false);
+    expect(createStaffConversationSchema.safeParse(input).success).toBe(true);
+  });
+
+  it("creates one audited room with current site staff", async () => {
+    const { tx, service } = setup();
+    tx.siteMembership.findMany.mockResolvedValue([
+      { userId: actor.userId },
+      { userId: recipientUserId },
+    ]);
+
+    await expect(service.openStaffRoom(actor)).resolves.toEqual({
+      id: "conversation-a",
+      kind: "STAFF_ROOM",
+      created: true,
+    });
+    expect(tx.siteMembership.findMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: actor.tenantId,
+        role: { in: ["SITE_ADMIN", "STAFF"] },
+        user: {
+          isActive: true,
+          studentIdentities: { none: { tenantId: actor.tenantId } },
+        },
+      },
+      select: { userId: true },
+    });
+    expect(tx.messageConversation.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          kind: "STAFF_ROOM",
+          participants: {
+            create: expect.arrayContaining([
+              expect.objectContaining({
+                user: { connect: { id: actor.userId } },
+              }),
+              expect.objectContaining({
+                user: { connect: { id: recipientUserId } },
+              }),
+            ]),
+          },
+        }),
+      }),
+    );
+    expect(recordAuditEventInTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        action: "CREATED",
+        metadata: {
+          kind: "STAFF_ROOM",
+          participantUserIds: [actor.userId, recipientUserId].sort(),
+        },
+      }),
+    );
+  });
+
+  it("reconciles ended and rejoined members without creating a second room", async () => {
+    const { tx, service } = setup();
+    const formerUserId = "c89fb6a1-cbd7-4270-9d41-c2061add9238";
+    const newUserId = "9fb7597c-f387-4c9f-9212-c67b53cfeb11";
+    tx.siteMembership.findMany.mockResolvedValue([
+      { userId: actor.userId },
+      { userId: recipientUserId },
+      { userId: newUserId },
+    ]);
+    tx.messageConversation.findMany.mockResolvedValue([{ id: "room-a" }]);
+    tx.messageParticipant.findMany.mockResolvedValue([
+      { userId: actor.userId, removedAt: null },
+      { userId: recipientUserId, removedAt: new Date() },
+      { userId: formerUserId, removedAt: null },
+    ]);
+
+    await expect(service.openStaffRoom(actor)).resolves.toEqual({
+      id: "room-a",
+      kind: "STAFF_ROOM",
+      created: false,
+    });
+    expect(tx.messageParticipant.updateMany).toHaveBeenCalledTimes(2);
+    expect(tx.messageParticipant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: { in: [formerUserId] } }),
+      }),
+    );
+    expect(tx.messageParticipant.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ userId: { in: [recipientUserId] } }),
+        data: { removedAt: null },
+      }),
+    );
+    expect(tx.messageConversation.create).not.toHaveBeenCalled();
+    expect(tx.messageParticipant.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          tenantId: actor.tenantId,
+          conversationId: "room-a",
+          userId: newUserId,
+          kind: "STAFF",
+        },
+      ],
+    });
+    expect(recordAuditEventInTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        action: "UPDATED",
+        metadata: {
+          kind: "STAFF_ROOM",
+          addedUserIds: [newUserId],
+          rejoinedUserIds: [recipientUserId],
+          removedUserIds: [formerUserId],
+        },
+      }),
+    );
+  });
+
+  it("rejects an ineligible actor, a one-person site, and duplicate rooms", async () => {
+    const { tx, service } = setup();
+    tx.siteMembership.findUnique.mockResolvedValue(null);
+    await expect(service.openStaffRoom(actor)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+
+    tx.siteMembership.findUnique.mockResolvedValue({ id: actor.userId });
+    tx.siteMembership.findMany.mockResolvedValue([{ userId: actor.userId }]);
+    await expect(service.openStaffRoom(actor)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+
+    tx.siteMembership.findMany.mockResolvedValue([
+      { userId: actor.userId },
+      { userId: recipientUserId },
+    ]);
+    tx.messageConversation.findMany.mockResolvedValue([
+      { id: "room-a" },
+      { id: "room-b" },
+    ]);
+    await expect(service.openStaffRoom(actor)).rejects.toHaveProperty(
+      "status",
+      409,
+    );
+    expect(tx.messageConversation.create).not.toHaveBeenCalled();
   });
 });
