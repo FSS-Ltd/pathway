@@ -178,7 +178,7 @@ export function RecipientPicker({
           <p className="px-5 py-6 text-sm text-text-muted">{copy.intro}</p>
         ) : searching || resolvedSearch !== search ? (
           <p role="status" className="px-5 py-6 text-sm text-text-muted">
-            Searching…
+            {search ? "Searching…" : "Loading people…"}
           </p>
         ) : searchError ? (
           <div className="space-y-3 px-5 py-6">
@@ -193,12 +193,12 @@ export function RecipientPicker({
                 setRetrySearch((revision) => revision + 1);
               }}
             >
-              Retry search
+              {search ? "Retry search" : "Try again"}
             </Button>
           </div>
         ) : page.items.length === 0 ? (
           <p role="status" className="px-5 py-6 text-sm text-text-muted">
-            {copy.noMatch}
+            {search ? copy.noMatch : copy.intro}
           </p>
         ) : (
           <>

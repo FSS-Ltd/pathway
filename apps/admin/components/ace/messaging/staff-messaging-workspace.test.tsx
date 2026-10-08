@@ -101,6 +101,7 @@ async function run(): Promise<void> {
       const search = url.searchParams.get("search") ?? "";
       recipientSearches.push(search);
       assert.equal(url.searchParams.get("limit"), "20");
+      assert.equal(url.searchParams.has("search"), search.length > 0);
       if (search === "Al" && !alexSearchFailed) {
         alexSearchFailed = true;
         return jsonResponse({ message: "temporary error" }, 500);
@@ -332,10 +333,15 @@ async function run(): Promise<void> {
       "#staff-recipient-search",
     );
     assert.ok(search);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    assert.deepEqual(recipientSearches, [""]);
+    assert.match(container.textContent ?? "", /Bob Lee/);
     await changeSearch(search, "A");
-    assert.deepEqual(recipientSearches, [], "one character does not search");
+    assert.deepEqual(recipientSearches, ["", "A"]);
     await changeSearch(search, "Al");
-    assert.deepEqual(recipientSearches, ["Al"]);
+    assert.deepEqual(recipientSearches, ["", "A", "Al"]);
     const retrySearch = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Retry search"),
     );
@@ -344,7 +350,7 @@ async function run(): Promise<void> {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 300));
     });
-    assert.deepEqual(recipientSearches, ["Al", "Al"]);
+    assert.deepEqual(recipientSearches, ["", "A", "Al", "Al"]);
     const alex = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Alex Morgan"),
     );

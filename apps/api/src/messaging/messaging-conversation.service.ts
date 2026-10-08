@@ -30,10 +30,24 @@ export class MessagingConversationService {
           user: {
             isActive: true,
             studentIdentities: { none: { tenantId: actor.tenantId } },
-            OR: [
-              { displayName: { contains: query.search, mode: "insensitive" } },
-              { name: { contains: query.search, mode: "insensitive" } },
-            ],
+            ...(query.search
+              ? {
+                  OR: [
+                    {
+                      displayName: {
+                        contains: query.search,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                    {
+                      name: {
+                        contains: query.search,
+                        mode: "insensitive" as const,
+                      },
+                    },
+                  ],
+                }
+              : {}),
           },
         },
         select: {

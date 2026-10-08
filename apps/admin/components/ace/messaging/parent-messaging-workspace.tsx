@@ -14,7 +14,7 @@ const responderCopy = {
   label: "To: Approved school responder",
   placeholder: "Search your school team",
   hint: "Only current approved responders at this school appear.",
-  intro: "Choose a school team member to start your conversation.",
+  intro: "No approved school responders are available yet.",
   noMatch: "No approved responders match this search at your school.",
   searchError: "Unable to load school responders. Try again.",
   openError: "Unable to start your school conversation. Try again.",

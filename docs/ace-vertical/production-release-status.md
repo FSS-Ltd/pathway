@@ -1,10 +1,10 @@
 # ACE production release status
 
 Checked on 8 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `acd91f2e0421c60e553722cdde0ca9c6de1980ec`.
+to READY deployments at merged commit `e41574943aba178d6b4f63a5cb81e5db384ce970`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-5 are now served by all three apps.
+changes through REL-6 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -106,6 +106,28 @@ links needs a legal-access review before conversion. An unauthenticated
 signup for an email already in use must go through the verified existing-user
 route. This code step does not enable the production parent portal or change
 historical relationships.
+
+REL-6 merged in [PR #510](https://github.com/FSS-Ltd/pathway/pull/510) as
+`e41574943aba178d6b4f63a5cb81e5db384ce970`. All eight required checks
+passed on head `fd98589d74c5271e395c63ae829f3205ec7a255f` (CI run
+37849821831, CodeQL run 37849816768). [Production run
+37851006289](https://github.com/FSS-Ltd/pathway/actions/runs/37851006289)
+passed migrations and all three app deployments. Vercel reports READY API
+`dpl_2fHw11vu7F6ibYa1TZgeFYoLtqzk`, admin
+`dpl_DP4aMCXuo98N65JQBELxkps8L89a`, and web
+`dpl_A7Ait3uAdNrdTzzfDN4NbbHjeDaE` on the production domains. Live API
+health, environment health, public blog, and web configurator reads returned
+HTTP 200; anonymous admin messaging redirected to sign-in. Signed-in family
+and message data loading is still unverified.
+
+REL-7 prepares immediate staff recipient discovery in Messages. A read-only
+production check found five active staff memberships and one role-qualified
+parent-message responder at Demo ACE School. The new-message picker currently
+requires a search before listing anyone. This step will show the site's
+current staff immediately while retaining the existing site, role, student,
+and permission checks. It does not enable the parent portal or approve
+historical guardian links. A fresh signed-in production journey is still
+required to distinguish an expired browser session from a server rejection.
 
 ## Delivery steps
 
