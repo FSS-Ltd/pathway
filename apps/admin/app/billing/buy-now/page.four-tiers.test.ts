@@ -23,9 +23,9 @@ assert.ok(
   !source.includes('"GROWTH_MONTHLY"'),
   "admin buy-now page must not default new checkouts to the grandfathered Growth code",
 );
+assert.ok(source.includes("baseAv30: 50"));
 assert.ok(source.includes("baseAv30: 100"));
 assert.ok(source.includes("baseAv30: 200"));
-assert.ok(source.includes("baseAv30: 500"));
 assert.ok(source.includes("Active staff and volunteers:"));
 assert.ok(source.includes("previous 30 days"));
 assert.ok(!source.includes("AV30 included:"));

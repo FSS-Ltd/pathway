@@ -24,12 +24,12 @@ assert.ok(
   "admin PLAN_PRICES must not default new checkouts to the grandfathered Growth code",
 );
 const currentPlans = [
-  ["STARTER_49_MONTHLY", 100, 1, 49],
-  ["STARTER_49_YEARLY", 100, 1, 490],
-  ["GROWTH_99_MONTHLY", 200, 2, 99],
-  ["GROWTH_99_YEARLY", 200, 2, 990],
-  ["PROFESSIONAL_149_MONTHLY", 500, 5, 149],
-  ["PROFESSIONAL_149_YEARLY", 500, 5, 1490],
+  ["STARTER_49_MONTHLY", 50, 1, 49],
+  ["STARTER_49_YEARLY", 50, 1, 490],
+  ["GROWTH_99_MONTHLY", 100, 2, 99],
+  ["GROWTH_99_YEARLY", 100, 2, 990],
+  ["PROFESSIONAL_149_MONTHLY", 200, 5, 149],
+  ["PROFESSIONAL_149_YEARLY", 200, 5, 1490],
 ] as const;
 
 for (const [code, staffCap, sites, amount] of currentPlans) {

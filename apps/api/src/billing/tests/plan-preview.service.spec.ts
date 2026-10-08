@@ -21,12 +21,12 @@ describe("PlanPreviewService", () => {
   });
 
   it.each([
-    ["STARTER_49_MONTHLY", 100, 1],
-    ["STARTER_49_YEARLY", 100, 1],
-    ["GROWTH_99_MONTHLY", 200, 2],
-    ["GROWTH_99_YEARLY", 200, 2],
-    ["PROFESSIONAL_149_MONTHLY", 500, 5],
-    ["PROFESSIONAL_149_YEARLY", 500, 5],
+    ["STARTER_49_MONTHLY", 50, 1],
+    ["STARTER_49_YEARLY", 50, 1],
+    ["GROWTH_99_MONTHLY", 100, 2],
+    ["GROWTH_99_YEARLY", 100, 2],
+    ["PROFESSIONAL_149_MONTHLY", 200, 5],
+    ["PROFESSIONAL_149_YEARLY", 200, 5],
   ] as const)(
     "previews %s with its current staff allowance and site limit",
     (planCode, staffCap, sites) => {

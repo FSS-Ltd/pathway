@@ -85,7 +85,7 @@ Decisions made in the planning session that produced this doc set, plus decision
 |---|---|---|---|
 | D1 | NexSteps Home shape | Home-Education **vertical + plan + family surface + Community module**, same codebase, reusing the CEE TEACH Hub / Family Hub design (`docs/cee-vertical/01-architecture-overview.md`) | 07, 08 |
 | D2 | CEE features adopted | **Minimal**: Learning module + Community module only. Network tier, Postgres RLS, ABAC, Merit/rewards, the parent-portal publishing gate, and region pinning stay CEE-specific and are not built here | 04, 07, 08 |
-| D3 | Pricing / limits | Current packages: Starter £49/100, Growth £99/200, Professional £149/500 per month. The allowance counts unique staff and volunteers with qualifying activity in the previous 30 days; Enterprise remains custom/unlimited | Current pricing catalogue |
+| D3 | Pricing / limits | Current packages: Starter £49/50, Growth £99/100, Professional £149/200 per month. The allowance counts unique staff and volunteers with qualifying activity in the previous 30 days; Enterprise remains custom/unlimited | Current pricing catalogue |
 | D4 | Versioning | Product semver in API `/health` + web/admin footers, plus git tags + GitHub releases. **No** `CHANGELOG.md`, **no** per-doc version headers | 00 |
 | D5 | Existing customers | There are no paying subscribers to migrate; the master org remains unlimited. Keep legacy plan definitions for compatibility; any future migration uses a separate upgrade flow | 00 |
 | D6 | Capability grants | Config-driven (dev-doc's own recommendation): static TypeScript maps of `Vertical -> Capability[]` and `Module -> Capability[]` in `packages/platform` | 01 |

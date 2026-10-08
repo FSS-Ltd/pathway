@@ -10,7 +10,7 @@
 
 ## Goal
 
-Put a real product version on the platform, and set the current Starter / Growth / Professional / Enterprise pricing to £49/100, £99/200, £149/500, custom/unlimited — without breaking a single existing subscriber or silently repricing anyone.
+Put a real product version on the platform, and set the current Starter / Growth / Professional / Enterprise pricing to £49/50, £99/100, £149/200, custom/unlimited — without breaking a single existing subscriber or silently repricing anyone.
 
 ## Why this phase exists and isn't in the dev doc
 
@@ -24,9 +24,9 @@ The dev doc (`nexsteps-platform-architecture-dev-doc.md`, §5) states the target
 | Tier label | Existing catalogue fallback | Current target price and active staff/volunteer allowance |
 |---|---|---|
 | Core | £49.99/mo, 15 AV30, 50 children, 1 site | *(retired for new signups)* |
-| Starter | £149/mo, 50 AV30, 1 site | £49/mo, 100 active staff and volunteers, 1 site |
-| Growth | £399/mo, 200 AV30, 3 sites | £99/mo, 200 active staff and volunteers, 2 sites |
-| *(none)* | — | £149/mo, 500 active staff and volunteers, 5 sites (**Professional**, new) |
+| Starter | £149/mo, 50 AV30, 1 site | £49/mo, 50 active staff and volunteers, 1 site |
+| Growth | £399/mo, 200 AV30, 3 sites | £99/mo, 100 active staff and volunteers, 2 sites |
+| *(none)* | — | £149/mo, 200 active staff and volunteers, 5 sites (**Professional**, new) |
 | Enterprise | Contact, no self-serve | Custom, unlimited |
 
 If PR 0.2 just edited `PLAN_CATALOGUE["STARTER_MONTHLY"]`'s display price in place, every existing Starter subscriber would still be billed their original Stripe price (Stripe, not the catalogue, is authoritative) — but the UI would now lie about what they're paying, and any new signup routed to the old code would get the old Stripe price under new-looking copy. That's the mistake this phase is built to avoid, on both the billing side (D7) and the display side. See Open Decision 1 below.
@@ -120,7 +120,7 @@ There's no product version anywhere today either: root `package.json` has no `ve
 - Until this step lands in a given environment, `createCheckoutSession()` in that environment throws `"Price configuration missing for selected plan"` for the new codes (`stripe-buy-now.provider.ts:47`) — expected and correct, not a bug, until Stripe setup is done.
 
 **Failing test first:**
-- Unit test asserting `getPlanDefinition("V2_STARTER_MONTHLY")` (or the chosen code) returns the new fallback display price/100-limit, and that `getPlanDefinition("STARTER_MONTHLY")` **still** returns its original definition unchanged.
+- Unit test asserting `getPlanDefinition("V2_STARTER_MONTHLY")` (or the chosen code) returns the new fallback display price/50-limit, and that `getPlanDefinition("STARTER_MONTHLY")` **still** returns its original definition unchanged.
 - `tierHierarchy` ordering test: `professional` sits strictly between `growth` and `enterprise`.
 - Integration test (staging, once the Stripe-side step is done): `GET` the pricing diagnostics endpoint (`pricing.controller.ts`) and confirm the four new codes appear in `keysExtracted`; a `STRIPE_TEST`-mode checkout for a new code succeeds end-to-end and the returned Stripe session's price matches what was configured.
 

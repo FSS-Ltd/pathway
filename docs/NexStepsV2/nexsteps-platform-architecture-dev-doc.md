@@ -155,9 +155,9 @@ Future modules plug into the same architecture without new application code, onl
 
 | Plan | Price | Active staff and volunteers (previous 30 days) |
 |---|---|---|
-| Starter | £49/month | 100 |
-| Growth | £99/month | 200 |
-| Professional | £149/month | 500 |
+| Starter | £49/month | 50 |
+| Growth | £99/month | 100 |
+| Professional | £149/month | 200 |
 | Enterprise | Custom | Unlimited, dedicated support, custom SLA |
 
 Storage is the only usage-based add-on. Staff and volunteer allowances count unique users with qualifying activity during the previous 30 days. No SMS bundles or staff allowance add-on packs.
