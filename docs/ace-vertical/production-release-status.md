@@ -95,6 +95,7 @@ deployment's `/health` returned 200 with a database timestamp on 7 October.
 | 1.3g2    | Dated school enrolment foundation                      | Merged  | [#427](https://github.com/FSS-Ltd/pathway/pull/427) to `master` | `871b485a69e60baceae767a619304c93ddb9475d`; all eight checks passed: CI run 37699275536, CodeQL run 37699271978.                                                                                                | `5cf9634481cdbb2da0b63b4fbe6ac788046878a8` |
 | 1.3g3    | Explicit site teaching dates                           | Merged  | [#429](https://github.com/FSS-Ltd/pathway/pull/429) to `master` | `a360d9ec66847780bd432e3a05914183cbd9c6c7`; all eight checks passed: CI run 37702284432, CodeQL run 37702280876.                                                                                                | `52f8c51d9a892d6067722d0dba02f036eb564960` |
 | 1.3g4    | Daily attendance fact and correction-event foundation  | Merged  | [#431](https://github.com/FSS-Ltd/pathway/pull/431) to `master` | `76fdaace01d5e7471daa626c00ab5b475422cff1`; all eight checks passed: CI run 37706815302, CodeQL run 37706809864.                                                                                                | `3095b3cdae419e4052b1e02a550c660a662fb864` |
+| 1.3g5    | Scoped daily-register staff read API                   | In PR   | [#433](https://github.com/FSS-Ltd/pathway/pull/433) to `master` | Implementation `c201edf9c56ab74cdd085230204946651cd99f22`; local typecheck, lint, API build and unit tests passed; CI pending.                                                                                  | Pending                                    |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -102,8 +103,9 @@ deployment's `/health` returned 200 with a database timestamp on 7 October.
 Step 1.3g4 is merged after the corrected integration assertions passed on the
 final PR revision. The daily fact and correction-event schema has not been
 applied to the production database; live migrations remain deferred as agreed.
-The next build step is the scoped daily-register API read slice, followed by
-atomic mark and correction writes with history.
+The current build step is the scoped daily-register API read slice in PR #433.
+Atomic mark and correction writes with history follow only after its CI passes
+and it merges.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
