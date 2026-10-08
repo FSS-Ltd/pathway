@@ -1,5 +1,6 @@
 import {
   API_BASE_URL,
+  apiFetch,
   buildAuthHeaders,
   isUsingMockApi,
   paceRequestError,
@@ -80,7 +81,7 @@ async function diagnosticCommand<T>(
   if (isUsingMockApi()) {
     throw new Error("PACE diagnostic changes are not available in mock mode.");
   }
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await apiFetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: buildAuthHeaders(),
     credentials: "include",
@@ -112,7 +113,7 @@ export async function fetchPaceDiagnosticHistory({
   const params = new URLSearchParams({ childId, subjectId, limit: "50" });
   if (includeRetracted) params.set("includeRetracted", "true");
   if (cursor) params.set("cursor", cursor);
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/ace/pace/diagnostics?${params.toString()}`,
     {
       headers: buildAuthHeaders(),

@@ -116,7 +116,7 @@ async function run() {
   globalThis.fetch = async (url, init) => {
     assert.equal(init?.credentials, "include");
     assert.equal(
-      (init?.headers as Record<string, string>).Authorization,
+      new Headers(init?.headers).get("Authorization"),
       "Bearer test-token",
     );
     const path = new URL(String(url)).pathname;

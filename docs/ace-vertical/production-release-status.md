@@ -57,6 +57,32 @@ journeys, billing callbacks, background workers, and full staging journey tests
 were not exercised by these anonymous checks. Continue monitoring and verify
 those paths before treating broader ACE parity as complete.
 
+## Signed-in data loading follow-up — 8 October 2026
+
+The production staff messaging screen was observed with “Your session could not
+be verified. Please sign in again.” Its client request used a bearer token
+captured at sign-in rather than the shared transport's current Clerk token.
+The same request pattern existed in ACE settings, attendance, family, PACE,
+and staff handover clients. REL-5 moves those requests through the shared current-token transport;
+the regression test changes the token after sign-in and checks staff and parent
+recipient discovery. A merged client fix still needs a signed-in production
+journey before the data-loading issue can be closed.
+
+Read-only queries against the new production database found 44 staff or site
+admin memberships, 60 legacy parent-child links, 14 guardian contact records,
+no `GuardianIdentity` or `GuardianChildRelationship` rows, no access-tag grants,
+and one Organisation Head assignment. The school's `parentPortalEnabled` flag
+is false. These facts explain why the current parent portal and school-team
+messaging cannot yet work even with a fresh token. Legacy links and contact
+records need a reviewed mapping into ACE identity relationships; do not assume
+every contact has full legal access. An authorised school responder must also
+be assigned by a current fixed Head/Lead role or a scoped responder tag, and
+the parent portal must be enabled for the intended school. Verify a linked
+parent can discover a responder, open and send one school conversation, and
+that the same responder can read and reply. Repeat after tag revocation, child
+relationship end, and site switch. Until then, bidirectional production
+messaging is **not verified**.
+
 ## Delivery steps
 
 | Step     | Scope                                                                  | State   | PR and base                                                                         | Checked revision and CI                                                                                                                                                                                         | Merge evidence                             |

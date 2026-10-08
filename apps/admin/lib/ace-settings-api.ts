@@ -1,4 +1,9 @@
-import { API_BASE_URL, buildAuthHeaders, isUsingMockApi } from "./api-client";
+import {
+  API_BASE_URL,
+  apiFetch,
+  buildAuthHeaders,
+  isUsingMockApi,
+} from "./api-client";
 
 export type AcePacePolicy = {
   id: string;
@@ -55,7 +60,7 @@ export async function fetchAceSettings(
   if (isUsingMockApi()) {
     return { timezone: "Europe/London", pacePolicy: null, demeritPolicy: null };
   }
-  const response = await fetch(`${API_BASE_URL}/ace/settings`, {
+  const response = await apiFetch(`${API_BASE_URL}/ace/settings`, {
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",
@@ -71,7 +76,7 @@ export async function updateAcePacePolicy(
   if (isUsingMockApi()) {
     throw new Error("ACE settings changes are not available in mock mode.");
   }
-  const response = await fetch(`${API_BASE_URL}/ace/settings`, {
+  const response = await apiFetch(`${API_BASE_URL}/ace/settings`, {
     method: "PUT",
     headers: buildAuthHeaders(),
     credentials: "include",
@@ -86,7 +91,7 @@ export async function fetchAceSubjects(
   signal?: AbortSignal,
 ): Promise<AceSubject[]> {
   if (isUsingMockApi()) return [];
-  const response = await fetch(`${API_BASE_URL}/ace/subjects`, {
+  const response = await apiFetch(`${API_BASE_URL}/ace/subjects`, {
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",
@@ -124,7 +129,7 @@ async function writeAceSubject(
   if (isUsingMockApi()) {
     throw new Error("ACE subject changes are not available in mock mode.");
   }
-  const response = await fetch(`${API_BASE_URL}/ace/subjects${path}`, {
+  const response = await apiFetch(`${API_BASE_URL}/ace/subjects${path}`, {
     method,
     headers: buildAuthHeaders(),
     credentials: "include",

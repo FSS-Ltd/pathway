@@ -3,6 +3,9 @@ import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { notifyActiveSiteChanged } from "@/lib/active-site-events";
 import { setApiClientToken } from "@/lib/api-client";
+import { searchStaffRecipients } from "@/lib/ace-messaging-api";
+import { searchParentResponders } from "@/lib/ace-parent-messaging-api";
+import { setApiTokenGetter } from "@/lib/api-transport";
 import { StaffMessagingWorkspace } from "./staff-messaging-workspace";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -445,6 +448,30 @@ async function run(): Promise<void> {
     globalThis.fetch = originalFetch;
     setApiClientToken(null);
     container.remove();
+  }
+
+  const requestedPaths: string[] = [];
+  setApiClientToken("expired-token");
+  setApiTokenGetter(async () => "fresh-token");
+  globalThis.fetch = async (input, init) => {
+    requestedPaths.push(new URL(String(input)).pathname);
+    assert.equal(
+      new Headers(init?.headers).get("Authorization"),
+      "Bearer fresh-token",
+    );
+    return jsonResponse({ items: [], hasMore: false });
+  };
+  try {
+    await searchStaffRecipients("Sam");
+    await searchParentResponders("site-one", "");
+    assert.deepEqual(requestedPaths, [
+      "/ace/messages/conversations/recipients",
+      "/ace/parent/sites/site-one/messages/conversations/recipients",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    setApiTokenGetter(null);
+    setApiClientToken(null);
   }
 }
 

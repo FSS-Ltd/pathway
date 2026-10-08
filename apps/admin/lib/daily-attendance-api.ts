@@ -1,4 +1,9 @@
-import { API_BASE_URL, buildAuthHeaders, isUsingMockApi } from "./api-client";
+import {
+  API_BASE_URL,
+  apiFetch,
+  buildAuthHeaders,
+  isUsingMockApi,
+} from "./api-client";
 
 export type DailyAttendanceStatus = "PRESENT" | "ABSENT" | "LATE";
 export type DailyAbsenceReason =
@@ -80,12 +85,15 @@ export async function fetchDailyAttendance(
     limit: "50",
   });
   if (query.bandId) params.set("bandId", query.bandId);
-  const response = await fetch(`${API_BASE_URL}/attendance/daily?${params}`, {
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-    signal,
-  });
+  const response = await apiFetch(
+    `${API_BASE_URL}/attendance/daily?${params}`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    },
+  );
   if (!response.ok) throw await dailyAttendanceError(response);
   return response.json() as Promise<DailyAttendancePage>;
 }
@@ -99,7 +107,7 @@ export async function saveDailyAttendanceMark(
   if (isUsingMockApi()) {
     throw new Error("Daily attendance changes are unavailable in mock mode.");
   }
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/attendance/daily/${encodeURIComponent(date)}/children/${encodeURIComponent(childId)}`,
     {
       method: "PUT",
@@ -120,7 +128,7 @@ export async function fetchDailyAttendanceHistory(
   if (isUsingMockApi()) return { items: [], nextCursor: null };
   const params = new URLSearchParams({ limit: "25" });
   if (cursor) params.set("cursor", cursor);
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/attendance/daily/${encodeURIComponent(factId)}/history?${params}`,
     {
       headers: buildAuthHeaders(),
@@ -141,7 +149,7 @@ export async function fetchDailyAttendanceCsv(
     throw new Error("Daily attendance exports are unavailable in mock mode.");
   }
   const params = new URLSearchParams(range);
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE_URL}/attendance/daily/export?${params}`,
     {
       headers: buildAuthHeaders(),

@@ -33,6 +33,12 @@ but the current database triggers prohibit student conversation creation and
 participation; student messaging is unavailable until a separate safeguarding
 decision and schema change are reviewed.
 
+The web requests for staff and parent conversations use the shared authenticated
+API transport so each request gets the current Clerk token. A successful page
+render or an anonymous API health check does not establish that recipient
+discovery works for a signed-in user. The production acceptance check includes
+both sides of a real linked guardian and approved responder conversation.
+
 ## Access and API contract
 
 The server resolves the selected site from the authenticated request. Every
