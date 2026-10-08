@@ -125,14 +125,14 @@ describeIfDb("notice guardian eligibility in the identity schema", () => {
           `);
           await tx.$executeRawUnsafe(`
             INSERT INTO "GuardianChildRelationship"
-              ("id", "tenantId", "guardianIdentityId", "childId", "legalAccess", "startsAt", "endedAt", "revokedAt") VALUES
-              ('${id()}', '${tenantId}', '${guardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL, NULL),
-              ('${id()}', '${tenantId}', '${endedId}', '${childId}', 'FULL', now() - interval '2 days', now() - interval '1 day', NULL),
-              ('${id()}', '${tenantId}', '${noneId}', '${childId}', 'NONE', now() - interval '2 days', NULL, NULL),
-              ('${id()}', '${tenantId}', '${limitedId}', '${childId}', 'LIMITED', now() - interval '2 days', NULL, NULL),
-              ('${id()}', '${tenantId}', '${revokedId}', '${childId}', 'FULL', now() - interval '2 days', NULL, now() - interval '1 day'),
-              ('${id()}', '${tenantId}', '${guestId}', '${guestChildId}', 'FULL', now() - interval '2 days', NULL, NULL),
-              ('${id()}', '${tenantId}', '${studentGuardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL, NULL)
+              ("id", "tenantId", "guardianIdentityId", "childId", "legalAccess", "startsAt", "endedAt", "revokedAt", "revokedByUserId", "revocationReason") VALUES
+              ('${id()}', '${tenantId}', '${guardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${endedId}', '${childId}', 'FULL', now() - interval '2 days', now() - interval '1 day', NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${noneId}', '${childId}', 'NONE', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${limitedId}', '${childId}', 'LIMITED', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${revokedId}', '${childId}', 'FULL', now() - interval '2 days', NULL, now() - interval '1 day', '${staffUserId}', 'Probe'),
+              ('${id()}', '${tenantId}', '${guestId}', '${guestChildId}', 'FULL', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${studentGuardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL, NULL, NULL, NULL)
           `);
           await tx.$executeRawUnsafe(`
             INSERT INTO "StudentIdentity" ("id", "tenantId", "userId")
