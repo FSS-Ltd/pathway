@@ -68,3 +68,25 @@ export async function approveGuardianAccess(
     );
   }
 }
+
+export async function revokeGuardianAccess(
+  parentId: string,
+  childId: string,
+  reason: string,
+): Promise<void> {
+  if (isUsingMockApi()) {
+    throw new Error("Guardian access review requires a live API.");
+  }
+  const response = await apiFetch(reviewUrl(parentId, childId), {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    body: JSON.stringify({ reason: reason.trim() }),
+  });
+  if (!response.ok) {
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to revoke guardian access.",
+    );
+  }
+}

@@ -50,6 +50,7 @@ function setup() {
     guardianChildRelationship: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({ id: "relationship-a" }),
+      update: jest.fn().mockResolvedValue({ id: "relationship-a" }),
     },
     userTenantRole: { upsert: jest.fn().mockResolvedValue({ id: "role-a" }) },
   };
@@ -221,6 +222,76 @@ describe("school-reviewed guardian access", () => {
       ),
     ).resolves.toEqual({ id: "existing", childId, created: false });
     expect(tx.guardianChildRelationship.create).not.toHaveBeenCalled();
+    expect(recordAuditEventInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("revokes and audits only the active relationship at the selected site", async () => {
+    const { tx, service } = setup();
+    tx.guardianChildRelationship.findFirst.mockResolvedValue({
+      id: "relationship-a",
+    });
+
+    const result = await service.revoke(
+      tenantId,
+      orgId,
+      actorId,
+      parentId,
+      childId,
+      "Court order reviewed",
+    );
+
+    expect(result).toEqual({
+      id: "relationship-a",
+      childId,
+      revokedAt: expect.any(Date),
+    });
+    expect(tx.guardianChildRelationship.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId,
+        childId,
+        child: { tenantId, tenant: { orgId } },
+        guardianIdentity: { tenantId, userId: parentId },
+        legalAccess: "FULL",
+        startsAt: { lte: expect.any(Date) },
+        endedAt: null,
+        revokedAt: null,
+      },
+      select: { id: true },
+    });
+    expect(tx.guardianChildRelationship.update).toHaveBeenCalledWith({
+      where: { id: "relationship-a" },
+      data: {
+        revokedAt: result.revokedAt,
+        revokedByUserId: actorId,
+        revocationReason: "Court order reviewed",
+      },
+    });
+    expect(recordAuditEventInTransaction).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        entityId: "relationship-a",
+        metadata: expect.objectContaining({
+          kind: "GUARDIAN_ACCESS_REVOKED",
+          parentUserId: parentId,
+          childId,
+        }),
+      }),
+    );
+  });
+
+  it("rejects a relationship that is not active in the selected site", async () => {
+    const { tx, service } = setup();
+    await expect(
+      service.revoke(
+        tenantId,
+        orgId,
+        actorId,
+        parentId,
+        childId,
+        "Court order reviewed",
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.guardianChildRelationship.update).not.toHaveBeenCalled();
     expect(recordAuditEventInTransaction).not.toHaveBeenCalled();
   });
 });

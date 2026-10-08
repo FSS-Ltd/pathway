@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -23,6 +24,10 @@ const approvalSchema = z
     reviewBasis: z.enum(["SCHOOL_RECORDS", "LEGAL_DOCUMENT"]),
     confirmedLegalAccess: z.literal(true),
   })
+  .strict();
+
+const revocationSchema = z
+  .object({ reason: z.string().trim().min(10).max(500) })
   .strict();
 
 interface AuthenticatedRequest extends Request {
@@ -76,6 +81,34 @@ export class GuardianAccessReviewController {
       parentId,
       childId,
       parsed.data.reviewBasis,
+    );
+  }
+
+  @Delete(":childId")
+  async revoke(
+    @Param("parentId") parentId: string,
+    @Param("childId") childId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+    @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+  ) {
+    const parsed = revocationSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    const actorUserId = await assertOrgAdminAccess(
+      request.authUserId,
+      orgId,
+      "revoke guardian access",
+    );
+    return this.service.revoke(
+      tenantId,
+      orgId,
+      actorUserId,
+      parentId,
+      childId,
+      parsed.data.reason,
     );
   }
 }

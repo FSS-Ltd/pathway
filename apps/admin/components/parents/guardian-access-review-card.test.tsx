@@ -56,6 +56,14 @@ async function run(): Promise<void> {
       approved = true;
       return response({ id: "relationship-a", childId: "child-a" });
     }
+    if (init?.method === "DELETE") {
+      assert.equal(url.pathname.endsWith("/child-a"), true);
+      assert.deepEqual(JSON.parse(String(init.body)), {
+        reason: "Legal access withdrawn",
+      });
+      approved = false;
+      return response({ id: "relationship-a", childId: "child-a" });
+    }
     return response({
       parentId: "parent-a",
       hasVerifiedSignIn: signedIn,
@@ -106,6 +114,31 @@ async function run(): Promise<void> {
     await act(async () => approveButton.click());
     assert.equal(approvals, 1);
     assert.match(container.textContent ?? "", /Full access approved/);
+
+    const revokeButton = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.includes("Revoke access"),
+    );
+    assert.ok(revokeButton);
+    await act(async () => revokeButton.click());
+    const confirmRevocation = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.includes("Confirm revocation"),
+    );
+    assert.ok(confirmRevocation?.disabled);
+    const reason = container.querySelector<HTMLTextAreaElement>("textarea");
+    assert.ok(reason);
+    const setter = Object.getOwnPropertyDescriptor(
+      dom.window.HTMLTextAreaElement.prototype,
+      "value",
+    )?.set;
+    assert.ok(setter);
+    await act(async () => {
+      setter.call(reason, "Legal access withdrawn");
+      reason.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    });
+    assert.equal(confirmRevocation.disabled, false);
+    await act(async () => confirmRevocation.click());
+    assert.doesNotMatch(container.textContent ?? "", /Full access approved/);
+    assert.match(container.textContent ?? "", /Review access/);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;
