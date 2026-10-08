@@ -30,6 +30,7 @@ import {
 import { MessagingService } from "./messaging.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingCommandService } from "./messaging-command.service";
+import { StaffSchoolTeamHistoryService } from "./staff-school-team-history.service";
 import { StaffSchoolTeamService } from "./staff-school-team.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
@@ -40,6 +41,7 @@ export class MessagingController {
     private readonly conversations: MessagingConversationService,
     private readonly commands: MessagingCommandService,
     private readonly schoolTeam: StaffSchoolTeamService,
+    private readonly schoolTeamHistory: StaffSchoolTeamHistoryService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -110,6 +112,22 @@ export class MessagingController {
   async messages(@Param("id") id: string, @Query() query: unknown) {
     try {
       return await this.service.listStaffMessages(
+        this.actor(),
+        await conversationIdSchema.parseAsync(id),
+        await messageQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Get("school-team/:id/messages")
+  @RequirePermission("messaging.messages.read")
+  async schoolTeamMessages(@Param("id") id: string, @Query() query: unknown) {
+    try {
+      return await this.schoolTeamHistory.list(
         this.actor(),
         await conversationIdSchema.parseAsync(id),
         await messageQuerySchema.parseAsync(query),

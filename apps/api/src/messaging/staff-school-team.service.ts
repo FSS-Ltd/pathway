@@ -1,21 +1,16 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { ConversationQuery } from "./dto/messaging-query.dto";
 import {
   decodeConversationCursor,
   encodeConversationCursor,
 } from "./messaging-cursor";
-import {
-  assertMessagingActor,
-  requireCurrentStaff,
-  type MessagingActor,
-} from "./messaging-access";
+import { assertMessagingActor, type MessagingActor } from "./messaging-access";
 import { unreadCountsForConversations } from "./messaging-unread-count";
-import { parentResponderWhere } from "./parent-message-responder";
+import {
+  requireStaffSchoolTeamAccess,
+  staffSchoolTeamConversationScope,
+} from "./staff-school-team-access";
 
 const DEFAULT_LIMIT = 20;
 const VIEW = "school-team-conversations";
@@ -40,73 +35,12 @@ export class StaffSchoolTeamService {
     const limit = query.limit ?? DEFAULT_LIMIT;
 
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireCurrentStaff(tx, actor);
       const now = new Date();
-      const [site, responder] = await Promise.all([
-        tx.tenant.findFirst({
-          where: {
-            id: actor.tenantId,
-            orgId: actor.orgId,
-            org: { parentPortalEnabled: true },
-          },
-          select: { id: true },
-        }),
-        tx.siteMembership.findFirst({
-          where: parentResponderWhere(
-            actor.orgId,
-            actor.tenantId,
-            now,
-            actor.userId,
-          ),
-          select: { id: true },
-        }),
-      ]);
-      if (!site || !responder) {
-        throw new NotFoundException("Conversations not found");
-      }
+      await requireStaffSchoolTeamAccess(tx, actor, now);
 
       const rows = await tx.messageConversation.findMany({
         where: {
-          tenantId: actor.tenantId,
-          kind: "PARENT_STAFF",
-          guardianIdentity: {
-            is: {
-              tenantId: actor.tenantId,
-              user: {
-                isActive: true,
-                studentIdentities: { none: { tenantId: actor.tenantId } },
-              },
-              relationships: {
-                some: {
-                  tenantId: actor.tenantId,
-                  legalAccess: "FULL",
-                  startsAt: { lte: now },
-                  endedAt: null,
-                  revokedAt: null,
-                  child: { tenantId: actor.tenantId, isGuest: false },
-                },
-              },
-            },
-          },
-          participants: {
-            some: {
-              tenantId: actor.tenantId,
-              userId: actor.userId,
-              kind: "STAFF",
-              removedAt: null,
-            },
-          },
-          AND: [
-            {
-              participants: {
-                some: {
-                  tenantId: actor.tenantId,
-                  kind: "GUARDIAN",
-                  removedAt: null,
-                },
-              },
-            },
-          ],
+          ...staffSchoolTeamConversationScope(actor, now),
           ...(cursor
             ? {
                 OR: [
