@@ -1520,14 +1520,7 @@ export async function fetchPublicSignupLinkForCurrentSite(): Promise<AdminPublic
     cache: "no-store",
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      res.status === 403
-        ? "You don’t have permission to manage the parent signup link for this site."
-        : res.status === 400
-          ? "Active site context required. Select a site first."
-          : `Failed to load signup link: ${res.status}${body ? ` ${body}` : ""}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to load signup link.");
   }
   return (await res.json()) as AdminPublicSignupLink;
 }
@@ -1546,14 +1539,7 @@ export async function rotatePublicSignupLinkForCurrentSite(): Promise<AdminPubli
     cache: "no-store",
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      res.status === 403
-        ? "You don’t have permission to manage the parent signup link for this site."
-        : res.status === 400
-          ? "Active site context required. Select a site first."
-          : `Failed to rotate signup link: ${res.status}${body ? ` ${body}` : ""}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to regenerate link.");
   }
   return (await res.json()) as AdminPublicSignupLink;
 }
@@ -2129,10 +2115,7 @@ export async function fetchSessions(): Promise<AdminSessionRow[]> {
   });
 
   if (!res.ok) {
-    const body = await res.text();
-    throw new Error(
-      `Failed to load sessions (${res.status}): ${body || res.statusText}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to load sessions.");
   }
 
   type ApiSession = {
@@ -3582,10 +3565,7 @@ export async function fetchAnnouncements(): Promise<AdminAnnouncementRow[]> {
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch announcements: ${res.status} ${body || res.statusText}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to load announcements.");
   }
 
   const json = (await res.json()) as ApiAnnouncement[];
