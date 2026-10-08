@@ -89,7 +89,7 @@ async function run(): Promise<void> {
     );
     if (url.pathname.endsWith("/read-cursor")) {
       readCursorSaved = true;
-      return jsonResponse({ lastReadSequence: 2 });
+      return jsonResponse({ lastReadSequence: 3 });
     }
     if (url.pathname.endsWith("/recipients")) {
       const search = url.searchParams.get("search") ?? "";
@@ -139,7 +139,7 @@ async function run(): Promise<void> {
             id: "f5932f74-570c-4c22-a9bc-4d221883430e",
             conversationId,
             clientRequestId: body.clientRequestId,
-            sequence: 3,
+            sequence: 4,
             body: body.body,
             createdAt: "2026-10-07T10:02:00.000Z",
             reused: true,
@@ -153,11 +153,19 @@ async function run(): Promise<void> {
         items: [
           {
             id: "message-2",
-            sequence: 2,
+            sequence: 3,
             body: "Good morning",
             createdAt: date,
             sender: { id: staffId, displayName: "You" },
             recipientRead: true,
+          },
+          {
+            id: "message-1b",
+            sequence: 2,
+            body: "How are you?",
+            createdAt: date,
+            sender: { id: peerId, displayName: "Sam" },
+            recipientRead: null,
           },
           {
             id: "message-1",
@@ -205,11 +213,22 @@ async function run(): Promise<void> {
     await act(async () => conversationButton.click());
     assert.doesNotMatch(container.textContent ?? "", /unread message/);
     assert.match(container.textContent ?? "", /Welcome/);
+    assert.match(container.textContent ?? "", /How are you\?/);
     assert.match(container.textContent ?? "", /Good morning/);
     assert.match(container.querySelector("ol")?.textContent ?? "", /Read/);
     assert.equal(
       container.querySelectorAll('ol[aria-live="polite"] li').length,
-      2,
+      3,
+    );
+    assert.equal(
+      container.querySelectorAll('ol p[aria-hidden="true"]').length,
+      1,
+      "consecutive incoming messages show the sender once",
+    );
+    assert.equal(
+      container.querySelectorAll("ol time.sr-only").length,
+      1,
+      "the grouped message time remains available to assistive technology",
     );
     assert.equal(
       container.querySelector("textarea")?.getAttribute("aria-label"),

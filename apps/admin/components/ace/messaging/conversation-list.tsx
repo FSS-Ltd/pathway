@@ -3,6 +3,7 @@
 import React from "react";
 import { Button } from "@pathway/ui";
 import type { StaffConversation } from "@/lib/ace-messaging-api";
+import { ConversationAvatar } from "./conversation-avatar";
 import { useStaffMessaging } from "./use-staff-messaging";
 
 type MessagingState = ReturnType<typeof useStaffMessaging>;
@@ -83,25 +84,14 @@ function ConversationRow({
   selected: boolean;
   onSelect: () => void;
 }) {
-  const initials = conversation.title
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
   return (
     <button
       type="button"
       aria-current={selected ? "true" : undefined}
       onClick={onSelect}
-      className={`flex min-h-20 w-full items-center gap-3 px-4 py-3 text-left transition-colors motion-reduce:transition-none hover:bg-muted focus-visible:z-10 ${selected ? "bg-accent-subtle" : ""}`}
+      className={`flex min-h-20 w-full items-center gap-3 border-l-[3px] px-4 py-3 text-left transition-colors motion-reduce:transition-none hover:bg-muted focus-visible:z-10 ${selected ? "border-teal-700 bg-accent-subtle" : "border-transparent"}`}
     >
-      <span
-        aria-hidden="true"
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-primary/15 font-heading text-sm font-bold text-accent-strong"
-      >
-        {initials || "S"}
-      </span>
+      <ConversationAvatar title={conversation.title} />
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline justify-between gap-2">
           <span className="truncate font-semibold text-text-primary">
@@ -119,7 +109,7 @@ function ConversationRow({
             {conversation.latestMessage?.preview || "No messages yet"}
           </span>
           {conversation.unreadCount > 0 ? (
-            <span className="flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-accent-strong px-1.5 text-xs font-semibold text-white">
+            <span className="flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-teal-700 px-1.5 text-xs font-semibold text-white">
               <span aria-hidden="true">
                 {conversation.unreadCount > 99
                   ? "99+"
