@@ -17,7 +17,7 @@ import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import {
-  createStaffDirectConversationSchema,
+  createStaffConversationSchema,
   sendStaffMessageSchema,
 } from "./dto/messaging-command.dto";
 import {
@@ -61,10 +61,11 @@ export class MessagingController {
   @RequirePermission("messaging.conversations.create")
   async create(@Body() body: unknown) {
     try {
-      return await this.conversations.openStaffDirect(
-        this.actor(),
-        await createStaffDirectConversationSchema.parseAsync(body),
-      );
+      const input = await createStaffConversationSchema.parseAsync(body);
+      if (input.kind === "STAFF_ROOM") {
+        return await this.conversations.openStaffRoom(this.actor());
+      }
+      return await this.conversations.openStaffDirect(this.actor(), input);
     } catch (error) {
       if (error instanceof z.ZodError)
         throw new BadRequestException(error.flatten());

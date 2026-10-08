@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import {
   Prisma,
   prisma,
@@ -1335,6 +1339,109 @@ describe("ACE parent/staff messaging and notices storage", () => {
         recipientUserId: fixture.tenantBOnlyUserId,
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("opens one site staff room and reconciles current participants", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const service = new MessagingConversationService();
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const staffB = { ...actor, userId: fixture.staffBId };
+    const [first, second] = await Promise.all([
+      service.openStaffRoom(actor),
+      service.openStaffRoom(staffB),
+    ]);
+    expect(first.id).toBe(second.id);
+    expect([first.created, second.created].sort()).toEqual([false, true]);
+
+    const activeParticipants = () =>
+      withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        tx.messageParticipant.findMany({
+          where: {
+            tenantId: fixture.tenantAId,
+            conversationId: first.id,
+            removedAt: null,
+          },
+          select: { userId: true },
+          orderBy: { userId: "asc" },
+        }),
+      );
+    expect((await activeParticipants()).map((item) => item.userId)).toEqual(
+      [fixture.staffAId, fixture.staffBId, fixture.staffCId].sort(),
+    );
+    expect(
+      await prisma.auditEvent.count({
+        where: {
+          orgId: fixture.orgAId,
+          entityType: "ACE_MESSAGE",
+          entityId: first.id,
+          action: "CREATED",
+        },
+      }),
+    ).toBe(1);
+
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+      tx.siteMembership.delete({
+        where: {
+          tenantId_userId: {
+            tenantId: fixture.tenantAId,
+            userId: fixture.staffCId,
+          },
+        },
+      }),
+    );
+    await expect(service.openStaffRoom(actor)).resolves.toEqual({
+      id: first.id,
+      kind: "STAFF_ROOM",
+      created: false,
+    });
+    expect((await activeParticipants()).map((item) => item.userId)).toEqual(
+      [fixture.staffAId, fixture.staffBId].sort(),
+    );
+    await expect(
+      service.openStaffRoom({ ...actor, userId: fixture.staffCId }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      new MessagingCommandService().sendStaffMessage(actor, first.id, {
+        clientRequestId: randomUUID(),
+        body: "Current team only",
+      }),
+    ).resolves.toMatchObject({ conversationId: first.id, reused: false });
+
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+      tx.siteMembership.create({
+        data: { tenantId: fixture.tenantAId, userId: fixture.staffCId },
+      }),
+    );
+    await service.openStaffRoom(actor);
+    expect((await activeParticipants()).map((item) => item.userId)).toEqual(
+      [fixture.staffAId, fixture.staffBId, fixture.staffCId].sort(),
+    );
+    expect(
+      await prisma.auditEvent.count({
+        where: {
+          orgId: fixture.orgAId,
+          entityType: "ACE_MESSAGE",
+          entityId: first.id,
+          action: "UPDATED",
+        },
+      }),
+    ).toBe(2);
+
+    await expect(
+      service.openStaffRoom({
+        tenantId: fixture.tenantBId,
+        orgId: fixture.orgBId,
+        userId: fixture.staffCId,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.openStaffRoom({ ...actor, userId: fixture.studentUserId }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("discovers only eligible same-site staff through the tenant query", async () => {
