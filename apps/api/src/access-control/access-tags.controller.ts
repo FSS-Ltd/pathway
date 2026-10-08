@@ -13,6 +13,7 @@ import {
 import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
+import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
 import { AccessTagsService } from "./access-tags.service";
 import {
   accessTagGrantDto,
@@ -26,6 +27,7 @@ import { getOrCreateRequestId, type RequestWithRequestId } from "./request-id";
 import type { RoleActorContext } from "./roles.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
+@IndependentTransaction()
 @Controller("access/tags")
 export class AccessTagsController {
   constructor(
