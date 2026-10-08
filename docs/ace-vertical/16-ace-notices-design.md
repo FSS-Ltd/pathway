@@ -32,9 +32,15 @@ repurpose or migrate existing announcements silently.
   site membership. Students cannot publish or receive this notice audience.
 - Parent reads use the fixed Parent relationship template plus a current
   **full-access**, non-guest guardian-child relationship in the selected site
-  and the enabled parent portal. Add `notices.read` to the protected Parent
-  template in its own reviewed step. A site membership alone never grants
-  parent notice access; a guardian link alone never grants staff access.
+  and the enabled parent portal. Add the ACE-only, relationship-scoped
+  `ace.parent.notices.read` permission to the protected Parent template in its
+  own reviewed step. The existing `notices.read` key is site-scoped and cannot
+  seed onto a relationship role; changing its scope would widen access to the
+  product-wide `/announcements` API. The parent notice route checks its own
+  permission, active definition, portal, site, guardian link, and recipient
+  snapshot. A site membership alone never grants parent notice access; a
+  guardian link alone never grants staff access. The new key grants no access
+  to `/announcements` or to Clubs notices.
 - At publication, resolve eligible current staff and full-access guardians
   inside the selected site and insert one audience member per user. `PARENTS`,
   `STAFF`, and `PARENTS_AND_STAFF` are the only audience choices. For a user
@@ -95,7 +101,7 @@ readers' private details by default.
 | Draft                | Site-scoped create, edit, and bounded draft list. Typed `notices.manage`; validate title/body/audience/expiry and optimistic revision.                                            |
 | Publish and withdraw | Separate audited commands under `notices.publish`, with transaction-level RLS and locked recipient resolution. Return 409 on a stale draft or changed audience eligibility.       |
 | Staff inbox          | Bounded signed cursor and detail for active published notices with the caller's current staff membership and `notices.read`; `PARENTS` is excluded.                               |
-| Parent inbox         | Explicit site route and bounded cursor under fixed Parent access, enabled portal, full guardian link, and a matching recipient snapshot; `STAFF` is excluded.                     |
+| Parent inbox         | Explicit site route and bounded cursor under `ace.parent.notices.read`, enabled portal, full guardian link, and a matching recipient snapshot; `STAFF` is excluded.               |
 | Read receipt         | Idempotent current-recipient command, returning the caller's receipt only. Deny guessed IDs, expired/withdrawn notices, ended links, and cross-site writes.                       |
 | Attachments          | Private tenant/notice keys, short-lived upload and download grants, file type and byte checks, stored hash, no public URL, and the same current audience check on every download. |
 | Email                | Outbox worker after commit, one notification per user, opt-out checks, retry and failure audit; email failures do not roll back published in-app notices.                         |
@@ -122,10 +128,11 @@ unique audience and receipt constraints under concurrent requests. Verify
 that no paid entitlement is activated by a notice tag and that Clubs notices
 remain behind Clubs entitlement.
 
-Implement the additive lifecycle/RLS migration, permission template, draft
-and publish API, reader API and receipts, web screens, then attachments and
-email in separate gated PRs. Each PR starts from freshly fetched GitHub
-`master`, passes the exact-head CI gate, and merges before the next begins.
+Implement the additive lifecycle/RLS migration, relationship permission and
+template, draft and publish API, reader API and receipts, web screens, then
+attachments and email in separate gated PRs. Each PR starts from freshly
+fetched GitHub `master`, passes the exact-head CI gate, and merges before the
+next begins.
 Run authenticated staff/parent/staff-parent browser journeys against an
 isolated staging database before a manual production release. If a phase
 fails, disable its new entry point or revert its app release. Keep published
