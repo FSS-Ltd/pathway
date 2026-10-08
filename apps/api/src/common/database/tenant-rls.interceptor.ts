@@ -1,6 +1,7 @@
 import {
   CallHandler,
   ExecutionContext,
+  Inject,
   Injectable,
   NestInterceptor,
 } from "@nestjs/common";
@@ -22,7 +23,7 @@ interface RequestWithContext {
  */
 @Injectable()
 export class TenantRlsInterceptor implements NestInterceptor {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(@Inject(Reflector) private readonly reflector: Reflector) {}
 
   intercept(context: ExecutionContext, next: CallHandler) {
     if (
