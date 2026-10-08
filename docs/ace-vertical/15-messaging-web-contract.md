@@ -49,6 +49,7 @@ or message metadata in a denial.
 | `GET /ace/messages/conversations?cursor=&limit=`                                   | `messaging.conversations.read`                                                 | Only conversations where the caller is an active participant in the selected site; bounded, newest-first page.                                                           |
 | `GET /ace/messages/conversations/school-team?cursor=&limit=`                       | `messaging.conversations.read`                                                 | Separate bounded parent-thread inbox for a current approved staff responder in the selected site, while the parent portal and full guardian link remain active.          |
 | `GET /ace/messages/conversations/school-team/:id/messages?before=&limit=`          | `messaging.messages.read`                                                      | Bounded newest-first history for the same current responder and active guardian thread; reading never advances a cursor or claims a parent read receipt.                 |
+| `PUT /ace/messages/conversations/school-team/:id/read-cursor`                      | `messaging.messages.read`                                                      | Advance only the current staff responder's cursor to an existing message sequence in their active parent thread; never move it backward.                                 |
 | `GET /ace/parent/sites/:siteId/messages/conversations`                             | `messaging.conversations.read` from the fixed Parent template                  | Active full guardian relationship and participant in the requested site; parent portal enabled; at most one school-team thread.                                          |
 | `GET /ace/parent/sites/:siteId/messages/conversations/recipients?search=&limit=`   | `messaging.conversations.create` from the fixed Parent template                | Current same-site staff with an active fixed Head/Lead role or parent-message-responder tag; return at most 20 names and IDs.                                            |
 | `POST /ace/parent/sites/:siteId/messages/conversations`                            | `messaging.conversations.create` from the fixed Parent template                | Parent selects a current approved responder; open one audited `PARENT_STAFF` thread for the guardian or reuse it without changing responders.                            |
@@ -200,6 +201,13 @@ before reading messages. Pages are bounded by sequence and expose only the
 body, time and sender display name. They do not advance a read cursor or
 report a parent read receipt. Staff read-cursor, reply and web entry remain
 separate steps.
+
+Step 1.3e4i adds an explicit staff read cursor for school-team threads. The
+write rechecks the same current responder, parent portal, full guardian link,
+and active participants as the inbox and history routes. It accepts only an
+existing sequence in that thread and uses the shared forward-only cursor
+write. It does not expose a parent read receipt. Staff replies and web entry
+remain separate steps.
 
 Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive
 conversation list and thread, paged history, explicit read cursor, and a
