@@ -22,8 +22,8 @@ staff direct and room message sending, and step 1.3e2c adds site staffroom
 opening. Step 1.3e2d adds its web control, step 1.3e4a adds a read-only
 parent conversation list, step 1.3e4b adds read-only parent message history,
 step 1.3e4d adds parent responder discovery and school-team creation, and
-step 1.3e4e adds parent message sending. The parent web journey remains
-pending. The existing
+step 1.3e4e adds parent message sending. Step 1.3e4f adds the parent web
+school-team journey. The existing
 `PARENT_STAFF` uniqueness constraint
 allows **one conversation per guardian identity per site**, so the first web
 journey is a school-team conversation, not one separate thread per staff
@@ -170,8 +170,16 @@ responders. The request uses the same bounded body and stable client request
 ID as staff sending. Matching retries reuse the first message; a changed body
 with the same ID is rejected. New messages deliver only to current approved
 responders and are audited without storing plaintext in the audit record.
-Parent web access and staff replies to the school-team thread remain later
-slices.
+Step 1.3e4f adds `/ace/parent/sites/:siteId/messages` for a linked parent.
+The family landing shows one school-message entry per linked site. The web
+screen lists the existing school-team thread or discovers current approved
+responders to open one, then loads bounded history, advances the explicit
+read cursor, and sends with a stable retry ID. It preserves a failed draft,
+shows a sent bubble only after the API confirms it, clears site-specific
+content on a site change, and shows an access-ended state for denied sites.
+The parent history API does not supply staff read receipts, so the latest
+outgoing bubble says “Sent” after confirmation and never claims “Read”.
+Staff replies to school-team threads and notices remain later slices.
 
 Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive
 conversation list and thread, paged history, explicit read cursor, and a
@@ -247,12 +255,17 @@ dependency or a claim that this web screen is an Apple platform screen.
    duplicate send, concurrent sequence allocation, and denied ID probes.
 2. Staff web: list, select, send, read feedback, and direct/room journeys with
    loading/error/empty states; browser tests at wide and compact widths.
-3. Parent web: school-team thread and composer only after responder assignment
-   is enforced; browser tests for linked and unlinked family accounts.
+3. Parent web: the school-team thread and composer use the current approved
+   responder and guardian checks. The DOM journey covers a linked family,
+   responder discovery, failed-send retry, site switch, and denied site. An
+   authenticated cross-persona browser journey remains a release check.
 4. Notices: separate audience, publish, list, and receipt API/web slices. Do
    not mark C12 complete until notice read state and denied audiences work.
 
-Each item needs its own PR and merge gate. Mobile screen equivalents and
-acceptance tests are documented after web parity; this step changes no Expo
-screen. Production smoke testing follows the separate release and database
-cutover gates.
+Each item needs its own PR and merge gate. The mobile follow-up needs a
+site-scoped family messages entry, approved-responder picker, school-team
+thread, read-cursor action, and labelled composer. Acceptance tests must cover
+linked and ended guardians, site switching, send retry with one request ID,
+and no false read receipt. Mobile work starts after web parity; this step
+changes no Expo screen. Production smoke testing follows the separate release
+and database cutover gates.

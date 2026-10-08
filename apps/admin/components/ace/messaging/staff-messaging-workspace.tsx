@@ -119,6 +119,7 @@ export function StaffMessagingWorkspace({
               currentUserId={currentUserId}
               canSend={canSend}
               messaging={messaging}
+              onBack={() => messaging.select(null)}
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">

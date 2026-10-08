@@ -4,9 +4,24 @@ import * as React from "react";
 import { Button } from "@pathway/ui";
 import type { StaffConversation, StaffMessage } from "@/lib/ace-messaging-api";
 import { ConversationAvatar } from "./conversation-avatar";
-import { useStaffMessaging } from "./use-staff-messaging";
 
-type MessagingState = ReturnType<typeof useStaffMessaging>;
+export type MessageDetailState = {
+  messages: StaffMessage[];
+  nextBefore: number | null;
+  threadLoading: boolean;
+  threadError: string | null;
+  threadMoreLoading: boolean;
+  draft: string;
+  sending: boolean;
+  sendError: string | null;
+  loadOlderMessages: () => Promise<void>;
+  retryThread: () => void;
+  changeDraft: (value: string) => void;
+  send: () => Promise<void>;
+};
+type ConversationIdentity = Pick<StaffConversation, "id" | "title"> & {
+  kind: StaffConversation["kind"] | "PARENT_STAFF";
+};
 const shortTime = new Intl.DateTimeFormat("en-GB", { timeStyle: "short" });
 const shortDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" });
 
@@ -15,11 +30,15 @@ export function ConversationDetail({
   currentUserId,
   canSend,
   messaging,
+  onBack,
+  composerId = "staff-message-draft",
 }: {
-  conversation: StaffConversation;
+  conversation: ConversationIdentity;
   currentUserId: string;
   canSend: boolean;
-  messaging: MessagingState;
+  messaging: MessageDetailState;
+  onBack?: () => void;
+  composerId?: string;
 }) {
   const endRef = React.useRef<HTMLDivElement>(null);
   const latestSequence = messaging.messages.at(-1)?.sequence;
@@ -30,14 +49,16 @@ export function ConversationDetail({
   return (
     <>
       <header className="flex items-center gap-3 border-b border-border-subtle bg-surface/95 px-4 py-3 sm:px-6">
-        <button
-          type="button"
-          onClick={() => messaging.select(null)}
-          className="min-h-11 rounded-lg px-2 text-sm font-medium text-teal-700 md:hidden"
-          aria-label="Back to conversations"
-        >
-          ‹ Back
-        </button>
+        {onBack ? (
+          <button
+            type="button"
+            onClick={onBack}
+            className="min-h-11 rounded-lg px-2 text-sm font-medium text-teal-700 md:hidden"
+            aria-label="Back to conversations"
+          >
+            ‹ Back
+          </button>
+        ) : null}
         <ConversationAvatar title={conversation.title} />
         <div className="min-w-0">
           <h2 className="truncate font-heading text-lg font-semibold text-text-primary">
@@ -46,7 +67,9 @@ export function ConversationDetail({
           <p className="text-xs text-text-muted">
             {conversation.kind === "STAFF_ROOM"
               ? "Staff room"
-              : "Direct staff conversation"}
+              : conversation.kind === "PARENT_STAFF"
+                ? "Your school team"
+                : "Direct staff conversation"}
           </p>
         </div>
       </header>
@@ -105,7 +128,11 @@ export function ConversationDetail({
         <div ref={endRef} />
       </div>
 
-      <MessageComposer canSend={canSend} messaging={messaging} />
+      <MessageComposer
+        canSend={canSend}
+        messaging={messaging}
+        composerId={composerId}
+      />
     </>
   );
 }
@@ -213,9 +240,11 @@ function MessageList({
 function MessageComposer({
   canSend,
   messaging,
+  composerId,
 }: {
   canSend: boolean;
-  messaging: MessagingState;
+  messaging: MessageDetailState;
+  composerId: string;
 }) {
   if (!canSend) {
     return (
@@ -237,12 +266,12 @@ function MessageComposer({
         void messaging.send();
       }}
     >
-      <label htmlFor="staff-message-draft" className="sr-only">
+      <label htmlFor={composerId} className="sr-only">
         Message
       </label>
       <div className="flex items-end gap-3 rounded-[1.75rem] border border-border-strong bg-surface p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-status-info">
         <textarea
-          id="staff-message-draft"
+          id={composerId}
           value={messaging.draft}
           onChange={(event) => messaging.changeDraft(event.target.value)}
           onKeyDown={(event) => {
