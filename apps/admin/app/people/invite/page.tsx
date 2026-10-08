@@ -5,19 +5,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button, Card, Input, Label, Select } from "@pathway/ui";
 import { Checkbox } from "../../../components/ui/checkbox";
+import { useAdminContext } from "@/lib/admin-context";
 import {
   createInvite,
-  fetchActiveSiteState,
   type CreateInvitePayload,
 } from "../../../lib/api-client";
 import { useAdminAccess } from "../../../lib/use-admin-access";
 import { canAccessRoute } from "../../../lib/permissions";
 import { NoAccessCard } from "../../../components/no-access-card";
-
-const resolveOrgId = (activeSiteId: string | null, sites: Array<{ id: string; orgId: string }>) => {
-  const activeSite = sites.find((site) => site.id === activeSiteId) ?? sites[0];
-  return activeSite?.orgId ?? null;
-};
 
 const PRIMARY_HEX = "#0ec2a2";
 
@@ -71,6 +66,7 @@ function StyledRadio({
 export default function InvitePersonPage() {
   const router = useRouter();
   const pathname = usePathname() ?? "/people/invite";
+  const { state: adminState } = useAdminContext();
   const { role, isLoading: isLoadingAccess } = useAdminAccess();
   const [email, setEmail] = React.useState("");
   const [name, setName] = React.useState("");
@@ -84,11 +80,9 @@ export default function InvitePersonPage() {
     "SITE_ADMIN" | "STAFF" | "VIEWER" | ""
   >("");
   const [selectedSiteIds, setSelectedSiteIds] = React.useState<string[]>([]);
-  const [sites, setSites] = React.useState<
-    Array<{ id: string; name: string; orgId: string }>
-  >([]);
+  const sites = adminState.status === "ready" ? adminState.snapshot.sites : [];
   const [error, setError] = React.useState<string | null>(null);
-  const [orgId, setOrgId] = React.useState<string | null>(null);
+  const orgId = adminState.status === "ready" ? adminState.snapshot.activeOrgId : null;
   const [fieldErrors, setFieldErrors] = React.useState<{
     email?: string;
     orgRole?: string;
@@ -98,20 +92,6 @@ export default function InvitePersonPage() {
   const [submitting, setSubmitting] = React.useState(false);
 
   const canAccess = canAccessRoute(pathname, role);
-
-  React.useEffect(() => {
-    const loadOrg = async () => {
-      try {
-        const state = await fetchActiveSiteState();
-        const resolvedOrgId = resolveOrgId(state.activeSiteId, state.sites);
-        setOrgId(resolvedOrgId);
-        setSites(state.sites);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load active site");
-      }
-    };
-    void loadOrg();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,4 +376,3 @@ export default function InvitePersonPage() {
     </div>
   );
 }
-

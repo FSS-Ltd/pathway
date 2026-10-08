@@ -5,23 +5,16 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button, Card, Input, Label, Select, Textarea } from "@pathway/ui";
 import { ClassColorPicker } from "../../../components/class-color-picker";
+import { useAdminContext } from "@/lib/admin-context";
 import {
-  fetchActiveSiteState,
   createClass,
   type CreateClassPayload,
 } from "../../../lib/api-client";
 
-const resolveTenantId = (
-  activeSiteId: string | null,
-  sites: Array<{ id: string }>,
-) => {
-  const activeSite = sites.find((s) => s.id === activeSiteId) ?? sites[0];
-  return activeSite?.id ?? null;
-};
-
 export default function NewClassPage() {
   const router = useRouter();
-  const [tenantId, setTenantId] = React.useState<string | null>(null);
+  const { state: adminState } = useAdminContext();
+  const tenantId = adminState.status === "ready" ? adminState.snapshot.activeSiteId : null;
   const [form, setForm] = React.useState<CreateClassPayload>({
     name: "",
     minAge: null,
@@ -35,18 +28,6 @@ export default function NewClassPage() {
     Partial<Record<keyof CreateClassPayload, string>>
   >({});
   const [submitting, setSubmitting] = React.useState(false);
-
-  React.useEffect(() => {
-    const load = async () => {
-      try {
-        const state = await fetchActiveSiteState();
-        setTenantId(resolveTenantId(state.activeSiteId, state.sites));
-      } catch {
-        setError("Failed to load active site");
-      }
-    };
-    void load();
-  }, []);
 
   const handleChange = (
     key: keyof CreateClassPayload,
@@ -88,7 +69,7 @@ export default function NewClassPage() {
 
     setSubmitting(true);
     try {
-      const created = await createClass(tenantId, {
+      await createClass(tenantId, {
         name: form.name!.trim(),
         minAge: form.minAge ?? undefined,
         maxAge: form.maxAge ?? undefined,

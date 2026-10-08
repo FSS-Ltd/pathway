@@ -1,29 +1,19 @@
 "use client";
 
-/**
- * next-auth/react's useSession() shape, backed by Clerk. Kept deliberately
- * narrow to what the app actually reads (accessToken, user.id/name/email) -
- * see docs/auth-migration for the full audit. `roles` is intentionally
- * omitted: useAdminAccess() already fetches roles itself from
- * session.accessToken and only ever fell back to session.roles when the
- * token was missing, which can't happen here (status is only
- * "authenticated" once a token exists).
- *
- * Rewriting all ~45 call sites to Clerk's own hooks would be a much larger,
- * riskier diff than swapping the provider underneath this shim - see the
- * PR3 write-up for why this shape was chosen deliberately.
- */
+import React from "react";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { setApiClientToken, fetchMe } from "./api-client";
+import { fetchMe, setApiClientToken } from "./api-client";
+import { cancelApiReads, setApiTokenGetter } from "./api-transport";
 
 export type CompatSessionUser = {
   id: string;
@@ -32,102 +22,135 @@ export type CompatSessionUser = {
 };
 
 export type CompatSession = {
+  /** Legacy shape for consumers; the API transport always gets a current token. */
   accessToken: string;
   user: CompatSessionUser;
 };
 
-export type SessionStatus = "loading" | "authenticated" | "unauthenticated";
+export type SessionStatus =
+  | "loading"
+  | "authenticated"
+  | "unauthenticated"
+  | "error";
 
-type SessionContextValue = {
+export type SessionContextValue = {
   data: CompatSession | null;
   status: SessionStatus;
-  /** Re-resolves the internal user id/token. See fetchMe() in api-client.ts. */
+  error: string | null;
   update: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue>({
   data: null,
   status: "loading",
-  update: async () => {},
+  error: null,
+  update: async () => undefined,
 });
 
-/**
- * Resolves the Clerk session to the internal user id/token exactly once per
- * sign-in and broadcasts it via context, matching NextAuth's SessionProvider
- * caching behaviour (each page's own useSession() call would otherwise
- * re-fetch /auth/me independently).
- */
 export function SessionProvider({ children }: PropsWithChildren) {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
+  return (
+    <SessionRuntime
+      isLoaded={isLoaded}
+      isSignedIn={isSignedIn}
+      getToken={getToken}
+      identity={{
+        id: user?.id ?? null,
+        name: user?.fullName ?? user?.firstName ?? null,
+        email: user?.primaryEmailAddress?.emailAddress ?? null,
+      }}
+    >
+      {children}
+    </SessionRuntime>
+  );
+}
+
+type SessionRuntimeProps = PropsWithChildren<{
+  isLoaded: boolean;
+  isSignedIn: boolean | undefined;
+  getToken: () => Promise<string | null>;
+  identity: { id: string | null; name: string | null; email: string | null };
+}>;
+
+/** Clerk-facing adapter stays thin; the runtime can be verified with real React. */
+export function SessionRuntime({
+  children,
+  isLoaded,
+  isSignedIn,
+  getToken,
+  identity,
+}: SessionRuntimeProps) {
   const [session, setSession] = useState<CompatSession | null>(null);
   const [status, setStatus] = useState<SessionStatus>("loading");
+  const [error, setError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const activeIdentity = useRef<string | null | undefined>(undefined);
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+  const currentToken = useCallback(() => getTokenRef.current(), []);
+  const clerkUserId = identity.id;
+  const name = identity.name;
+  const email = identity.email;
 
   const resolve = useCallback(async () => {
+    const requestGeneration = ++generation.current;
+    const nextIdentity = isSignedIn ? clerkUserId : null;
+    if (activeIdentity.current !== nextIdentity) {
+      cancelApiReads();
+      activeIdentity.current = nextIdentity;
+    }
+    setSession(null);
+    setError(null);
+    setStatus("loading");
+    setApiClientToken(null);
+    setApiTokenGetter(null);
+
+    if (!isLoaded) return;
     if (!isSignedIn) {
-      setApiClientToken(null);
-      setSession(null);
       setStatus("unauthenticated");
       return;
     }
-
-    const token = await getToken();
-    if (!token) {
-      setApiClientToken(null);
-      setSession(null);
-      setStatus("unauthenticated");
-      return;
-    }
-
-    setApiClientToken(token);
-
-    const compatUser: CompatSessionUser = {
-      id: "",
-      name: user?.fullName ?? user?.firstName ?? null,
-      email: user?.primaryEmailAddress?.emailAddress ?? null,
-    };
 
     try {
+      const token = await currentToken();
+      if (!token) throw new Error("No session token is available.");
+      if (requestGeneration !== generation.current) return;
+      setApiTokenGetter(currentToken);
       const me = await fetchMe();
-      compatUser.id = me.userId;
-    } catch (err) {
-      // AuthUserGuard JIT-provisions on first verified request, so this
-      // should be transient at worst (e.g. a cold start). Surface the
-      // session anyway rather than stalling on "loading" forever -
-      // userId-dependent call sites already handle a missing id.
-      console.error("[SESSION] Failed to resolve internal user id:", err);
+      if (!me.userId?.trim())
+        throw new Error("Your account identity is unavailable.");
+      if (requestGeneration !== generation.current) return;
+      setApiClientToken(token);
+      setSession({ accessToken: token, user: { id: me.userId, name, email } });
+      setStatus("authenticated");
+    } catch {
+      if (requestGeneration !== generation.current) return;
+      setApiTokenGetter(null);
+      setApiClientToken(null);
+      setSession(null);
+      setError("Unable to verify your account. Please retry.");
+      setStatus("error");
     }
-
-    setSession({ accessToken: token, user: compatUser });
-    setStatus("authenticated");
-  }, [isSignedIn, getToken, user]);
+  }, [isLoaded, isSignedIn, currentToken, clerkUserId, name, email]);
 
   useEffect(() => {
-    if (!isLoaded) {
-      setStatus("loading");
-      return;
-    }
     void resolve();
-  }, [isLoaded, resolve]);
-
-  // Clerk session tokens are short-lived (default 60s) but resolve() above
-  // only runs once per sign-in, so the cached token in api-client.ts goes
-  // stale mid-session and every request after that 401s with an "exp"
-  // claim failure. Refresh it in the background well inside that window.
-  useEffect(() => {
-    if (!isSignedIn) return;
-    const interval = setInterval(() => {
-      void getToken().then((token: string | null) => setApiClientToken(token));
-    }, 30_000);
-    return () => clearInterval(interval);
-  }, [isSignedIn, getToken]);
+    return () => {
+      generation.current += 1;
+      setApiTokenGetter(null);
+      setApiClientToken(null);
+    };
+  }, [resolve, clerkUserId]);
 
   const value = useMemo(
-    () => ({ data: session, status, update: resolve }),
-    [session, status, resolve],
+    () => ({ data: session, status, error, update: resolve }),
+    [session, status, error, resolve],
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  );
 }
 
 export function useSession(): SessionContextValue {

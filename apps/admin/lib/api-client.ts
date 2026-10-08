@@ -5,7 +5,9 @@
 // rely on implicit mock fallbacks.
 import { toLocalDateKey } from "./date";
 import { notifyActiveSiteChanged } from "./active-site-events";
+import { notifyAccessChanged } from "./access-change-events";
 import { AdminAttendanceSaveError } from "./attendance-save-error";
+import { apiErrorFromResponse, createApiFetch } from "./api-transport";
 
 export { AdminAttendanceSaveError } from "./attendance-save-error";
 export type { AdminAttendanceSaveOutcome } from "./attendance-save-error";
@@ -24,6 +26,9 @@ if (!publicApiUrl && !useMockApiExplicit) {
 }
 
 export const API_BASE_URL = publicApiUrl ?? "http://localhost:3333";
+
+// Existing API functions share one request-time authentication transport.
+const fetch = createApiFetch(API_BASE_URL);
 
 export const isUsingMockApi = (): boolean => {
   return useMockApiExplicit;
@@ -624,8 +629,8 @@ export type AdminReportBundleInput = {
   periodEnd: string;
 };
 
-// Auth header builder with support for runtime token injection.
-// Token comes from Clerk via setApiClientToken() (see lib/use-session-compat.tsx).
+// Legacy header builder for call sites that pass a token explicitly.
+// createApiFetch replaces it with a current Clerk token at request time.
 let accessTokenOverride: string | null = null;
 export function setApiClientToken(token?: string | null) {
   accessTokenOverride = token ?? null;
@@ -1315,18 +1320,16 @@ async function behaviourRequestError(
 /** Get current user id from API (when session.user.id is missing). */
 export async function fetchMe(): Promise<{ userId: string }> {
   if (isUsingMockApi()) {
-    return { userId: "" };
+    return { userId: "mock-user" };
   }
   const res = await fetch(`${API_BASE_URL}/auth/me`, {
     method: "GET",
     headers: buildAuthHeaders(),
     cache: "no-store",
+    credentials: "include",
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to get current user (${res.status}): ${body || res.statusText}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to resolve your account.");
   }
   return res.json() as Promise<{ userId: string }>;
 }
@@ -1357,7 +1360,7 @@ export async function fetchActiveSiteState(): Promise<ActiveSiteState> {
     credentials: "include",
   });
   if (!response.ok) {
-    throw new Error(`Failed to fetch active site: ${response.status}`);
+    throw await apiErrorFromResponse(response, "Unable to load available sites.");
   }
   return (await response.json()) as ActiveSiteState;
 }
@@ -1404,7 +1407,7 @@ export async function fetchUserRoles(
     credentials: "include",
   });
   if (!response.ok) {
-    throw new Error(`Failed to fetch user roles: ${response.status}`);
+    throw await apiErrorFromResponse(response, "Unable to load your roles.");
   }
   return (await response.json()) as UserRolesResponse;
 }
@@ -1421,10 +1424,7 @@ export async function fetchOrgCapabilities(
     cache: "no-store",
   });
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch capabilities: ${response.status} ${body}`,
-    );
+    throw await apiErrorFromResponse(response, "Unable to load enabled features.");
   }
   const json = (await response.json()) as { capabilities: string[] };
   return json.capabilities ?? [];
@@ -1442,10 +1442,7 @@ export async function fetchMyPermissions(
     cache: "no-store",
   });
   if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch effective permissions: ${response.status} ${body}`,
-    );
+    throw await apiErrorFromResponse(response, "Unable to load your permissions.");
   }
   const json = (await response.json()) as { permissions: string[] };
   return json.permissions ?? [];
@@ -1495,7 +1492,7 @@ export async function setActiveSite(siteId: string): Promise<ActiveSiteState> {
     body: JSON.stringify({ siteId }),
   });
   if (!response.ok) {
-    throw new Error(`Failed to set active site: ${response.status}`);
+    throw await apiErrorFromResponse(response, "Unable to switch sites.");
   }
   const state = (await response.json()) as ActiveSiteState;
   notifyActiveSiteChanged();
@@ -5180,6 +5177,7 @@ export async function fetchOrgOverview(): Promise<AdminOrgOverview> {
   const res = await fetch(`${API_BASE_URL}/orgs`, {
     headers: buildAuthHeaders(),
     cache: "no-store",
+    credentials: "include",
   });
 
   if (!res.ok) {
@@ -7014,6 +7012,7 @@ export async function assignRole(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) return throwCodedRoleApiError(res, "Failed to assign role");
+  notifyAccessChanged();
   return res.json();
 }
 
@@ -7026,6 +7025,7 @@ export async function revokeRoleAssignment(
     credentials: "include",
   });
   if (!res.ok) return throwCodedRoleApiError(res, "Failed to revoke role assignment");
+  notifyAccessChanged();
   return res.json();
 }
 

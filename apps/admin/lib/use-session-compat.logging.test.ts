@@ -1,33 +1,123 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import {
+  ApiError,
+  cancelApiReads,
+  createApiFetch,
+  setApiTokenGetter,
+} from "./api-transport";
 
-const source = readFileSync(
-  new URL("./use-session-compat.tsx", import.meta.url),
-  "utf8",
-);
+const nativeFetch = globalThis.fetch;
+const apiFetch = createApiFetch("http://api.test");
 
-assert.doesNotMatch(
-  source,
-  /console\.log/,
-  "session resolution must not contain ad-hoc console.log diagnostics",
-);
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
-// Clerk session tokens default to a 60s lifetime. Without a background
-// refresh well inside that window, every apps/admin API call started more
-// than ~60s into a session gets a stale token and 401s with an "exp" claim
-// failure (see the roles/access audit log bug). Guard against regressing
-// back to "resolve token once per sign-in".
-const intervalMatch = source.match(
-  /setInterval\(\s*\(\)\s*=>\s*{\s*void getToken\(\)\.then\(\(token[^)]*\)\s*=>\s*setApiClientToken\(token\)\);\s*}\s*,\s*([\d_]+)\s*\)/,
-);
-assert.ok(
-  intervalMatch,
-  "expected a setInterval that refreshes the api-client token via getToken()",
-);
-const intervalMs = Number(intervalMatch![1].replace(/_/g, ""));
-assert.ok(
-  intervalMs > 0 && intervalMs < 60_000,
-  `token refresh interval (${intervalMs}ms) must be well under Clerk's 60s default token lifetime`,
-);
+async function run(): Promise<void> {
+  const seen: string[] = [];
+  globalThis.fetch = async (_input, init) => {
+    seen.push(new Headers(init?.headers).get("Authorization") ?? "");
+    return new Response("{}", { status: 200 });
+  };
 
-console.log("session compat logging checks passed");
+  let token = "first";
+  setApiTokenGetter(async () => token);
+  await apiFetch("http://api.test/auth/me");
+  token = "second";
+  await apiFetch("http://api.test/auth/me");
+  assert.deepEqual(seen, ["Bearer first", "Bearer second"]);
+
+  const waitForToken = deferred<string | null>();
+  let tokenCalls = 0;
+  setApiTokenGetter(() => {
+    tokenCalls += 1;
+    return waitForToken.promise;
+  });
+  const first = apiFetch("http://api.test/one");
+  const second = apiFetch("http://api.test/two");
+  waitForToken.resolve("shared");
+  await Promise.all([first, second]);
+  assert.equal(tokenCalls, 1);
+  assert.deepEqual(seen.slice(-2), ["Bearer shared", "Bearer shared"]);
+
+  seen.length = 0;
+  tokenCalls = 0;
+  setApiTokenGetter(async () => {
+    tokenCalls += 1;
+    return tokenCalls === 1 ? "expired" : "fresh";
+  });
+  globalThis.fetch = async (_input, init) => {
+    seen.push(new Headers(init?.headers).get("Authorization") ?? "");
+    return new Response("{}", { status: seen.length === 1 ? 401 : 200 });
+  };
+  assert.equal((await apiFetch("http://api.test/data")).status, 200);
+  assert.deepEqual(seen, ["Bearer expired", "Bearer fresh"]);
+
+  seen.length = 0;
+  globalThis.fetch = async () => {
+    seen.push("request");
+    return new Response("{}", { status: 401 });
+  };
+  assert.equal(
+    (await apiFetch("http://api.test/write", { method: "POST" })).status,
+    401,
+  );
+  assert.equal(seen.length, 1, "writes are never replayed");
+
+  seen.length = 0;
+  globalThis.fetch = async () => {
+    seen.push("request");
+    return new Response("{}", { status: 403 });
+  };
+  assert.equal((await apiFetch("http://api.test/data")).status, 403);
+  assert.equal(
+    seen.length,
+    1,
+    "403 is a permission denial, not a token refresh",
+  );
+
+  const waitForSignOut = deferred<string | null>();
+  setApiTokenGetter(() => waitForSignOut.promise);
+  const inFlight = apiFetch("http://api.test/data");
+  setApiTokenGetter(null);
+  waitForSignOut.resolve("old-token");
+  await assert.rejects(
+    inFlight,
+    (error: unknown) =>
+      error instanceof ApiError && error.code === "SESSION_CHANGED",
+  );
+
+  setApiTokenGetter(async () => "current");
+  globalThis.fetch = async (_input, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () =>
+        reject(new Error("aborted")),
+      );
+    });
+  const scopedRead = apiFetch("http://api.test/scoped-data");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  cancelApiReads();
+  await assert.rejects(
+    scopedRead,
+    /aborted/,
+    "site changes cancel old scoped reads",
+  );
+
+  setApiTokenGetter(async () => "secret");
+  globalThis.fetch = async (_input, init) => {
+    assert.equal(new Headers(init?.headers).get("Authorization"), null);
+    return new Response("{}", { status: 200 });
+  };
+  await apiFetch("https://external.test/resource");
+}
+
+run()
+  .then(() => console.log("API token transport checks passed"))
+  .finally(() => {
+    setApiTokenGetter(null);
+    globalThis.fetch = nativeFetch;
+  });
