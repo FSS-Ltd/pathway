@@ -1,4 +1,4 @@
-import { ArgumentsHost, Catch, Logger } from "@nestjs/common";
+import { ArgumentsHost, Catch, Inject, Logger } from "@nestjs/common";
 import { BaseExceptionFilter, HttpAdapterHost } from "@nestjs/core";
 import { Prisma } from "@pathway/db";
 import {
@@ -25,7 +25,7 @@ function retryableDatabaseCode(error: unknown): string | null {
 export class DatabaseAvailabilityFilter extends BaseExceptionFilter {
   private readonly logger = new Logger(DatabaseAvailabilityFilter.name);
 
-  constructor(adapterHost: HttpAdapterHost) {
+  constructor(@Inject(HttpAdapterHost) adapterHost: HttpAdapterHost) {
     super(adapterHost.httpAdapter);
   }
 

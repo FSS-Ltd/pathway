@@ -1,53 +1,31 @@
 # ACE production release status
 
-Checked on 8 October 2026. The manual [production deployment](https://github.com/FSS-Ltd/pathway/actions/runs/37645052412)
-completed its migration, API, admin, and web jobs successfully at merged commit
-`a41e09aac3fde40f646e0242b0b8e3f0191e0122`. The API production
-configuration now selects the restored London Supabase project. The prior
-[failed deployment](https://github.com/FSS-Ltd/pathway/actions/runs/34189600516)
-stopped at Prisma migration and skipped all three apps. PR #501 restored
-`master`-push deployment triggers on 8 October. Its first
-[automatic run](https://github.com/FSS-Ltd/pathway/actions/runs/37829217494)
-failed while applying `20261008020000_ace_family_context_discovery`:
-`app."StudentIdentity"` is a view in the restored database, and PostgreSQL
-cannot create its self-discovery policy on a view. API, admin, and web jobs
-were skipped. Migration recovery and a portable policy target are required
-before a newer app release can proceed.
+Checked on 8 October 2026. Production API, admin, and web aliases currently
+point to READY deployments at `a41e09aac3fde40f646e0242b0b8e3f0191e0122`
+after a coordinated rollback. The API still connects to the restored London
+Supabase project `jzofykdzpuslpdyfovxp`; its live `/health` returned 200 with
+a database timestamp after rollback. The newer ACE app code is **not yet live**.
 
-The [next automatic run](https://github.com/FSS-Ltd/pathway/actions/runs/37834814498)
-at merged commit `70cc53502f37da07a0e449e5604ce51ee862c015` stopped with
-Prisma P3009 because that failed record is unresolved; it again skipped the
-three app jobs.
+PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
+discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
+The failed Prisma attempt was marked rolled back, then attempt 2 of
+[production run 37837131918](https://github.com/FSS-Ltd/pathway/actions/runs/37837131918)
+completed all four jobs. Prisma reported 113 migrations and an up-to-date
+schema on the new database. Read-only checks confirmed the corrected migration,
+four other 8 October migrations, and both policies on the `public` identity
+tables. The [recovery runbook](runbooks/family-discovery-migration-recovery.md)
+records the exact sequence.
 
-The 8 October read-only target audit confirmed that the failed migration has
-no completion or rollback marker, `app."StudentIdentity"` is a view, both real
-identity tables in `public` have forced RLS, and neither self-discovery policy
-exists. The [recovery runbook](runbooks/family-discovery-migration-recovery.md)
-records the post-merge repair and verification sequence.
-
-Current release step **REL-2** is implementing the portable family discovery
-policy target and a replay test for both `app` and split `public` layouts.
-Production `migrate resolve` and the next deploy remain pending its merged,
-CI-verified PR.
-
-On 7 October, the connected Vercel API confirmed that the API
-project's production `DATABASE_URL` and `SUPABASE_URL` both reference
-`jzofykdzpuslpdyfovxp`. Its production Supabase secret key is present.
-Admin and web use API URLs rather than direct database credentials. All three
-production deployments remain READY at `a41e09aac3fde40f646e0242b0b8e3f0191e0122`;
-the later merged ACE steps have not been deployed.
-The connected Vercel readback confirmed both API production URLs reference the
-new project, their updates predate the READY API deployment, and that
-deployment's `/health` returned 200 with a database timestamp on 7 October.
-On 8 October, the connected Vercel project readback reconfirmed the API
-`DATABASE_URL` targets the new project's London transaction pooler, its
-`SUPABASE_URL` selects the new project, and the production Supabase credential
-fingerprint matches the local new-project service credential. Admin and web
-both point to `https://api.nexsteps.dev`. The three READY deployments were
-created after the variable updates but still serve code commit `a41e09a`.
-The connected Vercel deployment list checked again after PR #482 merged still
-showed API, admin and web READY at that older commit. A GitHub merge alone
-does not release the new parent screen.
+Vercel then reported API, admin, and web deployments READY at `26d43e4b`.
+The new API alias returned HTTP 500 on `/health`: its TSX-loaded
+`DatabaseAvailabilityFilter` had no constructor injection metadata, so Nest
+passed an undefined `HttpAdapterHost` during startup. Vercel runtime logs
+confirmed the failure. The API, admin, and web aliases were rolled back to
+the prior READY deployments at `a41e09a`; the API recovered to HTTP 200,
+marketing and `/configure` returned HTTP 200, and admin redirected to Clerk
+sign-in. Current step **REL-3** fixes the API bootstrap with a production-loader
+regression test, then repeats CI, deployment, and live smoke checks. A green
+GitHub deploy job or READY Vercel state alone does not close this release gate.
 
 ## Delivery steps
 
@@ -126,6 +104,7 @@ does not release the new parent screen.
 | 1.3e5b   | ACE parent notice relationship permission                              | Merged  | [#500](https://github.com/FSS-Ltd/pathway/pull/500) to `master`                     | `c5858bf00bba252d508b01f37526755d3ae46f31`; all eight checks passed: CI run 37821295904, CodeQL run 37821292163.                                                                                                | `e4f5e46ea274150b364cb2d99f370d21bbdda071` |
 | 1.3e5c1  | Full guardian eligibility for ACE notice audiences                     | Merged  | [#502](https://github.com/FSS-Ltd/pathway/pull/502) to `master`                     | `7d11c7a253984777f32a9aad738f30d7dfd6c5da`; all eight checks passed: CI run 37828070800, CodeQL run 37828063709.                                                                                                | `1bf510c6fc01e3ddbfdcb4c90ce3963b26ca9e38` |
 | 1.3e5c2  | ACE notice expiry, withdrawal, immutable publication and read receipts | Merged  | [#503](https://github.com/FSS-Ltd/pathway/pull/503) to `master`                     | `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`; all eight checks passed: CI run 37833550859, CodeQL run 37833546948.                                                                                                | `70cc53502f37da07a0e449e5604ce51ee862c015` |
+| REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

@@ -1,10 +1,33 @@
 import type { ArgumentsHost } from "@nestjs/common";
+import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { HttpAdapterHost } from "@nestjs/core";
 import { ExpressAdapter } from "@nestjs/platform-express";
 import { Prisma } from "@pathway/db";
 import { DatabaseAvailabilityFilter } from "./database-availability.filter";
 
 describe("DatabaseAvailabilityFilter", () => {
+  it("boots as a global filter through the production tsx loader", () => {
+    const script = `
+      const { Module } = require('@nestjs/common');
+      const { APP_FILTER, NestFactory } = require('@nestjs/core');
+      const { ExpressAdapter } = require('@nestjs/platform-express');
+      const { DatabaseAvailabilityFilter } = require('./src/common/database/database-availability.filter.ts');
+      class TestModule {}
+      Module({ providers: [{ provide: APP_FILTER, useClass: DatabaseAvailabilityFilter }] })(TestModule);
+      NestFactory.create(TestModule, new ExpressAdapter(), { logger: false })
+        .then(async (app) => { await app.init(); await app.close(); })
+        .catch((error) => { console.error(error); process.exitCode = 1; });
+    `;
+    const result = spawnSync(
+      process.execPath,
+      ["-r", "tsx/cjs", "-r", "reflect-metadata", "-e", script],
+      { cwd: path.resolve(__dirname, "../../.."), encoding: "utf8" },
+    );
+
+    expect(result.status).toBe(0);
+  });
+
   it("returns a retryable, correlated response without leaking Prisma details", () => {
     const adapterHost = new HttpAdapterHost();
     adapterHost.httpAdapter = new ExpressAdapter();
