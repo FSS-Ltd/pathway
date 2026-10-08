@@ -128,16 +128,24 @@ does not release the new parent screen.
 | AR-3     | Preserve admin navigation and select one active link                   | Merged  | [#466](https://github.com/FSS-Ltd/pathway/pull/466) on `fix/admin-navigation-state` | `2650297aeba1201096fd49b77f20f160a9b567e2`; all eight checks passed; 20-click browser verification completed                                                                                                    | `3fdabf8d5f7a155a72bf2f56975320feff3f05ef` |
 | AR-4     | Grant scoped superuser operational access                              | Merged  | [#469](https://github.com/FSS-Ltd/pathway/pull/469) to `master`                     | `e34171c325f288dfbd92aff09777ec9bbee1be97`; all eight checks passed, including integration/RLS; read-only account mapping verified                                                                              | `15e088698831e0612ed4c1b807cfee8608da53cb` |
 | AR-5     | Correct admin page states and cross-feature recovery                   | Merged  | [#471](https://github.com/FSS-Ltd/pathway/pull/471) to `master`                     | `acc862e535a0fcbe9b4e1c8b9dcc22aaf21b4fc1`; all eight checks passed: CI run 37766561625, CodeQL run 37766558388; admin build and page regressions passed locally                                                | `04fafae64de1dc5f33c4580d98e0e1987923e9db` |
+| AR-6     | Hide dashboard API response bodies and correct failure copy            | Merged  | [#495](https://github.com/FSS-Ltd/pathway/pull/495) to `master`                     | `3dbe33d13ace38b30ec6441a6a5ec30de661ec45`; all eight checks passed: CI run 37814687587, CodeQL run 37814683507; admin test, typecheck and build passed locally                                                 | `8e2b8af583510597d5f05a37fa277e94213dc69c` |
 | 1.3b2+   | ACE core web journey slices                                            | Planned | Pending                                                                             | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                                   | Planned | Pending                                                                             | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                                     | Planned | Pending                                                                             | Pending                                                                                                                                                                                                         | Pending                                    |
 
 AR-1 addresses the production single-connection pool timeouts seen on access,
-concerns, and notes requests. GitHub confirmed all five admin reliability steps
-merged after their current revisions passed required CI. No production deployment
-or account mutation was included. The next permissible action is to verify the
-deployed API and admin commit IDs, then request release authorisation before
-production changes and the reported user-journey check.
+concerns, and notes requests. GitHub confirmed all six admin reliability steps
+merged after their current revisions passed required CI. AR-6 was added after
+the dashboard exposed raw 500 response text on a failed announcement request.
+The 8 October production check confirmed that the API, admin and public web
+still serve `a41e09aac3fde40f646e0242b0b8e3f0191e0122`, before AR-1–AR-6.
+The observed Roles & Access request passed permission evaluation but then timed
+out waiting for the API's single database connection. An unauthenticated GET
+`/announcements` returned 401; the observed announcement reads were authorised
+for a signed-in user, though the old admin shell rendered them while its own
+role lookup failed. No production deployment or account mutation was included.
+The next permissible action is to obtain release authorisation, deploy
+compatible API/admin revisions, and repeat the reported user journey.
 
 Step 1.3g4 is merged after the corrected integration assertions passed on the
 final PR revision. The daily fact and correction-event schema has not been
