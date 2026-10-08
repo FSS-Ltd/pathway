@@ -21,6 +21,7 @@ export async function resolveDailyAttendanceAccess(
   tx: Prisma.TransactionClient,
   actor: DailyAttendanceActor,
   date: Date,
+  permission: "attendance.read" | "attendance.manage",
 ): Promise<DailyAttendanceAccess> {
   if (!actor.tenantId || !actor.orgId || !actor.userId) {
     throw new BadRequestException("An active site is required");
@@ -84,7 +85,7 @@ export async function resolveDailyAttendanceAccess(
         isActive: true,
         permissions: {
           some: {
-            permissionKey: "attendance.read",
+            permissionKey: permission,
             permission: { isActive: true },
           },
         },
