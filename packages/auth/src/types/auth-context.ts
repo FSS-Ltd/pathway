@@ -2,6 +2,8 @@ import type { RoleSet } from "./roles";
 
 export interface UserIdentity {
   userId: string;
+  /** Verified from the internal User record, never from token claims. */
+  isSuperUser?: boolean;
   email?: string;
   givenName?: string;
   familyName?: string;
@@ -46,5 +48,4 @@ export interface AuthContext {
   issuedAt?: number;
   expiresAt?: number;
 }
-
 

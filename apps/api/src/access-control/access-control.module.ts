@@ -55,12 +55,73 @@ import {
 import { RoleSafetyService } from "./role-safety.service";
 
 const effectivePermissionsReader: EffectivePermissionsReader = {
-  async getOrganisationMembership(userId, orgId) {
+  async isActiveSuperUser(userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { superUser: true, isActive: true },
+    });
+    return Boolean(user?.superUser && user.isActive);
+  },
+
+  async getMembership(userId, orgId, tenantId, isSuperUser) {
     const membership = await prisma.orgMembership.findUnique({
       where: { orgId_userId: { orgId, userId } },
+      select: { role: true },
+    });
+    if (!membership) {
+      return { hasMembership: false, isSuperUser: false };
+    }
+    if (!isSuperUser) {
+      return { hasMembership: true, isSuperUser: false };
+    }
+    if (!tenantId) {
+      return { hasMembership: true, isSuperUser: true };
+    }
+
+    // The global flag never admits a user to a new site or organisation.
+    const tenant = await prisma.tenant.findFirst({
+      where: { id: tenantId, orgId },
       select: { id: true },
     });
-    return membership !== null;
+    if (!tenant) {
+      return { hasMembership: true, isSuperUser: false };
+    }
+    if (membership.role === "ORG_ADMIN") {
+      return { hasMembership: true, isSuperUser: true };
+    }
+    const siteMembership = await prisma.siteMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { id: true },
+    });
+    if (siteMembership) {
+      return { hasMembership: true, isSuperUser: true };
+    }
+    const [legacySiteRole, legacyOrgAdmin] = await Promise.all([
+      prisma.userTenantRole.findFirst({
+        where: { tenantId, userId },
+        select: { id: true },
+      }),
+      prisma.userOrgRole.findFirst({
+        where: { orgId, userId, role: "ORG_ADMIN" },
+        select: { id: true },
+      }),
+    ]);
+    return {
+      hasMembership: true,
+      isSuperUser: Boolean(siteMembership || legacySiteRole || legacyOrgAdmin),
+    };
+  },
+
+  async findActivePermissionKeys(keys) {
+    if (keys.length === 0) return [];
+    const disabledDefinitions = await prisma.permissionDefinition.findMany({
+      where: { key: { in: [...keys] }, isActive: false },
+      select: { key: true },
+    });
+    // The compile-time capability registry owns executable keys. A missing
+    // metadata row must not silently disable a capability during rollout.
+    const disabled = new Set(disabledDefinitions.map(({ key }) => key));
+    return keys.filter((key) => !disabled.has(key));
   },
 
   async findAssignments(userId, orgId, tenantId, now) {

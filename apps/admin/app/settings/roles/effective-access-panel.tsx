@@ -72,7 +72,7 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
   return (
     <Card
       title="Effective access preview"
-      description="What a person can actually do, and which role granted it"
+      description="What a person can actually do, and why access was granted"
     >
       <div className="mt-4 max-w-sm">
         <Label htmlFor="effective-access-person">Person</Label>
@@ -156,7 +156,15 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
                       )}
                     </div>
                     <span className="text-xs text-text-muted">
-                      Granted via: {roleNames(roles, entry?.sourceRoleIds ?? [])}
+                      Granted via: {[
+                        ...(entry?.sourceSuperUser ? ["Superuser"] : []),
+                        ...(entry?.sourceRoleIds.length
+                          ? [roleNames(roles, entry.sourceRoleIds)]
+                          : []),
+                        ...(entry?.sourceTagGrantIds?.length
+                          ? ["Access tag"]
+                          : []),
+                      ].join(", ")}
                     </span>
                   </div>
                 );

@@ -94,6 +94,7 @@ describe("effective permission RLS resolution", () => {
     orgB: randomUUID(),
     allowedUser: randomUUID(),
     crossOrgUser: randomUUID(),
+    superUser: randomUUID(),
     orgARole: randomUUID(),
     orgBRole: randomUUID(),
     siteA: randomUUID(),
@@ -134,6 +135,11 @@ describe("effective permission RLS resolution", () => {
           id: fixture.crossOrgUser,
           email: `${fixture.crossOrgUser}@example.test`,
         },
+        {
+          id: fixture.superUser,
+          email: `${fixture.superUser}@example.test`,
+          superUser: true,
+        },
       ],
     });
     await prisma.tenant.createMany({
@@ -157,10 +163,14 @@ describe("effective permission RLS resolution", () => {
         { orgId: fixture.orgA, userId: fixture.allowedUser },
         { orgId: fixture.orgA, userId: fixture.crossOrgUser },
         { orgId: fixture.orgB, userId: fixture.crossOrgUser },
+        { orgId: fixture.orgA, userId: fixture.superUser },
       ],
     });
     await prisma.siteMembership.create({
       data: { tenantId: fixture.siteA, userId: fixture.allowedUser },
+    });
+    await prisma.siteMembership.create({
+      data: { tenantId: fixture.siteA, userId: fixture.superUser },
     });
     await prisma.orgVertical.createMany({
       data: [
@@ -289,13 +299,21 @@ describe("effective permission RLS resolution", () => {
         where: { tenantId: { in: [fixture.siteA, fixture.siteB] } },
       });
       await prisma.orgMembership.deleteMany({
-        where: { userId: { in: [fixture.allowedUser, fixture.crossOrgUser] } },
+        where: {
+          userId: {
+            in: [fixture.allowedUser, fixture.crossOrgUser, fixture.superUser],
+          },
+        },
       });
       await prisma.tenant.deleteMany({
         where: { id: { in: [fixture.siteA, fixture.siteB] } },
       });
       await prisma.user.deleteMany({
-        where: { id: { in: [fixture.allowedUser, fixture.crossOrgUser] } },
+        where: {
+          id: {
+            in: [fixture.allowedUser, fixture.crossOrgUser, fixture.superUser],
+          },
+        },
       });
       await prisma.org.deleteMany({
         where: { id: { in: [fixture.orgA, fixture.orgB] } },
@@ -383,6 +401,7 @@ describe("effective permission RLS resolution", () => {
           undefined,
           NOW,
           tx,
+          true,
         );
         expect(before).toHaveLength(1);
 
@@ -401,6 +420,7 @@ describe("effective permission RLS resolution", () => {
           undefined,
           NOW,
           tx,
+          true,
         );
         expect(after).toEqual([]);
         throw rollback;
@@ -436,6 +456,7 @@ describe("effective permission RLS resolution", () => {
         fixture.siteA,
         NOW,
         tx,
+        true,
       );
       const siteB = await cutoverService.listForUserWithSourcesInTransaction(
         fixture.allowedUser,
@@ -443,6 +464,7 @@ describe("effective permission RLS resolution", () => {
         fixture.siteB,
         NOW,
         tx,
+        true,
       );
       expect(siteA.map(({ permissionKey }) => permissionKey)).toEqual([
         "ace.pace.read",
@@ -468,6 +490,38 @@ describe("effective permission RLS resolution", () => {
       allowed: false,
       reason: "permission-missing",
       sourceRoleIds: [],
+    });
+  });
+
+  it("grants an admitted superuser without an assignment but rejects other scopes", async () => {
+    if (!service) return;
+    const request = {
+      userId: fixture.superUser,
+      orgId: fixture.orgA,
+      tenantId: fixture.siteA,
+      permission: "ace.pace.read" as const,
+      now: NOW,
+    };
+
+    await expect(service.resolve(request)).resolves.toEqual({
+      allowed: true,
+      reason: "allowed",
+      sourceRoleIds: [],
+      sourceSuperUser: true,
+    });
+    await expect(
+      service.resolve({ ...request, tenantId: undefined }),
+    ).resolves.toMatchObject({ allowed: true, sourceSuperUser: true });
+    await expect(
+      service.resolve({ ...request, tenantId: fixture.siteB }),
+    ).resolves.toMatchObject({
+      allowed: false,
+    });
+    await expect(
+      service.resolve({ ...request, orgId: fixture.orgB }),
+    ).resolves.toMatchObject({
+      allowed: false,
+      reason: "no-membership",
     });
   });
 

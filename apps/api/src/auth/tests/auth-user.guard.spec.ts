@@ -41,6 +41,8 @@ function buildContext(headers: Record<string, string> = {}) {
 
 const baseUser = {
   id: "user-1",
+  superUser: false,
+  isActive: true,
   email: "person@example.test",
   displayName: "Person One",
   name: null,
@@ -102,6 +104,39 @@ describe("AuthUserGuard", () => {
     expect(pathwayContext.rawClaims.factorVerificationAgeMinutes).toEqual([
       1, 2,
     ]);
+    expect(pathwayContext.user).toMatchObject({ isSuperUser: false });
+  });
+
+  it("derives superuser status only from the internal active user", async () => {
+    verify.mockResolvedValueOnce({
+      provider: "clerk",
+      sub: "clerk_super",
+      superUser: true,
+    });
+    findIdentity.mockResolvedValueOnce({
+      user: { ...baseUser, superUser: true, isActive: true },
+    });
+    const ctx = buildContext();
+
+    await guard.canActivate(ctx);
+    expect(ctx.req.authIsSuperUser).toBe(true);
+    expect(
+      (ctx.req.__pathwayContext as { user: { isSuperUser: boolean } }).user
+        .isSuperUser,
+    ).toBe(true);
+  });
+
+  it("ignores a superuser claim when the internal user is ordinary", async () => {
+    verify.mockResolvedValueOnce({
+      provider: "clerk",
+      sub: "clerk_staff",
+      superUser: true,
+    });
+    findIdentity.mockResolvedValueOnce({ user: baseUser });
+    const ctx = buildContext();
+
+    await guard.canActivate(ctx);
+    expect(ctx.req.authIsSuperUser).toBe(false);
   });
 
   it("JIT-provisions via AuthIdentityService when no identity is linked yet", async () => {
@@ -111,13 +146,11 @@ describe("AuthUserGuard", () => {
       email: "new@example.test",
       emailVerified: true,
     });
-    findIdentity
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        userId: "user-2",
-        email: "new@example.test",
-        user: { ...baseUser, id: "user-2" },
-      });
+    findIdentity.mockResolvedValueOnce(null).mockResolvedValueOnce({
+      userId: "user-2",
+      email: "new@example.test",
+      user: { ...baseUser, id: "user-2" },
+    });
     authIdentityService.upsertFromProvider.mockResolvedValueOnce({
       userId: "user-2",
     });

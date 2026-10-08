@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { PathwayRequestContext } from "@pathway/auth";
+import type { PermissionKey } from "@pathway/platform";
+import { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
 import { SAFEGUARDING_ROLES_KEY } from "./safeguarding.decorator";
 import type { SafeguardingRoleRequirement } from "./safeguarding.types";
 
@@ -14,10 +16,13 @@ import type { SafeguardingRoleRequirement } from "./safeguarding.types";
 export class SafeguardingGuard implements CanActivate {
   constructor(
     @Inject(Reflector) private readonly reflector: Reflector,
-    @Inject(PathwayRequestContext) private readonly requestContext: PathwayRequestContext,
+    @Inject(PathwayRequestContext)
+    private readonly requestContext: PathwayRequestContext,
+    @Inject(EffectivePermissionsService)
+    private readonly permissions: EffectivePermissionsService,
   ) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const requirement =
       this.reflector.getAllAndOverride<SafeguardingRoleRequirement>(
         SAFEGUARDING_ROLES_KEY,
@@ -39,7 +44,37 @@ export class SafeguardingGuard implements CanActivate {
       return true;
     }
 
+    const actor = this.requestContext.getContext();
+    if (
+      actor?.user.isSuperUser &&
+      actor.user.userId &&
+      actor.org.orgId &&
+      actor.tenant.tenantId &&
+      actor.tenant.orgId === actor.org.orgId
+    ) {
+      const method = context
+        .switchToHttp()
+        .getRequest<{ method?: string }>().method;
+      const permission: PermissionKey | undefined =
+        method === "GET"
+          ? "safeguarding.concerns.read"
+          : method === "POST"
+            ? "safeguarding.concerns.record"
+            : method === "PATCH" || method === "DELETE"
+              ? "safeguarding.concerns.manage"
+              : undefined;
+      if (permission) {
+        const decision = await this.permissions.resolve({
+          userId: actor.user.userId,
+          orgId: actor.org.orgId,
+          tenantId: actor.tenant.tenantId,
+          permission,
+          now: new Date(),
+        });
+        if (decision.allowed && decision.sourceSuperUser) return true;
+      }
+    }
+
     throw new ForbiddenException("Insufficient safeguarding permissions");
   }
 }
-

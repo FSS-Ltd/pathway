@@ -40,6 +40,7 @@ export class AccessDecisionLogger {
       reason: decision.reason,
       sourceRoleIds: decision.sourceRoleIds,
       sourceTagGrantIds: decision.sourceTagGrantIds,
+      sourceSuperUser: decision.sourceSuperUser,
       requestId,
       route,
     });

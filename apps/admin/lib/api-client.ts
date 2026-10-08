@@ -6923,6 +6923,8 @@ export type AdminRoleAssignment = {
 export type AdminEffectivePermission = {
   permissionKey: string;
   sourceRoleIds: string[];
+  sourceTagGrantIds?: string[];
+  sourceSuperUser?: true;
 };
 
 export type AdminAccessAuditEvent = {

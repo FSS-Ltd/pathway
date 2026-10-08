@@ -2,9 +2,9 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from "@nestjs/common";
 import { OrgRole, prisma, runTransaction } from "@pathway/db";
+import { assertOrgAdminAccess } from "./org-admin-access";
 
 type PersonUser = {
   id: string;
@@ -70,7 +70,12 @@ export class OrgPeopleService {
     orgId: string,
     actorUserId: string | undefined,
   ): Promise<OrgPersonRow[]> {
-    await this.assertOrgAdmin(actorUserId, orgId, "view people");
+    await assertOrgAdminAccess(
+      actorUserId,
+      orgId,
+      "view people",
+      "operational-read",
+    );
 
     const { members, siteCountMap } = await this.collectOrgPeople(orgId);
     return members.map(({ user, role, source }) => ({
@@ -90,7 +95,12 @@ export class OrgPeopleService {
     orgId: string,
     actorUserId: string | undefined,
   ): Promise<DeletedOrgPersonRow[]> {
-    await this.assertOrgAdmin(actorUserId, orgId, "view deleted people");
+    await assertOrgAdminAccess(
+      actorUserId,
+      orgId,
+      "view deleted people",
+      "operational-read",
+    );
 
     return prisma.orgDeletedUser.findMany({
       where: { orgId },
@@ -114,7 +124,7 @@ export class OrgPeopleService {
     targetUserId: string,
     actorUserId: string | undefined,
   ): Promise<DeletedOrgPersonRow> {
-    const actorId = await this.assertOrgAdmin(
+    const actorId = await assertOrgAdminAccess(
       actorUserId,
       orgId,
       "delete people",
@@ -242,40 +252,6 @@ export class OrgPeopleService {
     });
   }
 
-  async assertOrgAdmin(
-    userId: string | undefined,
-    orgId: string,
-    action: string,
-  ): Promise<string> {
-    if (!userId) {
-      throw new UnauthorizedException("User ID not found in request");
-    }
-
-    const membership = await prisma.orgMembership.findFirst({
-      where: {
-        userId,
-        orgId,
-        role: { in: [OrgRole.ORG_ADMIN] },
-      },
-    });
-    const orgRole = membership
-      ? null
-      : await prisma.userOrgRole.findFirst({
-          where: {
-            userId,
-            orgId,
-            role: { in: [OrgRole.ORG_ADMIN] },
-          },
-        });
-
-    if (!membership && !orgRole) {
-      throw new UnauthorizedException(
-        `You must be an Organisation admin to ${action}`,
-      );
-    }
-    return userId;
-  }
-
   private async collectOrgPeople(orgId: string): Promise<{
     members: PersonMember[];
     siteCountMap: Map<string, number>;
@@ -362,7 +338,8 @@ export class OrgPeopleService {
           continue;
         }
         const invite = orgInvites.find(
-          (item) => item.email.toLowerCase() === (user.email ?? "").toLowerCase(),
+          (item) =>
+            item.email.toLowerCase() === (user.email ?? "").toLowerCase(),
         );
         memberByUserId.set(user.id, {
           user,

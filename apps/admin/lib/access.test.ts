@@ -4,10 +4,13 @@
  */
 
 import {
+  canAccessAdminSection,
+  canAccessSafeguardingAdmin,
   getAdminRoleInfoFromApiResponse,
   hasCapability,
   hasPermission,
   meetsAccessRequirement,
+  isStaffOnly,
 } from "./access";
 
 function runTests() {
@@ -53,6 +56,19 @@ function runTests() {
   assert(superUserRole.isSuperUser, "superuser payload grants superuser access");
   assert(superUserRole.isOrgAdmin, "org admin membership grants org admin");
   assert(superUserRole.isSiteAdmin, "site admin membership grants site admin");
+
+  const superUserWithoutAdminRole = getAdminRoleInfoFromApiResponse({
+    userId: "user-super",
+    superUser: true,
+    currentOrgIsMasterOrg: false,
+    orgRoles: [],
+    siteRoles: [],
+    orgMemberships: [{ orgId: "org-1", orgName: "Victorious Kids", role: "ORG_MEMBER" }],
+    siteMemberships: [],
+  });
+  assert(!isStaffOnly(superUserWithoutAdminRole), "superuser is not classified as staff-only");
+  assert(canAccessAdminSection(superUserWithoutAdminRole), "superuser can enter admin sections");
+  assert(canAccessSafeguardingAdmin(superUserWithoutAdminRole), "superuser can enter safeguarding administration");
 
   console.log("hasCapability");
   assert(

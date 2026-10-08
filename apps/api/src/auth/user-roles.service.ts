@@ -58,6 +58,7 @@ export class UserRolesService {
           where: { id: userId },
           select: {
             superUser: true,
+            isActive: true,
             hasFamilyAccess: true,
             hasServeAccess: true,
             lastActiveTenantId: true,
@@ -178,7 +179,7 @@ export class UserRolesService {
 
     return {
       userId,
-      superUser: user?.superUser ?? false,
+      superUser: Boolean(user?.isActive && user.superUser),
       currentOrgIsMasterOrg: currentOrg?.isMasterOrg ?? false,
       orgRoles: Array.from(orgRoles.entries()).map(([orgId, role]) => ({
         orgId,

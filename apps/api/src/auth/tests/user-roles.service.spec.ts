@@ -77,6 +77,7 @@ describe("UserRolesService", () => {
   it("builds the superuser role response from current memberships", async () => {
     userFindUnique.mockResolvedValue({
       superUser: true,
+      isActive: true,
       hasFamilyAccess: true,
       hasServeAccess: true,
       lastActiveTenantId: "tenant-1",
