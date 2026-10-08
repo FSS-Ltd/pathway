@@ -9,6 +9,7 @@ import { CAPABILITY_DEFINITIONS } from "../capability-definitions";
 
 const availableTags = [
   "finance-admin",
+  "attendance-exporter",
   "attendance-recorder",
   "behaviour-viewer",
   "pace-full-access",
@@ -53,6 +54,12 @@ describe("access-tag catalogue", () => {
     expect(ACCESS_TAG_DEFINITIONS["calendar-manager"].permissionKeys).toEqual(
       [],
     );
+  });
+
+  it("maps the exporter tag only to ACE attendance export", () => {
+    expect(accessTagPermissionKeys("attendance-exporter")).toEqual([
+      "ace.attendance.export",
+    ]);
   });
 
   it("keeps simulated investments outside every tag", () => {

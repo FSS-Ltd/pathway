@@ -33,8 +33,9 @@ export const ACCESS_TAG_DEFINITIONS = {
   },
   "attendance-exporter": {
     label: "Attendance exporter",
-    description: "Reserved until attendance export has its own permission.",
-    permissionKeys: [],
+    description:
+      "Export ACE attendance within existing site and student scope.",
+    permissionKeys: ["ace.attendance.export"],
   },
   "attendance-recorder": {
     label: "Attendance recorder",
@@ -121,7 +122,6 @@ const UNAVAILABLE_ACCESS_TAGS = new Set<AccessTagKey>([
   "shopkeeper",
   "shopadmin",
   "leaderboard-admin",
-  "attendance-exporter",
   "audit-viewer",
   "sensitive-note-viewer",
   "student-drillthrough-viewer",

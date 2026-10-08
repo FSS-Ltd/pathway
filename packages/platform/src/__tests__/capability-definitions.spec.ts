@@ -127,6 +127,7 @@ const SECTION_5_2_KEYS = [
 ] as const;
 
 const ADDITIONAL_MATRIX_KEYS = [
+  "ace.attendance.export",
   "platform.access.roles.read",
   "platform.access.roles.manage",
   "platform.access.permissions.read",
@@ -170,8 +171,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 113 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(113);
+  it("contains exactly the 114 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(114);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
@@ -201,6 +202,23 @@ describe("capability definitions", () => {
 
   it("grants ACE schools the dashboard capability", () => {
     expect(VERTICAL_CAPABILITIES.ACE_SCHOOL).toContain("ace.dashboard.read");
+  });
+
+  it("keeps ACE attendance export separate from attendance read and manage", () => {
+    expect(CAPABILITY_DEFINITIONS["ace.attendance.export"]).toMatchObject({
+      scope: "site",
+      sensitivity: "sensitive",
+      delegable: true,
+      requiredVertical: Vertical.ACE_SCHOOL,
+    });
+    expect(VERTICAL_CAPABILITIES.ACE_SCHOOL).toContain("ace.attendance.export");
+    for (const vertical of Object.values(Vertical).filter(
+      (value) => value !== Vertical.ACE_SCHOOL,
+    )) {
+      expect(VERTICAL_CAPABILITIES[vertical]).not.toContain(
+        "ace.attendance.export",
+      );
+    }
   });
 
   it("uses high-water sensitivity and the approved delegation policy", () => {

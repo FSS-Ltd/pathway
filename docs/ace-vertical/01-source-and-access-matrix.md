@@ -30,6 +30,14 @@ APIs are merged; the role-write retirement and assignment migration remain
 separate delivery steps. The original R01-R14 rows below are historical where
 they describe customer role mutations.
 
+The ACE-only `ace.attendance.export` capability is site-scoped, sensitive,
+delegable, and part of ACE core. Fixed Organisation Head and Site Lead roles
+hold it; other fixed roles do not. The `attendance-exporter` tag maps only to
+that key and cannot be granted outside an active ACE organisation by an actor
+who holds and may delegate it. The daily export route is a later step outside
+the original 68-route contract; its site, dated enrolment, year-band, row
+limit, tenant RLS, and audit checks are required in addition to the key.
+
 Step 1.2c adds these routes outside the original 68-route ACE contract. Each
 uses the authenticated request's organisation and selected site. Grant and
 revoke require an active fixed Organisation Head assignment; a legacy role

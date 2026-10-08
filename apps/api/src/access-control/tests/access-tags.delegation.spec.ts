@@ -21,6 +21,7 @@ interface FixtureOptions {
   permissionActive?: boolean;
   moduleActive?: boolean;
   permissionScope?: "organisation" | "site";
+  vertical?: Vertical;
 }
 
 function fixture(options: FixtureOptions = {}) {
@@ -33,6 +34,7 @@ function fixture(options: FixtureOptions = {}) {
     permissionActive = true,
     moduleActive = false,
     permissionScope = "site",
+    vertical = Vertical.ACE_SCHOOL,
   } = options;
   const knownKeys = permissionKeys ?? [heldKey ?? "attendance.manage"];
   const actorKeys = permissionKeys ?? (heldKey ? [heldKey] : []);
@@ -77,9 +79,7 @@ function fixture(options: FixtureOptions = {}) {
       ),
     },
     orgVertical: {
-      findUnique: jest
-        .fn()
-        .mockResolvedValue({ vertical: Vertical.ACE_SCHOOL }),
+      findUnique: jest.fn().mockResolvedValue({ vertical }),
     },
     orgModule: {
       findMany: jest
@@ -187,6 +187,39 @@ describe("access-tag delegation", () => {
         ),
       ),
     ).resolves.toBe("ACCESS_TAG_ASSIGNEE_NOT_IN_SITE");
+  });
+
+  it("requires the ACE export permission for the attendance-exporter tag", async () => {
+    const allowed = fixture({ heldKey: "ace.attendance.export" });
+    await expect(
+      assertCanGrantAccessTag(
+        allowed.tx,
+        ACTOR,
+        { userId: "staff-1", tagKey: "attendance-exporter", scope: "site" },
+        NOW,
+      ),
+    ).resolves.toBe("site-1");
+
+    for (const options of [
+      { heldKey: "attendance.manage" },
+      { heldKey: "ace.attendance.export", vertical: Vertical.CHURCH },
+    ]) {
+      const denied = fixture(options);
+      await expect(
+        deniedCode(
+          assertCanGrantAccessTag(
+            denied.tx,
+            ACTOR,
+            {
+              userId: "staff-1",
+              tagKey: "attendance-exporter",
+              scope: "site",
+            },
+            NOW,
+          ),
+        ),
+      ).resolves.toBe("ACCESS_TAG_CANNOT_DELEGATE");
+    }
   });
 
   it("denies inactive, unheld, or incompatible permissions", async () => {

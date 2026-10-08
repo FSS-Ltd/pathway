@@ -66,6 +66,14 @@ export const CAPABILITY_DEFINITIONS = {
     "site",
     "standard",
   ),
+  "ace.attendance.export": defineCapability(
+    "Export ACE attendance",
+    "Export daily attendance records within the active site and assigned scope",
+    "site",
+    "sensitive",
+    true,
+    aceRequirement,
+  ),
   "volunteers.manage": defineCapability(
     "Manage volunteers",
     "Manage volunteer records for the active site",

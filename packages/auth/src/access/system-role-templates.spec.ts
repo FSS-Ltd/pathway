@@ -43,6 +43,7 @@ describe("ACE system role templates", () => {
           "platform.access.audit.read",
           "attendance.read",
           "attendance.manage",
+          "ace.attendance.export",
           "messaging.conversations.read",
           "messaging.conversations.create",
           "messaging.messages.read",
@@ -99,6 +100,7 @@ describe("ACE system role templates", () => {
         permissions: [
           "attendance.read",
           "attendance.manage",
+          "ace.attendance.export",
           "messaging.conversations.read",
           "messaging.conversations.create",
           "messaging.messages.read",
@@ -254,6 +256,25 @@ describe("ACE system role templates", () => {
     );
   });
 
+  it("reserves ACE attendance export for leaders or an explicit access tag", () => {
+    expect(SYSTEM_ROLE_TEMPLATES.organisationHead.permissions).toContain(
+      "ace.attendance.export",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.siteLead.permissions).toContain(
+      "ace.attendance.export",
+    );
+    for (const key of [
+      "staff",
+      "safeguardingLead",
+      "parent",
+      "student",
+    ] as const) {
+      expect(SYSTEM_ROLE_TEMPLATES[key].permissions).not.toContain(
+        "ace.attendance.export",
+      );
+    }
+  });
+
   it("gives every template except financeOperator at least one core (vertical-independent) permission", () => {
     const coreSet = new Set(CORE_PERMISSIONS);
     for (const [key, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
@@ -274,6 +295,7 @@ describe("ACE system role templates", () => {
     const siteOrOrgOnlyCore = [
       "attendance.read",
       "attendance.manage",
+      "ace.attendance.export",
       "notices.read",
       "notices.manage",
       "notices.publish",
