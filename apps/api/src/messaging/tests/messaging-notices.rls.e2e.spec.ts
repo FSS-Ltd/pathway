@@ -19,6 +19,7 @@ import { MessagingService } from "../messaging.service";
 import { MessagingConversationService } from "../messaging-conversation.service";
 import { MessagingCommandService } from "../messaging-command.service";
 import { ParentMessagingHistoryService } from "../parent-messaging-history.service";
+import { ParentMessagingReadCursorService } from "../parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "../parent-messaging.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
@@ -1962,6 +1963,98 @@ describe("ACE parent/staff messaging and notices storage", () => {
         ),
       "23505",
     );
+  });
+
+  it("advances only a current parent's own school-team cursor to an existing sequence", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createParentStaffConversation(tx, fixture);
+        const messages = [];
+        for (const body of ["First update", "Second update"]) {
+          messages.push(
+            await tx.message.create({
+              data: {
+                tenantId: fixture.tenantAId,
+                conversationId: conversation.conversationId,
+                senderParticipantId: conversation.staffParticipantIds[0],
+                clientRequestId: randomUUID(),
+                bodyEncrypted: body,
+              },
+            }),
+          );
+        }
+        return { ...conversation, messages };
+      },
+    );
+    const [first, second] = created.messages;
+    const cursor = new ParentMessagingReadCursorService();
+    const list = new ParentMessagingService();
+    const advance = (
+      userId: string,
+      conversationId: string,
+      sequence: number,
+    ) =>
+      cursor.advance(fixture.tenantAId, userId, conversationId, { sequence });
+
+    expect(
+      (await list.list(fixture.tenantAId, fixture.guardianAUserId)).items[0]
+        .unreadCount,
+    ).toBe(2);
+    await expect(
+      advance(fixture.guardianAUserId, created.conversationId, second.sequence),
+    ).resolves.toEqual({ lastReadSequence: second.sequence });
+    await expect(
+      advance(fixture.guardianAUserId, created.conversationId, first.sequence),
+    ).resolves.toEqual({ lastReadSequence: second.sequence });
+    expect(
+      (await list.list(fixture.tenantAId, fixture.guardianAUserId)).items[0]
+        .unreadCount,
+    ).toBe(0);
+    await expect(
+      advance(
+        fixture.guardianAUserId,
+        created.conversationId,
+        second.sequence + 1,
+      ),
+    ).rejects.toThrow("Message sequence not found");
+    for (const userId of [
+      fixture.guardianBUserId,
+      fixture.staffAId,
+      fixture.studentUserId,
+    ]) {
+      await expect(
+        advance(userId, created.conversationId, first.sequence),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    }
+    await expect(
+      cursor.advance(
+        fixture.tenantBId,
+        fixture.guardianAUserId,
+        created.conversationId,
+        { sequence: first.sequence },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    const guardianParticipantId = created.guardianParticipantId;
+    if (!guardianParticipantId) throw new Error("Missing guardian participant");
+    const cursors = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.messageParticipantReadCursor.findMany({
+          where: { conversationId: created.conversationId },
+          select: { participantId: true, lastReadSequence: true },
+        }),
+    );
+    expect(cursors).toEqual([
+      {
+        participantId: guardianParticipantId,
+        lastReadSequence: second.sequence,
+      },
+    ]);
   });
 
   it("rejects guardians in staff conversations, student participants, and guardians without active relationships", async () => {

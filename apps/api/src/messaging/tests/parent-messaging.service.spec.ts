@@ -1,6 +1,7 @@
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import { ParentMessagingHistoryService } from "../parent-messaging-history.service";
+import { ParentMessagingReadCursorService } from "../parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "../parent-messaging.service";
 
 jest.mock("@pathway/auth", () => ({
@@ -17,6 +18,7 @@ jest.mock("@pathway/db", () => ({
 
 function setup() {
   const tx = {
+    $queryRaw: jest.fn().mockResolvedValue([{ lastReadSequence: 6 }]),
     user: { findFirst: jest.fn().mockResolvedValue({ id: "parent-a" }) },
     guardianIdentity: {
       findFirst: jest.fn().mockResolvedValue({ id: "guardian-a" }),
@@ -44,6 +46,7 @@ function setup() {
     },
     message: {
       count: jest.fn().mockResolvedValue(3),
+      findFirst: jest.fn().mockResolvedValue({ id: "message-six" }),
       findMany: jest.fn().mockResolvedValue([]),
     },
   };
@@ -60,6 +63,7 @@ function setup() {
     tx,
     service: new ParentMessagingService(),
     history: new ParentMessagingHistoryService(),
+    readCursor: new ParentMessagingReadCursorService(),
   };
 }
 
@@ -149,6 +153,77 @@ describe("parent messaging list", () => {
       NotFoundException,
     );
     expect(withTenantRlsContext).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("parent messaging read cursor", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("advances only the linked guardian's school-team participant", async () => {
+    const { tx, readCursor } = setup();
+    await expect(
+      readCursor.advance("site-a", "parent-a", "conversation-a", {
+        sequence: 6,
+      }),
+    ).resolves.toEqual({ lastReadSequence: 6 });
+    expect(tx.messageConversation.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "conversation-a",
+        tenantId: "site-a",
+        guardianIdentityId: "guardian-a",
+      }),
+      select: {
+        participants: {
+          where: {
+            tenantId: "site-a",
+            userId: "parent-a",
+            kind: "GUARDIAN",
+            guardianIdentityId: "guardian-a",
+            removedAt: null,
+          },
+          select: { id: true },
+          take: 1,
+        },
+      },
+    });
+    expect(tx.message.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: "site-a",
+        conversationId: "conversation-a",
+        sequence: 6,
+      },
+      select: { id: true },
+    });
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects inaccessible threads and nonexistent sequences before writing", async () => {
+    const { tx, readCursor } = setup();
+    tx.messageConversation.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      readCursor.advance("site-a", "parent-a", "other-conversation", {
+        sequence: 6,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    tx.message.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      readCursor.advance("site-a", "parent-a", "conversation-a", {
+        sequence: 7,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it("denies ended guardian relationships before changing a cursor", async () => {
+    const { tx, readCursor } = setup();
+    tx.guardianIdentity.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      readCursor.advance("site-a", "parent-a", "conversation-a", {
+        sequence: 6,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.messageConversation.findFirst).not.toHaveBeenCalled();
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 });
 

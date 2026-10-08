@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   Param,
+  Put,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -13,8 +15,10 @@ import { IndependentTransaction } from "../common/database/independent-transacti
 import {
   conversationIdSchema,
   messageQuerySchema,
+  readCursorSchema,
 } from "./dto/messaging-query.dto";
 import { ParentMessagingHistoryService } from "./parent-messaging-history.service";
+import { ParentMessagingReadCursorService } from "./parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "./parent-messaging.service";
 
 @UseGuards(AuthUserGuard)
@@ -24,6 +28,7 @@ export class ParentMessagingController {
   constructor(
     private readonly service: ParentMessagingService,
     private readonly history: ParentMessagingHistoryService,
+    private readonly readCursor: ParentMessagingReadCursorService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -47,6 +52,27 @@ export class ParentMessagingController {
         this.requestContext.requireContext().user.userId,
         await conversationIdSchema.parseAsync(id),
         await messageQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(error.flatten());
+      }
+      throw error;
+    }
+  }
+
+  @Put(":id/read-cursor")
+  async advanceReadCursor(
+    @Param("siteId") siteId: string,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    try {
+      return await this.readCursor.advance(
+        siteId,
+        this.requestContext.requireContext().user.userId,
+        await conversationIdSchema.parseAsync(id),
+        await readCursorSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError) {
