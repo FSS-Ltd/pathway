@@ -87,6 +87,7 @@ export type RolesTransactionRunner = <T>(
 
 export function createRolesTransactionBoundary(
   transactionRunner: RolesTransactionRunner = runTransaction,
+  bindScopedContext = true,
 ): RolesTransactionBoundary {
   return {
     async run(actor, operation) {
@@ -107,6 +108,7 @@ export function createRolesTransactionBoundary(
           }
         }
 
+        if (!bindScopedContext) return operation(tx);
         return withPrismaTransactionContext(
           tx,
           () => operation(tx),
@@ -125,6 +127,12 @@ export function createRolesTransactionBoundary(
 }
 
 export const rolesTransactionBoundary = createRolesTransactionBoundary();
+
+/** Maintenance cutover explicitly switches site RLS on its owned transaction. */
+export const maintenanceRolesTransactionBoundary = createRolesTransactionBoundary(
+  runTransaction,
+  false,
+);
 
 export interface UpdateRoleCommand extends UpdateRoleDto {
   roleId: string;
