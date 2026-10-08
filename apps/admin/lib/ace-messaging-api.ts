@@ -25,9 +25,9 @@ export type StaffRecipientPage = {
   hasMore: boolean;
 };
 
-export type OpenedStaffConversation = {
+type OpenedStaffConversation<Kind extends StaffConversation["kind"]> = {
   id: string;
-  kind: "STAFF_DIRECT";
+  kind: Kind;
   created: boolean;
 };
 
@@ -64,12 +64,23 @@ export async function searchStaffRecipients(
 
 export async function openStaffDirectConversation(
   recipientUserId: string,
-): Promise<OpenedStaffConversation> {
+): Promise<OpenedStaffConversation<"STAFF_DIRECT">> {
   if (isUsingMockApi())
     throw new Error("Messaging is unavailable in mock mode.");
   return request(basePath, {
     method: "POST",
     body: JSON.stringify({ kind: "STAFF_DIRECT", recipientUserId }),
+  });
+}
+
+export async function openStaffRoom(): Promise<
+  OpenedStaffConversation<"STAFF_ROOM">
+> {
+  if (isUsingMockApi())
+    throw new Error("Messaging is unavailable in mock mode.");
+  return request(basePath, {
+    method: "POST",
+    body: JSON.stringify({ kind: "STAFF_ROOM" }),
   });
 }
 

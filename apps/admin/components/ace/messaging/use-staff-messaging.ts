@@ -7,6 +7,7 @@ import {
   fetchStaffConversations,
   fetchStaffMessages,
   openStaffDirectConversation,
+  openStaffRoom,
   sendStaffMessage,
   type StaffConversation,
   type StaffMessage,
@@ -33,6 +34,8 @@ export function useStaffMessaging(currentUserId: string) {
   const [drafts, setDrafts] = React.useState<Record<string, string>>({});
   const [sendingId, setSendingId] = React.useState<string | null>(null);
   const [sendError, setSendError] = React.useState<string | null>(null);
+  const [roomOpening, setRoomOpening] = React.useState(false);
+  const [roomError, setRoomError] = React.useState<string | null>(null);
   const siteGeneration = React.useRef(0);
   const threadGeneration = React.useRef(0);
   const selectedIdRef = React.useRef(selectedId);
@@ -54,6 +57,8 @@ export function useStaffMessaging(currentUserId: string) {
       setListError(null);
       setThreadError(null);
       setSendError(null);
+      setRoomOpening(false);
+      setRoomError(null);
       setListMoreLoading(false);
       setThreadMoreLoading(false);
       setSendingId(null);
@@ -263,18 +268,17 @@ export function useStaffMessaging(currentUserId: string) {
     setThreadError(null);
     setThreadMoreLoading(false);
     setSendError(null);
+    setRoomError(null);
   }
 
-  async function startDirectConversation(
-    recipient: StaffRecipient,
-  ): Promise<boolean> {
-    const site = siteGeneration.current;
-    const opened = await openStaffDirectConversation(recipient.id);
-    if (site !== siteGeneration.current) return false;
+  function selectOpenedConversation(
+    opened: Pick<StaffConversation, "id" | "kind">,
+    title: string,
+  ) {
     const summary: StaffConversation = {
       id: opened.id,
       kind: opened.kind,
-      title: recipient.displayName,
+      title,
       latestMessage: null,
       updatedAt: new Date().toISOString(),
       unreadCount: 0,
@@ -288,7 +292,34 @@ export function useStaffMessaging(currentUserId: string) {
         : [summary, ...current],
     );
     selectConversation(opened.id);
+  }
+
+  async function startDirectConversation(
+    recipient: StaffRecipient,
+  ): Promise<boolean> {
+    const site = siteGeneration.current;
+    const opened = await openStaffDirectConversation(recipient.id);
+    if (site !== siteGeneration.current) return false;
+    selectOpenedConversation(opened, recipient.displayName);
     return true;
+  }
+
+  async function startStaffRoom(): Promise<void> {
+    if (roomOpening) return;
+    const site = siteGeneration.current;
+    setRoomOpening(true);
+    setRoomError(null);
+    try {
+      const opened = await openStaffRoom();
+      if (site !== siteGeneration.current) return;
+      selectOpenedConversation(opened, "Staff room");
+    } catch (error) {
+      if (site === siteGeneration.current) {
+        setRoomError(messageFrom(error, "Unable to open the staff room."));
+      }
+    } finally {
+      if (site === siteGeneration.current) setRoomOpening(false);
+    }
   }
 
   return {
@@ -301,6 +332,9 @@ export function useStaffMessaging(currentUserId: string) {
     selectedId,
     select: selectConversation,
     startDirectConversation,
+    startStaffRoom,
+    roomOpening,
+    roomError,
     messages,
     nextBefore,
     threadLoading,
