@@ -170,17 +170,14 @@ describe("ACE daily attendance fact storage", () => {
           siteId,
           "2042-09-03",
         );
-        await tx.aceDailyAttendance.create({
-          data: {
-            tenantId: siteId,
-            childId,
-            date,
-            status: "ABSENT",
-            recordedByUserId: actorId,
-          },
-        });
+        await tx.$executeRaw`
+          INSERT INTO "AceDailyAttendance"
+            ("id", "tenantId", "childId", "date", "status", "recordedByUserId", "updatedAt")
+          VALUES
+            (${randomUUID()}, ${siteId}, ${childId}, ${date}::date, 'ABSENT', ${actorId}, CURRENT_TIMESTAMP)
+        `;
       }),
-    ).rejects.toMatchObject({ code: "P2004" });
+    ).rejects.toMatchObject({ code: "P2010", meta: { code: "23514" } });
 
     await expect(
       withTenantRlsContext(siteId, orgId, async (tx) => {
@@ -217,17 +214,14 @@ describe("ACE daily attendance fact storage", () => {
             dateString,
             calendar,
           );
-          await tx.aceDailyAttendance.create({
-            data: {
-              tenantId: siteId,
-              childId,
-              date,
-              status: "PRESENT",
-              recordedByUserId: actorId,
-            },
-          });
+          await tx.$executeRaw`
+            INSERT INTO "AceDailyAttendance"
+              ("id", "tenantId", "childId", "date", "status", "recordedByUserId", "updatedAt")
+            VALUES
+              (${randomUUID()}, ${siteId}, ${childId}, ${date}::date, 'PRESENT', ${actorId}, CURRENT_TIMESTAMP)
+          `;
         }),
-      ).rejects.toMatchObject({ code: "P2004" });
+      ).rejects.toMatchObject({ code: "P2010", meta: { code: "23514" } });
     }
   });
 
@@ -302,18 +296,17 @@ describe("ACE daily attendance fact storage", () => {
       return event.id;
     });
 
-    await expect(
-      withTenantRlsContext(siteId, orgId, (tx) =>
-        tx.aceDailyAttendanceCorrectionEvent.delete({
+    await withTenantRlsContext(siteId, orgId, async (tx) => {
+      await tx.$executeRawUnsafe('SET LOCAL ROLE "pathway_e2e_tenant_rls"');
+      expect(
+        await tx.aceDailyAttendanceCorrectionEvent.deleteMany({
           where: { id: eventId },
         }),
-      ),
-    ).rejects.toThrow();
-    await expect(
-      withTenantRlsContext(siteId, orgId, (tx) =>
-        tx.aceDailyAttendance.delete({ where: { id: markId } }),
-      ),
-    ).rejects.toThrow();
+      ).toEqual({ count: 0 });
+      expect(
+        await tx.aceDailyAttendance.deleteMany({ where: { id: markId } }),
+      ).toEqual({ count: 0 });
+    });
     expect(
       await withTenantRlsContext(siteId, orgId, (tx) =>
         tx.aceDailyAttendance.findUnique({ where: { id: markId } }),
