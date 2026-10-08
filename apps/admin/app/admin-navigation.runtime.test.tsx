@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import {
   SidebarNav,
   type SidebarNavItem,
@@ -16,6 +15,10 @@ Object.assign(globalThis, {
   document: dom.window.document,
   HTMLElement: dom.window.HTMLElement,
   IS_REACT_ACT_ENVIRONMENT: true,
+});
+Object.defineProperty(globalThis, "navigator", {
+  value: dom.window.navigator,
+  configurable: true,
 });
 
 const items: SidebarNavItem[] = [
@@ -49,6 +52,7 @@ function groupButton(nav: Element, label: string): HTMLButtonElement {
 }
 
 async function run(): Promise<void> {
+  const { renderToStaticMarkup } = await import("react-dom/server");
   const defaultMarkup = renderToStaticMarkup(
     <SidebarNav items={items} currentPath="/ace" />,
   );
