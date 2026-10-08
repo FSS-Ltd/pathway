@@ -3735,6 +3735,214 @@ describe("ACE parent/staff messaging and notices storage", () => {
     expect(notice?.publishedAt).not.toBeNull();
   });
 
+  it("allows draft edits but rejects an expired notice at publication", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const noticeId = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const id = await insertNotice(tx, fixture);
+        await tx.$executeRaw`
+          UPDATE "AceNotice"
+          SET "title" = 'Edited draft', "expiresAt" = CURRENT_TIMESTAMP - interval '1 hour'
+          WHERE "id" = ${id}
+        `;
+        await insertNoticeAudienceMember(tx, fixture, {
+          noticeId: id,
+          recipientUserId: fixture.staffCId,
+          recipientKind: "STAFF",
+        });
+        return id;
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          publishNotice(tx, noticeId),
+        ),
+      "23514",
+    );
+    const [notice] = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$queryRaw<Array<{ title: string; publishedAt: Date | null }>>`
+          SELECT "title", "publishedAt" FROM "AceNotice" WHERE "id" = ${noticeId}
+        `,
+    );
+    expect(notice).toEqual({ title: "Edited draft", publishedAt: null });
+  });
+
+  it("freezes published content and attachments while allowing final withdrawal", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const { noticeId, attachmentId } = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const id = await insertNotice(tx, fixture);
+        await tx.$executeRaw`
+          UPDATE "AceNotice"
+          SET "expiresAt" = CURRENT_TIMESTAMP + interval '1 day'
+          WHERE "id" = ${id}
+        `;
+        const attachmentId = await insertNoticeAttachment(tx, fixture, id);
+        await insertNoticeAudienceMember(tx, fixture, {
+          noticeId: id,
+          recipientUserId: fixture.staffCId,
+          recipientKind: "STAFF",
+        });
+        await publishNotice(tx, id);
+        return { noticeId: id, attachmentId };
+      },
+    );
+
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`
+            UPDATE "AceNotice"
+            SET "title" = 'Changed', "body" = 'Changed',
+                "expiresAt" = CURRENT_TIMESTAMP + interval '2 days'
+            WHERE "id" = ${noticeId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`
+            DELETE FROM "AceNoticeAttachment" WHERE "id" = ${attachmentId}
+          `,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+          insertNoticeAttachment(tx, fixture, noticeId),
+        ),
+      "55000",
+    );
+
+    await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$executeRaw`
+        UPDATE "AceNotice" SET "withdrawnAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${noticeId}
+      `,
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`
+            UPDATE "AceNotice" SET "withdrawnAt" = NULL
+            WHERE "id" = ${noticeId}
+          `,
+        ),
+      "55000",
+    );
+  });
+
+  it("makes read times write-once and denies new reads after withdrawal", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const { noticeId, firstReceiptId, secondReceiptId } =
+      await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        async (tx) => {
+          const noticeId = await insertNotice(tx, fixture);
+          const firstMemberId = await insertNoticeAudienceMember(tx, fixture, {
+            noticeId,
+            recipientUserId: fixture.staffBId,
+            recipientKind: "STAFF",
+          });
+          const secondMemberId = await insertNoticeAudienceMember(tx, fixture, {
+            noticeId,
+            recipientUserId: fixture.staffCId,
+            recipientKind: "STAFF",
+          });
+          await publishNotice(tx, noticeId);
+          const firstReceiptId = await insertNoticeReceipt(
+            tx,
+            fixture,
+            firstMemberId,
+          );
+          const secondReceiptId = await insertNoticeReceipt(
+            tx,
+            fixture,
+            secondMemberId,
+          );
+          await tx.$executeRaw`
+            UPDATE "AceNoticeReceipt" SET "deliveredAt" = CURRENT_TIMESTAMP
+            WHERE "id" IN (${firstReceiptId}, ${secondReceiptId})
+          `;
+          return { noticeId, firstReceiptId, secondReceiptId };
+        },
+      );
+
+    await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$executeRaw`
+        UPDATE "AceNoticeReceipt" SET "readAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${firstReceiptId}
+      `,
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`
+            UPDATE "AceNoticeReceipt"
+            SET "readAt" = CURRENT_TIMESTAMP + interval '1 minute'
+            WHERE "id" = ${firstReceiptId}
+          `,
+        ),
+      "55000",
+    );
+    await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.$executeRaw`
+        UPDATE "AceNotice" SET "withdrawnAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${noticeId}
+      `,
+    );
+    await expectDatabaseRejection(
+      () =>
+        withMessagingRlsContext(
+          fixture.tenantAId,
+          fixture.orgAId,
+          (tx) =>
+            tx.$executeRaw`
+            UPDATE "AceNoticeReceipt" SET "readAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${secondReceiptId}
+          `,
+        ),
+      "23514",
+    );
+  });
+
   it("rejects receipts for a draft notice audience", async () => {
     if (!isDatabaseAvailable()) return;
 
