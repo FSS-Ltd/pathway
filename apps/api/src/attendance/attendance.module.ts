@@ -14,6 +14,8 @@ import { StudentDailyAttendanceController } from "./student-daily-attendance.con
 import { StudentDailyAttendanceService } from "./student-daily-attendance.service";
 import { ParentDailyAttendanceController } from "./parent-daily-attendance.controller";
 import { ParentDailyAttendanceService } from "./parent-daily-attendance.service";
+import { FamilyContextsController } from "./family-contexts.controller";
+import { FamilyContextsService } from "./family-contexts.service";
 
 @Module({
   imports: [CommonModule, Av30Module, AuthModule, AccessControlModule],
@@ -21,6 +23,7 @@ import { ParentDailyAttendanceService } from "./parent-daily-attendance.service"
     DailyAttendanceController,
     StudentDailyAttendanceController,
     ParentDailyAttendanceController,
+    FamilyContextsController,
     AttendanceController,
   ],
   providers: [
@@ -31,6 +34,7 @@ import { ParentDailyAttendanceService } from "./parent-daily-attendance.service"
     DailyAttendanceWriteService,
     StudentDailyAttendanceService,
     ParentDailyAttendanceService,
+    FamilyContextsService,
   ],
   exports: [AttendanceService],
 })

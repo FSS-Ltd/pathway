@@ -8,8 +8,8 @@ bounded staff correction-history read. Step 1.3g8 adds the staff web register
 for marking, correction and history. Step 1.3g9 adds a student-only daily mark
 history API. Step 1.3g10 adds a linked-parent daily mark history API. Step
 1.3g11 adds parent and student web views for explicit site and child links.
-Self-service site and child discovery, exports and production migration remain
-open.
+Step 1.3g12 adds authenticated family site and child discovery. A family
+landing page, exports and production migration remain open.
 
 ## Source behaviour and current gap
 
@@ -89,6 +89,20 @@ child ID from an explicit link; both call the existing guarded API and show
 recorded-day counts without implying an attendance rate. These pages do not
 yet discover a signed-in person's linked sites or children. Navigation from an
 invitation or family landing page remains a separate step.
+
+Step 1.3g12 adds `GET /ace/family/contexts` for a signed-in person. A narrow
+forced-RLS read policy lets the API discover only that person's guardian and
+student identity site IDs without a selected site. Each candidate site is then
+rechecked in a tenant-scoped transaction. A parent context requires the
+organisation's parent portal switch, an active `FULL` guardian relationship,
+and a non-guest child. A student context requires the site's student portal
+policy, exactly one active self-link, and a non-guest child. The response
+contains only context kind, site ID/name and child ID/name. It does not grant
+attendance access: the daily-history routes still recheck their own boundaries
+on every request. The discovery policy adds no table grant to browser database
+roles and no write permission. The read is limited to 100 identity sites per
+kind; an excess fails rather than silently omitting links. The migration must
+be applied before the endpoint can discover contexts in production.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
