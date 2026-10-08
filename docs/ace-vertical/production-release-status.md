@@ -162,9 +162,13 @@ family-context discovery suite within 71 integration suites and 443 tests.
 The self-scoped discovery API and narrow identity read policy are merged but
 not in production. A family landing page remains the next web step.
 
-Step 1.3g13 is in progress on `feature/ace-family-landing`. It connects the
-merged context-discovery API to a family-only web entry point and the guarded
-daily attendance pages. It is not in production.
+Step 1.3g13 merged in [PR #451](https://github.com/FSS-Ltd/pathway/pull/451)
+at `7619de8b3551e4ae804c8077539a99b1ab2debb4`. All eight checks passed
+on head `9a430bb7ed9f99ef4fa1d117c31a2f49f784ba95` (CI run
+37733318199; CodeQL run 37733314937). Local admin build and the full admin
+test script passed, including the family landing interaction test. The
+family-only entry point links authorised contexts to guarded daily attendance
+pages. It is not in production; broader family journeys remain open.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
