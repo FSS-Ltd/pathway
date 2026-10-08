@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   Injectable,
@@ -20,6 +19,7 @@ import {
   STAFF_CONVERSATION_KINDS,
   type MessagingActor,
 } from "./messaging-access";
+import { advanceMessageReadCursor } from "./messaging-read-cursor";
 
 const DEFAULT_LIMIT = 20;
 
@@ -290,23 +290,13 @@ export class MessagingService {
       });
       if (!message) throw new BadRequestException("Message sequence not found");
 
-      const rows = await tx.$queryRaw<Array<{ lastReadSequence: number }>>`
-        INSERT INTO "MessageParticipantReadCursor" (
-          "id", "tenantId", "conversationId", "participantId", "lastReadSequence"
-        ) VALUES (
-          ${randomUUID()}, ${actor.tenantId}, ${conversationId},
-          ${participant.id}, ${input.sequence}
-        )
-        ON CONFLICT ("tenantId", "conversationId", "participantId")
-        DO UPDATE SET
-          "lastReadSequence" = GREATEST(
-            "MessageParticipantReadCursor"."lastReadSequence",
-            EXCLUDED."lastReadSequence"
-          ),
-          "updatedAt" = CURRENT_TIMESTAMP
-        RETURNING "lastReadSequence"
-      `;
-      return { lastReadSequence: rows[0].lastReadSequence };
+      return advanceMessageReadCursor(
+        tx,
+        actor.tenantId,
+        conversationId,
+        participant.id,
+        input.sequence,
+      );
     });
   }
 }
