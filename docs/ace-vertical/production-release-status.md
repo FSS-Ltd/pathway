@@ -94,6 +94,7 @@ does not release the new parent screen.
 | 1.3e4d   | Linked-parent school-team conversation open API                        | Merged  | [#478](https://github.com/FSS-Ltd/pathway/pull/478) to `master`                     | `f54b994d94f811c2f8bfb96cb822c9065b4ce21c`; all eight checks passed: CI run 37777932359, CodeQL run 37777929612.                                                                                                | `3f1ab2d6043fe59751e0c81e71820f2274b66e2e` |
 | 1.3e4e   | Linked-parent school-team message send API                             | Merged  | [#480](https://github.com/FSS-Ltd/pathway/pull/480) to `master`                     | `554a073025f3ae4d5a17b6ee7220c7f571037e22`; all eight checks passed: CI run 37781236015, CodeQL run 37781233614.                                                                                                | `b21c2baf1c5dfaba288843cce333960470d81779` |
 | 1.3e4f   | Linked-parent school-team messaging web journey                        | Merged  | [#482](https://github.com/FSS-Ltd/pathway/pull/482) to `master`                     | `90b22698b93186e99055dae6be59e78b5b53107b`; all eight checks passed: CI run 37787308119, CodeQL run 37787303829.                                                                                                | `eb0dab891860a287144dbcd27bc6432658b3e0a7` |
+| 1.3e4g   | Scoped staff school-team conversation inbox API                        | Merged  | [#484](https://github.com/FSS-Ltd/pathway/pull/484) to `master`                     | `096b9ad0b5b1a1471f0b18be5f9a2e30dff4f8cb`; all eight checks passed: CI run 37792543851, CodeQL run 37792542324.                                                                                                | `b90d2594b0cbde4331bf987eb386802b34a800ff` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -311,6 +312,15 @@ does not claim a read receipt the parent API cannot prove. Staff school-team
 replies and notices remain C12 work. The three production apps still serve
 older code. Estimated overall ACE update completion after this merge:
 **91%**.
+
+Step 1.3e4g merged in [PR #484](https://github.com/FSS-Ltd/pathway/pull/484)
+at `b90d2594b0cbde4331bf987eb386802b34a800ff`. All eight checks passed
+on head `096b9ad0b5b1a1471f0b18be5f9a2e30dff4f8cb`, including the
+PostgreSQL integration and RLS suites. The staff inbox API lists only the
+current approved responder's active parent threads within the selected site;
+it is separate from the direct/room inbox and does not yet have a staff web
+entry, history or reply route. The production apps still serve the older code
+commit. Estimated overall ACE update completion after this merge: **91%**.
 
 Step 1.3f1 was merged in [PR #413](https://github.com/FSS-Ltd/pathway/pull/413)
 after all eight checks passed on its final revision, including PostgreSQL
