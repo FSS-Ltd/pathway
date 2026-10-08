@@ -14,7 +14,9 @@ import { RequirePermission } from "../access-control/require-permission.decorato
 import { isDateOnly } from "../ace-settings/dto/academic-calendar.dto";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { DailyAttendanceService } from "./daily-attendance.service";
+import { DailyAttendanceHistoryService } from "./daily-attendance-history.service";
 import { DailyAttendanceWriteService } from "./daily-attendance-write.service";
+import { attendanceHistoryQuerySchema } from "./dto/attendance-history-query.dto";
 import { dailyAttendanceMarkSchema } from "./dto/daily-attendance-mark.dto";
 import { dailyAttendanceQuerySchema } from "./dto/daily-attendance-query.dto";
 
@@ -24,6 +26,7 @@ export class DailyAttendanceController {
   constructor(
     private readonly service: DailyAttendanceService,
     private readonly writeService: DailyAttendanceWriteService,
+    private readonly historyService: DailyAttendanceHistoryService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -36,6 +39,21 @@ export class DailyAttendanceController {
     }
     const context = this.requestContext.requireContext();
     return this.service.list(parsed.data, {
+      tenantId: context.tenant.tenantId,
+      orgId: context.org.orgId,
+      userId: context.user.userId,
+    });
+  }
+
+  @Get(":id/history")
+  @RequirePermission("attendance.read")
+  history(@Param("id") id: string, @Query() query: unknown) {
+    const parsed = attendanceHistoryQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    const context = this.requestContext.requireContext();
+    return this.historyService.list(id, parsed.data, {
       tenantId: context.tenant.tenantId,
       orgId: context.org.orgId,
       userId: context.user.userId,
