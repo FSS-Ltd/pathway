@@ -31,15 +31,22 @@ describeIfDb("notice guardian eligibility in the identity schema", () => {
     const tenantId = id();
     const otherTenantId = id();
     const childId = id();
+    const guestChildId = id();
     const guardianId = id();
     const unlinkedId = id();
     const endedId = id();
     const noneId = id();
+    const limitedId = id();
+    const revokedId = id();
+    const guestId = id();
     const studentGuardianId = id();
     const guardianUserId = id();
     const unlinkedUserId = id();
     const endedUserId = id();
     const noneUserId = id();
+    const limitedUserId = id();
+    const revokedUserId = id();
+    const guestUserId = id();
     const studentUserId = id();
     const staffUserId = id();
     const outsiderUserId = id();
@@ -68,6 +75,9 @@ describeIfDb("notice guardian eligibility in the identity schema", () => {
             unlinkedUserId,
             endedUserId,
             noneUserId,
+            limitedUserId,
+            revokedUserId,
+            guestUserId,
             studentUserId,
             staffUserId,
             outsiderUserId,
@@ -87,6 +97,15 @@ describeIfDb("notice guardian eligibility in the identity schema", () => {
               lastName: "Probe",
             },
           });
+          await tx.child.create({
+            data: {
+              id: guestChildId,
+              tenantId,
+              firstName: "Guest",
+              lastName: "Probe",
+              isGuest: true,
+            },
+          });
           await tx.siteMembership.createMany({
             data: [staffUserId, studentUserId].map((userId) => ({
               tenantId,
@@ -99,15 +118,21 @@ describeIfDb("notice guardian eligibility in the identity schema", () => {
               ('${unlinkedId}', '${tenantId}', '${unlinkedUserId}'),
               ('${endedId}', '${tenantId}', '${endedUserId}'),
               ('${noneId}', '${tenantId}', '${noneUserId}'),
+              ('${limitedId}', '${tenantId}', '${limitedUserId}'),
+              ('${revokedId}', '${tenantId}', '${revokedUserId}'),
+              ('${guestId}', '${tenantId}', '${guestUserId}'),
               ('${studentGuardianId}', '${tenantId}', '${studentUserId}')
           `);
           await tx.$executeRawUnsafe(`
             INSERT INTO "GuardianChildRelationship"
-              ("id", "tenantId", "guardianIdentityId", "childId", "legalAccess", "startsAt", "endedAt") VALUES
-              ('${id()}', '${tenantId}', '${guardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL),
-              ('${id()}', '${tenantId}', '${endedId}', '${childId}', 'FULL', now() - interval '2 days', now() - interval '1 day'),
-              ('${id()}', '${tenantId}', '${noneId}', '${childId}', 'NONE', now() - interval '2 days', NULL),
-              ('${id()}', '${tenantId}', '${studentGuardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL)
+              ("id", "tenantId", "guardianIdentityId", "childId", "legalAccess", "startsAt", "endedAt", "revokedAt", "revokedByUserId", "revocationReason") VALUES
+              ('${id()}', '${tenantId}', '${guardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${endedId}', '${childId}', 'FULL', now() - interval '2 days', now() - interval '1 day', NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${noneId}', '${childId}', 'NONE', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${limitedId}', '${childId}', 'LIMITED', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${revokedId}', '${childId}', 'FULL', now() - interval '2 days', NULL, now() - interval '1 day', '${staffUserId}', 'Probe'),
+              ('${id()}', '${tenantId}', '${guestId}', '${guestChildId}', 'FULL', now() - interval '2 days', NULL, NULL, NULL, NULL),
+              ('${id()}', '${tenantId}', '${studentGuardianId}', '${childId}', 'FULL', now() - interval '2 days', NULL, NULL, NULL, NULL)
           `);
           await tx.$executeRawUnsafe(`
             INSERT INTO "StudentIdentity" ("id", "tenantId", "userId")
@@ -135,6 +160,12 @@ describeIfDb("notice guardian eligibility in the identity schema", () => {
                 ('${tenantId}', '${endedUserId}', 'GUARDIAN', '${endedId}', 'PARENTS',
                  'Guardian notice recipients require a current guardian-child relationship'),
                 ('${tenantId}', '${noneUserId}', 'GUARDIAN', '${noneId}', 'PARENTS',
+                 'Guardian notice recipients require a current guardian-child relationship'),
+                ('${tenantId}', '${limitedUserId}', 'GUARDIAN', '${limitedId}', 'PARENTS',
+                 'Guardian notice recipients require a current guardian-child relationship'),
+                ('${tenantId}', '${revokedUserId}', 'GUARDIAN', '${revokedId}', 'PARENTS',
+                 'Guardian notice recipients require a current guardian-child relationship'),
+                ('${tenantId}', '${guestUserId}', 'GUARDIAN', '${guestId}', 'PARENTS',
                  'Guardian notice recipients require a current guardian-child relationship'),
                 ('${tenantId}', '${studentUserId}', 'GUARDIAN', '${studentGuardianId}', 'PARENTS',
                  'Students cannot receive ACE notice audiences'),
