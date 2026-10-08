@@ -213,7 +213,11 @@ describe("ACE student daily attendance history", () => {
       });
       await tx.studentIdentityLink.updateMany({
         where: { tenantId: siteId, childId },
-        data: { revokedAt: new Date(), revokedByUserId: recorderId },
+        data: {
+          revokedAt: new Date(),
+          revokedByUserId: recorderId,
+          revocationReason: "Student portal access closed",
+        },
       });
     });
     const revoked = await request(app.getHttpServer())
