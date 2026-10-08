@@ -1,8 +1,12 @@
 "use client";
 
 import React from "react";
+import { requestFailure } from "@/lib/request-error";
 import { Badge, Card, Label, Select } from "@pathway/ui";
-import { CAPABILITY_DEFINITIONS, type PermissionKey } from "@pathway/platform/capability-definitions";
+import {
+  CAPABILITY_DEFINITIONS,
+  type PermissionKey,
+} from "@pathway/platform/capability-definitions";
 import {
   fetchAccessSummary,
   fetchEffectivePermissions,
@@ -28,10 +32,17 @@ function roleNames(roles: AdminRoleDefinition[], roleIds: string[]): string {
     .join(", ");
 }
 
-export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProps) {
+export function EffectiveAccessPanel({
+  roles,
+  people,
+}: EffectiveAccessPanelProps) {
   const [userId, setUserId] = React.useState("");
-  const [permissions, setPermissions] = React.useState<AdminEffectivePermission[] | null>(null);
-  const [assignments, setAssignments] = React.useState<AdminAccessSummaryAssignment[] | null>(null);
+  const [permissions, setPermissions] = React.useState<
+    AdminEffectivePermission[] | null
+  >(null);
+  const [assignments, setAssignments] = React.useState<
+    AdminAccessSummaryAssignment[] | null
+  >(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -53,7 +64,9 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load effective access");
+          setError(
+            requestFailure(err, "Unable to load effective access.").message,
+          );
         }
       })
       .finally(() => {
@@ -65,7 +78,8 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
   }, [userId]);
 
   const groups = React.useMemo(
-    () => groupPermissionsByPrefix((permissions ?? []).map((p) => p.permissionKey)),
+    () =>
+      groupPermissionsByPrefix((permissions ?? []).map((p) => p.permissionKey)),
     [permissions],
   );
 
@@ -97,7 +111,9 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
       )}
 
       {isLoading && (
-        <div className="mt-4 py-4 text-center text-sm text-text-muted">Loading...</div>
+        <div className="mt-4 py-4 text-center text-sm text-text-muted">
+          Loading...
+        </div>
       )}
 
       {!isLoading && assignments && assignments.length > 0 && (
@@ -117,7 +133,10 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
                 <Badge variant="default">{assignment.scope}</Badge>
               </div>
               <span className="text-xs text-text-muted">
-                {formatAssignmentWindow(assignment.startsAt, assignment.expiresAt)}
+                {formatAssignmentWindow(
+                  assignment.startsAt,
+                  assignment.expiresAt,
+                )}
               </span>
             </div>
           ))}
@@ -150,13 +169,18 @@ export function EffectiveAccessPanel({ roles, people }: EffectiveAccessPanelProp
                         {definition?.label ?? key}
                       </span>
                       {definition && definition.sensitivity !== "standard" && (
-                        <Badge variant={sensitivityBadgeVariant(definition.sensitivity)}>
+                        <Badge
+                          variant={sensitivityBadgeVariant(
+                            definition.sensitivity,
+                          )}
+                        >
                           {definition.sensitivity}
                         </Badge>
                       )}
                     </div>
                     <span className="text-xs text-text-muted">
-                      Granted via: {[
+                      Granted via:{" "}
+                      {[
                         ...(entry?.sourceSuperUser ? ["Superuser"] : []),
                         ...(entry?.sourceRoleIds.length
                           ? [roleNames(roles, entry.sourceRoleIds)]

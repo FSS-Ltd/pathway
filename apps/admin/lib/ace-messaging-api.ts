@@ -1,4 +1,5 @@
 import { API_BASE_URL, buildAuthHeaders, isUsingMockApi } from "./api-client";
+import { apiErrorFromResponse } from "./api-transport";
 
 export type StaffConversation = {
   id: string;
@@ -145,10 +146,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     cache: "no-store",
   });
   if (!response.ok) {
-    throw new Error(
-      response.status === 403 || response.status === 404
-        ? "Messaging is no longer available to you at this site."
-        : "Unable to complete the messaging request. Try again.",
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to complete the messaging request. Try again.",
     );
   }
   return response.json() as Promise<T>;

@@ -1,7 +1,16 @@
 "use client";
 
 import React from "react";
-import { Badge, Button, Card, DataTable, Input, Label, Select, type ColumnDef } from "@pathway/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  Input,
+  Label,
+  Select,
+  type ColumnDef,
+} from "@pathway/ui";
 import { toast } from "sonner";
 import {
   assignRole,
@@ -12,6 +21,7 @@ import {
   type PersonRow,
 } from "@/lib/api-client";
 import { formatAssignmentWindow, parseCodedError } from "@/lib/roles";
+import { requestFailure } from "@/lib/request-error";
 
 export type AssignmentPanelProps = {
   roles: AdminRoleDefinition[];
@@ -28,7 +38,11 @@ function personLabel(people: PersonRow[], userId: string): string {
   return person ? `${person.name} (${person.email})` : userId;
 }
 
-export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanelProps) {
+export function AssignmentPanel({
+  roles,
+  people,
+  activeSiteId,
+}: AssignmentPanelProps) {
   const assignableRoles = roles.filter(
     (role) =>
       role.isSystem &&
@@ -36,7 +50,9 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
       (role.scope === "organisation" ||
         (activeSiteId !== null && role.tenantId === activeSiteId)),
   );
-  const [assignments, setAssignments] = React.useState<AdminRoleAssignment[]>([]);
+  const [assignments, setAssignments] = React.useState<AdminRoleAssignment[]>(
+    [],
+  );
   const [nextCursor, setNextCursor] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isLoadingMore, setIsLoadingMore] = React.useState(false);
@@ -61,7 +77,7 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
       setAssignments(result.items);
       setNextCursor(result.nextCursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load assignments");
+      setError(requestFailure(err, "Unable to load assignments.").message);
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +95,7 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
       setAssignments((prev) => [...prev, ...result.items]);
       setNextCursor(result.nextCursor);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load more assignments");
+      setError(requestFailure(err, "Unable to load more assignments.").message);
     } finally {
       setIsLoadingMore(false);
     }
@@ -129,12 +145,18 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
     {
       id: "person",
       header: "Person",
-      cell: (row) => <span className="text-sm text-text-primary">{personLabel(people, row.userId)}</span>,
+      cell: (row) => (
+        <span className="text-sm text-text-primary">
+          {personLabel(people, row.userId)}
+        </span>
+      ),
     },
     {
       id: "role",
       header: "Role",
-      cell: (row) => <Badge variant="default">{roleName(roles, row.roleDefinitionId)}</Badge>,
+      cell: (row) => (
+        <Badge variant="default">{roleName(roles, row.roleDefinitionId)}</Badge>
+      ),
       width: "180px",
     },
     {
@@ -178,7 +200,10 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
 
   return (
     <div className="flex flex-col gap-4">
-      <Card title="Assign a fixed role" description="Grant a platform role to a person in this organisation">
+      <Card
+        title="Assign a fixed role"
+        description="Grant a platform role to a person in this organisation"
+      >
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <Label htmlFor="assign-person">Person</Label>
@@ -239,7 +264,11 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
           <p className="mt-2 text-sm text-status-danger">{assignError}</p>
         )}
         <div className="mt-4">
-          <Button size="sm" onClick={handleAssign} disabled={isAssigning || assignableRoles.length === 0}>
+          <Button
+            size="sm"
+            onClick={handleAssign}
+            disabled={isAssigning || assignableRoles.length === 0}
+          >
             {isAssigning ? "Assigning…" : "Assign role"}
           </Button>
         </div>
@@ -252,7 +281,9 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
           </div>
         )}
         {isLoading ? (
-          <div className="py-8 text-center text-sm text-text-muted">Loading...</div>
+          <div className="py-8 text-center text-sm text-text-muted">
+            Loading...
+          </div>
         ) : (
           <>
             <DataTable
@@ -262,7 +293,12 @@ export function AssignmentPanel({ roles, people, activeSiteId }: AssignmentPanel
             />
             {nextCursor && (
               <div className="mt-3 flex justify-center">
-                <Button variant="secondary" size="sm" onClick={handleLoadMore} disabled={isLoadingMore}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                >
                   {isLoadingMore ? "Loading…" : "Load more"}
                 </Button>
               </div>

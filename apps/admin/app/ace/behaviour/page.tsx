@@ -16,11 +16,10 @@ import {
   type AdminBehaviourEntry,
 } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
-import { useSession } from "@/lib/use-session-compat";
+import { requestFailure } from "@/lib/request-error";
 
 export default function BehaviourPage() {
   const { state: adminState } = useAdminContext();
-  const { data: session, status: sessionStatus } = useSession();
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
   const canRead = hasFreshPermission(permissions, "ace.behaviour.read");
   const canRecord = hasFreshPermission(permissions, "ace.behaviour.record");
@@ -35,9 +34,12 @@ export default function BehaviourPage() {
     [],
   );
   const [history, setHistory] = React.useState<AdminBehaviourEntry[]>([]);
-  const activeSite = adminState.status === "ready"
-    ? adminState.snapshot.sites.find((site) => site.id === adminState.snapshot.activeSiteId)
-    : null;
+  const activeSite =
+    adminState.status === "ready"
+      ? adminState.snapshot.sites.find(
+          (site) => site.id === adminState.snapshot.activeSiteId,
+        )
+      : null;
   const activeSiteId = activeSite?.id ?? null;
   const siteTimeZone = activeSite?.timezone ?? null;
   const [isLoading, setIsLoading] = React.useState(true);
@@ -64,9 +66,7 @@ export default function BehaviourPage() {
       setHistory(nextHistory.items);
     } catch (cause) {
       setError(
-        cause instanceof Error && cause.message
-          ? cause.message
-          : "Unable to load behaviour capture.",
+        requestFailure(cause, "Unable to load behaviour capture.").message,
       );
       setHistory([]);
     } finally {
@@ -75,16 +75,9 @@ export default function BehaviourPage() {
   }, [siteTimeZone]);
 
   React.useEffect(() => {
-    if (
-      sessionStatus !== "authenticated" ||
-      !session ||
-      isLoadingAccess ||
-      !canRead
-    ) {
-      return;
-    }
+    if (isLoadingAccess || !canRead) return;
     void load();
-  }, [canRead, isLoadingAccess, load, session, sessionStatus]);
+  }, [canRead, isLoadingAccess, load]);
 
   if (isLoadingAccess) return null;
   if (!canRead) {

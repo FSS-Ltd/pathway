@@ -82,12 +82,12 @@ export function PaceRoster({
               </Button>
             </div>
           ) : null}
-          {!isLoading && items.length === 0 ? (
+          {!isLoading && !error && items.length === 0 ? (
             <p className="text-sm text-text-muted">
               No active PACE placements are available for this site.
             </p>
           ) : null}
-          {!isLoading && items.length > 0 ? (
+          {!isLoading && !error && items.length > 0 ? (
             <ul className="space-y-3" aria-label="PACE roster">
               {items.map((item) => (
                 <li
@@ -144,7 +144,7 @@ export function PaceRoster({
         title="PACE exceptions"
         description="Review placements that are behind, blocked, stale, or need attention. Corrections create a linked record and never overwrite history."
       >
-        {isLoading ? null : exceptions.length === 0 ? (
+        {isLoading || error ? null : exceptions.length === 0 ? (
           <p className="text-sm text-text-muted">
             No PACE exceptions need review.
           </p>

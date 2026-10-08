@@ -113,7 +113,7 @@ export function BehaviourHistory({
         </p>
       ) : null}
 
-      {!isLoading && visibleItems.length > 0 ? (
+      {!isLoading && !error && visibleItems.length > 0 ? (
         <ol className="mt-5 space-y-3">
           {visibleItems.map((item) => (
             <li key={item.id} className="rounded-md border border-border p-4">

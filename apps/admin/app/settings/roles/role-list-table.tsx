@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { Badge, DataTable, type ColumnDef } from "@pathway/ui";
 import type { AdminRoleDefinition } from "@/lib/api-client";
 

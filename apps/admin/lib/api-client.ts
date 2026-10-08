@@ -736,7 +736,7 @@ export async function fetchAceDashboard(
     signal: input.signal,
   });
   if (!response.ok) {
-    throw new Error("Unable to load the ACE overview.");
+    throw await apiErrorFromResponse(response, "Unable to load the ACE overview.");
   }
   return response.json() as Promise<AceDashboardResponse>;
 }
@@ -2469,12 +2469,7 @@ export async function fetchAssignmentsForOrg(
         return acc;
       }, {});
     } else {
-      const body = await sessionsRes.text().catch(() => "");
-      console.warn(
-        "Failed to prefetch sessions for rota window",
-        sessionsRes.status,
-        body,
-      );
+      throw await apiErrorFromResponse(sessionsRes, "Unable to load the schedule window.");
     }
   }
 
@@ -2520,12 +2515,7 @@ export async function fetchAssignmentsForOrg(
     },
   );
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to load assignments (${res.status}): ${body || res.statusText}`,
-    );
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load assignments.");
 
   const json = (await res.json()) as ApiAssignment[];
   const filtered = json.filter((assignment) => {
@@ -2673,10 +2663,7 @@ export async function updateAssignment(
   });
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to update assignment (${res.status}): ${body || res.statusText}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to update the assignment.");
   }
 
   const json = (await res.json()) as ApiAssignment;
@@ -2750,10 +2737,7 @@ export async function createSwapRequest(params: {
     }),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to create swap request (${res.status}): ${body || res.statusText}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to create the swap request.");
   }
   return res.json() as Promise<AdminSwapRequestRow>;
 }
@@ -2772,12 +2756,8 @@ export async function fetchMySwapRequests(
       cache: "no-store",
     }),
   ]);
-  if (!fromRes.ok || !toRes.ok) {
-    const body =
-      (await fromRes.text().catch(() => "")) ||
-      (await toRes.text().catch(() => ""));
-    throw new Error(`Failed to load swap requests: ${body || "unknown"}`);
-  }
+  if (!fromRes.ok) throw await apiErrorFromResponse(fromRes, "Unable to load swap requests.");
+  if (!toRes.ok) throw await apiErrorFromResponse(toRes, "Unable to load swap requests.");
   const fromList = (await fromRes.json()) as AdminSwapRequestRow[];
   const toList = (await toRes.json()) as AdminSwapRequestRow[];
   const seen = new Set<string>();
@@ -2804,10 +2784,7 @@ export async function acceptSwapRequest(
     body: JSON.stringify({ status: "ACCEPTED" }),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to accept swap (${res.status}): ${body || res.statusText}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to accept the swap.");
   }
   return res.json() as Promise<AdminSwapRequestRow>;
 }
@@ -2822,10 +2799,7 @@ export async function declineSwapRequest(
     body: JSON.stringify({ status: "DECLINED" }),
   });
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to decline swap (${res.status}): ${body || res.statusText}`,
-    );
+    throw await apiErrorFromResponse(res, "Unable to decline the swap.");
   }
   return res.json() as Promise<AdminSwapRequestRow>;
 }
@@ -4520,12 +4494,7 @@ export async function fetchOpenConcerns(): Promise<AdminConcernRow[]> {
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch concerns: ${res.status} ${body || res.statusText}`,
-    );
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load concerns.");
 
   const json = (await res.json()) as ApiConcern[];
 
@@ -4652,12 +4621,7 @@ export async function fetchNotesSummary(): Promise<AdminNotesSummary> {
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch notes: ${res.status} ${body || res.statusText}`,
-    );
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load notes summary.");
 
   const notes = (await res.json()) as ApiNote[];
   const totalNotes = notes.length;
@@ -5587,10 +5551,7 @@ export async function fetchStaff(): Promise<AdminStaffRow[]> {
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch users: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load staff.");
 
   const json = (await res.json()) as ApiUser[];
   return json.map(mapUserToStaffRow);
@@ -6520,11 +6481,7 @@ export async function fetchPeopleForOrg(orgId: string): Promise<PersonRow[]> {
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("[api-client] fetchPeopleForOrg error:", res.status, body);
-    throw new Error(`Failed to fetch people: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load people.");
 
   return (await res.json()) as PersonRow[];
 }
@@ -6540,10 +6497,7 @@ export async function fetchDeletedPeopleForOrg(
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch deleted people: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load deleted people.");
 
   return (await res.json()) as DeletedPersonRow[];
 }
@@ -6561,10 +6515,7 @@ export async function deletePersonFromOrg(
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to delete person: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to remove this person.");
 
   return (await res.json()) as DeletedPersonRow;
 }
@@ -6586,10 +6537,7 @@ export async function fetchInvitesForOrg(
     cache: "no-store",
   });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch invites: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load invitations.");
 
   return (await res.json()) as InviteRow[];
 }
@@ -6630,10 +6578,7 @@ export async function resendInvite(
     },
   );
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to resend invite: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to resend invitation.");
 
   return (await res.json()) as InviteRow;
 }
@@ -6653,10 +6598,7 @@ export async function revokeInvite(
     },
   );
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to revoke invite: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to revoke invitation.");
 
   return (await res.json()) as InviteRow;
 }
@@ -6974,10 +6916,7 @@ export async function fetchRoles(): Promise<AdminRoleDefinition[]> {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch roles: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load roles.");
   return res.json();
 }
 
@@ -6994,10 +6933,7 @@ export async function fetchRoleAssignments(params?: {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch role assignments: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load role assignments.");
   return res.json();
 }
 
@@ -7045,10 +6981,7 @@ export async function fetchEffectivePermissions(userId: string): Promise<{
       cache: "no-store",
     },
   );
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch effective permissions: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load effective permissions.");
   return res.json();
 }
 
@@ -7060,10 +6993,7 @@ export async function fetchAccessSummary(
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch access summary: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load access summary.");
   return res.json();
 }
 
@@ -7082,9 +7012,6 @@ export async function fetchAccessAuditEvents(params?: {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch audit events: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load audit events.");
   return res.json();
 }
