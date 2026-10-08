@@ -33,6 +33,8 @@ const REQUIRED_RLS_TABLES = [
   "AceStaffYearBandAssignment",
   "AceSchoolEnrollment",
   "AceTeachingDate",
+  "AceDailyAttendance",
+  "AceDailyAttendanceCorrectionEvent",
   "StudentSubjectEnrollment",
   "PaceAssessment",
   "PaceProgress",

@@ -332,6 +332,14 @@ enum AceTeachingDateKind {
   CLOSED
 }
 
+enum AceDailyAbsenceReason {
+  SICK
+  HOLIDAY
+  NOT_SCHEDULED
+  EXCUSED
+  UNEXCUSED
+}
+
 enum StudentSubjectEnrollmentStatus {
   ACTIVE
   ENDED
@@ -881,6 +889,8 @@ model Tenant {
   aceStaffYearBandAssignments AceStaffYearBandAssignment[]
   aceSchoolEnrollments   AceSchoolEnrollment[]
   aceTeachingDates       AceTeachingDate[]
+  aceDailyAttendance     AceDailyAttendance[]
+  aceDailyCorrections    AceDailyAttendanceCorrectionEvent[]
   subjectEnrollments     StudentSubjectEnrollment[]
   paceAssessments        PaceAssessment[]
   paceProgress           PaceProgress[]
@@ -1088,6 +1098,8 @@ model User {
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
   correctedAttendance       Attendance[]                 @relation("AttendanceCorrectedBy")
   attendanceCorrectionEvents AttendanceCorrectionEvent[] @relation("AttendanceCorrectionEventRecordedBy")
+  aceDailyAttendanceRecorded AceDailyAttendance[] @relation("AceDailyAttendanceRecordedBy")
+  aceDailyCorrectionsRecorded AceDailyAttendanceCorrectionEvent[] @relation("AceDailyCorrectionRecordedBy")
   createdBehaviourCategories BehaviourCategory[]         @relation("BehaviourCategoryCreatedBy")
   createdDemeritPolicies     DemeritPolicy[]             @relation("DemeritPolicyCreatedBy")
   authorisedDemeritOverrides DemeritStageOverride[]      @relation("DemeritStageOverrideAuthorisedBy")
@@ -1487,6 +1499,7 @@ model Child {
   concerns                   Concern[]
   attendance                 Attendance[]
   attendanceCorrectionEvents AttendanceCorrectionEvent[]
+  aceDailyAttendance         AceDailyAttendance[]
   childNotes                 ChildNote[]
   learningLogs               LearningLog[]
   aceSchoolEnrollments       AceSchoolEnrollment[]
@@ -2549,6 +2562,44 @@ model AceTeachingDate {
   @@unique([id, tenantId])
   @@unique([tenantId, date])
   @@index([tenantId, academicYearId, date])
+}
+
+model AceDailyAttendance {
+  id               String                         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId          String
+  child            Child                          @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  date             DateTime                       @db.Date
+  status           AttendanceStatus
+  absenceReason    AceDailyAbsenceReason?
+  recordedByUserId String
+  recordedBy       User                           @relation("AceDailyAttendanceRecordedBy", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  recordedAt       DateTime                       @default(now())
+  updatedAt        DateTime                       @updatedAt
+  corrections      AceDailyAttendanceCorrectionEvent[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, childId, date])
+  @@index([tenantId, date, status])
+}
+
+model AceDailyAttendanceCorrectionEvent {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  dailyAttendanceId  String
+  dailyAttendance    AceDailyAttendance     @relation(fields: [dailyAttendanceId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "AceDailyCorrection_fact_fkey")
+  previousStatus     AttendanceStatus
+  newStatus          AttendanceStatus
+  previousReason     AceDailyAbsenceReason?
+  newReason          AceDailyAbsenceReason?
+  correctionReason   String                 @db.Text
+  correctedByUserId  String
+  correctedBy        User                   @relation("AceDailyCorrectionRecordedBy", fields: [correctedByUserId], references: [id], onDelete: Restrict)
+  correctedAt        DateTime               @default(now())
+
+  @@index([tenantId, dailyAttendanceId, correctedAt, id], map: "AceDailyCorrection_history_idx")
 }
 
 model AceTermReport {
