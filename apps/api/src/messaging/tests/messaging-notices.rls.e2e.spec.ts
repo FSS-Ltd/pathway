@@ -4249,7 +4249,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
         withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
           setNoticeReceiptState(tx, seeded.receiptId, new Date(), null),
         ),
-      "23514",
+      "55000",
     );
   });
 
