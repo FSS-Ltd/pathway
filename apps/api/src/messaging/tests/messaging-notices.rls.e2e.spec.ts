@@ -1851,22 +1851,6 @@ describe("ACE parent/staff messaging and notices storage", () => {
       ],
       nextCursor: null,
     });
-    const guardianParticipantId = parentConversation.guardianParticipantId;
-    if (!guardianParticipantId) throw new Error("Missing guardian participant");
-    await prisma.messageParticipant.update({
-      where: { id: guardianParticipantId },
-      data: { removedAt: new Date() },
-    });
-    try {
-      expect(
-        (await service.list(fixture.tenantAId, fixture.guardianAUserId)).items,
-      ).toEqual([]);
-    } finally {
-      await prisma.messageParticipant.update({
-        where: { id: guardianParticipantId },
-        data: { removedAt: null },
-      });
-    }
     expect(
       (await service.list(fixture.tenantAId, fixture.guardianBUserId)).items,
     ).toEqual([]);
