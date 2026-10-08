@@ -154,9 +154,12 @@ organisation UI requests. The parent page requires an explicit site and child
 link; the student page requires an explicit site link. Self-service site and
 child discovery remains open. Production deployment remains deferred.
 
-Step 1.3g12 is in progress on `feature/ace-family-context-discovery`.
-It adds a self-scoped family context discovery API and a narrow identity
-read policy for candidate-site lookup. This migration and the endpoint are
+Step 1.3g12 merged in [PR #449](https://github.com/FSS-Ltd/pathway/pull/449)
+at `ed1a0d14cb3f71e2646f5f0c682a9e860d538061`. All eight checks passed
+on head `fc1a0b194ea0bb70d248fa9d6215e7a317900310` (CI run
+37731266442; CodeQL run 37731264798). CI's disposable PostgreSQL ran the
+family-context discovery suite within 71 integration suites and 443 tests.
+The self-scoped discovery API and narrow identity read policy are merged but
 not in production. A family landing page remains the next web step.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
