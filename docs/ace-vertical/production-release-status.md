@@ -121,14 +121,19 @@ bounded correction-history read in step 1.3g7 is merged after CI Postgres ran
 1.3g8 adds the staff register web journey after the admin interaction test and
 all eight CI checks passed. Step 1.3g9 adds a student-only daily history read
 after its identity-link, portal-policy, date-boundary and cross-site integration
-checks passed on the corrected PR revision. Parent access, student web, exports,
+checks passed on the corrected PR revision. Parent and student web, exports,
 production migration and deployment remain deferred.
 
-Step 1.3g10 is in [PR #443](https://github.com/FSS-Ltd/pathway/pull/443),
-implementing the linked-parent daily history API. Local lint,
-typecheck, API build, unit and formatting checks passed. Its database request
-and RLS tests await CI because disposable PostgreSQL is unavailable locally.
-The step remains open until its PR has current-revision green CI and is merged.
+Step 1.3g10's linked-parent daily history API merged in
+[PR #443](https://github.com/FSS-Ltd/pathway/pull/443) at
+`12196b9c17a3c94bc4ff6474b8dd9d0ad71d4f36`. All eight checks passed on
+head `e28d067c875e1accc98581a575f1725430c17066` (CI run 37724622686;
+CodeQL run 37724617494). CI's disposable PostgreSQL ran the positive and
+denied relationship, date, site, and revocation request tests. Local lint,
+typecheck, API build, unit and formatting checks also passed. The local
+database-backed test command skipped assertions because its disposable
+PostgreSQL was unavailable. Parent and student web, exports, production
+migration and deployment remain open.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
