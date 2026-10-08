@@ -1384,7 +1384,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
       }),
     ).toBe(1);
 
-    await withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
       tx.siteMembership.delete({
         where: {
           tenantId_userId: {
@@ -1412,7 +1412,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
       }),
     ).resolves.toMatchObject({ conversationId: first.id, reused: false });
 
-    await withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
       tx.siteMembership.create({
         data: { tenantId: fixture.tenantAId, userId: fixture.staffCId },
       }),
