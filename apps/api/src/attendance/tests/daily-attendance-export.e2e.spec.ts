@@ -233,6 +233,14 @@ describe("ACE daily attendance export", () => {
           startsOn: date("2042-09-01"),
         },
       });
+      await tx.aceTeachingDate.create({
+        data: {
+          tenantId: otherSiteId,
+          academicYearId,
+          date: date(firstDate),
+          kind: "TEACHING",
+        },
+      });
       await tx.aceDailyAttendance.create({
         data: {
           tenantId: otherSiteId,
