@@ -135,6 +135,7 @@ async function run(): Promise<void> {
     "true",
   );
   await expectActive("/ace/pace/", "/ace/pace");
+  await expectActive("/ace/pace////", "/ace/pace");
   await expectActive("/ace", "/ace");
   await expectActive("/ace/messages", "/ace/messages");
   await expectActive("/settings/roles/", "/settings/roles");

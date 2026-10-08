@@ -160,7 +160,11 @@ export const defaultSidebarItems: SidebarNavItem[] = [
   { label: "Settings", href: "/settings", icon: undefined, iconIndex: 13 },
 ];
 
-const normalisePath = (path: string): string => path.replace(/\/+$/, "") || "/";
+function normalisePath(path: string): string {
+  let end = path.length;
+  while (end > 1 && path.charCodeAt(end - 1) === 47) end -= 1;
+  return path.slice(0, end) || "/";
+}
 
 function resolveActiveItem(
   items: SidebarNavItem[],
