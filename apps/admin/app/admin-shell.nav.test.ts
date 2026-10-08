@@ -172,6 +172,21 @@ assert.ok(
   "expected Attendance navigation to require the attendance.read permission",
 );
 
+const dailyRegisterVisible = (capabilities: string[], permissions: string[]) =>
+  resolveAdminNavItems({
+    role: staffRole,
+    currentOrgIsMasterOrg: false,
+    capabilities,
+    permissions,
+    ui: { labels: {} },
+  }).some((item) => item.href === "/ace/attendance/daily");
+assert.equal(dailyRegisterVisible([], ["attendance.read"]), false);
+assert.equal(dailyRegisterVisible(["ace.dashboard.read"], []), false);
+assert.equal(
+  dailyRegisterVisible(["ace.dashboard.read"], ["attendance.read"]),
+  true,
+);
+
 const noticesNavEntry = navigationSource.match(
   /defaultSidebarItems\[9\][\s\S]*?access:\s*"site-admin-or-higher"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication",?\s*\},/,
 );

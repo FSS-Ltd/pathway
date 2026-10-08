@@ -4,8 +4,9 @@
 [Oasis parity matrix](02-oasis-web-journey-parity.md). Steps 1.3g1–1.3g4
 established the schema. Step 1.3g5 adds the scoped staff roster read API.
 Step 1.3g6 adds atomic daily mark and correction writes. Step 1.3g7 adds the
-bounded staff correction-history read. The web journey and production migration
-remain open.
+bounded staff correction-history read. Step 1.3g8 adds the staff web register
+for marking, correction and history. Family/student views, exports and production
+migration remain open.
 
 ## Source behaviour and current gap
 

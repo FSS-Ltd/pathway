@@ -12,6 +12,7 @@ import {
   CalendarClock,
   CheckSquare,
   ClipboardCheck,
+  ClipboardList,
   Megaphone,
   ShieldCheck,
   CreditCard,
@@ -92,6 +93,7 @@ const iconComponents: LucideIcon[] = [
   PackageSearch, // 25 Physical PACE inventory
   MessageCircle, // 26 Staff messages
   CalendarDays, // 27 ACE academic setup
+  ClipboardList, // 28 ACE daily register
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.
