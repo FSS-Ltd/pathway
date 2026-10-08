@@ -190,6 +190,11 @@ file formatting, diff check, and Graphify passed. The bounded, audited ACE
 daily CSV route is merged but not deployed. Controlled permission seeding and
 the phased production release remain open; no schema migration was added.
 
+Step 1.3g14c is in progress on `feature/ace-attendance-export-web`. It adds a
+permission-aware staff download for the ACE daily CSV route with a bounded
+date range, clear feedback, and cancellation on site changes. Production
+release remains deferred.
+
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
 journey is merged but is not in the current manual production deployment.

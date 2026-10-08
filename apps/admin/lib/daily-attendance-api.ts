@@ -133,6 +133,39 @@ export async function fetchDailyAttendanceHistory(
   return response.json() as Promise<DailyAttendanceHistoryPage>;
 }
 
+export async function fetchDailyAttendanceCsv(
+  range: { from: string; to: string },
+  signal?: AbortSignal,
+): Promise<Blob> {
+  if (isUsingMockApi()) {
+    throw new Error("Daily attendance exports are unavailable in mock mode.");
+  }
+  const params = new URLSearchParams(range);
+  const response = await fetch(
+    `${API_BASE_URL}/attendance/daily/export?${params}`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    },
+  );
+  if (response.status === 403) {
+    throw new Error("You cannot export daily attendance for this site.");
+  }
+  if (response.status === 400) {
+    throw new Error(
+      "The export is too large or the date range is invalid. Choose fewer days.",
+    );
+  }
+  if (!response.ok) {
+    throw new Error(
+      "Daily attendance could not be exported. Please try again.",
+    );
+  }
+  return response.blob();
+}
+
 async function dailyAttendanceError(response: Response): Promise<Error> {
   if (response.status === 403)
     return new Error("You cannot access this register.");

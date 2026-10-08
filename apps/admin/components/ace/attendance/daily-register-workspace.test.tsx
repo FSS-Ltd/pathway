@@ -167,13 +167,23 @@ async function run() {
 
   try {
     await act(async () =>
-      root.render(<DailyRegisterWorkspace canManage={false} />),
+      root.render(
+        <DailyRegisterWorkspace canManage={false} canExport={false} />,
+      ),
     );
     assert.match(container.textContent ?? "", /Ari Student/);
     assert.match(container.textContent ?? "", /Read-only access/);
     assert.equal(container.querySelectorAll("form").length, 0);
+    assert.doesNotMatch(container.textContent ?? "", /Download CSV/);
 
-    await act(async () => root.render(<DailyRegisterWorkspace canManage />));
+    await act(async () =>
+      root.render(<DailyRegisterWorkspace canManage={false} canExport />),
+    );
+    assert.match(container.textContent ?? "", /Download CSV/);
+
+    await act(async () =>
+      root.render(<DailyRegisterWorkspace canManage canExport={false} />),
+    );
     const saveButton = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.trim() === "Save mark",
     );
