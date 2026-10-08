@@ -3,28 +3,34 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   Put,
   Query,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
+import type { Response } from "express";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { isDateOnly } from "../ace-settings/dto/academic-calendar.dto";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { DailyAttendanceService } from "./daily-attendance.service";
+import { DailyAttendanceExportService } from "./daily-attendance-export.service";
 import { DailyAttendanceHistoryService } from "./daily-attendance-history.service";
 import { DailyAttendanceWriteService } from "./daily-attendance-write.service";
 import { attendanceHistoryQuerySchema } from "./dto/attendance-history-query.dto";
 import { dailyAttendanceMarkSchema } from "./dto/daily-attendance-mark.dto";
 import { dailyAttendanceQuerySchema } from "./dto/daily-attendance-query.dto";
+import { dailyAttendanceExportQuerySchema } from "./dto/daily-attendance-export-query.dto";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("attendance/daily")
 export class DailyAttendanceController {
   constructor(
     private readonly service: DailyAttendanceService,
+    private readonly exportService: DailyAttendanceExportService,
     private readonly writeService: DailyAttendanceWriteService,
     private readonly historyService: DailyAttendanceHistoryService,
     private readonly requestContext: PathwayRequestContext,
@@ -43,6 +49,30 @@ export class DailyAttendanceController {
       orgId: context.org.orgId,
       userId: context.user.userId,
     });
+  }
+
+  @Get("export")
+  @RequirePermission("ace.attendance.export")
+  @Header("Content-Type", "text/csv; charset=utf-8")
+  async export(
+    @Query() query: unknown,
+    @Res() response: Response,
+  ): Promise<void> {
+    const parsed = dailyAttendanceExportQuerySchema.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    const context = this.requestContext.requireContext();
+    const csv = await this.exportService.export(parsed.data, {
+      tenantId: context.tenant.tenantId,
+      orgId: context.org.orgId,
+      userId: context.user.userId,
+    });
+    response.setHeader(
+      "Content-Disposition",
+      `attachment; filename="nexsteps-ace-attendance-${parsed.data.from}-${parsed.data.to}.csv"`,
+    );
+    response.send(csv);
   }
 
   @Get(":id/history")

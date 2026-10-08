@@ -122,6 +122,15 @@ current site membership, dated year-band scope for non-leaders, bounded dates
 and rows, tenant RLS, and an audit record. A tag alone cannot widen student or
 site scope. No existing session export route gains this new permission.
 
+Step 1.3g14b adds a daily attendance CSV route using that permission. A
+validated inclusive date range spans at most 31 days and returns at most 5,000
+marked facts; a larger result fails without a partial CSV. Each row requires a
+site-matched, non-guest child enrolled in an academic year and year band on
+that mark date. Tagged staff also need a dated assignment to that year band.
+The route emits a successful export audit event with dates, optional child ID,
+and row count, and guards spreadsheet formula cells. Empty exports retain the
+headers and an audit event. Session attendance exports remain separate.
+
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
    timestamps. Enforce one row per `(tenantId, childId, date)` and composite

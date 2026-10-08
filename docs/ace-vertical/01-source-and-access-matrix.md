@@ -34,8 +34,8 @@ The ACE-only `ace.attendance.export` capability is site-scoped, sensitive,
 delegable, and part of ACE core. Fixed Organisation Head and Site Lead roles
 hold it; other fixed roles do not. The `attendance-exporter` tag maps only to
 that key and cannot be granted outside an active ACE organisation by an actor
-who holds and may delegate it. The daily export route is a later step outside
-the original 68-route contract; its site, dated enrolment, year-band, row
+who holds and may delegate it. The daily export route is outside the original
+68-route contract; its site, dated enrolment, year-band, row
 limit, tenant RLS, and audit checks are required in addition to the key.
 
 Step 1.2c adds these routes outside the original 68-route ACE contract. Each
@@ -242,6 +242,7 @@ Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cuto
 | N06a | GET | `/attendance/daily` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active organisation membership; current site membership for site-lead and staff | selected site, dated school enrolment, and staff year-band assignment unless active fixed leader role grants full-site scope | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
 | N06b | PUT | `/attendance/daily/:date/children/:childId` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active organisation membership; current site membership for site-lead and staff | selected site, open teaching date, dated school enrolment, and staff year-band assignment unless active fixed leader role grants full-site scope | `none` | daily correction event and audit | `sensitive` | trusted tenant context; tenant-scoped RLS; serialised child/date writes |
 | N06c | GET | `/attendance/daily/:id/history` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active organisation membership; current site membership for site-lead and staff | selected-site daily fact and dated school enrolment; staff year-band assignment unless active fixed leader role grants full-site scope | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS; bounded signed cursor scoped to site and fact |
+| N06d | GET | `/attendance/daily/export` | `ace.attendance.export` | `ace.attendance.export` | organisation-head, site-lead, tagged staff | active organisation membership; current site membership for site-lead and staff | selected site, dated school enrolment and staff year-band assignment unless active fixed leader role grants full-site scope | ACE core; 31-day and 5,000-row cap | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS; successful CSV exports audited |
 | N07 | GET | `/attendance/session-summaries` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
 | N08 | GET | `/attendance/session/:sessionId` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | session belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
 | N09 | GET | `/attendance/:id` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | record belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
