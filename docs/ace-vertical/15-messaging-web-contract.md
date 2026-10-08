@@ -19,10 +19,10 @@ creator/participant eligibility triggers. Step 1.3e1a adds a read-only staff
 conversation-list route. Step 1.3e1b adds read-only staff message history.
 Step 1.3e2a adds staff direct conversation creation, step 1.3e2b adds
 staff direct and room message sending, and step 1.3e2c adds site staffroom
-opening. Step 1.3e2d adds its web control, and step 1.3e4a adds a read-only
-parent conversation list. Parent creation, sending, and the web journey remain
-pending. The
-existing `PARENT_STAFF` uniqueness constraint
+opening. Step 1.3e2d adds its web control, step 1.3e4a adds a read-only
+parent conversation list, and step 1.3e4b adds read-only parent message history.
+Parent creation, sending, and the web journey remain pending. The existing
+`PARENT_STAFF` uniqueness constraint
 allows **one conversation per guardian identity per site**, so the first web
 journey is a school-team conversation, not one separate thread per staff
 contact. A site's staff membership alone is too broad to make every staff
@@ -42,17 +42,18 @@ participant removal, or tag revocation. Return the same not-found response for
 missing, foreign, and inaccessible conversations; never return child, guardian,
 or message metadata in a denial.
 
-| Planned route                                                 | Permission                                                                     | Additional boundary                                                                                                                                                 |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /ace/messages/conversations?cursor=&limit=`              | `messaging.conversations.read`                                                 | Only conversations where the caller is an active participant in the selected site; bounded, newest-first page.                                                      |
-| `GET /ace/parent/sites/:siteId/messages/conversations`        | `messaging.conversations.read` from the fixed Parent template                  | Active full guardian relationship and participant in the requested site; parent portal enabled; at most one school-team thread.                                     |
-| `POST /ace/messages/conversations`                            | `messaging.conversations.create`                                               | Parent opens or reuses their own `PARENT_STAFF` school-team conversation; staff direct/room creation requires current site membership and approved recipient scope. |
-| `GET /ace/messages/conversations/recipients?search=&limit=`   | `messaging.conversations.create`                                               | Current active staff in the selected site only; excludes the caller and student identities. Search needs 2–80 characters and returns at most 20 names and IDs.      |
-| `GET /ace/messages/conversations/:id/messages?before=&limit=` | `messaging.messages.read`                                                      | Recheck participant and relationship/membership; bounded sequence page, with only necessary sender display names and delivery facts.                                |
-| `POST /ace/messages/conversations/:id/messages`               | `messaging.messages.send`                                                      | Active participant, nonblank bounded body, client request ID; atomic sequence allocation, message, recipient deliveries, and audit.                                 |
-| `PUT /ace/messages/conversations/:id/read-cursor`             | `messaging.messages.read`                                                      | Advance only the caller's cursor to a sequence that exists in this conversation; never move it backward.                                                            |
-| `PUT /ace/messages/conversations/:id/responders/:userId`      | `messaging.conversations.create` and fixed Organisation Head or Site Lead role | Assign a current same-site staff responder to this parent conversation; audit additions and removals. A tag alone cannot invoke this route.                         |
-| `DELETE /ace/messages/conversations/:id/responders/:userId`   | `messaging.conversations.create` and fixed Organisation Head or Site Lead role | End an assignment without deleting message history; audit the removal.                                                                                              |
+| Planned route                                                                      | Permission                                                                     | Additional boundary                                                                                                                                                      |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /ace/messages/conversations?cursor=&limit=`                                   | `messaging.conversations.read`                                                 | Only conversations where the caller is an active participant in the selected site; bounded, newest-first page.                                                           |
+| `GET /ace/parent/sites/:siteId/messages/conversations`                             | `messaging.conversations.read` from the fixed Parent template                  | Active full guardian relationship and participant in the requested site; parent portal enabled; at most one school-team thread.                                          |
+| `GET /ace/parent/sites/:siteId/messages/conversations/:id/messages?before=&limit=` | `messaging.messages.read` from the fixed Parent template                       | Only the requested school-team thread while the guardian relationship and participant remain current; bounded newest-first sequence page without moving the read cursor. |
+| `POST /ace/messages/conversations`                                                 | `messaging.conversations.create`                                               | Parent opens or reuses their own `PARENT_STAFF` school-team conversation; staff direct/room creation requires current site membership and approved recipient scope.      |
+| `GET /ace/messages/conversations/recipients?search=&limit=`                        | `messaging.conversations.create`                                               | Current active staff in the selected site only; excludes the caller and student identities. Search needs 2–80 characters and returns at most 20 names and IDs.           |
+| `GET /ace/messages/conversations/:id/messages?before=&limit=`                      | `messaging.messages.read`                                                      | Recheck participant and relationship/membership; bounded sequence page, with only necessary sender display names and delivery facts.                                     |
+| `POST /ace/messages/conversations/:id/messages`                                    | `messaging.messages.send`                                                      | Active participant, nonblank bounded body, client request ID; atomic sequence allocation, message, recipient deliveries, and audit.                                      |
+| `PUT /ace/messages/conversations/:id/read-cursor`                                  | `messaging.messages.read`                                                      | Advance only the caller's cursor to a sequence that exists in this conversation; never move it backward.                                                                 |
+| `PUT /ace/messages/conversations/:id/responders/:userId`                           | `messaging.conversations.create` and fixed Organisation Head or Site Lead role | Assign a current same-site staff responder to this parent conversation; audit additions and removals. A tag alone cannot invoke this route.                              |
+| `DELETE /ace/messages/conversations/:id/responders/:userId`                        | `messaging.conversations.create` and fixed Organisation Head or Site Lead role | End an assignment without deleting message history; audit the removal.                                                                                                   |
 
 Conversation summaries include a stable ID, kind, permitted participant display
 names, latest-message preview/time, and unread count. Message pages include
@@ -140,7 +141,12 @@ to a non-guest child, and an active guardian participant. It returns no
 conversation data for unlinked or removed people. A linked guardian with no
 thread receives an empty list. The list includes only the latest preview and
 unread count; creation, message history, read cursor, and sending remain
-unavailable to parents in this slice.
+unavailable to parents in this slice. Step 1.3e4b adds bounded parent history
+for that thread with explicit site and conversation IDs. It repeats the current
+guardian, participant, portal, and fixed Parent read-permission checks before
+reading message bodies. It returns only sender display names from that thread
+and does not update read state. Parent creation, sending, read-cursor writes,
+and web access remain later slices.
 
 Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive
 conversation list and thread, paged history, explicit read cursor, and a

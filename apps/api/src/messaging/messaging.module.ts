@@ -7,6 +7,7 @@ import { MessagingCommandService } from "./messaging-command.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingService } from "./messaging.service";
 import { ParentMessagingController } from "./parent-messaging.controller";
+import { ParentMessagingHistoryService } from "./parent-messaging-history.service";
 import { ParentMessagingService } from "./parent-messaging.service";
 
 @Module({
@@ -17,6 +18,7 @@ import { ParentMessagingService } from "./parent-messaging.service";
     MessagingConversationService,
     MessagingCommandService,
     ParentMessagingService,
+    ParentMessagingHistoryService,
   ],
 })
 export class MessagingModule {}

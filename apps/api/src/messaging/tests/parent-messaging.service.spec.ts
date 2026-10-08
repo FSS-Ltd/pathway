@@ -1,10 +1,13 @@
 import { NotFoundException } from "@nestjs/common";
 import { prisma, withTenantRlsContext } from "@pathway/db";
+import { ParentMessagingHistoryService } from "../parent-messaging-history.service";
 import { ParentMessagingService } from "../parent-messaging.service";
 
 jest.mock("@pathway/auth", () => ({
   SYSTEM_ROLE_TEMPLATES: {
-    parent: { permissions: ["messaging.conversations.read"] },
+    parent: {
+      permissions: ["messaging.conversations.read", "messaging.messages.read"],
+    },
   },
 }));
 jest.mock("@pathway/db", () => ({
@@ -39,7 +42,10 @@ function setup() {
     messageParticipantReadCursor: {
       findUnique: jest.fn().mockResolvedValue({ lastReadSequence: 2 }),
     },
-    message: { count: jest.fn().mockResolvedValue(3) },
+    message: {
+      count: jest.fn().mockResolvedValue(3),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   jest.mocked(prisma.tenant.findUnique).mockResolvedValue({
     orgId: "org-a",
@@ -50,7 +56,11 @@ function setup() {
     .mockImplementation(async (_siteId, _orgId, operation) =>
       operation(tx as never),
     );
-  return { tx, service: new ParentMessagingService() };
+  return {
+    tx,
+    service: new ParentMessagingService(),
+    history: new ParentMessagingHistoryService(),
+  };
 }
 
 describe("parent messaging list", () => {
@@ -139,5 +149,92 @@ describe("parent messaging list", () => {
       NotFoundException,
     );
     expect(withTenantRlsContext).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("parent messaging history", () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it("returns a bounded page without moving the read cursor", async () => {
+    const { tx, history } = setup();
+    tx.message.findMany.mockResolvedValueOnce([
+      {
+        id: "message-six",
+        sequence: 6,
+        bodyEncrypted: "A school update",
+        createdAt: new Date("2026-10-08T10:05:00.000Z"),
+        sender: {
+          kind: "STAFF",
+          userId: "staff-a",
+          user: { displayName: " Ms Taylor ", name: null },
+        },
+      },
+      { id: "message-five", sequence: 5 },
+    ]);
+
+    await expect(
+      history.list("site-a", "parent-a", "conversation-a", { limit: 1 }),
+    ).resolves.toEqual({
+      items: [
+        {
+          id: "message-six",
+          sequence: 6,
+          body: "A school update",
+          createdAt: "2026-10-08T10:05:00.000Z",
+          sender: { id: "staff-a", displayName: "Ms Taylor" },
+        },
+      ],
+      nextBefore: 6,
+    });
+    expect(tx.permissionDefinition.findUnique).toHaveBeenCalledWith({
+      where: { key: "messaging.messages.read" },
+      select: { isActive: true },
+    });
+    expect(tx.messageConversation.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: "conversation-a",
+        tenantId: "site-a",
+        guardianIdentityId: "guardian-a",
+      }),
+      select: { id: true },
+    });
+    expect(tx.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: "site-a", conversationId: "conversation-a" },
+        take: 2,
+      }),
+    );
+    expect(tx.messageParticipantReadCursor.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("pages before a sequence and hides unrelated conversations", async () => {
+    const { tx, history } = setup();
+    await history.list("site-a", "parent-a", "conversation-a", { before: 5 });
+    expect(tx.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: "site-a",
+          conversationId: "conversation-a",
+          sequence: { lt: 5 },
+        },
+        take: 21,
+      }),
+    );
+
+    tx.messageConversation.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      history.list("site-a", "parent-a", "other-conversation", {}),
+    ).rejects.toThrow("Messages not found");
+    expect(tx.message.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("denies an ended relationship before reading messages", async () => {
+    const { tx, history } = setup();
+    tx.guardianIdentity.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      history.list("site-a", "parent-a", "conversation-a", {}),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.messageConversation.findFirst).not.toHaveBeenCalled();
+    expect(tx.message.findMany).not.toHaveBeenCalled();
   });
 });
