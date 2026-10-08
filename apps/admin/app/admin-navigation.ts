@@ -100,6 +100,15 @@ const navItemsWithAccess: (SidebarNavItem & {
     group: "Schedule",
   }, // Attendance
   {
+    label: "Daily register",
+    href: "/ace/attendance/daily",
+    iconIndex: 28,
+    access: "staff-or-admin",
+    capability: "ace.dashboard.read",
+    permission: "attendance.read",
+    group: "Schedule",
+  },
+  {
     ...defaultSidebarItems[9],
     access: "site-admin-or-higher",
     permission: "notices.read",
