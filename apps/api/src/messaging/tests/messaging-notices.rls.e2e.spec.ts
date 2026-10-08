@@ -23,6 +23,7 @@ import { ParentMessagingConversationService } from "../parent-messaging-conversa
 import { ParentMessagingCommandService } from "../parent-messaging-command.service";
 import { ParentMessagingReadCursorService } from "../parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "../parent-messaging.service";
+import { StaffSchoolTeamService } from "../staff-school-team.service";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -2173,6 +2174,113 @@ describe("ACE parent/staff messaging and notices storage", () => {
           },
         },
       });
+    }
+  });
+
+  it("lists a parent thread only for its current approved staff responder", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const grant = await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.accessTagGrant.create({
+          data: {
+            orgId: fixture.orgAId,
+            tenantId: fixture.tenantAId,
+            userId: fixture.staffAId,
+            tagKey: "PARENT_MESSAGE_RESPONDER",
+            grantedById: fixture.staffAId,
+          },
+        }),
+    );
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const service = new StaffSchoolTeamService();
+    try {
+      const created = await withMessagingRlsContext(
+        fixture.tenantAId,
+        fixture.orgAId,
+        async (tx) => {
+          const conversation = await createParentStaffConversation(tx, fixture);
+          if (!conversation.guardianParticipantId) {
+            throw new Error("Parent conversation fixture lacks a guardian");
+          }
+          await insertMessage(tx, fixture, {
+            conversationId: conversation.conversationId,
+            senderParticipantId: conversation.guardianParticipantId,
+            clientRequestId: randomUUID(),
+            bodyEncrypted: "Please call the family",
+          });
+          return conversation;
+        },
+      );
+
+      const listed = await service.list(actor, {});
+      expect(listed.items).toEqual([
+        expect.objectContaining({
+          id: created.conversationId,
+          kind: "PARENT_STAFF",
+          title: "Parent",
+          latestMessage: expect.objectContaining({
+            preview: "Please call the family",
+          }),
+          unreadCount: 1,
+        }),
+      ]);
+      expect(
+        (await new MessagingService().listStaffConversations(actor, {})).items,
+      ).toEqual([]);
+      await expect(
+        service.list({ ...actor, userId: fixture.staffBId }, {}),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      await expect(
+        service.list(
+          { ...actor, tenantId: fixture.tenantBId, orgId: fixture.orgBId },
+          {},
+        ),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+
+      await prisma.guardianChildRelationship.update({
+        where: { id: fixture.guardianARelationshipId },
+        data: { endedAt: new Date() },
+      });
+      expect((await service.list(actor, {})).items).toEqual([]);
+      await prisma.guardianChildRelationship.update({
+        where: { id: fixture.guardianARelationshipId },
+        data: { endedAt: null },
+      });
+
+      await prisma.org.update({
+        where: { id: fixture.orgAId },
+        data: { parentPortalEnabled: false },
+      });
+      await expect(service.list(actor, {})).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      await prisma.org.update({
+        where: { id: fixture.orgAId },
+        data: { parentPortalEnabled: true },
+      });
+
+      await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        tx.accessTagGrant.update({
+          where: { id: grant.id },
+          data: { revokedAt: new Date(), revokedById: fixture.staffAId },
+        }),
+      );
+      await expect(service.list(actor, {})).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    } finally {
+      await prisma.org.update({
+        where: { id: fixture.orgAId },
+        data: { parentPortalEnabled: true },
+      });
+      await prisma.accessTagGrant.delete({ where: { id: grant.id } });
     }
   });
 
