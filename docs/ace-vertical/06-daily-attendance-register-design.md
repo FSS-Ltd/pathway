@@ -5,8 +5,9 @@
 established the schema. Step 1.3g5 adds the scoped staff roster read API.
 Step 1.3g6 adds atomic daily mark and correction writes. Step 1.3g7 adds the
 bounded staff correction-history read. Step 1.3g8 adds the staff web register
-for marking, correction and history. Family/student views, exports and production
-migration remain open.
+for marking, correction and history. Step 1.3g9 adds a student-only daily mark
+history API. Parent access, student web, exports and production migration remain
+open.
 
 ## Source behaviour and current gap
 
@@ -57,6 +58,15 @@ Step 1.3g7 reads the append-only daily correction events only after resolving
 the selected-site fact and the actor's dated band scope. Pages are newest
 first, bounded to 50, and use a signed cursor bound to the site and fact. A
 corrected teaching calendar does not hide a previously issued fact's history.
+Step 1.3g9 gives an authenticated student a bounded view of their own issued
+daily marks through an explicit site route. The service checks the site's
+student portal policy and exactly one active self-link on each read. It rejects
+future dates in the site's timezone, missing timezones, revoked/ended links,
+and other sites with the same not-found response. Only date, status and absence
+reason leave this route; staff identities and correction notes stay private.
+The site portal policy is the current release switch for issued daily marks;
+there is no per-mark publication state. This endpoint does not expose an
+attendance-rate denominator or a parent view.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
