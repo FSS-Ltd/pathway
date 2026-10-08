@@ -12,7 +12,7 @@ import { CustomAssignmentRetirementWriter } from "./custom-assignment-retirement
 import { EffectivePermissionsService } from "./effective-permissions.service";
 import { RoleSafetyService } from "./role-safety.service";
 import {
-  rolesTransactionBoundary,
+  maintenanceRolesTransactionBoundary,
   type RoleActorContext,
   type RolesTransactionBoundary,
 } from "./roles.service";
@@ -36,7 +36,7 @@ export class CustomAssignmentRetirementService {
     private readonly roleSafety: RoleSafetyService,
     private readonly outbox: OutboxService,
     private readonly cache: AccessCacheService,
-    private readonly transaction: RolesTransactionBoundary = rolesTransactionBoundary,
+    private readonly transaction: RolesTransactionBoundary = maintenanceRolesTransactionBoundary,
   ) {}
 
   async retire(

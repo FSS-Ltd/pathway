@@ -1,6 +1,8 @@
 import {
   Prisma,
+  applyTenantContext,
   runTransaction,
+  withPrismaTransactionContext,
   roleScopeAcceptsPermissionScope,
   type RoleScope,
 } from "@pathway/db";
@@ -85,13 +87,12 @@ export type RolesTransactionRunner = <T>(
 
 export function createRolesTransactionBoundary(
   transactionRunner: RolesTransactionRunner = runTransaction,
+  bindScopedContext = true,
 ): RolesTransactionBoundary {
   return {
     async run(actor, operation) {
       return transactionRunner(async (tx) => {
-        await tx.$executeRawUnsafe("SELECT set_config('app.org_id', $1, true)", actor.orgId);
-        await tx.$executeRawUnsafe("SELECT set_config('app.tenant_id', $1, true)", actor.tenantId ?? "");
-        await tx.$executeRawUnsafe("SET LOCAL row_security = on");
+        await applyTenantContext(tx, actor.tenantId ?? "", actor.orgId);
 
         if (actor.tenantId) {
           const site = await tx.tenant.findFirst({
@@ -107,13 +108,31 @@ export function createRolesTransactionBoundary(
           }
         }
 
-        return operation(tx);
+        if (!bindScopedContext) return operation(tx);
+        return withPrismaTransactionContext(
+          tx,
+          () => operation(tx),
+          actor.tenantId
+            ? {
+                kind: "tenant",
+                tenantId: actor.tenantId,
+                orgId: actor.orgId,
+                readOnly: false,
+              }
+            : { kind: "org", orgId: actor.orgId, readOnly: false },
+        );
       });
     },
   };
 }
 
 export const rolesTransactionBoundary = createRolesTransactionBoundary();
+
+/** Maintenance cutover explicitly switches site RLS on its owned transaction. */
+export const maintenanceRolesTransactionBoundary = createRolesTransactionBoundary(
+  runTransaction,
+  false,
+);
 
 export interface UpdateRoleCommand extends UpdateRoleDto {
   roleId: string;

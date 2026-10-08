@@ -200,8 +200,16 @@ const featureAvailabilityReader: FeatureAvailabilityReader = {
 const effectivePermissionsContext: EffectivePermissionsContext = {
   async run(orgId, tenantId, operation, transaction) {
     if (transaction) {
-      await applyTenantContext(transaction, tenantId ?? "", orgId);
-      return withPrismaTransactionContext(transaction, operation);
+      return withPrismaTransactionContext(
+        transaction,
+        async () => {
+          await applyTenantContext(transaction, tenantId ?? "", orgId);
+          return operation();
+        },
+        tenantId
+          ? { kind: "tenant", tenantId, orgId, readOnly: false }
+          : { kind: "org", orgId, readOnly: false },
+      );
     }
     return tenantId
       ? withTenantRlsContext(tenantId, orgId, () => operation())

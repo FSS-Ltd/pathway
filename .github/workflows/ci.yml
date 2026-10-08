@@ -196,6 +196,32 @@ jobs:
         run: pnpm test:integration
         continue-on-error: false
 
+      - name: Create one-connection test database
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: postgres
+          PGUSER: pathway_test_user
+          PGPASSWORD: pathway_test_password
+        run: psql -c "CREATE DATABASE pathway_test_one_connection;"
+
+      - name: Verify request transactions with one database connection
+        env:
+          E2E_USE_GLOBAL_SETUP: "true"
+          E2E_RLS_ROLE: pathway_e2e_rls
+          E2E_TENANT_RLS_ROLE: pathway_e2e_tenant_rls
+          E2E_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_test_one_connection?schema=app&connection_limit=1
+          E2E_BOOTSTRAP_DATABASE_URL: postgresql://pathway_test_user:pathway_test_password@localhost:5432/pathway_test_one_connection?schema=app&connection_limit=1
+          E2E_ORG_ID: "00000000-0000-0000-0000-000000000001"
+          E2E_TENANT_ID: "00000000-0000-0000-0000-00000000000a"
+          E2E_TENANT2_ID: "00000000-0000-0000-0000-00000000000b"
+          E2E_TENANT_SLUG: "e2e-tenant-a"
+          E2E_ALLOW_RESET: "false"
+        run: >-
+          pnpm --filter @pathway/api test:integration --runTestsByPath
+          src/concerns/tests/concerns.e2e.spec.ts
+          src/access-control/tests/effective-permissions.tenant-rls.e2e.spec.ts
+
   system-role-seed-proof:
     name: System Role Seed Database Identity
     runs-on: ubuntu-22.04

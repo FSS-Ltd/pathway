@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { Test, type TestingModule } from "@nestjs/testing";
-import { Vertical, prisma } from "@pathway/db";
+import { Vertical, prisma, withTenantRlsContext } from "@pathway/db";
 import { EffectivePermissionsService } from "../effective-permissions.service";
 import { AccessControlModule } from "../access-control.module";
 import {
@@ -141,5 +141,72 @@ describe("effective permission resolution establishes its own tenant RLS context
     await expect(
       service.listForUser(fixture.user, fixture.org, fixture.site),
     ).resolves.toEqual(["ace.pace.read"]);
+  });
+
+  it("resolves permissions on the request transaction's only connection", async () => {
+    if (!service) return;
+
+    await withTenantRlsContext(fixture.site, fixture.org, async (outer) => {
+      const [{ pid: outerPid }] = await outer.$queryRaw<Array<{ pid: number }>>`
+        SELECT pg_backend_pid() AS pid
+      `;
+      const [{ pid: nestedPid }] = await withTenantRlsContext(
+        fixture.site,
+        fixture.org,
+        (nested) => nested.$queryRaw<Array<{ pid: number }>>`
+          SELECT pg_backend_pid() AS pid
+        `,
+      );
+      expect(nestedPid).toBe(outerPid);
+      await expect(
+        service!.resolve({
+          userId: fixture.user,
+          orgId: fixture.org,
+          tenantId: fixture.site,
+          permission: "ace.pace.read",
+          now: NOW,
+        }),
+      ).resolves.toMatchObject({ allowed: true });
+    });
+  });
+
+  it("rejects a site switch inside a transaction and releases the connection", async () => {
+    if (!service) return;
+
+    await withTenantRlsContext(fixture.site, fixture.org, async () => {
+      await expect(
+        withTenantRlsContext(randomUUID(), fixture.org, async () => undefined),
+      ).rejects.toThrow("Cannot change the scope");
+    });
+    await expect(
+      service.listForUser(fixture.user, fixture.org, fixture.site),
+    ).resolves.toContain("ace.pace.read");
+  });
+
+  it("rolls back a nested write with its outer request transaction", async () => {
+    if (!service) return;
+    const childId = randomUUID();
+
+    await expect(
+      withTenantRlsContext(fixture.site, fixture.org, async () => {
+        await withTenantRlsContext(fixture.site, fixture.org, async (tx) => {
+          await tx.child.create({
+            data: {
+              id: childId,
+              tenantId: fixture.site,
+              firstName: "Rolled",
+              lastName: "Back",
+            },
+          });
+        });
+        throw new Error("rollback request");
+      }),
+    ).rejects.toThrow("rollback request");
+
+    await withTenantRlsContext(fixture.site, fixture.org, async (tx) => {
+      await expect(
+        tx.child.findUnique({ where: { id: childId } }),
+      ).resolves.toBeNull();
+    });
   });
 });
