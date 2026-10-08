@@ -180,6 +180,10 @@ and Graphify passed. The ACE-only daily export permission and approved
 the bounded, audited export route after this evidence record merges. The
 controlled permission and role seed remains a release task.
 
+Step 1.3g14b is in progress on `feature/ace-attendance-daily-export`. It adds
+the bounded, audited ACE daily CSV route behind the dedicated export
+permission. No production seed or deployment is part of this step.
+
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
 journey is merged but is not in the current manual production deployment.

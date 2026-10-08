@@ -8,6 +8,7 @@ import { AttendanceService } from "./attendance.service";
 import { AttendanceHistoryService } from "./attendance-history.service";
 import { DailyAttendanceController } from "./daily-attendance.controller";
 import { DailyAttendanceService } from "./daily-attendance.service";
+import { DailyAttendanceExportService } from "./daily-attendance-export.service";
 import { DailyAttendanceHistoryService } from "./daily-attendance-history.service";
 import { DailyAttendanceWriteService } from "./daily-attendance-write.service";
 import { StudentDailyAttendanceController } from "./student-daily-attendance.controller";
@@ -30,6 +31,7 @@ import { FamilyContextsService } from "./family-contexts.service";
     AttendanceService,
     AttendanceHistoryService,
     DailyAttendanceService,
+    DailyAttendanceExportService,
     DailyAttendanceHistoryService,
     DailyAttendanceWriteService,
     StudentDailyAttendanceService,

@@ -17,12 +17,84 @@ export interface DailyAttendanceAccess {
   bands: Array<{ id: string; name: string }>;
 }
 
+interface DailyAttendanceRoleScope {
+  timezone: string | null;
+  leader: boolean;
+}
+
 export async function resolveDailyAttendanceAccess(
   tx: Prisma.TransactionClient,
   actor: DailyAttendanceActor,
   date: Date,
   permission: "attendance.read" | "attendance.manage",
 ): Promise<DailyAttendanceAccess> {
+  const { timezone, leader } = await resolveDailyAttendanceRoleScope(
+    tx,
+    actor,
+    permission,
+  );
+  const assignments = leader
+    ? []
+    : await tx.aceStaffYearBandAssignment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          startsOn: { lte: date },
+          OR: [{ endsOn: null }, { endsOn: { gte: date } }],
+        },
+        select: { yearBandId: true },
+      });
+  const permittedBandIds = [
+    ...new Set(assignments.map((row) => row.yearBandId)),
+  ];
+  const bands = await tx.aceYearBand.findMany({
+    where: {
+      tenantId: actor.tenantId,
+      ...(leader ? {} : { id: { in: permittedBandIds } }),
+    },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
+    select: { id: true, name: true },
+  });
+  return { timezone, bands };
+}
+
+export async function resolveDailyAttendanceExportScope(
+  tx: Prisma.TransactionClient,
+  actor: DailyAttendanceActor,
+  from: Date,
+  to: Date,
+): Promise<{
+  leader: boolean;
+  assignments: Array<{
+    yearBandId: string;
+    startsOn: Date;
+    endsOn: Date | null;
+  }>;
+}> {
+  const { leader } = await resolveDailyAttendanceRoleScope(
+    tx,
+    actor,
+    "ace.attendance.export",
+  );
+  const assignments = leader
+    ? []
+    : await tx.aceStaffYearBandAssignment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          startsOn: { lte: to },
+          OR: [{ endsOn: null }, { endsOn: { gte: from } }],
+        },
+        select: { yearBandId: true, startsOn: true, endsOn: true },
+      });
+  return { leader, assignments };
+}
+
+async function resolveDailyAttendanceRoleScope(
+  tx: Prisma.TransactionClient,
+  actor: DailyAttendanceActor,
+  permission: "attendance.read" | "attendance.manage" | "ace.attendance.export",
+): Promise<DailyAttendanceRoleScope> {
   if (!actor.tenantId || !actor.orgId || !actor.userId) {
     throw new BadRequestException("An active site is required");
   }
@@ -100,28 +172,5 @@ export async function resolveDailyAttendanceAccess(
   if (!leader && !siteMembership) {
     throw new ForbiddenException("Permission denied");
   }
-
-  const assignments = leader
-    ? []
-    : await tx.aceStaffYearBandAssignment.findMany({
-        where: {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          startsOn: { lte: date },
-          OR: [{ endsOn: null }, { endsOn: { gte: date } }],
-        },
-        select: { yearBandId: true },
-      });
-  const permittedBandIds = [
-    ...new Set(assignments.map((row) => row.yearBandId)),
-  ];
-  const bands = await tx.aceYearBand.findMany({
-    where: {
-      tenantId: actor.tenantId,
-      ...(leader ? {} : { id: { in: permittedBandIds } }),
-    },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }],
-    select: { id: true, name: true },
-  });
-  return { timezone: site.timezone, bands };
+  return { timezone: site.timezone, leader: Boolean(leader) };
 }
