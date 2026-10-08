@@ -304,8 +304,10 @@ dependency or a claim that this web screen is an Apple platform screen.
    responder and guardian checks. The DOM journey covers a linked family,
    responder discovery, failed-send retry, site switch, and denied site. An
    authenticated cross-persona browser journey remains a release check.
-4. Notices: separate audience, publish, list, and receipt API/web slices. Do
-   not mark C12 complete until notice read state and denied audiences work.
+4. Notices: follow the [ACE notice contract](16-ace-notices-design.md) in
+   separate audience, publish, list, receipt, attachment, and email API/web
+   slices. Do not mark C12 complete until notice read state and denied
+   audiences work.
 
 Each item needs its own PR and merge gate. The mobile follow-up needs a
 site-scoped family messages entry, approved-responder picker, school-team
