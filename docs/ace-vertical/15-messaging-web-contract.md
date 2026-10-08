@@ -218,6 +218,14 @@ client request ID for retry safety, and records an audit event without the
 message body. Reusing an ID with different text conflicts. The route does not
 claim a parent read receipt; the staff web entry remains a separate step.
 
+Step 1.3e4k adds a separate School Team view to the staff message workspace.
+The view loads only when selected, lists current parent threads, pages scoped
+history, advances the staff read cursor after a successful history load, and
+replies with a stable client request ID. Switching sites or views clears
+visible thread state and unsent site-specific drafts. A denied responder sees
+an unavailable state. Staff replies show no parent read receipt because the
+school-team history contract does not provide one.
+
 Step 1.3e3a adds the staff web journey at `/ace/messages`: a responsive
 conversation list and thread, paged history, explicit read cursor, and a
 labelled composer. It keeps a failed draft and reuses the same client request

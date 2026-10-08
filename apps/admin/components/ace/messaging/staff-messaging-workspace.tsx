@@ -18,14 +18,8 @@ export function StaffMessagingWorkspace({
   canSend: boolean;
   canCreate: boolean;
 }) {
-  const messaging = useStaffMessaging(currentUserId);
-  const [composing, setComposing] = React.useState(false);
-  React.useEffect(
-    () => setComposing(false),
-    [messaging.siteRevision, canCreate],
-  );
-  const selected = messaging.conversations.find(
-    (conversation) => conversation.id === messaging.selectedId,
+  const [channel, setChannel] = React.useState<"staff" | "school-team">(
+    "staff",
   );
 
   return (
@@ -38,10 +32,62 @@ export function StaffMessagingWorkspace({
           Messages
         </h1>
         <p className="text-sm leading-6 text-text-muted">
-          Private staff conversations and your site staff room.
+          Private staff conversations, your site staff room, and family
+          messages.
         </p>
       </header>
+      <div
+        role="group"
+        aria-label="Message channels"
+        className="inline-flex w-fit rounded-2xl border border-border-subtle bg-surface p-1 shadow-sm"
+      >
+        {(["staff", "school-team"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={channel === option}
+            onClick={() => setChannel(option)}
+            className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong ${channel === option ? "bg-accent-subtle text-accent-strong" : "text-text-muted hover:text-text-primary"}`}
+          >
+            {option === "staff" ? "Staff" : "School Team"}
+          </button>
+        ))}
+      </div>
+      <StaffConversationPane
+        key={channel}
+        channel={channel}
+        currentUserId={currentUserId}
+        canSend={canSend}
+        canCreate={canCreate}
+      />
+    </main>
+  );
+}
 
+function StaffConversationPane({
+  channel,
+  currentUserId,
+  canSend,
+  canCreate,
+}: {
+  channel: "staff" | "school-team";
+  currentUserId: string;
+  canSend: boolean;
+  canCreate: boolean;
+}) {
+  const schoolTeam = channel === "school-team";
+  const messaging = useStaffMessaging(currentUserId, channel);
+  const [composing, setComposing] = React.useState(false);
+  React.useEffect(
+    () => setComposing(false),
+    [messaging.siteRevision, canCreate],
+  );
+  const selected = messaging.conversations.find(
+    (conversation) => conversation.id === messaging.selectedId,
+  );
+
+  return (
+    <>
       <div className="grid h-[min(75dvh,50rem)] min-h-[28rem] overflow-hidden rounded-3xl border border-border-subtle bg-surface shadow-card md:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)]">
         <section
           aria-label="Conversations"
@@ -62,9 +108,9 @@ export function StaffMessagingWorkspace({
             <>
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
                 <h2 className="font-heading text-lg font-semibold text-text-primary">
-                  Conversations
+                  {schoolTeam ? "School Team" : "Conversations"}
                 </h2>
-                {canCreate ? (
+                {!schoolTeam && canCreate ? (
                   <div className="flex flex-wrap gap-2">
                     <Button
                       type="button"
@@ -102,7 +148,7 @@ export function StaffMessagingWorkspace({
                   {messaging.roomError}
                 </p>
               ) : null}
-              <ConversationList messaging={messaging} />
+              <ConversationList messaging={messaging} schoolTeam={schoolTeam} />
             </>
           )}
         </section>
@@ -120,6 +166,10 @@ export function StaffMessagingWorkspace({
               canSend={canSend}
               messaging={messaging}
               onBack={() => messaging.select(null)}
+              contextLabel={schoolTeam ? "Parent conversation" : undefined}
+              composerId={
+                schoolTeam ? "school-team-message-draft" : "staff-message-draft"
+              }
             />
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
@@ -133,12 +183,14 @@ export function StaffMessagingWorkspace({
                 Choose a conversation
               </h2>
               <p className="mt-2 max-w-sm text-sm leading-6 text-text-muted">
-                Select a staff thread to read its messages.
+                {schoolTeam
+                  ? "Select a family thread to read its messages."
+                  : "Select a staff thread to read its messages."}
               </p>
             </div>
           )}
         </section>
       </div>
-    </main>
+    </>
   );
 }

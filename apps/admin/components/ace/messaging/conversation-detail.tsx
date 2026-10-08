@@ -19,9 +19,7 @@ export type MessageDetailState = {
   changeDraft: (value: string) => void;
   send: () => Promise<void>;
 };
-type ConversationIdentity = Pick<StaffConversation, "id" | "title"> & {
-  kind: StaffConversation["kind"] | "PARENT_STAFF";
-};
+type ConversationIdentity = Pick<StaffConversation, "id" | "title" | "kind">;
 const shortTime = new Intl.DateTimeFormat("en-GB", { timeStyle: "short" });
 const shortDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" });
 
@@ -32,6 +30,7 @@ export function ConversationDetail({
   messaging,
   onBack,
   composerId = "staff-message-draft",
+  contextLabel,
 }: {
   conversation: ConversationIdentity;
   currentUserId: string;
@@ -39,6 +38,7 @@ export function ConversationDetail({
   messaging: MessageDetailState;
   onBack?: () => void;
   composerId?: string;
+  contextLabel?: string;
 }) {
   const endRef = React.useRef<HTMLDivElement>(null);
   const latestSequence = messaging.messages.at(-1)?.sequence;
@@ -65,11 +65,12 @@ export function ConversationDetail({
             {conversation.title}
           </h2>
           <p className="text-xs text-text-muted">
-            {conversation.kind === "STAFF_ROOM"
-              ? "Staff room"
-              : conversation.kind === "PARENT_STAFF"
-                ? "Your school team"
-                : "Direct staff conversation"}
+            {contextLabel ??
+              (conversation.kind === "STAFF_ROOM"
+                ? "Staff room"
+                : conversation.kind === "PARENT_STAFF"
+                  ? "Your school team"
+                  : "Direct staff conversation")}
           </p>
         </div>
       </header>
