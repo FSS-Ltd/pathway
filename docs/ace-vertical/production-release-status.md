@@ -14,6 +14,22 @@ cannot create its self-discovery policy on a view. API, admin, and web jobs
 were skipped. Migration recovery and a portable policy target are required
 before a newer app release can proceed.
 
+The [next automatic run](https://github.com/FSS-Ltd/pathway/actions/runs/37834814498)
+at merged commit `70cc53502f37da07a0e449e5604ce51ee862c015` stopped with
+Prisma P3009 because that failed record is unresolved; it again skipped the
+three app jobs.
+
+The 8 October read-only target audit confirmed that the failed migration has
+no completion or rollback marker, `app."StudentIdentity"` is a view, both real
+identity tables in `public` have forced RLS, and neither self-discovery policy
+exists. The [recovery runbook](runbooks/family-discovery-migration-recovery.md)
+records the post-merge repair and verification sequence.
+
+Current release step **REL-2** is implementing the portable family discovery
+policy target and a replay test for both `app` and split `public` layouts.
+Production `migrate resolve` and the next deploy remain pending its merged,
+CI-verified PR.
+
 On 7 October, the connected Vercel API confirmed that the API
 project's production `DATABASE_URL` and `SUPABASE_URL` both reference
 `jzofykdzpuslpdyfovxp`. Its production Supabase secret key is present.
@@ -109,6 +125,7 @@ does not release the new parent screen.
 | 1.3e5a1  | Parent notice permission boundary correction                           | Merged  | [#499](https://github.com/FSS-Ltd/pathway/pull/499) to `master`                     | `9ee2322c1efd86a0ad974d060acad25224af7386`; all eight checks passed: CI run 37819210083, CodeQL run 37819205960.                                                                                                | `29a1780d4663840a6e19bce7aebfe1277e61e30e` |
 | 1.3e5b   | ACE parent notice relationship permission                              | Merged  | [#500](https://github.com/FSS-Ltd/pathway/pull/500) to `master`                     | `c5858bf00bba252d508b01f37526755d3ae46f31`; all eight checks passed: CI run 37821295904, CodeQL run 37821292163.                                                                                                | `e4f5e46ea274150b364cb2d99f370d21bbdda071` |
 | 1.3e5c1  | Full guardian eligibility for ACE notice audiences                     | Merged  | [#502](https://github.com/FSS-Ltd/pathway/pull/502) to `master`                     | `7d11c7a253984777f32a9aad738f30d7dfd6c5da`; all eight checks passed: CI run 37828070800, CodeQL run 37828063709.                                                                                                | `1bf510c6fc01e3ddbfdcb4c90ce3963b26ca9e38` |
+| 1.3e5c2  | ACE notice expiry, withdrawal, immutable publication and read receipts | Merged  | [#503](https://github.com/FSS-Ltd/pathway/pull/503) to `master`                     | `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`; all eight checks passed: CI run 37833550859, CodeQL run 37833546948.                                                                                                | `70cc53502f37da07a0e449e5604ce51ee862c015` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -419,7 +436,14 @@ on head `7d11c7a253984777f32a9aad738f30d7dfd6c5da`, including portable
 in an ACE notice audience. It has not been applied to production; estimated
 completion remains **about 51%**.
 
-**Revised overall ACE update estimate: about 51%.** The earlier 87% and 91%
+Step 1.3e5c2 merged in [PR #503](https://github.com/FSS-Ltd/pathway/pull/503)
+at `70cc53502f37da07a0e449e5604ce51ee862c015`. All eight checks passed
+on head `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`. The additive notice
+migration enforces expiry, final withdrawal, immutable publication and
+write-once read receipts. Its API and web journey remain to be built. Overall
+ACE update completion after this merge is **about 52%**.
+
+**Revised overall ACE update estimate: about 52%.** The earlier 87% and 91%
 estimates were too high for the full approved plan. The [journey matrix](02-oasis-web-journey-parity.md)
 still marks 13 of 17 core journeys partial and all five paid add-ons missing;
 the newer ACE code also has not passed the production release gate. This
