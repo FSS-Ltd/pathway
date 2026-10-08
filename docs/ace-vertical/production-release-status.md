@@ -98,7 +98,7 @@ deployment's `/health` returned 200 with a database timestamp on 7 October.
 | 1.3g5    | Scoped daily-register staff read API                   | Merged  | [#433](https://github.com/FSS-Ltd/pathway/pull/433) to `master` | `06aad2c5ba687c5f9a66ecb48ac0f35eff9b628a`; all eight checks passed: CI run 37709708490, CodeQL run 37709703647.                                                                                                | `e0d43785eb9b592d0f2db4bcdfd4dee97d780c75` |
 | 1.3g6    | Atomic daily-register mark and correction write API    | Merged  | [#435](https://github.com/FSS-Ltd/pathway/pull/435) to `master` | `27a814c792180cb15fbb7a67170528198c437563`; all eight checks passed: CI run 37712759665, CodeQL run 37712756595.                                                                                                | `69641dae68c1db991a4193d3b34ff6f5f9555ea4` |
 | 1.3g7    | Scoped daily correction-history read API               | Merged  | [#437](https://github.com/FSS-Ltd/pathway/pull/437) to `master` | `923a352f80476722d2b20a84448cd9c46850fa5d`; all eight checks passed: CI run 37715465693, CodeQL run 37715461713.                                                                                                | `be87f6344a694007315c8fcc2c7a2ddeae6ae866` |
-| 1.3g8    | ACE staff daily-register web journey                   | Draft   | [#439](https://github.com/FSS-Ltd/pathway/pull/439) to `master` | `02f351b04871f400493ce3d19e9737c98bfccd48`; local checks passed. CI pending on final PR revision.                                                                                                               | Pending                                    |
+| 1.3g8    | ACE staff daily-register web journey                   | Merged  | [#439](https://github.com/FSS-Ltd/pathway/pull/439) to `master` | `3c3fd705446b388a198f297132285cb7082bf424`; all eight checks passed: CI run 37718515055, CodeQL run 37718511575.                                                                                                | `fff8e69087ef313ab80c640c625af5763b2d83c4` |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
@@ -110,8 +110,9 @@ Step 1.3g5 is merged after disposable-Postgres integration verified the
 scoped staff roster and fixed-leader view. Step 1.3g6 is merged after CI
 Postgres ran the daily write suite and all eight required checks passed. The
 bounded correction-history read in step 1.3g7 is merged after CI Postgres ran
-68 integration suites and 431 tests, including the daily history suite. Production
-migration remains deferred.
+68 integration suites and 431 tests, including the daily history suite. Step
+1.3g8 adds the staff register web journey after the admin interaction test and
+all eight CI checks passed. Production migration and deployment remain deferred.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
