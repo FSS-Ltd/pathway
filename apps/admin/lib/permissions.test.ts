@@ -42,6 +42,12 @@ const safeguardingLeadRole: AdminRoleInfo = {
   isSuperUser: false,
 };
 
+const superUserRole: AdminRoleInfo = {
+  ...staffRole,
+  isStaff: false,
+  isSuperUser: true,
+};
+
 function runTests() {
   let passed = 0;
   let failed = 0;
@@ -80,6 +86,9 @@ function runTests() {
   assert(canAccessRoute("/safeguarding", safeguardingLeadRole), "SAFEGUARDING_LEAD can access /safeguarding");
   assert(canAccessRoute("/safeguarding", siteAdminRole), "SITE_ADMIN can access /safeguarding");
   assert(canAccessRoute("/safeguarding", orgAdminRole), "ORG_ADMIN can access /safeguarding");
+  assert(canAccessRoute("/people", superUserRole), "superuser can access People");
+  assert(canAccessRoute("/safeguarding", superUserRole), "superuser can access safeguarding");
+  assert(!canAccessRoute("/billing", superUserRole), "superuser flag alone does not grant billing authority");
 
   const rolesReadPermission = ["platform.access.roles.read"];
   assert(
@@ -95,6 +104,8 @@ function runTests() {
     "SITE_ADMIN by role name alone, with no typed permission, cannot access /settings/roles",
   );
   assert(!canAccessRoute("/settings/roles", staffRole, []), "STAFF cannot access /settings/roles");
+  assert(!canAccessRoute("/settings/roles", superUserRole, []), "superuser still needs an effective Roles permission");
+  assert(canAccessRoute("/settings/roles", superUserRole, rolesReadPermission), "superuser with effective permission can access Roles");
 
   console.log("canPerform");
   assert(!canPerform("people:invite", staffRole), "STAFF cannot people:invite");

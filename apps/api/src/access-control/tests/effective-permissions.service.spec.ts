@@ -62,19 +62,26 @@ function tagGrant(
 
 function createService({
   hasMembership = true,
+  isSuperUser = false,
   grants = [grant()],
   tagGrants = [],
   capabilities = ["ace.pace.read" as PermissionKey],
+  activePermissionKeys = capabilities,
   available = true,
 }: {
   hasMembership?: boolean;
+  isSuperUser?: boolean;
   grants?: readonly Grant[];
   tagGrants?: readonly EffectiveTagPermissionGrant[];
   capabilities?: readonly PermissionKey[];
+  activePermissionKeys?: readonly PermissionKey[];
   available?: boolean;
 } = {}): EffectivePermissionsService {
   const reader: EffectivePermissionsReader = {
-    getOrganisationMembership: async () => hasMembership,
+    isActiveSuperUser: async () => isSuperUser,
+    getMembership: async () => ({ hasMembership, isSuperUser }),
+    findActivePermissionKeys: async (keys) =>
+      keys.filter((key) => activePermissionKeys.includes(key)),
     findAssignments: async () => grants,
     findTagGrants: async () => tagGrants,
   };
@@ -114,6 +121,71 @@ async function resolve(
 }
 
 describe("EffectivePermissionsService", () => {
+  it("grants an admitted superuser active operational permissions without a role", async () => {
+    const service = createService({ isSuperUser: true, grants: [] });
+
+    await expect(resolve(service, { tenantId: SITE_ID })).resolves.toEqual({
+      allowed: true,
+      reason: "allowed",
+      sourceRoleIds: [],
+      sourceSuperUser: true,
+    });
+    await expect(
+      service.listForUser(USER_ID, ORG_ID, SITE_ID),
+    ).resolves.toEqual(["ace.pace.read"]);
+    await expect(
+      service.listForUserWithSources(USER_ID, ORG_ID, SITE_ID),
+    ).resolves.toEqual([
+      {
+        permissionKey: "ace.pace.read",
+        sourceRoleIds: [],
+        sourceSuperUser: true,
+      },
+    ]);
+  });
+
+  it("does not grant a superuser outside membership or enabled permissions", async () => {
+    await expect(
+      resolve(
+        createService({ hasMembership: false, isSuperUser: true, grants: [] }),
+      ),
+    ).resolves.toMatchObject({ allowed: false, reason: "no-membership" });
+    await expect(
+      resolve(
+        createService({ isSuperUser: true, grants: [], capabilities: [] }),
+      ),
+    ).resolves.toMatchObject({ allowed: false, reason: "capability-missing" });
+    await expect(
+      resolve(
+        createService({ isSuperUser: true, grants: [], available: false }),
+      ),
+    ).resolves.toMatchObject({ allowed: false, reason: "feature-disabled" });
+    await expect(
+      resolve(
+        createService({
+          isSuperUser: true,
+          grants: [],
+          activePermissionKeys: [],
+        }),
+      ),
+    ).resolves.toMatchObject({ allowed: false, reason: "feature-disabled" });
+    await expect(
+      createService({
+        isSuperUser: true,
+        grants: [],
+        activePermissionKeys: [],
+      }).listForUser(USER_ID, ORG_ID, SITE_ID),
+    ).resolves.toEqual([]);
+  });
+
+  it("does not change an ordinary user's missing-permission decision", async () => {
+    await expect(resolve(createService({ grants: [] }))).resolves.toEqual({
+      allowed: false,
+      reason: "permission-missing",
+      sourceRoleIds: [],
+    });
+  });
+
   it("allows an organisation role grant for an active organisation member", async () => {
     const decision = await resolve(createService());
 
@@ -171,7 +243,9 @@ describe("EffectivePermissionsService", () => {
   it("requests only organisation or matching site assignment scopes", async () => {
     const requestedTenantIds: Array<string | undefined> = [];
     const reader: EffectivePermissionsReader = {
-      getOrganisationMembership: async () => true,
+      isActiveSuperUser: async () => false,
+      getMembership: async () => ({ hasMembership: true, isSuperUser: false }),
+      findActivePermissionKeys: async () => [],
       findAssignments: async (_userId, _orgId, tenantId) => {
         requestedTenantIds.push(tenantId);
         return [grant({ roleScope: "site", roleTenantId: SITE_ID })];
@@ -193,12 +267,16 @@ describe("EffectivePermissionsService", () => {
   });
 
   it("uses the shared access cache and reloads after user invalidation", async () => {
-    const getOrganisationMembership = jest.fn().mockResolvedValue(true);
+    const getMembership = jest
+      .fn()
+      .mockResolvedValue({ hasMembership: true, isSuperUser: false });
     const findAssignments = jest.fn().mockResolvedValue([grant()]);
     const cache = new AccessCacheService();
     const service = new EffectivePermissionsService(
       {
-        getOrganisationMembership,
+        isActiveSuperUser: async () => false,
+        getMembership,
+        findActivePermissionKeys: async () => [],
         findAssignments,
         findTagGrants: async () => [],
       },
@@ -210,13 +288,13 @@ describe("EffectivePermissionsService", () => {
 
     await resolve(service, { tenantId: SITE_ID });
     await resolve(service, { tenantId: SITE_ID });
-    expect(getOrganisationMembership).toHaveBeenCalledTimes(2);
+    expect(getMembership).toHaveBeenCalledTimes(2);
     expect(findAssignments).toHaveBeenCalledTimes(1);
 
     await cache.invalidateUser(USER_ID, ORG_ID);
     await resolve(service, { tenantId: SITE_ID });
 
-    expect(getOrganisationMembership).toHaveBeenCalledTimes(3);
+    expect(getMembership).toHaveBeenCalledTimes(3);
     expect(findAssignments).toHaveBeenCalledTimes(2);
   });
 
@@ -225,7 +303,12 @@ describe("EffectivePermissionsService", () => {
     const findAssignments = jest.fn().mockResolvedValue([grant({ expiresAt })]);
     const service = new EffectivePermissionsService(
       {
-        getOrganisationMembership: async () => true,
+        isActiveSuperUser: async () => false,
+        getMembership: async () => ({
+          hasMembership: true,
+          isSuperUser: false,
+        }),
+        findActivePermissionKeys: async () => [],
         findAssignments,
         findTagGrants: async () => [],
       },
@@ -334,7 +417,12 @@ describe("EffectivePermissionsService", () => {
     })
       .overrideProvider(EFFECTIVE_PERMISSIONS_READER)
       .useValue({
-        getOrganisationMembership: async () => true,
+        isActiveSuperUser: async () => false,
+        getMembership: async () => ({
+          hasMembership: true,
+          isSuperUser: false,
+        }),
+        findActivePermissionKeys: async () => [],
         findAssignments: async () => [grant()],
         findTagGrants: async () => [],
       } satisfies EffectivePermissionsReader)
@@ -367,7 +455,12 @@ describe("EffectivePermissionsService", () => {
     })
       .overrideProvider(EFFECTIVE_PERMISSIONS_READER)
       .useValue({
-        getOrganisationMembership: async () => true,
+        isActiveSuperUser: async () => false,
+        getMembership: async () => ({
+          hasMembership: true,
+          isSuperUser: false,
+        }),
+        findActivePermissionKeys: async () => [],
         findAssignments: async () => [
           grant({ permissionKey: "unregistered.key" as PermissionKey }),
         ],
@@ -634,7 +727,9 @@ describe("EffectivePermissionsService", () => {
     let capabilities: PermissionKey[] = ["ace.pace.read"];
     const findTagGrants = jest.fn().mockImplementation(async () => tags);
     const reader: EffectivePermissionsReader = {
-      getOrganisationMembership: async () => true,
+      isActiveSuperUser: async () => false,
+      getMembership: async () => ({ hasMembership: true, isSuperUser: false }),
+      findActivePermissionKeys: async () => [],
       findAssignments: async () => [],
       findTagGrants,
     };

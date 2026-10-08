@@ -298,7 +298,9 @@ describe("RolesService", () => {
       let permissionPresent = true;
       let roleIsActive = true;
       const reader = {
-        getOrganisationMembership: jest.fn().mockResolvedValue(true),
+        isActiveSuperUser: jest.fn().mockResolvedValue(false),
+        getMembership: jest.fn().mockResolvedValue({ hasMembership: true, isSuperUser: false }),
+        findActivePermissionKeys: jest.fn().mockResolvedValue([]),
         findAssignments: jest.fn().mockImplementation(async () => {
           if (!permissionPresent) return [];
           return [{
