@@ -32,6 +32,7 @@ const ACE_LEARNING_KEYS = [
 ] as const;
 
 const ACE_CORE_KEYS = [
+  "ace.attendance.export",
   "ace.settings.read",
   "ace.settings.manage",
   "ace.pace.read",

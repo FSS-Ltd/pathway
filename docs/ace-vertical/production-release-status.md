@@ -170,6 +170,11 @@ test script passed, including the family landing interaction test. The
 family-only entry point links authorised contexts to guarded daily attendance
 pages. It is not in production; broader family journeys remain open.
 
+Step 1.3g14a is in progress on `feature/ace-attendance-export-permission`.
+It prepares the ACE-only daily export permission and the approved
+`attendance-exporter` access tag. No export route or production seed is part
+of this step.
+
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
 journey is merged but is not in the current manual production deployment.

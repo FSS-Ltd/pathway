@@ -112,6 +112,16 @@ retry states. Its family-shell navigation never requests staff roles or
 organisation UI. It does not imply that the wider parent and student portal
 journeys are complete.
 
+Step 1.3g14a establishes `ace.attendance.export` as a separate ACE core
+permission before any daily CSV route exists. Organisation heads and site leads
+receive it through their fixed-role templates after the controlled permission
+and role seed; ordinary staff do not. The approved Oasis
+`attendance-exporter` access tag maps only to this key and can be granted only
+when the actor may delegate it. The future export route must still enforce
+current site membership, dated year-band scope for non-leaders, bounded dates
+and rows, tenant RLS, and an audit record. A tag alone cannot widen student or
+site scope. No existing session export route gains this new permission.
+
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server
    timestamps. Enforce one row per `(tenantId, childId, date)` and composite

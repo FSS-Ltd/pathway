@@ -22,6 +22,7 @@ export const SYSTEM_ROLE_TEMPLATES = {
       "platform.access.audit.read",
       "attendance.read",
       "attendance.manage",
+      "ace.attendance.export",
       "messaging.conversations.read",
       "messaging.conversations.create",
       "messaging.messages.read",
@@ -78,6 +79,7 @@ export const SYSTEM_ROLE_TEMPLATES = {
     permissions: [
       "attendance.read",
       "attendance.manage",
+      "ace.attendance.export",
       "messaging.conversations.read",
       "messaging.conversations.create",
       "messaging.messages.read",

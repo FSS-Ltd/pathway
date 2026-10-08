@@ -41,6 +41,7 @@ export const VERTICAL_CAPABILITIES = {
   ],
   ACE_SCHOOL: [
     ...PLATFORM_CORE_CAPABILITIES,
+    "ace.attendance.export",
     "students.manage",
     "classes.manage",
     "pace.manage",
