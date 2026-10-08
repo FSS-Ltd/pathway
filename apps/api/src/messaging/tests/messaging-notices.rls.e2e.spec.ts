@@ -544,9 +544,9 @@ async function seedTenantAF21Rows(
     recipientKind: "GUARDIAN",
     guardianIdentityId: fixture.guardianAIdentityId,
   });
+  await insertNoticeAttachment(tx, fixture, noticeId);
   await publishNotice(tx, noticeId);
   await insertNoticeReceipt(tx, fixture, audienceMemberId);
-  await insertNoticeAttachment(tx, fixture, noticeId);
   return {
     conversationId: conversation.conversationId,
     guardianParticipantId,
@@ -4112,6 +4112,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
           WHERE "id" = ${draftAudienceMemberId}
         `;
         expect(draftAudienceMemberDeleteCount).toBe(1);
+        await insertNoticeAttachment(tx, fixture, noticeId);
         await publishNotice(tx, noticeId);
         const receiptId = await insertNoticeReceipt(
           tx,
@@ -4119,7 +4120,6 @@ describe("ACE parent/staff messaging and notices storage", () => {
           guardianAudienceMemberId,
         );
         await insertNoticeReceipt(tx, fixture, staffAudienceMemberId);
-        await insertNoticeAttachment(tx, fixture, noticeId);
         return {
           noticeId,
           guardianAudienceMemberId,
