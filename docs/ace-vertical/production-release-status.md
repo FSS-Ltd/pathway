@@ -92,6 +92,7 @@ created after the variable updates but still serve code commit `a41e09a`.
 | 1.3e3b2  | Scoped staff direct conversation web control           | Merged  | [#408](https://github.com/FSS-Ltd/pathway/pull/408) to `master` | `cfc654754a680baeffb0b93e5151e321b970d320`; all eight checks passed: CI run 37652063721, CodeQL run 37652056053.                                                                                                | `99f671de57e0031c80ea6b7d48907924643d7608` |
 | 1.3e3c   | Scoped staff unread counts and list badges             | Merged  | [#409](https://github.com/FSS-Ltd/pathway/pull/409) to `master` | `87214821eb625ee211945d5a26717c92d9e12266`; all eight checks passed: CI run 37656203634, CodeQL run 37656189481.                                                                                                | `aac2f36551a793b56cf6fdbeb5a56eaa268b18ac` |
 | 1.3e3d   | Scoped direct-message read feedback                    | Merged  | [#411](https://github.com/FSS-Ltd/pathway/pull/411) to `master` | `223df300078c50882000fd6271c4fe7fec3a440f`; all eight checks passed: CI run 37661038756, CodeQL run 37661033054.                                                                                                | `ac1d2feb66e24d1b5e5f4f27669d30a6e550b03e` |
+| 1.3e3e   | Staff messaging conversation UI polish                 | Merged  | [#461](https://github.com/FSS-Ltd/pathway/pull/461) to `master` | `33bb57ceaf91fd2eef75df289cafe43a9c42a7d2`; all eight checks passed: CI run 37747729854, CodeQL run 37747727162.                                                                                                | `11e9d6c8f2a8633fedbd2f480fc9c079939648f5` |
 | 1.3f1    | C02 subject placement progress baseline                | Merged  | [#413](https://github.com/FSS-Ltd/pathway/pull/413) to `master` | `677860b0f7dc9e00dfdd38806a7a7a71137c7470`; all eight checks passed: CI run 37668386401, CodeQL run 37668381804.                                                                                                | `3b5a86bc4887bca1b0f7e49b7e92c0318bb0de69` |
 | 1.3f2    | C01 PACE policy web settings                           | Merged  | [#415](https://github.com/FSS-Ltd/pathway/pull/415) to `master` | `6b4c85663b22c5faa8b9e825a2f056e84281a6f1`; all eight checks passed: CI run 37674606330, CodeQL run 37674600785.                                                                                                | `47b11a8ec3461db3d0bfeb03475b8e8dbae6231a` |
 | 1.3f3a   | ACE core site-scoped subject catalogue API             | Merged  | [#419](https://github.com/FSS-Ltd/pathway/pull/419) to `master` | `8b0f384ec92a7b8191a0fd6293129fc13e384d6f`; all eight checks passed: CI run 37683959404, CodeQL run 37683952847.                                                                                                | `84f2a8a76492dac78618b67234eaddfd5932c412` |
@@ -207,6 +208,13 @@ Step 1.3e3d was merged in [PR #411](https://github.com/FSS-Ltd/pathway/pull/411)
 after all eight checks passed, including 59 integration suites and 401 tests
 against CI Postgres. Its direct-message read feedback is also awaiting the
 next gated manual production deployment.
+
+Step 1.3e3e was merged in [PR #461](https://github.com/FSS-Ltd/pathway/pull/461)
+after all eight checks passed on head `33bb57ceaf91fd2eef75df289cafe43a9c42a7d2`.
+It groups nearby staff messages, keeps the composer in view, and strengthens
+contrast and selected-thread feedback. The UI is merged but not deployed;
+the connected Vercel API, admin, and web production deployments still serve
+`a41e09aac3fde40f646e0242b0b8e3f0191e0122`.
 
 Step 1.3f1 was merged in [PR #413](https://github.com/FSS-Ltd/pathway/pull/413)
 after all eight checks passed on its final revision, including PostgreSQL
