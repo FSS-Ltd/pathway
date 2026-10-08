@@ -1,6 +1,6 @@
 import { NotFoundException, BadRequestException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { prisma } from "@pathway/db";
+import { prisma, withTenantRlsContext } from "@pathway/db";
 import { PublicSignupService } from "../public-signup.service";
 import { MailerService } from "../../mailer/mailer.service";
 import { Auth0ManagementService } from "../../auth/auth0-management.service";
@@ -36,6 +36,12 @@ jest.mock("@pathway/db", () => {
       childGuardianContact: {
         createMany: jest.fn(),
       },
+      guardianIdentity: {
+        upsert: jest.fn(),
+      },
+      guardianChildRelationship: {
+        createMany: jest.fn(),
+      },
       emergencyContact: {
         createMany: jest.fn(),
       },
@@ -47,6 +53,16 @@ jest.mock("@pathway/db", () => {
       return fn(p);
     }),
   },
+    withTenantRlsContext: jest.fn(
+      (
+        _tenantId: string,
+        _orgId: string,
+        fn: (tx: unknown) => Promise<unknown>,
+      ) => {
+        const p = jest.requireMock("@pathway/db").prisma;
+        return fn(p);
+      },
+    ),
   };
 });
 
@@ -80,6 +96,9 @@ describe("PublicSignupService", () => {
 
     service = moduleRef.get(PublicSignupService);
     jest.clearAllMocks();
+    (prisma.guardianIdentity.upsert as jest.Mock).mockResolvedValue({
+      id: "guardian-1",
+    });
     mailerMock.sendParentSignupCompleteEmail.mockResolvedValue(undefined);
     auth0Mock.createUser.mockResolvedValue("auth0|123");
   });
@@ -139,58 +158,30 @@ describe("PublicSignupService", () => {
   });
 
   describe("linkChildrenExistingUser", () => {
-    it("sets hasFamilyAccess and creates parent-child links", async () => {
+    it("rejects attempts to claim existing children from a signup link", async () => {
       (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
-      (prisma.child.findMany as jest.Mock).mockResolvedValue([
-        { id: "child-1" },
-        { id: "child-2" },
-      ]);
-      (prisma.user.update as jest.Mock).mockResolvedValue({});
-      (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
-      (prisma.userTenantRole.create as jest.Mock).mockResolvedValue({});
-      (prisma.$transaction as jest.Mock).mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-        fn(prisma),
-      );
-
-      const result = await service.linkChildrenExistingUser(
-        "user-1",
-        "a".repeat(32),
-        ["child-1", "child-2"],
-      );
-
-      expect(result).toEqual({ success: true, linkedCount: 2 });
-      expect(prisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: "user-1" },
-          data: expect.objectContaining({
-            tenantId: "tenant-1",
-            hasFamilyAccess: true,
-            children: { connect: [{ id: "child-1" }, { id: "child-2" }] },
-          }),
-        }),
-      );
+      await expect(
+        service.linkChildrenExistingUser("user-1", "a".repeat(32), ["child-1"]),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.child.findMany).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.guardianIdentity.upsert).not.toHaveBeenCalled();
     });
 
-    it("is idempotent - calling twice does not duplicate links", async () => {
+    it("sets family access without a child relationship when no child is supplied", async () => {
       (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
-      (prisma.child.findMany as jest.Mock).mockResolvedValue([{ id: "child-1" }]);
       (prisma.user.update as jest.Mock).mockResolvedValue({});
       (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.userTenantRole.create as jest.Mock).mockResolvedValue({});
-      (prisma.$transaction as jest.Mock).mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-        fn(prisma),
-      );
 
-      await service.linkChildrenExistingUser("user-1", "a".repeat(32), ["child-1"]);
-      await service.linkChildrenExistingUser("user-1", "a".repeat(32), ["child-1"]);
-
-      expect(prisma.user.update).toHaveBeenCalledTimes(2);
-      expect((prisma.user.update as jest.Mock).mock.calls[0][0].data.children).toEqual({
-        connect: [{ id: "child-1" }],
+      await expect(
+        service.linkChildrenExistingUser("user-1", "a".repeat(32), []),
+      ).resolves.toEqual({ success: true, linkedCount: 0 });
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: "user-1" },
+        data: { tenantId: "tenant-1", hasFamilyAccess: true },
       });
-      expect((prisma.user.update as jest.Mock).mock.calls[1][0].data.children).toEqual({
-        connect: [{ id: "child-1" }],
-      });
+      expect(prisma.guardianIdentity.upsert).not.toHaveBeenCalled();
     });
 
     it("creates children with internal profile pictures without organisation photo consent", async () => {
@@ -228,6 +219,21 @@ describe("PublicSignupService", () => {
             photoContentType: "image/jpeg",
           }),
         }),
+      );
+      expect(prisma.guardianChildRelationship.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            tenantId: "tenant-1",
+            guardianIdentityId: "guardian-1",
+            childId: "child-1",
+            legalAccess: "FULL",
+          },
+        ],
+      });
+      expect(withTenantRlsContext).toHaveBeenCalledWith(
+        "tenant-1",
+        "org-1",
+        expect.any(Function),
       );
     });
   });
@@ -355,6 +361,45 @@ describe("PublicSignupService", () => {
       expect(prisma.child.create).toHaveBeenCalled();
       expect(prisma.emergencyContact.createMany).toHaveBeenCalled();
       expect(prisma.parentSignupConsent.create).toHaveBeenCalled();
+      expect(prisma.guardianIdentity.upsert).toHaveBeenCalledWith({
+        where: { tenantId_userId: { tenantId: "tenant-1", userId: "user-1" } },
+        create: { tenantId: "tenant-1", userId: "user-1" },
+        update: {},
+        select: { id: true },
+      });
+      expect(prisma.guardianChildRelationship.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            tenantId: "tenant-1",
+            guardianIdentityId: "guardian-1",
+            childId: "child-1",
+            legalAccess: "FULL",
+          },
+        ],
+      });
+    });
+
+    it("does not attach a new child to an existing account by email alone", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue({ id: "existing-user" });
+
+      await expect(service.submit(validDto)).rejects.toThrow(BadRequestException);
+      expect(prisma.child.create).not.toHaveBeenCalled();
+      expect(prisma.guardianIdentity.upsert).not.toHaveBeenCalled();
+    });
+
+    it("does not grant guardian access when consent cannot be recorded", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.user.create as jest.Mock).mockResolvedValue({ id: "user-1" });
+      (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
+      (prisma.child.create as jest.Mock).mockResolvedValue({ id: "child-1" });
+      (prisma.parentSignupConsent.create as jest.Mock).mockRejectedValue(
+        new Error("Consent write failed"),
+      );
+
+      await expect(service.submit(validDto)).rejects.toThrow("Consent write failed");
+      expect(prisma.guardianIdentity.upsert).not.toHaveBeenCalled();
     });
 
     it("accepts an internal child profile picture without organisation photo consent", async () => {
@@ -455,6 +500,7 @@ describe("PublicSignupService", () => {
       expect(prisma.user.findFirst).not.toHaveBeenCalled();
       expect(prisma.user.create).not.toHaveBeenCalled();
       expect(prisma.userTenantRole.create).not.toHaveBeenCalled();
+      expect(prisma.guardianIdentity.upsert).not.toHaveBeenCalled();
       expect(auth0Mock.createUser).not.toHaveBeenCalled();
       expect(mailerMock.sendParentSignupCompleteEmail).not.toHaveBeenCalled();
       expect(
@@ -555,6 +601,16 @@ describe("PublicSignupService", () => {
       });
       expect(prisma.child.create).toHaveBeenCalled();
       expect(auth0Mock.createUser).not.toHaveBeenCalled();
+      expect(prisma.guardianChildRelationship.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            tenantId: "tenant-1",
+            guardianIdentityId: "guardian-1",
+            childId: "child-1",
+            legalAccess: "FULL",
+          },
+        ],
+      });
     });
   });
 });
