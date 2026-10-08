@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "@/lib/use-session-compat";
+import { useAdminContext } from "@/lib/admin-context";
 import {
   Badge,
   Button,
@@ -13,7 +13,6 @@ import {
   type ColumnDef,
 } from "@pathway/ui";
 import {
-  fetchActiveSiteState,
   fetchPeopleForOrg,
   fetchDeletedPeopleForOrg,
   fetchInvitesForOrg,
@@ -28,14 +27,9 @@ import { getSafeDisplayName } from "../../lib/names";
 import { useAdminAccess } from "../../lib/use-admin-access";
 import { canPerform } from "../../lib/permissions";
 
-const resolveOrgId = (activeSiteId: string | null, sites: Array<{ id: string; orgId: string }>) => {
-  const activeSite = sites.find((site) => site.id === activeSiteId) ?? sites[0];
-  return activeSite?.orgId ?? null;
-};
-
 export default function PeoplePage() {
   const router = useRouter();
-  const { data: session, status: sessionStatus } = useSession();
+  const { state: adminState } = useAdminContext();
   const { role, userId: apiUserId, isLoading: isLoadingAccess } = useAdminAccess();
   const canDeletePeople = role.isOrgAdmin;
   const [people, setPeople] = React.useState<PersonRow[]>([]);
@@ -45,7 +39,7 @@ export default function PeoplePage() {
   const [deletingUserId, setDeletingUserId] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
-  const [orgId, setOrgId] = React.useState<string | null>(null);
+  const orgId = adminState.status === "ready" ? adminState.snapshot.activeOrgId : null;
   const [searchQuery, setSearchQuery] = React.useState("");
   const [activeTab, setActiveTab] = React.useState<
     "people" | "invites" | "deleted"
@@ -72,21 +66,6 @@ export default function PeoplePage() {
       setIsLoading(false);
     }
   }, [canDeletePeople, orgId]);
-
-  React.useEffect(() => {
-    // Only load data when session is authenticated
-    if (sessionStatus !== "authenticated" || !session) return;
-    const loadOrg = async () => {
-      try {
-        const state = await fetchActiveSiteState();
-        const resolvedOrgId = resolveOrgId(state.activeSiteId, state.sites);
-        setOrgId(resolvedOrgId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load active site");
-      }
-    };
-    void loadOrg();
-  }, [sessionStatus, session]);
 
   React.useEffect(() => {
     if (!orgId) return;
@@ -183,7 +162,7 @@ export default function PeoplePage() {
   }, [deletedPeople, searchQuery]);
 
   const canEditPeople = canPerform("people:edit", role);
-  const sessionUserId = (session?.user as { id?: string })?.id ?? null;
+  const sessionUserId = apiUserId;
   const currentUserId = sessionUserId || apiUserId || null;
 
   const peopleColumns = React.useMemo<ColumnDef<PersonRow>[]>(

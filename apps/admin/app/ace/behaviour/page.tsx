@@ -1,13 +1,13 @@
 "use client";
 
 import React from "react";
+import { useAdminContext } from "@/lib/admin-context";
 import { NoAccessCard } from "@/components/no-access-card";
 import { BehaviourForm } from "@/components/ace/behaviour/behaviour-form";
 import { BehaviourHistory } from "@/components/ace/behaviour/behaviour-history";
 import { isValidIanaTimeZone } from "@/components/ace/behaviour/behaviour-time";
 import {
   correctBehaviour,
-  fetchActiveSiteState,
   fetchBehaviourHistory,
   fetchBehaviourPolicy,
   fetchChildren,
@@ -19,6 +19,7 @@ import { useAdminAccess } from "@/lib/use-admin-access";
 import { useSession } from "@/lib/use-session-compat";
 
 export default function BehaviourPage() {
+  const { state: adminState } = useAdminContext();
   const { data: session, status: sessionStatus } = useSession();
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
   const canRead = hasFreshPermission(permissions, "ace.behaviour.read");
@@ -34,8 +35,11 @@ export default function BehaviourPage() {
     [],
   );
   const [history, setHistory] = React.useState<AdminBehaviourEntry[]>([]);
-  const [activeSiteId, setActiveSiteId] = React.useState<string | null>(null);
-  const [siteTimeZone, setSiteTimeZone] = React.useState<string | null>(null);
+  const activeSite = adminState.status === "ready"
+    ? adminState.snapshot.sites.find((site) => site.id === adminState.snapshot.activeSiteId)
+    : null;
+  const activeSiteId = activeSite?.id ?? null;
+  const siteTimeZone = activeSite?.timezone ?? null;
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -43,20 +47,14 @@ export default function BehaviourPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [siteState, nextChildren, policy, nextHistory] = await Promise.all([
-        fetchActiveSiteState(),
+      const [nextChildren, policy, nextHistory] = await Promise.all([
         fetchChildren(),
         fetchBehaviourPolicy(),
         fetchBehaviourHistory({ limit: 50 }),
       ]);
-      const activeSite = siteState.sites.find(
-        (site) => site.id === siteState.activeSiteId,
-      );
-      if (!activeSite?.timezone || !isValidIanaTimeZone(activeSite.timezone)) {
+      if (!siteTimeZone || !isValidIanaTimeZone(siteTimeZone)) {
         throw new Error("The active site timezone is unavailable.");
       }
-      setSiteTimeZone(activeSite.timezone);
-      setActiveSiteId(activeSite.id);
       setChildren(
         nextChildren
           .filter((child) => child.status === "active")
@@ -71,12 +69,10 @@ export default function BehaviourPage() {
           : "Unable to load behaviour capture.",
       );
       setHistory([]);
-      setActiveSiteId(null);
-      setSiteTimeZone(null);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [siteTimeZone]);
 
   React.useEffect(() => {
     if (

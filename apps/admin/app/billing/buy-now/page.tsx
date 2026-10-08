@@ -2,8 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
+import { useAdminContext } from "@/lib/admin-context";
 import {
   Badge,
   Button,
@@ -18,9 +18,7 @@ import {
   previewPlanSelection,
   fetchBillingPrices,
   fetchBillingOverview,
-  fetchOrgOverview,
   fetchPeopleForOrg,
-  fetchActiveSiteState,
 } from "../../../lib/api-client";
 import {
   PLAN_PRICES,
@@ -82,7 +80,8 @@ const formatAmount = (value: number) => {
 };
 
 export default function BuyNowPage() {
-  const router = useRouter();
+  const { state: adminState } = useAdminContext();
+  const snapshot = adminState.status === "ready" ? adminState.snapshot : null;
   const { data: session, status: sessionStatus } = useSession();
   const [planTier, setPlanTier] = React.useState<(typeof planOptions)[number]["code"]>("STARTER");
   const [billingPeriod, setBillingPeriod] = React.useState<"monthly" | "yearly">("monthly");
@@ -146,40 +145,13 @@ export default function BuyNowPage() {
 
   // Load org and owner info to pre-populate contact fields
   React.useEffect(() => {
-    if (sessionStatus !== "authenticated" || !session) return;
+    if (sessionStatus !== "authenticated" || !session || !snapshot) return;
 
     const loadOrgInfo = async () => {
       setIsLoadingOrgInfo(true);
+      setOrgName(snapshot.org.name);
       try {
-        // Get current org ID from active site
-        const activeSite = await fetchActiveSiteState();
-        const currentSite = activeSite.sites.find(
-          (s) => s.id === activeSite.activeSiteId || activeSite.sites[0],
-        );
-        const orgId = currentSite?.orgId;
-
-        if (!orgId) {
-          console.warn("[buy-now] No org ID available from active site");
-          setIsLoadingOrgInfo(false);
-          return;
-        }
-
-        // Fetch org overview and people in parallel
-        const [orgOverview, people] = await Promise.all([
-          fetchOrgOverview().catch((err) => {
-            console.error("[buy-now] fetchOrgOverview failed:", err);
-            return { name: "" };
-          }),
-          fetchPeopleForOrg(orgId).catch((err) => {
-            console.error("[buy-now] fetchPeopleForOrg failed:", err);
-            return [];
-          }),
-        ]);
-
-        // Set org name
-        if (orgOverview.name) {
-          setOrgName(orgOverview.name);
-        }
+        const people = await fetchPeopleForOrg(snapshot.activeOrgId);
 
         // Find org admin/owner (prioritize ORG_ADMIN role)
         const orgAdmin = people.find(
@@ -203,7 +175,7 @@ export default function BuyNowPage() {
     };
 
     void loadOrgInfo();
-  }, [sessionStatus, session]);
+  }, [sessionStatus, session, snapshot?.activeOrgId, snapshot?.org.name]);
 
   // Fetch current plan for "Your current plan" badge and same-plan check
   React.useEffect(() => {
@@ -404,11 +376,6 @@ export default function BuyNowPage() {
         },
       )
     : { currency: "gbp", subtotalMajor: 0, totalMajor: 0, lines: [] };
-  const planPriceLabel =
-    planCode && planCode !== "ENTERPRISE_CONTACT"
-      ? mergedPlanPrices[planCode]?.label
-      : null;
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">

@@ -1,10 +1,7 @@
 "use client";
 
-import React from "react";
-import { useSession } from "@/lib/use-session-compat";
-import { fetchOrgOverview } from "./api-client";
-import { subscribeToActiveSiteChanges } from "./active-site-events";
-import { resolveOrgUi, resolveOrgUiKey, orgLabel, type OrgUi, type OrgUiKey } from "./org-ui";
+import { useAdminContext } from "./admin-context";
+import { resolveOrgUi, orgLabel, type OrgUi, type OrgUiKey } from "./org-ui";
 
 type OrgUiContextValue = {
   ui: OrgUi;
@@ -13,60 +10,23 @@ type OrgUiContextValue = {
   isLoading: boolean;
 };
 
-const OrgUiContext = React.createContext<OrgUiContextValue>({
-  ui: resolveOrgUi(null, null),
-  key: "UNKNOWN",
-  logoUrl: null,
-  isLoading: false,
-});
-
-export function OrgUiProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
-  const [state, setState] = React.useState<OrgUiContextValue>({
-    ui: resolveOrgUi(null, null),
-    key: "UNKNOWN",
-    logoUrl: null,
-    isLoading: false,
-  });
-
-  React.useEffect(() => {
-    if (!session) {
-      setState({ ui: resolveOrgUi(null, null), key: "UNKNOWN", logoUrl: null, isLoading: false });
-      return;
-    }
-
-    let cancelled = false;
-    const load = () => {
-      setState((prev) => ({ ...prev, isLoading: true }));
-      fetchOrgOverview()
-        .then((org) => {
-          if (cancelled) return;
-          setState({
-            ui: resolveOrgUi(org.vertical, org.sector),
-            key: resolveOrgUiKey(org.vertical, org.sector),
-            logoUrl: org.logoUrl ?? null,
-            isLoading: false,
-          });
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setState({ ui: resolveOrgUi(null, null), key: "UNKNOWN", logoUrl: null, isLoading: false });
-        });
-    };
-
-    load();
-    const unsubscribe = subscribeToActiveSiteChanges(load);
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, [session]);
-
-  return <OrgUiContext.Provider value={state}>{children}</OrgUiContext.Provider>;
-}
-
+/** Compatibility selector over the shared admin context. */
 export function useOrgUi(): OrgUiContextValue {
-  return React.useContext(OrgUiContext);
+  const { state } = useAdminContext();
+  if (state.status !== "ready") {
+    return {
+      ui: resolveOrgUi(null, null),
+      key: "UNKNOWN",
+      logoUrl: null,
+      isLoading: state.status === "loading" || state.status === "switching",
+    };
+  }
+  return {
+    ui: state.snapshot.ui,
+    key: state.snapshot.uiKey,
+    logoUrl: state.snapshot.logoUrl,
+    isLoading: false,
+  };
 }
 
 export function useOrgLabel(href: string, fallback: string): string {

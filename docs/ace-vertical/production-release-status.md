@@ -106,15 +106,16 @@ created after the variable updates but still serve code commit `a41e09a`.
 | 1.3g7    | Scoped daily correction-history read API               | Merged  | [#437](https://github.com/FSS-Ltd/pathway/pull/437) to `master` | `923a352f80476722d2b20a84448cd9c46850fa5d`; all eight checks passed: CI run 37715465693, CodeQL run 37715461713.                                                                                                | `be87f6344a694007315c8fcc2c7a2ddeae6ae866` |
 | 1.3g8    | ACE staff daily-register web journey                   | Merged  | [#439](https://github.com/FSS-Ltd/pathway/pull/439) to `master` | `3c3fd705446b388a198f297132285cb7082bf424`; all eight checks passed: CI run 37718515055, CodeQL run 37718511575.                                                                                                | `fff8e69087ef313ab80c640c625af5763b2d83c4` |
 | 1.3g9    | Student self-scoped daily mark history API             | Merged  | [#441](https://github.com/FSS-Ltd/pathway/pull/441) to `master` | `46cfbf3c464c4ad51fb4658577cf202b08018397`; all eight checks passed: CI run 37722060232, CodeQL run 37722057745.                                                                                                | `3000b27f2c0fdfd21c5649848c3afa0b8dbee696` |
-| AR-1     | Reuse scoped request transactions and return retryable database errors | In progress | [#458](https://github.com/FSS-Ltd/pathway/pull/458) to `master` | Local API/DB typecheck, lint and unit tests, API build passed; final-revision CI database proof pending | Pending |
+| AR-1     | Reuse scoped request transactions and return retryable database errors | Merged | [#458](https://github.com/FSS-Ltd/pathway/pull/458) to `master` | `ad02690185b22becd98d6e00777a6f2153424d31`; all eight checks passed, including the one-connection database proof | `2bd804c9fbe340a689f27a0ca74ea9279fd7e6c6` |
+| AR-2     | Share admin session, site, organisation and access state | In progress | Current branch `fix/admin-shared-context`; PR pending | Local verification in progress | Pending |
 | 1.3b2+   | ACE core web journey slices                            | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.4      | Paid add-ons and entitlement billing                   | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 | 1.5      | Shared web UI and messaging finish                     | Planned | Pending                                                         | Pending                                                                                                                                                                                                         | Pending                                    |
 
 AR-1 addresses the production single-connection pool timeouts seen on access,
-concerns, and notes requests. The next permissible step is AR-2 only after the
-AR-1 PR has passing checks on its final revision and GitHub confirms its merge.
-No production deployment is included in AR-1.
+concerns, and notes requests. Its final revision passed all required checks and
+GitHub confirmed the merge, so AR-2 is the current delivery step. No production
+deployment is included in these steps.
 
 Step 1.3g4 is merged after the corrected integration assertions passed on the
 final PR revision. The daily fact and correction-event schema has not been

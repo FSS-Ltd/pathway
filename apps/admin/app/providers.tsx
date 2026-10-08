@@ -3,7 +3,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
 import { SessionProvider } from "@/lib/use-session-compat";
-import { OrgUiProvider } from "@/lib/use-org-ui";
+import { AdminContextProvider } from "@/lib/admin-context";
 import { AdminShell } from "./admin-shell";
 import { FamilyPortalShell } from "./family-portal-shell";
 
@@ -18,9 +18,9 @@ function RouteShell({ children }: { children: React.ReactNode }) {
     return <FamilyPortalShell>{children}</FamilyPortalShell>;
   }
   return (
-    <OrgUiProvider>
+    <AdminContextProvider>
       <AdminShell>{children}</AdminShell>
-    </OrgUiProvider>
+    </AdminContextProvider>
   );
 }
 

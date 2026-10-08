@@ -10,6 +10,7 @@ import { APP_VERSION } from "@pathway/util/version";
 import { TopBarActions } from "@/components/topbar-actions";
 import { SidebarNav, TopBar } from "@pathway/ui";
 import { useAdminAccess } from "@/lib/use-admin-access";
+import { useAdminContext } from "@/lib/admin-context";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { useOrgUi } from "@/lib/use-org-ui";
 import { orgLabel } from "@/lib/org-ui";
@@ -19,8 +20,7 @@ import { resolveAdminNavItems } from "./admin-navigation";
 const getDevRuntimeState = () => {
   // Check if we have any API URL configured (supports both old and new env var names)
   const hasApiUrl = Boolean(
-    process.env.NEXT_PUBLIC_API_URL || 
-    process.env.NEXT_PUBLIC_API_BASE_URL
+    process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL,
   );
   const isMockApi = !hasApiUrl;
   return { isMockApi };
@@ -74,7 +74,13 @@ type AdminBrandLinkProps = {
 
 // Plain <img> (not next/image): logoUrl is a per-org Supabase URL not known at build
 // time, and the admin app has no images.remotePatterns configured for it.
-const BrandMark = ({ logoUrl, alt }: { logoUrl?: string | null; alt: string }) => {
+const BrandMark = ({
+  logoUrl,
+  alt,
+}: {
+  logoUrl?: string | null;
+  alt: string;
+}) => {
   const [broken, setBroken] = React.useState(false);
   React.useEffect(() => setBroken(false), [logoUrl]);
 
@@ -109,7 +115,10 @@ type FeedbackNavLinkProps = {
 
 // Filled colored badge (vs. every other sidebar item's bare outline glyph) so this
 // support/feedback entry point reads as visually distinct at a glance.
-const FeedbackNavLink = ({ isCollapsed = false, isActive }: FeedbackNavLinkProps) => (
+const FeedbackNavLink = ({
+  isCollapsed = false,
+  isActive,
+}: FeedbackNavLinkProps) => (
   <Link
     href="/feedback"
     title={isCollapsed ? "Feedback" : undefined}
@@ -128,7 +137,9 @@ const FeedbackNavLink = ({ isCollapsed = false, isActive }: FeedbackNavLinkProps
 
 const AppVersionTag = ({ isCollapsed = false }: { isCollapsed?: boolean }) =>
   isCollapsed ? null : (
-    <span className="block px-3 pt-2 text-xs text-text-muted">v{APP_VERSION}</span>
+    <span className="block px-3 pt-2 text-xs text-text-muted">
+      v{APP_VERSION}
+    </span>
   );
 
 const AdminBrandLink = ({
@@ -168,6 +179,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   const title = orgLabel(ui, pathname, resolveTitle(pathname));
   const { isMockApi } = getDevRuntimeState();
   const { data: session } = useSession();
+  const { state: adminState, retry: retryAdminContext } = useAdminContext();
 
   // Only show mock banner if truly in mock mode
   const showMockBanner = isMockApi;
@@ -178,11 +190,10 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
     currentOrgIsMasterOrg,
     capabilities,
     permissions,
-    error: accessError,
     warning: accessWarning,
   } = useAdminAccess();
 
-  // Org's white-label logo for the day-to-day brand swap, from OrgUiProvider.
+  // Org's white-label logo comes from the shared admin context.
   // Stays null pre-auth (login/accept-invite before sign-in), so those screens
   // keep the Nexsteps mark.
 
@@ -251,7 +262,9 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   );
 
   if (isAuthRoute) {
-    return <div className="min-h-screen bg-shell text-text-primary">{children}</div>;
+    return (
+      <div className="min-h-screen bg-shell text-text-primary">{children}</div>
+    );
   }
 
   return (
@@ -272,10 +285,18 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           currentPath={pathname}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          header={<AdminBrandLink isCollapsed={isSidebarCollapsed} logoUrl={orgLogoUrl} />}
+          header={
+            <AdminBrandLink
+              isCollapsed={isSidebarCollapsed}
+              logoUrl={orgLogoUrl}
+            />
+          }
           footer={
             <>
-              <FeedbackNavLink isCollapsed={isSidebarCollapsed} isActive={isFeedbackActive} />
+              <FeedbackNavLink
+                isCollapsed={isSidebarCollapsed}
+                isActive={isFeedbackActive}
+              />
               <AppVersionTag isCollapsed={isSidebarCollapsed} />
             </>
           }
@@ -312,17 +333,38 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
                   Running in mock API mode - some data is sample only.
                 </div>
               )}
-              {accessError && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900">
-                  Role lookup failed: {accessError}
-                </div>
-              )}
               {accessWarning && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-                  Role lookup warning: {accessWarning}
+                  {accessWarning}
                 </div>
               )}
-              {children}
+              {adminState.status === "ready" ? (
+                <React.Fragment
+                  key={`${adminState.snapshot.userId}:${adminState.snapshot.activeSiteId}`}
+                >
+                  {children}
+                </React.Fragment>
+              ) : adminState.status === "error" ? (
+                <div
+                  role="alert"
+                  className="rounded-md border border-status-danger/30 bg-status-danger/10 p-4"
+                >
+                  <p>{adminState.message}</p>
+                  <button
+                    type="button"
+                    onClick={() => void retryAdminContext()}
+                    className="mt-2 underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : adminState.status === "no-active-site" ? (
+                <p>Select a site from the menu to continue.</p>
+              ) : adminState.status === "unauthenticated" ? (
+                <p>Sign in to continue.</p>
+              ) : (
+                <p role="status">Loading your admin context…</p>
+              )}
             </div>
           </main>
         </div>

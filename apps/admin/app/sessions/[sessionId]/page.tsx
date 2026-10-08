@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
+import { useAdminContext } from "@/lib/admin-context";
 import { ArrowLeft, CalendarClock, MapPin, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Label, Select } from "@pathway/ui";
 import {
@@ -16,7 +17,6 @@ import {
   fetchAttendanceDetailBySessionId,
   fetchAuthDebugContext,
   fetchLessonById,
-  fetchMe,
   fetchSessionById,
   fetchSessionStaffAttendance,
   fetchHandoverForSession,
@@ -108,7 +108,8 @@ function buildHandoverHref(
 export default function SessionDetailPage() {
   const params = useParams<{ sessionId: string }>();
   const router = useRouter();
-  const { data: authSession, status: sessionStatus } = useSession();
+  const { status: sessionStatus } = useSession();
+  const { state: adminState } = useAdminContext();
   const { role, isLoading: isLoadingAccess } = useAdminAccess();
   const sessionId = params.sessionId;
 
@@ -117,7 +118,7 @@ export default function SessionDetailPage() {
     handoverLogId: string | null;
     status?: string;
   } | null>(null);
-  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
+  const currentUserId = adminState.status === "ready" ? adminState.snapshot.userId : null;
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [notFound, setNotFound] = React.useState(false);
@@ -241,18 +242,6 @@ export default function SessionDetailPage() {
       void load();
     }
   }, [sessionStatus, load]);
-
-  React.useEffect(() => {
-    const uid = (authSession?.user as { id?: string } | undefined)?.id;
-    if (uid) {
-      setCurrentUserId(uid);
-      return;
-    }
-    if (sessionStatus !== "authenticated") return;
-    fetchMe()
-      .then((r) => setCurrentUserId(r.userId ?? null))
-      .catch(() => setCurrentUserId(null));
-  }, [sessionStatus, authSession?.user]);
 
   React.useEffect(() => {
     if (!session?.startsAt || !session?.endsAt) {

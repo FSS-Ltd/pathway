@@ -1,18 +1,11 @@
 "use client";
 
 import React from "react";
-import { useSession } from "@/lib/use-session-compat";
-import {
-  Badge,
-  Button,
-  Card,
-  Input,
-  Select,
-} from "@pathway/ui";
+import { useAdminContext } from "@/lib/admin-context";
+import { Badge, Button, Card, Select } from "@pathway/ui";
 import {
   AdminAssignmentRow,
   AdminSwapRequestRow,
-  fetchMe,
   fetchMyAssignments,
   fetchMySwapRequests,
   fetchStaff,
@@ -23,10 +16,7 @@ import {
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
 
-const assignmentStatusCopy: Record<
-  AdminAssignmentRow["status"],
-  string
-> = {
+const assignmentStatusCopy: Record<AdminAssignmentRow["status"], string> = {
   pending: "Pending",
   confirmed: "Accepted",
   declined: "Declined",
@@ -82,16 +72,20 @@ const formatWeekRange = (start: Date) => {
 };
 
 export default function MySchedulePage() {
-  const { data: session, status: sessionStatus } = useSession();
+  const { state: adminState } = useAdminContext();
   const [weekStart, setWeekStart] = React.useState<Date>(() =>
     startOfWeek(new Date()),
   );
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | "pending" | "confirmed" | "declined"
   >("all");
-  const [assignments, setAssignments] = React.useState<AdminAssignmentRow[]>([]);
+  const [assignments, setAssignments] = React.useState<AdminAssignmentRow[]>(
+    [],
+  );
   const [swaps, setSwaps] = React.useState<AdminSwapRequestRow[]>([]);
-  const [staff, setStaff] = React.useState<{ id: string; fullName: string }[]>([]);
+  const [staff, setStaff] = React.useState<{ id: string; fullName: string }[]>(
+    [],
+  );
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [swapFormAssignmentId, setSwapFormAssignmentId] = React.useState<
@@ -102,24 +96,10 @@ export default function MySchedulePage() {
   const [actionLoadingId, setActionLoadingId] = React.useState<string | null>(
     null,
   );
-  const [resolvedUserId, setResolvedUserId] = React.useState<
-    string | null | undefined
-  >(undefined);
-
-  const sessionUserId = (session?.user as { id?: string } | undefined)?.id;
   const userId =
-    sessionUserId ??
-    (typeof resolvedUserId === "string" ? resolvedUserId : undefined);
+    adminState.status === "ready" ? adminState.snapshot.userId : null;
   const dateFrom = toLocalDateKey(weekStart);
   const dateTo = toLocalDateKey(addDays(weekStart, 6));
-
-  React.useEffect(() => {
-    if (sessionStatus !== "authenticated" || sessionUserId) return;
-    if (resolvedUserId !== undefined) return;
-    fetchMe()
-      .then((r) => setResolvedUserId(r.userId || null))
-      .catch(() => setResolvedUserId(null));
-  }, [sessionStatus, sessionUserId, resolvedUserId]);
 
   const loadData = React.useCallback(async () => {
     if (!userId) return;
@@ -131,10 +111,7 @@ export default function MySchedulePage() {
           userId,
           dateFrom,
           dateTo,
-          status:
-            statusFilter === "all"
-              ? undefined
-              : statusFilter,
+          status: statusFilter === "all" ? undefined : statusFilter,
         }),
         fetchMySwapRequests(userId),
         fetchStaff().catch(() => []),
@@ -152,10 +129,10 @@ export default function MySchedulePage() {
   }, [userId, dateFrom, dateTo, statusFilter]);
 
   React.useEffect(() => {
-    if (sessionStatus === "authenticated" && userId) {
+    if (userId) {
       void loadData();
     }
-  }, [sessionStatus, userId, loadData]);
+  }, [userId, loadData]);
 
   const handleAccept = async (assignmentId: string) => {
     setActionLoadingId(assignmentId);
@@ -217,9 +194,7 @@ export default function MySchedulePage() {
       await acceptSwapRequest(swapId);
       await loadData();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to accept swap",
-      );
+      setError(err instanceof Error ? err.message : "Failed to accept swap");
     } finally {
       setActionLoadingId(null);
     }
@@ -231,9 +206,7 @@ export default function MySchedulePage() {
       await declineSwapRequest(swapId);
       await loadData();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to decline swap",
-      );
+      setError(err instanceof Error ? err.message : "Failed to decline swap");
     } finally {
       setActionLoadingId(null);
     }
@@ -245,7 +218,7 @@ export default function MySchedulePage() {
   const outboundSwaps = swaps.filter((s) => s.fromUserId === userId);
   const staffOptions = staff.filter((s) => s.id !== userId);
 
-  if (sessionStatus !== "authenticated") {
+  if (adminState.status === "unauthenticated") {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold text-text-primary font-heading">
@@ -258,15 +231,13 @@ export default function MySchedulePage() {
     );
   }
 
-  if (sessionStatus === "authenticated" && !sessionUserId && resolvedUserId === undefined) {
+  if (adminState.status === "loading" || adminState.status === "switching") {
     return (
       <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold text-text-primary font-heading">
           My schedule
         </h1>
-        <p className="text-sm text-text-muted">
-          Loading your schedule…
-        </p>
+        <p className="text-sm text-text-muted">Loading your schedule…</p>
       </div>
     );
   }
@@ -352,10 +323,7 @@ export default function MySchedulePage() {
         ) : loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-16 animate-pulse rounded-md bg-muted"
-              />
+              <div key={i} className="h-16 animate-pulse rounded-md bg-muted" />
             ))}
           </div>
         ) : assignments.length === 0 ? (
@@ -477,9 +445,7 @@ export default function MySchedulePage() {
         {loading ? (
           <div className="h-12 animate-pulse rounded-md bg-muted" />
         ) : inboundSwaps.length === 0 && outboundSwaps.length === 0 ? (
-          <p className="text-sm text-text-muted">
-            No swap requests right now.
-          </p>
+          <p className="text-sm text-text-muted">No swap requests right now.</p>
         ) : (
           <div className="space-y-4">
             {inboundSwaps.length > 0 && (

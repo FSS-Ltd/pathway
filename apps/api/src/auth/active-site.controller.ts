@@ -48,16 +48,19 @@ export class ActiveSiteController {
 
   @UseGuards(AuthUserGuard)
   @Get()
-  async getActiveSite(@Req() req: AuthenticatedRequest) {
+  async getActiveSite(
+    @Req() req: AuthenticatedRequest,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const userId = req.authUserId;
-    
+
     if (!userId) {
       throw new UnauthorizedException("Missing authenticated user");
     }
-    
+
     // Get user's accessible sites
     const sites = await this.listSitesForUser(userId);
-    
+
     // Get user's last active tenant
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -78,8 +81,13 @@ export class ActiveSiteController {
         });
       }
     }
-    
-    return { activeSiteId: activeSiteId ?? null, sites };
+
+    const selectedSite = sites.find((site) => site.id === activeSiteId);
+    this.setActiveSiteCookies(res, {
+      siteId: selectedSite?.id ?? null,
+      orgId: selectedSite?.orgId ?? null,
+    });
+    return { activeSiteId: selectedSite?.id ?? null, sites };
   }
 
   private async listSitesForUser(userId: string): Promise<SiteSummary[]> {
@@ -133,9 +141,10 @@ export class ActiveSiteController {
       }
     });
 
-    return Array.from(seen.values()).sort((a, b) =>
-      (a.orgName ?? "").localeCompare(b.orgName ?? "") ||
-      a.name.localeCompare(b.name),
+    return Array.from(seen.values()).sort(
+      (a, b) =>
+        (a.orgName ?? "").localeCompare(b.orgName ?? "") ||
+        a.name.localeCompare(b.name),
     );
   }
 
@@ -168,7 +177,7 @@ export class ActiveSiteController {
 
     const result = { activeSiteId: body.siteId, sites };
     const selectedSite = sites.find((s) => s.id === body.siteId);
-    
+
     this.setActiveSiteCookies(res, {
       siteId: body.siteId,
       orgId: selectedSite?.orgId ?? null,

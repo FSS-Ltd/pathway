@@ -13,16 +13,16 @@ import {
   Loader2,
   Settings,
 } from "lucide-react";
-import {
-  SiteOption,
-  fetchActiveSiteState,
-  setActiveSite,
-  fetchStaffProfile,
-} from "@/lib/api-client";
+import { SiteOption, fetchStaffProfile } from "@/lib/api-client";
+import { useAdminContext } from "@/lib/admin-context";
 import { getSafeDisplayName, getInitials } from "@/lib/names";
 import { useAdminAccess } from "@/lib/use-admin-access";
 
-function getTierLabel(role: { isOrgAdmin: boolean; isOrgOwner: boolean; isSiteAdmin: boolean }): string {
+function getTierLabel(role: {
+  isOrgAdmin: boolean;
+  isOrgOwner: boolean;
+  isSiteAdmin: boolean;
+}): string {
   if (role.isOrgAdmin || role.isOrgOwner) return "Admin";
   if (role.isSiteAdmin) return "Team Lead";
   return "Staff Member";
@@ -128,13 +128,25 @@ export function TopBarActions() {
   const { data: session, status } = useSession();
   const { redirectToSignIn, signOut } = useClerk();
   const { role } = useAdminAccess();
-  const [siteState, setSiteState] = React.useState<SiteState>({
-    activeSiteId: null,
-    sites: [],
-  });
-  const [loadingSites, setLoadingSites] = React.useState(false);
-  const [savingSiteId, setSavingSiteId] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const { state: adminState, switchSite, savingSiteId } = useAdminContext();
+  const siteState: SiteState =
+    adminState.status === "ready"
+      ? {
+          activeSiteId: adminState.snapshot.activeSiteId,
+          sites: adminState.snapshot.sites,
+        }
+      : adminState.status === "no-active-site" ||
+          adminState.status === "switching"
+        ? { activeSiteId: null, sites: adminState.sites }
+        : { activeSiteId: null, sites: [] };
+  const loadingSites =
+    adminState.status === "loading" || adminState.status === "switching";
+  const error =
+    adminState.status === "ready" || adminState.status === "no-active-site"
+      ? (adminState.warning ?? null)
+      : null;
+  const avatarUserId =
+    adminState.status === "ready" ? adminState.snapshot.userId : null;
 
   const siteMenuRef = React.useRef<HTMLDivElement | null>(null);
   const userMenuRef = React.useRef<HTMLDivElement | null>(null);
@@ -177,28 +189,9 @@ export function TopBarActions() {
     };
   }, []);
 
-  const loadActiveSite = React.useCallback(async () => {
-    if (status !== "authenticated") return;
-    setLoadingSites(true);
-    setError(null);
-    try {
-      const result = await fetchActiveSiteState();
-      setSiteState(result);
-    } catch (err) {
-      console.error(err);
-      setError("Unable to load sites");
-    } finally {
-      setLoadingSites(false);
-    }
-  }, [status]);
-
-  React.useEffect(() => {
-    void loadActiveSite();
-  }, [loadActiveSite]);
-
   // Fetch staff profile for avatar when authenticated
   React.useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !avatarUserId) return;
     let cancelled = false;
     fetchStaffProfile()
       .then((p) => {
@@ -212,42 +205,17 @@ export function TopBarActions() {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, [status, avatarUserId]);
 
   const avatarSrc =
     staffProfile?.hasAvatar && !avatarError
       ? "/api/staff/profile/avatar"
-      : (session?.user as { image?: string | null })?.image ?? null;
-
-  // Auto-select when only one site is available.
-  React.useEffect(() => {
-    if (
-      status === "authenticated" &&
-      !loadingSites &&
-      siteState.activeSiteId === null &&
-      siteState.sites.length === 1
-    ) {
-      const onlySite = siteState.sites[0];
-      if (onlySite?.id) {
-        void handleSelectSite(onlySite.id);
-      }
-    }
-  }, [status, loadingSites, siteState.activeSiteId, siteState.sites]);
+      : ((session?.user as { image?: string | null })?.image ?? null);
 
   const handleSelectSite = async (siteId: string) => {
-    setSavingSiteId(siteId);
-    setError(null);
-    try {
-      const result = await setActiveSite(siteId);
-      setSiteState(result);
-      setSiteOpen(false);
-      setUserOpen(false);
-    } catch (err) {
-      console.error(err);
-      setError("Unable to switch site");
-    } finally {
-      setSavingSiteId(null);
-    }
+    await switchSite(siteId);
+    setSiteOpen(false);
+    setUserOpen(false);
   };
 
   const currentSite =
@@ -318,7 +286,6 @@ export function TopBarActions() {
         >
           <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-subtle text-xs font-semibold text-accent-strong">
             {avatarSrc ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={avatarSrc}
                 alt=""
@@ -351,7 +318,6 @@ export function TopBarActions() {
             <div className="flex items-center gap-2 px-3 py-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-accent-subtle text-xs font-semibold text-accent-strong">
                 {avatarSrc ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={avatarSrc}
                     alt=""
@@ -369,7 +335,9 @@ export function TopBarActions() {
                   {userDisplayName ?? "Signed-in user"}
                 </div>
                 {userEmail && (
-                  <div className="truncate text-xs text-text-muted">{userEmail}</div>
+                  <div className="truncate text-xs text-text-muted">
+                    {userEmail}
+                  </div>
                 )}
               </div>
             </div>

@@ -1,10 +1,9 @@
 "use client";
 
 import React from "react";
-import { useSession } from "@/lib/use-session-compat";
+import { useAdminContext } from "@/lib/admin-context";
 import { Button, Card } from "@pathway/ui";
 import {
-  fetchActiveSiteState,
   fetchPeopleForOrg,
   fetchRoles,
   type AdminRoleDefinition,
@@ -22,11 +21,15 @@ import { AuditLogPanel } from "./audit-log-panel";
 type Tab = "roles" | "assignments" | "effective-access" | "audit";
 
 export default function RolesAdminPage() {
-  const { data: session, status: sessionStatus } = useSession();
+  const { state: adminState } = useAdminContext();
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
-  const canAccess = hasPermission(permissions, "platform.access.roles.read");
-  const [orgId, setOrgId] = React.useState<string | null>(null);
-  const [activeSiteId, setActiveSiteId] = React.useState<string | null>(null);
+  const canAccess =
+    permissions !== null &&
+    hasPermission(permissions, "platform.access.roles.read");
+  const orgId =
+    adminState.status === "ready" ? adminState.snapshot.activeOrgId : null;
+  const activeSiteId =
+    adminState.status === "ready" ? adminState.snapshot.activeSiteId : null;
   const [roles, setRoles] = React.useState<AdminRoleDefinition[]>([]);
   const [people, setPeople] = React.useState<PersonRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -35,31 +38,20 @@ export default function RolesAdminPage() {
   const loadVersion = React.useRef(0);
 
   const load = React.useCallback(async () => {
+    if (!orgId) return;
     const version = ++loadVersion.current;
     setIsLoading(true);
     setError(null);
     try {
-      const state = await fetchActiveSiteState();
-      const resolvedOrgId =
-        state.sites.find((s) => s.id === state.activeSiteId)?.orgId ??
-        state.sites[0]?.orgId ??
-        null;
-      if (!resolvedOrgId) {
-        throw new Error("Active organisation not found.");
-      }
       const [rolesData, peopleData] = await Promise.all([
         fetchRoles(),
-        fetchPeopleForOrg(resolvedOrgId),
+        fetchPeopleForOrg(orgId),
       ]);
       if (version !== loadVersion.current) return;
-      setActiveSiteId(state.activeSiteId);
-      setOrgId(resolvedOrgId);
       setRoles(rolesData);
       setPeople(peopleData);
     } catch (err) {
       if (version !== loadVersion.current) return;
-      setOrgId(null);
-      setActiveSiteId(null);
       setRoles([]);
       setPeople([]);
       setError(
@@ -70,10 +62,10 @@ export default function RolesAdminPage() {
     } finally {
       if (version === loadVersion.current) setIsLoading(false);
     }
-  }, []);
+  }, [orgId]);
 
   React.useEffect(() => {
-    if (sessionStatus !== "authenticated" || !session) return;
+    if (adminState.status !== "ready") return;
     if (isLoadingAccess || !canAccess) return;
     void load();
     const unsubscribe = subscribeToActiveSiteChanges(() => {
@@ -83,7 +75,7 @@ export default function RolesAdminPage() {
       loadVersion.current += 1;
       unsubscribe();
     };
-  }, [sessionStatus, session, isLoadingAccess, canAccess, load]);
+  }, [adminState.status, isLoadingAccess, canAccess, load]);
 
   if (isLoadingAccess) {
     return (
