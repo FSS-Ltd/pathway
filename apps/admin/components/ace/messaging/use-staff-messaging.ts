@@ -5,17 +5,25 @@ import { requestFailure } from "@/lib/request-error";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import {
   advanceStaffReadCursor,
+  advanceSchoolTeamReadCursor,
+  fetchSchoolTeamConversations,
+  fetchSchoolTeamMessages,
   fetchStaffConversations,
   fetchStaffMessages,
   openStaffDirectConversation,
   openStaffRoom,
   sendStaffMessage,
+  sendSchoolTeamMessage,
   type StaffConversation,
   type StaffMessage,
   type StaffRecipient,
 } from "@/lib/ace-messaging-api";
 
-export function useStaffMessaging(currentUserId: string) {
+export function useStaffMessaging(
+  currentUserId: string,
+  channel: "staff" | "school-team" = "staff",
+) {
+  const schoolTeam = channel === "school-team";
   const [siteRevision, setSiteRevision] = React.useState(0);
   const [listRevision, setListRevision] = React.useState(0);
   const [threadRevision, setThreadRevision] = React.useState(0);
@@ -58,6 +66,8 @@ export function useStaffMessaging(currentUserId: string) {
       setListError(null);
       setThreadError(null);
       setSendError(null);
+      setDrafts({});
+      requestIds.current = {};
       setRoomOpening(false);
       setRoomError(null);
       setListMoreLoading(false);
@@ -78,7 +88,9 @@ export function useStaffMessaging(currentUserId: string) {
     const controller = new AbortController();
     setListLoading(true);
     setListError(null);
-    void fetchStaffConversations({ signal: controller.signal })
+    void (schoolTeam ? fetchSchoolTeamConversations : fetchStaffConversations)({
+      signal: controller.signal,
+    })
       .then((page) => {
         if (!active || generation !== siteGeneration.current) return;
         const opened = openedConversation.current;
@@ -91,7 +103,14 @@ export function useStaffMessaging(currentUserId: string) {
       })
       .catch((error: unknown) => {
         if (!active || controller.signal.aborted) return;
-        setListError(messageFrom(error, "Unable to load conversations."));
+        setListError(
+          messageFrom(
+            error,
+            schoolTeam
+              ? "School team messages are unavailable for this site."
+              : "Unable to load conversations.",
+          ),
+        );
       })
       .finally(() => {
         if (active) setListLoading(false);
@@ -100,7 +119,7 @@ export function useStaffMessaging(currentUserId: string) {
       active = false;
       controller.abort();
     };
-  }, [siteRevision, listRevision]);
+  }, [siteRevision, listRevision, schoolTeam]);
 
   React.useEffect(() => {
     if (!selectedId) {
@@ -117,14 +136,34 @@ export function useStaffMessaging(currentUserId: string) {
     setThreadMoreLoading(false);
     setThreadLoading(true);
     setThreadError(null);
-    void fetchStaffMessages(selectedId, { signal: controller.signal })
+    void (schoolTeam ? fetchSchoolTeamMessages : fetchStaffMessages)(
+      selectedId,
+      {
+        signal: controller.signal,
+      },
+    )
       .then((page) => {
         if (!active || generation !== threadGeneration.current) return;
-        setMessages(page.items.slice().reverse());
+        setMessages(
+          page.items
+            .slice()
+            .reverse()
+            .map((item) => ({
+              ...item,
+              recipientRead:
+                !schoolTeam &&
+                "recipientRead" in item &&
+                typeof item.recipientRead === "boolean"
+                  ? item.recipientRead
+                  : null,
+            })),
+        );
         setNextBefore(page.nextBefore);
         const newest = page.items[0];
         if (newest) {
-          void advanceStaffReadCursor(selectedId, newest.sequence)
+          void (
+            schoolTeam ? advanceSchoolTeamReadCursor : advanceStaffReadCursor
+          )(selectedId, newest.sequence)
             .then(() => {
               if (!active || generation !== threadGeneration.current) return;
               if (openedConversation.current?.id === selectedId) {
@@ -155,7 +194,7 @@ export function useStaffMessaging(currentUserId: string) {
       active = false;
       controller.abort();
     };
-  }, [selectedId, siteRevision, threadRevision]);
+  }, [selectedId, siteRevision, threadRevision, schoolTeam]);
 
   async function loadMoreConversations() {
     if (!nextCursor || listMoreLoading) return;
@@ -163,7 +202,9 @@ export function useStaffMessaging(currentUserId: string) {
     setListMoreLoading(true);
     setListError(null);
     try {
-      const page = await fetchStaffConversations({ cursor: nextCursor });
+      const page = await (
+        schoolTeam ? fetchSchoolTeamConversations : fetchStaffConversations
+      )({ cursor: nextCursor });
       if (generation !== siteGeneration.current) return;
       setConversations((current) => {
         const seen = new Set(current.map((item) => item.id));
@@ -186,11 +227,27 @@ export function useStaffMessaging(currentUserId: string) {
     setThreadMoreLoading(true);
     setThreadError(null);
     try {
-      const page = await fetchStaffMessages(conversationId, {
+      const page = await (
+        schoolTeam ? fetchSchoolTeamMessages : fetchStaffMessages
+      )(conversationId, {
         before: nextBefore,
       });
       if (generation !== threadGeneration.current) return;
-      setMessages((current) => [...page.items.slice().reverse(), ...current]);
+      setMessages((current) => [
+        ...page.items
+          .slice()
+          .reverse()
+          .map((item) => ({
+            ...item,
+            recipientRead:
+              !schoolTeam &&
+              "recipientRead" in item &&
+              typeof item.recipientRead === "boolean"
+                ? item.recipientRead
+                : null,
+          })),
+        ...current,
+      ]);
       setNextBefore(page.nextBefore);
     } catch (error) {
       if (generation === threadGeneration.current) {
@@ -220,7 +277,9 @@ export function useStaffMessaging(currentUserId: string) {
     setSendingId(conversationId);
     setSendError(null);
     try {
-      const sent = await sendStaffMessage(conversationId, {
+      const sent = await (
+        schoolTeam ? sendSchoolTeamMessage : sendStaffMessage
+      )(conversationId, {
         clientRequestId,
         body,
       });
@@ -273,7 +332,9 @@ export function useStaffMessaging(currentUserId: string) {
   }
 
   function selectOpenedConversation(
-    opened: Pick<StaffConversation, "id" | "kind">,
+    opened: Pick<StaffConversation, "id"> & {
+      kind: "STAFF_DIRECT" | "STAFF_ROOM";
+    },
     title: string,
   ) {
     const summary: StaffConversation = {

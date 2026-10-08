@@ -3,7 +3,7 @@ import { apiErrorFromResponse } from "./api-transport";
 
 export type StaffConversation = {
   id: string;
-  kind: "STAFF_DIRECT" | "STAFF_ROOM";
+  kind: "STAFF_DIRECT" | "STAFF_ROOM" | "PARENT_STAFF";
   title: string;
   latestMessage: { preview: string; createdAt: string } | null;
   updatedAt: string;
@@ -26,7 +26,7 @@ export type StaffRecipientPage = {
   hasMore: boolean;
 };
 
-type OpenedStaffConversation<Kind extends StaffConversation["kind"]> = {
+type OpenedStaffConversation<Kind extends "STAFF_DIRECT" | "STAFF_ROOM"> = {
   id: string;
   kind: Kind;
   created: boolean;
@@ -39,6 +39,11 @@ export type StaffConversationPage = {
 
 export type StaffMessagePage = {
   items: StaffMessage[];
+  nextBefore: number | null;
+};
+
+export type SchoolTeamMessagePage = {
+  items: Omit<StaffMessage, "recipientRead">[];
   nextBefore: number | null;
 };
 
@@ -135,6 +140,53 @@ export async function advanceStaffReadCursor(
       method: "PUT",
       body: JSON.stringify({ sequence }),
     },
+  );
+}
+
+const schoolTeamPath = `${basePath}/school-team`;
+
+export async function fetchSchoolTeamConversations(
+  input: { cursor?: string; signal?: AbortSignal } = {},
+): Promise<StaffConversationPage> {
+  if (isUsingMockApi()) return { items: [], nextCursor: null };
+  const query = new URLSearchParams({ limit: "30" });
+  if (input.cursor) query.set("cursor", input.cursor);
+  return request(`${schoolTeamPath}?${query}`, { signal: input.signal });
+}
+
+export async function fetchSchoolTeamMessages(
+  conversationId: string,
+  input: { before?: number; signal?: AbortSignal } = {},
+): Promise<SchoolTeamMessagePage> {
+  if (isUsingMockApi()) return { items: [], nextBefore: null };
+  const query = new URLSearchParams({ limit: "50" });
+  if (input.before) query.set("before", String(input.before));
+  return request(
+    `${schoolTeamPath}/${encodeURIComponent(conversationId)}/messages?${query}`,
+    { signal: input.signal },
+  );
+}
+
+export async function sendSchoolTeamMessage(
+  conversationId: string,
+  input: { clientRequestId: string; body: string },
+): Promise<SentStaffMessage> {
+  if (isUsingMockApi())
+    throw new Error("Messaging is unavailable in mock mode.");
+  return request(
+    `${schoolTeamPath}/${encodeURIComponent(conversationId)}/messages`,
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export async function advanceSchoolTeamReadCursor(
+  conversationId: string,
+  sequence: number,
+): Promise<void> {
+  if (isUsingMockApi()) return;
+  await request(
+    `${schoolTeamPath}/${encodeURIComponent(conversationId)}/read-cursor`,
+    { method: "PUT", body: JSON.stringify({ sequence }) },
   );
 }
 

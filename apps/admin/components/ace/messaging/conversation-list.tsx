@@ -9,7 +9,13 @@ import { useStaffMessaging } from "./use-staff-messaging";
 type MessagingState = ReturnType<typeof useStaffMessaging>;
 const shortDate = new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" });
 
-export function ConversationList({ messaging }: { messaging: MessagingState }) {
+export function ConversationList({
+  messaging,
+  schoolTeam = false,
+}: {
+  messaging: MessagingState;
+  schoolTeam?: boolean;
+}) {
   if (messaging.listLoading && messaging.conversations.length === 0) {
     return (
       <p role="status" className="px-5 py-6 text-sm text-text-muted">
@@ -32,7 +38,9 @@ export function ConversationList({ messaging }: { messaging: MessagingState }) {
   if (messaging.conversations.length === 0) {
     return (
       <p role="status" className="px-5 py-6 text-sm leading-6 text-text-muted">
-        No staff conversations are available for this site.
+        {schoolTeam
+          ? "No school team conversations are available for this site."
+          : "No staff conversations are available for this site."}
       </p>
     );
   }
@@ -41,7 +49,9 @@ export function ConversationList({ messaging }: { messaging: MessagingState }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <ul
         className="flex-1 divide-y divide-border-subtle overflow-y-auto"
-        aria-label="Staff conversations"
+        aria-label={
+          schoolTeam ? "School team conversations" : "Staff conversations"
+        }
       >
         {messaging.conversations.map((conversation) => (
           <li key={conversation.id}>
