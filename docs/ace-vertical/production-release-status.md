@@ -180,9 +180,15 @@ and Graphify passed. The ACE-only daily export permission and approved
 the bounded, audited export route after this evidence record merges. The
 controlled permission and role seed remains a release task.
 
-Step 1.3g14b is in progress on `feature/ace-attendance-daily-export`. It adds
-the bounded, audited ACE daily CSV route behind the dedicated export
-permission. No production seed or deployment is part of this step.
+Step 1.3g14b merged in [PR #455](https://github.com/FSS-Ltd/pathway/pull/455)
+at `96166d670705a8751dd9d2fb8008f78850525403`. All eight checks passed
+on head `b1275b92d016b3ad6093d1a8b49dc95ac5ed095a` (CI run
+37740570066; CodeQL run 37740565296). CI's disposable PostgreSQL passed 72
+integration suites and 445 tests, including the scoped daily export journey.
+Local 16-package lint and typecheck, 1,073 API unit tests, API build, changed
+file formatting, diff check, and Graphify passed. The bounded, audited ACE
+daily CSV route is merged but not deployed. Controlled permission seeding and
+the phased production release remain open; no schema migration was added.
 
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
