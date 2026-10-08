@@ -32,6 +32,7 @@ import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingCommandService } from "./messaging-command.service";
 import { StaffSchoolTeamHistoryService } from "./staff-school-team-history.service";
 import { StaffSchoolTeamReadCursorService } from "./staff-school-team-read-cursor.service";
+import { StaffSchoolTeamCommandService } from "./staff-school-team-command.service";
 import { StaffSchoolTeamService } from "./staff-school-team.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
@@ -44,6 +45,7 @@ export class MessagingController {
     private readonly schoolTeam: StaffSchoolTeamService,
     private readonly schoolTeamHistory: StaffSchoolTeamHistoryService,
     private readonly schoolTeamCursors: StaffSchoolTeamReadCursorService,
+    private readonly schoolTeamCommands: StaffSchoolTeamCommandService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -149,6 +151,23 @@ export class MessagingController {
         this.actor(),
         await conversationIdSchema.parseAsync(id),
         await readCursorSchema.parseAsync(body),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Post("school-team/:id/messages")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission("messaging.messages.send")
+  async schoolTeamSend(@Param("id") id: string, @Body() body: unknown) {
+    try {
+      return await this.schoolTeamCommands.send(
+        this.actor(),
+        await conversationIdSchema.parseAsync(id),
+        await sendMessageSchema.parseAsync(body),
       );
     } catch (error) {
       if (error instanceof z.ZodError)

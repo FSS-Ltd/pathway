@@ -14,6 +14,7 @@ import { ParentMessagingReadCursorService } from "./parent-messaging-read-cursor
 import { ParentMessagingService } from "./parent-messaging.service";
 import { StaffSchoolTeamHistoryService } from "./staff-school-team-history.service";
 import { StaffSchoolTeamReadCursorService } from "./staff-school-team-read-cursor.service";
+import { StaffSchoolTeamCommandService } from "./staff-school-team-command.service";
 import { StaffSchoolTeamService } from "./staff-school-team.service";
 
 @Module({
@@ -26,6 +27,7 @@ import { StaffSchoolTeamService } from "./staff-school-team.service";
     StaffSchoolTeamService,
     StaffSchoolTeamHistoryService,
     StaffSchoolTeamReadCursorService,
+    StaffSchoolTeamCommandService,
     ParentMessagingService,
     ParentMessagingCommandService,
     ParentMessagingConversationService,
