@@ -154,6 +154,11 @@ organisation UI requests. The parent page requires an explicit site and child
 link; the student page requires an explicit site link. Self-service site and
 child discovery remains open. Production deployment remains deferred.
 
+Step 1.3g12 is in progress on `feature/ace-family-context-discovery`.
+It adds a self-scoped family context discovery API and a narrow identity
+read policy for candidate-site lookup. This migration and the endpoint are
+not in production. A family landing page remains the next web step.
+
 Step 1.3e3c was merged in [PR #409](https://github.com/FSS-Ltd/pathway/pull/409)
 after all eight checks passed on its final revision. Its staff unread-count
 journey is merged but is not in the current manual production deployment.
