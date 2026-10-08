@@ -12,12 +12,15 @@ import { DailyAttendanceHistoryService } from "./daily-attendance-history.servic
 import { DailyAttendanceWriteService } from "./daily-attendance-write.service";
 import { StudentDailyAttendanceController } from "./student-daily-attendance.controller";
 import { StudentDailyAttendanceService } from "./student-daily-attendance.service";
+import { ParentDailyAttendanceController } from "./parent-daily-attendance.controller";
+import { ParentDailyAttendanceService } from "./parent-daily-attendance.service";
 
 @Module({
   imports: [CommonModule, Av30Module, AuthModule, AccessControlModule],
   controllers: [
     DailyAttendanceController,
     StudentDailyAttendanceController,
+    ParentDailyAttendanceController,
     AttendanceController,
   ],
   providers: [
@@ -27,6 +30,7 @@ import { StudentDailyAttendanceService } from "./student-daily-attendance.servic
     DailyAttendanceHistoryService,
     DailyAttendanceWriteService,
     StudentDailyAttendanceService,
+    ParentDailyAttendanceService,
   ],
   exports: [AttendanceService],
 })

@@ -6,8 +6,8 @@ established the schema. Step 1.3g5 adds the scoped staff roster read API.
 Step 1.3g6 adds atomic daily mark and correction writes. Step 1.3g7 adds the
 bounded staff correction-history read. Step 1.3g8 adds the staff web register
 for marking, correction and history. Step 1.3g9 adds a student-only daily mark
-history API. Parent access, student web, exports and production migration remain
-open.
+history API. Step 1.3g10 adds a linked-parent daily mark history API. Parent and
+student web, exports and production migration remain open.
 
 ## Source behaviour and current gap
 
@@ -67,6 +67,16 @@ reason leave this route; staff identities and correction notes stay private.
 The site portal policy is the current release switch for issued daily marks;
 there is no per-mark publication state. This endpoint does not expose an
 attendance-rate denominator or a parent view.
+Step 1.3g10 gives an authenticated parent a bounded view of one explicitly
+selected child at one explicit site. Every read requires an active guardian
+identity and a current `FULL` legal-access relationship to that non-guest
+child. `LIMITED` and `NONE` relationships do not receive absence reasons or
+marks because the model has no finer-grained attendance disclosure rule. The
+student portal policy applies to student links only; it is not a parent
+release switch. Issued daily facts are available immediately to a full-access
+guardian. Missing, future-starting, ended, revoked and cross-site links use
+the same not-found response. The shared bounded date and response contract
+omits staff identities and correction notes.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server

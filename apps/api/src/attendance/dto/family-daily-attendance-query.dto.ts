@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isDateOnly } from "../../ace-settings/dto/academic-calendar.dto";
 
-export const studentDailyAttendanceQuerySchema = z
+export const familyDailyAttendanceQuerySchema = z
   .object({
     from: z
       .string()
@@ -22,6 +22,6 @@ export const studentDailyAttendanceQuerySchema = z
     { message: "Select at most 366 days", path: ["to"] },
   );
 
-export type StudentDailyAttendanceQuery = z.infer<
-  typeof studentDailyAttendanceQuerySchema
+export type FamilyDailyAttendanceQuery = z.infer<
+  typeof familyDailyAttendanceQuerySchema
 >;
