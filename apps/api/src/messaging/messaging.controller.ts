@@ -30,6 +30,7 @@ import {
 import { MessagingService } from "./messaging.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingCommandService } from "./messaging-command.service";
+import { StaffSchoolTeamService } from "./staff-school-team.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("ace/messages/conversations")
@@ -38,6 +39,7 @@ export class MessagingController {
     private readonly service: MessagingService,
     private readonly conversations: MessagingConversationService,
     private readonly commands: MessagingCommandService,
+    private readonly schoolTeam: StaffSchoolTeamService,
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
@@ -46,6 +48,21 @@ export class MessagingController {
   async list(@Query() query: unknown) {
     try {
       return await this.service.listStaffConversations(
+        this.actor(),
+        await conversationQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Get("school-team")
+  @RequirePermission("messaging.conversations.read")
+  async schoolTeamConversations(@Query() query: unknown) {
+    try {
+      return await this.schoolTeam.list(
         this.actor(),
         await conversationQuerySchema.parseAsync(query),
       );

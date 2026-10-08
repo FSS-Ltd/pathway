@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, withTenantRlsContext } from "@pathway/db";
+import { withTenantRlsContext } from "@pathway/db";
 import type {
   ConversationQuery,
   MessageQuery,
@@ -20,6 +20,7 @@ import {
   type MessagingActor,
 } from "./messaging-access";
 import { advanceMessageReadCursor } from "./messaging-read-cursor";
+import { unreadCountsForConversations } from "./messaging-unread-count";
 
 const DEFAULT_LIMIT = 20;
 
@@ -90,32 +91,11 @@ export class MessagingService {
       });
       const page = rows.slice(0, limit);
       const last = page.at(-1);
-      const unreadRows = page.length
-        ? await tx.$queryRaw<
-            Array<{ conversationId: string; unreadCount: bigint }>
-          >(Prisma.sql`
-            SELECT message."conversationId" AS "conversationId",
-                   COUNT(*) AS "unreadCount"
-            FROM "Message" AS message
-            JOIN "MessageParticipant" AS participant
-              ON participant."tenantId" = message."tenantId"
-             AND participant."conversationId" = message."conversationId"
-             AND participant."userId" = ${actor.userId}
-             AND participant."kind" = 'STAFF'::"MessageParticipantKind"
-             AND participant."removedAt" IS NULL
-            LEFT JOIN "MessageParticipantReadCursor" AS read_cursor
-              ON read_cursor."tenantId" = message."tenantId"
-             AND read_cursor."conversationId" = message."conversationId"
-             AND read_cursor."participantId" = participant."id"
-            WHERE message."tenantId" = ${actor.tenantId}
-              AND message."conversationId" IN (${Prisma.join(page.map((row) => row.id))})
-              AND message."senderParticipantId" <> participant."id"
-              AND message."sequence" > COALESCE(read_cursor."lastReadSequence", 0)
-            GROUP BY message."conversationId"
-          `)
-        : [];
-      const unreadByConversation = new Map(
-        unreadRows.map((row) => [row.conversationId, Number(row.unreadCount)]),
+      const unreadByConversation = await unreadCountsForConversations(
+        tx,
+        actor.tenantId,
+        actor.userId,
+        page.map((row) => row.id),
       );
       return {
         items: page.map((row) => {
