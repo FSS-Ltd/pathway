@@ -88,6 +88,7 @@ created after the variable updates but still serve code commit `a41e09a`.
 | 1.3e4a   | Linked-parent school-team conversation list API                        | Merged  | [#470](https://github.com/FSS-Ltd/pathway/pull/470) to `master`                     | `e2843e435f055c10df144a0986ad30da382a2694`; all eight checks passed: CI run 37766725458, CodeQL run 37766721567.                                                                                                | `5c5a47409ae10fae458fd7daa49982f7bc1af317` |
 | 1.3e4b   | Linked-parent school-team message history API                          | Merged  | [#474](https://github.com/FSS-Ltd/pathway/pull/474) to `master`                     | `7cc891144125f2a6eabd770c671d3f99087f3ff1`; all eight checks passed: CI run 37769991851, CodeQL run 37769988310.                                                                                                | `7fcb36c7800cf73214ef787e54ecca007c9dafb8` |
 | 1.3e4c   | Linked-parent school-team read-cursor API                              | Merged  | [#476](https://github.com/FSS-Ltd/pathway/pull/476) to `master`                     | `cbe28d24d9457b829df6412d403bcf064508d301`; all eight checks passed: CI run 37773684601, CodeQL run 37773682585.                                                                                                | `0f17f8086480bb1c5b488ccebaf71df80a9b7d25` |
+| 1.3e4d   | Linked-parent school-team conversation open API                        | Merged  | [#478](https://github.com/FSS-Ltd/pathway/pull/478) to `master`                     | `f54b994d94f811c2f8bfb96cb822c9065b4ce21c`; all eight checks passed: CI run 37777932359, CodeQL run 37777929612.                                                                                                | `3f1ab2d6043fe59751e0c81e71820f2274b66e2e` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -274,6 +275,15 @@ guardian participant in their own school-team thread to an existing sequence;
 it cannot regress. Parent conversation creation, sending, and web access remain
 separate C12 slices. The manual production deployment still serves older code.
 Estimated overall ACE update completion after this merge: **89%**.
+
+Step 1.3e4d merged in [PR #478](https://github.com/FSS-Ltd/pathway/pull/478)
+at `3f1ab2d6043fe59751e0c81e71820f2274b66e2e`. All eight checks passed
+on head `f54b994d94f811c2f8bfb96cb822c9065b4ce21c`, including PostgreSQL
+integration and RLS. A linked parent can select an approved site responder and
+open or reuse their one school-team conversation; expired or revoked responder
+tags are excluded. Parent sending and web access remain separate C12 slices.
+The manual production deployment still serves older code. Estimated overall
+ACE update completion after this merge: **89%**.
 
 Step 1.3f1 was merged in [PR #413](https://github.com/FSS-Ltd/pathway/pull/413)
 after all eight checks passed on its final revision, including PostgreSQL
