@@ -98,6 +98,7 @@ does not release the new parent screen.
 | 1.3e4h   | Scoped staff school-team message history API                           | Merged  | [#486](https://github.com/FSS-Ltd/pathway/pull/486) to `master`                     | `4dcb094ce32b0d561c351e053e013788338477c5`; all eight checks passed: CI run 37796800922, CodeQL run 37796796579.                                                                                                | `535c088bbd53539feea19648d7dadef738be61dc` |
 | 1.3e4i   | Scoped staff school-team read-cursor API                               | Merged  | [#488](https://github.com/FSS-Ltd/pathway/pull/488) to `master`                     | `d1dddb81d611af5ad1cd8997cf0b06cbc6a8c18b`; all eight checks passed: CI run 37801462309, CodeQL run 37801460439.                                                                                                | `76f64f3bbffeec60c1be1568f50996a389790e15` |
 | 1.3e4j   | Scoped staff school-team reply API                                     | Merged  | [#490](https://github.com/FSS-Ltd/pathway/pull/490) to `master`                     | `89a37dbdf65a2caa4a267b6e0d2567b4a4a3db91`; all eight checks passed: CI run 37805483170, CodeQL run 37805478643.                                                                                                | `0a9f3f371badda8d895fb16f3c3aa17884208c16` |
+| 1.3e4k   | Staff school-team messaging web view                                   | Merged  | [#492](https://github.com/FSS-Ltd/pathway/pull/492) to `master`                     | `9474ba71d21c88e7ecc62a93f32096db971c6bcc`; all eight checks passed: CI run 37809894950, CodeQL run 37809889978.                                                                                                | `f85fa11a4fb8904d9bf64c8db2137fb2e4a38ef0` |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
@@ -354,8 +355,18 @@ portal and site switches deny new replies. The staff web entry and notices
 remain, and production still serves older code. Estimated overall ACE update
 completion after this merge: **about 50%**.
 
-**Revised overall ACE update estimate: about 50%.** The earlier 91% estimate
-was too high for the full approved plan. The [journey matrix](02-oasis-web-journey-parity.md)
+Step 1.3e4k merged in [PR #492](https://github.com/FSS-Ltd/pathway/pull/492)
+at `f85fa11a4fb8904d9bf64c8db2137fb2e4a38ef0`. All eight checks passed
+on head `9474ba71d21c88e7ecc62a93f32096db971c6bcc`, including the
+PostgreSQL integration suite. The staff workspace now has a separate School
+Team view with a current responder-scoped inbox, bounded history, read cursor,
+and retry-safe replies. It clears site-specific state on a site switch and
+never claims a parent read receipt. Notices and authenticated staging browser
+verification remain; the production apps still serve `a41e09a`. Estimated
+overall ACE update completion after this merge: **about 51%**.
+
+**Revised overall ACE update estimate: about 51%.** The earlier 87% and 91%
+estimates were too high for the full approved plan. The [journey matrix](02-oasis-web-journey-parity.md)
 still marks 13 of 17 core journeys partial and all five paid add-ons missing;
 the newer ACE code also has not passed the production release gate. This
 estimate reflects remaining outcomes, rather than the number of merged PRs.
