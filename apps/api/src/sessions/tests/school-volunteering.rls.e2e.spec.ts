@@ -159,6 +159,21 @@ describe("school volunteer reservation RLS and capacity", () => {
       ).toEqual([]);
     });
 
+    await withTenantRlsContext(siteId, orgId, async (tx) => {
+      await tx.user.update({
+        where: { id: staffId },
+        data: { isActive: false },
+      });
+      await tx.$executeRawUnsafe('SET LOCAL ROLE "pathway_e2e_tenant_rls"');
+      await tx.$executeRaw`SELECT set_config('app.user_id', ${staffId}, true)`;
+      await tx.$executeRaw`SELECT set_config('app.ace_volunteer_staff_view', 'on', true)`;
+      expect(
+        await tx.aceSchoolVolunteerReservation.findMany({
+          where: { id: { in: reservations.map(({ id }) => id) } },
+        }),
+      ).toEqual([]);
+    });
+
     await expect(
       withTenantRlsContext(siteId, orgId, async (tx) => {
         await tx.$executeRaw`SELECT set_config('app.user_id', ${parentIds[0]}, true)`;

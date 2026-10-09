@@ -105,60 +105,94 @@ FOR EACH ROW EXECUTE FUNCTION app.require_ace_school_volunteer_scope();
 ALTER TABLE "AceSchoolVolunteerReservation" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AceSchoolVolunteerReservation" FORCE ROW LEVEL SECURITY;
 
+-- User rows can have no legacy tenantId, so the tenant-scoped User policy
+-- cannot establish staff eligibility inside this reservation policy.
+CREATE FUNCTION app.ace_school_volunteer_staff_can_view(site_id text)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  data_schema text;
+  allowed boolean;
+BEGIN
+  IF site_id IS DISTINCT FROM app.current_tenant_id() THEN
+    RETURN false;
+  END IF;
+  SELECT namespace.nspname INTO data_schema
+  FROM pg_catalog.pg_class relation
+  JOIN pg_catalog.pg_namespace namespace ON namespace.oid = relation.relnamespace
+  WHERE relation.relname = 'AceSchoolVolunteerReservation'
+    AND relation.relkind IN ('r', 'p')
+    AND namespace.nspname IN ('public', 'app')
+  ORDER BY (namespace.nspname = 'public') DESC
+  LIMIT 1;
+  IF data_schema IS NULL THEN
+    RETURN false;
+  END IF;
+  EXECUTE pg_catalog.format(
+    'SELECT EXISTS (
+      SELECT 1 FROM %1$I."User" actor
+      JOIN %1$I."Tenant" site ON site."id" = $1
+      WHERE actor."id" = NULLIF(current_setting(''app.user_id'', true), '''')
+        AND actor."isActive" = true
+        AND (
+          actor."superUser" = true
+          OR EXISTS (
+            SELECT 1 FROM %1$I."SiteMembership" membership
+            WHERE membership."tenantId" = site."id"
+              AND membership."userId" = actor."id"
+              AND membership."role" IN (''STAFF'', ''SITE_ADMIN'')
+          )
+          OR EXISTS (
+            SELECT 1 FROM %1$I."UserTenantRole" role
+            WHERE role."tenantId" = site."id"
+              AND role."userId" = actor."id"
+              AND role."role" IN (''ADMIN'', ''COORDINATOR'', ''TEACHER'', ''LEAD'', ''SUPPORT'')
+          )
+          OR EXISTS (
+            SELECT 1 FROM %1$I."OrgMembership" membership
+            WHERE membership."orgId" = site."orgId"
+              AND membership."userId" = actor."id"
+              AND membership."role" = ''ORG_ADMIN''
+          )
+          OR EXISTS (
+            SELECT 1 FROM %1$I."UserOrgRole" role
+            WHERE role."orgId" = site."orgId"
+              AND role."userId" = actor."id"
+              AND role."role" = ''ORG_ADMIN''
+          )
+          OR EXISTS (
+            SELECT 1 FROM %1$I."UserRoleAssignment" assignment
+            JOIN %1$I."OrgRoleDefinition" definition
+              ON definition."id" = assignment."roleDefinitionId"
+            WHERE assignment."userId" = actor."id"
+              AND assignment."orgId" = site."orgId"
+              AND assignment."roleDefinitionId" IN (
+                ''system-role:'' || site."orgId" || '':organisation:organisationHead'',
+                ''system-role:'' || site."orgId" || '':'' || site."id" || '':siteLead''
+              )
+              AND definition."isSystem" = true
+              AND definition."isActive" = true
+              AND assignment."startsAt" <= CURRENT_TIMESTAMP
+              AND (assignment."expiresAt" IS NULL OR assignment."expiresAt" > CURRENT_TIMESTAMP)
+              AND assignment."revokedAt" IS NULL
+          )
+        )
+    )', data_schema
+  ) INTO allowed USING site_id;
+  RETURN COALESCE(allowed, false);
+END;
+$$;
+
 CREATE POLICY "AceSchoolVolunteerReservation_select" ON "AceSchoolVolunteerReservation"
   FOR SELECT USING (
     "tenantId" = app.current_tenant_id()
     AND (
       (current_setting('app.ace_volunteer_staff_view', true) = 'on'
-        AND EXISTS (
-          SELECT 1 FROM "User" actor
-          JOIN "Tenant" site ON site."id" = "AceSchoolVolunteerReservation"."tenantId"
-          WHERE actor."id" = NULLIF(current_setting('app.user_id', true), '')
-            AND actor."isActive" = true
-            AND (
-              actor."superUser" = true
-              OR EXISTS (
-                SELECT 1 FROM "SiteMembership" membership
-                WHERE membership."tenantId" = site."id"
-                  AND membership."userId" = actor."id"
-                  AND membership."role" IN ('STAFF', 'SITE_ADMIN')
-              )
-              OR EXISTS (
-                SELECT 1 FROM "UserTenantRole" role
-                WHERE role."tenantId" = site."id"
-                  AND role."userId" = actor."id"
-                  AND role."role" IN ('ADMIN', 'COORDINATOR', 'TEACHER', 'LEAD', 'SUPPORT')
-              )
-              OR EXISTS (
-                SELECT 1 FROM "OrgMembership" membership
-                WHERE membership."orgId" = site."orgId"
-                  AND membership."userId" = actor."id"
-                  AND membership."role" = 'ORG_ADMIN'
-              )
-              OR EXISTS (
-                SELECT 1 FROM "UserOrgRole" role
-                WHERE role."orgId" = site."orgId"
-                  AND role."userId" = actor."id"
-                  AND role."role" = 'ORG_ADMIN'
-              )
-              OR EXISTS (
-                SELECT 1 FROM "UserRoleAssignment" assignment
-                JOIN "OrgRoleDefinition" definition
-                  ON definition."id" = assignment."roleDefinitionId"
-                WHERE assignment."userId" = actor."id"
-                  AND assignment."orgId" = site."orgId"
-                  AND assignment."roleDefinitionId" IN (
-                    'system-role:' || site."orgId" || ':organisation:organisationHead',
-                    'system-role:' || site."orgId" || ':' || site."id" || ':siteLead'
-                  )
-                  AND definition."isSystem" = true
-                  AND definition."isActive" = true
-                  AND assignment."startsAt" <= CURRENT_TIMESTAMP
-                  AND (assignment."expiresAt" IS NULL OR assignment."expiresAt" > CURRENT_TIMESTAMP)
-                  AND assignment."revokedAt" IS NULL
-              )
-            )
-        ))
+        AND app.ace_school_volunteer_staff_can_view("tenantId"))
       OR EXISTS (
         SELECT 1 FROM "GuardianIdentity" guardian
         JOIN "GuardianChildRelationship" relationship
