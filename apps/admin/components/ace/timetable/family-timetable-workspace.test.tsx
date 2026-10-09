@@ -72,7 +72,7 @@ async function run() {
       requested.at(-1) ?? "",
       /\/ace\/parent\/sites\/school-one\/children\/child-one\/timetable\?/,
     );
-    assert.match(container.textContent ?? "", /Ari’s timetable/);
+    assert.match(container.textContent ?? "", /Ari’s sessions/);
     assert.match(container.textContent ?? "", /Maths/);
     assert.doesNotMatch(container.textContent ?? "", /session-one/);
 

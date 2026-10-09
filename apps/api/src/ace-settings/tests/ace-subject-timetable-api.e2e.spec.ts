@@ -144,6 +144,14 @@ describe("ACE subject timetable Head API", () => {
     expect(manager.status).toBe(200);
     expect(manager.body.schedule.id).toBe(fixture.schedule.id);
     expect(manager.body.schedule.slots).toHaveLength(1);
+    const setup = await request(app.getHttpServer())
+      .get("/ace/subject-timetable/setup")
+      .set("Authorization", managerAuthorization);
+    expect(setup.status).toBe(200);
+    expect(setup.body.academicYears[0].periods[0].id).toBe(
+      fixture.schedule.academicPeriodId,
+    );
+    expect(setup.body.yearBands[0].id).toBe(fixture.schedule.yearBandId);
   });
 
   it("rejects stale schedules and unenrolled subjects, then issues an immutable version", async () => {
@@ -236,6 +244,13 @@ describe("ACE subject timetable Head API", () => {
       .send(draftCommand);
     expect(saved.status).toBe(200);
     expect(saved.body.version).toBe(2);
+    const draftRead = await request(app.getHttpServer())
+      .get(draftPath)
+      .set("Authorization", managerAuthorization);
+    expect(draftRead.status).toBe(200);
+    expect(draftRead.body.eligibleSubjects).toEqual([
+      expect.objectContaining({ id: fixture.entry.subjectId }),
+    ]);
 
     const publishPath = `${base}/children/${fixture.childId}/publish`;
     const issued = await request(app.getHttpServer())
