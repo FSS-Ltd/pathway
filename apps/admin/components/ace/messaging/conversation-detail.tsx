@@ -289,7 +289,7 @@ function MessageComposer({
           maxLength={4000}
           rows={2}
           placeholder="Write a message"
-          className="max-h-40 min-h-11 min-w-0 flex-1 resize-none rounded-[1.375rem] border border-border-strong bg-surface px-4 py-2.5 text-sm leading-6 text-text-primary shadow-sm outline-none placeholder:text-text-muted focus:border-status-info focus:ring-2 focus:ring-status-info"
+          className="max-h-40 min-h-11 min-w-0 flex-1 resize-none rounded-[1.375rem] border border-border-strong bg-surface px-4 py-2.5 text-sm leading-6 text-text-primary shadow-sm outline-none placeholder:text-text-muted focus:border-status-info focus:ring-2 focus:ring-status-info focus-visible:ring-offset-0"
         />
         <Button
           type="submit"
