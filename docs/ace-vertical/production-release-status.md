@@ -209,10 +209,26 @@ whole-app metadata regression check. The observed error was
 `listStaffConversations` on an undefined service after an allowed access
 decision; the production response contained no private message data. Local
 TSX audit now finds zero missing dependencies among 111 classes with
-constructor parameters. Signed-in production data loading still needs a fresh
-smoke check after deployment. The existing School Team staff inbox and reply
-routes provide the return path for parent conversations; the full two-way
+constructor parameters. [PR #515](https://github.com/FSS-Ltd/pathway/pull/515)
+merged as `532bfeb8d65df9d38a33d96ae01cb06f4a2adbff` after all eight
+checks passed on `3ff450d1f4ac8f009bb280b689e231b8cbac29da`.
+[Production run 37865725001](https://github.com/FSS-Ltd/pathway/actions/runs/37865725001)
+passed migrations and all three Vercel deploy jobs; the API deployment
+`dpl_2uokkPCA1HRrYFP4AnZKsaurPWD8` is READY on `api.nexsteps.dev`.
+Authenticated Messages still returned 500 after this deployment because the
+newer tables are in the `app` schema while Prisma queried `public`. The
+existing School Team staff inbox and reply routes provide the return path for
+parent conversations; the full two-way
 journey still needs a live parent with approved guardian access.
+
+REL-12 repairs that schema mismatch for the ten ACE message and notice tables.
+It adds invoker-rights public views over the RLS-protected app tables, public
+enum domains, and equality operators for Prisma's enum filters. The views
+carry no direct Data API role grants. The production migration is still
+pending its PR gate. A read-only catalog audit found zero public message and
+notice relations and confirmed all ten base tables force RLS. A transaction
+that created the bridge, ran all five representative enum-filter reads, and
+rolled back passed on the new production database without persisting changes.
 
 ## Delivery steps
 
@@ -295,7 +311,8 @@ journey still needs a live parent with approved guardian access.
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                | `193a569892c38be565ac6755456f41bcf498ed76` |
 | REL-10   | Audited guardian access revocation                                     | Merged  | [#514](https://github.com/FSS-Ltd/pathway/pull/514) to `master`                     | `f5f2304eac229b4b9ae321420781d2baca24ba53`; all eight checks passed: CI run 37861062264, CodeQL run 37861058291.                                                                                                | `2120a185808af996e60868a8f6e085c5199e775c` |
-| REL-11   | Repair production API injection across ACE and Home                    | Active  | PR pending                                                                          | Local TSX audit covers 111 classes with zero missing dependencies; CI and production smoke pending.                                                                                                             | Pending                                    |
+| REL-11   | Repair production API injection across ACE and Home                    | Merged  | [#515](https://github.com/FSS-Ltd/pathway/pull/515) to `master`                     | `3ff450d1f4ac8f009bb280b689e231b8cbac29da`; all eight checks passed: CI 37865176399, CodeQL 37865172972. Deploy 37865725001 passed; messaging schema gap remains.                                               | `532bfeb8d65df9d38a33d96ae01cb06f4a2adbff` |
+| REL-12   | Bridge protected ACE message and notice tables to public Prisma        | Active  | PR pending                                                                          | Rollback-only target SQL probe passed; local and CI checks pending.                                                                                                                                             | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

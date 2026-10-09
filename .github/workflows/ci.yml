@@ -385,6 +385,7 @@ jobs:
           src/__tests__/portable-message-participant.integration.spec.ts
           src/__tests__/portable-notice-guardian-eligibility.integration.spec.ts
           src/__tests__/portable-family-discovery-policy.integration.spec.ts
+          src/__tests__/public-ace-message-bridge.integration.spec.ts
 
   organisation-role-rls:
     name: Organisation Role RLS
@@ -465,6 +466,7 @@ jobs:
           jest --config jest.config.ts --runInBand --runTestsByPath
           src/__tests__/portable-notice-guardian-eligibility.integration.spec.ts
           src/__tests__/portable-family-discovery-policy.integration.spec.ts
+          src/__tests__/public-ace-message-bridge.integration.spec.ts
 
       - name: Test organisation role RLS policy gate contract
         run: node --test scripts/lib/role-rls-gate.test.mjs
