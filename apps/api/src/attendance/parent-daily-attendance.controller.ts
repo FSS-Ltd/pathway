@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Inject,
   Param,
   Query,
   UseGuards,
@@ -15,7 +16,9 @@ import { ParentDailyAttendanceService } from "./parent-daily-attendance.service"
 @Controller("ace/parent/sites/:siteId/children/:childId/attendance/daily")
 export class ParentDailyAttendanceController {
   constructor(
+    @Inject(ParentDailyAttendanceService)
     private readonly service: ParentDailyAttendanceService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

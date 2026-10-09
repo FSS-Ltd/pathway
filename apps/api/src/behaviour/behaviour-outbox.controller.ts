@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Headers,
+  Inject,
   Post,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -11,7 +12,10 @@ const INTERNAL_SECRET_HEADER = "x-pathway-internal-secret";
 
 @Controller("internal/outbox")
 export class BehaviourOutboxController {
-  constructor(private readonly demeritEscalation: DemeritEscalationService) {}
+  constructor(
+    @Inject(DemeritEscalationService)
+    private readonly demeritEscalation: DemeritEscalationService,
+  ) {}
 
   @Post("behaviour")
   dispatch(

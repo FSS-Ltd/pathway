@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Put,
@@ -39,13 +40,20 @@ import { StaffSchoolTeamService } from "./staff-school-team.service";
 @Controller("ace/messages/conversations")
 export class MessagingController {
   constructor(
-    private readonly service: MessagingService,
+    @Inject(MessagingService) private readonly service: MessagingService,
+    @Inject(MessagingConversationService)
     private readonly conversations: MessagingConversationService,
+    @Inject(MessagingCommandService)
     private readonly commands: MessagingCommandService,
+    @Inject(StaffSchoolTeamService)
     private readonly schoolTeam: StaffSchoolTeamService,
+    @Inject(StaffSchoolTeamHistoryService)
     private readonly schoolTeamHistory: StaffSchoolTeamHistoryService,
+    @Inject(StaffSchoolTeamReadCursorService)
     private readonly schoolTeamCursors: StaffSchoolTeamReadCursorService,
+    @Inject(StaffSchoolTeamCommandService)
     private readonly schoolTeamCommands: StaffSchoolTeamCommandService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

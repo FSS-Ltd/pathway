@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Post,
   UseGuards,
@@ -20,8 +21,10 @@ import { StudentSubjectsService } from "./student-subjects.service";
 @Controller("ace/students")
 export class StudentSubjectsController {
   constructor(
+    @Inject(StudentSubjectsService)
     private readonly service: StudentSubjectsService,
-    private readonly paceQuery: PaceQueryService,
+    @Inject(PaceQueryService) private readonly paceQuery: PaceQueryService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

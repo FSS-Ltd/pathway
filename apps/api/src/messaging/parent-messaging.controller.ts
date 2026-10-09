@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Put,
@@ -36,11 +37,17 @@ import { ParentMessagingService } from "./parent-messaging.service";
 @Controller("ace/parent/sites/:siteId/messages/conversations")
 export class ParentMessagingController {
   constructor(
+    @Inject(ParentMessagingService)
     private readonly service: ParentMessagingService,
+    @Inject(ParentMessagingHistoryService)
     private readonly history: ParentMessagingHistoryService,
+    @Inject(ParentMessagingCommandService)
     private readonly commands: ParentMessagingCommandService,
+    @Inject(ParentMessagingConversationService)
     private readonly conversations: ParentMessagingConversationService,
+    @Inject(ParentMessagingReadCursorService)
     private readonly readCursor: ParentMessagingReadCursorService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

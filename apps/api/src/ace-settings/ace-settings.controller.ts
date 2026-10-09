@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Put,
   UseGuards,
 } from "@nestjs/common";
@@ -18,7 +19,8 @@ import { AceSettingsService } from "./ace-settings.service";
 @Controller("ace/settings")
 export class AceSettingsController {
   constructor(
-    private readonly service: AceSettingsService,
+    @Inject(AceSettingsService) private readonly service: AceSettingsService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

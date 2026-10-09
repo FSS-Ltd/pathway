@@ -1,6 +1,9 @@
-import { Controller, Post, Req, UseGuards } from "@nestjs/common";
+import { Controller, Inject, Post, Req, UseGuards } from "@nestjs/common";
 import type { Request } from "express";
-import { VerifiedPrincipalGuard, getVerifiedPrincipal } from "../auth/verified-principal.guard";
+import {
+  VerifiedPrincipalGuard,
+  getVerifiedPrincipal,
+} from "../auth/verified-principal.guard";
 import { NexstepsHomeSignupService } from "./nexsteps-home-signup.service";
 
 /**
@@ -13,7 +16,10 @@ import { NexstepsHomeSignupService } from "./nexsteps-home-signup.service";
  */
 @Controller("public/nexsteps-home")
 export class NexstepsHomeSignupController {
-  constructor(private readonly signupService: NexstepsHomeSignupService) {}
+  constructor(
+    @Inject(NexstepsHomeSignupService)
+    private readonly signupService: NexstepsHomeSignupService,
+  ) {}
 
   @Post("signup")
   @UseGuards(VerifiedPrincipalGuard)

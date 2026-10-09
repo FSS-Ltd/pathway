@@ -184,12 +184,35 @@ three Vercel deployments are READY on their production aliases: API
 redirect, and configurator smoke checks passed. Signed-in parent-to-staff
 messaging remains unverified.
 
-REL-10 adds organisation-admin revocation for an approved guardian-child
+REL-10 added organisation-admin revocation for an approved guardian-child
 relationship at the selected site. Revocation requires a reason, records the
 actor and time on the relationship, writes an audit event, and immediately
 removes that child's effective guardian access. A fixed Parent role can remain
-where the parent has other children. No historical links are approved or
-revoked automatically. This step is pending PR and production verification.
+where the parent has other children. No historical links were approved or
+revoked automatically. [PR #514](https://github.com/FSS-Ltd/pathway/pull/514)
+merged as `2120a185808af996e60868a8f6e085c5199e775c` after all eight checks
+passed on `f5f2304eac229b4b9ae321420781d2baca24ba53`. [Production run
+37861902083](https://github.com/FSS-Ltd/pathway/actions/runs/37861902083)
+passed migrations, API and admin; the web job passed on retry after the
+unchanged Nunito font-loader failure. All three Vercel aliases were READY and
+anonymous API, admin sign-in, and web smoke checks passed. Signed-in data
+loading was still unverified at that release.
+
+REL-11 addresses a confirmed production 500 on the authenticated staff
+conversation list. The API's TSX production loader does not emit constructor
+type metadata; Nest instantiated the staff messaging controller without its
+services. A runtime audit found the same missing injection metadata in 20
+other controllers and providers across ACE attendance, academic setup, PACE,
+behaviour, dashboard, family access, feedback, NexSteps Home signup, and
+privacy. This step adds explicit injection to all 22 affected classes and a
+whole-app metadata regression check. The observed error was
+`listStaffConversations` on an undefined service after an allowed access
+decision; the production response contained no private message data. Local
+TSX audit now finds zero missing dependencies among 111 classes with
+constructor parameters. Signed-in production data loading still needs a fresh
+smoke check after deployment. The existing School Team staff inbox and reply
+routes provide the return path for parent conversations; the full two-way
+journey still needs a live parent with approved guardian access.
 
 ## Delivery steps
 
@@ -271,6 +294,8 @@ revoked automatically. This step is pending PR and production verification.
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                | `193a569892c38be565ac6755456f41bcf498ed76` |
+| REL-10   | Audited guardian access revocation                                     | Merged  | [#514](https://github.com/FSS-Ltd/pathway/pull/514) to `master`                     | `f5f2304eac229b4b9ae321420781d2baca24ba53`; all eight checks passed: CI run 37861062264, CodeQL run 37861058291.                                                                                                | `2120a185808af996e60868a8f6e085c5199e775c` |
+| REL-11   | Repair production API injection across ACE and Home                    | Active  | PR pending                                                                          | Local TSX audit covers 111 classes with zero missing dependencies; CI and production smoke pending.                                                                                                             | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

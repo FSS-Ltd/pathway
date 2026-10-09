@@ -1,7 +1,11 @@
 import "reflect-metadata";
-import { SELF_DECLARED_DEPS_METADATA } from "@nestjs/common/constants";
+import {
+  MODULE_METADATA,
+  SELF_DECLARED_DEPS_METADATA,
+} from "@nestjs/common/constants";
 import { ModuleRef, Reflector } from "@nestjs/core";
 import { PathwayRequestContext } from "@pathway/auth";
+import { AppModule } from "../app.module";
 import { AccessDecisionLogger } from "../access-control/access-decision-logger";
 import { AccessCacheService } from "../access-control/access-cache.service";
 import { RoleSafetyService } from "../access-control/role-safety.service";
@@ -34,6 +38,20 @@ import { OrgsService } from "../orgs/orgs.service";
 import { StaffService } from "../staff/staff.service";
 import { BillingService } from "../billing/billing.service";
 import { MailerService } from "../mailer/mailer.service";
+import { MessagingController } from "../messaging/messaging.controller";
+import { MessagingService } from "../messaging/messaging.service";
+import { MessagingConversationService } from "../messaging/messaging-conversation.service";
+import { MessagingCommandService } from "../messaging/messaging-command.service";
+import { StaffSchoolTeamService } from "../messaging/staff-school-team.service";
+import { StaffSchoolTeamHistoryService } from "../messaging/staff-school-team-history.service";
+import { StaffSchoolTeamReadCursorService } from "../messaging/staff-school-team-read-cursor.service";
+import { StaffSchoolTeamCommandService } from "../messaging/staff-school-team-command.service";
+import { ParentMessagingController } from "../messaging/parent-messaging.controller";
+import { ParentMessagingService } from "../messaging/parent-messaging.service";
+import { ParentMessagingHistoryService } from "../messaging/parent-messaging-history.service";
+import { ParentMessagingCommandService } from "../messaging/parent-messaging-command.service";
+import { ParentMessagingConversationService } from "../messaging/parent-messaging-conversation.service";
+import { ParentMessagingReadCursorService } from "../messaging/parent-messaging-read-cursor.service";
 
 type DeclaredDependency = {
   index: number;
@@ -46,8 +64,81 @@ function getDeclaredDependencies(target: unknown): DeclaredDependency[] {
   );
 }
 
+function getModuleEntries(module: object, key: string): unknown[] {
+  const entries: unknown = Reflect.getMetadata(key, module);
+  return Array.isArray(entries) ? entries : [];
+}
+
+function getRuntimeInjectionTargets(): Array<{ name: string; length: number }> {
+  const visited = new Set<object>();
+  const targets: Array<{ name: string; length: number }> = [];
+
+  function visit(module: unknown): void {
+    if (typeof module !== "function" || visited.has(module)) return;
+    visited.add(module);
+
+    for (const key of [
+      MODULE_METADATA.CONTROLLERS,
+      MODULE_METADATA.PROVIDERS,
+    ]) {
+      for (const provider of getModuleEntries(module, key)) {
+        if (typeof provider === "function" && provider.length > 0) {
+          targets.push(provider);
+        }
+      }
+    }
+    for (const entry of getModuleEntries(module, MODULE_METADATA.IMPORTS)) {
+      if (typeof entry === "object" && entry !== null && "module" in entry) {
+        visit(entry.module);
+      } else {
+        visit(entry);
+      }
+    }
+  }
+
+  visit(AppModule);
+  return targets;
+}
+
 describe("dependency injection metadata", () => {
+  it("declares every production constructor dependency explicitly", () => {
+    const missing = getRuntimeInjectionTargets().flatMap((target) => {
+      const declared = new Set(
+        getDeclaredDependencies(target).map((dependency) => dependency.index),
+      );
+      return Array.from({ length: target.length }, (_, index) => index)
+        .filter((index) => !declared.has(index))
+        .map((index) => `${target.name}[${index}]`);
+    });
+
+    expect(missing).toEqual([]);
+  });
+
   it.each([
+    {
+      target: MessagingController,
+      dependencies: [
+        { index: 0, param: MessagingService },
+        { index: 1, param: MessagingConversationService },
+        { index: 2, param: MessagingCommandService },
+        { index: 3, param: StaffSchoolTeamService },
+        { index: 4, param: StaffSchoolTeamHistoryService },
+        { index: 5, param: StaffSchoolTeamReadCursorService },
+        { index: 6, param: StaffSchoolTeamCommandService },
+        { index: 7, param: PathwayRequestContext },
+      ],
+    },
+    {
+      target: ParentMessagingController,
+      dependencies: [
+        { index: 0, param: ParentMessagingService },
+        { index: 1, param: ParentMessagingHistoryService },
+        { index: 2, param: ParentMessagingCommandService },
+        { index: 3, param: ParentMessagingConversationService },
+        { index: 4, param: ParentMessagingReadCursorService },
+        { index: 5, param: PathwayRequestContext },
+      ],
+    },
     {
       target: AccessDecisionLogger,
       dependencies: [{ index: 0, param: LoggingService }],

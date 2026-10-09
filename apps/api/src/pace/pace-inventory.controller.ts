@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Get,
+  Inject,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -20,7 +21,9 @@ import { PaceInventoryQueryService } from "./pace-inventory-query.service";
 @Controller("ace/pace/inventory")
 export class PaceInventoryController {
   constructor(
+    @Inject(PaceInventoryQueryService)
     private readonly service: PaceInventoryQueryService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

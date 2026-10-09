@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Inject,
   Param,
   Patch,
   Post,
@@ -27,9 +28,13 @@ import { PaceInventoryStockCommandService } from "./pace-inventory-stock-command
 @Controller("ace/pace/inventory")
 export class PaceInventoryCommandsController {
   constructor(
+    @Inject(PaceInventoryOrderCommandService)
     private readonly orderService: PaceInventoryOrderCommandService,
+    @Inject(PaceInventoryOrderStatusService)
     private readonly statusService: PaceInventoryOrderStatusService,
+    @Inject(PaceInventoryStockCommandService)
     private readonly stockService: PaceInventoryStockCommandService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

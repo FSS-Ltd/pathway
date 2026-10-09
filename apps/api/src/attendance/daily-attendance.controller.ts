@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Header,
+  Inject,
   Param,
   Put,
   Query,
@@ -29,10 +30,15 @@ import { dailyAttendanceExportQuerySchema } from "./dto/daily-attendance-export-
 @Controller("attendance/daily")
 export class DailyAttendanceController {
   constructor(
+    @Inject(DailyAttendanceService)
     private readonly service: DailyAttendanceService,
+    @Inject(DailyAttendanceExportService)
     private readonly exportService: DailyAttendanceExportService,
+    @Inject(DailyAttendanceWriteService)
     private readonly writeService: DailyAttendanceWriteService,
+    @Inject(DailyAttendanceHistoryService)
     private readonly historyService: DailyAttendanceHistoryService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
