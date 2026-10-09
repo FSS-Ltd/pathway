@@ -73,7 +73,7 @@ function ContextList({
   );
 }
 
-function SchoolMessagesList({ contexts }: { contexts: FamilyContext[] }) {
+function SchoolLinksList({ contexts }: { contexts: FamilyContext[] }) {
   const schools = Array.from(
     new Map(
       contexts.map(({ siteId, siteName }) => [siteId, siteName]),
@@ -81,30 +81,34 @@ function SchoolMessagesList({ contexts }: { contexts: FamilyContext[] }) {
   );
   if (schools.length === 0) return null;
   return (
-    <section aria-label="School messages" className="space-y-3">
+    <section aria-label="Your schools" className="space-y-3">
       <h2 className="font-heading text-xl font-semibold text-text-primary">
-        School messages
+        Your schools
       </h2>
       <ul className="grid gap-3 sm:grid-cols-2">
         {schools.map(([siteId, siteName]) => (
           <li key={siteId}>
-            <Link
-              href={`/ace/parent/sites/${encodeURIComponent(siteId)}/messages`}
-              className="group flex min-h-20 items-center justify-between gap-4 rounded-xl border border-border-subtle bg-surface px-5 py-4 shadow-card transition-colors motion-reduce:transition-none hover:border-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
-            >
-              <span>
-                <span className="block font-heading text-lg font-semibold text-text-primary">
-                  {siteName}
-                </span>
-                <span className="text-sm font-medium text-accent-strong">
-                  Message your school team
-                </span>
-              </span>
-              <ChevronRight
-                className="h-5 w-5 shrink-0 text-text-muted"
-                aria-hidden="true"
-              />
-            </Link>
+            <div className="rounded-xl border border-border-subtle bg-surface px-5 py-4 shadow-card">
+              <h3 className="font-heading text-lg font-semibold text-text-primary">
+                {siteName}
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Link
+                  href={`/ace/parent/sites/${encodeURIComponent(siteId)}/messages`}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                >
+                  Messages{" "}
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link
+                  href={`/ace/parent/sites/${encodeURIComponent(siteId)}/volunteering`}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                >
+                  Help at school{" "}
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
           </li>
         ))}
       </ul>
@@ -153,8 +157,8 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
         </h1>
         <p className="max-w-2xl text-base leading-7 text-text-muted">
           Choose a linked child or your own student record to see attendance and
-          published subject timetables and sessions. Parents can also message
-          their school team.
+          published subject timetables and sessions. Parents can message their
+          school team and choose days to help at school.
         </p>
       </header>
 
@@ -199,7 +203,7 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
       ) : (
         <div className="space-y-8">
           <ContextList title="Children linked to you" items={parentContexts} />
-          <SchoolMessagesList contexts={parentContexts} />
+          <SchoolLinksList contexts={parentContexts} />
           <ContextList title="Your student access" items={studentContexts} />
         </div>
       )}

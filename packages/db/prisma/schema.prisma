@@ -910,6 +910,7 @@ model Tenant {
   aceStaffYearBandAssignments AceStaffYearBandAssignment[]
   aceSchoolEnrollments   AceSchoolEnrollment[]
   aceTeachingDates       AceTeachingDate[]
+  aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
   aceTimetableSchedules  AceTimetableSchedule[]
   aceTimetableSlots      AceTimetableSlot[]
   aceStudentTimetableDrafts AceStudentTimetableDraft[]
@@ -1085,6 +1086,7 @@ model User {
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
+  aceSchoolVolunteerCancellations AceSchoolVolunteerReservation[] @relation("AceVolunteerCancelledBy")
   familyIdentityInvites FamilyIdentityInvite[] @relation("FamilyIdentityInviteUser")
   familyIdentityInvitesCreated FamilyIdentityInvite[] @relation("FamilyIdentityInviteCreatedBy")
   familyIdentityInvitesRevoked FamilyIdentityInvite[] @relation("FamilyIdentityInviteRevokedBy")
@@ -1200,6 +1202,7 @@ model GuardianIdentity {
   messageConversations     MessageConversation[]
   messageParticipants      MessageParticipant[]
   aceNoticeAudienceMembers AceNoticeAudienceMember[]
+  aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, userId])
@@ -2528,6 +2531,7 @@ model AcademicPeriod {
   aceTimetableSchedules AceTimetableSchedule[]
   aceStudentTimetableDrafts AceStudentTimetableDraft[]
   aceStudentTimetablePublications AceStudentTimetablePublication[]
+  aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @default(now()) @updatedAt
 
@@ -2609,6 +2613,28 @@ model AceTeachingDate {
   @@unique([id, tenantId])
   @@unique([tenantId, date])
   @@index([tenantId, academicYearId, date])
+}
+
+model AceSchoolVolunteerReservation {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  guardianIdentityId String
+  guardianIdentity   GuardianIdentity @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  academicPeriodId   String
+  academicPeriod     AcademicPeriod @relation(fields: [academicPeriodId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  date               DateTime  @db.Date
+  slot               Int
+  cancelledAt        DateTime?
+  cancelledByUserId  String?
+  cancelledBy        User?     @relation("AceVolunteerCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  cancellationReason String?   @db.VarChar(240)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, academicPeriodId, date])
+  @@index([tenantId, guardianIdentityId, date])
 }
 
 model AceTimetableSchedule {

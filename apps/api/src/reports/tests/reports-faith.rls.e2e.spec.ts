@@ -789,6 +789,7 @@ describe("ACE report publication storage", () => {
     await deleteReportRowsIfPresent(prisma);
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
+        "AceSchoolVolunteerReservation",
         "AceNoticeReceipt",
         "AceNoticeAttachment",
         "AceNoticeAudienceMember",

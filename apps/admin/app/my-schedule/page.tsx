@@ -21,6 +21,7 @@ import { requestFailure, type RequestFailure } from "../../lib/request-error";
 import { SwapCandidateForm, SwapRequestList } from "./swap-panels";
 import { AssignmentList } from "./assignment-list";
 import { TeamRota } from "./team-rota";
+import { SchoolVolunteerRota } from "./school-volunteer-rota";
 
 const addDays = (date: Date, days: number) => {
   const next = new Date(date);
@@ -411,6 +412,14 @@ export default function MySchedulePage() {
         )}
       </Card>
       <TeamRota siteId={siteId} dateFrom={dateFrom} dateTo={dateTo} />
+      {adminState.status === "ready" &&
+      adminState.snapshot.uiKey === "ACE_SCHOOL" ? (
+        <SchoolVolunteerRota
+          siteId={siteId}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+        />
+      ) : null}
     </div>
   );
 }
