@@ -12,6 +12,12 @@ Object.assign(globalThis, {
   HTMLElement: dom.window.HTMLElement,
   IS_REACT_ACT_ENVIRONMENT: true,
 });
+if (!("navigator" in globalThis)) {
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: dom.window.navigator,
+  });
+}
 
 const copy = {
   title: "New message",
