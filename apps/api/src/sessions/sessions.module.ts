@@ -5,11 +5,12 @@ import { BillingModule } from "../billing/billing.module";
 import { SessionsController } from "./sessions.controller";
 import { SessionsService } from "./sessions.service";
 import { StaffAttendanceService } from "./staff-attendance.service";
+import { RotaAccessService } from "./rota-access.service";
 
 @Module({
   imports: [CommonModule, BillingModule, AuthModule],
   controllers: [SessionsController],
-  providers: [SessionsService, StaffAttendanceService],
+  providers: [SessionsService, StaffAttendanceService, RotaAccessService],
   exports: [SessionsService, StaffAttendanceService],
 })
 export class SessionsModule {}

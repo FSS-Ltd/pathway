@@ -8,7 +8,6 @@ import {
   Body,
   Query,
   BadRequestException,
-  UnauthorizedException,
   UseGuards,
   Inject,
   Req,
@@ -23,6 +22,12 @@ import { upsertStaffAttendanceDto } from "./dto/upsert-staff-attendance.dto";
 import { CurrentTenant, CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../billing/entitlements-enforcement.service";
+import { RotaAccessService, rotaActorFromRequest } from "./rota-access.service";
+
+type AuthenticatedRequest = Request & {
+  authUserId?: string;
+  authIsSuperUser?: boolean;
+};
 
 type IsoDateString = string; // ISO 8601 expected
 
@@ -45,8 +50,11 @@ function parseDateOrThrow(label: string, value?: string): Date | undefined {
 export class SessionsController {
   constructor(
     @Inject(SessionsService) private readonly svc: SessionsService,
-    @Inject(StaffAttendanceService) private readonly staffAttendanceSvc: StaffAttendanceService,
-    @Inject(EntitlementsEnforcementService) private readonly enforcement: EntitlementsEnforcementService,
+    @Inject(StaffAttendanceService)
+    private readonly staffAttendanceSvc: StaffAttendanceService,
+    @Inject(EntitlementsEnforcementService)
+    private readonly enforcement: EntitlementsEnforcementService,
+    @Inject(RotaAccessService) private readonly rotaAccess: RotaAccessService,
   ) {}
 
   @Get()
@@ -54,9 +62,15 @@ export class SessionsController {
   async list(
     @Query() q: SessionsQuery,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
     const filters: SessionListFilters = {
       tenantId,
+      staffUserId: (await this.rotaAccess.canManage(actor))
+        ? undefined
+        : actor.userId,
       groupId: q.groupId,
       from: parseDateOrThrow("from", q.from),
       to: parseDateOrThrow("to", q.to),
@@ -69,7 +83,13 @@ export class SessionsController {
   async getById(
     @Param("id") id: string,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.rotaAccess.assertSessionVisible(
+      rotaActorFromRequest(req, orgId, tenantId),
+      id,
+    );
     return this.svc.getById(id, tenantId);
   }
 
@@ -79,7 +99,11 @@ export class SessionsController {
     @Body() dto: CreateSessionDto,
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.rotaAccess.assertManager(
+      rotaActorFromRequest(req, orgId, tenantId),
+    );
     if (
       dto.startsAt &&
       dto.endsAt &&
@@ -102,7 +126,11 @@ export class SessionsController {
     @Body() body: unknown,
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.rotaAccess.assertManager(
+      rotaActorFromRequest(req, orgId, tenantId),
+    );
     const parsed = bulkCreateSessionsSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten());
@@ -118,7 +146,12 @@ export class SessionsController {
     @Param("id") id: string,
     @Body() dto: UpdateSessionDto,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.rotaAccess.assertManager(
+      rotaActorFromRequest(req, orgId, tenantId),
+    );
     if (
       dto.startsAt &&
       dto.endsAt &&
@@ -137,7 +170,12 @@ export class SessionsController {
   async delete(
     @Param("id") id: string,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.rotaAccess.assertManager(
+      rotaActorFromRequest(req, orgId, tenantId),
+    );
     return this.svc.delete(id, tenantId);
   }
 
@@ -146,7 +184,13 @@ export class SessionsController {
   async getStaffAttendance(
     @Param("id") id: string,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.rotaAccess.assertSessionVisible(
+      rotaActorFromRequest(req, orgId, tenantId),
+      id,
+    );
     return this.staffAttendanceSvc.getRoster(id, tenantId);
   }
 
@@ -155,15 +199,21 @@ export class SessionsController {
   async patchStaffAttendance(
     @Param("id") id: string,
     @Body() body: unknown,
-    @Req() req: Request & { authUserId?: string },
+    @Req() req: AuthenticatedRequest,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
   ) {
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
+    await this.rotaAccess.assertSessionVisible(actor, id);
     const parsed = upsertStaffAttendanceDto.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.format());
     }
-    const userId = req.authUserId;
-    if (!userId) throw new UnauthorizedException("User context required");
-    return this.staffAttendanceSvc.upsert(id, tenantId, userId, parsed.data);
+    return this.staffAttendanceSvc.upsert(
+      id,
+      tenantId,
+      actor.userId,
+      parsed.data,
+    );
   }
 }

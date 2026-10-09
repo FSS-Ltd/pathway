@@ -1,10 +1,11 @@
 # ACE production release status
 
 Checked on 9 October 2026. Production API, admin, and web aliases point to
-READY deployments at merged commit `291abb9c2673b134eb163a42ba82ad01ca9d8ae8`.
+READY deployments at merged commit `9635810c49e6003eb1280784942f0aacdee079dc`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through SEC-1 are now served by all three apps.
+changes through SEC-1 are now served by all three apps; the later documentation
+merge [#524](https://github.com/FSS-Ltd/pathway/pull/524) is also deployed.
 Estimated overall ACE/Oasis update completion after this merge is **about 66%**;
 the remaining core journeys, paid add-ons, and product-wide web finish are
 tracked below.
@@ -379,6 +380,16 @@ and unsigned admin Messages redirected to sign-in. Vercel reported no runtime
 error clusters across the three projects in the checked one-hour window.
 Authenticated production rota actions were not exercised by this smoke check.
 
+SEC-2 scopes the generic session routes to the same actor boundary before
+family/student timetable work. Fixed site or organisation managers retain
+site session administration. Assigned staff may read only their own sessions
+and rosters and mark staff attendance only for a session to which they are
+assigned. Parents cannot read the generic session detail or change sessions;
+their future timetable requires a separate released, relationship-scoped view.
+Local lint, typecheck, build, unit, formatting, diff, and Graphify checks pass.
+The local E2E database is unavailable, so the new HTTP persona case awaits
+database-backed CI. SEC-2 is in progress and has not merged or deployed.
+
 ## Delivery steps
 
 | Step     | Scope                                                                  | State   | PR and base                                                                         | Checked revision and CI                                                                                                                                                                                         | Merge evidence                             |
@@ -468,6 +479,7 @@ Authenticated production rota actions were not exercised by this smoke check.
 | REL-16   | Bound signed-in API token waiting and allow retry                      | Merged  | [#520](https://github.com/FSS-Ltd/pathway/pull/520) to `master`                     | `b11ec3672862d2119ba445e863053fa8c0cb8a55`; all eight checks passed: CI 37877846658, CodeQL 37877841712. Deploy 37878631116 passed four jobs; aliases, anonymous smoke, and runtime errors checked.             | `4a23ab2cd1d7a8c2feed45603bdbe390f548282e` |
 | REL-17   | Align message text box and focus outline                               | Merged  | [#521](https://github.com/FSS-Ltd/pathway/pull/521) to `master`                     | `f6dbadb1c78e084ce00a043841b89e05cc18f5dc`; eight checks passed: CI 37879678167, CodeQL 37879675426. Deploy 37880134482 and live smoke passed.                                                                  | `a2dd1f2acf6fb9674c38a05b375054302a7da3b8` |
 | SEC-1    | Scope rota assignments and swaps to authorised actors                  | Merged  | [#523](https://github.com/FSS-Ltd/pathway/pull/523) to `master`                     | `11352796f02469ec90b5eb35929ff6eac026a8b3`; all eight checks passed: CI 37883306819, CodeQL 37883303461. Deploy 37883971325 and anonymous smoke passed.                                                         | `291abb9c2673b134eb163a42ba82ad01ca9d8ae8` |
+| SEC-2    | Scope sessions and staff attendance to authorised actors               | Active  | PR pending                                                                          | Local lint, typecheck, API build/unit, formatting, diff, and Graphify passed; database-backed CI pending.                                                                                                       | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

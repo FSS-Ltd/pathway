@@ -2,7 +2,7 @@ import request from "supertest";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../../app.module";
-import { prisma, withTenantRlsContext } from "@pathway/db";
+import { prisma, Role, withTenantRlsContext } from "@pathway/db";
 import { randomUUID } from "crypto";
 import {
   clearE2eAuthAccess,
@@ -230,5 +230,73 @@ describe("Sessions (e2e)", () => {
       .set("Authorization", authHeader);
 
     expect(res.status).toBe(404);
+  });
+
+  it("shows assigned staff their session and denies a parent session access", async () => {
+    if (!app) return;
+    const staff = await seedE2eAuthUser({
+      subject: `sessions-staff-${randomUUID()}`,
+      tenantId,
+      siteRole: "STAFF",
+    });
+    const parent = await seedE2eAuthUser({
+      subject: `sessions-parent-${randomUUID()}`,
+      tenantId,
+      siteRole: "VIEWER",
+    });
+    const assignmentId = randomUUID();
+    try {
+      await withTenantRlsContext(tenantId, orgId, async (tx) => {
+        await tx.assignment.create({
+          data: {
+            id: assignmentId,
+            sessionId: ids.session,
+            userId: staff.userId,
+            role: Role.TEACHER,
+          },
+        });
+      });
+
+      const staffList = await request(app.getHttpServer())
+        .get("/sessions")
+        .set("Authorization", staff.authorization);
+      expect(staffList.status).toBe(200);
+      expect(
+        staffList.body.some((row: { id: string }) => row.id === ids.session),
+      ).toBe(true);
+
+      const staffDetail = await request(app.getHttpServer())
+        .get(`/sessions/${ids.session}`)
+        .set("Authorization", staff.authorization);
+      expect(staffDetail.status).toBe(200);
+
+      const parentList = await request(app.getHttpServer())
+        .get("/sessions")
+        .set("Authorization", parent.authorization);
+      expect(parentList.status).toBe(200);
+      expect(
+        parentList.body.some((row: { id: string }) => row.id === ids.session),
+      ).toBe(false);
+
+      const parentDetail = await request(app.getHttpServer())
+        .get(`/sessions/${ids.session}`)
+        .set("Authorization", parent.authorization);
+      expect(parentDetail.status).toBe(404);
+
+      const parentWrite = await request(app.getHttpServer())
+        .patch(`/sessions/${ids.session}`)
+        .set("Authorization", parent.authorization)
+        .send({ title: "Unauthorized edit" });
+      expect(parentWrite.status).toBe(403);
+    } finally {
+      await withTenantRlsContext(tenantId, orgId, async (tx) => {
+        await tx.assignment.deleteMany({ where: { id: assignmentId } });
+      });
+      await clearE2eAuthAccess(staff.userId);
+      await clearE2eAuthAccess(parent.userId);
+      await prisma.user.deleteMany({
+        where: { id: { in: [staff.userId, parent.userId] } },
+      });
+    }
   });
 });

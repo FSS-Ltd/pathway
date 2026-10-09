@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { getSystemRoleId, OrgRole, prisma, SiteRole } from "@pathway/db";
@@ -84,5 +85,21 @@ export class RotaAccessService {
     if (!(await this.canManage(actor))) {
       throw new ForbiddenException("Rota management is not available");
     }
+  }
+
+  async assertSessionVisible(
+    actor: RotaActor,
+    sessionId: string,
+  ): Promise<void> {
+    if (await this.canManage(actor)) return;
+    const assignment = await prisma.assignment.findFirst({
+      where: {
+        sessionId,
+        userId: actor.userId,
+        session: { tenantId: actor.tenantId },
+      },
+      select: { id: true },
+    });
+    if (!assignment) throw new NotFoundException("Session not found");
   }
 }

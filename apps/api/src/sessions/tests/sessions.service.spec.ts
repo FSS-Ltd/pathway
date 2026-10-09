@@ -14,7 +14,13 @@ type SessionRow = {
   createdAt: Date;
   updatedAt: Date;
   groups?: { id: string; name: string }[];
-  lessons?: { id: string; title: string; description: string | null; resourceFileName: string | null; fileKey: string | null }[];
+  lessons?: {
+    id: string;
+    title: string;
+    description: string | null;
+    resourceFileName: string | null;
+    fileKey: string | null;
+  }[];
 };
 
 describe("SessionsService", () => {
@@ -140,6 +146,22 @@ describe("SessionsService", () => {
           groups: { select: { id: true, name: true } },
         },
       });
+    });
+
+    it("filters a staff schedule in the database", async () => {
+      sFindMany.mockResolvedValue([]);
+      aGroupBy.mockResolvedValue([]);
+
+      await svc.list({ tenantId: ids.tenant, staffUserId: "staff-1" });
+
+      expect(sFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            tenantId: ids.tenant,
+            assignments: { some: { userId: "staff-1" } },
+          },
+        }),
+      );
     });
   });
 
@@ -298,11 +320,7 @@ describe("SessionsService", () => {
       });
       gFindMany.mockResolvedValue([]);
       await expect(
-        svc.update(
-          base.id,
-          { groupIds: [crossTenantGroupId] },
-          ids.tenant,
-        ),
+        svc.update(base.id, { groupIds: [crossTenantGroupId] }, ids.tenant),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

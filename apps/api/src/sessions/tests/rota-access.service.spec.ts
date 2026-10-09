@@ -15,6 +15,7 @@ describe("RotaAccessService", () => {
   let orgMembership: Lookup;
   let legacyOrgRole: Lookup;
   let fixedRole: Lookup;
+  let assignment: Lookup;
 
   beforeEach(async () => {
     jest.resetModules();
@@ -22,6 +23,7 @@ describe("RotaAccessService", () => {
     orgMembership = jest.fn().mockResolvedValue(null);
     legacyOrgRole = jest.fn().mockResolvedValue(null);
     fixedRole = jest.fn().mockResolvedValue(null);
+    assignment = jest.fn().mockResolvedValue(null);
     jest.doMock("@pathway/db", () => ({
       getSystemRoleId: (orgId: string, tenantId: string | null, key: string) =>
         `${orgId}:${tenantId ?? "org"}:${key}`,
@@ -32,6 +34,7 @@ describe("RotaAccessService", () => {
         orgMembership: { findFirst: orgMembership },
         userOrgRole: { findFirst: legacyOrgRole },
         userRoleAssignment: { findFirst: fixedRole },
+        assignment: { findFirst: assignment },
       },
     }));
     const module = await import("../rota-access.service");
@@ -78,5 +81,33 @@ describe("RotaAccessService", () => {
     expect(() =>
       rotaActorFromRequest({ authUserId: actor.userId }, actor.orgId, ""),
     ).toThrow("Active site and user required");
+  });
+
+  it("shows a session only to its assigned staff member or manager", async () => {
+    await expect(
+      service.assertSessionVisible(actor, "session-1"),
+    ).rejects.toMatchObject({
+      status: 404,
+    });
+    expect(assignment).toHaveBeenCalledWith({
+      where: {
+        sessionId: "session-1",
+        userId: actor.userId,
+        session: { tenantId: actor.tenantId },
+      },
+      select: { id: true },
+    });
+
+    assignment.mockResolvedValueOnce({ id: "assignment-1" });
+    await expect(
+      service.assertSessionVisible(actor, "session-1"),
+    ).resolves.toBeUndefined();
+
+    siteMembership.mockResolvedValue({ id: "site-admin" });
+    assignment.mockClear();
+    await expect(
+      service.assertSessionVisible(actor, "session-1"),
+    ).resolves.toBeUndefined();
+    expect(assignment).not.toHaveBeenCalled();
   });
 });

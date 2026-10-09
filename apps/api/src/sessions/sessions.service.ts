@@ -30,6 +30,7 @@ const WEEKDAY_ORDER: Weekday[] = [
 
 export interface SessionListFilters {
   tenantId: string;
+  staffUserId?: string;
   groupId?: string;
   /** overlap window start */
   from?: Date;
@@ -74,10 +75,14 @@ export class SessionsService {
   async list(filters: SessionListFilters) {
     const where: {
       tenantId: string;
+      assignments?: { some: { userId: string } };
       groups?: { some: { id: string } };
       AND?: Array<Record<string, unknown>>;
     } = { tenantId: filters.tenantId };
 
+    if (filters.staffUserId) {
+      where.assignments = { some: { userId: filters.staffUserId } };
+    }
     if (filters.groupId) where.groups = { some: { id: filters.groupId } };
 
     const andClauses: Array<Record<string, unknown>> = [];
@@ -205,7 +210,8 @@ export class SessionsService {
       });
       const found = new Set(groups.map((g) => g.id));
       const missing = groupIds.filter((id) => !found.has(id));
-      if (missing.length) throw new BadRequestException("group not found or wrong tenant");
+      if (missing.length)
+        throw new BadRequestException("group not found or wrong tenant");
     }
 
     try {
@@ -256,7 +262,8 @@ export class SessionsService {
     });
     const foundIds = new Set(groups.map((g) => g.id));
     const missing = parsed.groupIds.filter((id) => !foundIds.has(id));
-    if (missing.length) throw new BadRequestException("group not found or wrong tenant");
+    if (missing.length)
+      throw new BadRequestException("group not found or wrong tenant");
 
     const [sh, sm] = parsed.startTime.split(":").map(Number);
     const [eh, em] = parsed.endTime.split(":").map(Number);
@@ -305,10 +312,7 @@ export class SessionsService {
             const user = await prisma.user.findFirst({
               where: {
                 id: userId,
-                OR: [
-                  { tenantId },
-                  { siteMemberships: { some: { tenantId } } },
-                ],
+                OR: [{ tenantId }, { siteMemberships: { some: { tenantId } } }],
               },
               select: { id: true },
             });
@@ -338,7 +342,12 @@ export class SessionsService {
 
     const current = await prisma.session.findFirst({
       where: { id, tenantId },
-      select: { tenantId: true, startsAt: true, endsAt: true, groups: { select: { id: true } } },
+      select: {
+        tenantId: true,
+        startsAt: true,
+        endsAt: true,
+        groups: { select: { id: true } },
+      },
     });
     if (!current) throw new NotFoundException("Session not found");
 
@@ -350,7 +359,9 @@ export class SessionsService {
       changes.groupIds !== undefined
         ? (changes.groupIds ?? [])
         : changes.groupId !== undefined
-          ? (changes.groupId ? [changes.groupId] : [])
+          ? changes.groupId
+            ? [changes.groupId]
+            : []
           : undefined;
 
     if (groupIds && groupIds.length) {
@@ -360,7 +371,8 @@ export class SessionsService {
       });
       const found = new Set(groups.map((g) => g.id));
       const missing = groupIds.filter((id) => !found.has(id));
-      if (missing.length) throw new BadRequestException("group not found or wrong tenant");
+      if (missing.length)
+        throw new BadRequestException("group not found or wrong tenant");
     }
 
     const nextStarts = changes.startsAt ?? current.startsAt;
