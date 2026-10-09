@@ -11,6 +11,7 @@ export class ApiError extends Error {
 }
 
 type TokenGetter = () => Promise<string | null>;
+const TOKEN_WAIT_MS = 15_000;
 
 let tokenGetter: TokenGetter | null = null;
 let pendingToken: Promise<string | null> | null = null;
@@ -28,7 +29,7 @@ export function setApiTokenGetter(getter: TokenGetter | null): void {
   tokenGeneration += 1;
 }
 
-async function getCurrentToken(): Promise<string | null> {
+async function getCurrentToken(signal?: AbortSignal): Promise<string | null> {
   if (!tokenGetter) return null;
   if (!pendingToken) {
     const request = tokenGetter();
@@ -39,7 +40,30 @@ async function getCurrentToken(): Promise<string | null> {
       })
       .catch(() => undefined);
   }
-  return pendingToken;
+  const request = pendingToken;
+  const deadline = AbortSignal.timeout(TOKEN_WAIT_MS);
+  const waitSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
+  return new Promise<string | null>((resolve, reject) => {
+    const onAbort = () => {
+      if (pendingToken === request) pendingToken = null;
+      reject(waitSignal.reason);
+    };
+    if (waitSignal.aborted) {
+      onAbort();
+      return;
+    }
+    waitSignal.addEventListener("abort", onAbort, { once: true });
+    void request.then(
+      (token) => {
+        waitSignal.removeEventListener("abort", onAbort);
+        resolve(token);
+      },
+      (error: unknown) => {
+        waitSignal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 export async function apiErrorFromResponse(
@@ -93,7 +117,13 @@ export function createApiFetch(apiBaseUrl: string): typeof globalThis.fetch {
       init?.method ?? (input instanceof Request ? input.method : "GET")
     ).toUpperCase();
     const send = async (): Promise<Response> => {
-      const token = await getCurrentToken();
+      const signal =
+        method === "GET"
+          ? init?.signal
+            ? AbortSignal.any([init.signal, currentReads.signal])
+            : currentReads.signal
+          : (init?.signal ?? undefined);
+      const token = await getCurrentToken(signal);
       if (generation !== tokenGeneration) {
         throw new ApiError(
           "Your session changed. Please retry.",
@@ -116,12 +146,6 @@ export function createApiFetch(apiBaseUrl: string): typeof globalThis.fetch {
         }
         headers.set("Authorization", `Bearer ${token}`);
       }
-      const signal =
-        method === "GET"
-          ? init?.signal
-            ? AbortSignal.any([init.signal, currentReads.signal])
-            : currentReads.signal
-          : init?.signal;
       return globalThis.fetch(input, { ...init, headers, signal });
     };
 

@@ -44,6 +44,50 @@ async function run(): Promise<void> {
   assert.equal(tokenCalls, 1);
   assert.deepEqual(seen.slice(-2), ["Bearer shared", "Bearer shared"]);
 
+  const stalledToken = deferred<string | null>();
+  let recoveryCalls = 0;
+  setApiTokenGetter(() => {
+    recoveryCalls += 1;
+    return recoveryCalls === 1
+      ? stalledToken.promise
+      : Promise.resolve("recovered");
+  });
+  const cancelled = new AbortController();
+  const waitingForToken = apiFetch("http://api.test/stalled", {
+    signal: cancelled.signal,
+  });
+  cancelled.abort();
+  await assert.rejects(
+    Promise.race([
+      waitingForToken,
+      new Promise((_resolve, reject) =>
+        setTimeout(() => reject(new Error("Token wait did not cancel")), 100),
+      ),
+    ]),
+    (error: unknown) =>
+      error instanceof DOMException && error.name === "AbortError",
+  );
+  await apiFetch("http://api.test/recovered");
+  assert.equal(recoveryCalls, 2, "a stalled token must not block retry");
+  assert.equal(seen.at(-1), "Bearer recovered");
+  stalledToken.resolve("late-token");
+
+  const oldSiteToken = deferred<string | null>();
+  setApiTokenGetter(() => oldSiteToken.promise);
+  const oldSiteRead = apiFetch("http://api.test/old-site");
+  cancelApiReads();
+  await assert.rejects(
+    Promise.race([
+      oldSiteRead,
+      new Promise((_resolve, reject) =>
+        setTimeout(() => reject(new Error("Site switch did not cancel")), 100),
+      ),
+    ]),
+    (error: unknown) =>
+      error instanceof DOMException && error.name === "AbortError",
+  );
+  oldSiteToken.resolve("old-site-token");
+
   seen.length = 0;
   tokenCalls = 0;
   setApiTokenGetter(async () => {
