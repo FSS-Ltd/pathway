@@ -44,13 +44,15 @@ sessions and cannot express a student's repeating subject allocation.
    must not silently carry assignments to the wrong time.
 3. Publication copies period dates/name, year-band label, slot times/labels,
    weekday, and subject name/colour into versioned snapshot rows in one
-   transaction. Historical versions must not change when a schedule or
+   transaction. Set `publishedAt` only after every entry has been written;
+   an unsealed version is never returned to a family. After sealing, no entry
+   may be added, edited, or removed. Historical versions must not change when a schedule or
    subject is later edited. Store `publishedAt`, publishing actor, and an
    optional `withdrawnAt`/actor/reason; withdraw an issued version through an
    audited command rather than deleting its history. The newest publication
    for a child and period is the family view only while it is not withdrawn.
    Withdrawing it does not automatically reveal an older version; the Head
-   must explicitly republish or reinstate a suitable version.
+   must explicitly publish a new version.
 4. Use the existing `AcademicPeriod` as the term identity and its site-local
    date bounds. Do not copy Oasis's string term key or infer a term from a
    calendar date. Validate that the period belongs to the same academic year
