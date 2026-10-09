@@ -3,10 +3,12 @@
 import React from "react";
 import { StaffMessagingWorkspace } from "@/components/ace/messaging/staff-messaging-workspace";
 import { NoAccessCard } from "@/components/no-access-card";
+import { useAdminContext } from "@/lib/admin-context";
 import { useAdminAccess } from "@/lib/use-admin-access";
 
 export default function AceMessagesPage() {
   const access = useAdminAccess();
+  const { state } = useAdminContext();
 
   if (access.isLoading) {
     return (
@@ -34,6 +36,9 @@ export default function AceMessagesPage() {
       currentUserId={access.userId}
       canSend={access.permissions.includes("messaging.messages.send")}
       canCreate={access.permissions.includes("messaging.conversations.create")}
+      familyMessagingEnabled={
+        state.status === "ready" && state.snapshot.org.parentPortalEnabled
+      }
     />
   );
 }
