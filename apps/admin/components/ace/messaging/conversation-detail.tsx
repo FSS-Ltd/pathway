@@ -270,7 +270,7 @@ function MessageComposer({
       <label htmlFor={composerId} className="sr-only">
         Message
       </label>
-      <div className="flex items-end gap-3 rounded-[1.75rem] border border-border-strong bg-surface p-1.5 shadow-sm focus-within:ring-2 focus-within:ring-status-info">
+      <div className="flex items-end gap-3">
         <textarea
           id={composerId}
           value={messaging.draft}
@@ -289,7 +289,7 @@ function MessageComposer({
           maxLength={4000}
           rows={2}
           placeholder="Write a message"
-          className="max-h-40 min-h-11 flex-1 resize-none border-0 bg-transparent px-3 py-2 text-sm leading-6 text-text-primary outline-none placeholder:text-text-muted focus:ring-0"
+          className="max-h-40 min-h-11 min-w-0 flex-1 resize-none rounded-[1.375rem] border border-border-strong bg-surface px-4 py-2.5 text-sm leading-6 text-text-primary shadow-sm outline-none placeholder:text-text-muted focus:border-status-info focus:ring-2 focus:ring-status-info focus-visible:ring-offset-0"
         />
         <Button
           type="submit"
