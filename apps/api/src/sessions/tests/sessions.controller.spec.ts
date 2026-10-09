@@ -12,6 +12,7 @@ import { UpdateSessionDto } from "../dto/update-session.dto";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../../billing/entitlements-enforcement.service";
 import { RotaAccessService } from "../rota-access.service";
+import { FamilyTimetableService } from "../family-timetable.service";
 
 // Minimal shape used in tests (avoid importing Prisma types here)
 type LessonShape = {
@@ -28,6 +29,7 @@ interface SessionShape {
   startsAt: Date;
   endsAt: Date;
   title: string | null;
+  familyPublishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   groups: { id: string; name: string }[];
@@ -51,6 +53,7 @@ describe("SessionsController", () => {
     startsAt: new Date("2025-01-01T09:00:00Z"),
     endsAt: new Date("2025-01-01T10:00:00Z"),
     title: "Kids service",
+    familyPublishedAt: null,
     createdAt: new Date("2024-12-31T00:00:00Z"),
     updatedAt: new Date("2024-12-31T00:00:00Z"),
     groups: [{ id: "g1", name: "Kids" }],
@@ -115,6 +118,7 @@ describe("SessionsController", () => {
       .fn<Promise<void>, []>()
       .mockResolvedValue(undefined),
   };
+  const familyTimetable = { setPublication: jest.fn() };
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -130,6 +134,7 @@ describe("SessionsController", () => {
         { provide: SessionsService, useValue: serviceMock },
         { provide: StaffAttendanceService, useValue: staffAttendanceMock },
         { provide: RotaAccessService, useValue: rotaAccess },
+        { provide: FamilyTimetableService, useValue: familyTimetable },
         {
           provide: EntitlementsEnforcementService,
           useValue: enforcementMock,
@@ -361,7 +366,24 @@ describe("SessionsController", () => {
     await expect(
       controller.delete(baseSession.id, tenantId, orgId, staffRequest),
     ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      controller.publishForFamily(
+        baseSession.id,
+        tenantId,
+        orgId,
+        staffRequest,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(
+      controller.unpublishForFamily(
+        baseSession.id,
+        tenantId,
+        orgId,
+        staffRequest,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
     expect(serviceMock.create).not.toHaveBeenCalled();
     expect(serviceMock.update).not.toHaveBeenCalled();
+    expect(familyTimetable.setPublication).not.toHaveBeenCalled();
   });
 });

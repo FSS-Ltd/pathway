@@ -23,6 +23,7 @@ import { CurrentTenant, CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../billing/entitlements-enforcement.service";
 import { RotaAccessService, rotaActorFromRequest } from "./rota-access.service";
+import { FamilyTimetableService } from "./family-timetable.service";
 
 type AuthenticatedRequest = Request & {
   authUserId?: string;
@@ -55,6 +56,8 @@ export class SessionsController {
     @Inject(EntitlementsEnforcementService)
     private readonly enforcement: EntitlementsEnforcementService,
     @Inject(RotaAccessService) private readonly rotaAccess: RotaAccessService,
+    @Inject(FamilyTimetableService)
+    private readonly familyTimetable: FamilyTimetableService,
   ) {}
 
   @Get()
@@ -177,6 +180,44 @@ export class SessionsController {
       rotaActorFromRequest(req, orgId, tenantId),
     );
     return this.svc.delete(id, tenantId);
+  }
+
+  @Post(":id/family-publication")
+  @UseGuards(AuthUserGuard)
+  async publishForFamily(
+    @Param("id") id: string,
+    @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
+    await this.rotaAccess.assertManager(actor);
+    return this.familyTimetable.setPublication(
+      id,
+      tenantId,
+      orgId,
+      actor.userId,
+      true,
+    );
+  }
+
+  @Delete(":id/family-publication")
+  @UseGuards(AuthUserGuard)
+  async unpublishForFamily(
+    @Param("id") id: string,
+    @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
+    await this.rotaAccess.assertManager(actor);
+    return this.familyTimetable.setPublication(
+      id,
+      tenantId,
+      orgId,
+      actor.userId,
+      false,
+    );
   }
 
   @Get(":id/staff-attendance")

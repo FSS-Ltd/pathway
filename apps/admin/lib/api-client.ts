@@ -50,6 +50,7 @@ export type AdminRelatedConcernMeta = {
 
 export type AdminSessionRow = {
   id: string;
+  familyPublishedAt?: string | null;
   title: string;
   startsAt: string;
   endsAt: string;
@@ -226,7 +227,6 @@ export type MyNextHandoverResponse =
   | MyNextHandoverAvailable;
 
 export type HandoverLogStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
-
 
 // ANNOUNCEMENTS FORMS (CreateAnnouncementDto / UpdateAnnouncementDto subset)
 export type AdminAnnouncementFormValues = {
@@ -737,7 +737,10 @@ export async function fetchAceDashboard(
     signal: input.signal,
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(response, "Unable to load the ACE overview.");
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to load the ACE overview.",
+    );
   }
   return response.json() as Promise<AceDashboardResponse>;
 }
@@ -828,7 +831,9 @@ export async function createAcademicYear(
   input: CreateAdminAcademicYearInput,
 ): Promise<AdminAcademicYear> {
   if (isUsingMockApi()) {
-    throw new Error("Academic calendar updates are not available in mock mode.");
+    throw new Error(
+      "Academic calendar updates are not available in mock mode.",
+    );
   }
   const response = await fetch(`${API_BASE_URL}/ace/academic-years`, {
     method: "POST",
@@ -841,22 +846,26 @@ export async function createAcademicYear(
   return response.json() as Promise<AdminAcademicYear>;
 }
 
-async function academicCalendarRequestError(response: Response): Promise<Error> {
+async function academicCalendarRequestError(
+  response: Response,
+): Promise<Error> {
   const fallback = `Academic calendar request failed: ${response.status}`;
-  const body = await response.json().catch(() => null) as unknown;
+  const body = (await response.json().catch(() => null)) as unknown;
   if (typeof body === "object" && body !== null && "message" in body) {
     const message = body.message;
-    if (typeof message === "string" && message.trim()) return new Error(message);
+    if (typeof message === "string" && message.trim())
+      return new Error(message);
   }
   return new Error(fallback);
 }
 
 async function studentSubjectsRequestError(response: Response): Promise<Error> {
   const fallback = `Subject placement request failed: ${response.status}`;
-  const body = await response.json().catch(() => null) as unknown;
+  const body = (await response.json().catch(() => null)) as unknown;
   if (typeof body === "object" && body !== null && "message" in body) {
     const { message } = body;
-    if (typeof message === "string" && message.trim()) return new Error(message);
+    if (typeof message === "string" && message.trim())
+      return new Error(message);
   }
   return new Error(fallback);
 }
@@ -1311,11 +1320,7 @@ async function behaviourRequestError(
       : "";
   const code =
     "code" in body && typeof body.code === "string" ? body.code : undefined;
-  return new AdminBehaviourApiError(
-    message || fallback,
-    response.status,
-    code,
-  );
+  return new AdminBehaviourApiError(message || fallback, response.status, code);
 }
 
 /** Get current user id from API (when session.user.id is missing). */
@@ -1361,7 +1366,10 @@ export async function fetchActiveSiteState(): Promise<ActiveSiteState> {
     credentials: "include",
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(response, "Unable to load available sites.");
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to load available sites.",
+    );
   }
   return (await response.json()) as ActiveSiteState;
 }
@@ -1425,7 +1433,10 @@ export async function fetchOrgCapabilities(
     cache: "no-store",
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(response, "Unable to load enabled features.");
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to load enabled features.",
+    );
   }
   const json = (await response.json()) as { capabilities: string[] };
   return json.capabilities ?? [];
@@ -1443,7 +1454,10 @@ export async function fetchMyPermissions(
     cache: "no-store",
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(response, "Unable to load your permissions.");
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to load your permissions.",
+    );
   }
   const json = (await response.json()) as { permissions: string[] };
   return json.permissions ?? [];
@@ -1466,11 +1480,14 @@ export async function fetchAuthDebugContext(): Promise<{
   dbSiteMemberships: Array<{ tenantId: string; role: string }>;
   dbOrgMemberships: Array<{ orgId: string; role: string }>;
 }> {
-  const response = await fetch(`${API_BASE_URL}/auth/active-site/debug-context`, {
-    method: "GET",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/auth/active-site/debug-context`,
+    {
+      method: "GET",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+    },
+  );
   if (!response.ok) {
     throw new Error(`Failed to fetch debug context: ${response.status}`);
   }
@@ -1512,14 +1529,19 @@ export type AdminPublicSignupLink = {
  */
 export async function fetchPublicSignupLinkForCurrentSite(): Promise<AdminPublicSignupLink> {
   if (isUsingMockApi()) {
-    throw new Error("Parent signup QR requires the real API; disable mock API to use this feature.");
+    throw new Error(
+      "Parent signup QR requires the real API; disable mock API to use this feature.",
+    );
   }
-  const res = await fetch(`${API_BASE_URL}/tenants/current/public-signup-link`, {
-    method: "GET",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/tenants/current/public-signup-link`,
+    {
+      method: "GET",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
   if (!res.ok) {
     throw await apiErrorFromResponse(res, "Unable to load signup link.");
   }
@@ -1531,14 +1553,19 @@ export async function fetchPublicSignupLinkForCurrentSite(): Promise<AdminPublic
  */
 export async function rotatePublicSignupLinkForCurrentSite(): Promise<AdminPublicSignupLink> {
   if (isUsingMockApi()) {
-    throw new Error("Parent signup QR requires the real API; disable mock API to use this feature.");
+    throw new Error(
+      "Parent signup QR requires the real API; disable mock API to use this feature.",
+    );
   }
-  const res = await fetch(`${API_BASE_URL}/tenants/current/public-signup-link/rotate`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/tenants/current/public-signup-link/rotate`,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
   if (!res.ok) {
     throw await apiErrorFromResponse(res, "Unable to regenerate link.");
   }
@@ -1574,7 +1601,9 @@ export async function createGuestPassForCurrentSite(input: {
   consentConfirmed: boolean;
 }): Promise<GuestPassResult> {
   if (isUsingMockApi()) {
-    throw new Error("Guest pass requires the real API; disable mock API to use this feature.");
+    throw new Error(
+      "Guest pass requires the real API; disable mock API to use this feature.",
+    );
   }
   const res = await fetch(`${API_BASE_URL}/guest-pass/current`, {
     method: "POST",
@@ -1713,8 +1742,7 @@ export const mapApiAssignmentToAdminRow = (
     ? assignment.session.groups.map((g) => g.name).join(", ")
     : ((assignment.session as { group?: { name: string } })?.group?.name ??
       undefined);
-  const sessionGroupColor =
-    assignment.session?.groups?.[0]?.color ?? undefined;
+  const sessionGroupColor = assignment.session?.groups?.[0]?.color ?? undefined;
 
   return {
     id: assignment.id,
@@ -1839,6 +1867,7 @@ export async function fetchSessionsMock(): Promise<AdminSessionRow[]> {
 
 type ApiSessionDetail = {
   id: string;
+  familyPublishedAt?: string | null;
   title: string | null;
   startsAt: string;
   endsAt: string;
@@ -1885,6 +1914,7 @@ const mapApiSessionDetailToAdmin = (
   s: ApiSessionDetail,
 ): AdminSessionDetail & { groupId?: string | null; groupIds?: string[] } => ({
   id: s.id,
+  familyPublishedAt: s.familyPublishedAt ?? null,
   title: s.title ?? "Session",
   startsAt: s.startsAt,
   endsAt: s.endsAt,
@@ -2067,7 +2097,9 @@ export type ExportAttendanceParams = {
 };
 
 /** Triggers a CSV download for attendance export. Uses fetch + blob. */
-export async function exportAttendanceCsv(params: ExportAttendanceParams): Promise<void> {
+export async function exportAttendanceCsv(
+  params: ExportAttendanceParams,
+): Promise<void> {
   if (isUsingMockApi()) {
     throw new Error(
       "Cannot export attendance: API base URL is not set. Set NEXT_PUBLIC_API_URL.",
@@ -2091,7 +2123,9 @@ export async function exportAttendanceCsv(params: ExportAttendanceParams): Promi
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Failed to export attendance: ${res.status} ${body || res.statusText}`);
+    throw new Error(
+      `Failed to export attendance: ${res.status} ${body || res.statusText}`,
+    );
   }
   const blob = await res.blob();
   const disposition = res.headers.get("Content-Disposition");
@@ -2453,7 +2487,10 @@ export async function fetchAssignmentsForOrg(
         return acc;
       }, {});
     } else {
-      throw await apiErrorFromResponse(sessionsRes, "Unable to load the schedule window.");
+      throw await apiErrorFromResponse(
+        sessionsRes,
+        "Unable to load the schedule window.",
+      );
     }
   }
 
@@ -2499,7 +2536,8 @@ export async function fetchAssignmentsForOrg(
     },
   );
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load assignments.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load assignments.");
 
   const json = (await res.json()) as ApiAssignment[];
   const filtered = json.filter((assignment) => {
@@ -2740,8 +2778,10 @@ export async function fetchMySwapRequests(
       cache: "no-store",
     }),
   ]);
-  if (!fromRes.ok) throw await apiErrorFromResponse(fromRes, "Unable to load swap requests.");
-  if (!toRes.ok) throw await apiErrorFromResponse(toRes, "Unable to load swap requests.");
+  if (!fromRes.ok)
+    throw await apiErrorFromResponse(fromRes, "Unable to load swap requests.");
+  if (!toRes.ok)
+    throw await apiErrorFromResponse(toRes, "Unable to load swap requests.");
   const fromList = (await fromRes.json()) as AdminSwapRequestRow[];
   const toList = (await toRes.json()) as AdminSwapRequestRow[];
   const seen = new Set<string>();
@@ -2867,11 +2907,7 @@ const mapApiChildToAdmin = (c: ApiChild): AdminChildRow => ({
   preferredName: c.preferredName ?? null,
   ageGroup: c.ageGroupLabel ?? c.ageGroup ?? c.yearGroup ?? "-",
   primaryGroup:
-    c.group?.name ??
-    c.primaryGroupLabel ??
-    c.primaryGroup ??
-    c.groupId ??
-    "-",
+    c.group?.name ?? c.primaryGroupLabel ?? c.primaryGroup ?? c.groupId ?? "-",
   primaryGroupId: c.groupId ?? null,
   hasPhotoConsent: Boolean(c.hasPhotoConsent ?? c.photoConsent),
   hasAllergies: Array.isArray(c.allergies) && c.allergies.length > 0,
@@ -2887,11 +2923,7 @@ const mapApiChildDetailToAdmin = (c: ApiChildDetail): AdminChildDetail => ({
   preferredName: c.preferredName ?? null,
   ageGroupLabel: c.ageGroupLabel ?? c.ageGroup ?? c.yearGroup ?? null,
   primaryGroupLabel:
-    c.group?.name ??
-    c.primaryGroupLabel ??
-    c.primaryGroup ??
-    c.groupId ??
-    null,
+    c.group?.name ?? c.primaryGroupLabel ?? c.primaryGroup ?? c.groupId ?? null,
   hasPhotoConsent: Boolean(c.hasPhotoConsent ?? c.photoConsent),
   hasAllergies: Array.isArray(c.allergies) && c.allergies.length > 0,
   hasAdditionalNeeds:
@@ -3186,7 +3218,10 @@ export async function inviteParentToChild(
     headers: buildAuthHeaders(),
     credentials: "include",
     cache: "no-store",
-    body: JSON.stringify({ email: email.trim(), name: name?.trim() || undefined }),
+    body: JSON.stringify({
+      email: email.trim(),
+      name: name?.trim() || undefined,
+    }),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -3408,16 +3443,19 @@ export async function linkChildrenExistingUser(
     return { success: true, linkedCount: childrenToCreate.length };
   }
 
-  const res = await fetch(`${API_BASE_URL}/parents/link-children-existing-user`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-    body: JSON.stringify({
-      inviteToken,
-      childrenToCreate,
-    }),
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/parents/link-children-existing-user`,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      body: JSON.stringify({
+        inviteToken,
+        childrenToCreate,
+      }),
+    },
+  );
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -4023,7 +4061,9 @@ type ApiReportBundle = {
   completedAt?: string | null;
 };
 
-const mapApiLearningSubjectToAdmin = (subject: ApiLearningSubject): AdminLearningSubject => ({
+const mapApiLearningSubjectToAdmin = (
+  subject: ApiLearningSubject,
+): AdminLearningSubject => ({
   id: subject.id,
   name: subject.name,
   category: subject.category ?? null,
@@ -4032,7 +4072,9 @@ const mapApiLearningSubjectToAdmin = (subject: ApiLearningSubject): AdminLearnin
   sortOrder: subject.sortOrder ?? null,
 });
 
-const mapApiLearningLogToAdmin = (log: ApiLearningLog): AdminLearningLogRow => ({
+const mapApiLearningLogToAdmin = (
+  log: ApiLearningLog,
+): AdminLearningLogRow => ({
   id: log.id,
   childId: log.childId,
   subjectId: log.subjectId ?? null,
@@ -4043,7 +4085,9 @@ const mapApiLearningLogToAdmin = (log: ApiLearningLog): AdminLearningLogRow => (
   createdAt: log.createdAt,
 });
 
-const mapApiReportBundleToAdmin = (bundle: ApiReportBundle): AdminReportBundleRow => ({
+const mapApiReportBundleToAdmin = (
+  bundle: ApiReportBundle,
+): AdminReportBundleRow => ({
   id: bundle.id,
   childId: bundle.childId ?? null,
   periodStart: bundle.periodStart,
@@ -4055,7 +4099,10 @@ const mapApiReportBundleToAdmin = (bundle: ApiReportBundle): AdminReportBundleRo
   completedAt: bundle.completedAt ?? null,
 });
 
-async function learningRequest<T>(path: string, init?: RequestInit): Promise<T> {
+async function learningRequest<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/learning/${path}`, {
     ...init,
     headers: buildAuthHeaders(),
@@ -4063,7 +4110,9 @@ async function learningRequest<T>(path: string, init?: RequestInit): Promise<T> 
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`Learning request failed (${response.status}): ${body || response.statusText}`);
+    throw new Error(
+      `Learning request failed (${response.status}): ${body || response.statusText}`,
+    );
   }
   return response.json() as Promise<T>;
 }
@@ -4075,7 +4124,13 @@ export async function fetchLearningSubjects(): Promise<AdminLearningSubject[]> {
 }
 
 export async function createLearningSubject(
-  input: Pick<AdminLearningSubject, "name"> & Partial<Pick<AdminLearningSubject, "category" | "color" | "isActive" | "sortOrder">>,
+  input: Pick<AdminLearningSubject, "name"> &
+    Partial<
+      Pick<
+        AdminLearningSubject,
+        "category" | "color" | "isActive" | "sortOrder"
+      >
+    >,
 ): Promise<AdminLearningSubject> {
   const subject = await learningRequest<ApiLearningSubject>("subjects", {
     method: "POST",
@@ -4096,7 +4151,9 @@ export async function fetchLearningLogs(): Promise<AdminLearningLogRow[]> {
   return logs.map(mapApiLearningLogToAdmin);
 }
 
-export async function createLearningLog(input: AdminLearningLogInput): Promise<AdminLearningLogRow> {
+export async function createLearningLog(
+  input: AdminLearningLogInput,
+): Promise<AdminLearningLogRow> {
   const log = await learningRequest<ApiLearningLog>("logs", {
     method: "POST",
     body: JSON.stringify({
@@ -4117,7 +4174,9 @@ export async function fetchReportBundles(): Promise<AdminReportBundleRow[]> {
   return bundles.map(mapApiReportBundleToAdmin);
 }
 
-export async function createReportBundle(input: AdminReportBundleInput): Promise<AdminReportBundleRow> {
+export async function createReportBundle(
+  input: AdminReportBundleInput,
+): Promise<AdminReportBundleRow> {
   const bundle = await learningRequest<ApiReportBundle>("report-bundles", {
     method: "POST",
     body: JSON.stringify({
@@ -4130,13 +4189,18 @@ export async function createReportBundle(input: AdminReportBundleInput): Promise
 }
 
 export async function downloadReportBundle(bundleId: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/learning/report-bundles/${encodeURIComponent(bundleId)}/download`, {
-    headers: buildAuthHeaders(),
-    cache: "no-store",
-  });
+  const response = await fetch(
+    `${API_BASE_URL}/learning/report-bundles/${encodeURIComponent(bundleId)}/download`,
+    {
+      headers: buildAuthHeaders(),
+      cache: "no-store",
+    },
+  );
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(`Failed to download report bundle (${response.status}): ${body || response.statusText}`);
+    throw new Error(
+      `Failed to download report bundle (${response.status}): ${body || response.statusText}`,
+    );
   }
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
@@ -4297,8 +4361,18 @@ export async function fetchAttendanceDetailBySessionId(
       roomLabel: "Room 12",
       ageGroupLabel: "Year 3",
       rows: [
-        { attendanceId: "a1", childId: "c1", childName: "Amara Patel", status: "present" },
-        { attendanceId: "a2", childId: "c2", childName: "Leo Williams", status: "absent" },
+        {
+          attendanceId: "a1",
+          childId: "c1",
+          childName: "Amara Patel",
+          status: "present",
+        },
+        {
+          attendanceId: "a2",
+          childId: "c2",
+          childName: "Leo Williams",
+          status: "absent",
+        },
       ],
       summary: { present: 1, absent: 1, late: 0, unknown: 0 },
       status: "in_progress",
@@ -4475,7 +4549,8 @@ export async function fetchOpenConcerns(): Promise<AdminConcernRow[]> {
     cache: "no-store",
   });
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load concerns.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load concerns.");
 
   const json = (await res.json()) as ApiConcern[];
 
@@ -4602,7 +4677,8 @@ export async function fetchNotesSummary(): Promise<AdminNotesSummary> {
     cache: "no-store",
   });
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load notes summary.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load notes summary.");
 
   const notes = (await res.json()) as ApiNote[];
   const totalNotes = notes.length;
@@ -5716,7 +5792,13 @@ export async function fetchStaffProfile(): Promise<StaffProfileDetail> {
         },
       ],
       children: [
-        { id: "c1", firstName: "Sam", lastName: "Morgan", preferredName: "Sammy", group: { name: "Year 3" } },
+        {
+          id: "c1",
+          firstName: "Sam",
+          lastName: "Morgan",
+          preferredName: "Sammy",
+          group: { name: "Year 3" },
+        },
       ],
     };
   }
@@ -5897,7 +5979,9 @@ export async function fetchHandoverForSession(
   );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`Failed to fetch handover for session: ${res.status} ${body}`);
+    throw new Error(
+      `Failed to fetch handover for session: ${res.status} ${body}`,
+    );
   }
   return (await res.json()) as HandoverForSessionResponse;
 }
@@ -5918,10 +6002,13 @@ export async function fetchHandoverById(
   if (isUsingMockApi()) {
     throw new Error("Handover detail requires real API.");
   }
-  const res = await fetch(`${API_BASE_URL}/handover/${encodeURIComponent(id)}`, {
-    headers: buildAuthHeaders(),
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/handover/${encodeURIComponent(id)}`,
+    {
+      headers: buildAuthHeaders(),
+      cache: "no-store",
+    },
+  );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to fetch handover: ${res.status} ${body}`);
@@ -6015,12 +6102,15 @@ export async function fetchAdminHandoverDetail(
     throw new Error("Handover admin detail requires real API.");
   }
 
-  const res = await fetch(`${API_BASE_URL}/admin/handover/${encodeURIComponent(id)}`, {
-    method: "GET",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/admin/handover/${encodeURIComponent(id)}`,
+    {
+      method: "GET",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -6090,9 +6180,7 @@ export async function approveAdminHandover(
     throw new Error(
       res.status === 403
         ? "You don’t have permission to approve this handover. (403)"
-        : `Failed to approve handover: ${res.status}${
-            body ? ` ${body}` : ""
-          }`,
+        : `Failed to approve handover: ${res.status}${body ? ` ${body}` : ""}`,
     );
   }
 
@@ -6125,9 +6213,7 @@ export async function rejectAdminHandover(
     throw new Error(
       res.status === 403
         ? "You don’t have permission to reject this handover. (403)"
-        : `Failed to reject handover: ${res.status}${
-            body ? ` ${body}` : ""
-          }`,
+        : `Failed to reject handover: ${res.status}${body ? ` ${body}` : ""}`,
     );
   }
 
@@ -6176,11 +6262,14 @@ export async function updateHandover(
   if (isUsingMockApi()) {
     return { id, status: payload.status ?? "DRAFT" };
   }
-  const res = await fetch(`${API_BASE_URL}/handover/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    headers: buildAuthHeaders(),
-    body: JSON.stringify(payload),
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/handover/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: buildAuthHeaders(),
+      body: JSON.stringify(payload),
+    },
+  );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to update handover: ${res.status} ${body}`);
@@ -6478,7 +6567,8 @@ export async function fetchDeletedPeopleForOrg(
     cache: "no-store",
   });
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load deleted people.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load deleted people.");
 
   return (await res.json()) as DeletedPersonRow[];
 }
@@ -6496,7 +6586,8 @@ export async function deletePersonFromOrg(
     cache: "no-store",
   });
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to remove this person.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to remove this person.");
 
   return (await res.json()) as DeletedPersonRow;
 }
@@ -6518,7 +6609,8 @@ export async function fetchInvitesForOrg(
     cache: "no-store",
   });
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load invitations.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load invitations.");
 
   return (await res.json()) as InviteRow[];
 }
@@ -6559,7 +6651,8 @@ export async function resendInvite(
     },
   );
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to resend invitation.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to resend invitation.");
 
   return (await res.json()) as InviteRow;
 }
@@ -6579,7 +6672,8 @@ export async function revokeInvite(
     },
   );
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to revoke invitation.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to revoke invitation.");
 
   return (await res.json()) as InviteRow;
 }
@@ -6673,7 +6767,9 @@ export async function fetchBlogPostsAdmin(
   return res.json();
 }
 
-export async function fetchBlogPostAdmin(id: string): Promise<AdminBlogPost | null> {
+export async function fetchBlogPostAdmin(
+  id: string,
+): Promise<AdminBlogPost | null> {
   if (isUsingMockApi()) return null;
   const res = await fetch(`${API_BASE_URL}/admin/blog/posts/${id}`, {
     headers: buildAuthHeaders(),
@@ -6882,9 +6978,16 @@ export type AdminAccessSummary = {
 };
 
 /** Throws `Error("${code}:${message}")` when the API returns a coded error body. */
-async function throwCodedRoleApiError(res: Response, fallback: string): Promise<never> {
+async function throwCodedRoleApiError(
+  res: Response,
+  fallback: string,
+): Promise<never> {
   const body = await res.json().catch(() => null);
-  if (body && typeof body.code === "string" && typeof body.message === "string") {
+  if (
+    body &&
+    typeof body.code === "string" &&
+    typeof body.message === "string"
+  ) {
     throw new Error(`${body.code}:${body.message}`);
   }
   const text = await res.text().catch(() => "");
@@ -6914,7 +7017,8 @@ export async function fetchRoleAssignments(params?: {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load role assignments.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load role assignments.");
   return res.json();
 }
 
@@ -6938,12 +7042,16 @@ export async function assignRole(input: {
 export async function revokeRoleAssignment(
   assignmentId: string,
 ): Promise<AdminRoleAssignment> {
-  const res = await fetch(`${API_BASE_URL}/access/assignments/${assignmentId}`, {
-    method: "DELETE",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-  });
-  if (!res.ok) return throwCodedRoleApiError(res, "Failed to revoke role assignment");
+  const res = await fetch(
+    `${API_BASE_URL}/access/assignments/${assignmentId}`,
+    {
+      method: "DELETE",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+    },
+  );
+  if (!res.ok)
+    return throwCodedRoleApiError(res, "Failed to revoke role assignment");
   notifyAccessChanged();
   return res.json();
 }
@@ -6962,19 +7070,27 @@ export async function fetchEffectivePermissions(userId: string): Promise<{
       cache: "no-store",
     },
   );
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load effective permissions.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(
+      res,
+      "Unable to load effective permissions.",
+    );
   return res.json();
 }
 
 export async function fetchAccessSummary(
   userId: string,
 ): Promise<AdminAccessSummary> {
-  const res = await fetch(`${API_BASE_URL}/access/users/${userId}/access-summary`, {
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-  });
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load access summary.");
+  const res = await fetch(
+    `${API_BASE_URL}/access/users/${userId}/access-summary`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load access summary.");
   return res.json();
 }
 
@@ -6993,6 +7109,7 @@ export async function fetchAccessAuditEvents(params?: {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load audit events.");
+  if (!res.ok)
+    throw await apiErrorFromResponse(res, "Unable to load audit events.");
   return res.json();
 }

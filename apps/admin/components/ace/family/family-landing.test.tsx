@@ -88,6 +88,16 @@ async function run() {
       ],
     );
     assert.deepEqual(
+      Array.from(container.querySelectorAll("a[href*='/timetable']")).map(
+        (anchor) => anchor.getAttribute("href"),
+      ),
+      [
+        "/ace/parent/sites/school-one/children/child-one/timetable",
+        "/ace/parent/sites/school-one/children/child-three/timetable",
+        "/ace/student/sites/school-two/timetable",
+      ],
+    );
+    assert.deepEqual(
       Array.from(container.querySelectorAll('a[href$="/messages"]')).map(
         (anchor) => anchor.getAttribute("href"),
       ),

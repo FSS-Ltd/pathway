@@ -346,10 +346,14 @@ export class SessionsService {
         tenantId: true,
         startsAt: true,
         endsAt: true,
+        familyPublishedAt: true,
         groups: { select: { id: true } },
       },
     });
     if (!current) throw new NotFoundException("Session not found");
+    if (current.familyPublishedAt) {
+      throw new ConflictException("Unpublish this session before editing it");
+    }
 
     if (changes.tenantId && changes.tenantId !== tenantId) {
       throw new BadRequestException("tenantId must match current tenant");
@@ -404,12 +408,15 @@ export class SessionsService {
   }
 
   async delete(id: string, tenantId: string) {
+    const existing = await prisma.session.findFirst({
+      where: { id, tenantId },
+      select: { id: true, familyPublishedAt: true },
+    });
+    if (!existing) throw new NotFoundException("Session not found");
+    if (existing.familyPublishedAt) {
+      throw new ConflictException("Unpublish this session before deleting it");
+    }
     try {
-      const existing = await prisma.session.findFirst({
-        where: { id, tenantId },
-        select: { id: true },
-      });
-      if (!existing) throw new NotFoundException("Session not found");
       await prisma.session.delete({ where: { id } });
       return { id };
     } catch (e) {
