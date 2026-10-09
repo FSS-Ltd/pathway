@@ -147,6 +147,59 @@ describe("Swaps (e2e)", () => {
     });
   });
 
+  it("binds staff requests to the requester and recipient", async () => {
+    if (!app || !isDatabaseAvailable()) return;
+    const requester = await seedE2eAuthUser({
+      subject: `swap-requester-${randomUUID()}`,
+      userId: ids.userFrom,
+      tenantId,
+      siteRole: "STAFF",
+    });
+    const recipient = await seedE2eAuthUser({
+      subject: `swap-recipient-${randomUUID()}`,
+      userId: ids.userTo,
+      tenantId,
+      siteRole: "STAFF",
+    });
+    try {
+      const impersonation = await request(app.getHttpServer())
+        .post("/swaps")
+        .set("Authorization", recipient.authorization)
+        .send({
+          assignmentId: ids.assignment,
+          fromUserId: ids.userFrom,
+          toUserId: ids.userTo,
+        });
+      expect(impersonation.status).toBe(403);
+
+      const created = await request(app.getHttpServer())
+        .post("/swaps")
+        .set("Authorization", requester.authorization)
+        .send({
+          assignmentId: ids.assignment,
+          fromUserId: ids.userFrom,
+          toUserId: ids.userTo,
+        });
+      expect(created.status).toBe(201);
+
+      const accepted = await request(app.getHttpServer())
+        .patch(`/swaps/${created.body.id}`)
+        .set("Authorization", recipient.authorization)
+        .send({ status: SwapStatus.ACCEPTED });
+      expect(accepted.status).toBe(200);
+      expect(accepted.body.status).toBe(SwapStatus.ACCEPTED);
+
+      const replay = await request(app.getHttpServer())
+        .patch(`/swaps/${created.body.id}`)
+        .set("Authorization", requester.authorization)
+        .send({ status: SwapStatus.CANCELLED });
+      expect(replay.status).toBe(409);
+    } finally {
+      await clearE2eAuthAccess(requester.userId);
+      await clearE2eAuthAccess(recipient.userId);
+    }
+  });
+
   it("GET /swaps/:id should return the created swap", async () => {
     if (!app || !isDatabaseAvailable()) return;
     const createRes = await request(app.getHttpServer())

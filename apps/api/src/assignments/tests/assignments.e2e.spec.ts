@@ -1,4 +1,5 @@
 import request from "supertest";
+import { randomUUID } from "node:crypto";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../../app.module";
@@ -280,5 +281,34 @@ describe("Assignments (e2e)", () => {
       .set("Authorization", authHeader);
 
     expect(res.status).toBe(404);
+  });
+
+  it("limits a staff member to their own assignments", async () => {
+    if (!app || !ids.user || !ids.assignment) return;
+    const staff = await seedE2eAuthUser({
+      subject: `assignments-staff-${randomUUID()}`,
+      userId: ids.user,
+      tenantId,
+      siteRole: "STAFF",
+    });
+    try {
+      const own = await request(app.getHttpServer())
+        .get(`/assignments/${ids.assignment}`)
+        .set("Authorization", staff.authorization);
+      expect(own.status).toBe(200);
+
+      const other = await request(app.getHttpServer())
+        .get(`/assignments/${ids.otherAssignment}`)
+        .set("Authorization", staff.authorization);
+      expect(other.status).toBe(404);
+
+      const create = await request(app.getHttpServer())
+        .post("/assignments")
+        .set("Authorization", staff.authorization)
+        .send({ sessionId: ids.session, userId: ids.user, role: Role.TEACHER });
+      expect(create.status).toBe(403);
+    } finally {
+      await clearE2eAuthAccess(staff.userId);
+    }
   });
 });

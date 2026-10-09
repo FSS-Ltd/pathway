@@ -1,7 +1,8 @@
 # ACE production release status
 
-Checked on 9 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `a2dd1f2acf6fb9674c38a05b375054302a7da3b8`.
+Checked on 9 October 2026. The last fully checked production API, admin, and
+web aliases pointed to READY deployments at merged app-code commit
+`a2dd1f2acf6fb9674c38a05b375054302a7da3b8`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through REL-17 are now served by all three apps.
@@ -353,6 +354,18 @@ in the checked one-hour window. A signed-in staff conversation loaded and its
 focused composer showed the blue ring directly on the text area border; no
 message was sent. Parent-to-staff production messaging remains gated by the
 school's guardian review and parent-portal activation.
+
+SEC-1 closes an actor boundary on the legacy rota endpoints before the ACE
+family/student timetable work. A site or organisation manager can administer
+assignments and swaps. Staff reads stay within their own assignments or swap
+participation; staff may change only their own assignment status, request
+their own swap, and decide a request only as its recipient or requester.
+Swap recipients must be active staff at the site, and competing decisions
+cannot both claim an open request. The present manager check uses existing
+fixed Head/Lead and administrator authority; a dedicated delegable rota tag
+is still to be designed. The family/student released-schedule journey remains
+open. Local E2E attempts found no database at `localhost:5433`, so the new
+HTTP persona cases require the PR's database-backed CI.
 
 ## Delivery steps
 

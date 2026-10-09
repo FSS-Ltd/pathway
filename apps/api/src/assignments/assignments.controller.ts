@@ -9,6 +9,9 @@ import {
   Query,
   Req,
   Inject,
+  ForbiddenException,
+  NotFoundException,
+  UseGuards,
 } from "@nestjs/common";
 import type { Request } from "express";
 import { AssignmentsService } from "./assignments.service";
@@ -24,15 +27,26 @@ import {
 import { AssignmentStatus, Role } from "@pathway/db";
 import { CurrentTenant, CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { UseGuards } from "@nestjs/common";
 import { EntitlementsEnforcementService } from "../billing/entitlements-enforcement.service";
+import {
+  RotaAccessService,
+  rotaActorFromRequest,
+} from "../sessions/rota-access.service";
+
+type AuthenticatedRequest = Request & {
+  authUserId?: string;
+  authIsSuperUser?: boolean;
+};
 
 @UseGuards(AuthUserGuard)
 @Controller("assignments")
 export class AssignmentsController {
   constructor(
-    @Inject(AssignmentsService) private readonly assignmentsService: AssignmentsService,
-    @Inject(EntitlementsEnforcementService) private readonly enforcement: EntitlementsEnforcementService,
+    @Inject(AssignmentsService)
+    private readonly assignmentsService: AssignmentsService,
+    @Inject(EntitlementsEnforcementService)
+    private readonly enforcement: EntitlementsEnforcementService,
+    @Inject(RotaAccessService) private readonly rotaAccess: RotaAccessService,
   ) {}
 
   @Post()
@@ -40,7 +54,11 @@ export class AssignmentsController {
     @Body() body: unknown,
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.rotaAccess.assertManager(
+      rotaActorFromRequest(req, orgId, tenantId),
+    );
     const dto: CreateAssignmentDto = createAssignmentDto.parse(body);
     const av30 = await this.enforcement.checkAv30ForOrg(orgId);
     this.enforcement.assertWithinHardCap(av30);
@@ -53,6 +71,8 @@ export class AssignmentsController {
     @Query()
     query: Record<string, unknown>,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
     const querySchema = z.object({
       sessionId: z.string().uuid().optional(),
@@ -64,11 +84,18 @@ export class AssignmentsController {
     });
 
     const filters = querySchema.parse(query);
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
+    const manager = await this.rotaAccess.canManage(actor);
+    if (!manager && filters.userId && filters.userId !== actor.userId) {
+      throw new ForbiddenException(
+        "Rota access is limited to your assignments",
+      );
+    }
 
     return this.assignmentsService.findAll({
       tenantId,
       ...(filters.sessionId ? { sessionId: filters.sessionId } : {}),
-      ...(filters.userId ? { userId: filters.userId } : {}),
+      userId: manager ? filters.userId : actor.userId,
       ...(filters.role ? { role: filters.role } : {}),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
@@ -80,10 +107,19 @@ export class AssignmentsController {
   async findOne(
     @Param("id") id: string,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
-    // validate id format
     z.string().uuid().parse(id);
-    return this.assignmentsService.findOne(id, tenantId);
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
+    const assignment = await this.assignmentsService.findOne(id, tenantId);
+    if (
+      assignment.userId !== actor.userId &&
+      !(await this.rotaAccess.canManage(actor))
+    ) {
+      throw new NotFoundException("Assignment not found");
+    }
+    return assignment;
   }
 
   @Patch(":id")
@@ -92,20 +128,43 @@ export class AssignmentsController {
     @Body() body: unknown,
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
-    @Req() req: Request & { authUserId?: string },
+    @Req() req: AuthenticatedRequest,
   ) {
     z.string().uuid().parse(id);
     const dto: UpdateAssignmentDto = updateAssignmentDto.parse(body);
-    const currentUserId = req.authUserId;
-    return this.assignmentsService.update(id, dto, tenantId, orgId, currentUserId);
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
+    const manager = await this.rotaAccess.canManage(actor);
+    if (!manager) {
+      if (!dto.status || dto.sessionId || dto.userId || dto.role) {
+        throw new ForbiddenException(
+          "Only your assignment status can be changed",
+        );
+      }
+      const assignment = await this.assignmentsService.findOne(id, tenantId);
+      if (assignment.userId !== actor.userId) {
+        throw new NotFoundException("Assignment not found");
+      }
+    }
+    return this.assignmentsService.update(
+      id,
+      dto,
+      tenantId,
+      orgId,
+      manager ? undefined : actor.userId,
+    );
   }
 
   @Delete(":id")
   async remove(
     @Param("id") id: string,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
     z.string().uuid().parse(id);
+    await this.rotaAccess.assertManager(
+      rotaActorFromRequest(req, orgId, tenantId),
+    );
     await this.assignmentsService.remove(id, tenantId);
     return { id, deleted: true };
   }
