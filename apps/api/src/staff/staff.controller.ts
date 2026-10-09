@@ -22,16 +22,23 @@ import { updateStaffDto } from "./dto/update-staff.dto";
 import { updateProfileDto } from "./dto/update-profile.dto";
 import { uploadAvatarDto } from "./dto/upload-avatar.dto";
 
-const forSessionAssignmentQuery = z.object({
-  groupId: z.string().uuid().optional(),
-  startsAt: z.string().min(1),
-  endsAt: z.string().min(1),
-});
+const forSessionAssignmentQuery = z
+  .object({
+    groupId: z.string().uuid().optional(),
+    startsAt: z.string().datetime({ offset: true }),
+    endsAt: z.string().datetime({ offset: true }),
+  })
+  .refine((value) => new Date(value.endsAt) > new Date(value.startsAt), {
+    message: "End time must be after start time",
+    path: ["endsAt"],
+  });
 
 @UseGuards(AuthUserGuard)
 @Controller("staff")
 export class StaffController {
-  constructor(@Inject(StaffService) private readonly staffService: StaffService) {}
+  constructor(
+    @Inject(StaffService) private readonly staffService: StaffService,
+  ) {}
 
   @Get("profile")
   async getProfile(
@@ -67,7 +74,12 @@ export class StaffController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.errors);
     }
-    return this.staffService.updateProfile(userId, tenantId, orgId, parsed.data);
+    return this.staffService.updateProfile(
+      userId,
+      tenantId,
+      orgId,
+      parsed.data,
+    );
   }
 
   @Get("profile/avatar")

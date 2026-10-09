@@ -2389,17 +2389,20 @@ model VolunteerPreference {
 }
 
 model StaffUnavailableDate {
-  id        String   @id @default(uuid())
-  userId    String
-  tenantId  String
-  date      DateTime @db.Date
-  reason    String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String
+  tenantId    String
+  date        DateTime @db.Date
+  startMinute Int      @default(0)
+  endMinute   Int      @default(1440)
+  reason      String?
+  createdAt   DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, tenantId, date])
+  @@unique([userId, tenantId, date, startMinute, endMinute], map: "StaffUnavailableDate_window_key")
+  @@index([tenantId, date])
   @@index([tenantId])
   @@index([userId])
 }

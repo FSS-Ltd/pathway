@@ -5668,6 +5668,13 @@ export async function fetchStaff(): Promise<AdminStaffRow[]> {
   return json.map(mapUserToStaffRow);
 }
 
+export type StaffUnavailableWindow = {
+  date: string;
+  startMinute: number;
+  endMinute: number;
+  reason?: string | null;
+};
+
 export type StaffEditDetail = {
   id: string;
   firstName: string | null;
@@ -5685,7 +5692,7 @@ export type StaffEditDetail = {
     startTime: string;
     endTime: string;
   }[];
-  unavailableDates: { date: string; reason: string | null }[];
+  unavailableDates: StaffUnavailableWindow[];
   preferredGroups: { id: string; name: string }[];
   canEditAvailability: boolean;
   hasServeAccess?: boolean;
@@ -5735,7 +5742,7 @@ export type StaffProfileUpdatePayload = {
     startTime: string;
     endTime: string;
   }[];
-  unavailableDates?: { date: string; reason?: string }[];
+  unavailableDates?: StaffUnavailableWindow[];
   preferredGroupIds?: string[];
 };
 
@@ -5751,7 +5758,7 @@ export type StaffEditUpdatePayload = {
     startTime: string;
     endTime: string;
   }[];
-  unavailableDates?: { date: string; reason?: string }[];
+  unavailableDates?: StaffUnavailableWindow[];
   preferredGroupIds?: string[];
 };
 

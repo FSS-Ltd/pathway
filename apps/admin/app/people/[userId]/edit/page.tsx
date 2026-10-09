@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, Card, Input, Label, Select } from "@pathway/ui";
+import { Button, Card, Input, Label, Select } from "@pathway/ui";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   fetchStaffDetailForEdit,
@@ -12,7 +12,9 @@ import {
   updateStaff,
   type StaffEditDetail,
   type StaffEditUpdatePayload,
+  type StaffUnavailableWindow,
 } from "@/lib/api-client";
+import { UnavailableWindowEditor } from "@/components/staff/unavailable-window-editor";
 import { toast } from "sonner";
 
 const WEEKDAYS: { value: string; label: string }[] = [
@@ -39,7 +41,9 @@ export default function EditStaffPage() {
   const userId = params.userId;
 
   const [staff, setStaff] = React.useState<StaffEditDetail | null>(null);
-  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>([]);
+  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -53,12 +57,11 @@ export default function EditStaffPage() {
     AvailabilityRange[]
   >([]);
   const [unavailableDates, setUnavailableDates] = React.useState<
-    { date: string; reason?: string }[]
+    StaffUnavailableWindow[]
   >([]);
   const [preferredGroupIds, setPreferredGroupIds] = React.useState<string[]>(
     [],
   );
-  const [newUnavailableDate, setNewUnavailableDate] = React.useState("");
   const [validationErrors, setValidationErrors] = React.useState<
     Record<string, string>
   >({});
@@ -91,6 +94,8 @@ export default function EditStaffPage() {
         setUnavailableDates(
           staffData.unavailableDates.map((u) => ({
             date: u.date,
+            startMinute: u.startMinute ?? 0,
+            endMinute: u.endMinute ?? 1440,
             reason: u.reason ?? undefined,
           })),
         );
@@ -124,26 +129,12 @@ export default function EditStaffPage() {
     value: string,
   ) => {
     setWeeklyAvailability((prev) =>
-      prev.map((r, i) =>
-        i === index ? { ...r, [field]: value } : r,
-      ),
+      prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)),
     );
   };
 
   const removeAvailabilityRange = (index: number) => {
     setWeeklyAvailability((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const addUnavailableDate = () => {
-    const date = newUnavailableDate.trim();
-    if (!date) return;
-    if (unavailableDates.some((u) => u.date === date)) return;
-    setUnavailableDates((prev) => [...prev, { date }]);
-    setNewUnavailableDate("");
-  };
-
-  const removeUnavailableDate = (date: string) => {
-    setUnavailableDates((prev) => prev.filter((u) => u.date !== date));
   };
 
   const togglePreferredGroup = (groupId: string) => {
@@ -166,14 +157,17 @@ export default function EditStaffPage() {
     }
     const dayRanges = new Map<string, { start: number; end: number }[]>();
     for (const r of weeklyAvailability) {
-      const startM = parseInt(r.startTime.slice(0, 2), 10) * 60 + parseInt(r.startTime.slice(3), 10);
-      const endM = parseInt(r.endTime.slice(0, 2), 10) * 60 + parseInt(r.endTime.slice(3), 10);
+      const startM =
+        parseInt(r.startTime.slice(0, 2), 10) * 60 +
+        parseInt(r.startTime.slice(3), 10);
+      const endM =
+        parseInt(r.endTime.slice(0, 2), 10) * 60 +
+        parseInt(r.endTime.slice(3), 10);
       const existing = dayRanges.get(r.day) ?? [];
-      const overlaps = existing.some(
-        (o) => startM < o.end && endM > o.start,
-      );
+      const overlaps = existing.some((o) => startM < o.end && endM > o.start);
       if (overlaps) {
-        errs[`overlap-${r.day}`] = `Overlapping ranges for ${WEEKDAYS.find((w) => w.value === r.day)?.label ?? r.day}`;
+        errs[`overlap-${r.day}`] =
+          `Overlapping ranges for ${WEEKDAYS.find((w) => w.value === r.day)?.label ?? r.day}`;
       }
       existing.push({ start: startM, end: endM });
       dayRanges.set(r.day, existing);
@@ -210,9 +204,7 @@ export default function EditStaffPage() {
       toast.success("Profile saved successfully");
       router.push(`/people/${userId}`);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save changes",
-      );
+      setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setIsSaving(false);
     }
@@ -222,7 +214,10 @@ export default function EditStaffPage() {
     return (
       <div className="flex flex-col gap-4">
         <Button asChild variant="secondary" size="sm">
-          <Link href={`/people/${userId}`} className="inline-flex items-center gap-2">
+          <Link
+            href={`/people/${userId}`}
+            className="inline-flex items-center gap-2"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back
           </Link>
@@ -278,7 +273,10 @@ export default function EditStaffPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Personal details" description="Basic information about this staff member">
+        <Card
+          title="Personal details"
+          description="Basic information about this staff member"
+        >
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -315,11 +313,11 @@ export default function EditStaffPage() {
               </Select>
             </div>
             <div className="flex items-center gap-2">
-                <Checkbox
-                  id="isActive"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                />
+              <Checkbox
+                id="isActive"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+              />
               <Label htmlFor="isActive">Active</Label>
             </div>
             {staff.email && (
@@ -417,54 +415,18 @@ export default function EditStaffPage() {
 
         <Card
           title="Date exceptions"
-          description="Specific dates when this staff member is unavailable"
+          description="Whole days or specific hours when this staff member is unavailable"
         >
           {!canEditAvailability ? (
             <p className="text-sm text-text-muted">
               Date exceptions are unavailable on this plan.
             </p>
           ) : (
-            <div className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  type="date"
-                  value={newUnavailableDate}
-                  onChange={(e) => setNewUnavailableDate(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={addUnavailableDate}
-                >
-                  Add
-                </Button>
-              </div>
-              <ul className="space-y-1">
-                {unavailableDates.map((u) => (
-                  <li
-                    key={u.date}
-                    className="flex items-center justify-between rounded border border-border-subtle px-3 py-2 text-sm"
-                  >
-                    <span>{u.date}</span>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => removeUnavailableDate(u.date)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              {unavailableDates.length === 0 && (
-                <p className="text-sm text-text-muted">
-                  No blocked dates. Add a date above to mark unavailability.
-                </p>
-              )}
-            </div>
+            <UnavailableWindowEditor
+              value={unavailableDates}
+              onChange={setUnavailableDates}
+              disabled={isSaving}
+            />
           )}
         </Card>
 
