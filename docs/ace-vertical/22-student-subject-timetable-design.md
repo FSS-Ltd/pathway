@@ -44,7 +44,9 @@ sessions and cannot express a student's repeating subject allocation.
    must not silently carry assignments to the wrong time.
 3. Publication copies period dates/name, year-band label, slot times/labels,
    weekday, and subject name/colour into versioned snapshot rows in one
-   transaction. Set `publishedAt` only after every entry has been written;
+   transaction. Store the draft version on each publication so a repeated
+   publish of the same saved version fails reliably, even when timestamps
+   fall in the same millisecond. Set `publishedAt` only after every entry has been written;
    an unsealed version is never returned to a family. After sealing, no entry
    may be added, edited, or removed. Historical versions must not change when a schedule or
    subject is later edited. Store `publishedAt`, publishing actor, and an
@@ -89,6 +91,19 @@ sessions and cannot express a student's repeating subject allocation.
   labels the two views clearly as **Subject timetable** and **Sessions**.
   It never merges an unpublished subject draft with published sessions.
 
+C07b2 Head routes use `/ace/subject-timetable` under the selected-site
+request context. `GET` and `PUT`
+`/periods/:periodId/year-bands/:yearBandId/schedule` read and save the slot
+schedule. The same prefix has a paged `/roster` read and
+`/children/:childId/draft` read/save. Draft saves send `scheduleUpdatedAt` and
+`expectedVersion`; a new draft uses version `0`. `POST`
+`/children/:childId/publish` requires the saved version, schedule revision,
+and an explicit unassigned-lesson acknowledgement. A Head can read an issued
+version at `/periods/:periodId/children/:childId/publications/:publicationId`
+and withdraw the latest version through `/periods/:periodId/children/:childId/withdraw`.
+Every route requires `ace.settings.manage`; a missing or cross-site record is
+not returned.
+
 ## Web journey and design direction
 
 The Head workspace starts with academic period and year band selection, then
@@ -112,7 +127,10 @@ matching Expo screens.
 
 - A stale draft save fails with a conflict and a reload path. Concurrent
   publication commands serialize on the child's period draft so the latest
-  version is deterministic. A schedule change cannot rewrite issued copies.
+  version is deterministic. While drafts exist, schedule edits preserve slot
+  identities and reject removal of a day with assignments; a changed slot
+  layout must first be reconciled explicitly. A schedule change cannot rewrite
+  issued copies.
 - Missing or ambiguous year-band enrolment blocks draft creation and
   publication. It must not be guessed from free-text `Child.yearGroup`.
   Deactivated subjects remain in issued snapshots; new drafts cannot select
