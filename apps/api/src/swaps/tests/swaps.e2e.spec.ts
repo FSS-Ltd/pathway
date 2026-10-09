@@ -162,6 +162,26 @@ describe("Swaps (e2e)", () => {
       siteRole: "STAFF",
     });
     try {
+      const candidates = await request(app.getHttpServer())
+        .get(`/swaps/candidates?assignmentId=${ids.assignment}`)
+        .set("Authorization", requester.authorization);
+      expect(candidates.status).toBe(200);
+      expect(candidates.body).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: ids.userTo, fullName: "To User" }),
+        ]),
+      );
+      expect(
+        candidates.body.some(
+          (person: { id: string }) => person.id === ids.userFrom,
+        ),
+      ).toBe(false);
+
+      const unrelated = await request(app.getHttpServer())
+        .get(`/swaps/candidates?assignmentId=${ids.assignment}`)
+        .set("Authorization", recipient.authorization);
+      expect(unrelated.status).toBe(404);
+
       const impersonation = await request(app.getHttpServer())
         .post("/swaps")
         .set("Authorization", recipient.authorization)
@@ -188,6 +208,11 @@ describe("Swaps (e2e)", () => {
         .send({ status: SwapStatus.ACCEPTED });
       expect(accepted.status).toBe(200);
       expect(accepted.body.status).toBe(SwapStatus.ACCEPTED);
+
+      const formerHolder = await request(app.getHttpServer())
+        .get(`/swaps/candidates?assignmentId=${ids.assignment}`)
+        .set("Authorization", requester.authorization);
+      expect(formerHolder.status).toBe(404);
 
       const replay = await request(app.getHttpServer())
         .patch(`/swaps/${created.body.id}`)

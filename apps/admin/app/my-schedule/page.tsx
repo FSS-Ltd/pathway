@@ -3,13 +3,14 @@
 import React from "react";
 import Link from "next/link";
 import { useAdminContext } from "@/lib/admin-context";
-import { Badge, Button, Card, Select } from "@pathway/ui";
+import { Button, Card, Select } from "@pathway/ui";
 import {
   AdminAssignmentRow,
   AdminSwapRequestRow,
+  SwapCandidate,
   fetchMyAssignments,
   fetchMySwapRequests,
-  fetchStaff,
+  fetchSwapCandidates,
   updateAssignmentStatus,
   createSwapRequest,
   acceptSwapRequest,
@@ -17,41 +18,8 @@ import {
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
 import { requestFailure, type RequestFailure } from "../../lib/request-error";
-
-const assignmentStatusCopy: Record<AdminAssignmentRow["status"], string> = {
-  pending: "Pending",
-  confirmed: "Accepted",
-  declined: "Declined",
-};
-
-const assignmentStatusTone: Record<
-  AdminAssignmentRow["status"],
-  "default" | "accent" | "warning" | "success"
-> = {
-  pending: "warning",
-  confirmed: "success",
-  declined: "default",
-};
-
-function formatTimeRange(startsAt?: string, endsAt?: string) {
-  if (!startsAt || !endsAt) return { date: "Unknown", range: "-" };
-  const start = new Date(startsAt);
-  const end = new Date(endsAt);
-  const date = start.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-  const startTime = start.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const endTime = end.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  return { date, range: `${startTime} - ${endTime}` };
-}
+import { SwapCandidateForm, SwapRequestList } from "./swap-panels";
+import { AssignmentList } from "./assignment-list";
 
 const addDays = (date: Date, days: number) => {
   const next = new Date(date);
@@ -85,17 +53,18 @@ export default function MySchedulePage() {
     [],
   );
   const [swaps, setSwaps] = React.useState<AdminSwapRequestRow[]>([]);
-  const [staff, setStaff] = React.useState<{ id: string; fullName: string }[]>(
-    [],
-  );
+  const [candidates, setCandidates] = React.useState<SwapCandidate[]>([]);
+  const [candidateLoading, setCandidateLoading] = React.useState(false);
+  const [candidateRevision, setCandidateRevision] = React.useState(0);
+  const loadSequence = React.useRef(0);
   const [loading, setLoading] = React.useState(true);
+  const [loadedScope, setLoadedScope] = React.useState<string | null>(null);
   const [loadError, setLoadError] = React.useState<RequestFailure | null>(null);
   const [actionError, setActionError] = React.useState<RequestFailure | null>(
     null,
   );
-  const [staffError, setStaffError] = React.useState<RequestFailure | null>(
-    null,
-  );
+  const [candidateError, setCandidateError] =
+    React.useState<RequestFailure | null>(null);
   const [swapFormAssignmentId, setSwapFormAssignmentId] = React.useState<
     string | null
   >(null);
@@ -106,17 +75,24 @@ export default function MySchedulePage() {
   );
   const userId =
     adminState.status === "ready" ? adminState.snapshot.userId : null;
+  const siteId =
+    adminState.status === "ready" ? adminState.snapshot.activeSiteId : null;
   const dateFrom = toLocalDateKey(weekStart);
   const dateTo = toLocalDateKey(addDays(weekStart, 6));
+  const scopeKey =
+    userId && siteId
+      ? `${userId}:${siteId}:${dateFrom}:${dateTo}:${statusFilter}`
+      : null;
+  const showingCurrentScope = loadedScope === scopeKey;
 
   const loadData = React.useCallback(async () => {
-    if (!userId) return;
+    if (!userId || !siteId || !scopeKey) return;
+    const sequence = ++loadSequence.current;
     setLoading(true);
     setLoadError(null);
     setActionError(null);
-    setStaffError(null);
     try {
-      const [assignmentsRes, swapsRes, staffRes] = await Promise.all([
+      const [assignmentsRes, swapsRes] = await Promise.all([
         fetchMyAssignments({
           userId,
           dateFrom,
@@ -124,30 +100,56 @@ export default function MySchedulePage() {
           status: statusFilter === "all" ? undefined : statusFilter,
         }),
         fetchMySwapRequests(userId),
-        fetchStaff().catch((cause: unknown) => {
-          setStaffError(
-            requestFailure(cause, "Unable to load staff for swaps."),
-          );
-          return [];
-        }),
       ]);
+      if (sequence !== loadSequence.current) return;
       setAssignments(assignmentsRes);
       setSwaps(swapsRes);
-      setStaff(staffRes.map((s) => ({ id: s.id, fullName: s.fullName })));
+      setLoadedScope(scopeKey);
     } catch (err) {
+      if (sequence !== loadSequence.current) return;
       setAssignments([]);
       setSwaps([]);
       setLoadError(requestFailure(err, "Unable to load your schedule."));
+      setLoadedScope(scopeKey);
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
-  }, [userId, dateFrom, dateTo, statusFilter]);
+  }, [userId, siteId, scopeKey, dateFrom, dateTo, statusFilter]);
 
   React.useEffect(() => {
-    if (userId) {
-      void loadData();
-    }
-  }, [userId, loadData]);
+    void loadData();
+    return () => {
+      loadSequence.current += 1;
+    };
+  }, [loadData]);
+
+  React.useEffect(() => {
+    setSwapFormAssignmentId(null);
+    setSwapToUserId("");
+  }, [siteId]);
+
+  React.useEffect(() => {
+    if (!swapFormAssignmentId || !siteId) return;
+    const controller = new AbortController();
+    setCandidateLoading(true);
+    setCandidateError(null);
+    setCandidates([]);
+    void fetchSwapCandidates(swapFormAssignmentId, controller.signal)
+      .then((loaded) => {
+        if (!controller.signal.aborted) setCandidates(loaded);
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) {
+          setCandidateError(
+            requestFailure(cause, "Unable to load staff for swaps."),
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCandidateLoading(false);
+      });
+    return () => controller.abort();
+  }, [swapFormAssignmentId, siteId, candidateRevision]);
 
   const handleAccept = async (assignmentId: string) => {
     setActionLoadingId(assignmentId);
@@ -221,16 +223,13 @@ export default function MySchedulePage() {
     }
   };
 
-  const inboundSwaps = swaps.filter(
-    (s) => s.toUserId === userId && s.status === "REQUESTED",
-  );
+  const inboundSwaps = swaps.filter((s) => s.toUserId === userId);
   const outboundSwaps = swaps.filter((s) => s.fromUserId === userId);
-  const staffOptions = staff.filter((s) => s.id !== userId);
 
   if (adminState.status === "unauthenticated") {
     return (
       <div className="flex flex-col gap-4">
-        <h1 className="text-2xl font-semibold text-text-primary font-heading">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary">
           My schedule
         </h1>
         <p className="text-sm text-text-muted">
@@ -287,6 +286,7 @@ export default function MySchedulePage() {
             <Button
               variant="secondary"
               size="sm"
+              aria-label="Previous week"
               onClick={() => setWeekStart((p) => addDays(p, -7))}
             >
               Previous
@@ -304,6 +304,7 @@ export default function MySchedulePage() {
             <Button
               variant="secondary"
               size="sm"
+              aria-label="Next week"
               onClick={() => setWeekStart((p) => addDays(p, 7))}
             >
               Next
@@ -324,12 +325,25 @@ export default function MySchedulePage() {
           </div>
         }
       >
-        {actionError ? (
+        {showingCurrentScope && actionError ? (
           <p role="alert" className="text-sm text-status-danger">
             {actionError.message}
           </p>
         ) : null}
-        {loadError ? (
+        {!showingCurrentScope || loading ? (
+          <div
+            role="status"
+            className="space-y-3"
+            aria-label="Loading schedule"
+          >
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-16 rounded-md bg-muted motion-safe:animate-pulse"
+              />
+            ))}
+          </div>
+        ) : loadError ? (
           <div className="flex flex-col gap-2 rounded-md bg-status-danger/5 p-4 text-sm text-status-danger">
             <span className="font-semibold">Schedule unavailable</span>
             <span>{loadError.message}</span>
@@ -337,205 +351,62 @@ export default function MySchedulePage() {
               Retry
             </Button>
           </div>
-        ) : loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 animate-pulse rounded-md bg-muted" />
-            ))}
-          </div>
         ) : assignments.length === 0 ? (
           <p className="text-sm text-text-muted">
             No assignments for this week. Check back later or pick another week.
           </p>
         ) : (
-          <ul className="space-y-3">
-            {assignments.map((a) => {
-              const { date, range } = formatTimeRange(a.startsAt, a.endsAt);
-              const isSwapForm = swapFormAssignmentId === a.id;
-              const isBusy = actionLoadingId === a.id;
-              return (
-                <li
-                  key={a.id}
-                  className={`flex flex-col gap-2 rounded-lg border-2 p-3 ${
-                    !a.sessionGroupColor
-                      ? "border-border-subtle bg-surface-alt"
-                      : ""
-                  }`}
-                  style={
-                    a.sessionGroupColor
-                      ? {
-                          borderColor: a.sessionGroupColor,
-                          backgroundColor: `${a.sessionGroupColor}15`,
-                        }
-                      : undefined
-                  }
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <span className="font-medium text-text-primary">
-                        {a.sessionGroupName ?? a.sessionTitle ?? "Session"}
-                      </span>
-                      <span className="ml-2 text-sm text-text-muted">
-                        {date} · {range}
-                      </span>
-                    </div>
-                    <Badge variant={assignmentStatusTone[a.status]}>
-                      {assignmentStatusCopy[a.status]}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {a.status === "pending" && (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleAccept(a.id)}
-                          disabled={isBusy}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDecline(a.id)}
-                          disabled={isBusy}
-                        >
-                          Decline
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleRequestSwap(a.id)}
-                        >
-                          Request swap
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  {isSwapForm && (
-                    <div className="mt-2 flex flex-wrap items-end gap-2 rounded-md border border-border-subtle bg-surface p-3">
-                      {staffError ? (
-                        <p
-                          role="alert"
-                          className="w-full text-sm text-status-danger"
-                        >
-                          {staffError.message}
-                        </p>
-                      ) : null}
-                      <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-text-muted">Swap with</span>
-                        <Select
-                          value={swapToUserId}
-                          onChange={(e) => setSwapToUserId(e.target.value)}
-                          className="min-w-[180px]"
-                          disabled={Boolean(staffError)}
-                        >
-                          <option value="">Select staff…</option>
-                          {staffOptions.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.fullName}
-                            </option>
-                          ))}
-                        </Select>
-                      </label>
-                      <Button
-                        size="sm"
-                        onClick={handleSwapSubmit}
-                        disabled={
-                          !swapToUserId || swapSubmitting || Boolean(staffError)
-                        }
-                      >
-                        Submit request
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setSwapFormAssignmentId(null);
-                          setSwapToUserId("");
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <AssignmentList
+            assignments={assignments}
+            activeSwapAssignmentId={swapFormAssignmentId}
+            busyAssignmentId={actionLoadingId}
+            onAccept={(id) => void handleAccept(id)}
+            onDecline={(id) => void handleDecline(id)}
+            onRequestSwap={handleRequestSwap}
+            swapForm={
+              <SwapCandidateForm
+                candidates={candidates}
+                error={candidateError}
+                loading={candidateLoading}
+                selectedUserId={swapToUserId}
+                submitting={swapSubmitting}
+                onCancel={() => {
+                  setSwapFormAssignmentId(null);
+                  setSwapToUserId("");
+                }}
+                onRetry={() => {
+                  setSwapToUserId("");
+                  setCandidateRevision((value) => value + 1);
+                }}
+                onSelect={setSwapToUserId}
+                onSubmit={() => void handleSwapSubmit()}
+              />
+            }
+          />
         )}
       </Card>
 
       <Card
         title="Swap requests"
-        description="Inbound requests you can accept or decline; outbound requests you sent."
+        description="Review requests from colleagues and track the requests you sent."
       >
-        {loadError ? (
+        {!showingCurrentScope || loading ? (
+          <div
+            role="status"
+            className="h-12 rounded-md bg-muted motion-safe:animate-pulse"
+          />
+        ) : loadError ? (
           <p role="alert" className="text-sm text-status-danger">
             Swap requests are unavailable. Retry the schedule above.
           </p>
-        ) : loading ? (
-          <div className="h-12 animate-pulse rounded-md bg-muted" />
-        ) : inboundSwaps.length === 0 && outboundSwaps.length === 0 ? (
-          <p className="text-sm text-text-muted">No swap requests right now.</p>
         ) : (
-          <div className="space-y-4">
-            {inboundSwaps.length > 0 && (
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-text-muted">
-                  Inbound
-                </h3>
-                <ul className="space-y-2">
-                  {inboundSwaps.map((s) => (
-                    <li
-                      key={s.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border-subtle bg-surface-alt p-2 text-sm"
-                    >
-                      <span className="text-text-primary">
-                        Assignment {s.assignmentId.slice(0, 8)}…
-                      </span>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleAcceptSwap(s.id)}
-                          disabled={actionLoadingId === s.id}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeclineSwap(s.id)}
-                          disabled={actionLoadingId === s.id}
-                        >
-                          Decline
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {outboundSwaps.length > 0 && (
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-text-muted">
-                  Outbound
-                </h3>
-                <ul className="space-y-2">
-                  {outboundSwaps.map((s) => (
-                    <li
-                      key={s.id}
-                      className="rounded-md border border-border-subtle bg-surface-alt p-2 text-sm text-text-primary"
-                    >
-                      Assignment {s.assignmentId.slice(0, 8)}… →{" "}
-                      <Badge variant="default">{s.status}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
+          <SwapRequestList
+            inbound={inboundSwaps}
+            outbound={outboundSwaps}
+            actionLoadingId={actionLoadingId}
+            onAccept={(id) => void handleAcceptSwap(id)}
+            onDecline={(id) => void handleDeclineSwap(id)}
+          />
         )}
       </Card>
     </div>

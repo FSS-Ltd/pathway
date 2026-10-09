@@ -6,6 +6,8 @@ import {
 } from "@nestjs/common";
 import {
   prisma,
+  type Prisma,
+  AssignmentStatus,
   Role,
   SiteRole,
   SwapStatus,
@@ -21,9 +23,9 @@ const staffRoles = [
   Role.SUPPORT,
 ];
 
-function staffAtSite(userId: string, tenantId: string) {
+function staffAtSite(tenantId: string, userId?: string): Prisma.UserWhereInput {
   return {
-    id: userId,
+    ...(userId ? { id: userId } : {}),
     isActive: true,
     OR: [
       {
@@ -58,15 +60,15 @@ export class SwapsService {
     const [assignment, fromUser, toUser] = await Promise.all([
       prisma.assignment.findFirst({
         where: { id: dto.assignmentId, session: { tenantId } },
-        select: { id: true, userId: true },
+        select: { id: true, userId: true, status: true },
       }),
       prisma.user.findFirst({
-        where: staffAtSite(dto.fromUserId, tenantId),
+        where: staffAtSite(tenantId, dto.fromUserId),
         select: { id: true },
       }),
       dto.toUserId
         ? prisma.user.findFirst({
-            where: staffAtSite(dto.toUserId, tenantId),
+            where: staffAtSite(tenantId, dto.toUserId),
             select: { id: true },
           })
         : Promise.resolve(null),
@@ -75,6 +77,9 @@ export class SwapsService {
     if (!assignment) throw new NotFoundException("Assignment not found");
     if (assignment.userId !== dto.fromUserId) {
       throw new BadRequestException("Requester must hold the assignment");
+    }
+    if (assignment.status === AssignmentStatus.DECLINED) {
+      throw new BadRequestException("A declined assignment cannot be swapped");
     }
     if (!fromUser) throw new NotFoundException("fromUser not found");
     if (dto.toUserId && !toUser)
@@ -88,6 +93,46 @@ export class SwapsService {
         status: dto.status ?? SwapStatus.REQUESTED,
       },
     });
+  }
+
+  /** Only the assignment holder can discover active staff at its site for a swap. */
+  async findCandidates(assignmentId: string, userId: string, tenantId: string) {
+    const assignment = await prisma.assignment.findFirst({
+      where: { id: assignmentId, userId, session: { tenantId } },
+      select: { sessionId: true, status: true },
+    });
+    if (!assignment || assignment.status === AssignmentStatus.DECLINED) {
+      throw new NotFoundException("Assignment not found");
+    }
+
+    const [assignedStaff, staff] = await Promise.all([
+      prisma.assignment.findMany({
+        where: { sessionId: assignment.sessionId },
+        select: { userId: true },
+      }),
+      prisma.user.findMany({
+        where: staffAtSite(tenantId),
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          name: true,
+          displayName: true,
+        },
+      }),
+    ]);
+    const assignedIds = new Set(assignedStaff.map((row) => row.userId));
+    return staff
+      .filter((person) => person.id !== userId && !assignedIds.has(person.id))
+      .map((person) => ({
+        id: person.id,
+        fullName:
+          [person.firstName, person.lastName].filter(Boolean).join(" ") ||
+          person.displayName ||
+          person.name ||
+          "Staff member",
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
   }
 
   /**
@@ -118,6 +163,17 @@ export class SwapsService {
         assignment: { session: { tenantId: filter.tenantId } },
       },
       orderBy: { createdAt: "desc" },
+      include: {
+        assignment: {
+          select: {
+            session: {
+              select: { title: true, startsAt: true, endsAt: true },
+            },
+          },
+        },
+        fromUser: { select: { name: true } },
+        toUser: { select: { name: true } },
+      },
     });
   }
 
@@ -164,7 +220,7 @@ export class SwapsService {
         (dto.toUserId || dto.status === SwapStatus.ACCEPTED)
       ) {
         const toUser = await prisma.user.findFirst({
-          where: staffAtSite(nextToUserId, tenantId),
+          where: staffAtSite(tenantId, nextToUserId),
         });
         if (!toUser) throw new NotFoundException("toUser not found");
       }
@@ -189,6 +245,7 @@ export class SwapsService {
           where: {
             id: existing.assignmentId,
             userId: existing.fromUserId,
+            status: { not: AssignmentStatus.DECLINED },
             session: { tenantId },
           },
           data: { userId: nextToUserId },

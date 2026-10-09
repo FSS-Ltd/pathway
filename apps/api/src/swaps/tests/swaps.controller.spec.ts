@@ -85,6 +85,9 @@ describe("SwapsController", () => {
     findAll: jest
       .fn(async (_filters: any): Promise<SwapRecord[]> => [base])
       .mockImplementation(async () => [base]),
+    findCandidates: jest.fn(async () => [
+      { id: base.toUserId, fullName: "Recipient" },
+    ]),
     update: jest.fn(
       async (
         id: string,
@@ -209,6 +212,30 @@ describe("SwapsController", () => {
       const res = await controller.findAll({}, tenantId, orgId, actorRequest);
       expect(serviceMock.findAll).toHaveBeenCalledTimes(1);
       expect(Array.isArray(res)).toBe(true);
+    });
+  });
+
+  describe("findCandidates", () => {
+    it("binds candidate discovery to the authenticated assignment holder and site", async () => {
+      const result = await controller.findCandidates(
+        base.assignmentId,
+        tenantId,
+        orgId,
+        actorRequest,
+      );
+      expect(serviceMock.findCandidates).toHaveBeenCalledWith(
+        base.assignmentId,
+        base.fromUserId,
+        tenantId,
+      );
+      expect(result).toEqual([{ id: base.toUserId, fullName: "Recipient" }]);
+    });
+
+    it("rejects an invalid assignment ID before querying", async () => {
+      await expect(
+        controller.findCandidates("bad-id", tenantId, orgId, actorRequest),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(serviceMock.findCandidates).not.toHaveBeenCalled();
     });
   });
 

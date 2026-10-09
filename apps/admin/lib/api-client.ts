@@ -2730,11 +2730,28 @@ export async function fetchMyAssignments(params: {
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
     status: params.status,
+    userLookup: {},
   });
 }
 
-/** Minimal swap request shape for My Schedule / swap UI */
-export type AdminSwapRequestRow = {
+export type SwapCandidate = { id: string; fullName: string };
+
+export async function fetchSwapCandidates(
+  assignmentId: string,
+  signal?: AbortSignal,
+): Promise<SwapCandidate[]> {
+  const res = await fetch(
+    `${API_BASE_URL}/swaps/candidates?assignmentId=${encodeURIComponent(assignmentId)}`,
+    { headers: buildAuthHeaders(), cache: "no-store", signal },
+  );
+  if (!res.ok) {
+    throw await apiErrorFromResponse(res, "Unable to load swap candidates.");
+  }
+  return res.json() as Promise<SwapCandidate[]>;
+}
+
+/** Command responses contain only the persisted swap request. */
+export type AdminSwapRequest = {
   id: string;
   assignmentId: string;
   fromUserId: string;
@@ -2743,11 +2760,20 @@ export type AdminSwapRequestRow = {
   createdAt: string;
 };
 
+/** List responses add the session and participant context used by the rota UI. */
+export type AdminSwapRequestRow = AdminSwapRequest & {
+  assignment: {
+    session: { title: string | null; startsAt: string; endsAt: string };
+  };
+  fromUser: { name: string | null };
+  toUser: { name: string | null } | null;
+};
+
 export async function createSwapRequest(params: {
   fromUserId: string;
   assignmentId: string;
   toUserId: string;
-}): Promise<AdminSwapRequestRow> {
+}): Promise<AdminSwapRequest> {
   const res = await fetch(`${API_BASE_URL}/swaps`, {
     method: "POST",
     headers: buildAuthHeaders(),
@@ -2761,7 +2787,7 @@ export async function createSwapRequest(params: {
   if (!res.ok) {
     throw await apiErrorFromResponse(res, "Unable to create the swap request.");
   }
-  return res.json() as Promise<AdminSwapRequestRow>;
+  return res.json() as Promise<AdminSwapRequest>;
 }
 
 /** Fetch swap requests where the current user is from or to. */
@@ -2798,9 +2824,7 @@ export async function fetchMySwapRequests(
   return merged;
 }
 
-export async function acceptSwapRequest(
-  id: string,
-): Promise<AdminSwapRequestRow> {
+export async function acceptSwapRequest(id: string): Promise<AdminSwapRequest> {
   const res = await fetch(`${API_BASE_URL}/swaps/${id}`, {
     method: "PATCH",
     headers: buildAuthHeaders(),
@@ -2810,12 +2834,12 @@ export async function acceptSwapRequest(
   if (!res.ok) {
     throw await apiErrorFromResponse(res, "Unable to accept the swap.");
   }
-  return res.json() as Promise<AdminSwapRequestRow>;
+  return res.json() as Promise<AdminSwapRequest>;
 }
 
 export async function declineSwapRequest(
   id: string,
-): Promise<AdminSwapRequestRow> {
+): Promise<AdminSwapRequest> {
   const res = await fetch(`${API_BASE_URL}/swaps/${id}`, {
     method: "PATCH",
     headers: buildAuthHeaders(),
@@ -2825,7 +2849,7 @@ export async function declineSwapRequest(
   if (!res.ok) {
     throw await apiErrorFromResponse(res, "Unable to decline the swap.");
   }
-  return res.json() as Promise<AdminSwapRequestRow>;
+  return res.json() as Promise<AdminSwapRequest>;
 }
 
 // TODO: replace with real API call using tenant-scoped endpoint and auth headers
