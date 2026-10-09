@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   Patch,
   Post,
@@ -27,7 +28,8 @@ import {
 @Controller("ace/subjects")
 export class AceSubjectsController {
   constructor(
-    private readonly service: AceSubjectsService,
+    @Inject(AceSubjectsService) private readonly service: AceSubjectsService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

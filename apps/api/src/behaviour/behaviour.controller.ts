@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Post,
   Put,
@@ -28,9 +29,13 @@ import { updateBehaviourPolicySchema } from "./dto/behaviour-policy.dto";
 @Controller("ace/behaviour")
 export class BehaviourController {
   constructor(
+    @Inject(BehaviourPolicyService)
     private readonly policyService: BehaviourPolicyService,
+    @Inject(BehaviourCommandService)
     private readonly commandService: BehaviourCommandService,
+    @Inject(BehaviourQueryService)
     private readonly queryService: BehaviourQueryService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

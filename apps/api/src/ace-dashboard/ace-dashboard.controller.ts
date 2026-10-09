@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Inject, Query, UseGuards } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
@@ -9,7 +9,8 @@ import { AceDashboardService } from "./ace-dashboard.service";
 @Controller("ace/dashboard")
 export class AceDashboardController {
   constructor(
-    private readonly service: AceDashboardService,
+    @Inject(AceDashboardService) private readonly service: AceDashboardService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

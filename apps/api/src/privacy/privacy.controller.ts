@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   NotFoundException,
   Param,
   Post,
@@ -26,7 +27,9 @@ const idSchema = z.string().uuid();
 @Controller("privacy")
 @UseGuards(AuthUserGuard)
 export class PrivacyController {
-  constructor(private readonly service: PrivacyService) {}
+  constructor(
+    @Inject(PrivacyService) private readonly service: PrivacyService,
+  ) {}
 
   @Get("exports")
   listExports(@CurrentTenant("tenantId") tenantId: string) {
@@ -53,7 +56,10 @@ export class PrivacyController {
     const result = await this.service.getExportFile(id, tenantId);
     if (!result) throw new NotFoundException("Export not available");
     response.setHeader("Content-Type", result.contentType);
-    response.setHeader("Content-Disposition", `attachment; filename="${result.fileName}"`);
+    response.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${result.fileName}"`,
+    );
     response.send(result.buffer);
   }
 
@@ -67,7 +73,14 @@ export class PrivacyController {
     @CurrentUser("givenName") displayName: string | undefined,
   ) {
     const dto = this.parse(requestDeletionSchema, body);
-    return this.service.requestDeletion(dto, tenantId, orgId, userId, email, displayName);
+    return this.service.requestDeletion(
+      dto,
+      tenantId,
+      orgId,
+      userId,
+      email,
+      displayName,
+    );
   }
 
   private parse<T>(schema: z.ZodType<T>, value: unknown): T {

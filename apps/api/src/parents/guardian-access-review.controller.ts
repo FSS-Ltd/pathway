@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Post,
   Req,
@@ -39,7 +40,10 @@ interface AuthenticatedRequest extends Request {
 @RequirePermission("children.manage")
 @Controller("parents/:parentId/guardian-access")
 export class GuardianAccessReviewController {
-  constructor(private readonly service: GuardianAccessReviewService) {}
+  constructor(
+    @Inject(GuardianAccessReviewService)
+    private readonly service: GuardianAccessReviewService,
+  ) {}
 
   @Get()
   async list(

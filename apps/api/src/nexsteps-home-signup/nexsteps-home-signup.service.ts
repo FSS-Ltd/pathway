@@ -1,4 +1,10 @@
-import { ConflictException, ForbiddenException, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { OrgRole, Role, prisma } from "@pathway/db";
 import type { VerifiedPrincipal } from "../auth/token-verifier";
 import { ClerkManagementService } from "../auth/clerk-management.service";
@@ -19,18 +25,28 @@ const HOME_FREE_PLAN_CODE = "HOME_FREE";
  */
 @Injectable()
 export class NexstepsHomeSignupService {
-  constructor(private readonly clerkManagement: ClerkManagementService) {}
+  constructor(
+    @Inject(ClerkManagementService)
+    private readonly clerkManagement: ClerkManagementService,
+  ) {}
 
   async signup(
     principal: VerifiedPrincipal,
   ): Promise<{ success: true; orgId: string; tenantId: string }> {
     if (!principal.email || !principal.emailVerified) {
-      throw new ForbiddenException("Please verify your email before completing signup.");
+      throw new ForbiddenException(
+        "Please verify your email before completing signup.",
+      );
     }
     const email = principal.email.toLowerCase().trim();
 
     const existingIdentity = await prisma.userIdentity.findUnique({
-      where: { provider_providerSubject: { provider: "clerk", providerSubject: principal.sub } },
+      where: {
+        provider_providerSubject: {
+          provider: "clerk",
+          providerSubject: principal.sub,
+        },
+      },
       include: { user: { include: { tenant: true } } },
     });
     if (existingIdentity?.user.tenant) {
@@ -54,7 +70,9 @@ export class NexstepsHomeSignupService {
     if (!adoptedUserId) {
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
-        throw new ConflictException("An account already exists for this email address.");
+        throw new ConflictException(
+          "An account already exists for this email address.",
+        );
       }
     }
 

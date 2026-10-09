@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { MailerService } from "../mailer/mailer.service";
 import { CreateFeedbackDto, decodeScreenshotAttachment } from "./dto";
 
@@ -13,10 +13,15 @@ export type FeedbackContext = {
 
 @Injectable()
 export class FeedbackService {
-  constructor(private readonly mailer: MailerService) {}
+  constructor(@Inject(MailerService) private readonly mailer: MailerService) {}
 
-  async create(dto: CreateFeedbackDto, context: FeedbackContext): Promise<{ success: true }> {
-    let attachment: { buffer: Buffer; filename: string; contentType: string } | undefined;
+  async create(
+    dto: CreateFeedbackDto,
+    context: FeedbackContext,
+  ): Promise<{ success: true }> {
+    let attachment:
+      | { buffer: Buffer; filename: string; contentType: string }
+      | undefined;
     try {
       attachment =
         decodeScreenshotAttachment(

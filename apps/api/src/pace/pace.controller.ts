@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Post,
   Query,
@@ -38,11 +39,16 @@ import { PaceQueryService } from "./pace-query.service";
 @Controller("ace/pace")
 export class PaceController {
   constructor(
-    private readonly service: PaceQueryService,
+    @Inject(PaceQueryService) private readonly service: PaceQueryService,
+    @Inject(PaceCommandService)
     private readonly commandService: PaceCommandService,
+    @Inject(PaceDiagnosticCommandService)
     private readonly diagnosticCommandService: PaceDiagnosticCommandService,
+    @Inject(PaceDiagnosticQueryService)
     private readonly diagnosticQueryService: PaceDiagnosticQueryService,
+    @Inject(PaceExceptionsService)
     private readonly exceptionsService: PaceExceptionsService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
