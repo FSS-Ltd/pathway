@@ -166,7 +166,7 @@ describe("ACE family session timetable", () => {
     const deniedWrite = await request(server)
       .post(`/sessions/${sessionId}/family-publication`)
       .set("Authorization", parentAuth);
-    expect(deniedWrite.status).toBe(403);
+    expect(deniedWrite.status).toBe(401);
     const publish = await request(server)
       .post(`/sessions/${sessionId}/family-publication`)
       .set("Authorization", managerAuth);
