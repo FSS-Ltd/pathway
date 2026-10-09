@@ -123,11 +123,11 @@ export function FamilySubjectTimetableView({
       <header className="space-y-2">
         <Link
           href="/ace/family"
-          className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+          className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Your family
         </Link>
-        <p className="text-sm font-medium text-accent-strong">
+        <p className="text-sm font-medium text-text-muted">
           ACE / Learning week
         </p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">

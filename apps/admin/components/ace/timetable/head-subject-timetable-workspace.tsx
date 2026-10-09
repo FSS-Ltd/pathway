@@ -175,7 +175,7 @@ function HeadTimetableWorkspaceView() {
   return (
     <main className="mx-auto max-w-6xl space-y-6">
       <header className="space-y-2">
-        <p className="text-sm font-semibold text-accent-strong">
+        <p className="text-sm font-semibold text-text-muted">
           ACE / Academic setup
         </p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary">
@@ -199,7 +199,7 @@ function HeadTimetableWorkspaceView() {
             role="alert"
             className="flex flex-wrap items-center justify-between gap-3"
           >
-            <p className="text-sm text-status-danger">{error}</p>
+            <p className="text-sm font-semibold text-text-primary">{error}</p>
             <Button
               type="button"
               variant="outline"
@@ -238,7 +238,9 @@ function HeadTimetableWorkspaceView() {
                 role="alert"
                 className="flex flex-wrap items-center justify-between gap-3"
               >
-                <p className="text-sm text-status-danger">{selectionError}</p>
+                <p className="text-sm font-semibold text-text-primary">
+                  {selectionError}
+                </p>
                 <Button
                   type="button"
                   variant="outline"
@@ -264,7 +266,10 @@ function HeadTimetableWorkspaceView() {
                 onReload={() => setSelectionRevision((value) => value + 1)}
               />
               {scheduleSaved ? (
-                <p role="status" className="text-sm text-status-success">
+                <p
+                  role="status"
+                  className="text-sm font-medium text-text-primary"
+                >
                   Schedule saved for this period and year band.
                 </p>
               ) : null}

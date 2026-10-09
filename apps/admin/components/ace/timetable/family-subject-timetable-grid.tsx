@@ -50,7 +50,7 @@ function SubjectDay({
             key={`${entry.day}:${entry.slotPosition}`}
             className={`rounded-xl border px-4 py-3 ${entry.slotKind === "BREAK" ? "border-border-subtle bg-muted" : "border-border-subtle bg-surface shadow-card"}`}
           >
-            <span className="block text-xs font-semibold tabular-nums text-accent-strong">
+            <span className="block text-xs font-semibold tabular-nums text-text-muted">
               {timeLabel(entry.startMinutes)}–{timeLabel(entry.endMinutes)}
             </span>
             <span className="mt-1 block text-sm font-semibold text-text-primary">

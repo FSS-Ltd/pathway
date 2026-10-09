@@ -173,12 +173,12 @@ export function HeadScheduleEditor({
         </label>
         <div aria-live="polite" className="space-y-2">
           {error ? (
-            <p role="alert" className="text-sm text-status-danger">
+            <p role="alert" className="text-sm font-semibold text-text-primary">
               {error}
             </p>
           ) : null}
           {success ? (
-            <p role="status" className="text-sm text-status-success">
+            <p role="status" className="text-sm font-medium text-text-primary">
               Schedule saved.
             </p>
           ) : null}

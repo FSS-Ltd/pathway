@@ -181,12 +181,12 @@ export function HeadStudentGrid({
           </p>
         ) : null}
         {error ? (
-          <p role="alert" className="text-sm text-status-danger">
+          <p role="alert" className="text-sm font-semibold text-text-primary">
             {error}
           </p>
         ) : null}
         {success ? (
-          <p role="status" className="text-sm text-status-success">
+          <p role="status" className="text-sm font-medium text-text-primary">
             {success}
           </p>
         ) : null}
@@ -202,7 +202,10 @@ export function HeadStudentGrid({
         {!loading && data ? (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={currentPublication ? "success" : "default"}>
+              <Badge
+                variant="default"
+                className={currentPublication ? "border-status-ok" : undefined}
+              >
                 {currentPublication
                   ? "Published"
                   : latest?.withdrawnAt
@@ -220,7 +223,7 @@ export function HeadStudentGrid({
                 </span>
               ) : null}
               {dirty ? (
-                <span className="text-sm font-medium text-status-danger">
+                <span className="rounded-full border border-status-danger px-2 py-1 text-sm font-semibold text-text-primary">
                   Unsaved changes
                 </span>
               ) : null}
