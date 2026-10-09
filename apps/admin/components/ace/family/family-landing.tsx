@@ -10,11 +10,14 @@ import {
 } from "@/lib/family-contexts-api";
 import { useSession, type SessionStatus } from "@/lib/use-session-compat";
 
-function contextHref(context: FamilyContext): string {
+function contextHref(
+  context: FamilyContext,
+  view: "attendance" | "timetable",
+): string {
   const site = encodeURIComponent(context.siteId);
   return context.kind === "student"
-    ? `/ace/student/sites/${site}/attendance`
-    : `/ace/parent/sites/${site}/children/${encodeURIComponent(context.childId)}/attendance`;
+    ? `/ace/student/sites/${site}/${view}`
+    : `/ace/parent/sites/${site}/children/${encodeURIComponent(context.childId)}/${view}`;
 }
 
 function ContextList({
@@ -33,26 +36,28 @@ function ContextList({
       <ul className="grid gap-3 sm:grid-cols-2">
         {items.map((context) => (
           <li key={`${context.kind}:${context.siteId}:${context.childId}`}>
-            <Link
-              href={contextHref(context)}
-              className="group flex min-h-24 items-center justify-between gap-4 rounded-xl border border-border-subtle bg-surface px-5 py-4 shadow-card transition-colors hover:border-accent-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
-            >
-              <span className="min-w-0 space-y-1">
+            <div className="rounded-xl border border-border-subtle bg-surface px-5 py-4 shadow-card">
+              <div className="min-w-0 space-y-1">
                 <span className="block truncate font-heading text-lg font-semibold text-text-primary">
                   {context.childName}
                 </span>
                 <span className="block truncate text-sm text-text-muted">
                   {context.siteName}
                 </span>
-                <span className="block text-sm font-medium text-accent-strong">
-                  View attendance
-                </span>
-              </span>
-              <ChevronRight
-                aria-hidden="true"
-                className="h-5 w-5 shrink-0 text-text-muted transition-transform group-hover:translate-x-0.5"
-              />
-            </Link>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(["attendance", "timetable"] as const).map((view) => (
+                  <Link
+                    key={view}
+                    href={contextHref(context, view)}
+                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong motion-reduce:transition-none"
+                  >
+                    {view === "attendance" ? "Attendance" : "Timetable"}
+                    <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                  </Link>
+                ))}
+              </div>
+            </div>
           </li>
         ))}
       </ul>
@@ -139,8 +144,8 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
           Your family
         </h1>
         <p className="max-w-2xl text-base leading-7 text-text-muted">
-          Choose a linked child or your own student record to see daily
-          attendance. Parents can also message their school team.
+          Choose a linked child or your own student record to see attendance and
+          published sessions. Parents can also message their school team.
         </p>
       </header>
 

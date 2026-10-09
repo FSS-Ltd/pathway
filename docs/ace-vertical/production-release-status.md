@@ -402,6 +402,17 @@ redirected to sign-in. Vercel reported no runtime error clusters across the
 three projects in the checked one-hour window. Authenticated production session
 actions were not exercised by this smoke check.
 
+C07a is in progress from `master` merge `ac37713e0cd81c60aaf7043fe393c011815a9c71`.
+It adds an explicitly published seven-day group session timetable for linked
+parents and students, with manager publication controls and audited changes.
+This is a partial ACE timetable journey: individual subject grids and term
+publication still belong to later delivery. The database migration and
+authenticated family journey require CI and staging verification before release.
+Local lint, typecheck, API and admin unit tests, builds, Prisma schema validation,
+and schema-to-migration diff passed. The database-backed family test could not
+run locally because test Postgres at `localhost:5433` is unavailable; CI must
+exercise it against the migrated test database.
+
 ## Delivery steps
 
 | Step     | Scope                                                                  | State   | PR and base                                                                         | Checked revision and CI                                                                                                                                                                                         | Merge evidence                             |
@@ -492,6 +503,7 @@ actions were not exercised by this smoke check.
 | REL-17   | Align message text box and focus outline                               | Merged  | [#521](https://github.com/FSS-Ltd/pathway/pull/521) to `master`                     | `f6dbadb1c78e084ce00a043841b89e05cc18f5dc`; eight checks passed: CI 37879678167, CodeQL 37879675426. Deploy 37880134482 and live smoke passed.                                                                  | `a2dd1f2acf6fb9674c38a05b375054302a7da3b8` |
 | SEC-1    | Scope rota assignments and swaps to authorised actors                  | Merged  | [#523](https://github.com/FSS-Ltd/pathway/pull/523) to `master`                     | `11352796f02469ec90b5eb35929ff6eac026a8b3`; all eight checks passed: CI 37883306819, CodeQL 37883303461. Deploy 37883971325 and anonymous smoke passed.                                                         | `291abb9c2673b134eb163a42ba82ad01ca9d8ae8` |
 | SEC-2    | Scope sessions and staff attendance to authorised actors               | Merged  | [#525](https://github.com/FSS-Ltd/pathway/pull/525) to `master`                     | `57cbdc4e3572b5e1fdfed214cd5a80bcd2d923ff`; all eight checks passed: CI 37886190003, CodeQL 37886186050. Deploy 37886741900 passed four jobs; aliases and anonymous smoke verified.                             | `206f67ea1b29c916c4b7aa660a6f0a7d6c8d8891` |
+| C07a     | Published family group session timetable                               | Active  | `feature/ace-family-timetable` from `master`                                        | Local lint, typecheck, unit tests, builds, and Prisma diff passed; DB E2E and current-revision CI pending.                                                                                                      | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

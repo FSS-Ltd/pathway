@@ -6,11 +6,25 @@ import { SessionsController } from "./sessions.controller";
 import { SessionsService } from "./sessions.service";
 import { StaffAttendanceService } from "./staff-attendance.service";
 import { RotaAccessService } from "./rota-access.service";
+import { FamilyTimetableService } from "./family-timetable.service";
+import {
+  ParentTimetableController,
+  StudentTimetableController,
+} from "./family-timetable.controller";
 
 @Module({
   imports: [CommonModule, BillingModule, AuthModule],
-  controllers: [SessionsController],
-  providers: [SessionsService, StaffAttendanceService, RotaAccessService],
+  controllers: [
+    SessionsController,
+    ParentTimetableController,
+    StudentTimetableController,
+  ],
+  providers: [
+    SessionsService,
+    StaffAttendanceService,
+    RotaAccessService,
+    FamilyTimetableService,
+  ],
   exports: [SessionsService, StaffAttendanceService],
 })
 export class SessionsModule {}

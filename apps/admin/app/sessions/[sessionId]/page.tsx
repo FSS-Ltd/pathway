@@ -29,7 +29,11 @@ import {
 } from "../../../lib/api-client";
 import { toLocalDateKey } from "../../../lib/date";
 import { useAdminAccess } from "../../../lib/use-admin-access";
-import { canAccessAdminSection, canAccessSafeguardingAdmin } from "../../../lib/access";
+import {
+  canAccessAdminSection,
+  canAccessSafeguardingAdmin,
+} from "../../../lib/access";
+import { FamilyPublicationCard } from "@/components/ace/timetable/family-publication-card";
 
 const eligibilityReasonLabel: Record<
   NonNullable<StaffEligibilityRow["reason"]>,
@@ -91,10 +95,12 @@ function formatTimeRange(startsAt?: string, endsAt?: string) {
 }
 
 function buildHandoverHref(
-  session: AdminSessionDetail & { groupId?: string | null; groupIds?: string[] },
+  session: AdminSessionDetail & {
+    groupId?: string | null;
+    groupIds?: string[];
+  },
 ) {
-  const primaryGroupId =
-    session.groupIds?.[0] ?? session.groupId ?? null;
+  const primaryGroupId = session.groupIds?.[0] ?? session.groupId ?? null;
   if (!primaryGroupId) return "/handover/write";
   const start = new Date(session.startsAt);
   const handoverDate = toLocalDateKey(start);
@@ -118,19 +124,23 @@ export default function SessionDetailPage() {
     handoverLogId: string | null;
     status?: string;
   } | null>(null);
-  const currentUserId = adminState.status === "ready" ? adminState.snapshot.userId : null;
+  const currentUserId =
+    adminState.status === "ready" ? adminState.snapshot.userId : null;
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [notFound, setNotFound] = React.useState(false);
-  const [assignments, setAssignments] = React.useState<AdminAssignmentRow[]>([]);
+  const [assignments, setAssignments] = React.useState<AdminAssignmentRow[]>(
+    [],
+  );
   const [assignmentsLoading, setAssignmentsLoading] = React.useState(false);
   const [assignmentError, setAssignmentError] = React.useState<string | null>(
     null,
   );
   const [formStaffId, setFormStaffId] = React.useState("");
   const [formRole, setFormRole] = React.useState("Lead");
-  const [formStatus, setFormStatus] =
-    React.useState<"pending" | "confirmed">("confirmed");
+  const [formStatus, setFormStatus] = React.useState<"pending" | "confirmed">(
+    "confirmed",
+  );
   const [formSubmitting, setFormSubmitting] = React.useState(false);
   const [rowActionId, setRowActionId] = React.useState<string | null>(null);
   const [staffEligibility, setStaffEligibility] = React.useState<
@@ -138,16 +148,26 @@ export default function SessionDetailPage() {
   >([]);
   const [staffEligibilityLoading, setStaffEligibilityLoading] =
     React.useState(false);
-  const [lessonDetail, setLessonDetail] = React.useState<AdminLessonDetail | null>(null);
-  const [attendanceSummary, setAttendanceSummary] = React.useState<
-    { present: number; absent: number; late: number; unknown: number } | null
-  >(null);
+  const [lessonDetail, setLessonDetail] =
+    React.useState<AdminLessonDetail | null>(null);
+  const [attendanceSummary, setAttendanceSummary] = React.useState<{
+    present: number;
+    absent: number;
+    late: number;
+    unknown: number;
+  } | null>(null);
   const [staffAttendanceRoster, setStaffAttendanceRoster] = React.useState<
     StaffAttendanceRosterItem[] | null
   >(null);
-  const [staffAttendanceError, setStaffAttendanceError] = React.useState<string | null>(null);
-  const [staffAttendanceSaving, setStaffAttendanceSaving] = React.useState<string | null>(null);
-  const [authDebugContext, setAuthDebugContext] = React.useState<Awaited<ReturnType<typeof fetchAuthDebugContext>> | null>(null);
+  const [staffAttendanceError, setStaffAttendanceError] = React.useState<
+    string | null
+  >(null);
+  const [staffAttendanceSaving, setStaffAttendanceSaving] = React.useState<
+    string | null
+  >(null);
+  const [authDebugContext, setAuthDebugContext] = React.useState<Awaited<
+    ReturnType<typeof fetchAuthDebugContext>
+  > | null>(null);
 
   const isAdmin = canAccessAdminSection(role);
   const canStartHandover = role.isStaff || isAdmin;
@@ -225,9 +245,7 @@ export default function SessionDetailPage() {
         }
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load session",
-      );
+      setError(err instanceof Error ? err.message : "Failed to load session");
       setSession(null);
       setHandoverForSession(null);
       setAssignments([]);
@@ -287,17 +305,16 @@ export default function SessionDetailPage() {
     session?.presentCount !== undefined &&
     session?.absentCount !== undefined &&
     session?.lateCount !== undefined;
-  const attendanceBreakdown =
-    hasSessionBreakdown || attendanceSummary != null;
+  const attendanceBreakdown = hasSessionBreakdown || attendanceSummary != null;
   const displayPresent = hasSessionBreakdown
     ? session!.presentCount!
-    : attendanceSummary?.present ?? 0;
+    : (attendanceSummary?.present ?? 0);
   const displayAbsent = hasSessionBreakdown
     ? session!.absentCount!
-    : attendanceSummary?.absent ?? 0;
+    : (attendanceSummary?.absent ?? 0);
   const displayLate = hasSessionBreakdown
     ? session!.lateCount!
-    : attendanceSummary?.late ?? 0;
+    : (attendanceSummary?.late ?? 0);
 
   const handleStatusChange = React.useCallback(
     async (assignmentId: string, status: AdminAssignmentRow["status"]) => {
@@ -346,8 +363,9 @@ export default function SessionDetailPage() {
           <Button size="sm" asChild>
             <Link href={`/attendance/${sessionId}`}>Take attendance</Link>
           </Button>
-          {canStartHandover && session && (
-            handoverForSession?.handoverLogId ? (
+          {canStartHandover &&
+            session &&
+            (handoverForSession?.handoverLogId ? (
               <Button size="sm" asChild variant="secondary">
                 <Link
                   href={
@@ -372,9 +390,8 @@ export default function SessionDetailPage() {
                   Start handover
                 </Link>
               </Button>
-            )
-          )}
-          {isAdmin && (
+            ))}
+          {isAdmin && !session?.familyPublishedAt && (
             <Button asChild size="sm">
               <Link href={`/sessions/${sessionId}/edit`}>Edit session</Link>
             </Button>
@@ -451,21 +468,35 @@ export default function SessionDetailPage() {
                 </div>
               ) : null}
               {(() => {
-                const lesson = session.lesson ?? (lessonDetail ? {
-                  id: lessonDetail.id,
-                  title: lessonDetail.title,
-                  description: lessonDetail.description,
-                  resources: lessonDetail.resources?.length
-                    ? lessonDetail.resources.map((r) => ({ label: r.label, url: null, type: r.type }))
-                    : null,
-                } : null);
-                if (lesson?.description || (lesson?.resources && lesson.resources.length > 0)) {
+                const lesson =
+                  session.lesson ??
+                  (lessonDetail
+                    ? {
+                        id: lessonDetail.id,
+                        title: lessonDetail.title,
+                        description: lessonDetail.description,
+                        resources: lessonDetail.resources?.length
+                          ? lessonDetail.resources.map((r) => ({
+                              label: r.label,
+                              url: null,
+                              type: r.type,
+                            }))
+                          : null,
+                      }
+                    : null);
+                if (
+                  lesson?.description ||
+                  (lesson?.resources && lesson.resources.length > 0)
+                ) {
                   const safeUrl = (url: string | null | undefined) =>
-                    typeof url === "string" && (url.startsWith("https://") || url.startsWith("http://"));
+                    typeof url === "string" &&
+                    (url.startsWith("https://") || url.startsWith("http://"));
                   return (
                     <div className="space-y-2 text-sm text-text-muted">
                       {lesson.description ? (
-                        <p className="text-text-primary">{lesson.description}</p>
+                        <p className="text-text-primary">
+                          {lesson.description}
+                        </p>
                       ) : null}
                       {lesson.resources && lesson.resources.length > 0 ? (
                         <ul className="list-inside list-disc space-y-1">
@@ -523,10 +554,26 @@ export default function SessionDetailPage() {
             </div>
           </Card>
 
+          {isAdmin && (
+            <FamilyPublicationCard
+              sessionId={session.id}
+              publishedAt={session.familyPublishedAt ?? null}
+              onChanged={(familyPublishedAt) =>
+                setSession((current) =>
+                  current ? { ...current, familyPublishedAt } : current,
+                )
+              }
+            />
+          )}
+
           <Card
             className="md:col-span-3"
             title="Scheduled staff"
-            description={isAdmin ? "Schedule staff onto this session and keep statuses up to date." : "Staff assigned to this session."}
+            description={
+              isAdmin
+                ? "Schedule staff onto this session and keep statuses up to date."
+                : "Staff assigned to this session."
+            }
           >
             {assignmentError ? (
               <div className="mb-4 rounded-md bg-status-danger/5 px-3 py-2 text-sm text-status-danger">
@@ -546,8 +593,13 @@ export default function SessionDetailPage() {
                     assignment.startsAt,
                     assignment.endsAt,
                   );
-                  const isOwnAssignment = currentUserId != null && assignment.staffId === currentUserId;
-                  const showAcceptDecline = !isAdmin && isOwnAssignment && assignment.status === "pending";
+                  const isOwnAssignment =
+                    currentUserId != null &&
+                    assignment.staffId === currentUserId;
+                  const showAcceptDecline =
+                    !isAdmin &&
+                    isOwnAssignment &&
+                    assignment.status === "pending";
                   return (
                     <div
                       key={assignment.id}
@@ -558,8 +610,12 @@ export default function SessionDetailPage() {
                           <span className="font-semibold text-text-primary">
                             {assignment.staffName}
                           </span>
-                          <Badge variant="default">{assignment.roleLabel}</Badge>
-                          <Badge variant={assignmentStatusTone[assignment.status]}>
+                          <Badge variant="default">
+                            {assignment.roleLabel}
+                          </Badge>
+                          <Badge
+                            variant={assignmentStatusTone[assignment.status]}
+                          >
                             {assignmentStatusLabel[assignment.status]}
                           </Badge>
                         </div>
@@ -580,10 +636,17 @@ export default function SessionDetailPage() {
                                 setRowActionId(assignment.id);
                                 setAssignmentError(null);
                                 try {
-                                  await updateAssignmentStatus(assignment.id, "confirmed");
+                                  await updateAssignmentStatus(
+                                    assignment.id,
+                                    "confirmed",
+                                  );
                                   await refreshAssignments(session);
                                 } catch (err) {
-                                  setAssignmentError(err instanceof Error ? err.message : "Failed to accept");
+                                  setAssignmentError(
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Failed to accept",
+                                  );
                                 } finally {
                                   setRowActionId(null);
                                 }
@@ -599,10 +662,17 @@ export default function SessionDetailPage() {
                                 setRowActionId(assignment.id);
                                 setAssignmentError(null);
                                 try {
-                                  await updateAssignmentStatus(assignment.id, "declined");
+                                  await updateAssignmentStatus(
+                                    assignment.id,
+                                    "declined",
+                                  );
                                   await refreshAssignments(session);
                                 } catch (err) {
-                                  setAssignmentError(err instanceof Error ? err.message : "Failed to decline");
+                                  setAssignmentError(
+                                    err instanceof Error
+                                      ? err.message
+                                      : "Failed to decline",
+                                  );
                                 } finally {
                                   setRowActionId(null);
                                 }
@@ -621,7 +691,8 @@ export default function SessionDetailPage() {
                                 onChange={(e) =>
                                   handleStatusChange(
                                     assignment.id,
-                                    e.target.value as AdminAssignmentRow["status"],
+                                    e.target
+                                      .value as AdminAssignmentRow["status"],
                                   )
                                 }
                                 className="ml-2 rounded-md border border-border-subtle bg-white px-2 py-1 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
@@ -666,136 +737,138 @@ export default function SessionDetailPage() {
               </div>
             ) : (
               <p className="text-sm text-text-muted">
-                {isAdmin ? "No staff are assigned yet. Add someone below." : "No staff assigned yet."}
+                {isAdmin
+                  ? "No staff are assigned yet. Add someone below."
+                  : "No staff assigned yet."}
               </p>
             )}
 
             {isAdmin && (
-            <div className="mt-6 border-t border-border-subtle pt-4">
-              <h3 className="text-sm font-semibold text-text-primary">
-                Add staff
-              </h3>
-              <p className="text-xs text-text-muted">
-                Choose a staff member and role. Eligible staff (available at this
-                time, prefer this class) are listed first; you may still add
-                others.
-              </p>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  if (!session) return;
-                  if (!formStaffId.trim()) {
-                    setAssignmentError("Select a staff member to add.");
-                    return;
-                  }
-                  setFormSubmitting(true);
-                  setAssignmentError(null);
-                  try {
-                    await createAssignment(
-                      {
-                        sessionId: session.id,
-                        staffId: formStaffId.trim(),
-                        role: formRole,
-                        status: formStatus,
-                      },
-                      {
-                        sessionLookup: {
-                          [session.id]: {
-                            title: session.title,
-                            startsAt: session.startsAt,
-                            endsAt: session.endsAt,
+              <div className="mt-6 border-t border-border-subtle pt-4">
+                <h3 className="text-sm font-semibold text-text-primary">
+                  Add staff
+                </h3>
+                <p className="text-xs text-text-muted">
+                  Choose a staff member and role. Eligible staff (available at
+                  this time, prefer this class) are listed first; you may still
+                  add others.
+                </p>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!session) return;
+                    if (!formStaffId.trim()) {
+                      setAssignmentError("Select a staff member to add.");
+                      return;
+                    }
+                    setFormSubmitting(true);
+                    setAssignmentError(null);
+                    try {
+                      await createAssignment(
+                        {
+                          sessionId: session.id,
+                          staffId: formStaffId.trim(),
+                          role: formRole,
+                          status: formStatus,
+                        },
+                        {
+                          sessionLookup: {
+                            [session.id]: {
+                              title: session.title,
+                              startsAt: session.startsAt,
+                              endsAt: session.endsAt,
+                            },
                           },
                         },
-                      },
-                    );
-                    await refreshAssignments(session);
-                    setFormStaffId("");
-                    setFormRole("Lead");
-                    setFormStatus("confirmed");
-                  } catch (err) {
-                    setAssignmentError(
-                      err instanceof Error
-                        ? err.message
-                        : "Failed to add assignment",
-                    );
-                  } finally {
-                    setFormSubmitting(false);
-                  }
-                }}
-                className="mt-3 grid gap-3 md:grid-cols-4"
-              >
-                <div className="flex flex-col gap-1 md:col-span-2">
-                  <Label htmlFor="add-staff">Staff member</Label>
-                  <Select
-                    id="add-staff"
-                    value={formStaffId}
-                    onChange={(e) => setFormStaffId(e.target.value)}
-                    disabled={staffEligibilityLoading}
-                  >
-                    <option value="">Select…</option>
-                    {staffOptions.map((s) => (
-                      <option
-                        key={s.id}
-                        value={s.id}
-                        title={
-                          s.reason
-                            ? eligibilityReasonLabel[s.reason]
-                            : undefined
-                        }
-                      >
-                        {s.eligible
-                          ? s.email
-                            ? `${s.fullName} (${s.email})`
-                            : s.fullName
-                          : `${s.fullName}${s.email ? ` (${s.email})` : ""} — ${s.reason ? eligibilityReasonLabel[s.reason] : "Unavailable"}`}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="add-role">Role</Label>
-                  <Select
-                    id="add-role"
-                    value={formRole}
-                    onChange={(e) => setFormRole(e.target.value)}
-                  >
-                    <option value="Lead">Lead</option>
-                    <option value="Support">Support</option>
-                  </Select>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <Label htmlFor="add-status">Status</Label>
-                  <Select
-                    id="add-status"
-                    value={formStatus}
-                    onChange={(e) =>
-                      setFormStatus(e.target.value as "pending" | "confirmed")
-                    }
-                  >
-                    <option value="confirmed">Confirmed</option>
-                    <option value="pending">Pending</option>
-                  </Select>
-                </div>
-                <div className="md:col-span-4 flex flex-wrap items-center gap-2">
-                  <Button type="submit" size="sm" disabled={formSubmitting}>
-                    {formSubmitting ? "Adding…" : "Add to session"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
+                      );
+                      await refreshAssignments(session);
                       setFormStaffId("");
                       setFormRole("Lead");
                       setFormStatus("confirmed");
-                      setAssignmentError(null);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </div>
+                    } catch (err) {
+                      setAssignmentError(
+                        err instanceof Error
+                          ? err.message
+                          : "Failed to add assignment",
+                      );
+                    } finally {
+                      setFormSubmitting(false);
+                    }
+                  }}
+                  className="mt-3 grid gap-3 md:grid-cols-4"
+                >
+                  <div className="flex flex-col gap-1 md:col-span-2">
+                    <Label htmlFor="add-staff">Staff member</Label>
+                    <Select
+                      id="add-staff"
+                      value={formStaffId}
+                      onChange={(e) => setFormStaffId(e.target.value)}
+                      disabled={staffEligibilityLoading}
+                    >
+                      <option value="">Select…</option>
+                      {staffOptions.map((s) => (
+                        <option
+                          key={s.id}
+                          value={s.id}
+                          title={
+                            s.reason
+                              ? eligibilityReasonLabel[s.reason]
+                              : undefined
+                          }
+                        >
+                          {s.eligible
+                            ? s.email
+                              ? `${s.fullName} (${s.email})`
+                              : s.fullName
+                            : `${s.fullName}${s.email ? ` (${s.email})` : ""} — ${s.reason ? eligibilityReasonLabel[s.reason] : "Unavailable"}`}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="add-role">Role</Label>
+                    <Select
+                      id="add-role"
+                      value={formRole}
+                      onChange={(e) => setFormRole(e.target.value)}
+                    >
+                      <option value="Lead">Lead</option>
+                      <option value="Support">Support</option>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Label htmlFor="add-status">Status</Label>
+                    <Select
+                      id="add-status"
+                      value={formStatus}
+                      onChange={(e) =>
+                        setFormStatus(e.target.value as "pending" | "confirmed")
+                      }
+                    >
+                      <option value="confirmed">Confirmed</option>
+                      <option value="pending">Pending</option>
+                    </Select>
+                  </div>
+                  <div className="md:col-span-4 flex flex-wrap items-center gap-2">
+                    <Button type="submit" size="sm" disabled={formSubmitting}>
+                      {formSubmitting ? "Adding…" : "Add to session"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setFormStaffId("");
+                        setFormRole("Lead");
+                        setFormStatus("confirmed");
+                        setAssignmentError(null);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </div>
             )}
           </Card>
 
@@ -916,12 +989,20 @@ export default function SessionDetailPage() {
 
           {!isLoadingAccess && canAccessSafeguardingAdmin(role) ? (
             <Card title="Related notes & concerns">
-              {session.relatedSafeguarding?.notes?.length || session.relatedSafeguarding?.concerns?.length ? (
+              {session.relatedSafeguarding?.notes?.length ||
+              session.relatedSafeguarding?.concerns?.length ? (
                 <div className="space-y-2 text-sm">
                   {session.relatedSafeguarding.concerns?.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between gap-2">
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between gap-2"
+                    >
                       <span className="text-text-muted">
-                        Concern · {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "—"} {c.status ? `· ${c.status}` : ""}
+                        Concern ·{" "}
+                        {c.createdAt
+                          ? new Date(c.createdAt).toLocaleDateString()
+                          : "—"}{" "}
+                        {c.status ? `· ${c.status}` : ""}
                       </span>
                       <Link
                         href={`/safeguarding/concerns/${c.id}`}
@@ -932,9 +1013,16 @@ export default function SessionDetailPage() {
                     </div>
                   ))}
                   {session.relatedSafeguarding.notes?.map((n) => (
-                    <div key={n.id} className="flex items-center justify-between gap-2">
+                    <div
+                      key={n.id}
+                      className="flex items-center justify-between gap-2"
+                    >
                       <span className="text-text-muted">
-                        Note · {n.createdAt ? new Date(n.createdAt).toLocaleDateString() : "—"} {n.status ? `· ${n.status}` : ""}
+                        Note ·{" "}
+                        {n.createdAt
+                          ? new Date(n.createdAt).toLocaleDateString()
+                          : "—"}{" "}
+                        {n.status ? `· ${n.status}` : ""}
                       </span>
                       <Link
                         href="/safeguarding"
@@ -947,7 +1035,8 @@ export default function SessionDetailPage() {
                 </div>
               ) : (
                 <p className="text-sm text-text-muted">
-                  Related notes and concerns will appear here when available. No safeguarding detail is shown on this page.
+                  Related notes and concerns will appear here when available. No
+                  safeguarding detail is shown on this page.
                 </p>
               )}
             </Card>

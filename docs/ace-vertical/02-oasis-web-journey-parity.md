@@ -50,6 +50,17 @@ and authorised exports. The daily register, family/student daily history, and
 scoped CSV export are implemented in code; production checks remain. Session
 attendance does not satisfy those outcomes.
 
+C07a adds a dated, group-based family session timetable. A fixed rota manager
+must publish each session before a parent with a current full guardian link or
+the linked student can read its title and time. Editing a published session
+requires unpublishing it first. This closes the released-session read journey;
+C07 remains partial because Oasis also has per-student weekly subject grids,
+term snapshots, and a Head publication workspace that NexSteps does not yet
+provide. The later Expo follow-up needs parent and student timetable screens
+using these scoped endpoints, with week navigation, loading/empty/error states,
+and acceptance tests for revoked links, disabled portals, site changes, and
+unpublished sessions. Mobile delivery follows web parity.
+
 ## Paid add-ons and release boundaries
 
 These are tracked here so core journeys cannot quietly absorb paid features.

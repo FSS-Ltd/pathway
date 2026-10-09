@@ -11,6 +11,7 @@ type SessionRow = {
   startsAt: Date;
   endsAt: Date;
   title: string | null;
+  familyPublishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   groups?: { id: string; name: string }[];
@@ -70,6 +71,7 @@ describe("SessionsService", () => {
     startsAt: now,
     endsAt: later,
     title: "Sunday 11am",
+    familyPublishedAt: null,
     createdAt: now,
     updatedAt: now,
     groups: [{ id: ids.group, name: "Kids" }],

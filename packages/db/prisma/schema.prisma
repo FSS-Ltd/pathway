@@ -2295,6 +2295,7 @@ model Session {
   startsAt               DateTime
   endsAt                 DateTime
   title                  String?
+  familyPublishedAt      DateTime?
   assignments            Assignment[]
   attendances            Attendance[]
   lessons                Lesson[] // lessons linked to this session
@@ -2304,6 +2305,7 @@ model Session {
 
   @@index([tenantId])
   @@index([startsAt])
+  @@index([tenantId, familyPublishedAt, startsAt])
 }
 
 model Assignment {
