@@ -572,6 +572,19 @@ rota pages redirected to sign-in. No new runtime errors appeared; the admin
 Clerk error group is from 8 October on an older deployment. A signed-in shift
 create-and-view check remains unverified pending an approved staff session.
 
+C07g0 [PR #537](https://github.com/FSS-Ltd/pathway/pull/537) merged as
+`8dc592b4f4c7a61d4b071c9470ba07d260b43e4f` at checked revision
+`1c98be5f3ceb3e0206491e531392299096bf45e8`. Seven runnable checks
+passed in [CI 37944338801](https://github.com/FSS-Ltd/pathway/actions/runs/37944338801)
+and [CodeQL 37944332896](https://github.com/FSS-Ltd/pathway/actions/runs/37944332896).
+The separate CodeQL comparison was neutral because GitHub could not match
+its default JavaScript/TypeScript setup; both actual analysis jobs passed and
+the PR changed documentation only. Overall completion remains about 79%.
+C07g1 implements the dated parent school-support rota and staff view from the
+[design contract](26-parent-school-volunteer-rota-design.md). Its migration
+must run before the API and admin app release. A signed-in parent selection
+and staff view remain required production checks.
+
 ## Delivery steps
 
 | Step     | Scope                                                                  | State   | PR and base                                                                         | Checked revision and CI                                                                                                                                                                                                     | Merge evidence                             |
@@ -671,7 +684,8 @@ create-and-view check remains unverified pending an approved staff session.
 | C07d     | Site-scoped staff team rota and availability entry point               | Merged  | [#534](https://github.com/FSS-Ltd/pathway/pull/534) to `master`                     | `ec1fe5d68021c9dae2dcf1802461a25891067fa0`; eight checks passed: CI 37929864732, CodeQL 37929859313. Deploy 37931016306 passed and live anonymous smoke verified.                                                           | `8565a5a1367caaaca18987c3f4e8274acec396e7` |
 | C07e     | Partial-day staff availability and shared profile editor               | Merged  | [#535](https://github.com/FSS-Ltd/pathway/pull/535) to `master`                     | `6ea22d6a70dd9eee255f7ec7a614cb519b832c1b`; eight checks passed: CI 37934403942, CodeQL 37934398437. Deploy 37937727626 passed migrations and all apps; live anonymous smoke verified.                                      | `c7857c5f76d7e37d6d91ff90011416bc3783114e` |
 | C07f     | Typed cover and meeting staff shifts with private rota views           | Merged  | [#536](https://github.com/FSS-Ltd/pathway/pull/536) to `master`                     | `2722e59907fb59dd87f0e4f90d8c5e841913c1e5`; seven runnable checks passed, CodeQL comparison neutral/inapplicable to unchanged Actions files. Deploy 37942692871 applied migration and passed all apps; live smoke verified. | `5c26afca3caca259cc592b20f3b4ebe51ee873fa` |
-| C07g0    | School volunteer rota design contract                                  | In PR   | [#537](https://github.com/FSS-Ltd/pathway/pull/537) to `master`                     | Oasis/NexSteps boundary and UI design documented; implementation follows this PR.                                                                                                                                           | —                                          |
+| C07g0    | School volunteer rota design contract                                  | Merged  | [#537](https://github.com/FSS-Ltd/pathway/pull/537) to `master`                     | `1c98be5f3ceb3e0206491e531392299096bf45e8`; seven runnable checks passed in CI 37944338801 and CodeQL 37944332896; separate CodeQL comparison neutral/inapplicable to the docs-only change.                                 | `8dc592b4f4c7a61d4b071c9470ba07d260b43e4f` |
+| C07g1    | Dated parent school-support reservations and staff rota                | Pending | PR pending from `feature/ace-parent-school-volunteer-rota`                          | Parent and staff UI, guarded API, migration, RLS and focused tests are in local verification.                                                                                                                               | —                                          |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                            | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                            | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                            | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

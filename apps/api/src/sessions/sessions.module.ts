@@ -8,6 +8,11 @@ import { StaffAttendanceService } from "./staff-attendance.service";
 import { RotaAccessService } from "./rota-access.service";
 import { FamilyTimetableService } from "./family-timetable.service";
 import { FamilySubjectTimetableService } from "./family-subject-timetable.service";
+import { SchoolVolunteeringService } from "./school-volunteering.service";
+import {
+  ParentSchoolVolunteeringController,
+  StaffSchoolVolunteeringController,
+} from "./school-volunteering.controller";
 import {
   ParentSubjectTimetableController,
   StudentSubjectTimetableController,
@@ -25,6 +30,8 @@ import {
     StudentTimetableController,
     ParentSubjectTimetableController,
     StudentSubjectTimetableController,
+    ParentSchoolVolunteeringController,
+    StaffSchoolVolunteeringController,
   ],
   providers: [
     SessionsService,
@@ -32,6 +39,7 @@ import {
     RotaAccessService,
     FamilyTimetableService,
     FamilySubjectTimetableService,
+    SchoolVolunteeringService,
   ],
   exports: [SessionsService, StaffAttendanceService],
 })
