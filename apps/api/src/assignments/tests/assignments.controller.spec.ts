@@ -6,6 +6,8 @@ import { CreateAssignmentDto } from "../dto/create-assignment.dto";
 import { UpdateAssignmentDto } from "../dto/update-assignment.dto";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../../billing/entitlements-enforcement.service";
+import { RotaAccessService } from "../../sessions/rota-access.service";
+import { ForbiddenException, NotFoundException } from "@nestjs/common";
 
 type AssignmentShape = {
   id: string;
@@ -62,6 +64,13 @@ describe("AssignmentsController", () => {
       "checkAv30ForOrg" | "assertWithinHardCap"
     >
   >;
+  const actorRequest = { authUserId: assignment.userId } as Parameters<
+    AssignmentsController["create"]
+  >[3];
+  const rotaAccess = {
+    canManage: jest.fn<Promise<boolean>, []>().mockResolvedValue(true),
+    assertManager: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
+  };
 
   const createMockService = (): ServiceMock => ({
     create: jest.fn(),
@@ -89,6 +98,7 @@ describe("AssignmentsController", () => {
       providers: [
         { provide: AssignmentsService, useValue: mock },
         { provide: EntitlementsEnforcementService, useValue: enforcementMock },
+        { provide: RotaAccessService, useValue: rotaAccess },
       ],
     })
       .overrideGuard(AuthUserGuard)
@@ -100,6 +110,8 @@ describe("AssignmentsController", () => {
     enforcement = module.get(
       EntitlementsEnforcementService,
     ) as unknown as typeof enforcementMock;
+    rotaAccess.canManage.mockResolvedValue(true);
+    rotaAccess.assertManager.mockResolvedValue(undefined);
   });
 
   describe("create", () => {
@@ -112,7 +124,12 @@ describe("AssignmentsController", () => {
         status: AssignmentStatus.CONFIRMED,
       };
 
-      const result = await controller.create(dto, "tenant-1", "org-123");
+      const result = await controller.create(
+        dto,
+        "tenant-1",
+        "org-123",
+        actorRequest,
+      );
       expect(service.create).toHaveBeenCalledWith(dto, "tenant-1", "org-123");
       expect(result).toEqual(assignment);
     });
@@ -128,7 +145,7 @@ describe("AssignmentsController", () => {
       };
 
       await expect(
-        controller.create(dto, "tenant-1", "org-123"),
+        controller.create(dto, "tenant-1", "org-123", actorRequest),
       ).rejects.toThrow("HARD_CAP");
       expect(service.create).not.toHaveBeenCalled();
     });
@@ -145,6 +162,8 @@ describe("AssignmentsController", () => {
           status: assignment.status,
         },
         "tenant-1",
+        "org-123",
+        actorRequest,
       );
       expect(service.findAll).toHaveBeenCalledWith({
         tenantId: "tenant-1",
@@ -160,7 +179,12 @@ describe("AssignmentsController", () => {
   describe("findOne", () => {
     it("should return a single assignment", async () => {
       service.findOne.mockResolvedValue(assignment);
-      const result = await controller.findOne(assignment.id, "tenant-1");
+      const result = await controller.findOne(
+        assignment.id,
+        "tenant-1",
+        "org-123",
+        actorRequest,
+      );
       expect(service.findOne).toHaveBeenCalledWith(assignment.id, "tenant-1");
       expect(result).toEqual(assignment);
     });
@@ -175,23 +199,19 @@ describe("AssignmentsController", () => {
       };
       service.update.mockResolvedValue(updated);
       const dto: UpdateAssignmentDto = { status: AssignmentStatus.DECLINED };
-      const req = { authUserId: "user-1" } as Parameters<
-        AssignmentsController["update"]
-      >[4];
-
       const result = await controller.update(
         assignment.id,
         dto,
         "tenant-1",
         "org-123",
-        req,
+        actorRequest,
       );
       expect(service.update).toHaveBeenCalledWith(
         assignment.id,
         dto,
         "tenant-1",
         "org-123",
-        "user-1",
+        undefined,
       );
       expect(result).toEqual(updated);
     });
@@ -202,9 +222,53 @@ describe("AssignmentsController", () => {
       const deletionResult = { deleted: true, id: assignment.id };
       service.remove.mockResolvedValue(deletionResult);
 
-      const result = await controller.remove(assignment.id, "tenant-1");
+      const result = await controller.remove(
+        assignment.id,
+        "tenant-1",
+        "org-123",
+        actorRequest,
+      );
       expect(service.remove).toHaveBeenCalledWith(assignment.id, "tenant-1");
       expect(result).toEqual(deletionResult);
     });
+  });
+
+  it("binds staff list requests to the signed-in user", async () => {
+    rotaAccess.canManage.mockResolvedValue(false);
+    service.findAll.mockResolvedValue([assignment]);
+
+    await controller.findAll({}, "tenant-1", "org-123", actorRequest);
+    expect(service.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: assignment.userId }),
+    );
+    await expect(
+      controller.findAll(
+        { userId: "33333333-3333-4333-9333-333333333333" },
+        "tenant-1",
+        "org-123",
+        actorRequest,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("hides another staff member's assignment and denies a status change", async () => {
+    rotaAccess.canManage.mockResolvedValue(false);
+    service.findOne.mockResolvedValue({
+      ...assignment,
+      userId: "33333333-3333-4333-9333-333333333333",
+    });
+    await expect(
+      controller.findOne(assignment.id, "tenant-1", "org-123", actorRequest),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      controller.update(
+        assignment.id,
+        { status: AssignmentStatus.DECLINED },
+        "tenant-1",
+        "org-123",
+        actorRequest,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(service.update).not.toHaveBeenCalled();
   });
 });

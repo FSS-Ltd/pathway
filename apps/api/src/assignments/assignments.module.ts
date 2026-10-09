@@ -6,11 +6,12 @@ import { BillingModule } from "../billing/billing.module";
 import { MailerModule } from "../mailer/mailer.module";
 import { AssignmentsController } from "./assignments.controller";
 import { AssignmentsService } from "./assignments.service";
+import { RotaAccessService } from "../sessions/rota-access.service";
 
 @Module({
   imports: [CommonModule, Av30Module, BillingModule, AuthModule, MailerModule],
   controllers: [AssignmentsController],
-  providers: [AssignmentsService],
+  providers: [AssignmentsService, RotaAccessService],
   exports: [AssignmentsService],
 })
 export class AssignmentsModule {}
