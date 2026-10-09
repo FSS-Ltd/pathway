@@ -133,6 +133,65 @@ describe("AssignmentsService", () => {
     expect(result).toEqual([baseAssignment]);
   });
 
+  it("returns bounded site staff rota details without child data", async () => {
+    asMock(prisma.assignment.findMany).mockResolvedValue([
+      {
+        id: baseAssignment.id,
+        userId: baseAssignment.userId,
+        role: Role.TEACHER,
+        status: AssignmentStatus.CONFIRMED,
+        user: {
+          firstName: "Alex",
+          lastName: "Morgan",
+          displayName: null,
+          name: "Fallback",
+        },
+        session: {
+          id: baseAssignment.sessionId,
+          title: "PACE session",
+          startsAt: new Date("2026-10-05T09:00:00.000Z"),
+          endsAt: new Date("2026-10-05T10:00:00.000Z"),
+          groups: [{ id: "group-1", name: "Year 4" }],
+        },
+      },
+    ]);
+
+    const rows = await service.findTeamSchedule("site-1", {
+      dateFrom: "2026-10-05",
+      dateTo: "2026-10-11",
+    });
+    expect(prisma.assignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: { not: AssignmentStatus.DECLINED },
+          session: {
+            tenantId: "site-1",
+            startsAt: {
+              gte: new Date("2026-10-05T00:00:00.000Z"),
+              lt: new Date("2026-10-12T00:00:00.000Z"),
+            },
+          },
+          user: { is: expect.objectContaining({ isActive: true }) },
+        }),
+      }),
+    );
+    expect(rows).toEqual([
+      {
+        assignmentId: baseAssignment.id,
+        sessionId: baseAssignment.sessionId,
+        sessionTitle: "PACE session",
+        startsAt: "2026-10-05T09:00:00.000Z",
+        endsAt: "2026-10-05T10:00:00.000Z",
+        groups: [{ id: "group-1", name: "Year 4" }],
+        staffId: baseAssignment.userId,
+        staffName: "Alex Morgan",
+        role: Role.TEACHER,
+        status: AssignmentStatus.CONFIRMED,
+      },
+    ]);
+    expect(JSON.stringify(rows)).not.toMatch(/child|attendance|email/i);
+  });
+
   it("should get a single assignment by id", async () => {
     asMock(prisma.assignment.findFirst).mockResolvedValue(baseAssignment);
 

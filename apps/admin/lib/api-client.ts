@@ -2734,6 +2734,36 @@ export async function fetchMyAssignments(params: {
   });
 }
 
+export type AdminTeamAssignment = {
+  assignmentId: string;
+  sessionId: string;
+  sessionTitle: string;
+  startsAt: string;
+  endsAt: string;
+  groups: { id: string; name: string }[];
+  staffId: string;
+  staffName: string;
+  role: string;
+  status: "PENDING" | "CONFIRMED";
+};
+
+export async function fetchTeamSchedule(
+  dateFrom: string,
+  dateTo: string,
+  signal?: AbortSignal,
+): Promise<AdminTeamAssignment[]> {
+  if (isUsingMockApi()) return [];
+  const query = new URLSearchParams({ dateFrom, dateTo });
+  const response = await fetch(
+    `${API_BASE_URL}/assignments/team-schedule?${query.toString()}`,
+    { headers: buildAuthHeaders(), cache: "no-store", signal },
+  );
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response, "Unable to load team rota.");
+  }
+  return response.json() as Promise<AdminTeamAssignment[]>;
+}
+
 export type SwapCandidate = { id: string; fullName: string };
 
 export async function fetchSwapCandidates(

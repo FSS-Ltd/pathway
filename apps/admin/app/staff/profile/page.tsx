@@ -60,7 +60,9 @@ export default function StaffProfilePage() {
   const { data: session, status } = useSession();
   const { role } = useAdminAccess();
   const [profile, setProfile] = React.useState<StaffProfileDetail | null>(null);
-  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>([]);
+  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -75,7 +77,9 @@ export default function StaffProfilePage() {
   const [unavailableDates, setUnavailableDates] = React.useState<
     { date: string; reason?: string }[]
   >([]);
-  const [preferredGroupIds, setPreferredGroupIds] = React.useState<string[]>([]);
+  const [preferredGroupIds, setPreferredGroupIds] = React.useState<string[]>(
+    [],
+  );
   const [newUnavailableDate, setNewUnavailableDate] = React.useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
   const [avatarVersion, setAvatarVersion] = React.useState(0);
@@ -150,9 +154,7 @@ export default function StaffProfilePage() {
       setPreferredGroupIds(profileData.preferredGroups.map((g) => g.id));
       setGroups(groupsData);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to load profile",
-      );
+      setError(err instanceof Error ? err.message : "Failed to load profile");
       setProfile(null);
     } finally {
       setIsLoading(false);
@@ -264,9 +266,7 @@ export default function StaffProfilePage() {
       setProfile((prev) => (prev ? { ...prev, ...updated } : null));
       toast.success("Profile saved successfully");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save changes",
-      );
+      setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setIsSaving(false);
     }
@@ -306,9 +306,7 @@ export default function StaffProfilePage() {
       setAvatarVersion((v) => v + 1);
       toast.success("Photo updated successfully");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to upload photo",
-      );
+      setError(err instanceof Error ? err.message : "Failed to upload photo");
     } finally {
       setIsUploadingAvatar(false);
       e.target.value = "";
@@ -341,8 +339,7 @@ export default function StaffProfilePage() {
   const tierLabel = getTierLabel(role);
   const userImage = profile?.hasAvatar
     ? `/api/staff/profile/avatar?v=${avatarVersion}`
-    : profile?.avatarUrl ||
-      (session?.user as { image?: string | null })?.image;
+    : profile?.avatarUrl || (session?.user as { image?: string | null })?.image;
 
   if (status === "loading" || isLoading) {
     return (
@@ -385,7 +382,10 @@ export default function StaffProfilePage() {
         </div>
       )}
 
-      <div className="border-t border-dashed border-border-subtle" aria-hidden />
+      <div
+        className="border-t border-dashed border-border-subtle"
+        aria-hidden
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ProfileHeaderCard
@@ -460,6 +460,7 @@ export default function StaffProfilePage() {
       {/* Weekly availability */}
       {canEditAvailability && (
         <Card
+          id="weekly-availability"
           title="Weekly availability"
           description="Recurring time slots when you are available"
         >
@@ -684,19 +685,13 @@ export default function StaffProfilePage() {
             <tbody>
               {!profile?.assignments?.length ? (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="py-8 text-center text-text-muted"
-                  >
+                  <td colSpan={4} className="py-8 text-center text-text-muted">
                     No sessions assigned yet
                   </td>
                 </tr>
               ) : !filteredAssignments.length ? (
                 <tr>
-                  <td
-                    colSpan={4}
-                    className="py-8 text-center text-text-muted"
-                  >
+                  <td colSpan={4} className="py-8 text-center text-text-muted">
                     No sessions in this date range. Adjust the filter to see
                     older or future dates.
                   </td>
@@ -719,12 +714,9 @@ export default function StaffProfilePage() {
                         const isPending = a.status === "PENDING";
                         const isConfirmedOrDeclined =
                           a.status === "CONFIRMED" || a.status === "DECLINED";
-                        const marked =
-                          a.session.attendanceMarked ?? 0;
-                        const total =
-                          a.session.attendanceTotal ?? 0;
-                        const attendanceComplete =
-                          total > 0 && marked >= total;
+                        const marked = a.session.attendanceMarked ?? 0;
+                        const total = a.session.attendanceTotal ?? 0;
+                        const attendanceComplete = total > 0 && marked >= total;
                         const isBusy = actionLoadingId === a.id;
 
                         return (
@@ -763,9 +755,7 @@ export default function StaffProfilePage() {
                                       : "bg-muted text-text-muted"
                                 }`}
                               >
-                                {a.status === "PENDING"
-                                  ? "Pending"
-                                  : a.status}
+                                {a.status === "PENDING" ? "Pending" : a.status}
                               </span>
                             </td>
                             <td className="py-4">
@@ -773,12 +763,8 @@ export default function StaffProfilePage() {
                                 <Button
                                   size="sm"
                                   variant="primary"
-                                  onClick={() =>
-                                    handleAcceptAssignment(a.id)
-                                  }
-                                  disabled={
-                                    !isPending || isBusy
-                                  }
+                                  onClick={() => handleAcceptAssignment(a.id)}
+                                  disabled={!isPending || isBusy}
                                   className={
                                     isConfirmedOrDeclined
                                       ? "opacity-50 cursor-not-allowed"
@@ -800,12 +786,8 @@ export default function StaffProfilePage() {
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() =>
-                                    handleDeclineAssignment(a.id)
-                                  }
-                                  disabled={
-                                    !isPending || isBusy
-                                  }
+                                  onClick={() => handleDeclineAssignment(a.id)}
+                                  disabled={!isPending || isBusy}
                                   className={
                                     isConfirmedOrDeclined
                                       ? "opacity-50 cursor-not-allowed"
@@ -867,9 +849,7 @@ export default function StaffProfilePage() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={() =>
-                                  setActivityPage((p) =>
-                                    Math.max(1, p - 1),
-                                  )
+                                  setActivityPage((p) => Math.max(1, p - 1))
                                 }
                                 disabled={page <= 1}
                               >

@@ -20,6 +20,7 @@ import { toLocalDateKey } from "../../lib/date";
 import { requestFailure, type RequestFailure } from "../../lib/request-error";
 import { SwapCandidateForm, SwapRequestList } from "./swap-panels";
 import { AssignmentList } from "./assignment-list";
+import { TeamRota } from "./team-rota";
 
 const addDays = (date: Date, days: number) => {
   const next = new Date(date);
@@ -409,6 +410,7 @@ export default function MySchedulePage() {
           />
         )}
       </Card>
+      <TeamRota siteId={siteId} dateFrom={dateFrom} dateTo={dateTo} />
     </div>
   );
 }

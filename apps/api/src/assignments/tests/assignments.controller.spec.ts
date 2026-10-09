@@ -1,13 +1,21 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AssignmentsController } from "../assignments.controller";
-import { AssignmentsService } from "../assignments.service";
+import {
+  AssignmentsService,
+  type TeamScheduleRow,
+} from "../assignments.service";
 import { Role, AssignmentStatus } from "@pathway/db";
 import { CreateAssignmentDto } from "../dto/create-assignment.dto";
 import { UpdateAssignmentDto } from "../dto/update-assignment.dto";
+import type { TeamScheduleQueryDto } from "../dto/team-schedule-query.dto";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../../billing/entitlements-enforcement.service";
 import { RotaAccessService } from "../../sessions/rota-access.service";
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 
 type AssignmentShape = {
   id: string;
@@ -46,6 +54,10 @@ describe("AssignmentsController", () => {
       [CreateAssignmentDto, string, string]
     >;
     findAll: jest.Mock<Promise<readonly AssignmentShape[]>, [FindAllQuery]>;
+    findTeamSchedule: jest.Mock<
+      Promise<TeamScheduleRow[]>,
+      [string, TeamScheduleQueryDto]
+    >;
     findOne: jest.Mock<Promise<AssignmentShape>, [string, string]>;
     update: jest.Mock<
       Promise<AssignmentShape>,
@@ -70,11 +82,13 @@ describe("AssignmentsController", () => {
   const rotaAccess = {
     canManage: jest.fn<Promise<boolean>, []>().mockResolvedValue(true),
     assertManager: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
+    assertTeamViewer: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
   };
 
   const createMockService = (): ServiceMock => ({
     create: jest.fn(),
     findAll: jest.fn(),
+    findTeamSchedule: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -112,6 +126,7 @@ describe("AssignmentsController", () => {
     ) as unknown as typeof enforcementMock;
     rotaAccess.canManage.mockResolvedValue(true);
     rotaAccess.assertManager.mockResolvedValue(undefined);
+    rotaAccess.assertTeamViewer.mockResolvedValue(undefined);
   });
 
   describe("create", () => {
@@ -173,6 +188,52 @@ describe("AssignmentsController", () => {
         status: assignment.status,
       });
       expect(result).toEqual([assignment]);
+    });
+  });
+
+  describe("findTeamSchedule", () => {
+    const query = { dateFrom: "2026-10-05", dateTo: "2026-10-11" };
+
+    it("returns only the selected site's team schedule after access check", async () => {
+      service.findTeamSchedule.mockResolvedValue([]);
+      await expect(
+        controller.findTeamSchedule(query, "site-1", "org-123", actorRequest),
+      ).resolves.toEqual([]);
+      expect(rotaAccess.assertTeamViewer).toHaveBeenCalledWith({
+        userId: assignment.userId,
+        tenantId: "site-1",
+        orgId: "org-123",
+        isSuperUser: false,
+      });
+      expect(service.findTeamSchedule).toHaveBeenCalledWith("site-1", query);
+    });
+
+    it("rejects invalid or excessive date windows before reading", async () => {
+      for (const invalid of [
+        { dateFrom: "2026-02-30", dateTo: "2026-03-02" },
+        { dateFrom: "2026-10-05", dateTo: "2026-10-12" },
+        { dateFrom: "2026-10-11", dateTo: "2026-10-05" },
+      ]) {
+        await expect(
+          controller.findTeamSchedule(
+            invalid,
+            "site-1",
+            "org-123",
+            actorRequest,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+      }
+      expect(service.findTeamSchedule).not.toHaveBeenCalled();
+    });
+
+    it("does not read team data when the actor is denied", async () => {
+      rotaAccess.assertTeamViewer.mockRejectedValueOnce(
+        new ForbiddenException(),
+      );
+      await expect(
+        controller.findTeamSchedule(query, "site-1", "org-123", actorRequest),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(service.findTeamSchedule).not.toHaveBeenCalled();
     });
   });
 

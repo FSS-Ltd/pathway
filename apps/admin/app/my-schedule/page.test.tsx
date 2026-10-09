@@ -8,10 +8,13 @@ import { SwapCandidateForm, SwapRequestList } from "./swap-panels";
 import {
   fetchMyAssignments,
   fetchSwapCandidates,
+  fetchTeamSchedule,
   type AdminAssignmentRow,
   type AdminSwapRequestRow,
+  type AdminTeamAssignment,
 } from "@/lib/api-client";
 import { AssignmentList } from "./assignment-list";
+import { TeamRota, TeamRotaList } from "./team-rota";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost/my-schedule",
@@ -235,13 +238,58 @@ async function run(): Promise<void> {
       null,
     );
 
+    const teamAssignment: AdminTeamAssignment = {
+      assignmentId: "private-team-assignment",
+      sessionId: "private-session",
+      sessionTitle: "Year 4 Maths",
+      startsAt: "2026-10-12T09:00:00.000Z",
+      endsAt: "2026-10-12T10:00:00.000Z",
+      groups: [{ id: "group-1", name: "Year 4" }],
+      staffId: "private-staff",
+      staffName: "Alex Morgan",
+      role: "TEACHER",
+      status: "CONFIRMED",
+    };
+    await act(async () => {
+      root.render(<TeamRotaList rows={[teamAssignment]} />);
+    });
+    assert.match(container.textContent ?? "", /Year 4 Maths/);
+    assert.match(container.textContent ?? "", /Alex Morgan/);
+    assert.match(container.textContent ?? "", /Year 4/);
+    assert.doesNotMatch(container.textContent ?? "", /private-/);
+
+    await act(async () => {
+      root.render(
+        <TeamRota siteId={null} dateFrom="2026-10-12" dateTo="2026-10-18" />,
+      );
+    });
+    assert.match(container.textContent ?? "", /Choose a site/);
+    assert.equal(
+      container.querySelector('a[href="/staff/profile#weekly-availability"]')
+        ?.textContent,
+      "Set my availability",
+    );
+
     const nativeFetch = globalThis.fetch;
     const calls: string[] = [];
+    let teamMode: "ready" | "empty" | "denied" | "unavailable" = "ready";
     globalThis.fetch = async (input) => {
       const url = String(input);
       calls.push(url);
       if (url.includes("/swaps/candidates?")) {
         return Response.json([{ id: "colleague", fullName: "Alex Morgan" }]);
+      }
+      if (url.includes("/assignments/team-schedule?")) {
+        if (teamMode === "denied") {
+          return Response.json({ message: "Forbidden" }, { status: 403 });
+        }
+        if (teamMode === "unavailable") {
+          return Response.json(
+            { message: "Service unavailable" },
+            { status: 503 },
+          );
+        }
+        return Response.json(teamMode === "empty" ? [] : [teamAssignment]);
       }
       if (url.includes("/sessions") || url.includes("/assignments")) {
         return Response.json([]);
@@ -260,6 +308,71 @@ async function run(): Promise<void> {
       assert.deepEqual(await fetchSwapCandidates("assignment-1"), [
         { id: "colleague", fullName: "Alex Morgan" },
       ]);
+      assert.deepEqual(await fetchTeamSchedule("2026-10-12", "2026-10-18"), [
+        teamAssignment,
+      ]);
+      await act(async () => {
+        root.render(
+          <TeamRota
+            siteId="site-1"
+            dateFrom="2026-10-12"
+            dateTo="2026-10-18"
+          />,
+        );
+      });
+      assert.match(container.textContent ?? "", /Alex Morgan/);
+
+      teamMode = "empty";
+      await act(async () => {
+        root.render(
+          <TeamRota
+            siteId="site-2"
+            dateFrom="2026-10-12"
+            dateTo="2026-10-18"
+          />,
+        );
+      });
+      assert.match(container.textContent ?? "", /No team sessions/);
+      assert.doesNotMatch(container.textContent ?? "", /Alex Morgan/);
+
+      teamMode = "denied";
+      await act(async () => {
+        root.render(
+          <TeamRota
+            siteId="site-3"
+            dateFrom="2026-10-12"
+            dateTo="2026-10-18"
+          />,
+        );
+      });
+      assert.match(
+        container.querySelector('[role="alert"]')?.textContent ?? "",
+        /available to staff/,
+      );
+      assert.equal(
+        container.querySelector('a[href="/staff/profile#weekly-availability"]'),
+        null,
+      );
+
+      teamMode = "unavailable";
+      await act(async () => {
+        root.render(
+          <TeamRota
+            siteId="site-4"
+            dateFrom="2026-10-12"
+            dateTo="2026-10-18"
+          />,
+        );
+      });
+      assert.match(
+        container.querySelector('[role="alert"]')?.textContent ?? "",
+        /Unable to load team rota/,
+      );
+      teamMode = "ready";
+      await act(async () => {
+        container.querySelector<HTMLButtonElement>("button")?.click();
+      });
+      assert.match(container.textContent ?? "", /Alex Morgan/);
       assert.equal(
         calls.some((url) => url.endsWith("/users")),
         false,
@@ -267,6 +380,14 @@ async function run(): Promise<void> {
       assert.equal(
         calls.some((url) =>
           url.includes("/swaps/candidates?assignmentId=assignment-1"),
+        ),
+        true,
+      );
+      assert.equal(
+        calls.some((url) =>
+          url.includes(
+            "/assignments/team-schedule?dateFrom=2026-10-12&dateTo=2026-10-18",
+          ),
         ),
         true,
       );

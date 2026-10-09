@@ -6,42 +6,12 @@ import {
 } from "@nestjs/common";
 import {
   prisma,
-  type Prisma,
   AssignmentStatus,
-  Role,
-  SiteRole,
   SwapStatus,
   withTenantRlsContext,
 } from "@pathway/db";
 import { CreateSwapDto, UpdateSwapDto } from "./dto";
-
-const staffRoles = [
-  Role.ADMIN,
-  Role.COORDINATOR,
-  Role.TEACHER,
-  Role.LEAD,
-  Role.SUPPORT,
-];
-
-function staffAtSite(tenantId: string, userId?: string): Prisma.UserWhereInput {
-  return {
-    ...(userId ? { id: userId } : {}),
-    isActive: true,
-    OR: [
-      {
-        siteMemberships: {
-          some: {
-            tenantId,
-            role: { in: [SiteRole.STAFF, SiteRole.SITE_ADMIN] },
-          },
-        },
-      },
-      {
-        roles: { some: { tenantId, role: { in: staffRoles } } },
-      },
-    ],
-  };
-}
+import { staffAtSite } from "../sessions/rota-access.service";
 
 @Injectable()
 export class SwapsService {

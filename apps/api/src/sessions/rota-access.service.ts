@@ -4,7 +4,43 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { getSystemRoleId, OrgRole, prisma, SiteRole } from "@pathway/db";
+import {
+  getSystemRoleId,
+  OrgRole,
+  prisma,
+  type Prisma,
+  Role,
+  SiteRole,
+} from "@pathway/db";
+
+const staffRoles = [
+  Role.ADMIN,
+  Role.COORDINATOR,
+  Role.TEACHER,
+  Role.LEAD,
+  Role.SUPPORT,
+];
+
+export function staffAtSite(
+  tenantId: string,
+  userId?: string,
+): Prisma.UserWhereInput {
+  return {
+    ...(userId ? { id: userId } : {}),
+    isActive: true,
+    OR: [
+      {
+        siteMemberships: {
+          some: {
+            tenantId,
+            role: { in: [SiteRole.STAFF, SiteRole.SITE_ADMIN] },
+          },
+        },
+      },
+      { roles: { some: { tenantId, role: { in: staffRoles } } } },
+    ],
+  };
+}
 
 export interface RotaActor {
   userId: string;
@@ -84,6 +120,24 @@ export class RotaAccessService {
   async assertManager(actor: RotaActor): Promise<void> {
     if (!(await this.canManage(actor))) {
       throw new ForbiddenException("Rota management is not available");
+    }
+  }
+
+  async assertTeamViewer(actor: RotaActor): Promise<void> {
+    const activeUser = await prisma.user.findFirst({
+      where: { id: actor.userId, isActive: true },
+      select: { id: true },
+    });
+    if (!activeUser) {
+      throw new ForbiddenException("Team rota is not available");
+    }
+    if (await this.canManage(actor)) return;
+    const staff = await prisma.user.findFirst({
+      where: staffAtSite(actor.tenantId, actor.userId),
+      select: { id: true },
+    });
+    if (!staff) {
+      throw new ForbiddenException("Team rota is not available");
     }
   }
 
