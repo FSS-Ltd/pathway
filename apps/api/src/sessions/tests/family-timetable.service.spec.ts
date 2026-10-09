@@ -1,8 +1,9 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
-import { prisma, withTenantRlsContext } from "@pathway/db";
+import { prisma, SessionRotaKind, withTenantRlsContext } from "@pathway/db";
 import { FamilyTimetableService } from "../family-timetable.service";
 
 jest.mock("@pathway/db", () => ({
+  ...jest.requireActual<typeof import("@pathway/db")>("@pathway/db"),
   prisma: { tenant: { findUnique: jest.fn() } },
   withTenantRlsContext: jest.fn(),
 }));
@@ -41,6 +42,7 @@ function setup() {
       findFirst: jest.fn().mockResolvedValue({
         id: "session-a",
         familyPublishedAt: null,
+        rotaKind: SessionRotaKind.STANDARD,
         groups: [{ id: "group-a" }],
       }),
       update: jest.fn().mockResolvedValue({ familyPublishedAt: new Date() }),
@@ -87,6 +89,7 @@ describe("family timetable access", () => {
       where: {
         tenantId: "site-a",
         familyPublishedAt: { not: null },
+        rotaKind: SessionRotaKind.STANDARD,
         groups: { some: { id: "group-a" } },
         startsAt: { lt: range.to },
         endsAt: { gt: range.from },
@@ -143,11 +146,26 @@ describe("family timetable access", () => {
     tx.session.findFirst.mockResolvedValueOnce({
       id: "session-a",
       familyPublishedAt: null,
+      rotaKind: SessionRotaKind.STANDARD,
       groups: [],
     });
     await expect(
       service.setPublication("session-a", "site-a", "org-a", "manager-a", true),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(tx.session.update).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects publishing a cover shift even if it has a group", async () => {
+    const { tx, service } = setup();
+    tx.session.findFirst.mockResolvedValueOnce({
+      id: "session-a",
+      familyPublishedAt: null,
+      rotaKind: SessionRotaKind.COVER,
+      groups: [{ id: "group-a" }],
+    });
+    await expect(
+      service.setPublication("session-a", "site-a", "org-a", "manager-a", true),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.session.update).not.toHaveBeenCalled();
   });
 });

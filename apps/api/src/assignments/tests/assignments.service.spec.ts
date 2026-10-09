@@ -29,7 +29,7 @@ jest.mock("@pathway/db", () => {
 });
 
 import { AssignmentsService } from "../assignments.service";
-import { Role, AssignmentStatus, prisma } from "@pathway/db";
+import { Role, AssignmentStatus, SessionRotaKind, prisma } from "@pathway/db";
 import { Av30ActivityService } from "../../av30/av30-activity.service";
 import { Av30ActivityType } from "@pathway/types/av30";
 import { CreateAssignmentDto } from "../dto/create-assignment.dto";
@@ -149,6 +149,7 @@ describe("AssignmentsService", () => {
         session: {
           id: baseAssignment.sessionId,
           title: "PACE session",
+          rotaKind: SessionRotaKind.COVER,
           startsAt: new Date("2026-10-05T09:00:00.000Z"),
           endsAt: new Date("2026-10-05T10:00:00.000Z"),
           groups: [{ id: "group-1", name: "Year 4" }],
@@ -180,6 +181,7 @@ describe("AssignmentsService", () => {
         assignmentId: baseAssignment.id,
         sessionId: baseAssignment.sessionId,
         sessionTitle: "PACE session",
+        rotaKind: SessionRotaKind.COVER,
         startsAt: "2026-10-05T09:00:00.000Z",
         endsAt: "2026-10-05T10:00:00.000Z",
         groups: [{ id: "group-1", name: "Year 4" }],

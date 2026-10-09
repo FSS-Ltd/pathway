@@ -728,6 +728,23 @@ describe("AttendanceService", () => {
   });
 
   describe("upsertSessionAttendance", () => {
+    it("requires a teaching session before child attendance writes", async () => {
+      sFindFirst.mockResolvedValueOnce(null);
+      await expect(
+        svc.upsertSessionAttendance("shift-1", "tenant-123", { rows: [] }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(sFindFirst).toHaveBeenCalledWith({
+        where: {
+          id: "shift-1",
+          tenantId: "tenant-123",
+          rotaKind: "STANDARD",
+        },
+        select: { id: true, groups: { select: { id: true } } },
+      });
+      expect(aCreate).not.toHaveBeenCalled();
+      expect(aUpdate).not.toHaveBeenCalled();
+    });
+
     it("requires per-row correction provenance and writes Late coherently", async () => {
       sFindFirst.mockResolvedValueOnce({
         id: "session-1",

@@ -50,6 +50,7 @@ export type AdminRelatedConcernMeta = {
 
 export type AdminSessionRow = {
   id: string;
+  rotaKind?: AdminSessionRotaKind;
   familyPublishedAt?: string | null;
   title: string;
   startsAt: string;
@@ -91,6 +92,7 @@ export type AdminAssignmentRow = {
   roleLabel: "Lead" | "Support" | string;
   status: "pending" | "confirmed" | "declined";
   sessionTitle?: string;
+  rotaKind?: AdminSessionRotaKind;
   sessionGroupName?: string;
   /** Hex color for the primary group (for rota/schedule card styling) */
   sessionGroupColor?: string | null;
@@ -115,10 +117,13 @@ export type AdminSessionDetail = AdminSessionRow & {
 };
 
 // SESSION FORMS (CreateSessionDto / UpdateSessionDto subset)
+export type AdminSessionRotaKind = "STANDARD" | "COVER" | "MEETING";
+
 export type AdminSessionFormValues = {
   title: string;
   startsAt: string;
   endsAt: string;
+  rotaKind?: AdminSessionRotaKind;
   /** @deprecated use groupIds */
   groupId?: string;
   groupIds?: string[];
@@ -1679,6 +1684,7 @@ type ApiAssignment = {
   status?: string | null;
   session?: {
     id: string;
+    rotaKind?: AdminSessionRotaKind;
     title?: string | null;
     startsAt?: string | null;
     endsAt?: string | null;
@@ -1721,6 +1727,7 @@ export const mapApiAssignmentToAdminRow = (
       string,
       {
         title?: string | null;
+        rotaKind?: AdminSessionRotaKind;
         startsAt?: string | null;
         endsAt?: string | null;
       }
@@ -1754,6 +1761,7 @@ export const mapApiAssignmentToAdminRow = (
     roleLabel: normalizeRoleLabel(assignment.role),
     status: normalizeAssignmentStatus(assignment.status),
     sessionTitle: sessionMeta?.title ?? undefined,
+    rotaKind: sessionMeta?.rotaKind ?? assignment.session?.rotaKind,
     sessionGroupName: sessionGroupName ?? undefined,
     sessionGroupColor: sessionGroupColor ?? undefined,
     startsAt,
@@ -1867,6 +1875,7 @@ export async function fetchSessionsMock(): Promise<AdminSessionRow[]> {
 
 type ApiSessionDetail = {
   id: string;
+  rotaKind?: AdminSessionRotaKind;
   familyPublishedAt?: string | null;
   title: string | null;
   startsAt: string;
@@ -1914,6 +1923,7 @@ const mapApiSessionDetailToAdmin = (
   s: ApiSessionDetail,
 ): AdminSessionDetail & { groupId?: string | null; groupIds?: string[] } => ({
   id: s.id,
+  rotaKind: s.rotaKind ?? "STANDARD",
   familyPublishedAt: s.familyPublishedAt ?? null,
   title: s.title ?? "Session",
   startsAt: s.startsAt,
@@ -2155,6 +2165,7 @@ export async function fetchSessions(): Promise<AdminSessionRow[]> {
 
   type ApiSession = {
     id: string;
+    rotaKind?: AdminSessionRotaKind;
     title: string | null;
     startsAt: string;
     endsAt: string;
@@ -2178,6 +2189,7 @@ export async function fetchSessions(): Promise<AdminSessionRow[]> {
 
   return json.map((s) => ({
     id: s.id,
+    rotaKind: s.rotaKind ?? "STANDARD",
     title: s.title ?? "Session",
     startsAt: s.startsAt,
     endsAt: s.endsAt,
@@ -2211,7 +2223,7 @@ export async function fetchSessions(): Promise<AdminSessionRow[]> {
   }));
 }
 
-// CreateSessionDto: tenantId, groupIds?, startsAt, endsAt, title?
+// CreateSessionDto: tenantId, groupIds?, startsAt, endsAt, title?, rotaKind?
 export async function createSession(
   input: AdminSessionFormValues,
 ): Promise<AdminSessionDetail> {
@@ -2228,6 +2240,7 @@ export async function createSession(
     startsAt: input.startsAt,
     endsAt: input.endsAt,
     title: input.title?.trim() || undefined,
+    rotaKind: input.rotaKind ?? "STANDARD",
   };
 
   const res = await fetch(`${API_BASE_URL}/sessions`, {
@@ -2249,7 +2262,7 @@ export async function createSession(
   return mapApiSessionDetailToAdmin(json);
 }
 
-// UpdateSessionDto: tenantId?, groupIds?, startsAt?, endsAt?, title?
+// UpdateSessionDto: tenantId?, groupIds?, startsAt?, endsAt?, title?, rotaKind?
 export async function updateSession(
   id: string,
   input: Partial<AdminSessionFormValues>,
@@ -2264,6 +2277,7 @@ export async function updateSession(
         : undefined;
   const payload = {
     ...(input.title ? { title: input.title.trim() } : {}),
+    ...(input.rotaKind ? { rotaKind: input.rotaKind } : {}),
     ...(input.startsAt ? { startsAt: input.startsAt } : {}),
     ...(input.endsAt ? { endsAt: input.endsAt } : {}),
     ...(groupIds !== undefined ? { groupIds } : {}),
@@ -2465,6 +2479,7 @@ export async function fetchAssignmentsForOrg(
       type ApiSessionForLookup = {
         id: string;
         title?: string | null;
+        rotaKind?: AdminSessionRotaKind;
         startsAt?: string | null;
         endsAt?: string | null;
       };
@@ -2474,6 +2489,7 @@ export async function fetchAssignmentsForOrg(
           string,
           {
             title?: string | null;
+            rotaKind?: AdminSessionRotaKind;
             startsAt?: string | null;
             endsAt?: string | null;
           }
@@ -2481,6 +2497,7 @@ export async function fetchAssignmentsForOrg(
       >((acc, s) => {
         acc[s.id] = {
           title: s.title ?? undefined,
+          rotaKind: s.rotaKind,
           startsAt: s.startsAt ?? undefined,
           endsAt: s.endsAt ?? undefined,
         };
@@ -2738,6 +2755,7 @@ export type AdminTeamAssignment = {
   assignmentId: string;
   sessionId: string;
   sessionTitle: string;
+  rotaKind?: AdminSessionRotaKind;
   startsAt: string;
   endsAt: string;
   groups: { id: string; name: string }[];

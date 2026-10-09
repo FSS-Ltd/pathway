@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SessionRotaKind } from "@pathway/db";
 
 export const createSessionSchema = z.object({
   tenantId: z.string().uuid(),
@@ -7,6 +8,7 @@ export const createSessionSchema = z.object({
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
   title: z.string().optional(),
+  rotaKind: z.nativeEnum(SessionRotaKind).optional(),
 });
 
 export type CreateSessionDto = z.infer<typeof createSessionSchema>;

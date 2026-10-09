@@ -1,0 +1,4 @@
+CREATE TYPE "SessionRotaKind" AS ENUM ('STANDARD', 'COVER', 'MEETING');
+
+ALTER TABLE "Session"
+ADD COLUMN "rotaKind" "SessionRotaKind" NOT NULL DEFAULT 'STANDARD';

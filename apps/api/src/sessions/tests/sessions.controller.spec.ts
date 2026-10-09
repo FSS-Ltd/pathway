@@ -13,6 +13,7 @@ import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../../billing/entitlements-enforcement.service";
 import { RotaAccessService } from "../rota-access.service";
 import { FamilyTimetableService } from "../family-timetable.service";
+import { SessionRotaKind } from "@pathway/db";
 
 // Minimal shape used in tests (avoid importing Prisma types here)
 type LessonShape = {
@@ -29,6 +30,7 @@ interface SessionShape {
   startsAt: Date;
   endsAt: Date;
   title: string | null;
+  rotaKind: SessionRotaKind;
   familyPublishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -53,6 +55,7 @@ describe("SessionsController", () => {
     startsAt: new Date("2025-01-01T09:00:00Z"),
     endsAt: new Date("2025-01-01T10:00:00Z"),
     title: "Kids service",
+    rotaKind: SessionRotaKind.STANDARD,
     familyPublishedAt: null,
     createdAt: new Date("2024-12-31T00:00:00Z"),
     updatedAt: new Date("2024-12-31T00:00:00Z"),

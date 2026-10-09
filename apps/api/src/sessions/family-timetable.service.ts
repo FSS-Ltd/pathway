@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { withTenantRlsContext } from "@pathway/db";
+import { SessionRotaKind, withTenantRlsContext } from "@pathway/db";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import type { FamilyTimetableRange } from "./dto/family-timetable-query.dto";
@@ -36,6 +36,7 @@ export class FamilyTimetableService {
             where: {
               tenantId: siteId,
               familyPublishedAt: { not: null },
+              rotaKind: SessionRotaKind.STANDARD,
               groups: { some: { id: child.groupId } },
               startsAt: { lt: range.to },
               endsAt: { gt: range.from },
@@ -75,10 +76,16 @@ export class FamilyTimetableService {
         select: {
           id: true,
           familyPublishedAt: true,
+          rotaKind: true,
           groups: { select: { id: true } },
         },
       });
       if (!session) throw new NotFoundException("Session not found");
+      if (publish && session.rotaKind !== SessionRotaKind.STANDARD) {
+        throw new BadRequestException(
+          "Staff shifts cannot be published to families",
+        );
+      }
       if (publish && session.groups.length === 0) {
         throw new BadRequestException("Assign a group before publishing");
       }

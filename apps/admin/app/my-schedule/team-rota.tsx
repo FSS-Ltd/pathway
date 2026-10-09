@@ -6,6 +6,7 @@ import { Button, Card } from "@pathway/ui";
 import { fetchTeamSchedule, type AdminTeamAssignment } from "@/lib/api-client";
 import { toLocalDateKey } from "@/lib/date";
 import { requestFailure, type RequestFailure } from "@/lib/request-error";
+import { SessionRotaKindBadge } from "@/components/session-rota-kind";
 
 type TeamRotaState =
   | { scope: string; status: "loading" }
@@ -57,9 +58,12 @@ export function TeamRotaList({ rows }: { rows: AdminTeamAssignment[] }) {
                 className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
               >
                 <div className="min-w-0">
-                  <p className="font-medium text-text-primary">
-                    {row.sessionTitle}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-text-primary">
+                      {row.sessionTitle}
+                    </p>
+                    <SessionRotaKindBadge kind={row.rotaKind} />
+                  </div>
                   <p className="text-sm text-text-muted">
                     {row.groups.map((group) => group.name).join(", ") ||
                       "Site session"}

@@ -15,6 +15,7 @@ import {
 } from "@/lib/api-client";
 import { AssignmentList } from "./assignment-list";
 import { TeamRota, TeamRotaList } from "./team-rota";
+import { SessionRotaKindField } from "@/components/session-rota-kind";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost/my-schedule",
@@ -46,6 +47,32 @@ async function run(): Promise<void> {
   const container = document.body.appendChild(document.createElement("div"));
   const root = createRoot(container);
   try {
+    let selectedPurpose = "";
+    await act(async () => {
+      root.render(
+        <SessionRotaKindField
+          value="STANDARD"
+          onChange={(value) => {
+            selectedPurpose = value;
+          }}
+        />,
+      );
+    });
+    const purposeSelect =
+      container.querySelector<HTMLSelectElement>("#rotaKind");
+    assert.equal(purposeSelect?.options.length, 3);
+    assert.equal(
+      container.querySelector('label[for="rotaKind"]')?.textContent,
+      "Purpose",
+    );
+    await act(async () => {
+      if (purposeSelect) {
+        purposeSelect.value = "COVER";
+        purposeSelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    assert.equal(selectedPurpose, "COVER");
+
     await act(async () => {
       root.render(
         <AdminContextRuntime session={session("loading")}>
@@ -223,6 +250,23 @@ async function run(): Promise<void> {
     await act(async () => {
       root.render(
         <AssignmentList
+          assignments={[
+            { ...assignment, rotaKind: "COVER", sessionTitle: "Year 4 cover" },
+          ]}
+          activeSwapAssignmentId={null}
+          busyAssignmentId={null}
+          swapForm={null}
+          onAccept={() => undefined}
+          onDecline={() => undefined}
+          onRequestSwap={() => undefined}
+        />,
+      );
+    });
+    assert.match(container.textContent ?? "", /Cover shift/);
+    assert.match(container.textContent ?? "", /Year 4 cover/);
+    await act(async () => {
+      root.render(
+        <AssignmentList
           assignments={[{ ...assignment, status: "declined" }]}
           activeSwapAssignmentId={null}
           busyAssignmentId={null}
@@ -257,6 +301,12 @@ async function run(): Promise<void> {
     assert.match(container.textContent ?? "", /Alex Morgan/);
     assert.match(container.textContent ?? "", /Year 4/);
     assert.doesNotMatch(container.textContent ?? "", /private-/);
+    await act(async () => {
+      root.render(
+        <TeamRotaList rows={[{ ...teamAssignment, rotaKind: "MEETING" }]} />,
+      );
+    });
+    assert.match(container.textContent ?? "", /Staff meeting/);
 
     await act(async () => {
       root.render(
