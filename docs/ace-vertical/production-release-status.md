@@ -1,10 +1,10 @@
 # ACE production release status
 
 Checked on 9 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `ae1383b6195eb883bc5e99f08ed3cbc58dfd9741`.
+to READY deployments at merged commit `da27ee63f25a51558d3e68948e04816f416223da`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-14 are now served by all three apps.
+changes through REL-15 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -296,6 +296,27 @@ loading experience while the final production check remains open: a reviewed
 linked parent must discover a responder, send a message, and see the staff
 reply in the same site. The school must approve legal access and enable the
 parent portal before that test; no historical link is approved automatically.
+[PR #519](https://github.com/FSS-Ltd/pathway/pull/519) passed all eight checks
+on `921ddfa8c3819b02f607015b92c2cd5febfea6b3` (CI 37875192316,
+CodeQL 37875187357) and merged as
+`da27ee63f25a51558d3e68948e04816f416223da`. [Production run
+37875939897](https://github.com/FSS-Ltd/pathway/actions/runs/37875939897)
+passed migrations and all three app jobs. Vercel reports READY API
+`dpl_6hkBozHzFVLepEzDh5VLJuP2a9eh`, admin
+`dpl_65UXQpXHgijvnR43WZ5uiUQ4k4vf`, and web
+`dpl_HYX6a76nq652vXg6AYTQyHp8KkGc` at the merged commit. API health and
+the public blog read returned HTTP 200; unsigned admin Messages redirected to
+sign-in; the configurator returned HTTP 200. The signed-in ACE overview later
+exposed attendance and PACE counts in the browser accessibility tree. A live
+Messages visual check and parent-to-staff exchange remain open.
+
+REL-16 addresses a separate pre-network loading gap. The shared admin API
+transport can wait indefinitely for its Clerk token, even after a request's
+abort signal fires. This leaves signed-in data reads and the admin bootstrap
+loading indefinitely before any API request exists to diagnose. Token waiting
+will honour the request's abort signal, expire after 15 seconds, and allow a
+new token attempt on retry. It does not activate parent access or establish
+that every published journey loads live data.
 
 ## Delivery steps
 
@@ -382,7 +403,8 @@ parent portal before that test; no historical link is approved automatically.
 | REL-12   | Bridge protected ACE message and notice tables to public Prisma        | Merged  | [#516](https://github.com/FSS-Ltd/pathway/pull/516) to `master`                     | `3c0a2350ebf3245cc705377d700019431ac91ad2`; all eight checks passed: CI 37867521249, CodeQL 37867518620. Deploy 37868259048 passed all four jobs; database migration and aliases verified.                      | `68eec5eeda13eef0dd34ff771a2ec145ebe8db4b` |
 | REL-13   | Show disabled parent messaging state without a failed data request     | Merged  | [#517](https://github.com/FSS-Ltd/pathway/pull/517) to `master`                     | `01a916a281fdafe56010c6d41cb5a3fca9478dff`; all eight checks passed: CI 37870030605, CodeQL 37870029534. Deploy 37870846650 passed all four jobs; aliases verified.                                             | `4c805d636a3cc82c627ef3c3bd42d3c96ea0356d` |
 | REL-14   | Parent and staff two-way database messaging journey                    | Merged  | [#518](https://github.com/FSS-Ltd/pathway/pull/518) to `master`                     | `aa44fc3152cb4b327824cb3eb104d663ffd378bf`; all eight checks passed: CI 37871889213, CodeQL 37871886845. Deploy 37872708126 passed all four jobs; aliases verified.                                             | `ae1383b6195eb883bc5e99f08ed3cbc58dfd9741` |
-| REL-15   | Bound messaging recipient loading and offer retry                      | Active  | [#519](https://github.com/FSS-Ltd/pathway/pull/519) to `master`                     | Focused test, admin suite, repo lint/typecheck, admin build, formatting, diff check, and Graphify passed; CI rerun pending after a Node 20 test-environment correction.                                         | Pending                                    |
+| REL-15   | Bound messaging recipient loading and offer retry                      | Merged  | [#519](https://github.com/FSS-Ltd/pathway/pull/519) to `master`                     | `921ddfa8c3819b02f607015b92c2cd5febfea6b3`; all eight checks passed: CI 37875192316, CodeQL 37875187357. Deploy 37875939897 passed four jobs; aliases and anonymous smoke verified.                             | `da27ee63f25a51558d3e68948e04816f416223da` |
+| REL-16   | Bound signed-in API token waiting and allow retry                      | Active  | [#520](https://github.com/FSS-Ltd/pathway/pull/520) to `master`                     | Focused transport regression, admin suite, repo lint/typecheck, admin build, formatting, diff check, and Graphify passed; current-revision CI pending.                                                          | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
