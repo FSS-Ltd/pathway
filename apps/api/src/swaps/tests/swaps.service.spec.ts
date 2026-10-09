@@ -19,11 +19,13 @@ type PrismaSwapDelegate = {
 
 type PrismaAssignmentDelegate = {
   findFirst: jest.Mock<Promise<any>, [any?]>;
+  findMany: jest.Mock<Promise<any[]>, [any?]>;
   updateMany: jest.Mock<Promise<{ count: number }>, [any?]>;
 };
 
 type PrismaUserDelegate = {
   findFirst: jest.Mock<Promise<any>, [any?]>;
+  findMany: jest.Mock<Promise<any[]>, [any?]>;
 };
 
 type PrismaMock = {
@@ -70,17 +72,24 @@ describe("SwapsService", () => {
         findFirst: jest.fn(async () => ({
           id: base.assignmentId,
           userId: base.fromUserId,
+          sessionId: "session-1",
         })),
+        findMany: jest.fn(async () => [{ userId: base.fromUserId }]),
         updateMany: jest.fn(async () => ({ count: 1 })),
       },
       user: {
         findFirst: jest.fn(async () => ({ id: base.fromUserId })),
+        findMany: jest.fn(async () => [
+          { id: base.fromUserId, firstName: "A", lastName: "Staff" },
+          { id: "candidate", firstName: "B", lastName: "Staff" },
+        ]),
       },
     };
 
     jest.doMock("@pathway/db", () => ({
       prisma: prismaMock,
       SwapStatus,
+      AssignmentStatus: { DECLINED: "DECLINED" },
       Role: {
         ADMIN: "ADMIN",
         COORDINATOR: "COORDINATOR",
@@ -159,6 +168,25 @@ describe("SwapsService", () => {
     expect(prisma.swapRequest.create).not.toHaveBeenCalled();
   });
 
+  it("rejects a swap request for a declined assignment", async () => {
+    prisma.assignment.findFirst.mockResolvedValueOnce({
+      id: base.assignmentId,
+      userId: base.fromUserId,
+      status: "DECLINED",
+    });
+    await expect(
+      service.create(
+        {
+          assignmentId: base.assignmentId,
+          fromUserId: base.fromUserId,
+          toUserId: "33333333-3333-4333-9333-333333333333",
+        },
+        tenantId,
+      ),
+    ).rejects.toThrow("A declined assignment cannot be swapped");
+    expect(prisma.swapRequest.create).not.toHaveBeenCalled();
+  });
+
   it("rejects a recipient without active staff access at the site", async () => {
     prisma.user.findFirst
       .mockResolvedValueOnce({ id: base.fromUserId })
@@ -189,7 +217,70 @@ describe("SwapsService", () => {
         OR: [{ fromUserId: base.fromUserId }, { toUserId: base.fromUserId }],
       }),
       orderBy: { createdAt: "desc" },
+      include: expect.objectContaining({
+        assignment: expect.any(Object),
+        fromUser: expect.any(Object),
+        toUser: expect.any(Object),
+      }),
     });
+  });
+
+  it("lists only active site staff outside the assignment's session", async () => {
+    prisma.assignment.findMany.mockResolvedValueOnce([
+      { userId: base.fromUserId },
+      { userId: "already-assigned" },
+    ]);
+    prisma.user.findMany.mockResolvedValueOnce([
+      { id: "already-assigned", firstName: "C", lastName: "Staff" },
+      { id: "candidate", firstName: "B", lastName: "Staff" },
+      { id: base.fromUserId, firstName: "A", lastName: "Staff" },
+    ]);
+
+    await expect(
+      service.findCandidates(base.assignmentId, base.fromUserId, tenantId),
+    ).resolves.toEqual([{ id: "candidate", fullName: "B Staff" }]);
+    expect(prisma.assignment.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: base.assignmentId,
+        userId: base.fromUserId,
+        session: { tenantId },
+      },
+      select: { sessionId: true, status: true },
+    });
+    expect(prisma.user.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        isActive: true,
+        OR: expect.arrayContaining([
+          {
+            siteMemberships: {
+              some: { tenantId, role: { in: ["STAFF", "SITE_ADMIN"] } },
+            },
+          },
+        ]),
+      }),
+      select: expect.objectContaining({ id: true, name: true }),
+    });
+  });
+
+  it("does not reveal staff when the requester does not hold the assignment", async () => {
+    prisma.assignment.findFirst.mockResolvedValueOnce(null);
+    await expect(
+      service.findCandidates(base.assignmentId, "unrelated", tenantId),
+    ).rejects.toThrow("Assignment not found");
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it("does not offer a swap for a declined assignment", async () => {
+    prisma.assignment.findFirst.mockResolvedValueOnce({
+      id: base.assignmentId,
+      userId: base.fromUserId,
+      sessionId: "session-1",
+      status: "DECLINED",
+    });
+    await expect(
+      service.findCandidates(base.assignmentId, base.fromUserId, tenantId),
+    ).rejects.toThrow("Assignment not found");
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
   });
 
   it("findOne returns swap", async () => {
@@ -217,6 +308,7 @@ describe("SwapsService", () => {
       where: {
         id: base.assignmentId,
         userId: base.fromUserId,
+        status: { not: "DECLINED" },
         session: { tenantId },
       },
       data: { userId: recipientId },

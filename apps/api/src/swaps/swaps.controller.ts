@@ -106,6 +106,21 @@ export class SwapsController {
     });
   }
 
+  @Get("candidates")
+  async findCandidates(
+    @Query("assignmentId") assignmentId: string,
+    @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const parsed = idParamSchema.safeParse(assignmentId);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.issues);
+    }
+    const actor = rotaActorFromRequest(req, orgId, tenantId);
+    return this.swaps.findCandidates(parsed.data, actor.userId, tenantId);
+  }
+
   @Get(":id")
   async findOne(
     @Param("id") id: string,

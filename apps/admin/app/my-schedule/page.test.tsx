@@ -4,6 +4,14 @@ import React, { act } from "react";
 import { AdminContextRuntime } from "@/lib/admin-context";
 import type { SessionContextValue } from "@/lib/use-session-compat";
 import MySchedulePage from "./page";
+import { SwapCandidateForm, SwapRequestList } from "./swap-panels";
+import {
+  fetchMyAssignments,
+  fetchSwapCandidates,
+  type AdminAssignmentRow,
+  type AdminSwapRequestRow,
+} from "@/lib/api-client";
+import { AssignmentList } from "./assignment-list";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost/my-schedule",
@@ -60,6 +68,211 @@ async function run(): Promise<void> {
       container.querySelector('a[href="/login"]')?.textContent,
       "Sign in",
     );
+
+    let retries = 0;
+    await act(async () => {
+      root.render(
+        <SwapCandidateForm
+          candidates={[]}
+          error={{ kind: "unavailable", message: "Staff could not load." }}
+          loading={false}
+          selectedUserId=""
+          submitting={false}
+          onCancel={() => undefined}
+          onRetry={() => {
+            retries += 1;
+          }}
+          onSelect={() => undefined}
+          onSubmit={() => undefined}
+        />,
+      );
+    });
+    assert.equal(
+      container
+        .querySelector('[role="alert"]')
+        ?.textContent?.includes("Staff could not load."),
+      true,
+    );
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    assert.equal(retries, 1);
+
+    await act(async () => {
+      root.render(
+        <SwapCandidateForm
+          candidates={[{ id: "colleague", fullName: "Alex Morgan" }]}
+          error={null}
+          loading={false}
+          selectedUserId=""
+          submitting={false}
+          onCancel={() => undefined}
+          onRetry={() => undefined}
+          onSelect={() => undefined}
+          onSubmit={() => undefined}
+        />,
+      );
+    });
+    assert.equal(
+      container.querySelector("select")?.options[1]?.text,
+      "Alex Morgan",
+    );
+    assert.equal(
+      container.querySelector<HTMLButtonElement>("button")?.disabled,
+      true,
+    );
+
+    const swap: AdminSwapRequestRow = {
+      id: "swap-1",
+      assignmentId: "assignment-private-id",
+      fromUserId: "staff-1",
+      toUserId: "staff-2",
+      status: "REQUESTED",
+      createdAt: "2026-10-09T08:00:00.000Z",
+      assignment: {
+        session: {
+          title: "Year 4 Maths",
+          startsAt: "2026-10-12T09:00:00.000Z",
+          endsAt: "2026-10-12T10:00:00.000Z",
+        },
+      },
+      fromUser: { name: "Jamie Lee" },
+      toUser: { name: "Alex Morgan" },
+    };
+    let acceptedId: string | null = null;
+    await act(async () => {
+      root.render(
+        <SwapRequestList
+          inbound={[swap]}
+          outbound={[]}
+          actionLoadingId={null}
+          onAccept={(id) => {
+            acceptedId = id;
+          }}
+          onDecline={() => undefined}
+        />,
+      );
+    });
+    assert.match(container.textContent ?? "", /Year 4 Maths/);
+    assert.match(container.textContent ?? "", /Jamie Lee/);
+    assert.doesNotMatch(container.textContent ?? "", /assignment-private-id/);
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label^="Accept swap"]')
+        ?.click();
+    });
+    assert.equal(acceptedId, "swap-1");
+
+    await act(async () => {
+      root.render(
+        <SwapRequestList
+          inbound={[{ ...swap, status: "ACCEPTED" }]}
+          outbound={[]}
+          actionLoadingId={null}
+          onAccept={() => undefined}
+          onDecline={() => undefined}
+        />,
+      );
+    });
+    assert.match(container.textContent ?? "", /Accepted/);
+    assert.equal(
+      container.querySelector('button[aria-label^="Accept swap"]'),
+      null,
+    );
+
+    const assignment: AdminAssignmentRow = {
+      id: "assignment-1",
+      sessionId: "session-1",
+      staffId: "staff-1",
+      staffName: "Jamie Lee",
+      roleLabel: "Lead",
+      status: "confirmed",
+      sessionTitle: "Year 4 Maths",
+      startsAt: "2026-10-12T09:00:00.000Z",
+      endsAt: "2026-10-12T10:00:00.000Z",
+    };
+    let requestedId: string | null = null;
+    await act(async () => {
+      root.render(
+        <AssignmentList
+          assignments={[assignment]}
+          activeSwapAssignmentId={null}
+          busyAssignmentId={null}
+          swapForm={null}
+          onAccept={() => undefined}
+          onDecline={() => undefined}
+          onRequestSwap={(id) => {
+            requestedId = id;
+          }}
+        />,
+      );
+    });
+    assert.equal(
+      container.querySelector('button[aria-label^="Accept "]'),
+      null,
+    );
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('button[aria-label^="Request swap"]')
+        ?.click();
+    });
+    assert.equal(requestedId, "assignment-1");
+    await act(async () => {
+      root.render(
+        <AssignmentList
+          assignments={[{ ...assignment, status: "declined" }]}
+          activeSwapAssignmentId={null}
+          busyAssignmentId={null}
+          swapForm={null}
+          onAccept={() => undefined}
+          onDecline={() => undefined}
+          onRequestSwap={() => undefined}
+        />,
+      );
+    });
+    assert.equal(
+      container.querySelector('button[aria-label^="Request swap"]'),
+      null,
+    );
+
+    const nativeFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = async (input) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("/swaps/candidates?")) {
+        return Response.json([{ id: "colleague", fullName: "Alex Morgan" }]);
+      }
+      if (url.includes("/sessions") || url.includes("/assignments")) {
+        return Response.json([]);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    };
+    try {
+      assert.deepEqual(
+        await fetchMyAssignments({
+          userId: "staff-1",
+          dateFrom: "2026-10-12",
+          dateTo: "2026-10-18",
+        }),
+        [],
+      );
+      assert.deepEqual(await fetchSwapCandidates("assignment-1"), [
+        { id: "colleague", fullName: "Alex Morgan" },
+      ]);
+      assert.equal(
+        calls.some((url) => url.endsWith("/users")),
+        false,
+      );
+      assert.equal(
+        calls.some((url) =>
+          url.includes("/swaps/candidates?assignmentId=assignment-1"),
+        ),
+        true,
+      );
+    } finally {
+      globalThis.fetch = nativeFetch;
+    }
   } finally {
     await act(async () => root.unmount());
   }
