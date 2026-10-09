@@ -33,6 +33,49 @@ function timeFromMinute(min: number): string {
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
 }
 
+type UnavailableWindow = NonNullable<
+  UpdateProfileDto["unavailableDates"]
+>[number];
+
+async function replaceUnavailableWindows(
+  userId: string,
+  tenantId: string,
+  windows: UnavailableWindow[],
+): Promise<void> {
+  const sorted = [...windows].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.startMinute - b.startMinute,
+  );
+  for (let index = 1; index < sorted.length; index++) {
+    const previous = sorted[index - 1];
+    const current = sorted[index];
+    if (
+      previous.date === current.date &&
+      current.startMinute < previous.endMinute
+    ) {
+      throw new BadRequestException(
+        `Overlapping unavailable times on ${current.date}`,
+      );
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+    await tx.staffUnavailableDate.deleteMany({ where: { userId, tenantId } });
+    if (sorted.length > 0) {
+      await tx.staffUnavailableDate.createMany({
+        data: sorted.map((window) => ({
+          userId,
+          tenantId,
+          date: new Date(`${window.date}T00:00:00.000Z`),
+          startMinute: window.startMinute,
+          endMinute: window.endMinute,
+          reason: window.reason ?? null,
+        })),
+      });
+    }
+  });
+}
+
 export type StaffForAssignmentRow = {
   id: string;
   fullName: string;
@@ -86,8 +129,13 @@ export class StaffService {
     },
   ): Promise<StaffForAssignmentRow[]> {
     const sessionDate = new Date(params.startsAt);
-    const dateStr = sessionDate.toISOString().slice(0, 10);
-    const dayOfWeek = sessionDate.getDay();
+    const firstDate = new Date(
+      `${sessionDate.toISOString().slice(0, 10)}T00:00:00.000Z`,
+    );
+    const lastDate = new Date(
+      `${params.endsAt.toISOString().slice(0, 10)}T00:00:00.000Z`,
+    );
+    const dayOfWeek = sessionDate.getUTCDay();
     const weekday = WEEKDAY_ORDER[dayOfWeek];
     const startMin = Math.floor(params.startsAt.getTime() / 60000) % (24 * 60);
     const endMin = Math.floor(params.endsAt.getTime() / 60000) % (24 * 60);
@@ -126,9 +174,14 @@ export class StaffService {
           where: {
             userId: { in: userIds },
             tenantId,
-            date: new Date(dateStr),
+            date: { gte: firstDate, lte: lastDate },
           },
-          select: { userId: true },
+          select: {
+            userId: true,
+            date: true,
+            startMinute: true,
+            endMinute: true,
+          },
         }),
         prisma.volunteerPreference.findMany({
           where: {
@@ -150,7 +203,17 @@ export class StaffService {
           : Promise.resolve([]),
       ]);
 
-    const blockedSet = new Set(unavailableDates.map((u) => u.userId));
+    const blockedSet = new Set(
+      unavailableDates
+        .filter((window) => {
+          const date = window.date.getTime();
+          return (
+            params.startsAt.getTime() < date + window.endMinute * 60000 &&
+            params.endsAt.getTime() > date + window.startMinute * 60000
+          );
+        })
+        .map((window) => window.userId),
+    );
     const preferredSet = new Set(preferredGroups.map((p) => p.userId));
     const availableByUser = new Map<string, boolean>();
     for (const p of preferences) {
@@ -214,7 +277,12 @@ export class StaffService {
     role: string;
     isActive: boolean;
     weeklyAvailability: { day: Weekday; startTime: string; endTime: string }[];
-    unavailableDates: { date: string; reason: string | null }[];
+    unavailableDates: {
+      date: string;
+      startMinute: number;
+      endMinute: number;
+      reason: string | null;
+    }[];
     preferredGroups: { id: string; name: string }[];
     canEditAvailability: boolean;
     hasServeAccess: boolean;
@@ -260,7 +328,7 @@ export class StaffService {
       }),
       prisma.staffUnavailableDate.findMany({
         where: { userId, tenantId },
-        orderBy: { date: "asc" },
+        orderBy: [{ date: "asc" }, { startMinute: "asc" }],
       }),
       prisma.staffPreferredGroup.findMany({
         where: { userId, tenantId },
@@ -321,6 +389,8 @@ export class StaffService {
       weeklyAvailability,
       unavailableDates: unavailableDates.map((u) => ({
         date: u.date.toISOString().slice(0, 10),
+        startMinute: u.startMinute,
+        endMinute: u.endMinute,
         reason: u.reason,
       })),
       preferredGroups: preferredGroups.map((pg) => ({
@@ -634,25 +704,11 @@ export class StaffService {
         }
       }
       if (dto.unavailableDates !== undefined) {
-        const seen = new Set<string>();
-        const toCreate = dto.unavailableDates.filter((u) => {
-          if (seen.has(u.date)) return false;
-          seen.add(u.date);
-          return true;
-        });
-        await prisma.staffUnavailableDate.deleteMany({
-          where: { userId: currentUserId, tenantId },
-        });
-        for (const u of toCreate) {
-          await prisma.staffUnavailableDate.create({
-            data: {
-              userId: currentUserId,
-              tenantId,
-              date: new Date(u.date),
-              reason: u.reason ?? null,
-            },
-          });
-        }
+        await replaceUnavailableWindows(
+          currentUserId,
+          tenantId,
+          dto.unavailableDates,
+        );
       }
       if (dto.preferredGroupIds !== undefined) {
         const groups = await prisma.group.findMany({
@@ -813,25 +869,7 @@ export class StaffService {
     }
 
     if (canEditAvailability && dto.unavailableDates !== undefined) {
-      const seen = new Set<string>();
-      const toCreate = dto.unavailableDates.filter((u) => {
-        if (seen.has(u.date)) return false;
-        seen.add(u.date);
-        return true;
-      });
-      await prisma.staffUnavailableDate.deleteMany({
-        where: { userId, tenantId },
-      });
-      for (const u of toCreate) {
-        await prisma.staffUnavailableDate.create({
-          data: {
-            userId,
-            tenantId,
-            date: new Date(u.date),
-            reason: u.reason ?? null,
-          },
-        });
-      }
+      await replaceUnavailableWindows(userId, tenantId, dto.unavailableDates);
     }
 
     if (canEditAvailability && dto.preferredGroupIds !== undefined) {

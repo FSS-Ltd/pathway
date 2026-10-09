@@ -15,9 +15,11 @@ import {
   setApiClientToken,
   type StaffProfileDetail,
   type StaffProfileUpdatePayload,
+  type StaffUnavailableWindow,
 } from "@/lib/api-client";
 import { toLocalDateKey } from "@/lib/date";
 import { ProfileHeaderCard } from "@/components/profile-header-card";
+import { UnavailableWindowEditor } from "@/components/staff/unavailable-window-editor";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -75,12 +77,11 @@ export default function StaffProfilePage() {
     AvailabilityRange[]
   >([]);
   const [unavailableDates, setUnavailableDates] = React.useState<
-    { date: string; reason?: string }[]
+    StaffUnavailableWindow[]
   >([]);
   const [preferredGroupIds, setPreferredGroupIds] = React.useState<string[]>(
     [],
   );
-  const [newUnavailableDate, setNewUnavailableDate] = React.useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
   const [avatarVersion, setAvatarVersion] = React.useState(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -148,6 +149,8 @@ export default function StaffProfilePage() {
       setUnavailableDates(
         profileData.unavailableDates.map((u) => ({
           date: u.date,
+          startMinute: u.startMinute ?? 0,
+          endMinute: u.endMinute ?? 1440,
           reason: u.reason ?? undefined,
         })),
       );
@@ -187,18 +190,6 @@ export default function StaffProfilePage() {
 
   const removeAvailabilityRange = (index: number) => {
     setWeeklyAvailability((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const addUnavailableDate = () => {
-    const date = newUnavailableDate.trim();
-    if (!date) return;
-    if (unavailableDates.some((u) => u.date === date)) return;
-    setUnavailableDates((prev) => [...prev, { date }]);
-    setNewUnavailableDate("");
-  };
-
-  const removeUnavailableDate = (date: string) => {
-    setUnavailableDates((prev) => prev.filter((u) => u.date !== date));
   };
 
   const togglePreferredGroup = (groupId: string) => {
@@ -539,53 +530,16 @@ export default function StaffProfilePage() {
         </Card>
       )}
 
-      {/* Date exceptions */}
       {canEditAvailability && (
         <Card
           title="Date exceptions"
-          description="Specific dates when you are unavailable"
+          description="Choose whole days or specific hours when you are unavailable"
         >
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                type="date"
-                value={newUnavailableDate}
-                onChange={(e) => setNewUnavailableDate(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={addUnavailableDate}
-              >
-                Add
-              </Button>
-            </div>
-            <ul className="space-y-1">
-              {unavailableDates.map((u) => (
-                <li
-                  key={u.date}
-                  className="flex items-center justify-between rounded border border-border-subtle px-3 py-2 text-sm"
-                >
-                  <span>{u.date}</span>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => removeUnavailableDate(u.date)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-            {unavailableDates.length === 0 && (
-              <p className="text-sm text-text-muted">
-                No blocked dates. Add a date above to mark unavailability.
-              </p>
-            )}
-          </div>
+          <UnavailableWindowEditor
+            value={unavailableDates}
+            onChange={setUnavailableDates}
+            disabled={isSaving}
+          />
         </Card>
       )}
 
