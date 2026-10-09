@@ -9,6 +9,7 @@ import {
   type FamilyContext,
 } from "@/lib/family-contexts-api";
 import { useSession, type SessionStatus } from "@/lib/use-session-compat";
+import { familyTimetableHref } from "@/components/ace/timetable/family-timetable-navigation";
 
 function contextHref(
   context: FamilyContext,
@@ -52,10 +53,17 @@ function ContextList({
                     href={contextHref(context, view)}
                     className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong motion-reduce:transition-none"
                   >
-                    {view === "attendance" ? "Attendance" : "Timetable"}
+                    {view === "attendance" ? "Attendance" : "Sessions"}
                     <ChevronRight aria-hidden="true" className="h-4 w-4" />
                   </Link>
                 ))}
+                <Link
+                  href={familyTimetableHref(context, "subjects")}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong motion-reduce:transition-none"
+                >
+                  Subject timetable
+                  <ChevronRight aria-hidden="true" className="h-4 w-4" />
+                </Link>
               </div>
             </div>
           </li>
@@ -145,7 +153,8 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
         </h1>
         <p className="max-w-2xl text-base leading-7 text-text-muted">
           Choose a linked child or your own student record to see attendance and
-          published sessions. Parents can also message their school team.
+          published subject timetables and sessions. Parents can also message
+          their school team.
         </p>
       </header>
 

@@ -22,6 +22,38 @@ const scheduleInclude = {
 
 @Injectable()
 export class AceSubjectTimetableScheduleService {
+  async setup(actor: TimetableActor) {
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      await requireTimetableSite(tx, actor);
+      const [academicYears, yearBands] = await Promise.all([
+        tx.academicYear.findMany({
+          where: { tenantId: actor.tenantId },
+          orderBy: { startsOn: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            name: true,
+            periods: {
+              orderBy: { startsOn: "desc" },
+              select: {
+                id: true,
+                name: true,
+                startsOn: true,
+                endsOn: true,
+              },
+            },
+          },
+        }),
+        tx.aceYearBand.findMany({
+          where: { tenantId: actor.tenantId, isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          select: { id: true, name: true },
+        }),
+      ]);
+      return { academicYears, yearBands };
+    });
+  }
+
   async get(actor: TimetableActor, periodId: string, yearBandId: string) {
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await requireTimetableSite(tx, actor);

@@ -42,6 +42,11 @@ export class AceSubjectTimetableController {
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
+  @Get("setup")
+  getSetup() {
+    return this.schedules.setup(this.actor());
+  }
+
   @Get("periods/:periodId/year-bands/:yearBandId/schedule")
   getSchedule(
     @Param("periodId") periodId: string,

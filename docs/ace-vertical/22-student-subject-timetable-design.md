@@ -104,6 +104,18 @@ and withdraw the latest version through `/periods/:periodId/children/:childId/wi
 Every route requires `ace.settings.manage`; a missing or cross-site record is
 not returned.
 
+C07b3 adds a guarded `GET /ace/subject-timetable/setup` for the site's academic
+periods and active year bands. The Head draft read includes only subjects with
+an active child placement overlapping the selected period. Family routes are
+`GET /ace/parent/sites/:siteId/children/:childId/subject-timetable` and
+`GET /ace/student/sites/:siteId/subject-timetable`, with `/:periodId` appended
+for the issued snapshot. The list contains only periods whose newest issued
+version remains live. The detail route returns 404 for an unavailable child,
+period, portal, or latest version. It contains period dates, published date,
+local slot times, lesson or break labels, and subject names/colours, without
+drafts, staff IDs, or audit data. Both reads recheck the current family link
+and site switch inside the tenant context.
+
 ## Web journey and design direction
 
 The Head workspace starts with academic period and year band selection, then
@@ -122,6 +134,11 @@ tokens and components, visible focus, text labels alongside subject colour,
 adequate contrast, and reduced-motion-safe feedback. No decorative motion is
 needed to understand the timetable. The web experience is released before the
 matching Expo screens.
+
+Web routes: the Head works at `/ace/settings/academic/timetable`; parent and
+student subject grids use their existing family site paths ending in
+`/subject-timetable`. The existing `/timetable` route is labelled **Sessions**
+in the family navigation. The family landing offers both views directly.
 
 ## Failure modes, rollout, and verification
 

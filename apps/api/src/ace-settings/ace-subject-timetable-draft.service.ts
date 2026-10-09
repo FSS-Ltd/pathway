@@ -138,6 +138,19 @@ export class AceSubjectTimetableDraftService {
       if (draft && draft.scheduleId !== schedule?.id) {
         throw new ConflictException("The draft uses a different schedule");
       }
+      const placements = await tx.studentSubjectEnrollment.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          childId,
+          status: "ACTIVE",
+          startsOn: { lte: period.endsOn },
+          OR: [{ endsOn: null }, { endsOn: { gte: period.startsOn } }],
+          subject: { tenantId: actor.tenantId, isActive: true },
+        },
+        select: {
+          subject: { select: { id: true, name: true, color: true } },
+        },
+      });
       const publications = await tx.aceStudentTimetablePublication.findMany({
         where: {
           tenantId: actor.tenantId,
@@ -149,7 +162,12 @@ export class AceSubjectTimetableDraftService {
         take: 20,
         select: { id: true, publishedAt: true, withdrawnAt: true },
       });
-      return { schedule, draft, publications };
+      const eligibleSubjects = [
+        ...new Map(
+          placements.map(({ subject }) => [subject.id, subject]),
+        ).values(),
+      ].sort((a, b) => a.name.localeCompare(b.name));
+      return { schedule, draft, publications, eligibleSubjects };
     });
   }
 

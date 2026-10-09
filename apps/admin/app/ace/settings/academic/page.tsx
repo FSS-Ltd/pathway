@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
+import { Button } from "@pathway/ui";
 import { NoAccessCard } from "@/components/no-access-card";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import {
@@ -138,6 +140,15 @@ export default function AcademicCalendarPage() {
         timezone={calendar?.timezone ?? null}
         onSave={save}
       />
+      {canManage ? (
+        <div>
+          <Button asChild variant="outline" className="min-h-11">
+            <Link href="/ace/settings/academic/timetable">
+              Build subject timetable
+            </Link>
+          </Button>
+        </div>
+      ) : null}
       <SubjectSettings canManage={canManage} />
       <PacePolicySettings canManage={canManage} />
     </div>

@@ -10,6 +10,7 @@ import {
   type FamilyTimetableScope,
 } from "@/lib/family-timetable-api";
 import { useSession, type SessionStatus } from "@/lib/use-session-compat";
+import { FamilyTimetableNavigation } from "./family-timetable-navigation";
 
 const WEEK_MS = 7 * 86_400_000;
 
@@ -120,17 +121,17 @@ export function FamilyTimetableView({
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Your family
         </Link>
-        <p className="text-sm font-medium text-accent-strong">
-          ACE / Timetable
-        </p>
+        <p className="text-sm font-medium text-accent-strong">ACE / Sessions</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
-          {data ? `${data.childName}’s timetable` : "Timetable"}
+          {data ? `${data.childName}’s sessions` : "Sessions"}
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-text-muted">
           Published school sessions for this week. Your school will share
           updates here after publishing them.
         </p>
       </header>
+
+      <FamilyTimetableNavigation scope={scope} current="sessions" />
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
