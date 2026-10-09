@@ -14,15 +14,9 @@ import {
 import { AppModule } from "../../app.module";
 import { createSubjectTimetableFixture } from "./ace-subject-timetable.fixture";
 
-function requiredFixture(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Subject timetable API test requires ${name}`);
-  return value;
-}
-
-const orgId = requiredFixture("E2E_ORG_ID");
-const siteId = requiredFixture("E2E_TENANT_ID");
-const otherSiteId = requiredFixture("E2E_TENANT2_ID");
+const orgId = randomUUID();
+const siteId = randomUUID();
+const otherSiteId = randomUUID();
 
 describe("ACE subject timetable Head API", () => {
   let app: INestApplication | undefined;
@@ -39,6 +33,26 @@ describe("ACE subject timetable Head API", () => {
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
+    await prisma.org.create({
+      data: {
+        id: orgId,
+        name: `ACE timetable ${orgId}`,
+        slug: `ace-timetable-${orgId}`,
+        planCode: "trial",
+      },
+    });
+    await prisma.tenant.createMany({
+      data: [siteId, otherSiteId].map((id) => ({
+        id,
+        orgId,
+        name: `ACE timetable site ${id}`,
+        slug: `ace-timetable-${id}`,
+        timezone: "Europe/London",
+      })),
+    });
+    await prisma.orgVertical.create({
+      data: { orgId, vertical: "ACE_SCHOOL" },
+    });
     fixture = await withTenantRlsContext(siteId, orgId, (tx) =>
       createSubjectTimetableFixture(tx, siteId),
     );
