@@ -174,6 +174,9 @@ describe("ACE dashboard daily operations", () => {
           await tx.studentSubjectEnrollment.deleteMany({
             where: { tenantId: fixture!.tenantId },
           });
+          await tx.behaviourReviewRequest.deleteMany({
+            where: { tenantId: fixture!.tenantId },
+          });
           await tx.behaviourEntry.deleteMany({
             where: { tenantId: fixture!.tenantId },
           });

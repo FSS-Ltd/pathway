@@ -630,6 +630,7 @@ async function cleanupFixture(
   });
   await withTenantRlsContext(tenantId, orgId, async (tx) => {
     await tx.$executeRawUnsafe("SET LOCAL session_replication_role = replica");
+    await tx.behaviourReviewRequest.deleteMany({ where: { tenantId } });
     await tx.behaviourEntry.deleteMany({
       where: { id: { in: fixture.behaviourEntryIds } },
     });

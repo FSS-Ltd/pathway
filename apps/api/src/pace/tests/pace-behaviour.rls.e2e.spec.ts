@@ -1023,22 +1023,20 @@ describe("ACE PACE and behaviour fact storage", () => {
         ),
       "55000",
     );
-    await expectDatabaseRejection(
-      () =>
-        withTenantRlsContext(fixture!.tenantAId, fixture!.orgAId, (tx) =>
-          tx.behaviourReviewRequest.create({
-            data: {
-              tenantId: fixture!.tenantAId,
-              childId: fixture!.childA2Id,
-              behaviourEntryId: entryId,
-              kind: "HEAD",
-              stage: 3,
-              policyVersion: 1,
-            },
-          }),
-        ),
-      "23503",
-    );
+    await expect(
+      withTenantRlsContext(fixture!.tenantAId, fixture!.orgAId, (tx) =>
+        tx.behaviourReviewRequest.create({
+          data: {
+            tenantId: fixture!.tenantAId,
+            childId: fixture!.childA2Id,
+            behaviourEntryId: entryId,
+            kind: "HEAD",
+            stage: 3,
+            policyVersion: 1,
+          },
+        }),
+      ),
+    ).rejects.toMatchObject({ code: "P2003" });
   });
 
   it("isolates all PACE and behaviour tables with forced tenant RLS", async () => {
