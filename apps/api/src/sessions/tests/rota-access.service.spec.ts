@@ -16,6 +16,7 @@ describe("RotaAccessService", () => {
   let legacyOrgRole: Lookup;
   let fixedRole: Lookup;
   let assignment: Lookup;
+  let user: Lookup;
 
   beforeEach(async () => {
     jest.resetModules();
@@ -24,17 +25,26 @@ describe("RotaAccessService", () => {
     legacyOrgRole = jest.fn().mockResolvedValue(null);
     fixedRole = jest.fn().mockResolvedValue(null);
     assignment = jest.fn().mockResolvedValue(null);
+    user = jest.fn().mockResolvedValue(null);
     jest.doMock("@pathway/db", () => ({
       getSystemRoleId: (orgId: string, tenantId: string | null, key: string) =>
         `${orgId}:${tenantId ?? "org"}:${key}`,
       OrgRole: { ORG_ADMIN: "ORG_ADMIN" },
-      SiteRole: { SITE_ADMIN: "SITE_ADMIN" },
+      SiteRole: { SITE_ADMIN: "SITE_ADMIN", STAFF: "STAFF" },
+      Role: {
+        ADMIN: "ADMIN",
+        COORDINATOR: "COORDINATOR",
+        TEACHER: "TEACHER",
+        LEAD: "LEAD",
+        SUPPORT: "SUPPORT",
+      },
       prisma: {
         siteMembership: { findFirst: siteMembership },
         orgMembership: { findFirst: orgMembership },
         userOrgRole: { findFirst: legacyOrgRole },
         userRoleAssignment: { findFirst: fixedRole },
         assignment: { findFirst: assignment },
+        user: { findFirst: user },
       },
     }));
     const module = await import("../rota-access.service");
@@ -109,5 +119,53 @@ describe("RotaAccessService", () => {
       service.assertSessionVisible(actor, "session-1"),
     ).resolves.toBeUndefined();
     expect(assignment).not.toHaveBeenCalled();
+  });
+
+  it("allows active site staff and fixed managers to read the team rota", async () => {
+    user.mockResolvedValue({ id: actor.userId });
+    await expect(service.assertTeamViewer(actor)).resolves.toBeUndefined();
+    expect(user).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        id: actor.userId,
+        isActive: true,
+        OR: expect.any(Array),
+      }),
+      select: { id: true },
+    });
+
+    user.mockClear();
+    fixedRole.mockResolvedValue({ id: "head" });
+    await expect(service.assertTeamViewer(actor)).resolves.toBeUndefined();
+    expect(user).toHaveBeenCalledTimes(1);
+  });
+
+  it("denies inactive users and non-staff site viewers", async () => {
+    await expect(service.assertTeamViewer(actor)).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(siteMembership).not.toHaveBeenCalled();
+
+    user
+      .mockResolvedValueOnce({ id: actor.userId })
+      .mockResolvedValueOnce(null);
+    await expect(service.assertTeamViewer(actor)).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(user).toHaveBeenLastCalledWith({
+      where: expect.objectContaining({
+        id: actor.userId,
+        OR: expect.arrayContaining([
+          expect.objectContaining({
+            siteMemberships: {
+              some: {
+                tenantId: actor.tenantId,
+                role: { in: ["STAFF", "SITE_ADMIN"] },
+              },
+            },
+          }),
+        ]),
+      }),
+      select: { id: true },
+    });
   });
 });

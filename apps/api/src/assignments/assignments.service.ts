@@ -12,6 +12,21 @@ import { Av30ActivityService } from "../av30/av30-activity.service";
 import { MailerService } from "../mailer/mailer.service";
 import { CreateAssignmentDto } from "./dto/create-assignment.dto";
 import { UpdateAssignmentDto } from "./dto/update-assignment.dto";
+import { type TeamScheduleQueryDto } from "./dto/team-schedule-query.dto";
+import { staffAtSite } from "../sessions/rota-access.service";
+
+export type TeamScheduleRow = {
+  assignmentId: string;
+  sessionId: string;
+  sessionTitle: string;
+  startsAt: string;
+  endsAt: string;
+  groups: { id: string; name: string }[];
+  staffId: string;
+  staffName: string;
+  role: Role;
+  status: AssignmentStatus;
+};
 
 @Injectable()
 export class AssignmentsService {
@@ -36,14 +51,17 @@ export class AssignmentsService {
 
     const user = await prisma.user.findUnique({
       where: { id: dto.userId },
-      select: { id: true, tenantId: true, siteMemberships: { where: { tenantId }, select: { tenantId: true } } },
+      select: {
+        id: true,
+        tenantId: true,
+        siteMemberships: { where: { tenantId }, select: { tenantId: true } },
+      },
     });
     if (!user) throw new NotFoundException("Assignment not found");
     const belongsToTenant =
       user.tenantId === tenantId ||
       user.siteMemberships.some((m) => m.tenantId === tenantId);
-    if (!belongsToTenant)
-      throw new NotFoundException("Assignment not found");
+    if (!belongsToTenant) throw new NotFoundException("Assignment not found");
 
     try {
       const created = await prisma.assignment.create({
@@ -133,6 +151,75 @@ export class AssignmentsService {
     });
   }
 
+  async findTeamSchedule(
+    tenantId: string,
+    { dateFrom, dateTo }: TeamScheduleQueryDto,
+  ): Promise<TeamScheduleRow[]> {
+    const end = new Date(`${dateTo}T00:00:00.000Z`);
+    end.setUTCDate(end.getUTCDate() + 1);
+    const assignments = await prisma.assignment.findMany({
+      where: {
+        status: { not: AssignmentStatus.DECLINED },
+        session: {
+          tenantId,
+          startsAt: {
+            gte: new Date(`${dateFrom}T00:00:00.000Z`),
+            lt: end,
+          },
+        },
+        user: { is: staffAtSite(tenantId) },
+      },
+      select: {
+        id: true,
+        userId: true,
+        role: true,
+        status: true,
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            displayName: true,
+            name: true,
+          },
+        },
+        session: {
+          select: {
+            id: true,
+            title: true,
+            startsAt: true,
+            endsAt: true,
+            groups: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+
+    return assignments
+      .map((assignment) => ({
+        assignmentId: assignment.id,
+        sessionId: assignment.session.id,
+        sessionTitle: assignment.session.title ?? "Session",
+        startsAt: assignment.session.startsAt.toISOString(),
+        endsAt: assignment.session.endsAt.toISOString(),
+        groups: assignment.session.groups,
+        staffId: assignment.userId,
+        staffName:
+          [assignment.user.firstName, assignment.user.lastName]
+            .filter(Boolean)
+            .join(" ") ||
+          assignment.user.displayName ||
+          assignment.user.name ||
+          "Staff member",
+        role: assignment.role,
+        status: assignment.status,
+      }))
+      .sort(
+        (a, b) =>
+          a.startsAt.localeCompare(b.startsAt) ||
+          a.staffName.localeCompare(b.staffName),
+      );
+  }
+
   /**
    * Get a single assignment by id.
    */
@@ -187,7 +274,11 @@ export class AssignmentsService {
       });
 
       // Record AV30 activity if status changed to ACCEPTED or DECLINED
-      if (this.av30ActivityService && dto.status && dto.status !== existing.status) {
+      if (
+        this.av30ActivityService &&
+        dto.status &&
+        dto.status !== existing.status
+      ) {
         if (dto.status === AssignmentStatus.CONFIRMED) {
           await this.av30ActivityService
             .recordActivityWithIds(tenantId, orgId, {
@@ -263,8 +354,7 @@ export class AssignmentsService {
     });
     if (!session) return;
 
-    const staffName =
-      user.displayName?.trim() || user.name?.trim() || "Staff";
+    const staffName = user.displayName?.trim() || user.name?.trim() || "Staff";
     const sessionTitle = session.title?.trim() || "Session";
     const sessionStartsAt = session.startsAt
       ? new Date(session.startsAt).toLocaleString(undefined, {
@@ -273,7 +363,9 @@ export class AssignmentsService {
         })
       : "";
     const adminUrl =
-      process.env.ADMIN_URL || process.env.ADMIN_BASE_URL || "https://app.nexsteps.dev";
+      process.env.ADMIN_URL ||
+      process.env.ADMIN_BASE_URL ||
+      "https://app.nexsteps.dev";
     const acceptUrl = `${adminUrl.replace(/\/$/, "")}/my-schedule`;
     const orgName = session.tenant?.org?.name ?? undefined;
 
@@ -321,7 +413,9 @@ export class AssignmentsService {
       throw new BadRequestException(msg);
     }
     const msg =
-      error instanceof Error ? error.message : "Unable to process assignment operation";
+      error instanceof Error
+        ? error.message
+        : "Unable to process assignment operation";
     console.error("AssignmentsService unexpected error:", error);
     throw new BadRequestException(msg);
   }

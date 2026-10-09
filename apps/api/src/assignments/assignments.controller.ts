@@ -9,6 +9,7 @@ import {
   Query,
   Req,
   Inject,
+  BadRequestException,
   ForbiddenException,
   NotFoundException,
   UseGuards,
@@ -32,6 +33,7 @@ import {
   RotaAccessService,
   rotaActorFromRequest,
 } from "../sessions/rota-access.service";
+import { teamScheduleQueryDto } from "./dto/team-schedule-query.dto";
 
 type AuthenticatedRequest = Request & {
   authUserId?: string;
@@ -101,6 +103,23 @@ export class AssignmentsController {
       ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
       ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
     });
+  }
+
+  @Get("team-schedule")
+  async findTeamSchedule(
+    @Query() query: unknown,
+    @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const parsed = teamScheduleQueryDto.safeParse(query);
+    if (!parsed.success) {
+      throw new BadRequestException(parsed.error.flatten());
+    }
+    await this.rotaAccess.assertTeamViewer(
+      rotaActorFromRequest(req, orgId, tenantId),
+    );
+    return this.assignmentsService.findTeamSchedule(tenantId, parsed.data);
   }
 
   @Get(":id")

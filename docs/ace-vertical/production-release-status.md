@@ -1,11 +1,11 @@
 # ACE production release status
 
 Checked on 9 October 2026. Production API, admin, and web aliases point to
-READY deployments at merged commit `0aa1be0140ed2323858cdd7099876be0fcca7def`.
+READY deployments at merged commit `72f72da6fde0d49ae2fcf1baecae38a1a348598b`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through C07b3 are now served by all three apps.
-Estimated overall ACE/Oasis update completion after this merge is **about 75%**;
+changes through C07c are now served by all three apps.
+Estimated overall ACE/Oasis update completion after this merge is **about 76%**;
 the remaining core journeys, paid add-ons, and product-wide web finish are
 tracked below.
 
@@ -503,6 +503,24 @@ state. No runtime errors appeared across the three projects in the checked
 window. A publish-and-family read journey still needs configured academic data
 and a linked guardian or student identity.
 
+C07c [PR #533](https://github.com/FSS-Ltd/pathway/pull/533) merged as
+`72f72da6fde0d49ae2fcf1baecae38a1a348598b`. All eight PR checks passed
+on `70c8171b4a2de212e55de645b9d31b9f1d0cc9b7` in CI
+[37924201387](https://github.com/FSS-Ltd/pathway/actions/runs/37924201387)
+and CodeQL
+[37924195883](https://github.com/FSS-Ltd/pathway/actions/runs/37924195883).
+[Production run 37925146907](https://github.com/FSS-Ltd/pathway/actions/runs/37925146907)
+passed migrations and API, admin, and web jobs. Vercel READY production aliases
+serve API `dpl_D9XmPEbxKg5LiYcoC9jVZoVVqFB4`, admin
+`dpl_5SGXj4cMynP5U1YfqpHHVXKUFxJs`, and web
+`dpl_3v96jtHcWcQVn1AZDahrcaAejksD` at that merge. Live API health,
+environment health, and public blog, plus marketing and configurator, returned
+HTTP 200; unsigned My Schedule redirected to sign-in. A signed-in Head loaded
+My Schedule at Demo ACE School with the expected empty assignments and swaps
+for that week. No live swap transaction was possible without an assignment.
+The runtime error feed showed no new API or web errors; its admin Clerk group
+last occurred on an older deployment on 8 October.
+
 ## Delivery steps
 
 | Step     | Scope                                                                  | State   | PR and base                                                                         | Checked revision and CI                                                                                                                                                                                         | Merge evidence                             |
@@ -598,7 +616,8 @@ and a linked guardian or student identity.
 | C07b1    | Site-scoped subject timetable schema, constraints and RLS              | Merged  | [#530](https://github.com/FSS-Ltd/pathway/pull/530) to `master`                     | `18a3b46618603ff17031ba1fe74110c88da4c341`; all eight checks passed: CI 37907777783, CodeQL 37907771188. Deploy 37908913978 passed four jobs; aliases, anonymous smoke, and runtime errors checked.             | `27f58688316af070fbd4061e1870eb2aa095a997` |
 | C07b2    | Guarded Head subject timetable schedule, draft and publication APIs    | Merged  | [#531](https://github.com/FSS-Ltd/pathway/pull/531) to `master`                     | `64e08b3126dce7dd2db00e6d332806be668296c3`; all eight checks passed: CI 37913569202, CodeQL 37913564920. Deploy 37914554014 passed four jobs; aliases, anonymous smoke, and runtime errors checked.             | `8be337698ab570cefcb782de6ba71eb78e1a4324` |
 | C07b3    | Family subject timetable reads and Head/family web journeys            | Merged  | [#532](https://github.com/FSS-Ltd/pathway/pull/532) to `master`                     | `3d9e2df58d743b8bf539bc9a210f571548da77a6`; eight checks passed: CI 37919937595, CodeQL 37919935395. Deploy 37920954979 and live smoke passed.                                                                  | `0aa1be0140ed2323858cdd7099876be0fcca7def` |
-| C07c     | Site-scoped swap candidates and staff rota workspace clarity           | In PR   | [#533](https://github.com/FSS-Ltd/pathway/pull/533) to `master`                     | `2af5d4836fe6088a650ec594b892543d2e8cbb77`; local lint, typecheck, units, builds, formatting, and Graphify passed. Database E2E and CI pending.                                                                 | Pending                                    |
+| C07c     | Site-scoped swap candidates and staff rota workspace clarity           | Merged  | [#533](https://github.com/FSS-Ltd/pathway/pull/533) to `master`                     | `70c8171b4a2de212e55de645b9d31b9f1d0cc9b7`; eight checks passed: CI 37924201387, CodeQL 37924195883. Deploy 37925146907 and live smoke passed.                                                                  | `72f72da6fde0d49ae2fcf1baecae38a1a348598b` |
+| C07d     | Site-scoped staff team rota and availability entry point               | In PR   | [#534](https://github.com/FSS-Ltd/pathway/pull/534) to `master`                     | `236751c7220a332e211a665ffd50b83ac06fce44`; local lint, typecheck, unit, builds, formatting, and Graphify passed. Database E2E skipped locally; CI pending.                                                     | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
