@@ -69,9 +69,13 @@ export function RecipientPicker({
       return;
     }
     const controller = new AbortController();
+    const signal = AbortSignal.any([
+      controller.signal,
+      AbortSignal.timeout(15_000),
+    ]);
     setSearching(true);
     const timeout = window.setTimeout(() => {
-      void searchRecipients(search, controller.signal)
+      void searchRecipients(search, signal)
         .then((result) => {
           if (!controller.signal.aborted) {
             setPage(result);

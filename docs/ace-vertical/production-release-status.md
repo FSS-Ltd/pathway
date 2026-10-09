@@ -1,10 +1,10 @@
 # ACE production release status
 
 Checked on 9 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `4c805d636a3cc82c627ef3c3bd42d3c96ea0356d`.
+to READY deployments at merged commit `ae1383b6195eb883bc5e99f08ed3cbc58dfd9741`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-13 are now served by all three apps.
+changes through REL-14 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -276,6 +276,26 @@ replies as staff, and confirms the parent's inbox, history, and read cursor.
 It is a regression gate for the existing two-way API path, not evidence of a
 live parent exchange. Production activation still requires the school's
 review of guardian access and the parent-portal switch.
+[PR #518](https://github.com/FSS-Ltd/pathway/pull/518) passed all eight checks
+on `aa44fc3152cb4b327824cb3eb104d663ffd378bf` (CI 37871889213, CodeQL
+37871886845). The database integration job passed 72 suites and 459 tests,
+including the parent-to-staff reply journey. It merged as
+`ae1383b6195eb883bc5e99f08ed3cbc58dfd9741`.
+[Production run 37872708126](https://github.com/FSS-Ltd/pathway/actions/runs/37872708126)
+passed migrations and all three app deployments. Vercel confirms READY API
+`dpl_HmYjzFdmfEhZWQu2FpzbZqHDgqag`, admin
+`dpl_BsaPRRngohSJHfbYxUb7oMTK7CZ2`, and web
+`dpl_7cB4kFeLDTvgcc442e7Q7iXWyHA7` on their production aliases at that
+commit. API health returned 200 with a database timestamp, the configurator
+returned 200, and unsigned admin Messages redirected to sign-in. These checks
+do not exercise a live parent account.
+
+REL-15 bounds staff and parent recipient discovery so an unanswered request
+ends in an actionable retry state. This improves the published messaging
+loading experience while the final production check remains open: a reviewed
+linked parent must discover a responder, send a message, and see the staff
+reply in the same site. The school must approve legal access and enable the
+parent portal before that test; no historical link is approved automatically.
 
 ## Delivery steps
 
@@ -361,7 +381,8 @@ review of guardian access and the parent-portal switch.
 | REL-11   | Repair production API injection across ACE and Home                    | Merged  | [#515](https://github.com/FSS-Ltd/pathway/pull/515) to `master`                     | `3ff450d1f4ac8f009bb280b689e231b8cbac29da`; all eight checks passed: CI 37865176399, CodeQL 37865172972. Deploy 37865725001 passed; messaging schema gap remains.                                               | `532bfeb8d65df9d38a33d96ae01cb06f4a2adbff` |
 | REL-12   | Bridge protected ACE message and notice tables to public Prisma        | Merged  | [#516](https://github.com/FSS-Ltd/pathway/pull/516) to `master`                     | `3c0a2350ebf3245cc705377d700019431ac91ad2`; all eight checks passed: CI 37867521249, CodeQL 37867518620. Deploy 37868259048 passed all four jobs; database migration and aliases verified.                      | `68eec5eeda13eef0dd34ff771a2ec145ebe8db4b` |
 | REL-13   | Show disabled parent messaging state without a failed data request     | Merged  | [#517](https://github.com/FSS-Ltd/pathway/pull/517) to `master`                     | `01a916a281fdafe56010c6d41cb5a3fca9478dff`; all eight checks passed: CI 37870030605, CodeQL 37870029534. Deploy 37870846650 passed all four jobs; aliases verified.                                             | `4c805d636a3cc82c627ef3c3bd42d3c96ea0356d` |
-| REL-14   | Parent and staff two-way database messaging journey                    | Active  | PR pending                                                                          | Local lint/typecheck, API build, formatting, diff check, and Graphify refresh passed; local E2E database unavailable, CI integration proof pending.                                                             | Pending                                    |
+| REL-14   | Parent and staff two-way database messaging journey                    | Merged  | [#518](https://github.com/FSS-Ltd/pathway/pull/518) to `master`                     | `aa44fc3152cb4b327824cb3eb104d663ffd378bf`; all eight checks passed: CI 37871889213, CodeQL 37871886845. Deploy 37872708126 passed all four jobs; aliases verified.                                             | `ae1383b6195eb883bc5e99f08ed3cbc58dfd9741` |
+| REL-15   | Bound messaging recipient loading and offer retry                      | Active  | [#519](https://github.com/FSS-Ltd/pathway/pull/519) to `master`                     | Focused test, admin suite, repo lint/typecheck, admin build, formatting, diff check, and Graphify passed; CI rerun pending after a Node 20 test-environment correction.                                         | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
