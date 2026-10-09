@@ -6,7 +6,12 @@ import {
   Optional,
   UnauthorizedException,
 } from "@nestjs/common";
-import { prisma, withTenantRlsContext, type Prisma } from "@pathway/db";
+import {
+  prisma,
+  SessionRotaKind,
+  withTenantRlsContext,
+  type Prisma,
+} from "@pathway/db";
 import { PathwayRequestContext } from "@pathway/auth";
 import { Av30ActivityType } from "@pathway/types/av30";
 import { Av30ActivityService } from "../av30/av30-activity.service";
@@ -110,6 +115,7 @@ export class AttendanceService {
     const sessions = await prisma.session.findMany({
       where: {
         tenantId,
+        rotaKind: SessionRotaKind.STANDARD,
         startsAt: { lte: to },
         endsAt: { gte: from },
       },
@@ -177,7 +183,7 @@ export class AttendanceService {
     tenantId: string,
   ) {
     const session = await tx.session.findFirst({
-      where: { id: sessionId, tenantId },
+      where: { id: sessionId, tenantId, rotaKind: SessionRotaKind.STANDARD },
       select: {
         id: true,
         title: true,
@@ -260,7 +266,11 @@ export class AttendanceService {
       this.requestContext.currentOrgId,
       async (tx) => {
         const session = await tx.session.findFirst({
-          where: { id: sessionId, tenantId },
+          where: {
+            id: sessionId,
+            tenantId,
+            rotaKind: SessionRotaKind.STANDARD,
+          },
           select: { id: true, groups: { select: { id: true } } },
         });
         if (!session) throw new NotFoundException("Session not found");
@@ -451,9 +461,18 @@ export class AttendanceService {
     if (input.sessionId) {
       const session = await prisma.session.findUnique({
         where: { id: input.sessionId },
-        select: { id: true, tenantId: true, groups: { select: { id: true } } },
+        select: {
+          id: true,
+          tenantId: true,
+          rotaKind: true,
+          groups: { select: { id: true } },
+        },
       });
-      if (!session || session.tenantId !== tenantId) {
+      if (
+        !session ||
+        session.tenantId !== tenantId ||
+        session.rotaKind !== SessionRotaKind.STANDARD
+      ) {
         throw new NotFoundException("Attendance not found");
       }
       if (
@@ -579,9 +598,18 @@ export class AttendanceService {
     if (input.sessionId) {
       const session = await tx.session.findUnique({
         where: { id: input.sessionId },
-        select: { id: true, tenantId: true, groups: { select: { id: true } } },
+        select: {
+          id: true,
+          tenantId: true,
+          rotaKind: true,
+          groups: { select: { id: true } },
+        },
       });
-      if (!session || session.tenantId !== tenantId) {
+      if (
+        !session ||
+        session.tenantId !== tenantId ||
+        session.rotaKind !== SessionRotaKind.STANDARD
+      ) {
         throw new NotFoundException("Attendance not found");
       }
       const effectiveGroupId = input.groupId ?? current.groupId ?? undefined;

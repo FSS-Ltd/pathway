@@ -25,6 +25,12 @@ enum AssignmentStatus {
   DECLINED
 }
 
+enum SessionRotaKind {
+  STANDARD
+  COVER
+  MEETING
+}
+
 enum PermissionSlipChangeClassification {
   INITIAL
   MATERIAL
@@ -2322,6 +2328,7 @@ model Session {
   startsAt               DateTime
   endsAt                 DateTime
   title                  String?
+  rotaKind               SessionRotaKind          @default(STANDARD)
   familyPublishedAt      DateTime?
   assignments            Assignment[]
   attendances            Attendance[]

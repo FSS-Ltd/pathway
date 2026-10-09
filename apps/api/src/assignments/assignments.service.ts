@@ -6,7 +6,14 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
-import { prisma, Prisma, Role, AssignmentStatus, SiteRole } from "@pathway/db";
+import {
+  prisma,
+  Prisma,
+  Role,
+  AssignmentStatus,
+  SiteRole,
+  SessionRotaKind,
+} from "@pathway/db";
 import { Av30ActivityType } from "@pathway/types/av30";
 import { Av30ActivityService } from "../av30/av30-activity.service";
 import { MailerService } from "../mailer/mailer.service";
@@ -19,6 +26,7 @@ export type TeamScheduleRow = {
   assignmentId: string;
   sessionId: string;
   sessionTitle: string;
+  rotaKind: SessionRotaKind;
   startsAt: string;
   endsAt: string;
   groups: { id: string; name: string }[];
@@ -141,6 +149,7 @@ export class AssignmentsService {
           select: {
             id: true,
             title: true,
+            rotaKind: true,
             startsAt: true,
             endsAt: true,
             groups: { select: { id: true, name: true, color: true } },
@@ -186,6 +195,7 @@ export class AssignmentsService {
           select: {
             id: true,
             title: true,
+            rotaKind: true,
             startsAt: true,
             endsAt: true,
             groups: { select: { id: true, name: true } },
@@ -199,6 +209,7 @@ export class AssignmentsService {
         assignmentId: assignment.id,
         sessionId: assignment.session.id,
         sessionTitle: assignment.session.title ?? "Session",
+        rotaKind: assignment.session.rotaKind,
         startsAt: assignment.session.startsAt.toISOString(),
         endsAt: assignment.session.endsAt.toISOString(),
         groups: assignment.session.groups,

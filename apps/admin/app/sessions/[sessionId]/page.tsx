@@ -34,6 +34,7 @@ import {
   canAccessSafeguardingAdmin,
 } from "../../../lib/access";
 import { FamilyPublicationCard } from "@/components/ace/timetable/family-publication-card";
+import { SessionRotaKindBadge } from "@/components/session-rota-kind";
 
 const eligibilityReasonLabel: Record<
   NonNullable<StaffEligibilityRow["reason"]>,
@@ -217,9 +218,13 @@ export default function SessionDetailPage() {
         setAssignments([]);
         setHandoverForSession({ handoverLogId: null });
       } else {
-        fetchHandoverForSession(sessionId)
-          .then(setHandoverForSession)
-          .catch(() => setHandoverForSession({ handoverLogId: null }));
+        if (result.rotaKind === "STANDARD") {
+          fetchHandoverForSession(sessionId)
+            .then(setHandoverForSession)
+            .catch(() => setHandoverForSession({ handoverLogId: null }));
+        } else {
+          setHandoverForSession(null);
+        }
         setAssignments(result.assignments ?? []);
         await refreshAssignments(result);
         const hasBreakdown =
@@ -231,7 +236,7 @@ export default function SessionDetailPage() {
             .then(setLessonDetail)
             .catch(() => setLessonDetail(null));
         }
-        if (!hasBreakdown) {
+        if (result.rotaKind === "STANDARD" && !hasBreakdown) {
           fetchAttendanceDetailBySessionId(result.id)
             .then((d) => setAttendanceSummary(d?.summary ?? null))
             .catch(() => setAttendanceSummary(null));
@@ -360,10 +365,13 @@ export default function SessionDetailPage() {
           <Button variant="secondary" size="sm" onClick={load}>
             Refresh
           </Button>
-          <Button size="sm" asChild>
-            <Link href={`/attendance/${sessionId}`}>Take attendance</Link>
-          </Button>
-          {canStartHandover &&
+          {session?.rotaKind === "STANDARD" ? (
+            <Button size="sm" asChild>
+              <Link href={`/attendance/${sessionId}`}>Take attendance</Link>
+            </Button>
+          ) : null}
+          {session?.rotaKind === "STANDARD" &&
+            canStartHandover &&
             session &&
             (handoverForSession?.handoverLogId ? (
               <Button size="sm" asChild variant="secondary">
@@ -454,6 +462,7 @@ export default function SessionDetailPage() {
                 <Badge variant={statusTone[session.status]}>
                   {statusCopy[session.status]}
                 </Badge>
+                <SessionRotaKindBadge kind={session.rotaKind} />
               </div>
               {time ? (
                 <div className="flex flex-wrap items-center gap-3 text-sm text-text-muted">
@@ -461,100 +470,108 @@ export default function SessionDetailPage() {
                     <CalendarClock className="h-4 w-4" />
                     {time.date} · {time.range}
                   </span>
-                  <span className="inline-flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    {session.room} · {session.ageGroup}
-                  </span>
+                  {session.room !== "-" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      {session.room}
+                    </span>
+                  ) : null}
                 </div>
               ) : null}
-              {(() => {
-                const lesson =
-                  session.lesson ??
-                  (lessonDetail
-                    ? {
-                        id: lessonDetail.id,
-                        title: lessonDetail.title,
-                        description: lessonDetail.description,
-                        resources: lessonDetail.resources?.length
-                          ? lessonDetail.resources.map((r) => ({
-                              label: r.label,
-                              url: null,
-                              type: r.type,
-                            }))
-                          : null,
-                      }
-                    : null);
-                if (
-                  lesson?.description ||
-                  (lesson?.resources && lesson.resources.length > 0)
-                ) {
-                  const safeUrl = (url: string | null | undefined) =>
-                    typeof url === "string" &&
-                    (url.startsWith("https://") || url.startsWith("http://"));
-                  return (
-                    <div className="space-y-2 text-sm text-text-muted">
-                      {lesson.description ? (
-                        <p className="text-text-primary">
-                          {lesson.description}
-                        </p>
-                      ) : null}
-                      {lesson.resources && lesson.resources.length > 0 ? (
-                        <ul className="list-inside list-disc space-y-1">
-                          {lesson.resources.map((r, i) => {
-                            const label = r.label ?? "Resource";
-                            const url = r.url;
-                            return (
-                              <li key={i}>
-                                {url && safeUrl(url) ? (
-                                  <a
-                                    href={url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-accent-strong underline-offset-2 hover:underline"
-                                  >
-                                    {label}
-                                  </a>
-                                ) : (
-                                  label
-                                )}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : null}
-                    </div>
-                  );
-                }
-                return (
-                  <div className="text-sm text-text-muted">
-                    Lesson resources and description will appear when available.
-                  </div>
-                );
-              })()}
+              {session.rotaKind === "STANDARD"
+                ? (() => {
+                    const lesson =
+                      session.lesson ??
+                      (lessonDetail
+                        ? {
+                            id: lessonDetail.id,
+                            title: lessonDetail.title,
+                            description: lessonDetail.description,
+                            resources: lessonDetail.resources?.length
+                              ? lessonDetail.resources.map((r) => ({
+                                  label: r.label,
+                                  url: null,
+                                  type: r.type,
+                                }))
+                              : null,
+                          }
+                        : null);
+                    if (
+                      lesson?.description ||
+                      (lesson?.resources && lesson.resources.length > 0)
+                    ) {
+                      const safeUrl = (url: string | null | undefined) =>
+                        typeof url === "string" &&
+                        (url.startsWith("https://") ||
+                          url.startsWith("http://"));
+                      return (
+                        <div className="space-y-2 text-sm text-text-muted">
+                          {lesson.description ? (
+                            <p className="text-text-primary">
+                              {lesson.description}
+                            </p>
+                          ) : null}
+                          {lesson.resources && lesson.resources.length > 0 ? (
+                            <ul className="list-inside list-disc space-y-1">
+                              {lesson.resources.map((r, i) => {
+                                const label = r.label ?? "Resource";
+                                const url = r.url;
+                                return (
+                                  <li key={i}>
+                                    {url && safeUrl(url) ? (
+                                      <a
+                                        href={url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-accent-strong underline-offset-2 hover:underline"
+                                      >
+                                        {label}
+                                      </a>
+                                    ) : (
+                                      label
+                                    )}
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          ) : null}
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="text-sm text-text-muted">
+                        Lesson resources and description will appear when
+                        available.
+                      </div>
+                    );
+                  })()
+                : null}
             </div>
           </Card>
 
-          <Card title="Attendance">
-            <div className="space-y-2 text-sm text-text-primary">
-              <div className="font-semibold">
-                {session.attendanceMarked} of {session.attendanceTotal} children
-                marked
+          {session.rotaKind === "STANDARD" ? (
+            <Card title="Attendance">
+              <div className="space-y-2 text-sm text-text-primary">
+                <div className="font-semibold">
+                  {session.attendanceMarked} of {session.attendanceTotal}{" "}
+                  children marked
+                </div>
+                {attendanceBreakdown ? (
+                  <ul className="space-y-1 text-text-muted">
+                    <li>Present: {displayPresent}</li>
+                    <li>Absent: {displayAbsent}</li>
+                    <li>Late: {displayLate}</li>
+                  </ul>
+                ) : (
+                  <p className="text-text-muted">
+                    Breakdown will appear when attendance is recorded.
+                  </p>
+                )}
               </div>
-              {attendanceBreakdown ? (
-                <ul className="space-y-1 text-text-muted">
-                  <li>Present: {displayPresent}</li>
-                  <li>Absent: {displayAbsent}</li>
-                  <li>Late: {displayLate}</li>
-                </ul>
-              ) : (
-                <p className="text-text-muted">
-                  Breakdown will appear when attendance is recorded.
-                </p>
-              )}
-            </div>
-          </Card>
+            </Card>
+          ) : null}
 
-          {isAdmin && (
+          {isAdmin && session.rotaKind === "STANDARD" && (
             <FamilyPublicationCard
               sessionId={session.id}
               publishedAt={session.familyPublishedAt ?? null}

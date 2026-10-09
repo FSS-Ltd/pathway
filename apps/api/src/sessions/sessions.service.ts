@@ -4,7 +4,7 @@ import {
   NotFoundException,
   ConflictException,
 } from "@nestjs/common";
-import { prisma, Weekday } from "@pathway/db";
+import { prisma, SessionRotaKind, Weekday } from "@pathway/db";
 import {
   createSessionSchema,
   type CreateSessionDto,
@@ -187,6 +187,13 @@ export class SessionsService {
     if (parsed.endsAt.getTime() <= parsed.startsAt.getTime()) {
       throw new BadRequestException("endsAt must be after startsAt");
     }
+    if (
+      parsed.rotaKind &&
+      parsed.rotaKind !== SessionRotaKind.STANDARD &&
+      !parsed.title?.trim()
+    ) {
+      throw new BadRequestException("Cover and meeting shifts require a title");
+    }
 
     // ensure tenant exists for clearer error than FK violation
     const tenant = await prisma.tenant.findUnique({
@@ -224,6 +231,7 @@ export class SessionsService {
           startsAt: parsed.startsAt,
           endsAt: parsed.endsAt,
           title: parsed.title?.trim() ?? null,
+          rotaKind: parsed.rotaKind ?? SessionRotaKind.STANDARD,
         },
         include: { groups: { select: { id: true, name: true } } },
       });
@@ -347,12 +355,25 @@ export class SessionsService {
         startsAt: true,
         endsAt: true,
         familyPublishedAt: true,
+        title: true,
+        rotaKind: true,
         groups: { select: { id: true } },
       },
     });
     if (!current) throw new NotFoundException("Session not found");
     if (current.familyPublishedAt) {
       throw new ConflictException("Unpublish this session before editing it");
+    }
+    if (changes.rotaKind && changes.rotaKind !== current.rotaKind) {
+      throw new ConflictException(
+        "Session purpose cannot change after creation",
+      );
+    }
+    if (
+      (changes.rotaKind ?? current.rotaKind) !== SessionRotaKind.STANDARD &&
+      !(changes.title ?? current.title)?.trim()
+    ) {
+      throw new BadRequestException("Cover and meeting shifts require a title");
     }
 
     if (changes.tenantId && changes.tenantId !== tenantId) {
@@ -398,6 +419,7 @@ export class SessionsService {
             typeof changes.title === "undefined"
               ? undefined
               : (changes.title?.trim() ?? null),
+          rotaKind: changes.rotaKind,
         },
         include: { groups: { select: { id: true, name: true } } },
       });

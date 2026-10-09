@@ -175,6 +175,7 @@ export type { PrismaClient as PrismaClientType } from "@prisma/client";
 export {
   PrismaClient,
   AssignmentStatus,
+  SessionRotaKind,
   Role,
   Weekday,
   SwapStatus,
