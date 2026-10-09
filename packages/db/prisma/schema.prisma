@@ -2690,6 +2690,7 @@ model AceStudentTimetablePublication {
   tenantId         String
   tenant           Tenant                               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   draftId          String
+  draftVersion     Int                                  @default(1)
   childId          String
   academicPeriodId String
   draft            AceStudentTimetableDraft             @relation(fields: [draftId, tenantId, childId, academicPeriodId], references: [id, tenantId, childId, academicPeriodId], onDelete: Restrict)
