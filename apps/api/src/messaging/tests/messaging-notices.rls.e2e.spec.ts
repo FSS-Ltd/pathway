@@ -2181,6 +2181,128 @@ describe("ACE parent/staff messaging and notices storage", () => {
     }
   });
 
+  it("loads the parent-to-staff message and staff reply across both inboxes", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const grant = await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.accessTagGrant.create({
+          data: {
+            orgId: fixture.orgAId,
+            tenantId: fixture.tenantAId,
+            userId: fixture.staffAId,
+            tagKey: "PARENT_MESSAGE_RESPONDER",
+            grantedById: fixture.staffAId,
+          },
+        }),
+    );
+    const staffActor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+
+    try {
+      const parentConversations = new ParentMessagingConversationService();
+      const recipients = await parentConversations.recipients(
+        fixture.tenantAId,
+        fixture.guardianAUserId,
+        {},
+      );
+      expect(recipients.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: fixture.staffAId }),
+        ]),
+      );
+
+      const opened = await parentConversations.open(
+        fixture.tenantAId,
+        fixture.guardianAUserId,
+        { recipientUserId: fixture.staffAId },
+      );
+      const parentMessage = await new ParentMessagingCommandService().send(
+        fixture.tenantAId,
+        fixture.guardianAUserId,
+        opened.id,
+        { clientRequestId: randomUUID(), body: "Can we discuss the visit?" },
+      );
+      const staffInbox = await new StaffSchoolTeamService().list(
+        staffActor,
+        {},
+      );
+      expect(staffInbox.items).toEqual([
+        expect.objectContaining({
+          id: opened.id,
+          unreadCount: 1,
+          latestMessage: expect.objectContaining({
+            preview: "Can we discuss the visit?",
+          }),
+        }),
+      ]);
+      expect(
+        (
+          await new StaffSchoolTeamHistoryService().list(
+            staffActor,
+            opened.id,
+            {},
+          )
+        ).items[0],
+      ).toMatchObject({
+        id: parentMessage.id,
+        body: "Can we discuss the visit?",
+      });
+
+      const staffReply = await new StaffSchoolTeamCommandService().send(
+        staffActor,
+        opened.id,
+        { clientRequestId: randomUUID(), body: "Yes, let's arrange a time." },
+      );
+      const parentInbox = await new ParentMessagingService().list(
+        fixture.tenantAId,
+        fixture.guardianAUserId,
+      );
+      expect(parentInbox.items).toEqual([
+        expect.objectContaining({ id: opened.id, unreadCount: 1 }),
+      ]);
+      const parentHistory = await new ParentMessagingHistoryService().list(
+        fixture.tenantAId,
+        fixture.guardianAUserId,
+        opened.id,
+        {},
+      );
+      expect(parentHistory.items).toEqual([
+        expect.objectContaining({
+          id: staffReply.id,
+          body: "Yes, let's arrange a time.",
+        }),
+        expect.objectContaining({
+          id: parentMessage.id,
+          body: "Can we discuss the visit?",
+        }),
+      ]);
+      await expect(
+        new ParentMessagingReadCursorService().advance(
+          fixture.tenantAId,
+          fixture.guardianAUserId,
+          opened.id,
+          { sequence: staffReply.sequence },
+        ),
+      ).resolves.toEqual({ lastReadSequence: staffReply.sequence });
+      expect(
+        (
+          await new ParentMessagingService().list(
+            fixture.tenantAId,
+            fixture.guardianAUserId,
+          )
+        ).items[0]?.unreadCount,
+      ).toBe(0);
+    } finally {
+      await prisma.accessTagGrant.delete({ where: { id: grant.id } });
+    }
+  });
+
   it("lists a parent thread only for its current approved staff responder", async () => {
     if (!isDatabaseAvailable()) return;
 
