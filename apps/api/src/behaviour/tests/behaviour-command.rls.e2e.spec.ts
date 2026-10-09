@@ -15,6 +15,7 @@ import type { MailerService } from "../../mailer/mailer.service";
 import { BehaviourCommandService } from "../behaviour-command.service";
 import { BehaviourQueryService } from "../behaviour-query.service";
 import { DemeritEscalationService } from "../demerit-escalation.service";
+import { findActiveReviewers } from "../behaviour-review-access";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 
@@ -153,6 +154,7 @@ describe("ACE behaviour command database boundary", () => {
         await tx.$executeRawUnsafe(
           "SET LOCAL session_replication_role = replica",
         );
+        await tx.behaviourReviewRequest.deleteMany({ where: { tenantId } });
         await tx.behaviourEntry.deleteMany({ where: { tenantId } });
         await tx.behaviourCategory.deleteMany({ where: { tenantId } });
         await tx.demeritPolicy.deleteMany({ where: { tenantId } });
@@ -187,6 +189,81 @@ describe("ACE behaviour command database boundary", () => {
     });
     await prisma.tenant.deleteMany({ where: { orgId: fixture.orgId } });
     await prisma.org.deleteMany({ where: { id: fixture.orgId } });
+  });
+
+  it("finds an active organisation Head with no legacy site id and respects revocation", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const roleId = randomUUID();
+    const assignmentId = randomUUID();
+    const now = new Date();
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, async (tx) => {
+      await tx.orgRoleDefinition.create({
+        data: {
+          id: roleId,
+          orgId: fixture!.orgId,
+          tenantId: null,
+          name: "Organisation Head",
+          scope: "organisation",
+          isSystem: true,
+          createdById: fixture!.actorAId,
+          updatedById: fixture!.actorAId,
+        },
+      });
+      await tx.userRoleAssignment.create({
+        data: {
+          id: assignmentId,
+          orgId: fixture!.orgId,
+          tenantId: null,
+          userId: fixture!.orgRecorderId,
+          roleDefinitionId: roleId,
+          assignedById: fixture!.actorAId,
+          startsAt: new Date(now.getTime() - 1_000),
+        },
+      });
+    });
+    try {
+      const legacySiteId = await prisma.user.findUniqueOrThrow({
+        where: { id: fixture.orgRecorderId },
+        select: { tenantId: true },
+      });
+      expect(legacySiteId.tenantId).toBeNull();
+      const headIds = await withTenantRlsContext(
+        fixture.tenantAId,
+        fixture.orgId,
+        (tx) =>
+          findActiveReviewers(
+            tx,
+            { tenantId: fixture!.tenantAId, orgId: fixture!.orgId },
+            "HEAD",
+            now,
+          ),
+      );
+      expect(headIds).toContain(fixture.orgRecorderId);
+
+      await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
+        tx.userRoleAssignment.update({
+          where: { id: assignmentId },
+          data: { revokedAt: now, revokedById: fixture!.actorAId },
+        }),
+      );
+      const revokedIds = await withTenantRlsContext(
+        fixture.tenantAId,
+        fixture.orgId,
+        (tx) =>
+          findActiveReviewers(
+            tx,
+            { tenantId: fixture!.tenantAId, orgId: fixture!.orgId },
+            "HEAD",
+            new Date(now.getTime() + 1_000),
+          ),
+      );
+      expect(revokedIds).not.toContain(fixture.orgRecorderId);
+    } finally {
+      await prisma.userRoleAssignment.deleteMany({
+        where: { id: assignmentId },
+      });
+      await prisma.orgRoleDefinition.deleteMany({ where: { id: roleId } });
+    }
   });
 
   it("commits one fact, audit, and merit intent for concurrent command replay", async () => {

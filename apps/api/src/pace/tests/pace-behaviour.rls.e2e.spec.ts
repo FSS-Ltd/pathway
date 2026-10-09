@@ -185,6 +185,7 @@ async function deletePaceBehaviourRowsIfPresent(
       "PaceAssessment",
       "PacePolicyOverride",
       "PacePolicy",
+      "BehaviourReviewRequest",
       "BehaviourEntry",
       "DemeritStageOverride",
       "DemeritPolicy"
@@ -983,6 +984,61 @@ describe("ACE PACE and behaviour fact storage", () => {
     expect(result.atRest).not.toBe(plaintext);
     expect(isEncryptedField(result.atRest)).toBe(true);
     expect(result.throughClient).toBe(plaintext);
+  });
+
+  it("keeps behaviour review requests site-owned, linked, and immutable", async () => {
+    if (!fixture) throw new Error("Fixture not initialised");
+    const entryId = await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) => insertBehaviourEntry(tx, fixture!),
+    );
+    const reviewId = randomUUID();
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+      tx.behaviourReviewRequest.create({
+        data: {
+          id: reviewId,
+          tenantId: fixture!.tenantAId,
+          childId: fixture!.childAId,
+          behaviourEntryId: entryId,
+          kind: "SITE",
+          stage: 1,
+          policyVersion: 1,
+        },
+      }),
+    );
+    const otherSiteRows = await withTenantRlsContext(
+      fixture.tenantBId,
+      fixture.orgBId,
+      (tx) => tx.behaviourReviewRequest.findMany({ where: { id: reviewId } }),
+    );
+    expect(otherSiteRows).toEqual([]);
+    await expectDatabaseRejection(
+      () =>
+        withTenantRlsContext(
+          fixture!.tenantAId,
+          fixture!.orgAId,
+          (tx) =>
+            tx.$executeRaw`UPDATE "BehaviourReviewRequest" SET "stage" = 2 WHERE "id" = ${reviewId}`,
+        ),
+      "55000",
+    );
+    await expectDatabaseRejection(
+      () =>
+        withTenantRlsContext(fixture!.tenantAId, fixture!.orgAId, (tx) =>
+          tx.behaviourReviewRequest.create({
+            data: {
+              tenantId: fixture!.tenantAId,
+              childId: fixture!.childA2Id,
+              behaviourEntryId: entryId,
+              kind: "HEAD",
+              stage: 3,
+              policyVersion: 1,
+            },
+          }),
+        ),
+      "23503",
+    );
   });
 
   it("isolates all PACE and behaviour tables with forced tenant RLS", async () => {

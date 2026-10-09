@@ -6,8 +6,10 @@ import { MailerModule } from "../mailer/mailer.module";
 import { BehaviourCommandService } from "./behaviour-command.service";
 import { BehaviourPolicyService } from "./behaviour-policy.service";
 import { BehaviourQueryService } from "./behaviour-query.service";
+import { BehaviourReviewService } from "./behaviour-review.service";
 import { BehaviourController } from "./behaviour.controller";
 import { DemeritEscalationService } from "./demerit-escalation.service";
+import { DemeritStageService } from "./demerit-stage.service";
 import { BehaviourOutboxController } from "./behaviour-outbox.controller";
 
 @Module({
@@ -17,7 +19,9 @@ import { BehaviourOutboxController } from "./behaviour-outbox.controller";
     BehaviourPolicyService,
     BehaviourCommandService,
     BehaviourQueryService,
+    BehaviourReviewService,
     DemeritEscalationService,
+    DemeritStageService,
   ],
 })
 export class BehaviourModule {}
