@@ -210,8 +210,9 @@ whole-app metadata regression check. The observed error was
 decision; the production response contained no private message data. Local
 TSX audit now finds zero missing dependencies among 111 classes with
 constructor parameters. Signed-in production data loading still needs a fresh
-smoke check after deployment. Parent-to-staff conversations also need a staff
-inbox journey in a later delivery step.
+smoke check after deployment. The existing School Team staff inbox and reply
+routes provide the return path for parent conversations; the full two-way
+journey still needs a live parent with approved guardian access.
 
 ## Delivery steps
 
