@@ -4,11 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { SYSTEM_ROLE_TEMPLATES } from "@pathway/auth";
 import { evaluateDemeritStage } from "@pathway/ace-domain";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { MailerService } from "../mailer/mailer.service";
+import { findActiveReviewers } from "./behaviour-review-access";
+import { findActiveDemeritPolicy } from "./demerit-policy.repository";
 import {
   guardianNotificationIntentSchema,
   isIanaTimezone,
@@ -18,7 +19,6 @@ import {
   uniqueRecipients,
   uniqueSorted,
   type CreateDemeritIntentsInput,
-  type EscalationActor,
   type EscalationPredecessor,
   type DemeritEscalationResult,
   type DemeritPolicyRecord,
@@ -239,23 +239,7 @@ export class DemeritEscalationService {
     tenantId: string,
     now: Date,
   ): Promise<DemeritPolicyRecord> {
-    const policy = await tx.demeritPolicy.findFirst({
-      where: {
-        tenantId,
-        effectiveFrom: { lte: now },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
-      },
-      orderBy: [{ effectiveFrom: "desc" }, { version: "desc" }],
-      select: {
-        id: true,
-        version: true,
-        windowDays: true,
-        stageOneThreshold: true,
-        stageTwoThreshold: true,
-        stageThreeThreshold: true,
-        seriousMisconductStage: true,
-      },
-    });
+    const policy = await findActiveDemeritPolicy(tx, tenantId, now);
     if (!policy) throw new NotFoundException("Active demerit policy not found");
     return policy;
   }
@@ -299,7 +283,7 @@ export class DemeritEscalationService {
     }
 
     const reviewKind = input.action === "head-review" ? "HEAD" : "SITE";
-    const recipientUserIds = await this.findReviewerUserIds(
+    const recipientUserIds = await findActiveReviewers(
       tx,
       input.actor,
       reviewKind,
@@ -314,6 +298,20 @@ export class DemeritEscalationService {
         reviewKind,
       },
       idempotencyKey: `behaviour-review:${input.entry.id}:${input.stage}:${reviewKind.toLowerCase()}`,
+    });
+    await tx.behaviourReviewRequest.createMany({
+      data: [
+        {
+          tenantId: input.actor.tenantId,
+          childId: input.entry.childId,
+          behaviourEntryId: input.entry.id,
+          kind: reviewKind,
+          stage: input.stage,
+          policyVersion: input.policyVersion,
+          requestedAt: input.now,
+        },
+      ],
+      skipDuplicates: true,
     });
     return 1;
   }
@@ -357,38 +355,5 @@ export class DemeritEscalationService {
     return uniqueSorted(
       relationships.map(({ guardianIdentity }) => guardianIdentity.userId),
     );
-  }
-
-  private async findReviewerUserIds(
-    tx: Prisma.TransactionClient,
-    actor: EscalationActor,
-    reviewKind: "SITE" | "HEAD",
-    now: Date,
-  ): Promise<string[]> {
-    const isHeadReview = reviewKind === "HEAD";
-    const role = isHeadReview
-      ? SYSTEM_ROLE_TEMPLATES.organisationHead
-      : SYSTEM_ROLE_TEMPLATES.siteLead;
-    const assignments = await tx.userRoleAssignment.findMany({
-      where: {
-        orgId: actor.orgId,
-        tenantId: isHeadReview ? null : actor.tenantId,
-        revokedAt: null,
-        startsAt: { lte: now },
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-        user: { isActive: true },
-        roleDefinition: {
-          orgId: actor.orgId,
-          tenantId: isHeadReview ? null : actor.tenantId,
-          scope: role.scope,
-          isSystem: true,
-          isActive: true,
-          name: role.name,
-        },
-      },
-      select: { userId: true },
-      distinct: ["userId"],
-    });
-    return uniqueSorted(assignments.map(({ userId }) => userId));
   }
 }

@@ -591,6 +591,27 @@ passed. The dated parent school-support rota and staff view from the
 The migration must run before the API and admin app release. Signed-in
 parent selection and staff view remain required production checks. C08a0
 defines the next [behaviour stage and review contract](27-behaviour-review-parity-design.md).
+C08a0 [PR #539](https://github.com/FSS-Ltd/pathway/pull/539) merged as
+`5cc12dc68779cf69c23a78349f017332ce62099b` at checked revision
+`2fd613106000a0ddd65aa93918abfc8c92556a0f`. Eight checks passed in
+[CI 37953868699](https://github.com/FSS-Ltd/pathway/actions/runs/37953868699)
+and [CodeQL 37953862088](https://github.com/FSS-Ltd/pathway/actions/runs/37953862088).
+The design-only step did not change the overall completion estimate.
+C08a1 [PR #540](https://github.com/FSS-Ltd/pathway/pull/540) is green and waiting
+on merge. Local typechecks, ESLint, the pre-commit unit suites, Prisma schema
+validation, and the ACE governance inventory passed, and revision `73cecf09`
+passed all ten checks in
+[CI 37986511199](https://github.com/FSS-Ltd/pathway/actions/runs/37986511199)
+(integration: 77 suites / 479 tests plus the one-connection proof) and
+[CodeQL 37986506441](https://github.com/FSS-Ltd/pathway/actions/runs/37986506441).
+Branch fixes resolved the integration defects the first CI run exposed: the
+reviewer lookup bound a `timestamptz` against the function's `timestamp`
+signature, a new test created a system role outside the seed identity, the
+cross-site review read needed the restricted RLS role, and the review-request
+fixtures needed a Prisma `P2003` expectation plus teardown deletes. The additive
+migration must run before the API; signed-in Head/Lead and guardian-denial
+journeys remain production verification work. The step is not complete until
+the PR is merged.
 
 ## Delivery steps
 
@@ -693,7 +714,8 @@ defines the next [behaviour stage and review contract](27-behaviour-review-parit
 | C07f     | Typed cover and meeting staff shifts with private rota views           | Merged  | [#536](https://github.com/FSS-Ltd/pathway/pull/536) to `master`                     | `2722e59907fb59dd87f0e4f90d8c5e841913c1e5`; seven runnable checks passed, CodeQL comparison neutral/inapplicable to unchanged Actions files. Deploy 37942692871 applied migration and passed all apps; live smoke verified. | `5c26afca3caca259cc592b20f3b4ebe51ee873fa` |
 | C07g0    | School volunteer rota design contract                                  | Merged  | [#537](https://github.com/FSS-Ltd/pathway/pull/537) to `master`                     | `1c98be5f3ceb3e0206491e531392299096bf45e8`; seven runnable checks passed in CI 37944338801 and CodeQL 37944332896; separate CodeQL comparison neutral/inapplicable to the docs-only change.                                 | `8dc592b4f4c7a61d4b071c9470ba07d260b43e4f` |
 | C07g1    | Dated parent school-support reservations and staff rota                | Merged  | [#538](https://github.com/FSS-Ltd/pathway/pull/538) to `master`                     | `8b7a7427a06973dac519edf8e663f5227523b6cd`; seven runnable checks passed in CI 37951821431 and CodeQL 37951816041; separate CodeQL comparison neutral.                                                                      | `42c5ab087746318e486d2434cec983ddadc95d7d` |
-| C08a0    | Behaviour stage and review parity contract                             | In PR   | [#539](https://github.com/FSS-Ltd/pathway/pull/539) to `master`                     | Local Markdown formatting, diff, and Graphify code graph checks passed; CI pending.                                                                                                                                         | —                                          |
+| C08a0    | Behaviour stage and review parity contract                             | Merged  | [#539](https://github.com/FSS-Ltd/pathway/pull/539) to `master`                     | `2fd613106000a0ddd65aa93918abfc8c92556a0f`; eight checks passed in CI 37953868699 and CodeQL 37953862088.                                                                                                                   | `5cc12dc68779cf69c23a78349f017332ce62099b` |
+| C08a1    | Site-scoped demerit status, override, and review request API           | In PR   | [#540](https://github.com/FSS-Ltd/pathway/pull/540) to `master`                     | `73cecf09`; all ten checks passed: CI 37986511199 (integration 77 suites / 479 tests and the one-connection proof) and CodeQL 37986506441. Awaiting merge.                                                                  | —                                          |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                            | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                            | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                            | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

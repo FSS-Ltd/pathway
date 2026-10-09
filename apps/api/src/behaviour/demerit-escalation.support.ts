@@ -103,6 +103,23 @@ export function localDateWindow(
   };
 }
 
+export function localDateWindowForDate(
+  localDate: string,
+  timezone: string,
+  windowDays: number,
+): LocalDateWindow {
+  const startOn = addCalendarDays(localDate, -(windowDays - 1));
+  return {
+    start: localMidnightToUtc(startOn, timezone),
+    end: localMidnightToUtc(addCalendarDays(localDate, 1), timezone),
+    occurredOn: localDate,
+  };
+}
+
+export function currentLocalDate(instant: Date, timezone: string): string {
+  return localDateAt(instant, timezone);
+}
+
 export function summariseDemerits(entries: readonly WindowedDemerit[]) {
   return {
     demeritUnits: entries.reduce(

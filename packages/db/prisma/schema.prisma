@@ -933,6 +933,7 @@ model Tenant {
   behaviourCategories    BehaviourCategory[]
   demeritPolicies        DemeritPolicy[]
   demeritStageOverrides  DemeritStageOverride[]
+  behaviourReviewRequests BehaviourReviewRequest[]
   studentPortalPolicy    StudentPortalPolicy?
   guardianIdentities     GuardianIdentity[]
   studentIdentities      StudentIdentity[]
@@ -1548,6 +1549,7 @@ model Child {
   pacePolicyOverrides        PacePolicyOverride[]
   behaviourEntries           BehaviourEntry[]
   demeritStageOverrides      DemeritStageOverride[]
+  behaviourReviewRequests   BehaviourReviewRequest[]
   studentIdentityLinks       StudentIdentityLink[]
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites      FamilyIdentityInvite[]
@@ -3337,6 +3339,7 @@ model BehaviourEntry {
   commandFingerprint       String?
   correctsBehaviourEntry   BehaviourEntry?     @relation("BehaviourEntryCorrections", fields: [correctsBehaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict, map: "BehaviourEntry_correction_target_fkey")
   correction               BehaviourEntry?     @relation("BehaviourEntryCorrections")
+  reviewRequests           BehaviourReviewRequest[]
   createdAt                DateTime            @default(now())
 
   @@unique([id, tenantId])
@@ -3383,11 +3386,37 @@ model DemeritStageOverride {
   authorisedByUserId String
   authorisedBy       User          @relation("DemeritStageOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
   reason             String        @db.Text
+  clientCommandKeyHash String?
+  commandFingerprint String?
   expiresAt          DateTime // PostgreSQL also rejects non-finite timestamps.
   createdAt          DateTime      @default(now())
+  reviewRequests     BehaviourReviewRequest[]
 
   @@unique([id, tenantId])
+  @@unique([tenantId, clientCommandKeyHash])
+  @@unique([id, tenantId, childId])
   @@index([tenantId, childId, expiresAt])
+}
+
+model BehaviourReviewRequest {
+  id                     String               @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id])
+  childId                String
+  child                  Child                @relation(fields: [childId, tenantId], references: [id, tenantId])
+  behaviourEntryId       String?
+  behaviourEntry         BehaviourEntry?      @relation(fields: [behaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict)
+  demeritStageOverrideId String?
+  demeritStageOverride   DemeritStageOverride? @relation(fields: [demeritStageOverrideId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict)
+  kind                   String
+  stage                  Int
+  policyVersion          Int
+  requestedAt            DateTime             @default(now())
+
+  @@unique([behaviourEntryId, stage, kind])
+  @@unique([demeritStageOverrideId, stage, kind])
+  @@index([tenantId, requestedAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, childId, requestedAt(sort: Desc)])
 }
 
 model LearningLog {

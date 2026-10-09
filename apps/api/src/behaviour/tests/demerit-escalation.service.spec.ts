@@ -11,6 +11,7 @@ import { OutboxService } from "../../common/outbox/outbox.service";
 import { BehaviourOutboxController } from "../behaviour-outbox.controller";
 
 jest.mock("@pathway/db", () => ({
+  ...jest.requireActual("@pathway/db"),
   withTenantRlsContext: jest.fn(),
 }));
 
@@ -60,6 +61,9 @@ function transaction(
       findMany: jest.fn().mockResolvedValue(options.priorEntries ?? []),
     },
     demeritStageOverride: { findFirst: jest.fn().mockResolvedValue(null) },
+    behaviourReviewRequest: {
+      createMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     guardianChildRelationship: {
       findMany: jest.fn().mockResolvedValue(
         (options.guardianUserIds ?? ["guardian-1"]).map((userId) => ({
@@ -67,13 +71,11 @@ function transaction(
         })),
       ),
     },
-    userRoleAssignment: {
-      findMany: jest.fn().mockResolvedValue(
-        (options.reviewerUserIds ?? ["reviewer-1"]).map((userId) => ({
-          userId,
-        })),
-      ),
-    },
+    $queryRaw: jest.fn().mockResolvedValue(
+      (options.reviewerUserIds ?? ["reviewer-1"]).map((userId) => ({
+        userId,
+      })),
+    ),
     outboxEvent: {
       createMany: jest
         .fn()
@@ -182,7 +184,7 @@ describe("DemeritEscalationService", () => {
   ])(
     "creates the $action intent only when the demerit total crosses stage $stage",
     async ({ priorUnits, stage, action, eventType, reviewKind }) => {
-      const { result, events } = await createIntents({ priorUnits });
+      const { result, events, tx } = await createIntents({ priorUnits });
 
       expect(result).toEqual({
         stage,
@@ -207,6 +209,23 @@ describe("DemeritEscalationService", () => {
           }),
         }),
       ]);
+      if (reviewKind) {
+        expect(tx.behaviourReviewRequest.createMany).toHaveBeenCalledWith({
+          data: [
+            expect.objectContaining({
+              tenantId: actor.tenantId,
+              childId: "child-1",
+              behaviourEntryId: "entry-1",
+              kind: reviewKind,
+              stage,
+              policyVersion: 3,
+            }),
+          ],
+          skipDuplicates: true,
+        });
+      } else {
+        expect(tx.behaviourReviewRequest.createMany).not.toHaveBeenCalled();
+      }
     },
   );
 
@@ -239,17 +258,12 @@ describe("DemeritEscalationService", () => {
       policyVersion: 3,
       createdIntentCount: 1,
     });
-    expect(tx.userRoleAssignment.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          orgId: actor.orgId,
-          tenantId: null,
-          roleDefinition: expect.objectContaining({
-            name: "Organisation Head",
-          }),
-        }),
-      }),
-    );
+    expect(tx.$queryRaw.mock.calls[0]?.[0].values).toEqual([
+      actor.tenantId,
+      actor.orgId,
+      "HEAD",
+      now,
+    ]);
     expect([...events.values()][0]).toEqual(
       expect.objectContaining({
         payload: expect.objectContaining({

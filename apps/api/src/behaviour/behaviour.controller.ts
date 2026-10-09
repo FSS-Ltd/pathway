@@ -18,12 +18,19 @@ import { AuthUserGuard } from "../auth/auth-user.guard";
 import { BehaviourCommandService } from "./behaviour-command.service";
 import { BehaviourPolicyService } from "./behaviour-policy.service";
 import { BehaviourQueryService } from "./behaviour-query.service";
+import { BehaviourReviewService } from "./behaviour-review.service";
+import { DemeritStageService } from "./demerit-stage.service";
 import {
   behaviourCorrectionSchema,
   behaviourListQuerySchema,
   createBehaviourEntrySchema,
 } from "./dto/behaviour-entry.dto";
 import { updateBehaviourPolicySchema } from "./dto/behaviour-policy.dto";
+import {
+  demeritOverrideSchema,
+  demeritStatusQuerySchema,
+  reviewRequestsQuerySchema,
+} from "./dto/demerit-stage.dto";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("ace/behaviour")
@@ -35,6 +42,10 @@ export class BehaviourController {
     private readonly commandService: BehaviourCommandService,
     @Inject(BehaviourQueryService)
     private readonly queryService: BehaviourQueryService,
+    @Inject(DemeritStageService)
+    private readonly demeritStageService: DemeritStageService,
+    @Inject(BehaviourReviewService)
+    private readonly reviewService: BehaviourReviewService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
@@ -73,6 +84,53 @@ export class BehaviourController {
       if (error instanceof z.ZodError) {
         throw new BadRequestException(error.flatten());
       }
+      throw error;
+    }
+  }
+
+  @Get("children/:childId/demerit-status")
+  @RequirePermission("ace.behaviour.sensitive.read")
+  async demeritStatus(
+    @Param("childId") childId: string,
+    @Query() query: unknown,
+  ) {
+    try {
+      const parsedChildId = z.string().uuid().parse(childId);
+      const { date } = await demeritStatusQuerySchema.parseAsync(query);
+      return this.demeritStageService.status(this.actor(), parsedChildId, date);
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Post("demerit-overrides")
+  @RequirePermission("ace.behaviour.policy.manage")
+  async createDemeritOverride(@Body() body: unknown) {
+    try {
+      return await this.demeritStageService.override(
+        this.actor(),
+        await demeritOverrideSchema.parseAsync(body),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Get("review-requests")
+  @RequirePermission("ace.behaviour.sensitive.read")
+  async reviewRequests(@Query() query: unknown) {
+    try {
+      return await this.reviewService.list(
+        this.actor(),
+        await reviewRequestsQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
       throw error;
     }
   }
