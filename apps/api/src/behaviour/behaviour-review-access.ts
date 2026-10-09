@@ -9,10 +9,13 @@ export async function findActiveReviewers(
   kind: ReviewKind,
   now: Date,
 ): Promise<string[]> {
+  // Prisma binds JS Date parameters as timestamptz; the reviewer function
+  // compares against UTC wall-clock timestamp columns, so convert explicitly.
   const reviewers = await tx.$queryRaw<Array<{ userId: string }>>(Prisma.sql`
     SELECT "userId"
     FROM app.ace_behaviour_active_reviewers(
-      ${actor.tenantId}, ${actor.orgId}, ${kind}, ${now}
+      ${actor.tenantId}, ${actor.orgId}, ${kind},
+      (${now} AT TIME ZONE 'UTC')
     )
   `);
   return reviewers.map(({ userId }) => userId).sort();

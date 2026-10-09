@@ -10,6 +10,7 @@ import {
   seedE2eTypedRole,
 } from "../../../test-helpers.e2e";
 import type { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
+import { withSystemRoleFixtureWrites } from "../../access-control/tests/system-role-fixture";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import type { MailerService } from "../../mailer/mailer.service";
 import { BehaviourCommandService } from "../behaviour-command.service";
@@ -196,8 +197,8 @@ describe("ACE behaviour command database boundary", () => {
     const roleId = randomUUID();
     const assignmentId = randomUUID();
     const now = new Date();
-    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, async (tx) => {
-      await tx.orgRoleDefinition.create({
+    await withSystemRoleFixtureWrites((tx) =>
+      tx.orgRoleDefinition.create({
         data: {
           id: roleId,
           orgId: fixture!.orgId,
@@ -208,8 +209,10 @@ describe("ACE behaviour command database boundary", () => {
           createdById: fixture!.actorAId,
           updatedById: fixture!.actorAId,
         },
-      });
-      await tx.userRoleAssignment.create({
+      }),
+    );
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
+      tx.userRoleAssignment.create({
         data: {
           id: assignmentId,
           orgId: fixture!.orgId,
@@ -219,8 +222,8 @@ describe("ACE behaviour command database boundary", () => {
           assignedById: fixture!.actorAId,
           startsAt: new Date(now.getTime() - 1_000),
         },
-      });
-    });
+      }),
+    );
     try {
       const legacySiteId = await prisma.user.findUniqueOrThrow({
         where: { id: fixture.orgRecorderId },
@@ -262,7 +265,9 @@ describe("ACE behaviour command database boundary", () => {
       await prisma.userRoleAssignment.deleteMany({
         where: { id: assignmentId },
       });
-      await prisma.orgRoleDefinition.deleteMany({ where: { id: roleId } });
+      await withSystemRoleFixtureWrites((tx) =>
+        tx.orgRoleDefinition.deleteMany({ where: { id: roleId } }),
+      );
     }
   });
 

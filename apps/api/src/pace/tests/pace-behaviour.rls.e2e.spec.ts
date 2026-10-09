@@ -1007,7 +1007,7 @@ describe("ACE PACE and behaviour fact storage", () => {
         },
       }),
     );
-    const otherSiteRows = await withTenantRlsContext(
+    const otherSiteRows = await withPaceRlsContext(
       fixture.tenantBId,
       fixture.orgBId,
       (tx) => tx.behaviourReviewRequest.findMany({ where: { id: reviewId } }),
