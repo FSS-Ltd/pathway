@@ -139,7 +139,27 @@ async function run(): Promise<void> {
   try {
     await act(async () =>
       root.render(
-        <StaffMessagingWorkspace currentUserId={staffId} canSend canCreate />,
+        <StaffMessagingWorkspace
+          currentUserId={staffId}
+          canSend
+          canCreate
+          familyMessagingEnabled={false}
+        />,
+      ),
+    );
+    const unavailableChannel = buttonByText(container, "School Team");
+    assert.equal(unavailableChannel.disabled, true);
+    assert.match(container.textContent ?? "", /parent portal is enabled/);
+    assert.equal(schoolTeamRequests, 0);
+
+    await act(async () =>
+      root.render(
+        <StaffMessagingWorkspace
+          currentUserId={staffId}
+          canSend
+          canCreate
+          familyMessagingEnabled
+        />,
       ),
     );
     assert.equal(
@@ -203,10 +223,26 @@ async function run(): Promise<void> {
       container.textContent ?? "",
       /School team messages are unavailable/,
     );
-    await act(async () => buttonByText(container, "Staff").click());
+    const requestsBeforePortalClosed = schoolTeamRequests;
+    await act(async () =>
+      root.render(
+        <StaffMessagingWorkspace
+          currentUserId={staffId}
+          canSend
+          canCreate
+          familyMessagingEnabled={false}
+        />,
+      ),
+    );
+    assert.equal(buttonByText(container, "School Team").disabled, true);
     assert.equal(
       container.querySelector('button[aria-pressed="true"]')?.textContent,
       "Staff",
+    );
+    assert.equal(schoolTeamRequests, requestsBeforePortalClosed);
+    assert.doesNotMatch(
+      container.textContent ?? "",
+      /School team messages are unavailable/,
     );
   } finally {
     await act(async () => root.unmount());

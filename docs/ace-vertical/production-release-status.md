@@ -1,10 +1,10 @@
 # ACE production release status
 
 Checked on 9 October 2026. Production API, admin, and web aliases now point
-to READY deployments at merged commit `43e47d69ccd840001d9cc3587fb5509ca4b366e9`.
+to READY deployments at merged commit `68eec5eeda13eef0dd34ff771a2ec145ebe8db4b`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
-changes through REL-9 are now served by all three apps.
+changes through REL-12 are now served by all three apps.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -224,11 +224,38 @@ journey still needs a live parent with approved guardian access.
 REL-12 repairs that schema mismatch for the ten ACE message and notice tables.
 It adds invoker-rights public views over the RLS-protected app tables, public
 enum domains, and equality operators for Prisma's enum filters. The views
-carry no direct Data API role grants. The production migration is still
-pending its PR gate. A read-only catalog audit found zero public message and
-notice relations and confirmed all ten base tables force RLS. A transaction
-that created the bridge, ran all five representative enum-filter reads, and
-rolled back passed on the new production database without persisting changes.
+carry no direct Data API role grants. Before release, a transaction that
+created the bridge, ran all five representative enum-filter reads, and rolled
+back passed on the new database. [PR #516](https://github.com/FSS-Ltd/pathway/pull/516)
+passed all eight required checks on `3c0a2350ebf3245cc705377d700019431ac91ad2`
+(CI run 37867521249, CodeQL run 37867518620) and merged as
+`68eec5eeda13eef0dd34ff771a2ec145ebe8db4b`.
+[Production run 37868259048](https://github.com/FSS-Ltd/pathway/actions/runs/37868259048)
+passed migration, API, admin, and web jobs. The migration ledger and catalog
+show the bridge applied and all ten public views present. Vercel reports READY
+API `dpl_BGaFK3YzL6gZKN66BEE4WCCuSr5k`, admin
+`dpl_5iUJ5dGr866ARjiz32g7AbGT13Gw`, and web
+`dpl_2bKg1i7cv5WnyFBgrY2EgRtXrpJz` at the merge commit on their production
+aliases. Live API health, public blog, and web configurator reads returned 200.
+
+A read-only invocation of the staff recipient service against the new database
+returned four eligible colleagues for the signed-in Demo ACE School site
+administrator; five active staff memberships exist at that site. A staff
+conversation-list and recipient request reached the production API after the
+migration with allowed access decisions, and Vercel showed no recent messaging
+runtime error cluster. These checks do not prove that the recipient picker
+rendered in a browser or that a message was sent and received. The signed-in
+browser session could not be used to finish that visual check, so the staff
+and parent two-way journeys remain open release checks. The restored parent
+portal remains off, and historical guardian links still require the school's
+legal-access review before activation.
+
+REL-13 prevents the disabled parent portal from appearing as a failed School
+Team data load. The staff Messages page uses the organisation's current portal
+setting to disable that channel and explain the prerequisite; it continues to
+load staff conversations and recipients. The API remains the authority for
+portal, guardian, responder, and site access. A parent-to-staff send and staff
+reply in production remain unverified pending approved parent access.
 
 ## Delivery steps
 
@@ -312,7 +339,8 @@ rolled back passed on the new production database without persisting changes.
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                | `193a569892c38be565ac6755456f41bcf498ed76` |
 | REL-10   | Audited guardian access revocation                                     | Merged  | [#514](https://github.com/FSS-Ltd/pathway/pull/514) to `master`                     | `f5f2304eac229b4b9ae321420781d2baca24ba53`; all eight checks passed: CI run 37861062264, CodeQL run 37861058291.                                                                                                | `2120a185808af996e60868a8f6e085c5199e775c` |
 | REL-11   | Repair production API injection across ACE and Home                    | Merged  | [#515](https://github.com/FSS-Ltd/pathway/pull/515) to `master`                     | `3ff450d1f4ac8f009bb280b689e231b8cbac29da`; all eight checks passed: CI 37865176399, CodeQL 37865172972. Deploy 37865725001 passed; messaging schema gap remains.                                               | `532bfeb8d65df9d38a33d96ae01cb06f4a2adbff` |
-| REL-12   | Bridge protected ACE message and notice tables to public Prisma        | Active  | PR pending                                                                          | Rollback-only target SQL probe passed; local and CI checks pending.                                                                                                                                             | Pending                                    |
+| REL-12   | Bridge protected ACE message and notice tables to public Prisma        | Merged  | [#516](https://github.com/FSS-Ltd/pathway/pull/516) to `master`                     | `3c0a2350ebf3245cc705377d700019431ac91ad2`; all eight checks passed: CI 37867521249, CodeQL 37867518620. Deploy 37868259048 passed all four jobs; database migration and aliases verified.                      | `68eec5eeda13eef0dd34ff771a2ec145ebe8db4b` |
+| REL-13   | Show disabled parent messaging state without a failed data request     | Active  | PR pending                                                                          | Full admin tests, repository lint/typecheck, admin build, targeted formatting, diff check, and Graphify refresh passed locally; CI pending.                                                                     | Pending                                    |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |

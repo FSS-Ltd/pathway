@@ -13,14 +13,17 @@ export function StaffMessagingWorkspace({
   currentUserId,
   canSend,
   canCreate,
+  familyMessagingEnabled,
 }: {
   currentUserId: string;
   canSend: boolean;
   canCreate: boolean;
+  familyMessagingEnabled: boolean;
 }) {
   const [channel, setChannel] = React.useState<"staff" | "school-team">(
     "staff",
   );
+  const selectedChannel = familyMessagingEnabled ? channel : "staff";
 
   return (
     <main className="mx-auto flex min-w-0 max-w-7xl flex-col gap-5">
@@ -45,17 +48,25 @@ export function StaffMessagingWorkspace({
           <button
             key={option}
             type="button"
-            aria-pressed={channel === option}
+            aria-pressed={selectedChannel === option}
+            disabled={option === "school-team" && !familyMessagingEnabled}
             onClick={() => setChannel(option)}
-            className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong ${channel === option ? "bg-accent-subtle text-accent-strong" : "text-text-muted hover:text-text-primary"}`}
+            className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong disabled:cursor-not-allowed ${selectedChannel === option ? "bg-accent-subtle text-accent-strong" : "text-text-muted hover:text-text-primary"}`}
           >
             {option === "staff" ? "Staff" : "School Team"}
           </button>
         ))}
       </div>
+      {!familyMessagingEnabled ? (
+        <p className="rounded-xl border border-border-subtle bg-muted px-4 py-3 text-sm leading-6 text-text-muted">
+          School Team messaging will be available when the parent portal is
+          enabled. Guardian access must be approved before a parent can message
+          staff.
+        </p>
+      ) : null}
       <StaffConversationPane
-        key={channel}
-        channel={channel}
+        key={selectedChannel}
+        channel={selectedChannel}
         currentUserId={currentUserId}
         canSend={canSend}
         canCreate={canCreate}

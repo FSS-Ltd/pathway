@@ -228,7 +228,12 @@ async function run(): Promise<void> {
   try {
     await act(async () =>
       root.render(
-        <StaffMessagingWorkspace currentUserId={staffId} canSend canCreate />,
+        <StaffMessagingWorkspace
+          currentUserId={staffId}
+          canSend
+          canCreate
+          familyMessagingEnabled
+        />,
       ),
     );
     assert.match(container.textContent ?? "", /Sam Adeyemi/);
@@ -436,6 +441,7 @@ async function run(): Promise<void> {
           currentUserId={staffId}
           canSend={false}
           canCreate={false}
+          familyMessagingEnabled
         />,
       ),
     );
