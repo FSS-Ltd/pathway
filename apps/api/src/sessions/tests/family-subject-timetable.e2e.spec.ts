@@ -232,7 +232,11 @@ describe("ACE family subject timetable", () => {
     await withTenantRlsContext(siteId, orgId, (tx) =>
       tx.guardianChildRelationship.update({
         where: { id: relationshipId },
-        data: { revokedAt: new Date() },
+        data: {
+          revokedAt: new Date(),
+          revokedByUserId: fixture.actorId,
+          revocationReason: "Testing family access removal",
+        },
       }),
     );
     expect(
@@ -242,7 +246,11 @@ describe("ACE family subject timetable", () => {
     await withTenantRlsContext(siteId, orgId, (tx) =>
       tx.studentIdentityLink.update({
         where: { id: studentLinkId },
-        data: { revokedAt: new Date() },
+        data: {
+          revokedAt: new Date(),
+          revokedByUserId: fixture.actorId,
+          revocationReason: "Testing student access removal",
+        },
       }),
     );
     expect(
@@ -255,11 +263,19 @@ describe("ACE family subject timetable", () => {
     await withTenantRlsContext(siteId, orgId, async (tx) => {
       await tx.guardianChildRelationship.update({
         where: { id: relationshipId },
-        data: { revokedAt: null },
+        data: {
+          revokedAt: null,
+          revokedByUserId: null,
+          revocationReason: null,
+        },
       });
       await tx.studentIdentityLink.update({
         where: { id: studentLinkId },
-        data: { revokedAt: null },
+        data: {
+          revokedAt: null,
+          revokedByUserId: null,
+          revocationReason: null,
+        },
       });
     });
   });
@@ -295,6 +311,7 @@ describe("ACE family subject timetable", () => {
           slotLabel: "Morning",
           startMinutes: 540,
           endMinutes: 600,
+          subjectId: fixture.entry.subjectId,
           subjectName: "Revised reading",
         },
       });
