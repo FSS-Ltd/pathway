@@ -5,7 +5,7 @@ READY deployments at merged commit `5c26afca3caca259cc592b20f3b4ebe51ee873fa`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through C07f are now served by all three apps.
-Estimated overall ACE/Oasis update completion after this merge is **about 79%**;
+Estimated overall ACE/Oasis update completion after C07g1 is **about 81%**;
 the remaining core journeys, paid add-ons, and product-wide web finish are
 tracked below.
 
@@ -580,10 +580,17 @@ and [CodeQL 37944332896](https://github.com/FSS-Ltd/pathway/actions/runs/3794433
 The separate CodeQL comparison was neutral because GitHub could not match
 its default JavaScript/TypeScript setup; both actual analysis jobs passed and
 the PR changed documentation only. Overall completion remains about 79%.
-C07g1 implements the dated parent school-support rota and staff view from the
-[design contract](26-parent-school-volunteer-rota-design.md). Its migration
-must run before the API and admin app release. A signed-in parent selection
-and staff view remain required production checks.
+C07g1 [PR #538](https://github.com/FSS-Ltd/pathway/pull/538) merged as
+`42c5ab087746318e486d2434cec983ddadc95d7d` at checked revision
+`8b7a7427a06973dac519edf8e663f5227523b6cd`. Seven runnable checks
+passed in [CI 37951821431](https://github.com/FSS-Ltd/pathway/actions/runs/37951821431)
+and [CodeQL 37951816041](https://github.com/FSS-Ltd/pathway/actions/runs/37951816041).
+The separate CodeQL comparison was neutral; both actual analysis jobs
+passed. The dated parent school-support rota and staff view from the
+[design contract](26-parent-school-volunteer-rota-design.md) are merged.
+The migration must run before the API and admin app release. Signed-in
+parent selection and staff view remain required production checks. C08a0
+defines the next [behaviour stage and review contract](27-behaviour-review-parity-design.md).
 
 ## Delivery steps
 
@@ -685,7 +692,8 @@ and staff view remain required production checks.
 | C07e     | Partial-day staff availability and shared profile editor               | Merged  | [#535](https://github.com/FSS-Ltd/pathway/pull/535) to `master`                     | `6ea22d6a70dd9eee255f7ec7a614cb519b832c1b`; eight checks passed: CI 37934403942, CodeQL 37934398437. Deploy 37937727626 passed migrations and all apps; live anonymous smoke verified.                                      | `c7857c5f76d7e37d6d91ff90011416bc3783114e` |
 | C07f     | Typed cover and meeting staff shifts with private rota views           | Merged  | [#536](https://github.com/FSS-Ltd/pathway/pull/536) to `master`                     | `2722e59907fb59dd87f0e4f90d8c5e841913c1e5`; seven runnable checks passed, CodeQL comparison neutral/inapplicable to unchanged Actions files. Deploy 37942692871 applied migration and passed all apps; live smoke verified. | `5c26afca3caca259cc592b20f3b4ebe51ee873fa` |
 | C07g0    | School volunteer rota design contract                                  | Merged  | [#537](https://github.com/FSS-Ltd/pathway/pull/537) to `master`                     | `1c98be5f3ceb3e0206491e531392299096bf45e8`; seven runnable checks passed in CI 37944338801 and CodeQL 37944332896; separate CodeQL comparison neutral/inapplicable to the docs-only change.                                 | `8dc592b4f4c7a61d4b071c9470ba07d260b43e4f` |
-| C07g1    | Dated parent school-support reservations and staff rota                | In PR   | [#538](https://github.com/FSS-Ltd/pathway/pull/538) to `master`                     | `38ec8b716f3987087cdad6ea28542840aee31810`; local lint, typecheck, API/admin unit tests, builds, Prisma validation and formatting passed. Migration and RLS/race tests await CI PostgreSQL.                                     | —                                          |
+| C07g1    | Dated parent school-support reservations and staff rota                | Merged  | [#538](https://github.com/FSS-Ltd/pathway/pull/538) to `master`                     | `8b7a7427a06973dac519edf8e663f5227523b6cd`; seven runnable checks passed in CI 37951821431 and CodeQL 37951816041; separate CodeQL comparison neutral.                                                                      | `42c5ab087746318e486d2434cec983ddadc95d7d` |
+| C08a0    | Behaviour stage and review parity contract                             | In work | Pending                                                                             | Local documentation checks pending.                                                                                                                                                                                         | —                                          |
 | DB-2g    | Project-safe production environment preparation                        | Merged  | [#402](https://github.com/FSS-Ltd/pathway/pull/402) to `master`                     | `9dd57ad967110c7fa29255ae317a3ee667dad977`; all eight checks passed: CI run 37626233704, CodeQL run 37626227019.                                                                                                            | `35cb6cba8da6b42e74e94eda13b4f01bdcecb055` |
 | 1.3e3a   | Staff messaging web journey                                            | Merged  | [#404](https://github.com/FSS-Ltd/pathway/pull/404) to `master`                     | `ec8b73b3c4142bc3af0bfaf3f7ff017bf0dbbd6f`; all eight checks passed: CI run 37632328840, CodeQL run 37632323368.                                                                                                            | `8e310163e472ca223d03fce1d5f27c8618b2ded5` |
 | DB-2h    | Pin restored trigger-function search paths                             | Merged  | [#405](https://github.com/FSS-Ltd/pathway/pull/405) to `master`                     | `814bf9a8df64c1433ae11ee89fb11dba50ad85ac`; all eight checks passed: CI run 37638889700, CodeQL run 37638879624.                                                                                                            | `26efb8040bd3dcbc39388eb7bc786b3933d15dfd` |
