@@ -295,6 +295,7 @@ export class StudentInvitesService {
         "resend",
         {
           target: "STUDENT",
+          schoolApproval: "reconfirmed",
         },
       );
       return { invite: updated, email, siteName: site.name };

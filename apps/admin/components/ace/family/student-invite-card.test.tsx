@@ -38,7 +38,9 @@ async function run(): Promise<void> {
   let enabled = false;
   let invites: unknown[] = [];
   let sent = 0;
-  dom.window.confirm = () => true;
+  let resent = 0;
+  let allowResend = false;
+  dom.window.confirm = (message) => !message.includes("Resend") || allowResend;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     assert.equal(
@@ -53,6 +55,13 @@ async function run(): Promise<void> {
     }
     if (url.pathname === "/student-invites/children/child-a/access") {
       return response({ active: null });
+    }
+    if (url.pathname === "/student-invites/invite-a/resend") {
+      assert.deepEqual(JSON.parse(String(init?.body)), {
+        confirmedSchoolApproval: true,
+      });
+      resent += 1;
+      return response(invites[0]);
     }
     assert.equal(url.pathname, "/student-invites/children/child-a");
     if (init?.method === "POST") {
@@ -114,6 +123,15 @@ async function run(): Promise<void> {
     assert.equal(sent, 1);
     assert.match(container.textContent ?? "", /student@example.org/);
     assert.match(container.textContent ?? "", /Pending/);
+    const resendButton = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.includes("Resend"),
+    );
+    assert.ok(resendButton);
+    await act(async () => resendButton.click());
+    assert.equal(resent, 0);
+    allowResend = true;
+    await act(async () => resendButton.click());
+    assert.equal(resent, 1);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;

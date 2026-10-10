@@ -130,11 +130,11 @@ export function StudentInviteCard({ childId }: { childId: string }) {
 
   async function changeInvite(inviteId: string, action: "resend" | "revoke") {
     if (busy) return;
-    if (
-      action === "revoke" &&
-      !window.confirm("Revoke this pending student invitation?")
-    )
-      return;
+    const confirmation =
+      action === "resend"
+        ? "I confirm this student account still meets the school’s age and safeguarding policy. Resend the invitation?"
+        : "Revoke this pending student invitation?";
+    if (!window.confirm(confirmation)) return;
     setBusy(true);
     setError(null);
     try {

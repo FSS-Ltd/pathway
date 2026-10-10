@@ -108,7 +108,10 @@ export function updateStudentInvite(
   return request(
     `${encodeURIComponent(inviteId)}/${action}`,
     `Unable to ${action} student invitation.`,
-    { method: "POST" },
+    {
+      method: "POST",
+      body: action === "resend" ? { confirmedSchoolApproval: true } : undefined,
+    },
   );
 }
 

@@ -36,6 +36,7 @@ const inviteSchema = z
     confirmedSchoolApproval: z.literal(true),
   })
   .strict();
+const approvalSchema = inviteSchema.pick({ confirmedSchoolApproval: true });
 const policySchema = z.object({ enabled: z.boolean() }).strict();
 const revokeSchema = z
   .object({ reason: z.string().trim().min(10).max(500) })
@@ -171,10 +172,13 @@ export class StudentInvitesStaffController {
   @Post(":inviteId/resend")
   async resend(
     @Param("inviteId") inviteId: string,
+    @Body() body: unknown,
     @Req() request: AuthenticatedRequest,
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
   ) {
+    const parsed = approvalSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     const actorUserId = await assertOrgAdminAccess(
       request.authUserId,
       orgId,

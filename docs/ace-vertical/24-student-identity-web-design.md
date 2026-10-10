@@ -16,7 +16,8 @@ and invite one student email for one non-guest child after confirming that the
 school approved the account under its age and safeguarding policy. The
 invitation is pending for seven days. It grants no access until the invitee
 signs in with the verified invited email and accepts it. An admin can list,
-resend, revoke, or end access. The invitation and policy decisions are audited.
+resend after a fresh school-policy confirmation, revoke, or end access. The
+invitation and policy decisions are audited.
 
 **Product decision pending:** the ACE source matrix still marks the student
 identity ADR open. The current implementation assumption is per-student school

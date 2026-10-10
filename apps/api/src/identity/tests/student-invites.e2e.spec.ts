@@ -295,9 +295,14 @@ describe("student web identity invitation lifecycle", () => {
       .send({ email: secondEmail, confirmedSchoolApproval: true });
     expect(created.status).toBe(201);
     const inviteId = created.body.id as string;
-    const resent = await request(server)
+    const missingApproval = await request(server)
       .post(`/student-invites/${inviteId}/resend`)
       .set("Authorization", adminAuthorization);
+    expect(missingApproval.status).toBe(400);
+    const resent = await request(server)
+      .post(`/student-invites/${inviteId}/resend`)
+      .set("Authorization", adminAuthorization)
+      .send({ confirmedSchoolApproval: true });
     expect(resent.status).toBe(201);
     await prisma.user.update({
       where: { id: secondStudentId },
