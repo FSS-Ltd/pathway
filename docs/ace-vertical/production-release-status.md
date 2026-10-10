@@ -5,18 +5,27 @@ READY deployments at merged commit `5c26afca3caca259cc592b20f3b4ebe51ee873fa`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through C07f are now served by all three apps.
-Estimated overall ACE/Oasis update completion after C07g1 is **about 81%**;
-the remaining core journeys, paid add-ons, and product-wide web finish are
-tracked below.
+The [ACE master implementation plan](../superpowers/plans/2026-07-25-ace-vertical-master-plan.md)
+defines 150 delivery tasks. Merged task PRs are evidenced for its 22 foundation
+and 20 daily-operations tasks: **42/150, or 28% verified plan-task completion**.
+The later messaging, learning, add-on, and launch tracks have not been fully
+reconciled task by task; 28% is a documented minimum, not an estimate of all
+delivered outcomes. Earlier 81% and 52% qualitative estimates below use a
+different basis and should not be read as plan-task completion.
 
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
 `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0`. All eight checks passed
 on head `ff32874ce639ce125b43b7b59a741ae4e5fad07a`; the database
-integration log confirms the new draft route test ran. The site-scoped ACE
-notice draft API is merged but has not been deployed to production. The next
-C12 slice is the audited publish and withdraw API. The ACE-M20 identity and
-security gate remains open before C09 homework work begins.
+integration log confirms the new draft route test ran. Step 1.3e5d1 merged in
+[PR #548](https://github.com/FSS-Ltd/pathway/pull/548) at
+`24f6bcf4eda7227acc5c8e19fdd2684dde98a381`; all eight checks passed
+on head `40bdce5a7c1b7c0fecfd135b1c26590839acee69`, including the notice
+author regression in both identity schema layouts. The site-scoped ACE notice
+draft API and author-guard fix are merged but have not been deployed to
+production. The next C12 journey slice is the audited publish and withdraw
+API. The ACE-M20 identity and security gate remains open before the ACE-C01
+through C05 homework plan tasks begin.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -698,7 +707,8 @@ journeys remain production verification work.
 | 1.3e5b   | ACE parent notice relationship permission                              | Merged  | [#500](https://github.com/FSS-Ltd/pathway/pull/500) to `master`                     | `c5858bf00bba252d508b01f37526755d3ae46f31`; all eight checks passed: CI run 37821295904, CodeQL run 37821292163.                                                                                                            | `e4f5e46ea274150b364cb2d99f370d21bbdda071` |
 | 1.3e5c1  | Full guardian eligibility for ACE notice audiences                     | Merged  | [#502](https://github.com/FSS-Ltd/pathway/pull/502) to `master`                     | `7d11c7a253984777f32a9aad738f30d7dfd6c5da`; all eight checks passed: CI run 37828070800, CodeQL run 37828063709.                                                                                                            | `1bf510c6fc01e3ddbfdcb4c90ce3963b26ca9e38` |
 | 1.3e5c2  | ACE notice expiry, withdrawal, immutable publication and read receipts | Merged  | [#503](https://github.com/FSS-Ltd/pathway/pull/503) to `master`                     | `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`; all eight checks passed: CI run 37833550859, CodeQL run 37833546948.                                                                                                            | `70cc53502f37da07a0e449e5604ce51ee862c015` |
-| 1.3e5d   | ACE site notice draft API                                               | Merged  | [#546](https://github.com/FSS-Ltd/pathway/pull/546) to `master`                     | `ff32874ce639ce125b43b7b59a741ae4e5fad07a`; all eight checks passed: CI run 38065354098, CodeQL run 38065351413. The integration log confirms the draft API test ran.                                                       | `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0` |
+| 1.3e5d   | ACE site notice draft API                                              | Merged  | [#546](https://github.com/FSS-Ltd/pathway/pull/546) to `master`                     | `ff32874ce639ce125b43b7b59a741ae4e5fad07a`; all eight checks passed: CI run 38065354098, CodeQL run 38065351413. The integration log confirms the draft API test ran.                                                       | `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0` |
+| 1.3e5d1  | ACE notice author lifecycle guard                                      | Merged  | [#548](https://github.com/FSS-Ltd/pathway/pull/548) to `master`                     | `40bdce5a7c1b7c0fecfd135b1c26590839acee69`; all eight checks passed: CI run 38067159085, CodeQL run 38067158033. The app and public schema notice author probes passed.                                                     | `24f6bcf4eda7227acc5c8e19fdd2684dde98a381` |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                            | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                            | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                            | `193a569892c38be565ac6755456f41bcf498ed76` |
