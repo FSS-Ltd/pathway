@@ -140,7 +140,8 @@ The plan-task count remains **42/150 (28%)** because ACE-M13 and M14 still
 need full task-level reconciliation.
 Mobile notice work is paused at the user's request and excluded from this PR.
 
-Build step 1.3e5l (web guardian identity onboarding, in progress): replace the
+Build step 1.3e5l ([PR #558](https://github.com/FSS-Ltd/pathway/pull/558),
+web guardian identity onboarding, CI pending): replace the
 legacy parent invitation that linked a child and granted a site viewer role
 before acceptance. The new staff flow requires an organisation admin to record
 the legal access basis, creates a seven-day child-scoped pending invitation,
