@@ -40,7 +40,7 @@ interface AuthenticatedRequest extends Request {
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @IndependentTransaction()
-@RequirePermission("children.manage")
+@RequirePermission("students.manage")
 @Controller("family-invites/guardian")
 export class GuardianInvitesStaffController {
   constructor(

@@ -35,6 +35,7 @@ describe("guardian invitation lifecycle", () => {
         name: "Guardian invite test",
         slug: `guardian-${orgId}`,
         planCode: "trial",
+        parentPortalEnabled: true,
       },
     });
     await prisma.orgVertical.create({
@@ -63,7 +64,7 @@ describe("guardian invitation lifecycle", () => {
       tenantId: siteId,
       userId: adminId,
       scope: "site",
-      permissionKeys: ["children.manage"],
+      permissionKeys: ["students.manage"],
     });
     guardianAuthorization = (
       await seedE2eAuthUser({
