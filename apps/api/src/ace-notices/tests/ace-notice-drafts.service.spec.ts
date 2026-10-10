@@ -193,6 +193,7 @@ describe("AceNoticeDraftsService", () => {
         id: draft.id,
         tenantId: actor.tenantId,
         publishedAt: null,
+        scheduledAt: null,
         legacyImportedAt: null,
         updatedAt: revision,
       },

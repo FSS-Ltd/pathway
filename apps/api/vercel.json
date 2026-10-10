@@ -3,6 +3,12 @@
   "installCommand": "cd ../.. && corepack enable && pnpm install --frozen-lockfile --prod=false",
   "buildCommand": "cd ../.. && pnpm --filter @pathway/api build",
   "regions": ["lhr1"],
+  "crons": [
+    {
+      "path": "/api/internal/notice-schedules/run",
+      "schedule": "* * * * *"
+    }
+  ],
   "functions": {
     "api/[...path].js": {
       "maxDuration": 30,

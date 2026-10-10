@@ -210,6 +210,8 @@ export type AdminAnnouncementDetail = {
   publishedAt: string | null;
   withdrawnAt: string | null;
   legacyImportedAt: string | null;
+  scheduleFailedAt: string | null;
+  scheduleFailureReason: string | null;
   channels?: string[] | null;
   targetsSummary?: string | null;
 };
@@ -3675,6 +3677,8 @@ type ApiAnnouncement = {
   scheduledAt?: string | null;
   legacyImportedAt?: string | null;
   withdrawnAt?: string | null;
+  scheduleFailedAt?: string | null;
+  scheduleFailureReason?: string | null;
 };
 
 const statusLabelMap: Record<string, string> = {
@@ -3728,6 +3732,8 @@ const mapApiAnnouncementToAdminDetail = (
   publishedAt: (api as { publishedAt?: string | null }).publishedAt ?? null,
   withdrawnAt: api.withdrawnAt ?? null,
   legacyImportedAt: api.legacyImportedAt ?? null,
+  scheduleFailedAt: api.scheduleFailedAt ?? null,
+  scheduleFailureReason: api.scheduleFailureReason ?? null,
   channels:
     ((api as { channels?: string[] | null }).channels ??
     (api as { channel?: string | null }).channel)
@@ -3831,6 +3837,8 @@ export async function fetchAnnouncementById(
           publishedAt: row.scheduledAt ?? null,
           withdrawnAt: null,
           legacyImportedAt: null,
+          scheduleFailedAt: null,
+          scheduleFailureReason: null,
           channels: ["in-app"],
           targetsSummary: row.audienceLabel,
         }

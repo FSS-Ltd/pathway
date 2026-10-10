@@ -39,6 +39,7 @@ export class AceNoticePublicationService {
           id,
           tenantId: actor.tenantId,
           publishedAt: null,
+          scheduledAt: null,
           legacyImportedAt: null,
         },
         select: { id: true, audience: true, updatedAt: true },
@@ -60,6 +61,24 @@ export class AceNoticePublicationService {
   }
 
   async publish(id: string, input: PublishNoticeDto, actor: NoticeActor) {
+    return this.publishWithMode(id, input, actor, "immediate");
+  }
+
+  /** Called only by the authenticated due-schedule runner. */
+  async publishScheduled(
+    id: string,
+    input: PublishNoticeDto,
+    actor: NoticeActor,
+  ) {
+    return this.publishWithMode(id, input, actor, "scheduled");
+  }
+
+  private async publishWithMode(
+    id: string,
+    input: PublishNoticeDto,
+    actor: NoticeActor,
+    mode: "immediate" | "scheduled",
+  ) {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       const site = await requireSiteNoticeStaffAccess(tx, actor);
@@ -80,6 +99,21 @@ export class AceNoticePublicationService {
           where: { tenantId: actor.tenantId, noticeId: id },
         });
         return { id, publishedAt: notice.publishedAt, recipientCount };
+      }
+      if (mode === "scheduled") {
+        if (
+          !notice.scheduledAt ||
+          notice.scheduledAt > new Date() ||
+          notice.scheduledByUserId !== actor.userId
+        ) {
+          throw new ConflictException(
+            "Notice is no longer due for publication",
+          );
+        }
+      } else if (notice.scheduledAt) {
+        throw new ConflictException(
+          "Cancel the schedule before publishing now",
+        );
       }
       if (
         notice.updatedAt.getTime() !==
@@ -119,7 +153,11 @@ export class AceNoticePublicationService {
       await this.insertAudience(tx, actor.tenantId, id, recipients);
       await tx.aceNotice.update({
         where: { id_tenantId: { id, tenantId: actor.tenantId } },
-        data: { publishedAt: now },
+        data: {
+          publishedAt: now,
+          scheduleFailedAt: null,
+          scheduleFailureReason: null,
+        },
       });
       const members = await tx.aceNoticeAudienceMember.findMany({
         where: { tenantId: actor.tenantId, noticeId: id },

@@ -150,6 +150,9 @@ export type NoticeDraft = NoticeDraftInput & {
   id: string;
   createdAt: string;
   updatedAt: string;
+  scheduledAt: string | null;
+  scheduleFailedAt: string | null;
+  scheduleFailureReason: string | null;
 };
 export type NoticeAudiencePreview = {
   recipientCount: number;
@@ -199,6 +202,29 @@ export function publishNotice(
       expectedUpdatedAt: preview.updatedAt,
       expectedAudienceVersion: preview.audienceVersion,
     }),
+  });
+}
+
+export function scheduleNotice(
+  id: string,
+  preview: NoticeAudiencePreview,
+  scheduledAt: string,
+): Promise<{ id: string; scheduledAt: string }> {
+  return request(`/ace/notices/${encodeURIComponent(id)}/schedule`, {
+    method: "POST",
+    body: JSON.stringify({
+      expectedUpdatedAt: preview.updatedAt,
+      expectedAudienceVersion: preview.audienceVersion,
+      scheduledAt,
+    }),
+  });
+}
+
+export function cancelNoticeSchedule(
+  id: string,
+): Promise<{ id: string; scheduledAt: null }> {
+  return request(`/ace/notices/${encodeURIComponent(id)}/cancel-schedule`, {
+    method: "POST",
   });
 }
 

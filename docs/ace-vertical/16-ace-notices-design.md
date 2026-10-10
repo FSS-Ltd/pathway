@@ -75,8 +75,8 @@ silently omitting records from a restored schema.
 
 The shared notice record, lifecycle, scheduling, delivery, and receipt model
 applies across site models. Scheduling and cancellation before publication
-remain ACE-M13 requirements and are not delivered by the current immediate
-publication API. Class, group, and guardian-specific targeting must use an
+are ACE-M13 requirements alongside immediate publication. Class, group, and
+guardian-specific targeting must use an
 audience source and access policy verified for the relevant sector. School
 class and guardian relationship rules belong to the ACE extension; they must
 not widen access to the shared site-wide notice stream. ACE-M13 remains open
@@ -134,12 +134,41 @@ publisher's receipt summary returns only frozen recipient, delivered, read,
 and acknowledged totals. Historical imports have no receipt summary because
 their original delivery state is unknown.
 
+### Scheduled publication
+
+An authorised publisher may schedule a reviewed site-wide draft for a future
+time, then cancel it before publication. Scheduling checks the draft revision,
+current eligible recipient hash, nonempty audience, and expiry. The scheduled
+content and attachments remain frozen until cancellation or publication.
+`scheduledAt` is the earliest publication time, not a promise of execution at
+the exact second. The API Vercel project runs an authenticated minute sweep;
+each run discovers at most five due IDs, rechecks the scheduling publisher's
+current `notices.publish` access, and uses the ordinary tenant-scoped publish
+transaction. This keeps recipient snapshots, receipts, audit, and outbox facts
+identical to immediate publication. Repeated or overlapping sweeps cannot
+publish the same notice twice.
+
+If access, expiry, or audience eligibility changes, the sweep returns the
+draft for review without creating readers or delivery receipts. A transient
+database failure leaves it due for the next sweep. Cancellation and the sweep
+lock the same notice row, so whichever commits first decides the outcome. The
+publisher sees scheduled and review-needed states in the existing `/notices`
+screen. Only shared site-wide notices use this path; ACE class and guardian
+targeting still needs its separate audience policy.
+
+Scheduling is unavailable until the API project has a random `CRON_SECRET` of
+at least 16 characters and a Vercel plan that supports minute cron. Before
+release, verify the production cron is active, its authenticated route returns
+success, and a staging schedule publishes after its due time. After a database
+restore, inspect the cron and secret before enabling the UI.
+
 ## API and web slices
 
 | Slice                | Contract                                                                                                                                                                          |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Draft                | Site-scoped create, edit, and bounded draft list. Typed `notices.manage`; validate title/body/audience/expiry and optimistic revision.                                            |
 | Publish and withdraw | Separate audited commands under `notices.publish`, with transaction-level RLS and locked recipient resolution. Return 409 on a stale draft or changed audience eligibility.       |
+| Schedule and cancel  | Shared site-wide schedule under `notices.publish`; due worker rechecks the publisher and audience, then uses the same publication transaction.                                    |
 | Staff inbox          | Bounded signed cursor and detail for active published notices with the caller's current staff membership and `notices.read`; `PARENTS` is excluded.                               |
 | Parent inbox         | Explicit site route and bounded cursor under `ace.parent.notices.read`, enabled portal, full guardian link, and a matching recipient snapshot; `STAFF` is excluded.               |
 | Read receipt         | Idempotent current-recipient command, returning the caller's receipt only. Deny guessed IDs, expired/withdrawn notices, ended links, and cross-site writes.                       |

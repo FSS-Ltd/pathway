@@ -513,6 +513,197 @@ describe("ACE notice draft API", () => {
     });
   });
 
+  it("schedules, cancels, and publishes a notice once through the authenticated runner", async () => {
+    if (!app) return;
+    const priorSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = "integration-test-notice-cron-secret";
+    try {
+      const created = await request(app.getHttpServer())
+        .post("/ace/notices/drafts")
+        .set("Authorization", managerAuthorization)
+        .send({
+          title: "Scheduled staff update",
+          body: "Please check tomorrow's arrangements.",
+          audience: "STAFF",
+          expiresAt: null,
+        });
+      expect(created.status).toBe(201);
+      const path = `/ace/notices/${created.body.id}`;
+      const preview = await request(app.getHttpServer())
+        .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+        .set("Authorization", managerAuthorization);
+      expect(preview.status).toBe(200);
+      const reviewed = {
+        expectedUpdatedAt: created.body.updatedAt,
+        expectedAudienceVersion: preview.body.audienceVersion,
+      };
+      const scheduledAt = new Date(Date.now() + 30_000).toISOString();
+      const denied = await request(app.getHttpServer())
+        .post(`${path}/schedule`)
+        .set("Authorization", readerAuthorization)
+        .send({ ...reviewed, scheduledAt });
+      expect(denied.status).toBe(403);
+      const scheduled = await request(app.getHttpServer())
+        .post(`${path}/schedule`)
+        .set("Authorization", managerAuthorization)
+        .send({ ...reviewed, scheduledAt });
+      expect(scheduled.status).toBe(201);
+      expect(scheduled.body.scheduledAt).toBe(scheduledAt);
+      const status = await request(app.getHttpServer())
+        .get(`/announcements/${created.body.id}`)
+        .set("Authorization", managerAuthorization);
+      expect(status.body).toMatchObject({
+        status: "scheduled",
+        scheduledAt,
+        publishedAt: null,
+      });
+      const earlyPublish = await request(app.getHttpServer())
+        .post(`${path}/publish`)
+        .set("Authorization", managerAuthorization)
+        .send(reviewed);
+      expect(earlyPublish.status).toBe(409);
+      const editWhileScheduled = await request(app.getHttpServer())
+        .put(`/ace/notices/drafts/${created.body.id}`)
+        .set("Authorization", managerAuthorization)
+        .send({
+          title: "Changed after review",
+          body: "Please check tomorrow's arrangements.",
+          audience: "STAFF",
+          expiresAt: null,
+          expectedUpdatedAt: created.body.updatedAt,
+        });
+      expect(editWhileScheduled.status).toBe(409);
+      const deniedCancellation = await request(app.getHttpServer())
+        .post(`${path}/cancel-schedule`)
+        .set("Authorization", readerAuthorization);
+      expect(deniedCancellation.status).toBe(403);
+      const deniedRunner = await request(app.getHttpServer()).get(
+        "/internal/notice-schedules/run",
+      );
+      expect(deniedRunner.status).toBe(401);
+
+      const cancelled = await request(app.getHttpServer())
+        .post(`${path}/cancel-schedule`)
+        .set("Authorization", managerAuthorization);
+      expect(cancelled.status).toBe(201);
+      const freshDraft = await request(app.getHttpServer())
+        .get(`/ace/notices/drafts/${created.body.id}`)
+        .set("Authorization", managerAuthorization);
+      expect(freshDraft.body.scheduledAt).toBeNull();
+      const freshPreview = await request(app.getHttpServer())
+        .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+        .set("Authorization", managerAuthorization);
+      const dueAt = new Date(Date.now() + 4_000).toISOString();
+      const rescheduled = await request(app.getHttpServer())
+        .post(`${path}/schedule`)
+        .set("Authorization", managerAuthorization)
+        .send({
+          expectedUpdatedAt: freshDraft.body.updatedAt,
+          expectedAudienceVersion: freshPreview.body.audienceVersion,
+          scheduledAt: dueAt,
+        });
+      expect(rescheduled.status).toBe(201);
+
+      await new Promise<void>((resolve) =>
+        setTimeout(
+          resolve,
+          Math.max(0, new Date(dueAt).getTime() - Date.now() + 200),
+        ),
+      );
+      const run = await request(app.getHttpServer())
+        .get("/internal/notice-schedules/run")
+        .set("Authorization", `Bearer ${process.env.CRON_SECRET}`);
+      expect(run.status).toBe(200);
+      expect(run.body.published).toBe(1);
+      const repeated = await request(app.getHttpServer())
+        .get("/internal/notice-schedules/run")
+        .set("Authorization", `Bearer ${process.env.CRON_SECRET}`);
+      expect(repeated.status).toBe(200);
+      expect(repeated.body.published).toBe(0);
+      const stored = await withTenantRlsContext(siteId, orgId, async (tx) => ({
+        notice: await tx.aceNotice.findUnique({
+          where: { id: created.body.id },
+        }),
+        recipients: await tx.aceNoticeAudienceMember.count({
+          where: { tenantId: siteId, noticeId: created.body.id },
+        }),
+      }));
+      expect(stored.notice?.publishedAt).not.toBeNull();
+      expect(stored.recipients).toBe(preview.body.recipientCount);
+    } finally {
+      if (priorSecret === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = priorSecret;
+    }
+  });
+
+  it("pauses a scheduled notice when its parent audience disappears", async () => {
+    if (!app) return;
+    const priorSecret = process.env.CRON_SECRET;
+    process.env.CRON_SECRET = "integration-test-notice-cron-secret";
+    try {
+      const created = await request(app.getHttpServer())
+        .post("/ace/notices/drafts")
+        .set("Authorization", managerAuthorization)
+        .send({
+          title: "Parent schedule review",
+          body: "Please read the arrangements.",
+          audience: "PARENTS",
+          expiresAt: null,
+        });
+      expect(created.status).toBe(201);
+      const preview = await request(app.getHttpServer())
+        .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+        .set("Authorization", managerAuthorization);
+      expect(preview.body.recipientCount).toBeGreaterThan(0);
+      const dueAt = new Date(Date.now() + 4_000).toISOString();
+      const scheduled = await request(app.getHttpServer())
+        .post(`/ace/notices/${created.body.id}/schedule`)
+        .set("Authorization", managerAuthorization)
+        .send({
+          expectedUpdatedAt: created.body.updatedAt,
+          expectedAudienceVersion: preview.body.audienceVersion,
+          scheduledAt: dueAt,
+        });
+      expect(scheduled.status).toBe(201);
+      await prisma.org.update({
+        where: { id: orgId },
+        data: { parentPortalEnabled: false },
+      });
+      await new Promise<void>((resolve) =>
+        setTimeout(
+          resolve,
+          Math.max(0, new Date(dueAt).getTime() - Date.now() + 200),
+        ),
+      );
+      const run = await request(app.getHttpServer())
+        .get("/internal/notice-schedules/run")
+        .set("Authorization", `Bearer ${process.env.CRON_SECRET}`);
+      expect(run.status).toBe(200);
+      expect(run.body.needsReview).toBe(1);
+      const stored = await withTenantRlsContext(siteId, orgId, async (tx) => ({
+        notice: await tx.aceNotice.findUnique({
+          where: { id: created.body.id },
+        }),
+        recipients: await tx.aceNoticeAudienceMember.count({
+          where: { tenantId: siteId, noticeId: created.body.id },
+        }),
+      }));
+      expect(stored.notice).toMatchObject({
+        publishedAt: null,
+        scheduledAt: null,
+        scheduleFailureReason: "AUDIENCE_CHANGED",
+      });
+      expect(stored.recipients).toBe(0);
+    } finally {
+      await prisma.org.update({
+        where: { id: orgId },
+        data: { parentPortalEnabled: true },
+      });
+      if (priorSecret === undefined) delete process.env.CRON_SECRET;
+      else process.env.CRON_SECRET = priorSecret;
+    }
+  });
+
   it("lists only active staff-recipient notices and denies removed staff", async () => {
     if (!app) return;
     const created = await request(app.getHttpServer())

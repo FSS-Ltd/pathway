@@ -11,5 +11,10 @@ export const withdrawNoticeSchema = z
   .object({ reason: z.string().trim().min(1).max(500) })
   .strict();
 
+export const scheduleNoticeSchema = publishNoticeSchema.extend({
+  scheduledAt: z.string().datetime({ offset: true }),
+});
+
 export type PublishNoticeDto = z.infer<typeof publishNoticeSchema>;
 export type WithdrawNoticeDto = z.infer<typeof withdrawNoticeSchema>;
+export type ScheduleNoticeDto = z.infer<typeof scheduleNoticeSchema>;
