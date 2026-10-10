@@ -20,11 +20,18 @@ describe("ACE notice draft API", () => {
   const otherSiteId = randomUUID();
   const managerId = randomUUID();
   const readerId = randomUUID();
+  const publisherId = randomUUID();
+  const guardianUserId = randomUUID();
+  const childId = randomUUID();
+  const managerGuardianId = randomUUID();
+  const parentGuardianId = randomUUID();
   let app: INestApplication | undefined;
   let managerAuthorization = "";
   let readerAuthorization = "";
+  let publisherAuthorization = "";
   let managerRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
   let readerRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
+  let publisherRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
@@ -66,12 +73,21 @@ describe("ACE notice draft API", () => {
     });
     managerAuthorization = manager.authorization;
     readerAuthorization = reader.authorization;
+    const publisher = await seedE2eAuthUser({
+      subject: `ace-notice-publisher-${publisherId}`,
+      userId: publisherId,
+      tenantId: siteId,
+      siteRole: "STAFF",
+      orgId,
+      orgRole: "ORG_MEMBER",
+    });
+    publisherAuthorization = publisher.authorization;
     managerRole = await seedE2eTypedRole({
       orgId,
       tenantId: siteId,
       userId: managerId,
       scope: "site",
-      permissionKeys: ["notices.manage"],
+      permissionKeys: ["notices.manage", "notices.publish"],
     });
     readerRole = await seedE2eTypedRole({
       orgId,
@@ -79,6 +95,42 @@ describe("ACE notice draft API", () => {
       userId: readerId,
       scope: "site",
       permissionKeys: ["notices.read"],
+    });
+    publisherRole = await seedE2eTypedRole({
+      orgId,
+      tenantId: siteId,
+      userId: publisherId,
+      scope: "site",
+      permissionKeys: ["notices.publish"],
+    });
+    await prisma.user.create({
+      data: {
+        id: guardianUserId,
+        tenantId: siteId,
+        email: `${guardianUserId}@example.test`,
+      },
+    });
+    await prisma.child.create({
+      data: {
+        id: childId,
+        tenantId: siteId,
+        firstName: "Notice",
+        lastName: "Recipient",
+      },
+    });
+    await prisma.guardianIdentity.createMany({
+      data: [
+        { id: managerGuardianId, tenantId: siteId, userId: managerId },
+        { id: parentGuardianId, tenantId: siteId, userId: guardianUserId },
+      ],
+    });
+    await prisma.guardianChildRelationship.createMany({
+      data: [managerGuardianId, parentGuardianId].map((guardianIdentityId) => ({
+        tenantId: siteId,
+        guardianIdentityId,
+        childId,
+        legalAccess: "FULL",
+      })),
     });
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
@@ -91,15 +143,31 @@ describe("ACE notice draft API", () => {
     if (!isDatabaseAvailable()) return;
     await app?.close();
     await prisma.auditEvent.deleteMany({ where: { orgId } });
-    await withTenantRlsContext(siteId, orgId, (tx) =>
-      tx.aceNotice.deleteMany({ where: { tenantId: siteId } }),
-    );
+    await prisma.outboxEvent.deleteMany({ where: { orgId } });
+    // Published audience rows are intentionally immutable; disposable e2e
+    // databases clear the four notice tables together after the suite.
+    await prisma.$executeRawUnsafe(`
+      TRUNCATE TABLE
+        app."AceNoticeReceipt",
+        app."AceNoticeAttachment",
+        app."AceNoticeAudienceMember",
+        app."AceNotice"
+    `);
+    await prisma.guardianChildRelationship.deleteMany({
+      where: { tenantId: siteId, childId },
+    });
+    await prisma.guardianIdentity.deleteMany({ where: { tenantId: siteId } });
+    await prisma.child.delete({ where: { id: childId } });
     if (readerRole) await clearE2eTypedRole(readerRole, orgId);
+    if (publisherRole) await clearE2eTypedRole(publisherRole, orgId);
     if (managerRole) await clearE2eTypedRole(managerRole, orgId);
     await clearE2eAuthAccess(readerId);
+    await clearE2eAuthAccess(publisherId);
     await clearE2eAuthAccess(managerId);
     await prisma.user.deleteMany({
-      where: { id: { in: [managerId, readerId] } },
+      where: {
+        id: { in: [managerId, readerId, publisherId, guardianUserId] },
+      },
     });
     await prisma.orgVertical.deleteMany({ where: { orgId } });
     await prisma.tenant.deleteMany({
@@ -196,5 +264,146 @@ describe("ACE notice draft API", () => {
           { tenantId: otherSiteId, orgId, userId: managerId },
         ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("publishes a staff notice once, writes receipts, and withdraws after the author leaves", async () => {
+    if (!app) return;
+    const created = await request(app.getHttpServer())
+      .post("/ace/notices/drafts")
+      .set("Authorization", managerAuthorization)
+      .send({
+        title: "Staff update",
+        body: "The meeting starts at nine.",
+        audience: "STAFF",
+        expiresAt: null,
+      });
+    expect(created.status).toBe(201);
+    const preview = await request(app.getHttpServer())
+      .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+      .set("Authorization", managerAuthorization);
+    expect(preview.status).toBe(200);
+    expect(preview.body.recipientCount).toBe(3);
+
+    const publishBody = {
+      expectedUpdatedAt: created.body.updatedAt,
+      expectedAudienceVersion: preview.body.audienceVersion,
+    };
+    const denied = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", readerAuthorization)
+      .send(publishBody);
+    expect(denied.status).toBe(403);
+    const published = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send(publishBody);
+    expect(published.status).toBe(201);
+    expect(published.body.recipientCount).toBe(3);
+    const repeated = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send(publishBody);
+    expect(repeated.status).toBe(201);
+    expect(repeated.body).toEqual(published.body);
+    const stored = await withTenantRlsContext(siteId, orgId, async (tx) => ({
+      audience: await tx.aceNoticeAudienceMember.findMany({
+        where: { tenantId: siteId, noticeId: created.body.id },
+        include: { receipt: true },
+      }),
+      notice: await tx.aceNotice.findUnique({
+        where: { id: created.body.id },
+      }),
+    }));
+    expect(stored.audience).toHaveLength(3);
+    expect(stored.audience.every((member) => member.receipt?.deliveredAt)).toBe(
+      true,
+    );
+    expect(stored.notice?.publishedAt).not.toBeNull();
+
+    await prisma.siteMembership.delete({
+      where: { tenantId_userId: { tenantId: siteId, userId: managerId } },
+    });
+    const forbiddenWithdrawal = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/withdraw`)
+      .set("Authorization", managerAuthorization)
+      .send({ reason: "Superseded" });
+    expect(forbiddenWithdrawal.status).toBe(403);
+    const withdrawn = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/withdraw`)
+      .set("Authorization", publisherAuthorization)
+      .send({ reason: "Superseded" });
+    expect(withdrawn.status).toBe(201);
+    const repeatedWithdrawal = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/withdraw`)
+      .set("Authorization", publisherAuthorization)
+      .send({ reason: "Superseded" });
+    expect(repeatedWithdrawal.body).toEqual(withdrawn.body);
+    await prisma.siteMembership.create({
+      data: { tenantId: siteId, userId: managerId, role: "SITE_ADMIN" },
+    });
+    expect(
+      await prisma.outboxEvent.count({
+        where: { orgId, aggregateId: created.body.id },
+      }),
+    ).toBe(2);
+    expect(
+      await prisma.auditEvent.count({
+        where: { orgId, entityId: created.body.id },
+      }),
+    ).toBe(3);
+  });
+
+  it("rejects a stale recipient preview and deduplicates staff guardians", async () => {
+    if (!app) return;
+    const created = await request(app.getHttpServer())
+      .post("/ace/notices/drafts")
+      .set("Authorization", managerAuthorization)
+      .send({
+        title: "Family and staff",
+        body: "Please check the new timetable.",
+        audience: "PARENTS_AND_STAFF",
+        expiresAt: null,
+      });
+    expect(created.status).toBe(201);
+    const preview = await request(app.getHttpServer())
+      .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+      .set("Authorization", managerAuthorization);
+    expect(preview.body.recipientCount).toBe(4);
+    await prisma.org.update({
+      where: { id: orgId },
+      data: { parentPortalEnabled: false },
+    });
+    const stale = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send({
+        expectedUpdatedAt: created.body.updatedAt,
+        expectedAudienceVersion: preview.body.audienceVersion,
+      });
+    expect(stale.status).toBe(409);
+    await prisma.org.update({
+      where: { id: orgId },
+      data: { parentPortalEnabled: true },
+    });
+    const published = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send({
+        expectedUpdatedAt: created.body.updatedAt,
+        expectedAudienceVersion: preview.body.audienceVersion,
+      });
+    expect(published.status).toBe(201);
+    const members = await withTenantRlsContext(siteId, orgId, (tx) =>
+      tx.aceNoticeAudienceMember.findMany({
+        where: { tenantId: siteId, noticeId: created.body.id },
+      }),
+    );
+    expect(members).toHaveLength(4);
+    expect(
+      members.find((member) => member.recipientUserId === managerId),
+    ).toMatchObject({
+      recipientKind: "GUARDIAN",
+      guardianIdentityId: managerGuardianId,
+    });
   });
 });

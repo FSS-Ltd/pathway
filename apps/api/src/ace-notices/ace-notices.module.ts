@@ -4,10 +4,12 @@ import { AuthModule } from "../auth/auth.module";
 import { CommonModule } from "../common/common.module";
 import { AceNoticeDraftsController } from "./ace-notice-drafts.controller";
 import { AceNoticeDraftsService } from "./ace-notice-drafts.service";
+import { AceNoticePublicationController } from "./ace-notice-publication.controller";
+import { AceNoticePublicationService } from "./ace-notice-publication.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [AceNoticeDraftsController],
-  providers: [AceNoticeDraftsService],
+  controllers: [AceNoticeDraftsController, AceNoticePublicationController],
+  providers: [AceNoticeDraftsService, AceNoticePublicationService],
 })
 export class AceNoticesModule {}

@@ -123,6 +123,18 @@ summary rows without body text, and uses `createdAt` plus ID for stable order.
 The selected site comes only from the authenticated context. These routes
 do not publish a notice or expose one to readers.
 
+Publication uses `GET /ace/notices/drafts/:id/audience-preview` under
+`notices.publish` to return the eligible recipient count, draft `updatedAt`,
+and an `audienceVersion` hash of the deduplicated recipient snapshot.
+`POST /ace/notices/:id/publish` requires that exact draft revision and audience
+version. It returns HTTP 409 if either changed or the audience is empty, and
+returns the existing publication on an authorised retry. The command locks the
+notice row and creates the audience, one delivered receipt per recipient,
+audit record, and outbox fact in one transaction. `POST
+/ace/notices/:id/withdraw` requires a nonblank reason under
+`notices.publish`; it records a final withdrawal without deleting the issued
+notice or receipts. Both commands derive site and actor from authentication.
+
 Use existing `@pathway/ui` tokens. Staff and family notice lists are separate
 from private chat, show audience and publication time clearly, and expose
 unread state in text as well as colour. The publisher sees a recipient-count

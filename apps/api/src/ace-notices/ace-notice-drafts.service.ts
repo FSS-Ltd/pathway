@@ -1,24 +1,24 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { withTenantRlsContext, type Prisma } from "@pathway/db";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
+import {
+  assertNoticeActor,
+  requireAceNoticeAuthor,
+  type NoticeActor,
+} from "./ace-notice-access";
 import type {
   CreateNoticeDraftDto,
   ListNoticeDraftsDto,
   UpdateNoticeDraftDto,
 } from "./dto/ace-notice-draft.dto";
 
-export interface NoticeDraftActor {
-  tenantId: string;
-  orgId: string;
-  userId: string;
-}
+export type NoticeDraftActor = NoticeActor;
 
 const draftSelect = {
   id: true,
@@ -56,10 +56,10 @@ export class AceNoticeDraftsService {
     command: CreateNoticeDraftDto,
     actor: NoticeDraftActor,
   ): Promise<NoticeDraft> {
-    this.assertActor(actor);
+    assertNoticeActor(actor);
     this.assertFutureExpiry(command.expiresAt);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await this.requireAceAuthor(tx, actor);
+      await requireAceNoticeAuthor(tx, actor);
       const notice = await tx.aceNotice.create({
         data: {
           tenantId: actor.tenantId,
@@ -86,9 +86,9 @@ export class AceNoticeDraftsService {
     query: ListNoticeDraftsDto,
     actor: NoticeDraftActor,
   ): Promise<NoticeDraftPage> {
-    this.assertActor(actor);
+    assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await this.requireAceAuthor(tx, actor);
+      await requireAceNoticeAuthor(tx, actor);
       const scope: Prisma.AceNoticeWhereInput = {
         tenantId: actor.tenantId,
         publishedAt: null,
@@ -128,9 +128,9 @@ export class AceNoticeDraftsService {
   }
 
   async get(id: string, actor: NoticeDraftActor): Promise<NoticeDraft> {
-    this.assertActor(actor);
+    assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await this.requireAceAuthor(tx, actor);
+      await requireAceNoticeAuthor(tx, actor);
       const notice = await tx.aceNotice.findFirst({
         where: { id, tenantId: actor.tenantId, publishedAt: null },
         select: draftSelect,
@@ -145,14 +145,14 @@ export class AceNoticeDraftsService {
     command: UpdateNoticeDraftDto,
     actor: NoticeDraftActor,
   ): Promise<NoticeDraft> {
-    this.assertActor(actor);
+    assertNoticeActor(actor);
     this.assertFutureExpiry(command.expiresAt);
     const expectedUpdatedAt = new Date(command.expectedUpdatedAt);
     const updatedAt = new Date(
       Math.max(Date.now(), expectedUpdatedAt.getTime() + 1),
     );
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await this.requireAceAuthor(tx, actor);
+      await requireAceNoticeAuthor(tx, actor);
       const result = await tx.aceNotice.updateMany({
         where: {
           id,
@@ -186,47 +186,9 @@ export class AceNoticeDraftsService {
     });
   }
 
-  private assertActor(actor: NoticeDraftActor): void {
-    if (
-      !actor.tenantId?.trim() ||
-      !actor.orgId?.trim() ||
-      !actor.userId?.trim()
-    ) {
-      throw new BadRequestException("A complete active-site actor is required");
-    }
-  }
-
   private assertFutureExpiry(expiresAt: string | null): void {
     if (expiresAt && !(new Date(expiresAt).getTime() > Date.now())) {
       throw new BadRequestException("Notice expiry must be in the future");
-    }
-  }
-
-  private async requireAceAuthor(
-    tx: Prisma.TransactionClient,
-    actor: NoticeDraftActor,
-  ): Promise<void> {
-    const [site, vertical, membership, student] = await Promise.all([
-      tx.tenant.findFirst({
-        where: { id: actor.tenantId, orgId: actor.orgId },
-        select: { id: true },
-      }),
-      tx.orgVertical.findFirst({
-        where: { orgId: actor.orgId, vertical: "ACE_SCHOOL" },
-        select: { orgId: true },
-      }),
-      tx.siteMembership.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true },
-      }),
-      tx.studentIdentity.findFirst({
-        where: { tenantId: actor.tenantId, userId: actor.userId },
-        select: { id: true },
-      }),
-    ]);
-    if (!site || !vertical) throw new NotFoundException("ACE site not found");
-    if (!membership || student) {
-      throw new ForbiddenException("ACE notice author access denied");
     }
   }
 
