@@ -141,7 +141,7 @@ need full task-level reconciliation.
 Mobile notice work is paused at the user's request and excluded from this PR.
 
 Build step 1.3e5l ([PR #558](https://github.com/FSS-Ltd/pathway/pull/558),
-web guardian identity onboarding, CI pending): replace the
+web guardian identity onboarding, merged on 10 October): replace the
 legacy parent invitation that linked a child and granted a site viewer role
 before acceptance. The new staff flow requires an organisation admin to record
 the legal access basis, creates a seven-day child-scoped pending invitation,
@@ -158,9 +158,13 @@ Mobile work remains paused. ACE-M15 and M20 remain open until
 the remaining identity, relationship, and security tasks are verified. Local
 API and admin type checks, lint, and builds passed; API unit tests passed after
 the active-site expectation was updated, and admin tests passed. The guardian
-database E2E is in the PR but could not exercise PostgreSQL locally because
-the test server at `localhost:5433` is unavailable. The current build step
-still needs latest-head CI and a confirmed merge before completion.
+database E2E could not run locally because PostgreSQL was unavailable. All
+eight latest-head checks passed on `1ab8c066550db863d1cdb0f08b082828d251a4a0`
+(CI run 38090625503, CodeQL run 38090623814). The PostgreSQL integration log
+confirms the guardian E2E and invitation email migration ran; 79 suites and
+487 tests passed. GitHub confirmed the merge to `master` as
+`6c8cfce9b67df2a555c8ddaa3e876c1496156c5b`. The verified master-plan
+task count remains **42/150 (28%)** because M15 and M20 are not yet complete.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -851,7 +855,7 @@ journeys remain production verification work.
 | 1.3e5i   | Shared site notice scheduling and minute cron                          | Merged  | [#555](https://github.com/FSS-Ltd/pathway/pull/555) to `master`                     | `70fd7ccbcf422e6e0af269018178374fdba5d5c2`; all eight checks passed: CI run 38081211207, CodeQL run 38081208228.                                                                                                            | `cb2c20d0b66490dd24a6a97da71eed0cdb7b2f0e` |
 | 1.3e5j   | ACE school notice targeting across shared API and staff editor         | Merged  | [#556](https://github.com/FSS-Ltd/pathway/pull/556) to `master`                     | `14b7d75fd7b1e931699817701841cf74cac4df1c`; all eight latest-head checks passed: CI run 38084145084, CodeQL run 38084142024.                                                                                                | `18850674b91ddfa9526083c7144ebc39caed77ba` |
 | 1.3e5k   | Web notice recipient-change confirmation                               | Merged  | [#557](https://github.com/FSS-Ltd/pathway/pull/557) to `master`                     | `caee165a0c3264e3fe935b9837e2675ca737b0ab`; all eight latest-head checks passed: CI run 38087062057.                                                                                                                        | `0eec3e4e05169a8d97f6eff4ffb2b3d0c112b858` |
-| 1.3e5l   | Web guardian invitation and reviewed acceptance                        | In progress | PR pending | Local API and web verification in progress; CI and merge required before the next step. | — |
+| 1.3e5l   | Web guardian invitation and reviewed acceptance                        | Merged  | [#558](https://github.com/FSS-Ltd/pathway/pull/558) to `master`                     | `1ab8c066550db863d1cdb0f08b082828d251a4a0`; all eight latest-head checks passed: CI run 38090625503, CodeQL run 38090623814. The guardian E2E and migration ran against PostgreSQL.                            | `6c8cfce9b67df2a555c8ddaa3e876c1496156c5b` |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                            | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                            | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                            | `193a569892c38be565ac6755456f41bcf498ed76` |
