@@ -53,7 +53,7 @@ async function run(): Promise<void> {
               {
                 id: "notice-1",
                 title: "Visible notice",
-                audience: "STAFF",
+                audience: "PARENTS_AND_STAFF",
                 publishedAt: new Date().toISOString(),
               },
             ],
@@ -112,6 +112,7 @@ async function run(): Promise<void> {
     await act(async () => retry.click());
     await settle();
     assert.match(container.textContent ?? "", /Visible notice/);
+    assert.match(container.textContent ?? "", /Parents & staff/);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = nativeFetch;

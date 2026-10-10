@@ -3688,6 +3688,7 @@ const audienceLabelMap: Record<string, string> = {
   parents: "Parents",
   staff: "Staff",
   parents_staff: "Parents & staff",
+  parents_and_staff: "Parents & staff",
 };
 
 const audienceLabel = (audience?: string | null): string | null => {
