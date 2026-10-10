@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
 import { BehaviourReviewService } from "../behaviour-review.service";
@@ -29,7 +29,10 @@ function arrange(
         const eligible = values[2] === "HEAD" ? options.head : options.lead;
         return eligible ? [{ userId: actor.userId }] : [];
       }),
-    behaviourReviewRequest: { findMany: jest.fn().mockResolvedValue([]) },
+    behaviourReviewRequest: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   jest
     .mocked(withTenantRlsContext)
@@ -77,7 +80,7 @@ describe("BehaviourReviewService", () => {
           kind: { in: ["SITE"] },
           childId: "child-1",
         },
-        take: 20,
+        take: 21,
       }),
     );
   });
@@ -92,8 +95,72 @@ describe("BehaviourReviewService", () => {
           child: { isGuest: false },
           kind: { in: ["SITE", "HEAD"] },
         },
-        take: 50,
+        take: 51,
       }),
     );
+  });
+
+  it("continues past the first page using a scoped review cursor", async () => {
+    const { tx, service } = arrange({ head: true });
+    const requestedAt = new Date("2026-10-09T12:00:00.000Z");
+    const firstId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    const secondId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const thirdId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    tx.behaviourReviewRequest.findMany.mockResolvedValueOnce([
+      { id: firstId, requestedAt },
+      { id: secondId, requestedAt },
+      { id: thirdId, requestedAt: new Date("2026-10-08T12:00:00.000Z") },
+    ]);
+    await expect(service.list(actor, { limit: 2 })).resolves.toEqual({
+      items: [
+        { id: firstId, requestedAt },
+        { id: secondId, requestedAt },
+      ],
+      nextCursor: secondId,
+    });
+
+    tx.behaviourReviewRequest.findFirst.mockResolvedValue({
+      id: secondId,
+      requestedAt,
+    });
+    tx.behaviourReviewRequest.findMany.mockResolvedValueOnce([
+      { id: thirdId, requestedAt: new Date("2026-10-08T12:00:00.000Z") },
+    ]);
+    await expect(
+      service.list(actor, { limit: 2, cursor: secondId }),
+    ).resolves.toEqual({
+      items: [
+        { id: thirdId, requestedAt: new Date("2026-10-08T12:00:00.000Z") },
+      ],
+      nextCursor: null,
+    });
+    expect(tx.behaviourReviewRequest.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: actor.tenantId,
+        id: secondId,
+      }),
+      select: { id: true, requestedAt: true },
+    });
+    expect(tx.behaviourReviewRequest.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: [
+            { requestedAt: { lt: requestedAt } },
+            { requestedAt, id: { lt: secondId } },
+          ],
+        }),
+        take: 3,
+      }),
+    );
+  });
+
+  it("rejects a cursor outside the visible site and role scope", async () => {
+    const { tx, service } = arrange({ lead: true });
+    await expect(
+      service.list(actor, {
+        cursor: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.behaviourReviewRequest.findMany).not.toHaveBeenCalled();
   });
 });

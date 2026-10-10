@@ -9,6 +9,7 @@ import type { EffectivePermissionsService } from "../../access-control/effective
 import { recordAuditEventInTransaction } from "../../audit/audit.service";
 import type { OutboxService } from "../../common/outbox/outbox.service";
 import { DemeritStageService } from "../demerit-stage.service";
+import type { DemeritEscalationService } from "../demerit-escalation.service";
 
 jest.mock("@pathway/db", () => ({
   ...jest.requireActual("@pathway/db"),
@@ -36,6 +37,8 @@ function arrange(
     reviewer?: boolean;
     staff?: boolean;
     priorUnits?: number;
+    serious?: boolean;
+    seriousMisconductStage?: number;
   } = {},
 ) {
   const tx = {
@@ -65,7 +68,7 @@ function arrange(
         stageOneThreshold: 3,
         stageTwoThreshold: 6,
         stageThreeThreshold: 10,
-        seriousMisconductStage: 3,
+        seriousMisconductStage: options.seriousMisconductStage ?? 3,
       }),
     },
     behaviourEntry: {
@@ -74,7 +77,7 @@ function arrange(
           ? [
               {
                 pointsDelta: -options.priorUnits,
-                categoryIsSerious: false,
+                categoryIsSerious: options.serious ?? false,
                 occurredAt: new Date("2026-10-24T09:00:00Z"),
               },
             ]
@@ -83,19 +86,21 @@ function arrange(
     },
     demeritStageOverride: {
       findFirst: jest.fn().mockResolvedValue(null),
-      create: jest
-        .fn()
-        .mockImplementation(
-          ({
-            data,
-          }: {
-            data: { expiresAt: Date; commandFingerprint: string };
-          }) => ({
-            id: "override-1",
-            stage: 3,
-            expiresAt: data.expiresAt,
-          }),
-        ),
+      create: jest.fn().mockImplementation(
+        ({
+          data,
+        }: {
+          data: {
+            stage: number;
+            expiresAt: Date;
+            commandFingerprint: string;
+          };
+        }) => ({
+          id: "override-1",
+          stage: data.stage,
+          expiresAt: data.expiresAt,
+        }),
+      ),
     },
     behaviourReviewRequest: { create: jest.fn().mockResolvedValue({}) },
     $executeRaw: jest.fn().mockResolvedValue(0),
@@ -111,11 +116,15 @@ function arrange(
       .mockResolvedValue({ allowed: options.allowed !== false }),
   };
   const outbox = { enqueue: jest.fn().mockResolvedValue({}) };
+  const escalation = {
+    enqueueOverrideGuardianNotice: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new DemeritStageService(
     permissions as unknown as EffectivePermissionsService,
     outbox as unknown as OutboxService,
+    escalation as unknown as DemeritEscalationService,
   );
-  return { tx, permissions, outbox, service };
+  return { tx, permissions, outbox, escalation, service };
 }
 
 describe("DemeritStageService", () => {
@@ -232,6 +241,44 @@ describe("DemeritStageService", () => {
         metadata: expect.objectContaining({ reason: command.reason }),
       }),
     );
+  });
+
+  it("routes a manual Stage 2 guardian notice without creating a staff review", async () => {
+    const { tx, outbox, escalation, service } = arrange();
+    await service.override(actor, { ...command, stage: 2 });
+
+    expect(escalation.enqueueOverrideGuardianNotice).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        overrideId: "override-1",
+        childId: command.childId,
+        occurredOn: "2026-10-25",
+        policyVersion: 4,
+      }),
+    );
+    expect(outbox.enqueue).not.toHaveBeenCalled();
+    expect(tx.behaviourReviewRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps serious misconduct at Head review when manually raised to Stage 2", async () => {
+    const { tx, outbox, escalation, service } = arrange({
+      priorUnits: 1,
+      serious: true,
+      seriousMisconductStage: 1,
+    });
+    await service.override(actor, { ...command, stage: 2 });
+
+    expect(escalation.enqueueOverrideGuardianNotice).not.toHaveBeenCalled();
+    expect(outbox.enqueue).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        eventType: "behaviour.review-requested",
+        payload: expect.objectContaining({ reviewKind: "HEAD", stage: 2 }),
+      }),
+    );
+    expect(tx.behaviourReviewRequest.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ kind: "HEAD", stage: 2 }),
+    });
   });
 
   it("rejects a stage that does not exceed the current stage", async () => {

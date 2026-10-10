@@ -136,6 +136,42 @@ export class DemeritEscalationService {
     };
   }
 
+  async enqueueOverrideGuardianNotice(
+    tx: Prisma.TransactionClient,
+    input: {
+      actor: { tenantId: string; orgId: string };
+      childId: string;
+      overrideId: string;
+      policyVersion: number;
+      occurredOn: string;
+      now: Date;
+    },
+  ): Promise<void> {
+    const recipientUserIds = await this.findGuardianUserIds(
+      tx,
+      input.actor.tenantId,
+      input.childId,
+      input.now,
+    );
+    if (recipientUserIds.length === 0) return;
+    await this.outbox.enqueue(tx, {
+      aggregateType: "DEMERIT_STAGE_OVERRIDE",
+      aggregateId: input.overrideId,
+      eventType: "behaviour.guardian-notification.requested",
+      payload: {
+        demeritStageOverrideId: input.overrideId,
+        childId: input.childId,
+        tenantId: input.actor.tenantId,
+        orgId: input.actor.orgId,
+        stage: 2,
+        demeritPolicyVersion: input.policyVersion,
+        occurredOn: input.occurredOn,
+        recipientUserIds,
+      },
+      idempotencyKey: `behaviour-guardian-notification-override:${input.overrideId}:2`,
+    });
+  }
+
   async deliverGuardianNotification(
     unsafeIntent: GuardianNotificationIntent,
   ): Promise<{ sent: number }> {
@@ -270,7 +306,12 @@ export class DemeritEscalationService {
   ): Promise<number> {
     if (input.action === "none") return 0;
     if (input.action === "notify") {
-      const recipientUserIds = await this.findGuardianUserIds(tx, input);
+      const recipientUserIds = await this.findGuardianUserIds(
+        tx,
+        input.actor.tenantId,
+        input.entry.childId,
+        input.now,
+      );
       if (recipientUserIds.length === 0) return 0;
       await this.outbox.enqueue(tx, {
         aggregateType: "BEHAVIOUR_ENTRY",
@@ -338,16 +379,18 @@ export class DemeritEscalationService {
 
   private async findGuardianUserIds(
     tx: Prisma.TransactionClient,
-    input: CreateDemeritIntentsInput,
+    tenantId: string,
+    childId: string,
+    now: Date,
   ): Promise<string[]> {
     const relationships = await tx.guardianChildRelationship.findMany({
       where: {
-        tenantId: input.actor.tenantId,
-        childId: input.entry.childId,
+        tenantId,
+        childId,
         legalAccess: { not: "NONE" },
-        startsAt: { lte: input.now },
+        startsAt: { lte: now },
         revokedAt: null,
-        OR: [{ endedAt: null }, { endedAt: { gt: input.now } }],
+        OR: [{ endedAt: null }, { endedAt: { gt: now } }],
         guardianIdentity: { user: { isActive: true, email: { not: null } } },
       },
       select: { guardianIdentity: { select: { userId: true } } },
