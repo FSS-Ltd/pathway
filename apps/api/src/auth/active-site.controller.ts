@@ -13,6 +13,7 @@ import type { Request, Response } from "express";
 import { prisma, OrgRole, SiteRole } from "@pathway/db";
 import { AuthUserGuard } from "./auth-user.guard";
 import { UserRolesService } from "./user-roles.service";
+import { listStudentActiveSites } from "./student-active-sites";
 
 interface AuthenticatedRequest extends Request {
   authUserId?: string;
@@ -118,6 +119,8 @@ export class ActiveSiteController {
         select: { tenant: { include: { org: true } } },
       });
 
+    const studentSites = await listStudentActiveSites(userId);
+
     const orgTenantIds =
       orgMemberships.length > 0
         ? await prisma.tenant.findMany({
@@ -153,6 +156,15 @@ export class ActiveSiteController {
         orgSlug: tenant.org.slug,
         role: null,
         timezone: tenant.timezone ?? null,
+      })),
+      ...studentSites.map<SiteSummary>((site) => ({
+        id: site.id,
+        name: site.name,
+        orgId: site.orgId,
+        orgName: site.org.name,
+        orgSlug: site.org.slug,
+        role: null,
+        timezone: site.timezone ?? null,
       })),
     ];
 

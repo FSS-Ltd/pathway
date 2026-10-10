@@ -14,8 +14,12 @@ jest.mock("@pathway/db", () => ({
     guardianChildRelationship: { findMany: jest.fn() },
   },
 }));
+jest.mock("../student-active-sites", () => ({
+  listStudentActiveSites: jest.fn(),
+}));
 
 import { prisma } from "@pathway/db";
+import { listStudentActiveSites } from "../student-active-sites";
 const siteMembershipFindMany = prisma.siteMembership
   .findMany as unknown as jest.Mock;
 const orgMembershipFindMany = prisma.orgMembership
@@ -23,6 +27,7 @@ const orgMembershipFindMany = prisma.orgMembership
 const userFindUnique = prisma.user.findUnique as unknown as jest.Mock;
 const guardianRelationshipFindMany = prisma.guardianChildRelationship
   .findMany as unknown as jest.Mock;
+const studentSites = jest.mocked(listStudentActiveSites);
 
 type DeclaredDependency = {
   index: number;
@@ -33,6 +38,35 @@ describe("ActiveSiteController", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     guardianRelationshipFindMany.mockResolvedValue([]);
+    studentSites.mockResolvedValue([]);
+  });
+
+  it("lists only an enabled, current student-self site", async () => {
+    siteMembershipFindMany.mockResolvedValue([]);
+    orgMembershipFindMany.mockResolvedValue([]);
+    studentSites.mockResolvedValue([
+      {
+        id: "site-a",
+        name: "School",
+        orgId: "org-a",
+        timezone: "Europe/London",
+        org: { name: "Organisation", slug: "org" },
+      },
+    ]);
+    userFindUnique.mockResolvedValue({ lastActiveTenantId: "site-a" });
+    const controller = new ActiveSiteController(new UserRolesService());
+    const result = await controller.getActiveSite(
+      { authUserId: "student-a", cookies: {} } as unknown as Parameters<
+        ActiveSiteController["getActiveSite"]
+      >[0],
+      { cookie: jest.fn() } as unknown as Parameters<
+        ActiveSiteController["getActiveSite"]
+      >[1],
+    );
+    expect(result.sites).toEqual([
+      expect.objectContaining({ id: "site-a", role: null }),
+    ]);
+    expect(studentSites).toHaveBeenCalledWith("student-a");
   });
 
   it("lists a guardian site without adding a staff membership", async () => {
