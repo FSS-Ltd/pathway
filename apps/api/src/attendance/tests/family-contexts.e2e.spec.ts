@@ -306,6 +306,31 @@ describe("ACE family context discovery", () => {
     }
   });
 
+  it("removes every family context when the account is disabled", async () => {
+    if (!app) return;
+    for (const [userId, authorization] of [
+      [fullUserId, fullAuthorization],
+      [studentUserId, studentAuthorization],
+    ] as const) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { isActive: false },
+      });
+      try {
+        const response = await request(app.getHttpServer())
+          .get(route)
+          .set("Authorization", authorization);
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ items: [] });
+      } finally {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { isActive: true },
+        });
+      }
+    }
+  });
+
   it("removes disabled, revoked and ended links on the next read", async () => {
     if (!app) return;
     const server = app.getHttpServer();

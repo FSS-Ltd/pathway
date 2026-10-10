@@ -161,6 +161,25 @@ describe("ACE student daily attendance history", () => {
     });
   });
 
+  it("denies a disabled student even while the self link remains active", async () => {
+    if (!app) return;
+    await prisma.user.update({
+      where: { id: studentUserId },
+      data: { isActive: false },
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .get(route)
+        .set("Authorization", studentAuthorization);
+      expect(response.status).toBe(404);
+    } finally {
+      await prisma.user.update({
+        where: { id: studentUserId },
+        data: { isActive: true },
+      });
+    }
+  });
+
   it("denies unrelated users and other sites without revealing a child", async () => {
     if (!app) return;
     const server = app.getHttpServer();

@@ -25,12 +25,14 @@ eligible parent contexts.
 
 No schema or migration is needed. Candidate site IDs come from the existing
 identity RLS read, and current relationships and portal policy are checked in
-each site's tenant RLS transaction. Active permission definitions are
-platform-global and read once for the response. The response contains section
-names only, not permission
-records, unpublished content, or other families' data. Every destination
-continues to recheck identity, relationship, tenant, and release conditions on
-each request; navigation capabilities are a convenience, not authorization.
+each site's tenant RLS transaction. Identity discovery and the family
+attendance and timetable readers require an active internal user, so disabling
+an account removes navigation and blocks direct reads. Active permission
+definitions are platform-global and read once for the response. The response
+contains section names only, not permission records, unpublished content, or
+other families' data. Each destination retains its own tenant, relationship,
+permission, and publication checks; navigation capabilities are a convenience,
+not authorization.
 If discovery fails, the existing error and retry state remains. If a link is
 revoked after discovery, its destination returns its existing denial and a
 refresh removes it. Unpublished timetable content remains hidden by the

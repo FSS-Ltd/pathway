@@ -33,12 +33,12 @@ export class FamilyContextsService {
       await tx.$executeRawUnsafe("SET LOCAL row_security = on");
       const [guardians, students] = await Promise.all([
         tx.guardianIdentity.findMany({
-          where: { userId },
+          where: { userId, user: { isActive: true } },
           select: { tenantId: true },
           take: MAX_SITES + 1,
         }),
         tx.studentIdentity.findMany({
-          where: { userId },
+          where: { userId, user: { isActive: true } },
           select: { tenantId: true },
           take: MAX_SITES + 1,
         }),

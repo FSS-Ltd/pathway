@@ -44,7 +44,11 @@ export class ParentDailyAttendanceService {
           startsAt: { lte: new Date() },
           endedAt: null,
           revokedAt: null,
-          guardianIdentity: { tenantId: siteId, userId },
+          guardianIdentity: {
+            tenantId: siteId,
+            userId,
+            user: { isActive: true },
+          },
           child: { tenantId: siteId, isGuest: false },
         },
         select: { id: true },
