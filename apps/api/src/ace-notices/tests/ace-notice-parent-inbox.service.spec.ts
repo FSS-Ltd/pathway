@@ -38,6 +38,9 @@ function setup() {
     guardianIdentity: {
       findFirst: jest.fn().mockResolvedValue({ id: "guardian-a" }),
     },
+    guardianChildRelationship: {
+      findMany: jest.fn().mockResolvedValue([{ childId: "child-a" }]),
+    },
     studentIdentity: { findUnique: jest.fn().mockResolvedValue(null) },
     permissionDefinition: {
       findUnique: jest.fn().mockResolvedValue({ isActive: true }),
@@ -109,6 +112,10 @@ describe("AceNoticeParentInboxService", () => {
               recipientUserId: userId,
               recipientKind: "GUARDIAN",
               guardianIdentityId: "guardian-a",
+              OR: [
+                { targetedChildIds: { isEmpty: true } },
+                { targetedChildIds: { hasSome: ["child-a"] } },
+              ],
               receipt: { is: { deliveredAt: { not: null } } },
             },
           },
@@ -171,6 +178,23 @@ describe("AceNoticeParentInboxService", () => {
     await expect(service.get(siteId, userId, notice.id)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it("checks the targeted child against current full guardian links", async () => {
+    const { service, tx } = setup();
+    tx.guardianChildRelationship.findMany.mockResolvedValue([
+      { childId: "other-child" },
+    ]);
+    tx.aceNotice.findFirst.mockResolvedValue(null);
+    await expect(service.get(siteId, userId, notice.id)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(
+      tx.aceNotice.findFirst.mock.calls[0][0].where.audienceMembers.some.OR,
+    ).toEqual([
+      { targetedChildIds: { isEmpty: true } },
+      { targetedChildIds: { hasSome: ["other-child"] } },
+    ]);
   });
 
   it("denies a closed portal, ended link, student identity, and inactive permission", async () => {

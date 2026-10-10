@@ -139,13 +139,33 @@ export function acknowledgeParentNotice(
 }
 
 export type NoticeAudience = "PARENTS" | "STAFF" | "PARENTS_AND_STAFF";
+export type NoticeAudienceScope = "SITE" | "YEAR_BAND" | "GROUP" | "CHILD";
 export type NoticeDraftInput = {
   title: string;
   body: string;
   audience: NoticeAudience;
+  audienceScope: NoticeAudienceScope;
+  audienceTargetId: string | null;
   requiresAcknowledgement: boolean;
   expiresAt: string | null;
 };
+
+export type NoticeTargetOption = { id: string; label: string };
+export type NoticeTargetPage = {
+  available: boolean;
+  items: NoticeTargetOption[];
+};
+
+export function fetchNoticeTargets(
+  scope: Exclude<NoticeAudienceScope, "SITE">,
+  search = "",
+  selectedId?: string | null,
+  signal?: AbortSignal,
+): Promise<NoticeTargetPage> {
+  const query = new URLSearchParams({ scope, search });
+  if (selectedId) query.set("selectedId", selectedId);
+  return request(`/ace/notices/targets?${query}`, { signal });
+}
 export type NoticeDraft = NoticeDraftInput & {
   id: string;
   createdAt: string;

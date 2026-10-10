@@ -16,6 +16,7 @@ import {
   type NoticeActor,
 } from "./ace-notice-access";
 import { audienceVersion, resolveNoticeAudience } from "./ace-notice-audience";
+import { noticeAudienceTarget } from "./ace-notice-school-audience";
 import type { ScheduleNoticeDto } from "./dto/ace-notice-publication.dto";
 
 export type NoticeScheduleFailure =
@@ -78,6 +79,7 @@ export class AceNoticeSchedulingService {
         notice.audience,
         site.parentPortalEnabled,
         new Date(),
+        noticeAudienceTarget(notice.audienceScope, notice.audienceTargetId),
       );
       if (
         recipients.length === 0 ||

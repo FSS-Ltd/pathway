@@ -1935,6 +1935,8 @@ model AceNotice {
   title                   String
   body                    String            @db.Text
   audience                AceNoticeAudience
+  audienceScope           String            @default("SITE")
+  audienceTargetId        String?
   requiresAcknowledgement Boolean           @default(false)
   publishedAt             DateTime?
   scheduledAt             DateTime?
@@ -1957,6 +1959,7 @@ model AceNotice {
   @@unique([id, tenantId])
   @@index([tenantId, publishedAt])
   @@index([tenantId, scheduledAt])
+  @@index([tenantId, audienceScope, audienceTargetId])
   @@index([tenantId, withdrawnAt, publishedAt(sort: Desc)])
 }
 
@@ -1967,6 +1970,7 @@ model AceNoticeAudienceMember {
   recipientUserId    String
   recipientKind      AceNoticeAudienceMemberKind
   guardianIdentityId String?
+  targetedChildIds   String[]                    @default([])
   createdAt          DateTime                    @default(now())
 
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)

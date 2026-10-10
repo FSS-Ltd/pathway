@@ -41,6 +41,7 @@ function createTransaction() {
       findFirst: jest.fn().mockResolvedValue({ id: "membership-a" }),
     },
     studentIdentity: { findFirst: jest.fn().mockResolvedValue(null) },
+    aceStaffYearBandAssignment: { findMany: jest.fn().mockResolvedValue([]) },
     aceNotice: {
       findMany: jest.fn().mockResolvedValue([notice]),
       findFirst: jest.fn().mockResolvedValue(notice),
@@ -108,9 +109,10 @@ describe("AceNoticeStaffInboxService", () => {
       withdrawnAt: null,
       AND: expect.arrayContaining([
         {
-          OR: [
+          OR: expect.arrayContaining([
             { legacyImportedAt: { not: null } },
             {
+              audienceScope: "SITE",
               audienceMembers: {
                 some: {
                   recipientUserId: actor.userId,
@@ -118,7 +120,7 @@ describe("AceNoticeStaffInboxService", () => {
                 },
               },
             },
-          ],
+          ]),
         },
       ]),
     });
@@ -157,6 +159,26 @@ describe("AceNoticeStaffInboxService", () => {
     tx.aceNotice.findFirst.mockResolvedValue(null);
     await expect(service.get(notice.id, actor)).rejects.toBeInstanceOf(
       NotFoundException,
+    );
+  });
+
+  it("requires a current year-band assignment for a targeted staff notice", async () => {
+    const { service, tx } = createService();
+    tx.aceStaffYearBandAssignment.findMany.mockResolvedValue([
+      { yearBandId: "band-a" },
+    ]);
+    await service.get(notice.id, actor);
+    expect(tx.aceNotice.findFirst.mock.calls[0][0].where.AND).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              audienceScope: "YEAR_BAND",
+              audienceTargetId: { in: ["band-a"] },
+            }),
+          ]),
+        }),
+      ]),
     );
   });
 

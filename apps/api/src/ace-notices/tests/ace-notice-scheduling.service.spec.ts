@@ -21,6 +21,8 @@ const notice = {
   title: "Site update",
   body: "Please read this update.",
   audience: "STAFF" as const,
+  audienceScope: "SITE",
+  audienceTargetId: null,
   updatedAt: revision,
   scheduledAt: null as Date | null,
   scheduledByUserId: null as string | null,

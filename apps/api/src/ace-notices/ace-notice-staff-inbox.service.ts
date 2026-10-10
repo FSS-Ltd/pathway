@@ -17,6 +17,7 @@ import {
   type NoticeCursorPosition,
 } from "./ace-notice-cursor";
 import type { ListNoticeInboxDto } from "./dto/ace-notice-inbox.dto";
+import { noticeLocalDate } from "./ace-notice-school-audience";
 
 export interface StaffNoticeSummary {
   id: string;
@@ -43,6 +44,7 @@ export interface StaffNoticeDetail extends StaffNoticeSummary {
 function activeStaffNoticeScope(
   actor: NoticeActor,
   now: Date,
+  yearBandIds: string[],
   cursor?: NoticeCursorPosition,
 ): Prisma.AceNoticeWhereInput {
   return {
@@ -56,6 +58,14 @@ function activeStaffNoticeScope(
         OR: [
           { legacyImportedAt: { not: null } },
           {
+            audienceScope: "SITE",
+            audienceMembers: {
+              some: { tenantId: actor.tenantId, recipientUserId: actor.userId },
+            },
+          },
+          {
+            audienceScope: "YEAR_BAND",
+            audienceTargetId: { in: yearBandIds },
             audienceMembers: {
               some: { tenantId: actor.tenantId, recipientUserId: actor.userId },
             },
@@ -76,6 +86,25 @@ function activeStaffNoticeScope(
   };
 }
 
+async function currentYearBandIds(
+  tx: Prisma.TransactionClient,
+  actor: NoticeActor,
+  now: Date,
+  timezone: string | null,
+): Promise<string[]> {
+  const today = noticeLocalDate(now, timezone);
+  const assignments = await tx.aceStaffYearBandAssignment.findMany({
+    where: {
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+      startsOn: { lte: today },
+      OR: [{ endsOn: null }, { endsOn: { gte: today } }],
+    },
+    select: { yearBandId: true },
+  });
+  return assignments.map((assignment) => assignment.yearBandId);
+}
+
 @Injectable()
 export class AceNoticeStaffInboxService {
   async list(
@@ -84,13 +113,20 @@ export class AceNoticeStaffInboxService {
   ): Promise<StaffNoticePage> {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireSiteNoticeStaffAccess(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
+      const now = new Date();
+      const yearBandIds = await currentYearBandIds(
+        tx,
+        actor,
+        now,
+        site.timezone,
+      );
       const scope = noticeCursorScope(actor.tenantId, actor.userId);
       const cursor = query.cursor
         ? decodeNoticeCursor(query.cursor, scope)
         : undefined;
       const rows = await tx.aceNotice.findMany({
-        where: activeStaffNoticeScope(actor, new Date(), cursor),
+        where: activeStaffNoticeScope(actor, now, yearBandIds, cursor),
         orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
         take: query.limit + 1,
         select: {
@@ -130,9 +166,16 @@ export class AceNoticeStaffInboxService {
   async get(id: string, actor: NoticeActor): Promise<StaffNoticeDetail> {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireSiteNoticeStaffAccess(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
+      const now = new Date();
+      const yearBandIds = await currentYearBandIds(
+        tx,
+        actor,
+        now,
+        site.timezone,
+      );
       const row = await tx.aceNotice.findFirst({
-        where: { ...activeStaffNoticeScope(actor, new Date()), id },
+        where: { ...activeStaffNoticeScope(actor, now, yearBandIds), id },
         select: {
           id: true,
           title: true,
@@ -164,9 +207,16 @@ export class AceNoticeStaffInboxService {
   async markRead(id: string, actor: NoticeActor): Promise<{ readAt: Date }> {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireSiteNoticeStaffAccess(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
+      const now = new Date();
+      const yearBandIds = await currentYearBandIds(
+        tx,
+        actor,
+        now,
+        site.timezone,
+      );
       const notice = await tx.aceNotice.findFirst({
-        where: { ...activeStaffNoticeScope(actor, new Date()), id },
+        where: { ...activeStaffNoticeScope(actor, now, yearBandIds), id },
         select: {
           audienceMembers: {
             where: { tenantId: actor.tenantId, recipientUserId: actor.userId },
@@ -199,9 +249,16 @@ export class AceNoticeStaffInboxService {
   async acknowledge(id: string, actor: NoticeActor) {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireSiteNoticeStaffAccess(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
+      const now = new Date();
+      const yearBandIds = await currentYearBandIds(
+        tx,
+        actor,
+        now,
+        site.timezone,
+      );
       const notice = await tx.aceNotice.findFirst({
-        where: { ...activeStaffNoticeScope(actor, new Date()), id },
+        where: { ...activeStaffNoticeScope(actor, now, yearBandIds), id },
         select: {
           requiresAcknowledgement: true,
           audienceMembers: {

@@ -90,21 +90,36 @@ audiences, mobile notice experience, and launch verification are still open.
 The plan-task count remains **42/150 (28%)** because no complete ACE master-plan
 task was added by PR #554.
 
-Build step 1.3e5i (PR open, CI pending): schedule and cancel shared site notices
+Build step 1.3e5i (merged): schedule and cancel shared site notices
 through the existing `/notices` screen and API. A minute cron sweep will
 recheck the scheduled publisher's permission, audience, expiry, and draft
 revision before using the existing publication transaction. The migration
 adds scheduled metadata and a bounded due-notice discovery function. This step
 requires a configured API `CRON_SECRET` and a Vercel plan that supports minute
 cron before production use. [PR #555](https://github.com/FSS-Ltd/pathway/pull/555)
-targets `master` from implementation commit
-`c5179aa765801f5c96244ffb45e8e53bb6ac41ed`.
-Local API/admin type, lint, and build checks passed; four focused API unit
-suites passed 23 tests; Prisma schema validation and formatting passed. The
-database E2E must run in CI because this host has no usable local PostgreSQL
-shared-memory segment. CI and merge are pending. ACE-M13 remains open for
-class/group/guardian targeting, and ACE-M14 remains open for the mobile family
-experience.
+merged to `master` as `cb2c20d0b66490dd24a6a97da71eed0cdb7b2f0e`
+from checked head `70fd7ccbcf422e6e0af269018178374fdba5d5c2`.
+All eight latest-head checks passed (CI run 38081211207; CodeQL run
+38081208228), including Integration Tests and the three database jobs.
+The API Vercel project has a 64-character random production-only sensitive
+`CRON_SECRET`; its Pro plan supports minute cron. The production API deployment
+for the merge commit is READY, and Vercel shows Cron Jobs enabled with
+`/api/internal/notice-schedules/run` scheduled every minute. Vercel's
+path-filtered production logs show repeated GET 200 responses from 20:03 to
+20:18 UTC on 10 October, confirming that the authenticated sweep is running.
+A signed-in staging schedule publishing after its due time is still required
+before claiming end-to-end scheduled publication. The plan-task count remains
+**42/150 (28%)** because ACE-M13 and M14 are not yet complete.
+
+Build step 1.3e5j (PR preparation): add ACE school year-band, site-group, and
+one-child guardian targeting to the shared notice draft, preview, publish,
+schedule, inbox, and staff editor flow. Year-band staff come from current ACE
+staff assignments; group and child notices address guardians only because the
+site Group model has no authoritative staff assignment. A recipient's target
+child IDs freeze the publication reach while current full guardian links still
+gate reads. Local API/admin type checks, lint, builds, Prisma validation,
+formatting, 39 focused API unit tests, and the staff picker component test
+passed. PostgreSQL integration and migration replay require CI on this host.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -791,7 +806,9 @@ journeys remain production verification work.
 | 1.3e5e   | ACE-M13 site notice publish and withdraw API                           | Merged  | [#550](https://github.com/FSS-Ltd/pathway/pull/550) to `master`                     | `6cb0918dd6820650bd45eee48befff6f412a6f0b`; all eight checks passed: CI run 38069238757, CodeQL run 38069238052. The notice E2E suite ran against PostgreSQL.                                                               | `0272b862a1339a979598f5a76d27a4d04af70b98` |
 | 1.3e5f   | Shared site notice records, staff inbox, and existing notices UI       | Merged  | [#552](https://github.com/FSS-Ltd/pathway/pull/552) to `master`                     | `ed078be19a48520bf30ca3a60e7ac3db5e9b428a`; all eight checks passed: CI run 38076773221, CodeQL run 38076769974. PostgreSQL integration and database jobs passed.                                                           | `9b8835ba8eb750a53837fcc43253879b87a2d86f` |
 | 1.3e5g   | Parent notice API and family inbox                                     | Merged  | [#553](https://github.com/FSS-Ltd/pathway/pull/553) to `master`                     | `acfb6724f22a51f576966400db7e3fad273f1c5c`; all eight checks passed: CI run 38077903948, CodeQL run 38077901813.                                                                                                            | `03865b1ac4856210657fe769156d419382edb721` |
-| 1.3e5h   | Shared notice acknowledgement and receipt summary API/web              | Open    | [#554](https://github.com/FSS-Ltd/pathway/pull/554) to `master`                     | Local type, lint, build, unit, and component checks passed; database E2E and latest-head CI pending.                                                                                                                        | Not merged                                 |
+| 1.3e5h   | Shared notice acknowledgement and receipt summary API/web              | Merged  | [#554](https://github.com/FSS-Ltd/pathway/pull/554) to `master`                     | `07ebb4774e8d043eebc6bd7274addc88b1b10a42`; all eight checks passed: CI run 38080016504, CodeQL run 38080013505.                                                                                                            | `95cc8ea4ff5a2d960bda8db49a78f7ccb26be76e` |
+| 1.3e5i   | Shared site notice scheduling and minute cron                          | Merged  | [#555](https://github.com/FSS-Ltd/pathway/pull/555) to `master`                     | `70fd7ccbcf422e6e0af269018178374fdba5d5c2`; all eight checks passed: CI run 38081211207, CodeQL run 38081208228.                                                                                                            | `cb2c20d0b66490dd24a6a97da71eed0cdb7b2f0e` |
+| 1.3e5j   | ACE school notice targeting across shared API and staff editor         | Pending | PR and latest-head checks pending                                                   | Local type, lint, build, Prisma validation, formatting, focused API unit and UI component checks passed; database integration awaits CI.                                                                                    | Not merged                                 |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                            | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                            | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                            | `193a569892c38be565ac6755456f41bcf498ed76` |

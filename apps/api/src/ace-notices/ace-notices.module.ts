@@ -14,6 +14,8 @@ import { AceNoticeStaffInboxService } from "./ace-notice-staff-inbox.service";
 import { AceNoticeSchedulingService } from "./ace-notice-scheduling.service";
 import { AceNoticeScheduleRunnerService } from "./ace-notice-schedule-runner.service";
 import { AceNoticeScheduleRunnerController } from "./ace-notice-schedule-runner.controller";
+import { AceNoticeTargetsController } from "./ace-notice-targets.controller";
+import { AceNoticeTargetsService } from "./ace-notice-targets.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
@@ -21,6 +23,7 @@ import { AceNoticeScheduleRunnerController } from "./ace-notice-schedule-runner.
     AceNoticeDraftsController,
     AceNoticePublicationController,
     AceNoticeParentInboxController,
+    AceNoticeTargetsController,
     AceNoticeStaffInboxController,
     AceNoticeScheduleRunnerController,
   ],
@@ -32,6 +35,7 @@ import { AceNoticeScheduleRunnerController } from "./ace-notice-schedule-runner.
     AceNoticeStaffInboxService,
     AceNoticeSchedulingService,
     AceNoticeScheduleRunnerService,
+    AceNoticeTargetsService,
   ],
 })
 export class AceNoticesModule {}

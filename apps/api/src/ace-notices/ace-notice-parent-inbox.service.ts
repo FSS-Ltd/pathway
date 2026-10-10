@@ -34,12 +34,21 @@ export interface ParentNoticeDetail extends ParentNoticeSummary {
   body: string;
 }
 
-function recipientScope(siteId: string, userId: string, guardianId: string) {
+function recipientScope(
+  siteId: string,
+  userId: string,
+  guardianId: string,
+  childIds: string[],
+) {
   return {
     tenantId: siteId,
     recipientUserId: userId,
     recipientKind: "GUARDIAN" as const,
     guardianIdentityId: guardianId,
+    OR: [
+      { targetedChildIds: { isEmpty: true } },
+      { targetedChildIds: { hasSome: childIds } },
+    ],
     receipt: { is: { deliveredAt: { not: null } } },
   };
 }
@@ -48,6 +57,7 @@ function activeParentNoticeScope(
   siteId: string,
   userId: string,
   guardianId: string,
+  childIds: string[],
   now: Date,
   cursor?: NoticeCursorPosition,
 ): Prisma.AceNoticeWhereInput {
@@ -57,7 +67,9 @@ function activeParentNoticeScope(
     legacyImportedAt: null,
     publishedAt: { not: null, lte: now },
     withdrawnAt: null,
-    audienceMembers: { some: recipientScope(siteId, userId, guardianId) },
+    audienceMembers: {
+      some: recipientScope(siteId, userId, guardianId, childIds),
+    },
     AND: [
       { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
       ...(cursor
@@ -72,6 +84,26 @@ function activeParentNoticeScope(
         : []),
     ],
   };
+}
+
+async function currentGuardianChildIds(
+  tx: Prisma.TransactionClient,
+  siteId: string,
+  guardianId: string,
+): Promise<string[]> {
+  const links = await tx.guardianChildRelationship.findMany({
+    where: {
+      tenantId: siteId,
+      guardianIdentityId: guardianId,
+      legalAccess: "FULL",
+      startsAt: { lte: new Date() },
+      endedAt: null,
+      revokedAt: null,
+      child: { tenantId: siteId, isGuest: false },
+    },
+    select: { childId: true },
+  });
+  return links.map((link) => link.childId);
 }
 
 function summary(row: {
@@ -117,6 +149,7 @@ export class AceNoticeParentInboxService {
       "ace.parent.notices.read",
       "Notices not found",
       async (tx, guardianId) => {
+        const childIds = await currentGuardianChildIds(tx, siteId, guardianId);
         const scope = noticeCursorScope(siteId, userId, "parent", guardianId);
         const cursor = query.cursor
           ? decodeNoticeCursor(query.cursor, scope)
@@ -126,6 +159,7 @@ export class AceNoticeParentInboxService {
             siteId,
             userId,
             guardianId,
+            childIds,
             new Date(),
             cursor,
           ),
@@ -138,7 +172,7 @@ export class AceNoticeParentInboxService {
             expiresAt: true,
             requiresAcknowledgement: true,
             audienceMembers: {
-              where: recipientScope(siteId, userId, guardianId),
+              where: recipientScope(siteId, userId, guardianId, childIds),
               take: 1,
               select: {
                 receipt: {
@@ -176,9 +210,16 @@ export class AceNoticeParentInboxService {
       "ace.parent.notices.read",
       "Notices not found",
       async (tx, guardianId) => {
+        const childIds = await currentGuardianChildIds(tx, siteId, guardianId);
         const row = await tx.aceNotice.findFirst({
           where: {
-            ...activeParentNoticeScope(siteId, userId, guardianId, new Date()),
+            ...activeParentNoticeScope(
+              siteId,
+              userId,
+              guardianId,
+              childIds,
+              new Date(),
+            ),
             id,
           },
           select: {
@@ -189,7 +230,7 @@ export class AceNoticeParentInboxService {
             expiresAt: true,
             requiresAcknowledgement: true,
             audienceMembers: {
-              where: recipientScope(siteId, userId, guardianId),
+              where: recipientScope(siteId, userId, guardianId, childIds),
               take: 1,
               select: {
                 receipt: {
@@ -220,14 +261,21 @@ export class AceNoticeParentInboxService {
       "ace.parent.notices.read",
       "Notices not found",
       async (tx, guardianId) => {
+        const childIds = await currentGuardianChildIds(tx, siteId, guardianId);
         const row = await tx.aceNotice.findFirst({
           where: {
-            ...activeParentNoticeScope(siteId, userId, guardianId, new Date()),
+            ...activeParentNoticeScope(
+              siteId,
+              userId,
+              guardianId,
+              childIds,
+              new Date(),
+            ),
             id,
           },
           select: {
             audienceMembers: {
-              where: recipientScope(siteId, userId, guardianId),
+              where: recipientScope(siteId, userId, guardianId, childIds),
               take: 1,
               select: {
                 receipt: {
@@ -263,15 +311,22 @@ export class AceNoticeParentInboxService {
       "ace.parent.notices.read",
       "Notices not found",
       async (tx, guardianId) => {
+        const childIds = await currentGuardianChildIds(tx, siteId, guardianId);
         const notice = await tx.aceNotice.findFirst({
           where: {
-            ...activeParentNoticeScope(siteId, userId, guardianId, new Date()),
+            ...activeParentNoticeScope(
+              siteId,
+              userId,
+              guardianId,
+              childIds,
+              new Date(),
+            ),
             id,
           },
           select: {
             requiresAcknowledgement: true,
             audienceMembers: {
-              where: recipientScope(siteId, userId, guardianId),
+              where: recipientScope(siteId, userId, guardianId, childIds),
               take: 1,
               select: {
                 receipt: { select: { id: true, deliveredAt: true } },

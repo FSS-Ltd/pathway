@@ -15,6 +15,8 @@ const notice = {
   title: "Site notice",
   body: "Please read the update.",
   audience: "PARENTS_AND_STAFF" as const,
+  audienceScope: "SITE",
+  audienceTargetId: null,
   publishedAt: null,
   withdrawnAt: null,
   expiresAt: null,
