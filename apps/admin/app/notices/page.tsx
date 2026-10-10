@@ -230,12 +230,38 @@ function ManageNoticesPage() {
   );
 }
 
+function ManagerNoticeWorkspace() {
+  const [view, setView] = React.useState<"manage" | "inbox">("manage");
+  return (
+    <div className="space-y-5">
+      <div
+        role="group"
+        aria-label="Notice views"
+        className="inline-flex w-fit rounded-2xl border border-border-subtle bg-surface p-1 shadow-sm"
+      >
+        {(["manage", "inbox"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={view === option}
+            onClick={() => setView(option)}
+            className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong ${view === option ? "bg-accent-subtle text-accent-strong" : "text-text-muted hover:text-text-primary"}`}
+          >
+            {option === "manage" ? "Manage notices" : "My inbox"}
+          </button>
+        ))}
+      </div>
+      {view === "manage" ? <ManageNoticesPage /> : <StaffNoticeInbox />}
+    </div>
+  );
+}
+
 export default function NoticesPage() {
   const { state } = useAdminContext();
   if (state.status !== "ready") return null;
   const key = `${state.snapshot.activeSiteId}:${state.snapshot.userId}`;
   return hasPermission(state.snapshot.permissions, "notices.manage") ? (
-    <ManageNoticesPage key={key} />
+    <ManagerNoticeWorkspace key={key} />
   ) : (
     <StaffNoticeInbox key={key} />
   );
