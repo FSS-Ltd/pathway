@@ -127,14 +127,36 @@ component test passed. The plan-task count remains **42/150 (28%)** while
 ACE-M13 and M14 are not yet fully reconciled.
 
 Build step 1.3e5k ([PR #557](https://github.com/FSS-Ltd/pathway/pull/557),
-CI pending): require a second publisher confirmation when the selected
+merged, not deployed): require a second publisher confirmation when the selected
 audience or resolved recipient snapshot changes after preview, or a
 publish/schedule conflict invalidates it. Keep the current server-side revision and
 audience-version checks. The admin test covers empty audience, stale-preview
 conflict, reconfirmation, and both send controls. Local admin tests, typecheck,
 lint, build with test configuration, formatting, and structural Graphify passed.
-Wait for latest-head green CI and confirmed merge before another build step.
+All eight latest-head checks passed on `caee165a0c3264e3fe935b9837e2675ca737b0ab`
+(CI run 38087062057). GitHub confirmed the merge to `master` as
+`0eec3e4e05169a8d97f6eff4ffb2b3d0c112b858`.
+The plan-task count remains **42/150 (28%)** because ACE-M13 and M14 still
+need full task-level reconciliation.
 Mobile notice work is paused at the user's request and excluded from this PR.
+
+Build step 1.3e5l (web guardian identity onboarding, in progress): replace the
+legacy parent invitation that linked a child and granted a site viewer role
+before acceptance. The new staff flow requires an organisation admin to record
+the legal access basis, creates a seven-day child-scoped pending invitation,
+and supports status, resend, and revoke. A guardian must sign in with the
+verified invited address and accept before a reviewed relationship and parent
+role are created. The web acceptance page and child profile now use this flow;
+child list and creation are staff-only, while a guardian can read an individual
+child only with an active full relationship. Existing parent profiles retain
+their legacy link after acceptance, but it is no longer sufficient for child
+record access. Mobile work remains paused. ACE-M15 and M20 remain open until
+the remaining identity, relationship, and security tasks are verified. Local
+API and admin type checks, lint, and builds passed; API unit tests passed after
+the active-site expectation was updated, and admin tests passed. The guardian
+database E2E is in the PR but could not exercise PostgreSQL locally because
+the test server at `localhost:5433` is unavailable. The current build step
+still needs latest-head CI and a confirmed merge before completion.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -823,7 +845,9 @@ journeys remain production verification work.
 | 1.3e5g   | Parent notice API and family inbox                                     | Merged  | [#553](https://github.com/FSS-Ltd/pathway/pull/553) to `master`                     | `acfb6724f22a51f576966400db7e3fad273f1c5c`; all eight checks passed: CI run 38077903948, CodeQL run 38077901813.                                                                                                            | `03865b1ac4856210657fe769156d419382edb721` |
 | 1.3e5h   | Shared notice acknowledgement and receipt summary API/web              | Merged  | [#554](https://github.com/FSS-Ltd/pathway/pull/554) to `master`                     | `07ebb4774e8d043eebc6bd7274addc88b1b10a42`; all eight checks passed: CI run 38080016504, CodeQL run 38080013505.                                                                                                            | `95cc8ea4ff5a2d960bda8db49a78f7ccb26be76e` |
 | 1.3e5i   | Shared site notice scheduling and minute cron                          | Merged  | [#555](https://github.com/FSS-Ltd/pathway/pull/555) to `master`                     | `70fd7ccbcf422e6e0af269018178374fdba5d5c2`; all eight checks passed: CI run 38081211207, CodeQL run 38081208228.                                                                                                            | `cb2c20d0b66490dd24a6a97da71eed0cdb7b2f0e` |
-| 1.3e5j   | ACE school notice targeting across shared API and staff editor         | Open    | [#556](https://github.com/FSS-Ltd/pathway/pull/556) to `master`                     | Local type, lint, build, Prisma validation, formatting, focused API unit and UI component checks passed; database integration and latest-head CI pending.                                                                   | Not merged                                 |
+| 1.3e5j   | ACE school notice targeting across shared API and staff editor         | Merged  | [#556](https://github.com/FSS-Ltd/pathway/pull/556) to `master`                     | `14b7d75fd7b1e931699817701841cf74cac4df1c`; all eight latest-head checks passed: CI run 38084145084, CodeQL run 38084142024.                                                                                                | `18850674b91ddfa9526083c7144ebc39caed77ba` |
+| 1.3e5k   | Web notice recipient-change confirmation                               | Merged  | [#557](https://github.com/FSS-Ltd/pathway/pull/557) to `master`                     | `caee165a0c3264e3fe935b9837e2675ca737b0ab`; all eight latest-head checks passed: CI run 38087062057.                                                                                                                        | `0eec3e4e05169a8d97f6eff4ffb2b3d0c112b858` |
+| 1.3e5l   | Web guardian invitation and reviewed acceptance                        | In progress | PR pending | Local API and web verification in progress; CI and merge required before the next step. | — |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                            | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                            | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                            | `193a569892c38be565ac6755456f41bcf498ed76` |

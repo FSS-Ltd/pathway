@@ -96,12 +96,27 @@ export class ClerkManagementService {
     }
   }
 
+  /** Read the current primary address from Clerk for access-granting commands. */
+  async getVerifiedPrimaryEmail(userId: string): Promise<string | null> {
+    if (!this.client) return null;
+    const user = await this.client.users.getUser(userId);
+    const primary = user.emailAddresses.find(
+      (address) => address.id === user.primaryEmailAddressId,
+    );
+    return primary?.verification?.status === "verified"
+      ? primary.emailAddress.trim().toLowerCase()
+      : null;
+  }
+
   /**
    * Backfill externalId on a Clerk user created client-side (e.g. the
    * inverted nexsteps-home signup flow, where Clerk creates the account
    * before our internal User row exists).
    */
-  async setExternalId(clerkUserId: string, internalUserId: string): Promise<void> {
+  async setExternalId(
+    clerkUserId: string,
+    internalUserId: string,
+  ): Promise<void> {
     if (!this.client) return;
     try {
       await this.client.users.updateUser(clerkUserId, {

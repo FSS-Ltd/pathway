@@ -1,15 +1,13 @@
 import {
   Injectable,
   BadRequestException,
-  ForbiddenException,
   NotFoundException,
   Inject,
   Optional,
 } from "@nestjs/common";
-import { prisma, runTransaction, SiteRole } from "@pathway/db";
+import { prisma } from "@pathway/db";
 import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
-import { InvitesService } from "../invites/invites.service";
 import { getPlanDefinition } from "../billing/billing-plans";
 import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "../billing/subscription-plan-code";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
@@ -61,7 +59,6 @@ const notExpiredGuestFilter = () => ({
 @Injectable()
 export class ChildrenService {
   constructor(
-    @Inject(InvitesService) private readonly invitesService: InvitesService,
     @Optional()
     @Inject(SupabaseStorageService)
     storage?: SupabaseStorageService,
@@ -332,9 +329,31 @@ export class ChildrenService {
     return { buffer, contentType: type };
   }
 
-  /**
-   * Check if user can edit child: must be site admin or a linked guardian.
-   */
+  async assertCanViewChild(
+    childId: string,
+    tenantId: string,
+    userId: string | undefined,
+    isStaff: boolean,
+  ): Promise<void> {
+    if (isStaff) return;
+    if (!userId) throw new NotFoundException("Child not found");
+    const relationship = await prisma.guardianChildRelationship.findFirst({
+      where: {
+        tenantId,
+        childId,
+        legalAccess: "FULL",
+        startsAt: { lte: new Date() },
+        endedAt: null,
+        revokedAt: null,
+        guardianIdentity: { tenantId, userId, user: { isActive: true } },
+        child: { tenantId, isGuest: false },
+      },
+      select: { id: true },
+    });
+    if (!relationship) throw new NotFoundException("Child not found");
+  }
+
+  /** Check parent editing against reviewed access, not the legacy guardian link. */
   async assertCanEditChild(
     childId: string,
     tenantId: string,
@@ -342,17 +361,7 @@ export class ChildrenService {
     isSiteAdmin: boolean,
   ): Promise<void> {
     if (isSiteAdmin) return;
-    const child = await prisma.child.findFirst({
-      where: { id: childId, tenantId },
-      select: { guardians: { select: { id: true } } },
-    });
-    if (!child) throw new NotFoundException("Child not found");
-    const isGuardian = child.guardians.some((g) => g.id === userId);
-    if (!isGuardian) {
-      throw new ForbiddenException(
-        "Only admins and linked parents can edit this child",
-      );
-    }
+    await this.assertCanViewChild(childId, tenantId, userId, false);
   }
 
   /**
@@ -393,191 +402,6 @@ export class ChildrenService {
         photoKey: stored?.key ?? null,
       },
     });
-  }
-
-  /**
-   * Assert caller can invite a parent: must be ORG_ADMIN or a linked parent of the child.
-   */
-  private async assertCanInviteParent(
-    childId: string,
-    tenantId: string,
-    callerUserId: string,
-    isOrgAdmin: boolean,
-  ): Promise<void> {
-    if (isOrgAdmin) return;
-    const child = await prisma.child.findFirst({
-      where: { id: childId, tenantId },
-      select: { guardians: { select: { id: true } } },
-    });
-    if (!child) throw new NotFoundException("Child not found");
-    const isLinkedParent = child.guardians.some((g) => g.id === callerUserId);
-    if (!isLinkedParent) {
-      throw new ForbiddenException(
-        "Only org admins and linked parents can invite another parent",
-      );
-    }
-  }
-
-  /**
-   * Invite a parent to a child. If user exists: link and grant access. If not: create, invite, link.
-   * Caller must be ORG_ADMIN or a linked parent.
-   */
-  async inviteParentToChild(
-    childId: string,
-    tenantId: string,
-    callerUserId: string,
-    isOrgAdmin: boolean,
-    email: string,
-    name?: string,
-  ): Promise<
-    | { linked: true; parentId: string }
-    | { invited: true; parentId: string }
-    | { userNotFound: true }
-  > {
-    await this.assertCanInviteParent(
-      childId,
-      tenantId,
-      callerUserId,
-      isOrgAdmin,
-    );
-
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      throw new BadRequestException("Email is required");
-    }
-
-    const child = await prisma.child.findFirst({
-      where: { id: childId, tenantId },
-      select: { id: true, tenantId: true, guardians: { select: { id: true } } },
-    });
-    if (!child) throw new NotFoundException("Child not found");
-
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { orgId: true },
-    });
-    if (!tenant) throw new NotFoundException("Tenant not found");
-
-    const existingUser = await prisma.user.findFirst({
-      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-      select: { id: true },
-    });
-
-    if (existingUser) {
-      const alreadyLinked = child.guardians.some(
-        (g) => g.id === existingUser.id,
-      );
-      if (alreadyLinked) {
-        return { linked: true, parentId: existingUser.id };
-      }
-
-      await runTransaction(async (tx) => {
-        await tx.user.update({
-          where: { id: existingUser.id },
-          data: { hasFamilyAccess: true },
-        });
-        await tx.siteMembership.upsert({
-          where: {
-            tenantId_userId: { tenantId, userId: existingUser.id },
-          },
-          create: {
-            tenantId,
-            userId: existingUser.id,
-            role: SiteRole.VIEWER,
-          },
-          update: {},
-        });
-        await tx.child.update({
-          where: { id: childId },
-          data: {
-            guardians: { connect: { id: existingUser.id } },
-          },
-        });
-      });
-      return { linked: true, parentId: existingUser.id };
-    }
-
-    await this.invitesService.createInvite(tenant.orgId, callerUserId, {
-      email: normalizedEmail,
-      name: name || undefined,
-      siteAccess: {
-        mode: "ALL_SITES",
-        role: SiteRole.VIEWER,
-      },
-    });
-
-    const newUser = await prisma.user.findFirst({
-      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-      select: { id: true },
-    });
-    if (!newUser) {
-      return { userNotFound: true };
-    }
-
-    await runTransaction(async (tx) => {
-      await tx.user.update({
-        where: { id: newUser.id },
-        data: { hasFamilyAccess: true },
-      });
-      await tx.child.update({
-        where: { id: childId },
-        data: {
-          guardians: { connect: { id: newUser.id } },
-        },
-      });
-    });
-    return { invited: true, parentId: newUser.id };
-  }
-
-  /**
-   * Link an existing parent (user with family access) to a child by email.
-   * Caller must be a linked parent of the child.
-   */
-  async linkParentByEmail(
-    childId: string,
-    tenantId: string,
-    callerUserId: string,
-    email: string,
-  ): Promise<{ linked: true; parentId: string } | { userNotFound: true }> {
-    await this.assertCanEditChild(childId, tenantId, callerUserId, false);
-
-    const normalizedEmail = email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      throw new BadRequestException("Email is required");
-    }
-
-    const user = await prisma.user.findFirst({
-      where: {
-        email: { equals: normalizedEmail, mode: "insensitive" },
-        hasFamilyAccess: true,
-        OR: [{ tenantId }, { siteMemberships: { some: { tenantId } } }],
-      },
-      select: { id: true },
-    });
-
-    if (!user) {
-      return { userNotFound: true };
-    }
-
-    const child = await prisma.child.findFirst({
-      where: { id: childId, tenantId },
-      select: { guardians: { select: { id: true } } },
-    });
-    if (!child) throw new NotFoundException("Child not found");
-    const alreadyLinked = child.guardians.some((g) => g.id === user.id);
-    if (alreadyLinked) {
-      return { linked: true, parentId: user.id };
-    }
-
-    await prisma.child.update({
-      where: { id: childId },
-      data: {
-        guardians: {
-          connect: { id: user.id },
-        },
-      },
-    });
-    return { linked: true, parentId: user.id };
   }
 
   /**

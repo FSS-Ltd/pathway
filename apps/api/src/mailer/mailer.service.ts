@@ -45,6 +45,12 @@ type SendInviteEmailParams = {
   invitedByName?: string;
 };
 
+export type SendFamilyInviteEmailParams = {
+  to: string;
+  inviteUrl: string;
+  siteName: string;
+};
+
 /** Params for toolkit download link email. */
 export type SendToolkitLinkParams = {
   to: string;
@@ -535,6 +541,20 @@ If you didn't request this, you can safely ignore this email.
       this.logger.error(`[📧 MAILER] ❌ Exception while sending email to ${to}:`, error);
       throw new Error(`Failed to send invite email: ${String(error)}`);
     }
+  }
+
+  async sendFamilyInviteEmail(params: SendFamilyInviteEmailParams): Promise<void> {
+    if (!this.resend) throw new Error("Email delivery is unavailable");
+    const siteName = escapeHtml(params.siteName);
+    const inviteUrl = escapeHtml(params.inviteUrl);
+    const result = await this.resend.emails.send({
+      from: this.fromAddress,
+      to: params.to,
+      subject: `Guardian invitation from ${params.siteName}`,
+      html: `<p>${siteName} invited you to access your child's information on Nexsteps.</p><p><a href="${inviteUrl}">Review invitation</a></p><p>Sign in with this email address. The invitation expires in seven days.</p>`,
+      text: `${params.siteName} invited you to access your child's information on Nexsteps.\nReview invitation: ${params.inviteUrl}\nSign in with this email address. The invitation expires in seven days.`,
+    });
+    if (result.error) throw new Error("Email delivery failed");
   }
 
   /**

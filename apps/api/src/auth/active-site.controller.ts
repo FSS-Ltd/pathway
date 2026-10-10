@@ -104,6 +104,20 @@ export class ActiveSiteController {
       where: { userId, role: { in: ORG_ADMIN_ROLES } },
     });
 
+    const guardianRelationships =
+      await prisma.guardianChildRelationship.findMany({
+        where: {
+          guardianIdentity: { userId, user: { isActive: true } },
+          legalAccess: "FULL",
+          startsAt: { lte: new Date() },
+          endedAt: null,
+          revokedAt: null,
+          child: { isGuest: false },
+          tenant: { org: { parentPortalEnabled: true } },
+        },
+        select: { tenant: { include: { org: true } } },
+      });
+
     const orgTenantIds =
       orgMemberships.length > 0
         ? await prisma.tenant.findMany({
@@ -129,6 +143,15 @@ export class ActiveSiteController {
         orgName: tenant.org.name,
         orgSlug: tenant.org.slug,
         role: SiteRole.SITE_ADMIN,
+        timezone: tenant.timezone ?? null,
+      })),
+      ...guardianRelationships.map<SiteSummary>(({ tenant }) => ({
+        id: tenant.id,
+        name: tenant.name,
+        orgId: tenant.orgId,
+        orgName: tenant.org.name,
+        orgSlug: tenant.org.slug,
+        role: null,
         timezone: tenant.timezone ?? null,
       })),
     ];
