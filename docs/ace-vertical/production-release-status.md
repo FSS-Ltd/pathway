@@ -9,6 +9,15 @@ Estimated overall ACE/Oasis update completion after C07g1 is **about 81%**;
 the remaining core journeys, paid add-ons, and product-wide web finish are
 tracked below.
 
+Build update (10 October): step 1.3e5d merged in
+[PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
+`5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0`. All eight checks passed
+on head `ff32874ce639ce125b43b7b59a741ae4e5fad07a`; the database
+integration log confirms the new draft route test ran. The site-scoped ACE
+notice draft API is merged but has not been deployed to production. The next
+C12 slice is the audited publish and withdraw API. The ACE-M20 identity and
+security gate remains open before C09 homework work begins.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of
@@ -689,7 +698,7 @@ journeys remain production verification work.
 | 1.3e5b   | ACE parent notice relationship permission                              | Merged  | [#500](https://github.com/FSS-Ltd/pathway/pull/500) to `master`                     | `c5858bf00bba252d508b01f37526755d3ae46f31`; all eight checks passed: CI run 37821295904, CodeQL run 37821292163.                                                                                                            | `e4f5e46ea274150b364cb2d99f370d21bbdda071` |
 | 1.3e5c1  | Full guardian eligibility for ACE notice audiences                     | Merged  | [#502](https://github.com/FSS-Ltd/pathway/pull/502) to `master`                     | `7d11c7a253984777f32a9aad738f30d7dfd6c5da`; all eight checks passed: CI run 37828070800, CodeQL run 37828063709.                                                                                                            | `1bf510c6fc01e3ddbfdcb4c90ce3963b26ca9e38` |
 | 1.3e5c2  | ACE notice expiry, withdrawal, immutable publication and read receipts | Merged  | [#503](https://github.com/FSS-Ltd/pathway/pull/503) to `master`                     | `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`; all eight checks passed: CI run 37833550859, CodeQL run 37833546948.                                                                                                            | `70cc53502f37da07a0e449e5604ce51ee862c015` |
-| 1.3e5d   | ACE site notice draft API                                               | In PR   | [#546](https://github.com/FSS-Ltd/pathway/pull/546) to `master`                     | Latest-head CI pending; database-backed test skipped locally because PostgreSQL on `localhost:5433` was unavailable.                                                                                                             | Pending |
+| 1.3e5d   | ACE site notice draft API                                               | Merged  | [#546](https://github.com/FSS-Ltd/pathway/pull/546) to `master`                     | `ff32874ce639ce125b43b7b59a741ae4e5fad07a`; all eight checks passed: CI run 38065354098, CodeQL run 38065351413. The integration log confirms the draft API test ran.                                                       | `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0` |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                            | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                            | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                            | `193a569892c38be565ac6755456f41bcf498ed76` |
