@@ -123,6 +123,9 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
   );
   const [reviewedAudience, setReviewedAudience] =
     React.useState<AudienceSelection | null>(null);
+  const [reviewedAudienceVersion, setReviewedAudienceVersion] = React.useState<
+    string | null
+  >(null);
   const [reconfirmationRequired, setReconfirmationRequired] =
     React.useState(false);
   const [reconfirmed, setReconfirmed] = React.useState(false);
@@ -237,10 +240,15 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
       if (action === "save" && !dirty) setSuccess("Draft already saved.");
       if (action === "preview") {
         const result = await previewNoticeAudience(savedId);
-        if (audienceChanged(reviewedAudience, audienceSelection(form))) {
+        if (
+          audienceChanged(reviewedAudience, audienceSelection(form)) ||
+          (reviewedAudienceVersion !== null &&
+            reviewedAudienceVersion !== result.audienceVersion)
+        ) {
           setReconfirmationRequired(true);
         }
         setReviewedAudience(audienceSelection(form));
+        setReviewedAudienceVersion(result.audienceVersion);
         setReconfirmed(false);
         setPreview(result);
         setSuccess(null);

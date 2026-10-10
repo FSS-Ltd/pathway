@@ -127,9 +127,9 @@ component test passed. The plan-task count remains **42/150 (28%)** while
 ACE-M13 and M14 are not yet fully reconciled.
 
 Build step 1.3e5k ([PR #557](https://github.com/FSS-Ltd/pathway/pull/557),
-CI pending): require a second
-publisher confirmation after an audience selection changes or a publish/schedule
-conflict invalidates the preview. Keep the current server-side revision and
+CI pending): require a second publisher confirmation when the selected
+audience or resolved recipient snapshot changes after preview, or a
+publish/schedule conflict invalidates it. Keep the current server-side revision and
 audience-version checks. The admin test covers empty audience, stale-preview
 conflict, reconfirmation, and both send controls. Local admin tests, typecheck,
 lint, build with test configuration, formatting, and structural Graphify passed.

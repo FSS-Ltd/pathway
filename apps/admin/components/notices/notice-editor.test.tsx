@@ -115,7 +115,7 @@ async function run(): Promise<void> {
     if (route === "GET /ace/notices/drafts/notice-1/audience-preview")
       return response({
         recipientCount,
-        audienceVersion: "a".repeat(64),
+        audienceVersion: (recipientCount === 0 ? "a" : "b").repeat(64),
         updatedAt: `2026-10-10T10:00:0${draftRevision}.000Z`,
       });
     if (route === "POST /ace/notices/notice-1/publish") {
@@ -160,6 +160,18 @@ async function run(): Promise<void> {
     assert.equal(publish.disabled, true, "empty audiences cannot publish");
     recipientCount = 3;
     await clickButton(container, "Review audience");
+    assert.equal(
+      publish.disabled,
+      true,
+      "a changed recipient snapshot needs confirmation",
+    );
+    const changedRosterConfirmation = [...container.querySelectorAll("label")]
+      .find((item) =>
+        item.textContent?.includes("reviewed the current audience"),
+      )
+      ?.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    assert.ok(changedRosterConfirmation);
+    await act(async () => changedRosterConfirmation.click());
     assert.equal(publish.disabled, false);
     await clickButton(container, "Publish now");
     assert.equal(publishCalls, 1);
