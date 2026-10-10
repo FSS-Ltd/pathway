@@ -173,6 +173,30 @@ describe("ACE family subject timetable", () => {
     }
   });
 
+  it("denies published timetable reads after a family account is disabled", async () => {
+    if (!app) return;
+    for (const [userId, auth, path] of [
+      [parentId, parentAuth, parentPath()],
+      [studentId, studentAuth, studentPath()],
+    ] as const) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { isActive: false },
+      });
+      try {
+        const response = await request(app.getHttpServer())
+          .get(path)
+          .set("Authorization", auth);
+        expect(response.status).toBe(404);
+      } finally {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { isActive: true },
+        });
+      }
+    }
+  });
+
   it("returns the same not-found response for limited, cross-site, and unpublished access", async () => {
     if (!app) return;
     const server = app.getHttpServer();

@@ -171,6 +171,25 @@ describe("ACE parent daily attendance history", () => {
     });
   });
 
+  it("denies a disabled guardian even while the child link remains active", async () => {
+    if (!app) return;
+    await prisma.user.update({
+      where: { id: fullUserId },
+      data: { isActive: false },
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .get(route)
+        .set("Authorization", fullAuthorization);
+      expect(response.status).toBe(404);
+    } finally {
+      await prisma.user.update({
+        where: { id: fullUserId },
+        data: { isActive: true },
+      });
+    }
+  });
+
   it("denies limited, unrelated, wrong-child, wrong-site and anonymous reads", async () => {
     if (!app) return;
     const server = app.getHttpServer();

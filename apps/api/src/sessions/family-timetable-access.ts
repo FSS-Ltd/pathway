@@ -43,7 +43,11 @@ export async function requireFamilyTimetableChild(
         startsAt: { lte: now },
         endedAt: null,
         revokedAt: null,
-        guardianIdentity: { tenantId: siteId, userId },
+        guardianIdentity: {
+          tenantId: siteId,
+          userId,
+          user: { isActive: true },
+        },
         child: { tenantId: siteId, isGuest: false },
       },
       select: {
@@ -70,7 +74,11 @@ export async function requireFamilyTimetableChild(
           endedAt: null,
           revokedAt: null,
           linkedAt: { lte: now },
-          studentIdentity: { tenantId: siteId, userId },
+          studentIdentity: {
+            tenantId: siteId,
+            userId,
+            user: { isActive: true },
+          },
           child: { tenantId: siteId, isGuest: false },
         },
         select: {

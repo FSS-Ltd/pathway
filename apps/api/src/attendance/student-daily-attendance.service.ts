@@ -40,7 +40,11 @@ export class StudentDailyAttendanceService {
             endedAt: null,
             revokedAt: null,
             linkedAt: { lte: new Date() },
-            studentIdentity: { tenantId: siteId, userId },
+            studentIdentity: {
+              tenantId: siteId,
+              userId,
+              user: { isActive: true },
+            },
             child: { tenantId: siteId, isGuest: false },
           },
           select: { childId: true },

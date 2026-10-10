@@ -11,7 +11,16 @@ export type FamilyContext = {
   siteName: string;
   childId: string;
   childName: string;
+  sections: FamilySection[];
 };
+
+export type FamilySection =
+  | "attendance"
+  | "sessions"
+  | "subject-timetable"
+  | "notices"
+  | "messages"
+  | "volunteering";
 
 export async function fetchFamilyContexts(
   signal?: AbortSignal,
@@ -32,6 +41,13 @@ export async function fetchFamilyContexts(
         : "Family access could not be loaded. Please try again.",
     );
   }
-  const data = (await response.json()) as { items: FamilyContext[] };
-  return data.items;
+  const data = (await response.json()) as {
+    items: Array<
+      Omit<FamilyContext, "sections"> & { sections?: FamilySection[] }
+    >;
+  };
+  return data.items.map((item) => ({
+    ...item,
+    sections: item.sections ?? [],
+  }));
 }

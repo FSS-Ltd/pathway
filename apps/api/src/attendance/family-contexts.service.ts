@@ -4,6 +4,11 @@ import {
   runReadOnlyTransaction,
   withTenantRlsContext,
 } from "@pathway/db";
+import {
+  CHILD_SECTIONS,
+  parentSectionsForSite,
+  type FamilySection,
+} from "./family-context-sections";
 
 export interface FamilyContext {
   kind: "parent" | "student";
@@ -11,6 +16,7 @@ export interface FamilyContext {
   siteName: string;
   childId: string;
   childName: string;
+  sections: FamilySection[];
 }
 
 const MAX_SITES = 100;
@@ -22,17 +28,17 @@ export class FamilyContextsService {
       throw new BadRequestException("An authenticated user is required");
     }
 
-    const siteIds = await runReadOnlyTransaction(async (tx) => {
+    const discovery = await runReadOnlyTransaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.user_id', ${userId}, true)`;
       await tx.$executeRawUnsafe("SET LOCAL row_security = on");
       const [guardians, students] = await Promise.all([
         tx.guardianIdentity.findMany({
-          where: { userId },
+          where: { userId, user: { isActive: true } },
           select: { tenantId: true },
           take: MAX_SITES + 1,
         }),
         tx.studentIdentity.findMany({
-          where: { userId },
+          where: { userId, user: { isActive: true } },
           select: { tenantId: true },
           take: MAX_SITES + 1,
         }),
@@ -47,17 +53,43 @@ export class FamilyContextsService {
       ) {
         throw new BadRequestException("Too many linked sites to display");
       }
-      return ids;
+      return {
+        siteIds: ids,
+        studentSiteIds: new Set(students.map(({ tenantId }) => tenantId)),
+      };
     });
-    if (siteIds.length === 0) return { items: [] };
+    if (discovery.siteIds.length === 0) return { items: [] };
+
+    const activePermissions = new Set(
+      (
+        await prisma.permissionDefinition.findMany({
+          where: {
+            key: {
+              in: [
+                "ace.parent.notices.read",
+                "messaging.conversations.read",
+                "messaging.messages.read",
+              ],
+            },
+            isActive: true,
+          },
+          select: { key: true },
+        })
+      ).map(({ key }) => key),
+    );
 
     const sites = await prisma.tenant.findMany({
-      where: { id: { in: siteIds } },
+      where: { id: { in: discovery.siteIds } },
       select: {
         id: true,
         name: true,
         orgId: true,
-        org: { select: { parentPortalEnabled: true } },
+        org: {
+          select: {
+            parentPortalEnabled: true,
+            orgVertical: { select: { vertical: true } },
+          },
+        },
       },
     });
     const items: FamilyContext[] = [];
@@ -117,6 +149,11 @@ export class FamilyContextsService {
         },
       );
 
+      const parentSections = parentSectionsForSite(
+        activePermissions,
+        discovery.studentSiteIds.has(site.id),
+        site.org.orgVertical?.vertical === "ACE_SCHOOL",
+      );
       for (const child of scoped.parentChildren) {
         items.push({
           kind: "parent",
@@ -124,6 +161,7 @@ export class FamilyContextsService {
           siteName: site.name,
           childId: child.id,
           childName: `${child.firstName} ${child.lastName}`.trim(),
+          sections: parentSections,
         });
       }
       if (scoped.studentChild) {
@@ -134,6 +172,7 @@ export class FamilyContextsService {
           childId: scoped.studentChild.id,
           childName:
             `${scoped.studentChild.firstName} ${scoped.studentChild.lastName}`.trim(),
+          sections: CHILD_SECTIONS,
         });
       }
     }
