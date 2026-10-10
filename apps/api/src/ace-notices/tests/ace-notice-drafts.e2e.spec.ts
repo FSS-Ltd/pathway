@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ForbiddenException, type INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
-import { prisma } from "@pathway/db";
+import { prisma, withTenantRlsContext } from "@pathway/db";
 import request from "supertest";
 import {
   clearE2eAuthAccess,
@@ -91,7 +91,9 @@ describe("ACE notice draft API", () => {
     if (!isDatabaseAvailable()) return;
     await app?.close();
     await prisma.auditEvent.deleteMany({ where: { orgId } });
-    await prisma.aceNotice.deleteMany({ where: { tenantId: siteId } });
+    await withTenantRlsContext(siteId, orgId, (tx) =>
+      tx.aceNotice.deleteMany({ where: { tenantId: siteId } }),
+    );
     if (readerRole) await clearE2eTypedRole(readerRole, orgId);
     if (managerRole) await clearE2eTypedRole(managerRole, orgId);
     await clearE2eAuthAccess(readerId);
@@ -165,9 +167,10 @@ describe("ACE notice draft API", () => {
         where: { orgId, entityId: created.body.id },
       }),
     ).toBe(2);
-    expect(
-      await prisma.aceNotice.findUnique({ where: { id: created.body.id } }),
-    ).toMatchObject({
+    const stored = await withTenantRlsContext(siteId, orgId, (tx) =>
+      tx.aceNotice.findUnique({ where: { id: created.body.id } }),
+    );
+    expect(stored).toMatchObject({
       title: "Term update",
       publishedAt: null,
     });
