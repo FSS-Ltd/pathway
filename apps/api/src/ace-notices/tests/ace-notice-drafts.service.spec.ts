@@ -30,7 +30,11 @@ const content = {
 
 function createTransaction() {
   return {
-    tenant: { findFirst: jest.fn().mockResolvedValue({ id: actor.tenantId }) },
+    tenant: {
+      findFirst: jest.fn().mockResolvedValue({
+        org: { parentPortalEnabled: true },
+      }),
+    },
     orgVertical: {
       findFirst: jest.fn().mockResolvedValue({ orgId: actor.orgId }),
     },
