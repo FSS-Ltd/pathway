@@ -33,9 +33,11 @@ function setup() {
     tenantId,
     childId,
     invitedUserId,
+    invitedEmail: email,
     expiresAt: new Date(Date.now() + 86_400_000),
     acceptedAt: null,
     revokedAt: null,
+    tenant: { name: "School" },
     invitedUser: { email, isActive: true, identities: [] },
   };
   const tx = {
@@ -71,6 +73,7 @@ function setup() {
     },
     familyIdentityInvite: {
       findFirst: jest.fn().mockResolvedValue(invite),
+      findMany: jest.fn(),
       create: jest.fn(),
       update: jest.fn().mockResolvedValue(invite),
     },
@@ -122,6 +125,7 @@ describe("guardian identity invitations", () => {
         tenantId,
         childId,
         invitedUserId,
+        invitedEmail: email,
         target: "GUARDIAN",
       }),
     });
@@ -216,6 +220,41 @@ describe("guardian identity invitations", () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(tx.guardianChildRelationship.create).not.toHaveBeenCalled();
     expect(tx.userTenantRole.upsert).not.toHaveBeenCalled();
+  });
+
+  it("keeps the addressed email after acceptance by an account without a stored email", async () => {
+    const { tx, service, acceptance, invite } = setup();
+    const acceptedAt = new Date();
+    tx.familyIdentityInvite.findFirst.mockResolvedValue({
+      ...invite,
+      invitedUserId: userId,
+      acceptedAt,
+      invitedUser: {
+        email: null,
+        isActive: true,
+        identities: [{ id: "clerk-identity" }],
+      },
+    });
+    tx.familyIdentityInvite.findMany.mockResolvedValue([
+      {
+        id: inviteId,
+        expiresAt: invite.expiresAt,
+        acceptedAt,
+        revokedAt: null,
+        invitedEmail: email,
+        invitedUser: { email: null },
+      },
+    ]);
+
+    await expect(
+      acceptance.getForInvitee(tenantId, inviteId, userId, email),
+    ).resolves.toMatchObject({ acceptedAt });
+    await expect(
+      acceptance.acceptGuardianInvite(tenantId, inviteId, userId, email),
+    ).resolves.toEqual({ id: inviteId, acceptedAt });
+    await expect(
+      service.listGuardianInvites(tenantId, orgId, childId),
+    ).resolves.toEqual([expect.objectContaining({ email })]);
   });
 
   it("reads a Clerk verified primary address for an access grant", async () => {

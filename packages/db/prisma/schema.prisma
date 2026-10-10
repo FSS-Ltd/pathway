@@ -1302,6 +1302,7 @@ model FamilyIdentityInvite {
   id                         String               @id @default(uuid())
   tenantId                   String
   invitedUserId              String
+  invitedEmail               String?
   target                     FamilyIdentityTarget
   childId                    String?
   createdByUserId            String

@@ -62,6 +62,7 @@ export class GuardianInviteAcceptanceService {
           expiresAt: true,
           acceptedAt: true,
           revokedAt: true,
+          invitedEmail: true,
           invitedUserId: true,
           invitedUser: {
             select: {
@@ -114,7 +115,8 @@ export class GuardianInviteAcceptanceService {
       this.assertInvitee(invite, userId, verifiedEmail);
       if (
         !invite.invitedUser.isActive ||
-        invite.invitedUser.email?.toLowerCase() !== verifiedEmail.toLowerCase()
+        (invite.invitedEmail ?? invite.invitedUser.email)?.toLowerCase() !==
+          verifiedEmail.toLowerCase()
       ) {
         throw new ForbiddenException(
           "Verified email does not match invitation",
@@ -236,6 +238,7 @@ export class GuardianInviteAcceptanceService {
   private assertInvitee(
     invite: {
       invitedUserId: string;
+      invitedEmail?: string | null;
       invitedUser: { email: string | null; identities: Array<{ id: string }> };
     },
     userId: string,
@@ -243,7 +246,8 @@ export class GuardianInviteAcceptanceService {
   ): void {
     if (
       !verifiedEmail ||
-      invite.invitedUser.email?.toLowerCase() !== verifiedEmail.toLowerCase()
+      (invite.invitedEmail ?? invite.invitedUser.email)?.toLowerCase() !==
+        verifiedEmail.toLowerCase()
     ) {
       throw new NotFoundException("Invitation not found");
     }

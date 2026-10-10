@@ -151,7 +151,10 @@ role are created. The web acceptance page and child profile now use this flow;
 child list and creation are staff-only, while a guardian can read an individual
 child only with an active full relationship. Existing parent profiles retain
 their legacy link after acceptance, but it is no longer sufficient for child
-record access. Mobile work remains paused. ACE-M15 and M20 remain open until
+record access. A nullable, backfilled invitation email snapshot retains the
+address staff reviewed even when first Clerk sign-in creates an internal user
+without an email claim and acceptance transfers the invitation to that user.
+Mobile work remains paused. ACE-M15 and M20 remain open until
 the remaining identity, relationship, and security tasks are verified. Local
 API and admin type checks, lint, and builds passed; API unit tests passed after
 the active-site expectation was updated, and admin tests passed. The guardian

@@ -72,6 +72,12 @@ describe("guardian invitation lifecycle", () => {
         email: guardianEmail,
       })
     ).authorization;
+    // Clerk's default session token can create this account without an email
+    // claim. The invite must retain its addressed email after ownership moves.
+    await prisma.user.update({
+      where: { id: guardianId },
+      data: { email: null },
+    });
     strangerAuthorization = (
       await seedE2eAuthUser({
         subject: `guardian-stranger-${strangerId}`,
@@ -147,6 +153,18 @@ describe("guardian invitation lifecycle", () => {
       .set("Authorization", guardianAuthorization);
     expect(accepted.status).toBe(201);
     expect(accepted.body.acceptedAt).toBeTruthy();
+    const acceptedInvite = await request(server)
+      .get(`/family-invites/sites/${siteId}/${inviteId}`)
+      .set("Authorization", guardianAuthorization);
+    expect(acceptedInvite.status).toBe(200);
+    expect(acceptedInvite.body.acceptedAt).toBeTruthy();
+    const staffInvites = await request(server)
+      .get(`/family-invites/guardian/children/${childId}`)
+      .set("Authorization", adminAuthorization);
+    expect(staffInvites.status).toBe(200);
+    expect(staffInvites.body).toContainEqual(
+      expect.objectContaining({ id: inviteId, email: guardianEmail }),
+    );
     expect(
       await prisma.guardianChildRelationship.count({
         where: {

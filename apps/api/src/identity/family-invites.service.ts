@@ -125,13 +125,17 @@ export class FamilyInvitesService {
       const invite = existing
         ? await tx.familyIdentityInvite.update({
             where: { id_tenantId: { id: existing.id, tenantId } },
-            data: { expiresAt: new Date(now.getTime() + inviteLifetimeMs) },
+            data: {
+              invitedEmail: normalizedEmail,
+              expiresAt: new Date(now.getTime() + inviteLifetimeMs),
+            },
           })
         : await tx.familyIdentityInvite.create({
             data: {
               tenantId,
               childId,
               invitedUserId: user.id,
+              invitedEmail: normalizedEmail,
               createdByUserId: actorUserId,
               target: "GUARDIAN",
               expiresAt: new Date(now.getTime() + inviteLifetimeMs),
@@ -152,7 +156,7 @@ export class FamilyInvitesService {
       return {
         invite,
         siteName: site.name,
-        email: user.email ?? normalizedEmail,
+        email: normalizedEmail,
       };
     });
     await this.send(result.email, result.siteName, tenantId, result.invite.id);
@@ -177,13 +181,17 @@ export class FamilyInvitesService {
           expiresAt: true,
           acceptedAt: true,
           revokedAt: true,
+          invitedEmail: true,
           invitedUser: { select: { email: true } },
         },
         orderBy: { createdAt: "desc" },
         take: 50,
       });
       return invites.map((invite) =>
-        this.summary(invite, invite.invitedUser.email ?? ""),
+        this.summary(
+          invite,
+          invite.invitedEmail ?? invite.invitedUser.email ?? "",
+        ),
       );
     });
   }
@@ -212,7 +220,8 @@ export class FamilyInvitesService {
         where: { id: tenantId, orgId },
         select: { name: true },
       });
-      if (!site || !invite.invitedUser.email) {
+      const email = invite.invitedEmail ?? invite.invitedUser.email;
+      if (!site || !email) {
         throw new NotFoundException("Invitation not found");
       }
       const updated = await tx.familyIdentityInvite.update({
@@ -229,7 +238,7 @@ export class FamilyInvitesService {
       );
       return {
         invite: updated,
-        email: invite.invitedUser.email,
+        email,
         siteName: site.name,
       };
     });
