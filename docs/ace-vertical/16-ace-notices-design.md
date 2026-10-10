@@ -35,6 +35,9 @@ cutover, a database trigger mirrors any older-app writes to the canonical
 table so no records fall between migration and app deployment. Once the new
 app release is verified, retire the old write path and archive trigger in a
 separate gated change.
+The import discovers the historical table in either `app` or `public`,
+locks it before copying, and fails on notice ID collisions rather than
+silently omitting records from a restored schema.
 
 ## Access and audience
 

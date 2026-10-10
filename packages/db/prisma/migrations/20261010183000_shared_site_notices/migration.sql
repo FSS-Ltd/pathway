@@ -29,13 +29,29 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
+DECLARE
+  source_schema text;
+  source_matches boolean := false;
 BEGIN
-  IF TG_OP = 'INSERT' AND NOT EXISTS (
-    SELECT 1 FROM app."Announcement" source
-    WHERE source."id" = NEW."id" AND source."tenantId" = NEW."tenantId"
-  ) THEN
-    RAISE EXCEPTION 'Historical notice requires a matching announcement'
-      USING ERRCODE = 'check_violation';
+  IF TG_OP = 'INSERT' THEN
+    FOREACH source_schema IN ARRAY ARRAY['app', 'public'] LOOP
+      IF pg_catalog.to_regclass(pg_catalog.format('%I."Announcement"', source_schema))
+        IS NOT NULL
+      THEN
+        EXECUTE pg_catalog.format(
+          'SELECT EXISTS (
+             SELECT 1 FROM %I."Announcement"
+             WHERE "id" = $1 AND "tenantId" = $2
+           )',
+          source_schema
+        ) INTO source_matches USING NEW."id", NEW."tenantId";
+        IF source_matches THEN EXIT; END IF;
+      END IF;
+    END LOOP;
+    IF NOT source_matches THEN
+      RAISE EXCEPTION 'Historical notice requires a matching announcement'
+        USING ERRCODE = 'check_violation';
+    END IF;
   END IF;
   IF TG_OP = 'UPDATE' AND (
     OLD."legacyImportedAt" IS NULL
@@ -126,21 +142,9 @@ BEGIN
 END;
 $$;
 
--- Historical announcements span sites. Fail the migration if its role would
--- silently see a tenant-filtered subset of the source during collision checks
--- or backfill.
+-- Historical announcements span sites and can live in app on fresh installs
+-- or public on restored installations. Fail if RLS would hide source rows.
 SET row_security = off;
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM app."Announcement" source
-    JOIN app."AceNotice" notice ON notice."id" = source."id"
-  ) THEN
-    RAISE EXCEPTION 'Notice ID collision blocks historical import';
-  END IF;
-END;
-$$;
 
 CREATE FUNCTION app.mirror_legacy_announcement()
 RETURNS trigger
@@ -196,24 +200,63 @@ END;
 $$;
 REVOKE ALL ON FUNCTION app.mirror_legacy_announcement() FROM PUBLIC;
 
--- Creating the trigger locks the source for the remainder of this migration,
--- so the backfill and future writes cannot race past one another.
-CREATE TRIGGER "Announcement_mirror_to_site_notice"
-  AFTER INSERT OR UPDATE OR DELETE ON app."Announcement"
-  FOR EACH ROW EXECUTE FUNCTION app.mirror_legacy_announcement();
+DO $$
+DECLARE
+  source_schema text;
+  source_kind "char";
+  found_source boolean := false;
+  has_collision boolean;
+BEGIN
+  FOREACH source_schema IN ARRAY ARRAY['app', 'public'] LOOP
+    SELECT relation.relkind INTO source_kind
+    FROM pg_catalog.pg_class relation
+    WHERE relation.oid =
+      pg_catalog.to_regclass(pg_catalog.format('%I."Announcement"', source_schema));
+    IF source_kind IS NULL OR source_kind NOT IN ('r', 'p') THEN CONTINUE; END IF;
+    found_source := true;
 
-INSERT INTO app."AceNotice" (
-  "id", "tenantId", "createdByUserId", "title", "body", "audience",
-  "publishedAt", "createdAt", "updatedAt", "legacyImportedAt"
-)
-SELECT
-  source."id", source."tenantId", NULL, source."title", source."body",
-  CASE source."audience"::text
-    WHEN 'ALL' THEN 'PARENTS_AND_STAFF'::app."AceNoticeAudience"
-    WHEN 'PARENTS' THEN 'PARENTS'::app."AceNoticeAudience"
-    ELSE 'STAFF'::app."AceNoticeAudience"
-  END,
-  source."publishedAt", source."createdAt", source."updatedAt", pg_catalog.clock_timestamp()
-FROM app."Announcement" source;
+    -- Lock each source before checking IDs and copying rows. Older releases
+    -- cannot write between the collision check, backfill, and mirror trigger.
+    EXECUTE pg_catalog.format(
+      'CREATE TRIGGER "Announcement_mirror_to_site_notice"
+       AFTER INSERT OR UPDATE OR DELETE ON %I."Announcement"
+       FOR EACH ROW EXECUTE FUNCTION app.mirror_legacy_announcement()',
+      source_schema
+    );
+    EXECUTE pg_catalog.format(
+      'SELECT EXISTS (
+         SELECT 1 FROM %I."Announcement" source
+         JOIN app."AceNotice" notice ON notice."id" = source."id"
+       )',
+      source_schema
+    ) INTO has_collision;
+    IF has_collision THEN
+      RAISE EXCEPTION 'Notice ID collision blocks historical import';
+    END IF;
+
+    EXECUTE pg_catalog.format(
+      'INSERT INTO app."AceNotice" (
+         "id", "tenantId", "createdByUserId", "title", "body", "audience",
+         "publishedAt", "createdAt", "updatedAt", "legacyImportedAt"
+       )
+       SELECT
+         source."id", source."tenantId", NULL, source."title", source."body",
+         CASE source."audience"::text
+           WHEN ''ALL'' THEN ''PARENTS_AND_STAFF''::app."AceNoticeAudience"
+           WHEN ''PARENTS'' THEN ''PARENTS''::app."AceNoticeAudience"
+           ELSE ''STAFF''::app."AceNoticeAudience"
+         END,
+         source."publishedAt", source."createdAt", source."updatedAt",
+         pg_catalog.clock_timestamp()
+       FROM %I."Announcement" source',
+      source_schema
+    );
+  END LOOP;
+  IF NOT found_source THEN
+    RAISE EXCEPTION 'No legacy announcement table available for import'
+      USING ERRCODE = 'undefined_table';
+  END IF;
+END;
+$$;
 
 RESET row_security;

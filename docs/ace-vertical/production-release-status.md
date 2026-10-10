@@ -65,9 +65,9 @@ is open; this change has not been deployed or merged. Local API and admin
 type checks, 30 focused API unit tests, affected admin UI tests, lint,
 formatting, API and admin builds, Prisma schema validation, diff checks, and
 code Graphify refresh passed. The first CI run failed in three database jobs
-because the migration named `public."Announcement"` although the source table
-lives in `app`; the source references are corrected in this PR and fresh CI
-verification is pending. This host cannot start a local PostgreSQL cluster
+because the migration assumed `public."Announcement"` on fresh `app`-schema
+databases. The migration now discovers both layouts and fails on overlapping
+IDs; fresh CI verification is pending. This host cannot start a local PostgreSQL cluster
 (`shmget`: no free shared-memory segment). The plan-task count stays
 **42/150 (28%)** until a merged task is reconciled against the master plan.
 
