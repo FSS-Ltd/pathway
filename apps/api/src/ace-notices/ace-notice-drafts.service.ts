@@ -26,6 +26,9 @@ const draftSelect = {
   body: true,
   audience: true,
   requiresAcknowledgement: true,
+  scheduledAt: true,
+  scheduleFailedAt: true,
+  scheduleFailureReason: true,
   expiresAt: true,
   createdAt: true,
   updatedAt: true,
@@ -36,6 +39,9 @@ const draftSummarySelect = {
   title: true,
   audience: true,
   requiresAcknowledgement: true,
+  scheduledAt: true,
+  scheduleFailedAt: true,
+  scheduleFailureReason: true,
   expiresAt: true,
   createdAt: true,
   updatedAt: true,
@@ -167,6 +173,7 @@ export class AceNoticeDraftsService {
           id,
           tenantId: actor.tenantId,
           publishedAt: null,
+          scheduledAt: null,
           legacyImportedAt: null,
           updatedAt: expectedUpdatedAt,
         },
@@ -178,6 +185,8 @@ export class AceNoticeDraftsService {
             ? { requiresAcknowledgement: command.requiresAcknowledgement }
             : {}),
           expiresAt: command.expiresAt ? new Date(command.expiresAt) : null,
+          scheduleFailedAt: null,
+          scheduleFailureReason: null,
           updatedAt,
         },
       });
@@ -187,7 +196,9 @@ export class AceNoticeDraftsService {
           select: { publishedAt: true },
         });
         if (!current) throw new NotFoundException("Notice draft not found");
-        throw new ConflictException("Notice draft changed or was published");
+        throw new ConflictException(
+          "Notice draft changed, was scheduled, or was published",
+        );
       }
       const notice = await tx.aceNotice.findFirst({
         where: { id, tenantId: actor.tenantId, publishedAt: null },

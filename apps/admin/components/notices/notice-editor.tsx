@@ -9,6 +9,7 @@ import {
   fetchNoticeDraft,
   previewNoticeAudience,
   publishNotice,
+  scheduleNotice,
   updateNoticeDraft,
   type NoticeAudience,
   type NoticeAudiencePreview,
@@ -83,6 +84,8 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
   const [success, setSuccess] = React.useState<string | null>(null);
   const [dirty, setDirty] = React.useState(true);
   const [loadRevision, setLoadRevision] = React.useState(0);
+  const [scheduledAt, setScheduledAt] = React.useState<string | null>(null);
+  const [scheduledAtLocal, setScheduledAtLocal] = React.useState("");
 
   React.useEffect(() => {
     if (!draftId) return;
@@ -98,6 +101,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
           expiresAtLocal: localDateTime(draft.expiresAt),
         });
         setRevision(draft.updatedAt);
+        setScheduledAt(draft.scheduledAt);
         setDirty(false);
       })
       .catch((cause: unknown) => {
@@ -132,14 +136,29 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
     return draft.id;
   }
 
-  async function act(action: "save" | "preview" | "publish") {
+  async function act(action: "save" | "preview" | "publish" | "schedule") {
     if (pending) return;
     setPending(true);
     setError(null);
     try {
-      if (action === "publish") {
+      if (action === "publish" || action === "schedule") {
         if (!id || !preview || dirty) return;
-        await publishNotice(id, preview);
+        if (action === "schedule") {
+          const date = new Date(scheduledAtLocal);
+          if (
+            !scheduledAtLocal ||
+            Number.isNaN(date.getTime()) ||
+            date <= new Date()
+          ) {
+            throw new Error("Choose a future date and time to publish.");
+          }
+          if (form.expiresAtLocal && date >= new Date(form.expiresAtLocal)) {
+            throw new Error("Choose a time before the notice expires.");
+          }
+          await scheduleNotice(id, preview, date.toISOString());
+        } else {
+          await publishNotice(id, preview);
+        }
         router.push(`/notices/${id}`);
         return;
       }
@@ -159,7 +178,9 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
             ? "Unable to save notice."
             : action === "preview"
               ? "Unable to review the audience."
-              : "Unable to publish notice.",
+              : action === "schedule"
+                ? "Unable to schedule notice."
+                : "Unable to publish notice.",
         ).message,
       );
     } finally {
@@ -205,6 +226,17 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
               }}
             >
               Retry
+            </Button>
+          </div>
+        ) : scheduledAt ? (
+          <div className="space-y-3">
+            <p className="text-sm text-text-primary">
+              This notice is scheduled for{" "}
+              {new Date(scheduledAt).toLocaleString()}. Cancel its schedule from
+              the notice page before editing it.
+            </p>
+            <Button asChild variant="secondary">
+              <Link href={`/notices/${id}`}>View scheduled notice</Link>
             </Button>
           </div>
         ) : (
@@ -319,7 +351,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
         )}
       </Card>
       {preview && canPublish ? (
-        <Card title="Ready to publish">
+        <Card title="Ready to send">
           <p className="text-sm text-text-primary">
             {preview.recipientCount} eligible{" "}
             {preview.recipientCount === 1 ? "person" : "people"} at this site.
@@ -333,14 +365,45 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
               publication.
             </p>
           ) : null}
-          <Button
-            type="button"
-            className="mt-4"
-            disabled={pending || preview.recipientCount === 0}
-            onClick={() => void act("publish")}
-          >
-            {pending ? "Publishing…" : "Publish notice"}
-          </Button>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Button
+              type="button"
+              disabled={pending || preview.recipientCount === 0}
+              onClick={() => void act("publish")}
+            >
+              {pending ? "Working…" : "Publish now"}
+            </Button>
+          </div>
+          <div className="mt-5 space-y-3 border-t border-border-subtle pt-5">
+            <div className="space-y-1">
+              <Label htmlFor="notice-scheduled-at">
+                Or schedule publication
+              </Label>
+              <p className="text-sm text-text-muted">
+                This notice will appear at or after the chosen time if the
+                eligible audience is unchanged.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <Input
+                id="notice-scheduled-at"
+                type="datetime-local"
+                value={scheduledAtLocal}
+                onChange={(event) => setScheduledAtLocal(event.target.value)}
+                className="max-w-xs"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={
+                  pending || preview.recipientCount === 0 || !scheduledAtLocal
+                }
+                onClick={() => void act("schedule")}
+              >
+                {pending ? "Working…" : "Schedule notice"}
+              </Button>
+            </div>
+          </div>
         </Card>
       ) : null}
     </main>

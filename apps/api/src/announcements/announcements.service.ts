@@ -10,6 +10,9 @@ const noticeSelect = {
   audience: true,
   requiresAcknowledgement: true,
   publishedAt: true,
+  scheduledAt: true,
+  scheduleFailedAt: true,
+  scheduleFailureReason: true,
   withdrawnAt: true,
   legacyImportedAt: true,
   createdAt: true,
@@ -31,12 +34,15 @@ function presentNotice(row: NoticeRow) {
       ? row.publishedAt.getTime() > Date.now()
         ? "scheduled"
         : "sent"
-      : "draft";
+      : row.scheduledAt
+        ? "scheduled"
+        : "draft";
   return {
     ...row,
     audience: legacyAudience(row.audience),
     status,
-    scheduledAt: status === "scheduled" ? row.publishedAt : null,
+    scheduledAt:
+      row.scheduledAt ?? (status === "scheduled" ? row.publishedAt : null),
   };
 }
 

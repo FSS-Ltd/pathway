@@ -11,6 +11,9 @@ import { AceNoticeParentInboxController } from "./ace-notice-parent-inbox.contro
 import { AceNoticeParentInboxService } from "./ace-notice-parent-inbox.service";
 import { AceNoticeStaffInboxController } from "./ace-notice-staff-inbox.controller";
 import { AceNoticeStaffInboxService } from "./ace-notice-staff-inbox.service";
+import { AceNoticeSchedulingService } from "./ace-notice-scheduling.service";
+import { AceNoticeScheduleRunnerService } from "./ace-notice-schedule-runner.service";
+import { AceNoticeScheduleRunnerController } from "./ace-notice-schedule-runner.controller";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
@@ -19,6 +22,7 @@ import { AceNoticeStaffInboxService } from "./ace-notice-staff-inbox.service";
     AceNoticePublicationController,
     AceNoticeParentInboxController,
     AceNoticeStaffInboxController,
+    AceNoticeScheduleRunnerController,
   ],
   providers: [
     AceNoticeDraftsService,
@@ -26,6 +30,8 @@ import { AceNoticeStaffInboxService } from "./ace-notice-staff-inbox.service";
     AceNoticeReceiptSummaryService,
     AceNoticeParentInboxService,
     AceNoticeStaffInboxService,
+    AceNoticeSchedulingService,
+    AceNoticeScheduleRunnerService,
   ],
 })
 export class AceNoticesModule {}

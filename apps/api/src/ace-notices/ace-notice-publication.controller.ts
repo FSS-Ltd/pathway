@@ -15,9 +15,11 @@ import { RequirePermission } from "../access-control/require-permission.decorato
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { AceNoticePublicationService } from "./ace-notice-publication.service";
 import { AceNoticeReceiptSummaryService } from "./ace-notice-receipt-summary.service";
+import { AceNoticeSchedulingService } from "./ace-notice-scheduling.service";
 import { noticeDraftIdSchema } from "./dto/ace-notice-draft.dto";
 import {
   publishNoticeSchema,
+  scheduleNoticeSchema,
   withdrawNoticeSchema,
 } from "./dto/ace-notice-publication.dto";
 
@@ -29,6 +31,8 @@ export class AceNoticePublicationController {
     private readonly service: AceNoticePublicationService,
     @Inject(AceNoticeReceiptSummaryService)
     private readonly receipts: AceNoticeReceiptSummaryService,
+    @Inject(AceNoticeSchedulingService)
+    private readonly scheduling: AceNoticeSchedulingService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
@@ -56,6 +60,25 @@ export class AceNoticePublicationController {
   @RequirePermission("notices.publish")
   receiptSummary(@Param("id") id: string) {
     return this.receipts.get(this.parse(noticeDraftIdSchema, id), this.actor());
+  }
+
+  @Post(":id/schedule")
+  @RequirePermission("notices.publish")
+  schedule(@Param("id") id: string, @Body() body: unknown) {
+    return this.scheduling.schedule(
+      this.parse(noticeDraftIdSchema, id),
+      this.parse(scheduleNoticeSchema, body),
+      this.actor(),
+    );
+  }
+
+  @Post(":id/cancel-schedule")
+  @RequirePermission("notices.publish")
+  cancelSchedule(@Param("id") id: string) {
+    return this.scheduling.cancel(
+      this.parse(noticeDraftIdSchema, id),
+      this.actor(),
+    );
   }
 
   @Post(":id/withdraw")

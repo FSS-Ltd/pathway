@@ -77,15 +77,34 @@ checks passed, including Integration Tests and the three database jobs (CI run
 38077903948; CodeQL run 38077901813). The parent database E2E could not run
 locally because the test PostgreSQL server at `localhost:5433` is unavailable.
 
-Build step 1.3e5h (in progress): add optional, write-once acknowledgement to
+Build step 1.3e5h (merged, not deployed): add optional, write-once acknowledgement to
 the shared notice receipt model, guarded reader commands, publisher aggregate
 receipt totals, and matching family and staff web controls. PR
-[#554](https://github.com/FSS-Ltd/pathway/pull/554) is open; latest-head CI and
-merge are pending. ACE-M13 and M14
+[#554](https://github.com/FSS-Ltd/pathway/pull/554) merged into `master` as
+`95cc8ea4ff5a2d960bda8db49a78f7ccb26be76e` from head
+`07ebb4774e8d043eebc6bd7274addc88b1b10a42`. All eight latest-head
+checks passed, including Integration Tests and the three database jobs (CI run
+38080016504; CodeQL run 38080013505). ACE-M13 and M14
 remain incomplete: scheduled publication and cancellation, narrower school
 audiences, mobile notice experience, and launch verification are still open.
 The plan-task count remains **42/150 (28%)** because no complete ACE master-plan
-task was added by PR #553.
+task was added by PR #554.
+
+Build step 1.3e5i (PR open, CI pending): schedule and cancel shared site notices
+through the existing `/notices` screen and API. A minute cron sweep will
+recheck the scheduled publisher's permission, audience, expiry, and draft
+revision before using the existing publication transaction. The migration
+adds scheduled metadata and a bounded due-notice discovery function. This step
+requires a configured API `CRON_SECRET` and a Vercel plan that supports minute
+cron before production use. [PR #555](https://github.com/FSS-Ltd/pathway/pull/555)
+targets `master` from implementation commit
+`c5179aa765801f5c96244ffb45e8e53bb6ac41ed`.
+Local API/admin type, lint, and build checks passed; four focused API unit
+suites passed 23 tests; Prisma schema validation and formatting passed. The
+database E2E must run in CI because this host has no usable local PostgreSQL
+shared-memory segment. CI and merge are pending. ACE-M13 remains open for
+class/group/guardian targeting, and ACE-M14 remains open for the mobile family
+experience.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

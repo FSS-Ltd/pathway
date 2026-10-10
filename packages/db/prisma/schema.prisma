@@ -1161,6 +1161,7 @@ model User {
   createdMessageConversations       MessageConversation[]          @relation("MessageConversationCreatedBy")
   messageParticipants               MessageParticipant[]           @relation("MessageParticipantUser")
   createdAceNotices                 AceNotice[]                    @relation("AceNoticeCreatedBy")
+  scheduledAceNotices               AceNotice[]                    @relation("AceNoticeScheduledBy")
   aceNoticeAudienceMemberships      AceNoticeAudienceMember[]      @relation("AceNoticeAudienceRecipient")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
@@ -1936,6 +1937,11 @@ model AceNotice {
   audience                AceNoticeAudience
   requiresAcknowledgement Boolean           @default(false)
   publishedAt             DateTime?
+  scheduledAt             DateTime?
+  scheduledByUserId       String?
+  scheduledAudienceVersion String?
+  scheduleFailedAt        DateTime?
+  scheduleFailureReason   String?
   expiresAt               DateTime?
   withdrawnAt             DateTime?
   legacyImportedAt        DateTime?
@@ -1944,11 +1950,13 @@ model AceNotice {
 
   tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdBy       User?                     @relation("AceNoticeCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  scheduledBy     User?                     @relation("AceNoticeScheduledBy", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
   audienceMembers AceNoticeAudienceMember[]
   attachments     AceNoticeAttachment[]
 
   @@unique([id, tenantId])
   @@index([tenantId, publishedAt])
+  @@index([tenantId, scheduledAt])
   @@index([tenantId, withdrawnAt, publishedAt(sort: Desc)])
 }
 

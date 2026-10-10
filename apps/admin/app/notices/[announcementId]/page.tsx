@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Badge, Button, Card, Input, Label } from "@pathway/ui";
-import { withdrawNotice } from "@/lib/ace-notice-api";
+import { cancelNoticeSchedule, withdrawNotice } from "@/lib/ace-notice-api";
 import { requestFailure } from "@/lib/request-error";
 import { useAdminContext } from "@/lib/admin-context";
 import { useAdminAccess } from "@/lib/use-admin-access";
@@ -50,6 +50,10 @@ function NoticeDetailContent() {
   const [withdrawReason, setWithdrawReason] = React.useState("");
   const [withdrawPending, setWithdrawPending] = React.useState(false);
   const [withdrawError, setWithdrawError] = React.useState<string | null>(null);
+  const [showCancelSchedule, setShowCancelSchedule] = React.useState(false);
+  const [cancelPending, setCancelPending] = React.useState(false);
+  const [cancelError, setCancelError] = React.useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = React.useState(false);
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -91,6 +95,24 @@ function NoticeDetailContent() {
       );
     } finally {
       setWithdrawPending(false);
+    }
+  }
+
+  async function submitCancellation() {
+    if (cancelPending) return;
+    setCancelPending(true);
+    setCancelError(null);
+    try {
+      await cancelNoticeSchedule(announcementId);
+      setShowCancelSchedule(false);
+      setCancelSuccess(true);
+      await load();
+    } catch (cause) {
+      setCancelError(
+        requestFailure(cause, "Unable to cancel this schedule.").message,
+      );
+    } finally {
+      setCancelPending(false);
     }
   }
 
@@ -169,6 +191,11 @@ function NoticeDetailContent() {
         </Card>
       ) : announcement ? (
         <div className="flex flex-col gap-4">
+          {cancelSuccess ? (
+            <p role="status" className="text-sm text-status-success">
+              Schedule cancelled. The notice is a draft again.
+            </p>
+          ) : null}
           <Card>
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
@@ -196,6 +223,19 @@ function NoticeDetailContent() {
             </Card>
           ) : null}
 
+          {announcement.scheduleFailedAt ? (
+            <Card title="Publication needs review">
+              <p className="text-sm text-text-primary">
+                This notice was not sent.{" "}
+                {announcement.scheduleFailureReason ===
+                "PUBLISHER_ACCESS_CHANGED"
+                  ? "The scheduled publisher no longer has permission."
+                  : "The eligible audience or expiry changed before publication."}{" "}
+                Review the draft and its audience before sending it.
+              </p>
+            </Card>
+          ) : null}
+
           <Card title="Publication">
             <div className="space-y-1 text-sm text-text-primary">
               <div>Created: {formatDateTime(announcement.createdAt)}</div>
@@ -210,6 +250,52 @@ function NoticeDetailContent() {
               {announcement.audienceLabel ?? "Audience unavailable"}
             </p>
           </Card>
+          {announcement.status === "scheduled" &&
+          !announcement.publishedAt &&
+          !announcement.legacyImportedAt &&
+          canPublish ? (
+            <Card title="Cancel scheduled publication">
+              <p className="text-sm text-text-muted">
+                Cancellation returns this notice to a draft. You can edit or
+                schedule it again afterward.
+              </p>
+              {showCancelSchedule ? (
+                <div className="mt-3 space-y-3">
+                  {cancelError ? (
+                    <p role="alert" className="text-sm text-status-danger">
+                      {cancelError}
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      disabled={cancelPending}
+                      onClick={() => void submitCancellation()}
+                    >
+                      {cancelPending ? "Cancelling…" : "Confirm cancellation"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={cancelPending}
+                      onClick={() => setShowCancelSchedule(false)}
+                    >
+                      Keep schedule
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="mt-3"
+                  onClick={() => setShowCancelSchedule(true)}
+                >
+                  Cancel schedule
+                </Button>
+              )}
+            </Card>
+          ) : null}
           {announcement.status === "sent" &&
           !announcement.legacyImportedAt &&
           canPublish ? (
