@@ -1,6 +1,6 @@
 # ACE site notices: audience, publication, and receipts
 
-**Status:** implementation contract for C12; no route is released by this document.
+**Status:** implementation contract for ACE-M13 and ACE-M14; no route is released by this document.
 
 ## Problem and source behavior
 
@@ -11,20 +11,37 @@ private attachments and notification email with parent opt-outs. Its relevant
 source is `oasis-portal/apps/api/src/routers/notice.ts` and
 `apps/api/src/__tests__/notice.router.test.ts`. NexSteps must preserve those
 outcomes within its site tenancy, fixed roles, access tags, guardian links,
-parent portal switch, audit, and paid-module boundaries. Generic site notices
-are ACE core; Clubs notices belong to the Clubs entitlement and its scoped
+parent portal switch, audit, and paid-module boundaries. Site notices are
+platform core across site models; Clubs notices belong to the Clubs entitlement and its scoped
 leads. Neither route activates the other module.
 
-The existing `Announcement` model and `/announcements` API serve product-wide
-announcements. They do not have a recipient snapshot or per-reader receipt and
-allow edits and deletion after publication. ACE notices use the separate
-`AceNotice`, `AceNoticeAudienceMember`, `AceNoticeReceipt`, and
-`AceNoticeAttachment` tables already present in Prisma and forced RLS. Do not
-repurpose or migrate existing announcements silently.
+Site notices are one shared feature across site models. The existing
+`/notices` screen remains its entry point. The stronger `AceNotice` table is
+the canonical active record store for every site model; its physical name is
+historical, not an ACE-only access boundary. The legacy `Announcement` table
+is a transitional archive and write-through source while older app releases
+may still run. The `/announcements` read API serves canonical records; new
+writes use the draft, preview, publish, and withdraw commands. The old write
+API must not create a second active notice stream.
+
+Migrate all existing announcements into the canonical table with their IDs,
+site, title, body, audience, publication time, and timestamps intact. Mark
+their provenance and keep the original author and delivery/read history
+unknown. Historical records have no frozen audience or receipts. An eligible
+staff member may read a historical staff notice for their current site, but
+its UI must say that historical read status is unavailable. New publications
+always require an author, recipient snapshot, and receipt rows. During
+cutover, a database trigger mirrors any older-app writes to the canonical
+table so no records fall between migration and app deployment. Once the new
+app release is verified, retire the old write path and archive trigger in a
+separate gated change.
+The import discovers the historical table in either `app` or `public`,
+locks it before copying, and fails on notice ID collisions rather than
+silently omitting records from a restored schema.
 
 ## Access and audience
 
-- The selected tenant is the site. Every route uses the authenticated actor's
+- The selected tenant is the site for every site model. Every route uses the authenticated actor's
   current tenant and organisation context; no client-supplied tenant ID
   determines access. `notices.manage` permits drafting; `notices.publish`
   permits publishing and withdrawal. A scoped tag confers only its active
@@ -35,12 +52,11 @@ repurpose or migrate existing announcements silently.
   and the enabled parent portal. The protected Parent template carries the
   ACE-only, relationship-scoped `ace.parent.notices.read` permission. The
   existing `notices.read` key is site-scoped and cannot seed onto a
-  relationship role; changing its scope would widen access to the
-  product-wide `/announcements` API. The parent notice route checks its own
+  relationship role. The parent notice route checks its own
   permission, active definition, portal, site, guardian link, and recipient
   snapshot. A site membership alone never grants parent notice access; a
   guardian link alone never grants staff access. The new key grants no access
-  to `/announcements` or to Clubs notices.
+  to management reads or to Clubs notices.
 - At publication, resolve eligible current staff and full-access guardians
   inside the selected site and insert one audience member per user. `PARENTS`,
   `STAFF`, and `PARENTS_AND_STAFF` are the only audience choices. For a user
@@ -56,6 +72,15 @@ repurpose or migrate existing announcements silently.
   writes. Do not infer an audience from role name or from another site.
   Notices are site-wide; child-specific content needs a separately reviewed
   audience model and must not be placed in a site-wide notice.
+
+The shared notice record, lifecycle, scheduling, delivery, and receipt model
+applies across site models. Scheduling and cancellation before publication
+remain ACE-M13 requirements and are not delivered by the current immediate
+publication API. Class, group, and guardian-specific targeting must use an
+audience source and access policy verified for the relevant sector. School
+class and guardian relationship rules belong to the ACE extension; they must
+not widen access to the shared site-wide notice stream. ACE-M13 remains open
+until these audience and scheduling requirements are delivered and tested.
 
 ## Data and lifecycle
 
@@ -135,7 +160,19 @@ audit record, and outbox fact in one transaction. `POST
 `notices.publish`; it records a final withdrawal without deleting the issued
 notice or receipts. Both commands derive site and actor from authentication.
 
-Use existing `@pathway/ui` tokens. Staff and family notice lists are separate
+The staff inbox uses `GET /ace/notices` with a limit of 1–50 (default 25) and
+a signed, site-and-reader-bound cursor, plus `GET /ace/notices/:id` for detail.
+Both require `notices.read` and current staff membership. New publications
+require a frozen recipient row for the caller; imported historical notices
+use their original audience and have no read receipt. Only active `STAFF` and `PARENTS_AND_STAFF` publications
+appear. List rows omit body text; detail returns the body and only the caller's
+delivered/read timestamps. Losing membership or withdrawing or expiring a
+notice removes access immediately. `POST /ace/notices/:id/read` explicitly
+marks the caller's receipt read once and returns its stable `readAt` on retries.
+Parent inbox and parent read commands remain separate slices.
+
+Use the existing `/notices` entry point and `@pathway/ui` tokens across all
+site models. Staff and family notice lists are separate
 from private chat, show audience and publication time clearly, and expose
 unread state in text as well as colour. The publisher sees a recipient-count
 preview before confirmation, an explicit pending state, and a recoverable
@@ -144,6 +181,10 @@ and retry states. Site changes clear prior-site content and ignore late
 responses. Links and attachment controls remain keyboard accessible at
 compact widths and respect reduced motion. The Expo follow-up mirrors staff
 and family inbox, detail, attachment preview, and read state after web parity.
+Until the parent inbox is released, the web publisher defaults to `STAFF` and
+keeps parent-targeted drafts unpublished. The already-published parent API
+contract remains for the gated family reader slice; no UI should suggest that
+families can open a new notice before that reader path exists.
 
 ## Failure, verification, and rollout
 
@@ -157,9 +198,9 @@ unique audience and receipt constraints under concurrent requests. Verify
 that no paid entitlement is activated by a notice tag and that Clubs notices
 remain behind Clubs entitlement.
 
-Implement the additive lifecycle/RLS migration, relationship permission and
-template, draft and publish API, reader API and receipts, web screens, then
-attachments and email in separate gated PRs. Each PR starts from freshly
+Implement the shared-record import and transitional mirror, read and write API,
+then the unified `/notices` screen in the current gated slice. Later slices
+add parent inbox, attachments, and email. Each PR starts from freshly
 fetched GitHub `master`, passes the exact-head CI gate, and merges before the
 next begins.
 Run authenticated staff/parent/staff-parent browser journeys against an

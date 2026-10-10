@@ -46,15 +46,19 @@ async function run(): Promise<void> {
     if (path === "/sessions" || path === "/concerns") {
       return response({ message: "private database trace" }, 503);
     }
-    if (path === "/announcements") {
+    if (path === "/ace/notices") {
       return announcementsAvailable
-        ? response([
-            {
-              id: "notice-1",
-              title: "Visible notice",
-              createdAt: new Date().toISOString(),
-            },
-          ])
+        ? response({
+            items: [
+              {
+                id: "notice-1",
+                title: "Visible notice",
+                audience: "PARENTS_AND_STAFF",
+                publishedAt: new Date().toISOString(),
+              },
+            ],
+            nextCursor: null,
+          })
         : response({ message: "private database trace" }, 500);
     }
     if (path === "/tenants/current/public-signup-link") {
@@ -108,6 +112,7 @@ async function run(): Promise<void> {
     await act(async () => retry.click());
     await settle();
     assert.match(container.textContent ?? "", /Visible notice/);
+    assert.match(container.textContent ?? "", /Parents & staff/);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = nativeFetch;

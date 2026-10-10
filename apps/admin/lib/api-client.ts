@@ -208,6 +208,8 @@ export type AdminAnnouncementDetail = {
   createdAt: string | null;
   scheduledAt: string | null;
   publishedAt: string | null;
+  withdrawnAt: string | null;
+  legacyImportedAt: string | null;
   channels?: string[] | null;
   targetsSummary?: string | null;
 };
@@ -232,17 +234,6 @@ export type MyNextHandoverResponse =
   | MyNextHandoverAvailable;
 
 export type HandoverLogStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
-
-// ANNOUNCEMENTS FORMS (CreateAnnouncementDto / UpdateAnnouncementDto subset)
-export type AdminAnnouncementFormValues = {
-  title: string;
-  body: string;
-  audience: "ALL" | "PARENTS" | "STAFF";
-  sendMode: "draft" | "now" | "schedule";
-  scheduledAt?: string;
-  channels?: string[];
-  tenantId?: string;
-};
 
 export type AdminAttendanceRow = {
   id: string; // sessionId
@@ -3682,6 +3673,8 @@ type ApiAnnouncement = {
   audience?: string | null;
   createdAt: string;
   scheduledAt?: string | null;
+  legacyImportedAt?: string | null;
+  withdrawnAt?: string | null;
 };
 
 const statusLabelMap: Record<string, string> = {
@@ -3695,6 +3688,14 @@ const audienceLabelMap: Record<string, string> = {
   parents: "Parents",
   staff: "Staff",
   parents_staff: "Parents & staff",
+  parents_and_staff: "Parents & staff",
+};
+
+const audienceLabel = (audience?: string | null): string | null => {
+  if (!audience) return null;
+  const normalized =
+    audience === "ALL" ? "parents_staff" : audience.toLowerCase();
+  return audienceLabelMap[normalized] ?? audience;
 };
 
 const mapApiAnnouncementToAdminRow = (
@@ -3702,8 +3703,7 @@ const mapApiAnnouncementToAdminRow = (
 ): AdminAnnouncementRow => ({
   id: api.id,
   title: api.title,
-  audienceLabel:
-    (api.audience && audienceLabelMap[api.audience]) || api.audience || "-",
+  audienceLabel: audienceLabel(api.audience) ?? "-",
   statusLabel: statusLabelMap[api.status] ?? api.status ?? "Unknown",
   createdAt: api.createdAt,
   scheduledAt: api.scheduledAt ?? null,
@@ -3715,8 +3715,7 @@ const mapApiAnnouncementToAdminDetail = (
   id: api.id,
   title: api.title,
   body: (api as { body?: string | null }).body ?? null,
-  audienceLabel:
-    (api.audience && audienceLabelMap[api.audience]) || api.audience || null,
+  audienceLabel: audienceLabel(api.audience),
   status:
     api.status === "draft" ||
     api.status === "scheduled" ||
@@ -3727,6 +3726,8 @@ const mapApiAnnouncementToAdminDetail = (
   createdAt: api.createdAt ?? null,
   scheduledAt: api.scheduledAt ?? null,
   publishedAt: (api as { publishedAt?: string | null }).publishedAt ?? null,
+  withdrawnAt: api.withdrawnAt ?? null,
+  legacyImportedAt: api.legacyImportedAt ?? null,
   channels:
     ((api as { channels?: string[] | null }).channels ??
     (api as { channel?: string | null }).channel)
@@ -3775,14 +3776,37 @@ export async function fetchAnnouncements(): Promise<AdminAnnouncementRow[]> {
 export async function fetchRecentAnnouncements(
   limit = 4,
 ): Promise<AdminAnnouncementRow[]> {
-  const all = await fetchAnnouncements();
-  return all
-    .slice()
-    .sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    )
-    .slice(0, limit);
+  if (isUsingMockApi()) return (await fetchAnnouncements()).slice(0, limit);
+  const query = new URLSearchParams({
+    limit: String(Math.min(50, Math.max(1, limit))),
+  });
+  const response = await fetch(`${API_BASE_URL}/ace/notices?${query}`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to load recent notices.",
+    );
+  }
+  const page = (await response.json()) as {
+    items: Array<{
+      id: string;
+      title: string;
+      audience: "STAFF" | "PARENTS_AND_STAFF";
+      publishedAt: string;
+    }>;
+  };
+  return page.items.map((notice) => ({
+    id: notice.id,
+    title: notice.title,
+    audienceLabel: audienceLabel(notice.audience) ?? "Staff",
+    statusLabel: "Sent",
+    createdAt: notice.publishedAt,
+    scheduledAt: null,
+  }));
 }
 
 // NOTICES: detail view is read-only; do not surface provider payloads or internal delivery logs here.
@@ -3805,6 +3829,8 @@ export async function fetchAnnouncementById(
           createdAt: row.createdAt,
           scheduledAt: row.scheduledAt ?? null,
           publishedAt: row.scheduledAt ?? null,
+          withdrawnAt: null,
+          legacyImportedAt: null,
           channels: ["in-app"],
           targetsSummary: row.audienceLabel,
         }
@@ -3821,86 +3847,6 @@ export async function fetchAnnouncementById(
     const body = await res.text().catch(() => "");
     throw new Error(
       `Failed to fetch announcement: ${res.status} ${body || res.statusText}`,
-    );
-  }
-
-  const json = (await res.json()) as ApiAnnouncement;
-  return mapApiAnnouncementToAdminDetail(json);
-}
-
-// CreateAnnouncementDto fields: tenantId, title, body, audience, publishedAt?
-export async function createAnnouncement(
-  input: AdminAnnouncementFormValues,
-): Promise<AdminAnnouncementDetail> {
-  const publishedAt =
-    input.sendMode === "now"
-      ? new Date().toISOString()
-      : input.sendMode === "schedule"
-        ? input.scheduledAt
-        : undefined;
-
-  const payload = {
-    tenantId: input.tenantId ?? getDefaultTenantId(),
-    title: input.title?.trim(),
-    body: input.body?.trim(),
-    audience: input.audience,
-    ...(publishedAt ? { publishedAt } : {}),
-  };
-
-  const res = await fetch(`${API_BASE_URL}/announcements`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    cache: "no-store",
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to create announcement (${res.status}): ${
-        body || res.statusText
-      }`,
-    );
-  }
-
-  const json = (await res.json()) as ApiAnnouncement;
-  return mapApiAnnouncementToAdminDetail(json);
-}
-
-// UpdateAnnouncementDto fields: title?, body?, audience?, publishedAt?
-export async function updateAnnouncement(
-  id: string,
-  input: Partial<AdminAnnouncementFormValues>,
-): Promise<AdminAnnouncementDetail> {
-  const publishedAt =
-    input.sendMode === "now"
-      ? new Date().toISOString()
-      : input.sendMode === "schedule"
-        ? input.scheduledAt
-        : input.sendMode === "draft"
-          ? null
-          : undefined;
-
-  const payload = {
-    ...(input.title ? { title: input.title.trim() } : {}),
-    ...(input.body ? { body: input.body.trim() } : {}),
-    ...(input.audience ? { audience: input.audience } : {}),
-    ...(typeof publishedAt !== "undefined" ? { publishedAt } : {}),
-  };
-
-  const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
-    method: "PATCH",
-    headers: buildAuthHeaders(),
-    cache: "no-store",
-    body: JSON.stringify(payload),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to update announcement (${res.status}): ${
-        body || res.statusText
-      }`,
     );
   }
 

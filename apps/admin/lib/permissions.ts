@@ -29,9 +29,9 @@ const ADMIN_ONLY_PREFIXES = ["/settings", "/reports", "/people/invite"];
 /** Paths restricted to ORG_ADMIN only (billing). */
 const BILLING_PREFIXES = ["/billing"];
 
-/** Paths restricted to SITE_ADMIN or ORG_ADMIN (People, Classes, Announcements). */
-const SITE_ADMIN_PATHS = ["/people", "/classes", "/notices"];
-const SITE_ADMIN_PREFIXES = ["/people", "/classes", "/notices"];
+/** Paths restricted to SITE_ADMIN or ORG_ADMIN (People, Classes). */
+const SITE_ADMIN_PATHS = ["/people", "/classes"];
+const SITE_ADMIN_PREFIXES = ["/people", "/classes"];
 
 /** Create concern: any staff can access. */
 const CREATE_CONCERN_PATH = "/safeguarding/concerns/new";
@@ -54,6 +54,9 @@ export function canAccessRoute(
   }
   if (path === CREATE_CONCERN_PATH) {
     return true; // Any authenticated staff can create concerns
+  }
+  if (path.startsWith("/notices/")) {
+    return isSiteAdminOrHigher(role);
   }
   if (
     ROLES_ADMIN_PREFIXES.some((p) => path === p || path.startsWith(p + "/"))

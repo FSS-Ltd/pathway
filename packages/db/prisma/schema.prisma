@@ -1930,18 +1930,19 @@ model MessageAttachment {
 model AceNotice {
   id              String            @id @default(uuid())
   tenantId        String
-  createdByUserId String
+  createdByUserId String?
   title           String
   body            String            @db.Text
   audience        AceNoticeAudience
   publishedAt     DateTime?
   expiresAt       DateTime?
   withdrawnAt     DateTime?
+  legacyImportedAt DateTime?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
   tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  createdBy       User                      @relation("AceNoticeCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdBy       User?                     @relation("AceNoticeCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   audienceMembers AceNoticeAudienceMember[]
   attachments     AceNoticeAttachment[]
 

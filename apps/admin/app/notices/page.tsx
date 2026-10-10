@@ -2,7 +2,6 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useSession } from "@/lib/use-session-compat";
 import {
   Badge,
@@ -14,6 +13,9 @@ import {
   type ColumnDef,
 } from "@pathway/ui";
 import { AdminAnnouncementRow, fetchAnnouncements } from "../../lib/api-client";
+import { useAdminContext } from "@/lib/admin-context";
+import { hasPermission } from "@/lib/access";
+import { StaffNoticeInbox } from "@/components/notices/staff-notice-inbox";
 
 function formatDate(value?: string | null) {
   if (!value) return "-";
@@ -27,14 +29,14 @@ function formatDate(value?: string | null) {
   });
 }
 
-export default function NoticesPage() {
+function ManageNoticesPage() {
   const { data: session, status: sessionStatus } = useSession();
   const [data, setData] = React.useState<AdminAnnouncementRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<
-    "all" | "draft" | "scheduled" | "sent"
+    "all" | "draft" | "scheduled" | "sent" | "archived"
   >("all");
   const [audienceFilter, setAudienceFilter] = React.useState<
     "all" | "parents" | "staff"
@@ -75,7 +77,9 @@ export default function NoticesPage() {
       const matchesStatus =
         statusFilter === "all"
           ? true
-          : statusLabel.includes(statusFilter === "sent" ? "sent" : statusFilter);
+          : statusLabel.includes(
+              statusFilter === "sent" ? "sent" : statusFilter,
+            );
 
       const matchesAudience =
         audienceFilter === "all"
@@ -158,7 +162,9 @@ export default function NoticesPage() {
       <Card title="Notices & Announcements">
         {error ? (
           <div className="flex flex-col gap-2 rounded-md bg-status-danger/5 p-4 text-sm text-status-danger">
-            <span className="font-semibold">Couldn’t load announcements yet.</span>
+            <span className="font-semibold">
+              Couldn’t load announcements yet.
+            </span>
             <span>{error}</span>
             <div>
               <Button size="sm" variant="secondary" onClick={load}>
@@ -189,6 +195,7 @@ export default function NoticesPage() {
                   <option value="draft">Draft</option>
                   <option value="scheduled">Scheduled</option>
                   <option value="sent">Sent</option>
+                  <option value="archived">Archived</option>
                 </Select>
                 <Select
                   value={audienceFilter}
@@ -220,5 +227,42 @@ export default function NoticesPage() {
         </p>
       </Card>
     </div>
+  );
+}
+
+function ManagerNoticeWorkspace() {
+  const [view, setView] = React.useState<"manage" | "inbox">("manage");
+  return (
+    <div className="space-y-5">
+      <div
+        role="group"
+        aria-label="Notice views"
+        className="inline-flex w-fit rounded-2xl border border-border-subtle bg-surface p-1 shadow-sm"
+      >
+        {(["manage", "inbox"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            aria-pressed={view === option}
+            onClick={() => setView(option)}
+            className={`min-h-11 rounded-xl px-4 text-sm font-semibold transition-colors motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong ${view === option ? "bg-accent-subtle text-accent-strong" : "text-text-muted hover:text-text-primary"}`}
+          >
+            {option === "manage" ? "Manage notices" : "My inbox"}
+          </button>
+        ))}
+      </div>
+      {view === "manage" ? <ManageNoticesPage /> : <StaffNoticeInbox />}
+    </div>
+  );
+}
+
+export default function NoticesPage() {
+  const { state } = useAdminContext();
+  if (state.status !== "ready") return null;
+  const key = `${state.snapshot.activeSiteId}:${state.snapshot.userId}`;
+  return hasPermission(state.snapshot.permissions, "notices.manage") ? (
+    <ManagerNoticeWorkspace key={key} />
+  ) : (
+    <StaffNoticeInbox key={key} />
   );
 }

@@ -11,7 +11,7 @@ import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { OutboxService } from "../common/outbox/outbox.service";
 import {
   assertNoticeActor,
-  requireAceNoticeAuthor,
+  requireSiteNoticeStaffAccess,
   type NoticeActor,
 } from "./ace-notice-access";
 import {
@@ -33,9 +33,14 @@ export class AceNoticePublicationService {
   async preview(id: string, actor: NoticeActor) {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      const site = await requireAceNoticeAuthor(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
       const notice = await tx.aceNotice.findFirst({
-        where: { id, tenantId: actor.tenantId, publishedAt: null },
+        where: {
+          id,
+          tenantId: actor.tenantId,
+          publishedAt: null,
+          legacyImportedAt: null,
+        },
         select: { id: true, audience: true, updatedAt: true },
       });
       if (!notice) throw new NotFoundException("Notice draft not found");
@@ -57,13 +62,16 @@ export class AceNoticePublicationService {
   async publish(id: string, input: PublishNoticeDto, actor: NoticeActor) {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      const site = await requireAceNoticeAuthor(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
       await this.lock(tx, actor.tenantId, id);
       await this.lockNotice(tx, actor.tenantId, id);
       const notice = await tx.aceNotice.findFirst({
         where: { id, tenantId: actor.tenantId },
       });
       if (!notice) throw new NotFoundException("Notice draft not found");
+      if (notice.legacyImportedAt) {
+        throw new ConflictException("Historical drafts cannot be published");
+      }
       if (notice.withdrawnAt) {
         throw new ConflictException("Notice was withdrawn");
       }
@@ -138,7 +146,7 @@ export class AceNoticePublicationService {
   async withdraw(id: string, input: WithdrawNoticeDto, actor: NoticeActor) {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireAceNoticeAuthor(tx, actor);
+      await requireSiteNoticeStaffAccess(tx, actor);
       await this.lock(tx, actor.tenantId, id);
       await this.lockNotice(tx, actor.tenantId, id);
       const notice = await tx.aceNotice.findFirst({

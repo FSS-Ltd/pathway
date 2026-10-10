@@ -188,7 +188,7 @@ assert.equal(
 );
 
 const noticesNavEntry = navigationSource.match(
-  /defaultSidebarItems\[9\][\s\S]*?access:\s*"site-admin-or-higher"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication",?\s*\},/,
+  /defaultSidebarItems\[9\][\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication",?\s*\},/,
 );
 assert.ok(
   noticesNavEntry,
