@@ -1,11 +1,16 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@pathway/db";
 import type { CreateNoticeDraftDto } from "./dto/ace-notice-draft.dto";
+import {
+  resolveSchoolNoticeAudience,
+  type NoticeAudienceTarget,
+} from "./ace-notice-school-audience";
 
 export interface NoticeRecipient {
   recipientUserId: string;
   recipientKind: "GUARDIAN" | "STAFF";
   guardianIdentityId: string | null;
+  targetedChildIds?: string[];
 }
 
 export async function resolveNoticeAudience(
@@ -14,7 +19,21 @@ export async function resolveNoticeAudience(
   audience: CreateNoticeDraftDto["audience"],
   parentPortalEnabled: boolean,
   now: Date,
+  target: NoticeAudienceTarget = {
+    audienceScope: "SITE",
+    audienceTargetId: null,
+  },
 ): Promise<NoticeRecipient[]> {
+  if (target.audienceScope !== "SITE") {
+    return resolveSchoolNoticeAudience(
+      tx,
+      tenantId,
+      audience,
+      parentPortalEnabled,
+      now,
+      target,
+    );
+  }
   const includeStaff = audience !== "PARENTS";
   const includeParents = audience !== "STAFF" && parentPortalEnabled;
   const parentPermission = includeParents
@@ -95,6 +114,7 @@ export function audienceVersion(
           recipient.recipientUserId,
           recipient.recipientKind,
           recipient.guardianIdentityId,
+          ...(recipient.targetedChildIds ? [recipient.targetedChildIds] : []),
         ]),
       ]),
     )

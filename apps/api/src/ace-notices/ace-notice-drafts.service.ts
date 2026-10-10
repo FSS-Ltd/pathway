@@ -12,6 +12,7 @@ import {
   requireSiteNoticeStaffAccess,
   type NoticeActor,
 } from "./ace-notice-access";
+import { assertSchoolAudienceChoice } from "./ace-notice-school-audience";
 import type {
   CreateNoticeDraftDto,
   ListNoticeDraftsDto,
@@ -25,6 +26,8 @@ const draftSelect = {
   title: true,
   body: true,
   audience: true,
+  audienceScope: true,
+  audienceTargetId: true,
   requiresAcknowledgement: true,
   scheduledAt: true,
   scheduleFailedAt: true,
@@ -38,6 +41,8 @@ const draftSummarySelect = {
   id: true,
   title: true,
   audience: true,
+  audienceScope: true,
+  audienceTargetId: true,
   requiresAcknowledgement: true,
   scheduledAt: true,
   scheduleFailedAt: true,
@@ -66,8 +71,10 @@ export class AceNoticeDraftsService {
   ): Promise<NoticeDraft> {
     assertNoticeActor(actor);
     this.assertFutureExpiry(command.expiresAt);
+    assertSchoolAudienceChoice(command.audience, command);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireSiteNoticeStaffAccess(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
+      this.assertSchoolScope(command.audienceScope, site.vertical);
       const notice = await tx.aceNotice.create({
         data: {
           tenantId: actor.tenantId,
@@ -75,6 +82,8 @@ export class AceNoticeDraftsService {
           title: command.title,
           body: command.body,
           audience: command.audience,
+          audienceScope: command.audienceScope,
+          audienceTargetId: command.audienceTargetId,
           requiresAcknowledgement: command.requiresAcknowledgement,
           expiresAt: command.expiresAt ? new Date(command.expiresAt) : null,
         },
@@ -162,12 +171,14 @@ export class AceNoticeDraftsService {
   ): Promise<NoticeDraft> {
     assertNoticeActor(actor);
     this.assertFutureExpiry(command.expiresAt);
+    assertSchoolAudienceChoice(command.audience, command);
     const expectedUpdatedAt = new Date(command.expectedUpdatedAt);
     const updatedAt = new Date(
       Math.max(Date.now(), expectedUpdatedAt.getTime() + 1),
     );
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireSiteNoticeStaffAccess(tx, actor);
+      const site = await requireSiteNoticeStaffAccess(tx, actor);
+      this.assertSchoolScope(command.audienceScope, site.vertical);
       const result = await tx.aceNotice.updateMany({
         where: {
           id,
@@ -181,6 +192,8 @@ export class AceNoticeDraftsService {
           title: command.title,
           body: command.body,
           audience: command.audience,
+          audienceScope: command.audienceScope,
+          audienceTargetId: command.audienceTargetId,
           ...(command.requiresAcknowledgement !== undefined
             ? { requiresAcknowledgement: command.requiresAcknowledgement }
             : {}),
@@ -213,6 +226,14 @@ export class AceNoticeDraftsService {
   private assertFutureExpiry(expiresAt: string | null): void {
     if (expiresAt && !(new Date(expiresAt).getTime() > Date.now())) {
       throw new BadRequestException("Notice expiry must be in the future");
+    }
+  }
+
+  private assertSchoolScope(scope: string, vertical: string | null): void {
+    if (scope !== "SITE" && vertical !== "ACE_SCHOOL") {
+      throw new BadRequestException(
+        "School audiences require an ACE school site",
+      );
     }
   }
 

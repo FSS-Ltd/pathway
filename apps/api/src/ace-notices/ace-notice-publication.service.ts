@@ -23,6 +23,7 @@ import type {
   PublishNoticeDto,
   WithdrawNoticeDto,
 } from "./dto/ace-notice-publication.dto";
+import { noticeAudienceTarget } from "./ace-notice-school-audience";
 
 const recipientBatchSize = 500;
 
@@ -42,7 +43,13 @@ export class AceNoticePublicationService {
           scheduledAt: null,
           legacyImportedAt: null,
         },
-        select: { id: true, audience: true, updatedAt: true },
+        select: {
+          id: true,
+          audience: true,
+          audienceScope: true,
+          audienceTargetId: true,
+          updatedAt: true,
+        },
       });
       if (!notice) throw new NotFoundException("Notice draft not found");
       const recipients = await resolveNoticeAudience(
@@ -51,6 +58,7 @@ export class AceNoticePublicationService {
         notice.audience,
         site.parentPortalEnabled,
         new Date(),
+        noticeAudienceTarget(notice.audienceScope, notice.audienceTargetId),
       );
       return {
         recipientCount: recipients.length,
@@ -134,6 +142,7 @@ export class AceNoticePublicationService {
         notice.audience,
         site.parentPortalEnabled,
         now,
+        noticeAudienceTarget(notice.audienceScope, notice.audienceTargetId),
       );
       if (
         recipients.length === 0 ||

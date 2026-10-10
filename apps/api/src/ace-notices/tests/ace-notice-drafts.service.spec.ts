@@ -26,6 +26,8 @@ const content = {
   title: draft.title,
   body: draft.body,
   audience: draft.audience,
+  audienceScope: "SITE" as const,
+  audienceTargetId: null,
   requiresAcknowledgement: draft.requiresAcknowledgement,
   expiresAt: null,
 };
@@ -214,6 +216,8 @@ describe("AceNoticeDraftsService", () => {
         title: draft.title,
         body: draft.body,
         audience: draft.audience,
+        audienceScope: "SITE",
+        audienceTargetId: null,
         expiresAt: null,
         expectedUpdatedAt: revision.toISOString(),
       },

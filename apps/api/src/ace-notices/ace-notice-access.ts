@@ -24,11 +24,23 @@ export function assertNoticeActor(actor: NoticeActor): void {
 export async function requireSiteNoticeStaffAccess(
   tx: Prisma.TransactionClient,
   actor: NoticeActor,
-): Promise<{ parentPortalEnabled: boolean }> {
+): Promise<{
+  parentPortalEnabled: boolean;
+  vertical: string | null;
+  timezone: string | null;
+}> {
   const [site, membership, student] = await Promise.all([
     tx.tenant.findFirst({
       where: { id: actor.tenantId, orgId: actor.orgId },
-      select: { org: { select: { parentPortalEnabled: true } } },
+      select: {
+        timezone: true,
+        org: {
+          select: {
+            parentPortalEnabled: true,
+            orgVertical: { select: { vertical: true } },
+          },
+        },
+      },
     }),
     tx.siteMembership.findFirst({
       where: { tenantId: actor.tenantId, userId: actor.userId },
@@ -43,5 +55,9 @@ export async function requireSiteNoticeStaffAccess(
   if (!membership || student) {
     throw new ForbiddenException("Site notice staff access denied");
   }
-  return { parentPortalEnabled: site.org.parentPortalEnabled };
+  return {
+    parentPortalEnabled: site.org.parentPortalEnabled,
+    vertical: site.org.orgVertical?.vertical ?? null,
+    timezone: site.timezone,
+  };
 }

@@ -941,4 +941,208 @@ describe("ACE notice draft API", () => {
       .set("Authorization", guardianAuthorization);
     expect(hidden.status).toBe(404);
   });
+
+  it("publishes school roster audiences without widening staff or guardian reads", async () => {
+    if (!app) return;
+    const yearId = randomUUID();
+    const bandId = randomUUID();
+    const groupId = randomUUID();
+    const foreignGroupId = randomUUID();
+    const thisYear = new Date().getUTCFullYear();
+    const startsOn = new Date(Date.UTC(thisYear - 1, 0, 1));
+    const endsOn = new Date(Date.UTC(thisYear + 1, 11, 31));
+    await prisma.academicYear.create({
+      data: {
+        id: yearId,
+        tenantId: siteId,
+        name: `Notice year ${yearId}`,
+        startsOn,
+        endsOn,
+      },
+    });
+    await prisma.aceYearBand.create({
+      data: { id: bandId, tenantId: siteId, name: `Notice band ${bandId}` },
+    });
+    await prisma.group.createMany({
+      data: [
+        { id: groupId, tenantId: siteId, name: `Notice group ${groupId}` },
+        {
+          id: foreignGroupId,
+          tenantId: otherSiteId,
+          name: `Notice group ${foreignGroupId}`,
+        },
+      ],
+    });
+    await prisma.child.update({ where: { id: childId }, data: { groupId } });
+    await prisma.aceSchoolEnrollment.create({
+      data: {
+        tenantId: siteId,
+        childId,
+        academicYearId: yearId,
+        yearBandId: bandId,
+        startsOn,
+      },
+    });
+    const assignment = await prisma.aceStaffYearBandAssignment.create({
+      data: {
+        tenantId: siteId,
+        yearBandId: bandId,
+        userId: readerId,
+        startsOn,
+      },
+    });
+
+    async function publishTarget(
+      scope: "YEAR_BAND" | "GROUP" | "CHILD",
+      targetId: string,
+      audience: "PARENTS" | "PARENTS_AND_STAFF",
+    ) {
+      const created = await request(app!.getHttpServer())
+        .post("/ace/notices/drafts")
+        .set("Authorization", managerAuthorization)
+        .send({
+          title: `${scope} notice`,
+          body: "This notice follows the selected roster.",
+          audience,
+          audienceScope: scope,
+          audienceTargetId: targetId,
+          expiresAt: null,
+        });
+      expect(created.status).toBe(201);
+      const preview = await request(app!.getHttpServer())
+        .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+        .set("Authorization", managerAuthorization);
+      expect(preview.status).toBe(200);
+      expect(preview.body.recipientCount).toBeGreaterThan(0);
+      const published = await request(app!.getHttpServer())
+        .post(`/ace/notices/${created.body.id}/publish`)
+        .set("Authorization", managerAuthorization)
+        .send({
+          expectedUpdatedAt: created.body.updatedAt,
+          expectedAudienceVersion: preview.body.audienceVersion,
+        });
+      expect(published.status).toBe(201);
+      return created.body.id as string;
+    }
+
+    try {
+      const targets = await request(app.getHttpServer())
+        .get("/ace/notices/targets?scope=YEAR_BAND")
+        .set("Authorization", managerAuthorization);
+      expect(targets.status).toBe(200);
+      expect(targets.body.items).toContainEqual({
+        id: bandId,
+        label: `Notice band ${bandId}`,
+      });
+
+      const classNoticeId = await publishTarget(
+        "YEAR_BAND",
+        bandId,
+        "PARENTS_AND_STAFF",
+      );
+      const parentPath = `/ace/parent/sites/${siteId}/notices/${classNoticeId}`;
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get(parentPath)
+            .set("Authorization", guardianAuthorization)
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get(`/ace/notices/${classNoticeId}`)
+            .set("Authorization", readerAuthorization)
+        ).status,
+      ).toBe(200);
+
+      await prisma.aceStaffYearBandAssignment.delete({
+        where: { id: assignment.id },
+      });
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get(`/ace/notices/${classNoticeId}`)
+            .set("Authorization", readerAuthorization)
+        ).status,
+      ).toBe(404);
+
+      const groupNoticeId = await publishTarget("GROUP", groupId, "PARENTS");
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get(`/ace/parent/sites/${siteId}/notices/${groupNoticeId}`)
+            .set("Authorization", guardianAuthorization)
+        ).status,
+      ).toBe(200);
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get(`/ace/notices/${groupNoticeId}`)
+            .set("Authorization", readerAuthorization)
+        ).status,
+      ).toBe(404);
+
+      const childNoticeId = await publishTarget("CHILD", childId, "PARENTS");
+      await prisma.guardianChildRelationship.updateMany({
+        where: {
+          tenantId: siteId,
+          guardianIdentityId: parentGuardianId,
+          childId,
+        },
+        data: { endedAt: new Date() },
+      });
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get(`/ace/parent/sites/${siteId}/notices/${childNoticeId}`)
+            .set("Authorization", guardianAuthorization)
+        ).status,
+      ).toBe(404);
+
+      const foreignDraft = await request(app.getHttpServer())
+        .post("/ace/notices/drafts")
+        .set("Authorization", managerAuthorization)
+        .send({
+          title: "Foreign group",
+          body: "This must never publish.",
+          audience: "PARENTS",
+          audienceScope: "GROUP",
+          audienceTargetId: foreignGroupId,
+          expiresAt: null,
+        });
+      expect(foreignDraft.status).toBe(201);
+      expect(
+        (
+          await request(app.getHttpServer())
+            .get(`/ace/notices/drafts/${foreignDraft.body.id}/audience-preview`)
+            .set("Authorization", managerAuthorization)
+        ).status,
+      ).toBe(404);
+    } finally {
+      await prisma.guardianChildRelationship.updateMany({
+        where: {
+          tenantId: siteId,
+          guardianIdentityId: parentGuardianId,
+          childId,
+        },
+        data: { endedAt: null },
+      });
+      await prisma.aceStaffYearBandAssignment.deleteMany({
+        where: { tenantId: siteId, yearBandId: bandId },
+      });
+      await prisma.aceSchoolEnrollment.deleteMany({
+        where: { tenantId: siteId, yearBandId: bandId },
+      });
+      await prisma.child.update({
+        where: { id: childId },
+        data: { groupId: null },
+      });
+      await prisma.group.deleteMany({
+        where: { id: { in: [groupId, foreignGroupId] } },
+      });
+      await prisma.aceYearBand.delete({ where: { id: bandId } });
+      await prisma.academicYear.delete({ where: { id: yearId } });
+    }
+  });
 });

@@ -82,6 +82,29 @@ class and guardian relationship rules belong to the ACE extension; they must
 not widen access to the shared site-wide notice stream. ACE-M13 remains open
 until these audience and scheduling requirements are delivered and tested.
 
+For ACE school targeting, the school approved three existing roster sources:
+"class" is an active `AceYearBand` with current `AceSchoolEnrollment` rows;
+"group" is an active site `Group` with current `Child.groupId` membership;
+"guardian-specific" addresses the current full-access guardians of one
+selected non-guest `Child`. A year-band notice may address currently assigned
+`AceStaffYearBandAssignment` staff and/or guardians of enrolled children.
+Group and one-child notices address guardians only: `StaffPreferredGroup` is
+a preference, not an assignment or access grant. The API rejects these scopes
+outside an `ACE_SCHOOL` organisation and rejects targets from another site.
+Only the school scope fields extend the canonical `AceNotice` record; `SITE`
+remains the default for every site model and every historical notice.
+
+The publication snapshot stores the qualifying child IDs on each targeted
+guardian recipient. Later class or group moves do not rewrite a published
+audience; losing every current full-access relationship to those children
+does remove body, detail, read, and acknowledgement access. A targeted staff
+reader must also retain a current assignment to the notice's year band. The
+scheduled-audience hash includes the recipient child IDs, so roster changes
+before publication require another preview. Target metadata and recipient
+child snapshots are immutable after publication. The staff picker searches
+bounded site-scoped target options; it never exposes a target from another
+site.
+
 ## Data and lifecycle
 
 `AceNotice` has a draft (`publishedAt = null`) and a published state. Draft

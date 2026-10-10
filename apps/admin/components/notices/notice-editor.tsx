@@ -13,16 +13,20 @@ import {
   updateNoticeDraft,
   type NoticeAudience,
   type NoticeAudiencePreview,
+  type NoticeAudienceScope,
   type NoticeDraftInput,
 } from "@/lib/ace-notice-api";
 import { requestFailure } from "@/lib/request-error";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { hasPermission } from "@/lib/access";
+import { NoticeAudiencePicker } from "./notice-audience-picker";
 
 type FormState = {
   title: string;
   body: string;
   audience: NoticeAudience;
+  audienceScope: NoticeAudienceScope;
+  audienceTargetId: string | null;
   requiresAcknowledgement: boolean;
   expiresAtLocal: string;
 };
@@ -31,6 +35,8 @@ const emptyForm: FormState = {
   title: "",
   body: "",
   audience: "STAFF",
+  audienceScope: "SITE",
+  audienceTargetId: null,
   requiresAcknowledgement: false,
   expiresAtLocal: "",
 };
@@ -51,6 +57,15 @@ function validate(form: FormState): NoticeDraftInput {
   if (!body || body.length > 20_000) {
     throw new Error("Enter a message of 1 to 20,000 characters.");
   }
+  if ((form.audienceScope === "SITE") !== (form.audienceTargetId === null)) {
+    throw new Error("Choose a target for this school audience.");
+  }
+  if (
+    (form.audienceScope === "GROUP" || form.audienceScope === "CHILD") &&
+    form.audience !== "PARENTS"
+  ) {
+    throw new Error("Group and child notices can only address guardians.");
+  }
   const expiryDate = form.expiresAtLocal ? new Date(form.expiresAtLocal) : null;
   if (expiryDate && Number.isNaN(expiryDate.getTime())) {
     throw new Error("Enter a valid expiry date and time.");
@@ -63,6 +78,8 @@ function validate(form: FormState): NoticeDraftInput {
     title,
     body,
     audience: form.audience,
+    audienceScope: form.audienceScope,
+    audienceTargetId: form.audienceTargetId,
     requiresAcknowledgement: form.requiresAcknowledgement,
     expiresAt,
   };
@@ -97,6 +114,8 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
           title: draft.title,
           body: draft.body,
           audience: draft.audience,
+          audienceScope: draft.audienceScope,
+          audienceTargetId: draft.audienceTargetId,
           requiresAcknowledgement: draft.requiresAcknowledgement,
           expiresAtLocal: localDateTime(draft.expiresAt),
         });
@@ -118,6 +137,19 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
 
   function change<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+    setDirty(true);
+    setPreview(null);
+    setSuccess(null);
+  }
+
+  function changeScope(scope: NoticeAudienceScope) {
+    setForm((current) => ({
+      ...current,
+      audienceScope: scope,
+      audienceTargetId: null,
+      audience:
+        scope === "GROUP" || scope === "CHILD" ? "PARENTS" : current.audience,
+    }));
     setDirty(true);
     setPreview(null);
     setSuccess(null);
@@ -297,9 +329,15 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                     change("audience", event.target.value as NoticeAudience)
                   }
                 >
-                  <option value="PARENTS_AND_STAFF">Parents and staff</option>
+                  {form.audienceScope === "SITE" ||
+                  form.audienceScope === "YEAR_BAND" ? (
+                    <option value="PARENTS_AND_STAFF">Parents and staff</option>
+                  ) : null}
                   <option value="PARENTS">Parents</option>
-                  <option value="STAFF">Staff</option>
+                  {form.audienceScope === "SITE" ||
+                  form.audienceScope === "YEAR_BAND" ? (
+                    <option value="STAFF">Staff</option>
+                  ) : null}
                 </Select>
               </div>
               <div className="space-y-2">
@@ -314,6 +352,15 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                 />
               </div>
             </div>
+            <NoticeAudiencePicker
+              scope={form.audienceScope}
+              targetId={form.audienceTargetId}
+              pending={pending}
+              onScopeChange={changeScope}
+              onTargetChange={(targetId) =>
+                change("audienceTargetId", targetId)
+              }
+            />
             {error ? (
               <p role="alert" className="text-sm text-status-danger">
                 {error}
@@ -354,7 +401,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
         <Card title="Ready to send">
           <p className="text-sm text-text-primary">
             {preview.recipientCount} eligible{" "}
-            {preview.recipientCount === 1 ? "person" : "people"} at this site.
+            {preview.recipientCount === 1 ? "person" : "people"} for this reach.
             {preview.recipientCount > 0
               ? " Publication makes this notice available in their in-app inbox."
               : " No one can receive this notice yet. Check site memberships or guardian access before publishing."}
