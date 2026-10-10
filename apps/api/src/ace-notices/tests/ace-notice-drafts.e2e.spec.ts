@@ -483,7 +483,11 @@ describe("ACE notice draft API", () => {
           data: { requiresAcknowledgement: false },
         }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      message: expect.stringContaining(
+        "Published notice acknowledgement setting is immutable",
+      ),
+    });
     const guardianReceipt = await withTenantRlsContext(siteId, orgId, (tx) =>
       tx.aceNoticeReceipt.findFirst({
         where: {
@@ -504,7 +508,9 @@ describe("ACE notice draft API", () => {
           data: { acknowledgedAt: null },
         }),
       ),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("Notice acknowledgement is write-once"),
+    });
   });
 
   it("lists only active staff-recipient notices and denies removed staff", async () => {
