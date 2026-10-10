@@ -126,6 +126,11 @@ BEGIN
 END;
 $$;
 
+-- Historical announcements span sites. Fail the migration if its role would
+-- silently see a tenant-filtered subset of the source during collision checks
+-- or backfill.
+SET row_security = off;
+
 DO $$
 BEGIN
   IF EXISTS (
@@ -210,3 +215,5 @@ SELECT
   END,
   source."publishedAt", source."createdAt", source."updatedAt", pg_catalog.clock_timestamp()
 FROM public."Announcement" source;
+
+RESET row_security;
