@@ -25,9 +25,20 @@ function signature(payload: NoticeCursorPayload): string {
     .digest("base64url");
 }
 
-export function noticeCursorScope(tenantId: string, userId: string): string {
+export function noticeCursorScope(
+  tenantId: string,
+  userId: string,
+  reader: "staff" | "parent" = "staff",
+  guardianId?: string,
+): string {
   return createHash("sha256")
-    .update(JSON.stringify(["staff", tenantId, userId]))
+    .update(
+      JSON.stringify(
+        guardianId
+          ? [reader, tenantId, userId, guardianId]
+          : [reader, tenantId, userId],
+      ),
+    )
     .digest("base64url");
 }
 

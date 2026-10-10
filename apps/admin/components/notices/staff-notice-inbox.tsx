@@ -3,11 +3,12 @@
 import * as React from "react";
 import { ArrowLeft, MailOpen } from "lucide-react";
 import { Button } from "@pathway/ui";
-import type {
-  StaffNoticeDetail,
-  StaffNoticeSummary,
-} from "@/lib/ace-notice-api";
-import { useStaffNotices } from "./use-staff-notices";
+import {
+  useStaffNotices,
+  type NoticeDetail as NoticeDetailData,
+  type NoticeSummary,
+  type useNoticeInbox,
+} from "./use-staff-notices";
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -22,7 +23,8 @@ function formatDate(value: string): string {
       });
 }
 
-function audienceLabel(audience: StaffNoticeSummary["audience"]): string {
+function audienceLabel(audience: NoticeSummary["audience"]): string {
+  if (!audience) return "School notice";
   return audience === "STAFF" ? "Staff" : "Parents and staff";
 }
 
@@ -32,7 +34,7 @@ function NoticeDetail({
   readError,
   onRead,
 }: {
-  notice: StaffNoticeDetail;
+  notice: NoticeDetailData;
   readPending: boolean;
   readError: string | null;
   onRead: () => void;
@@ -82,18 +84,28 @@ function NoticeDetail({
   );
 }
 
-export function StaffNoticeInbox() {
-  const inbox = useStaffNotices();
+export function NoticeInboxView({
+  inbox,
+  reader,
+}: {
+  inbox: ReturnType<typeof useNoticeInbox>;
+  reader: "staff" | "parent";
+}) {
+  const isParent = reader === "parent";
   return (
     <main className="mx-auto flex min-w-0 max-w-6xl flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-accent-strong">Community</p>
+          <p className="text-sm font-medium text-accent-strong">
+            {isParent ? "ACE / Family" : "Community"}
+          </p>
           <h1 className="mt-1 font-heading text-2xl font-semibold text-text-primary sm:text-3xl">
-            Staff notices
+            {isParent ? "School notices" : "Staff notices"}
           </h1>
           <p className="mt-1 text-sm leading-6 text-text-muted">
-            Published updates for staff at your active site.
+            {isParent
+              ? "Updates published for your family at this school."
+              : "Published updates for staff at your active site."}
           </p>
         </div>
         <Button
@@ -109,7 +121,7 @@ export function StaffNoticeInbox() {
 
       <div className="grid min-h-[28rem] overflow-hidden rounded-2xl border border-border-subtle bg-surface shadow-card md:grid-cols-[minmax(15rem,21rem)_minmax(0,1fr)]">
         <section
-          aria-label="Staff notice list"
+          aria-label={isParent ? "School notice list" : "Staff notice list"}
           className={`${inbox.selectedId ? "hidden md:block" : "block"} min-w-0 border-border-subtle md:border-r`}
         >
           <div className="border-b border-border-subtle px-5 py-4">
@@ -149,7 +161,9 @@ export function StaffNoticeInbox() {
                 No current notices
               </p>
               <p className="mt-1 text-sm text-text-muted">
-                Published staff notices for this site will appear here.
+                {isParent
+                  ? "Published school notices for your family will appear here."
+                  : "Published staff notices for this site will appear here."}
               </p>
             </div>
           ) : null}
@@ -259,4 +273,9 @@ export function StaffNoticeInbox() {
       </div>
     </main>
   );
+}
+
+export function StaffNoticeInbox() {
+  const inbox = useStaffNotices();
+  return <NoticeInboxView inbox={inbox} reader="staff" />;
 }

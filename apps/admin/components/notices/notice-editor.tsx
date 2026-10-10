@@ -241,12 +241,6 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                   <option value="PARENTS">Parents</option>
                   <option value="STAFF">Staff</option>
                 </Select>
-                {form.audience !== "STAFF" ? (
-                  <p className="text-xs text-text-muted">
-                    Parent notices can be drafted now. Publishing awaits the
-                    family inbox.
-                  </p>
-                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="notice-expiry">Expires (optional)</Label>
@@ -301,20 +295,14 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
           <p className="text-sm text-text-primary">
             {preview.recipientCount} eligible{" "}
             {preview.recipientCount === 1 ? "person" : "people"} at this site.
-            {form.audience !== "STAFF"
-              ? " The family inbox is not available yet, so this draft cannot be published here."
-              : preview.recipientCount > 0
-                ? " Publication makes this notice available in their in-app inbox."
-                : " No one can receive this notice yet. Check site memberships or guardian access before publishing."}
+            {preview.recipientCount > 0
+              ? " Publication makes this notice available in their in-app inbox."
+              : " No one can receive this notice yet. Check site memberships or guardian access before publishing."}
           </p>
           <Button
             type="button"
             className="mt-4"
-            disabled={
-              pending ||
-              preview.recipientCount === 0 ||
-              form.audience !== "STAFF"
-            }
+            disabled={pending || preview.recipientCount === 0}
             onClick={() => void act("publish")}
           >
             {pending ? "Publishing…" : "Publish notice"}
