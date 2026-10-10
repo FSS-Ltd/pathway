@@ -3330,62 +3330,128 @@ export async function updateChild(
   return mapApiChildDetailToAdmin(json);
 }
 
-/** Link an existing parent to a child by email. Caller must be a linked parent. */
-export async function linkParentToChild(
+export type GuardianInvite = {
+  id: string;
+  email: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+};
+
+export type GuardianInviteReviewBasis = "SCHOOL_RECORDS" | "LEGAL_DOCUMENT";
+
+export async function listGuardianInvites(
   childId: string,
-  email: string,
-): Promise<{ linked: true; parentId: string } | { userNotFound: true }> {
-  if (isUsingMockApi()) {
-    return { userNotFound: true };
-  }
-  const res = await fetch(`${API_BASE_URL}/children/${childId}/link-parent`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-    body: JSON.stringify({ email: email.trim() }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to link parent: ${res.status} ${body}`);
-  }
-  return res.json() as Promise<
-    { linked: true; parentId: string } | { userNotFound: true }
-  >;
+): Promise<GuardianInvite[]> {
+  if (isUsingMockApi()) return [];
+  const response = await fetch(
+    `${API_BASE_URL}/family-invites/guardian/children/${childId}`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!response.ok)
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to load guardian invitations.",
+    );
+  return response.json() as Promise<GuardianInvite[]>;
 }
 
-/** Invite a parent to a child. ORG_ADMIN or linked parent only. Links if user exists, creates+invites if not. */
-export async function inviteParentToChild(
+export async function createGuardianInvite(
   childId: string,
   email: string,
-  name?: string,
-): Promise<
-  | { linked: true; parentId: string }
-  | { invited: true; parentId: string }
-  | { userNotFound: true }
-> {
-  if (isUsingMockApi()) {
-    return { userNotFound: true };
-  }
-  const res = await fetch(`${API_BASE_URL}/children/${childId}/invite-parent`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-    body: JSON.stringify({
-      email: email.trim(),
-      name: name?.trim() || undefined,
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Failed to invite parent: ${res.status} ${body}`);
-  }
-  return res.json() as Promise<
-    | { linked: true; parentId: string }
-    | { invited: true; parentId: string }
-    | { userNotFound: true }
-  >;
+  reviewBasis: GuardianInviteReviewBasis,
+): Promise<GuardianInvite> {
+  if (isUsingMockApi()) throw new Error("Invitations require the API.");
+  const response = await fetch(
+    `${API_BASE_URL}/family-invites/guardian/children/${childId}`,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      body: JSON.stringify({
+        email: email.trim(),
+        reviewBasis,
+        confirmedLegalAccess: true,
+      }),
+    },
+  );
+  if (!response.ok)
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to send guardian invitation.",
+    );
+  return response.json() as Promise<GuardianInvite>;
+}
+
+export async function updateGuardianInvite(
+  inviteId: string,
+  action: "resend" | "revoke",
+): Promise<void> {
+  if (isUsingMockApi()) throw new Error("Invitations require the API.");
+  const response = await fetch(
+    `${API_BASE_URL}/family-invites/guardian/${inviteId}/${action}`,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+    },
+  );
+  if (!response.ok)
+    throw await apiErrorFromResponse(
+      response,
+      `Unable to ${action} guardian invitation.`,
+    );
+}
+
+export type GuardianInviteForRecipient = {
+  id: string;
+  siteName: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  revokedAt: string | null;
+};
+
+export async function getGuardianInviteForRecipient(
+  siteId: string,
+  inviteId: string,
+): Promise<GuardianInviteForRecipient> {
+  const response = await fetch(
+    `${API_BASE_URL}/family-invites/sites/${siteId}/${inviteId}`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+    },
+  );
+  if (!response.ok)
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to load this invitation.",
+    );
+  return response.json() as Promise<GuardianInviteForRecipient>;
+}
+
+export async function acceptGuardianInvite(
+  siteId: string,
+  inviteId: string,
+): Promise<void> {
+  const response = await fetch(
+    `${API_BASE_URL}/family-invites/sites/${siteId}/${inviteId}/accept`,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+    },
+  );
+  if (!response.ok)
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to accept this invitation.",
+    );
 }
 
 /** Upload internal child profile photo. Only admin or linked parent can upload. */

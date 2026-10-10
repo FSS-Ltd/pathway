@@ -8,6 +8,7 @@ const count = jest.fn();
 const tFindUnique = jest.fn(); // tenant
 const gFindUnique = jest.fn(); // group
 const uFindMany = jest.fn(); // users (guardians)
+const guardianRelationshipFindFirst = jest.fn();
 const snapshotFindFirst = jest.fn();
 const subscriptionFindFirst = jest.fn();
 
@@ -17,23 +18,12 @@ jest.mock("@pathway/db", () => ({
     tenant: { findUnique: tFindUnique },
     group: { findUnique: gFindUnique },
     user: { findMany: uFindMany },
+    guardianChildRelationship: { findFirst: guardianRelationshipFindFirst },
     orgEntitlementSnapshot: { findFirst: snapshotFindFirst },
     subscription: { findFirst: subscriptionFindFirst },
     $disconnect: jest.fn(),
   },
-  runTransaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
-    const mockTx = {
-      user: { update: jest.fn().mockResolvedValue({}), findFirst: jest.fn() },
-      siteMembership: { upsert: jest.fn().mockResolvedValue({}) },
-      child: { update: jest.fn().mockResolvedValue({}) },
-    };
-    return fn(mockTx as never);
-  }),
 }));
-
-const mockInvitesService = {
-  createInvite: jest.fn(),
-};
 
 const mockStorage = {
   downloadObject: jest.fn(),
@@ -41,14 +31,9 @@ const mockStorage = {
   uploadObject: jest.fn(),
 };
 
-jest.mock("../../invites/invites.service", () => ({
-  InvitesService: jest.fn().mockImplementation(() => mockInvitesService),
-}));
-
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { ChildrenService } from "../../children/children.service";
 import { SupabaseStorageService } from "../../common/storage/supabase-storage.service";
-import { InvitesService } from "../../invites/invites.service";
 
 describe("ChildrenService", () => {
   let svc: ChildrenService;
@@ -58,13 +43,33 @@ describe("ChildrenService", () => {
     jest.clearAllMocks();
     mockStorage.isConfigured.mockReturnValue(false);
     mockStorage.uploadObject.mockResolvedValue(null);
-    svc = new ChildrenService(
-      mockInvitesService as unknown as InvitesService,
-      mockStorage as unknown as SupabaseStorageService,
-    );
+    svc = new ChildrenService(mockStorage as unknown as SupabaseStorageService);
     snapshotFindFirst.mockResolvedValue(null);
     subscriptionFindFirst.mockResolvedValue({ planCode: "STARTER_MONTHLY" });
     count.mockResolvedValue(10);
+  });
+
+  it("requires an active, reviewed relationship for guardian child detail access", async () => {
+    guardianRelationshipFindFirst.mockResolvedValueOnce(null);
+    await expect(
+      svc.assertCanViewChild("child-a", tenantId, "guardian-a", false),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    guardianRelationshipFindFirst.mockResolvedValueOnce({
+      id: "relationship-a",
+    });
+    await expect(
+      svc.assertCanViewChild("child-a", tenantId, "guardian-a", false),
+    ).resolves.toBeUndefined();
+    expect(guardianRelationshipFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId,
+          childId: "child-a",
+          legalAccess: "FULL",
+          revokedAt: null,
+        }),
+      }),
+    );
   });
 
   describe("list", () => {

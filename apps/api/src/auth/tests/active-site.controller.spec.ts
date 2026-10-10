@@ -11,6 +11,7 @@ jest.mock("@pathway/db", () => ({
     orgMembership: { findMany: jest.fn() },
     user: { findUnique: jest.fn(), update: jest.fn() },
     tenant: { findMany: jest.fn() },
+    guardianChildRelationship: { findMany: jest.fn() },
   },
 }));
 
@@ -20,6 +21,8 @@ const siteMembershipFindMany = prisma.siteMembership
 const orgMembershipFindMany = prisma.orgMembership
   .findMany as unknown as jest.Mock;
 const userFindUnique = prisma.user.findUnique as unknown as jest.Mock;
+const guardianRelationshipFindMany = prisma.guardianChildRelationship
+  .findMany as unknown as jest.Mock;
 
 type DeclaredDependency = {
   index: number;
@@ -29,6 +32,48 @@ type DeclaredDependency = {
 describe("ActiveSiteController", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    guardianRelationshipFindMany.mockResolvedValue([]);
+  });
+
+  it("lists a guardian site without adding a staff membership", async () => {
+    siteMembershipFindMany.mockResolvedValue([]);
+    orgMembershipFindMany.mockResolvedValue([]);
+    guardianRelationshipFindMany.mockResolvedValue([
+      {
+        tenant: {
+          id: "site-a",
+          name: "School",
+          orgId: "org-a",
+          timezone: "Europe/London",
+          org: { name: "Organisation", slug: "org" },
+        },
+      },
+    ]);
+    userFindUnique.mockResolvedValue({ lastActiveTenantId: "site-a" });
+    const controller = new ActiveSiteController(new UserRolesService());
+    const result = await controller.getActiveSite(
+      { authUserId: "guardian-a", cookies: {} } as unknown as Parameters<
+        ActiveSiteController["getActiveSite"]
+      >[0],
+      { cookie: jest.fn() } as unknown as Parameters<
+        ActiveSiteController["getActiveSite"]
+      >[1],
+    );
+    expect(result.sites).toEqual([
+      expect.objectContaining({ id: "site-a", role: null }),
+    ]);
+    expect(guardianRelationshipFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          guardianIdentity: {
+            userId: "guardian-a",
+            user: { isActive: true },
+          },
+          legalAccess: "FULL",
+          revokedAt: null,
+        }),
+      }),
+    );
   });
 
   it("declares UserRolesService as an explicit constructor dependency", () => {

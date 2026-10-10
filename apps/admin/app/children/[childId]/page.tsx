@@ -7,14 +7,17 @@ import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft, Download } from "lucide-react";
 import { Badge, Button, Card, Input, Label, Select } from "@pathway/ui";
 import { ProfileHeaderCard } from "../../../components/profile-header-card";
-import { canAccessAdminSection, canAccessSafeguardingAdmin } from "../../../lib/access";
+import { GuardianInviteCard } from "../../../components/parents/guardian-invite-card";
+import {
+  canAccessAdminSection,
+  canAccessSafeguardingAdmin,
+} from "../../../lib/access";
 import { useAdminAccess } from "../../../lib/use-admin-access";
 import {
   exportAttendanceCsv,
   fetchChildForEdit,
   fetchChildById,
   fetchGroups,
-  inviteParentToChild,
   updateChild,
   uploadChildPhoto,
   type AdminChildGuardianContact,
@@ -45,7 +48,9 @@ export default function ChildDetailPage() {
     hasAdditionalNeeds: boolean;
     guardianContacts: AdminChildGuardianContact[];
   } | null>(null);
-  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>([]);
+  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [notFound, setNotFound] = React.useState(false);
@@ -63,17 +68,6 @@ export default function ChildDetailPage() {
   const [isUploadingPhoto, setIsUploadingPhoto] = React.useState(false);
   const [photoVersion, setPhotoVersion] = React.useState(0);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [addParentEmail, setAddParentEmail] = React.useState("");
-  const [addParentName, setAddParentName] = React.useState("");
-  const [addParentStatus, setAddParentStatus] = React.useState<
-    "idle" | "inviting" | "success" | "error"
-  >("idle");
-  const [addParentError, setAddParentError] = React.useState<string | null>(
-    null,
-  );
-  const [addParentSuccessMessage, setAddParentSuccessMessage] = React.useState<
-    string | null
-  >(null);
   const [exportFrom, setExportFrom] = React.useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -89,10 +83,7 @@ export default function ChildDetailPage() {
   const guardianIds = child?.guardianIds ?? [];
   const canEdit =
     isAdmin || (!!currentUserId && guardianIds.includes(currentUserId));
-  const isLinkedParent =
-    !!currentUserId && guardianIds.includes(currentUserId);
-  const canInviteParent =
-    (role?.isOrgAdmin ?? false) || isLinkedParent;
+  const canInviteParent = role?.isOrgAdmin ?? false;
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -175,9 +166,7 @@ export default function ChildDetailPage() {
       await load();
       toast.success("Profile saved successfully");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save changes",
-      );
+      setError(err instanceof Error ? err.message : "Failed to save changes");
     } finally {
       setIsSaving(false);
     }
@@ -189,7 +178,7 @@ export default function ChildDetailPage() {
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
-      const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] ?? "" : "";
+      const base64 = dataUrl.includes(",") ? (dataUrl.split(",")[1] ?? "") : "";
       if (!base64) return;
       setIsUploadingPhoto(true);
       setError(null);
@@ -199,50 +188,13 @@ export default function ChildDetailPage() {
         await load();
         toast.success("Photo updated successfully");
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to upload photo",
-        );
+        setError(err instanceof Error ? err.message : "Failed to upload photo");
       } finally {
         setIsUploadingPhoto(false);
       }
     };
     reader.readAsDataURL(file);
     e.target.value = "";
-  };
-
-  const handleInviteParent = async () => {
-    const email = addParentEmail.trim();
-    if (!email || !child || !canInviteParent) return;
-    setAddParentStatus("inviting");
-    setAddParentError(null);
-    try {
-      const result = await inviteParentToChild(childId, email, addParentName.trim() || undefined);
-      if ("linked" in result && result.linked) {
-        setAddParentStatus("success");
-        setAddParentSuccessMessage("Parent linked successfully.");
-        setAddParentEmail("");
-        setAddParentName("");
-        await load();
-        toast.success("Parent linked successfully");
-      } else if ("invited" in result && result.invited) {
-        setAddParentStatus("success");
-        setAddParentSuccessMessage(
-          "Invite sent. They will receive an email to sign in or sign up, then they will have access to this child.",
-        );
-        setAddParentEmail("");
-        setAddParentName("");
-        await load();
-        toast.success("Invite sent successfully");
-      } else {
-        setAddParentStatus("idle");
-        setAddParentError("Could not complete invite. Please try again.");
-      }
-    } catch (err) {
-      setAddParentStatus("error");
-      setAddParentError(
-        err instanceof Error ? err.message : "Failed to invite parent",
-      );
-    }
   };
 
   const renderFlag = (
@@ -323,16 +275,10 @@ export default function ChildDetailPage() {
               <h1 className="text-2xl font-bold tracking-tight text-text-primary">
                 Profile
               </h1>
-              <p className="mt-1 text-text-muted">
-                Child details and overview
-              </p>
+              <p className="mt-1 text-text-muted">Child details and overview</p>
             </div>
             {canEdit && (
-              <Button
-                size="sm"
-                disabled={isSaving}
-                onClick={handleSave}
-              >
+              <Button size="sm" disabled={isSaving} onClick={handleSave}>
                 {isSaving ? "Saving…" : "Save changes"}
               </Button>
             )}
@@ -344,7 +290,10 @@ export default function ChildDetailPage() {
             </div>
           )}
 
-          <div className="border-t border-dashed border-border-subtle" aria-hidden />
+          <div
+            className="border-t border-dashed border-border-subtle"
+            aria-hidden
+          />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <ProfileHeaderCard
@@ -359,9 +308,7 @@ export default function ChildDetailPage() {
                 childDetail.ageGroupLabel ??
                 undefined
               }
-              avatarSrc={
-                `/api/children/${child.id}/photo?v=${photoVersion}`
-              }
+              avatarSrc={`/api/children/${child.id}/photo?v=${photoVersion}`}
               badges={
                 <Badge variant={statusTone[childDetail.status]}>
                   {childDetail.status === "active" ? "Active" : "Inactive"}
@@ -446,9 +393,7 @@ export default function ChildDetailPage() {
                   <Select
                     id="child-photoConsent"
                     value={photoConsent ? "yes" : "no"}
-                    onChange={(e) =>
-                      setPhotoConsent(e.target.value === "yes")
-                    }
+                    onChange={(e) => setPhotoConsent(e.target.value === "yes")}
                     className="mt-1"
                     disabled={!canEdit}
                   >
@@ -456,7 +401,8 @@ export default function ChildDetailPage() {
                     <option value="no">No</option>
                   </Select>
                   <p className="mt-1 text-xs text-text-muted">
-                    This controls photos or videos used outside the internal attendance profile.
+                    This controls photos or videos used outside the internal
+                    attendance profile.
                   </p>
                 </div>
                 <div>
@@ -480,64 +426,7 @@ export default function ChildDetailPage() {
             </Card>
           </div>
 
-          {canInviteParent && (
-            <Card
-              title="Invite parent"
-              description="Add another parent or guardian. If they already have an account, they will be linked. Otherwise, they will receive an invite email to sign up."
-            >
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
-                <div className="min-w-0 flex-1">
-                  <Label htmlFor="add-parent-email">Email *</Label>
-                  <Input
-                    id="add-parent-email"
-                    type="email"
-                    value={addParentEmail}
-                    onChange={(e) => {
-                      setAddParentEmail(e.target.value);
-                      setAddParentStatus("idle");
-                      setAddParentError(null);
-                      setAddParentSuccessMessage(null);
-                    }}
-                    placeholder="e.g. partner@example.com"
-                    className="mt-1"
-                    disabled={addParentStatus === "inviting"}
-                  />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <Label htmlFor="add-parent-name">Name (optional)</Label>
-                  <Input
-                    id="add-parent-name"
-                    type="text"
-                    value={addParentName}
-                    onChange={(e) => setAddParentName(e.target.value)}
-                    placeholder="For new users"
-                    className="mt-1"
-                    disabled={addParentStatus === "inviting"}
-                  />
-                </div>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  onClick={handleInviteParent}
-                  disabled={
-                    !addParentEmail.trim() || addParentStatus === "inviting"
-                  }
-                >
-                  {addParentStatus === "inviting" ? "Inviting…" : "Invite parent"}
-                </Button>
-              </div>
-              {addParentSuccessMessage && (
-                <p className="mt-3 text-sm text-status-success">
-                  {addParentSuccessMessage}
-                </p>
-              )}
-              {addParentError && (
-                <p className="mt-3 text-sm text-status-danger">
-                  {addParentError}
-                </p>
-              )}
-            </Card>
-          )}
+          {canInviteParent ? <GuardianInviteCard childId={childId} /> : null}
 
           {childDetail.guardianContacts.length > 0 ? (
             <Card title="Parent / guardian contacts">
@@ -582,7 +471,8 @@ export default function ChildDetailPage() {
               )}
             </div>
             <p className="mt-3 text-sm text-text-muted">
-              Profile pictures are internal attendance aids and do not depend on organisation photo/video consent.
+              Profile pictures are internal attendance aids and do not depend on
+              organisation photo/video consent.
             </p>
           </Card>
 
@@ -642,7 +532,8 @@ export default function ChildDetailPage() {
 
           <Card title="Safeguarding">
             <p className="text-sm text-text-muted">
-              Safeguarding view is available to authorised roles from the Safeguarding section. No safeguarding detail is shown here.
+              Safeguarding view is available to authorised roles from the
+              Safeguarding section. No safeguarding detail is shown here.
             </p>
             {!isLoadingAccess && canAccessSafeguardingAdmin(role) ? (
               <Button asChild variant="outline" size="sm" className="mt-3">
