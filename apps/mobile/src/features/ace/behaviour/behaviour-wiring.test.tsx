@@ -149,7 +149,7 @@ afterEach(() => {
 });
 
 describe("behaviour API contracts", () => {
-  it("uses the exact policy, history, command, and correction routes", async () => {
+  it("uses the exact behaviour and review routes", async () => {
     jest.restoreAllMocks();
     const request = jest.spyOn(apiClient, "request").mockResolvedValue({});
     const input: behaviourApi.BehaviourCommandInput = {
@@ -167,6 +167,17 @@ describe("behaviour API contracts", () => {
     await behaviourApi.fetchBehaviourHistory({ childId: "child-1", limit: 25 });
     await behaviourApi.recordBehaviour(input);
     await behaviourApi.correctBehaviour("entry/1", input);
+    await behaviourApi.fetchDemeritStatus("child/1", "2026-10-10");
+    await behaviourApi.fetchBehaviourReviewRequests("child/1", "cursor/1");
+    await behaviourApi.fetchBehaviourReviewFact("request/1");
+    const override: behaviourApi.DemeritOverrideInput = {
+      childId: "child/1",
+      stage: 2,
+      expectedPolicyVersion: 4,
+      reason: "Escalation needed",
+      idempotencyKey: "override-1",
+    };
+    await behaviourApi.createDemeritOverride(override);
 
     expect(request.mock.calls).toEqual([
       ["/ace/behaviour/policy", { method: "GET" }],
@@ -176,11 +187,99 @@ describe("behaviour API contracts", () => {
         "/ace/behaviour/entry%2F1/corrections",
         { method: "POST", body: JSON.stringify(input) },
       ],
+      [
+        "/ace/behaviour/children/child%2F1/demerit-status?date=2026-10-10",
+        { method: "GET" },
+      ],
+      [
+        "/ace/behaviour/review-requests?childId=child%2F1&limit=10&cursor=cursor%2F1",
+        { method: "GET" },
+      ],
+      ["/ace/behaviour/review-requests/request%2F1/fact", { method: "GET" }],
+      [
+        "/ace/behaviour/demerit-overrides",
+        { method: "POST", body: JSON.stringify(override) },
+      ],
     ]);
   });
 });
 
 describe("BehaviourScreen", () => {
+  it("separates sensitive history and keeps review text out of the saved draft", async () => {
+    jest.spyOn(behaviourApi, "fetchBehaviourPermissions").mockResolvedValue({
+      orgId: "org-1",
+      tenantId: "site-1",
+      permissions: [
+        "ace.behaviour.read",
+        "ace.behaviour.record",
+        "ace.behaviour.sensitive.read",
+        "ace.behaviour.policy.manage",
+      ],
+    });
+    jest.spyOn(behaviourApi, "fetchBehaviourHistory").mockResolvedValue({
+      items: [
+        historyEntry,
+        {
+          ...historyEntry,
+          id: "private-entry",
+          category: "pastoral",
+          visibility: "SENSITIVE",
+          reason: "Private history reason",
+        },
+      ],
+    });
+    jest.spyOn(behaviourApi, "fetchDemeritStatus").mockResolvedValue(null);
+    jest.spyOn(behaviourApi, "fetchBehaviourReviewRequests").mockResolvedValue({
+      items: [
+        {
+          id: "review-1",
+          childId: "child-1",
+          behaviourEntryId: "entry-1",
+          demeritStageOverrideId: null,
+          kind: "SITE",
+          stage: 2,
+          policyVersion: 4,
+          requestedAt: "2026-08-12T09:30:00.000Z",
+        },
+      ],
+      nextCursor: null,
+    });
+    jest.spyOn(behaviourApi, "fetchBehaviourReviewFact").mockResolvedValue({
+      entry: {
+        ...historyEntry,
+        id: "private-fact",
+        visibility: "SENSITIVE",
+        reason: "Review-only private reason",
+      },
+    });
+
+    const screen = render(<BehaviourScreen />);
+    await waitFor(() =>
+      expect(screen.getByText("Demerit stage and review")).toBeTruthy(),
+    );
+    expect(screen.queryByText("Private history reason")).toBeNull();
+    fireEvent.press(screen.getByText("Sensitive history"));
+    expect(screen.getByText("Private history reason")).toBeTruthy();
+    fireEvent.press(screen.getByText("General history"));
+    expect(screen.queryByText("Private history reason")).toBeNull();
+
+    fireEvent.press(screen.getAllByText("Jordan Smith")[1]!);
+    await waitFor(() =>
+      expect(screen.getByText("View current fact")).toBeTruthy(),
+    );
+    fireEvent.press(screen.getByText("View current fact"));
+    await waitFor(() =>
+      expect(screen.getByText("Review-only private reason")).toBeTruthy(),
+    );
+    expect(
+      jest
+        .mocked(SecureStore.setItemAsync)
+        .mock.calls.some(([, value]) =>
+          value.includes("Review-only private reason"),
+        ),
+    ).toBe(false);
+  });
+
   it("discards a cached sensitive selection and never reveals sensitive mode without fresh permission", async () => {
     jest.spyOn(SecureStore, "getItemAsync").mockResolvedValue(sensitiveDraft());
     jest.spyOn(behaviourApi, "fetchBehaviourPolicy").mockResolvedValue({
@@ -296,7 +395,9 @@ describe("BehaviourScreen", () => {
         .mockResolvedValueOnce({ entry: historyEntry, duplicate: false });
       const screen = render(<BehaviourScreen />);
 
-      await waitFor(() => expect(screen.getByText("Jordan Smith")).toBeTruthy());
+      await waitFor(() =>
+        expect(screen.getByText("Jordan Smith")).toBeTruthy(),
+      );
       fireEvent.press(screen.getByText("Jordan Smith"));
       fireEvent.press(screen.getByText("Kindness"));
       fireEvent.changeText(screen.getByLabelText("Behaviour points"), "2");
