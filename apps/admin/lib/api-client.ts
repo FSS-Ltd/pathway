@@ -1228,6 +1228,50 @@ export type AdminBehaviourHistoryQuery = {
   limit?: number;
 };
 
+export type AdminDemeritStatus = {
+  childId: string;
+  date: string;
+  policyVersion: number;
+  stage: number;
+  stageLabel: string;
+  action: "none" | "review" | "notify" | "head-review";
+  requiresNote: boolean;
+  headReview: boolean;
+  manualStage: number | null;
+  manualExpiresAt: string | null;
+};
+
+export type AdminDemeritOverrideInput = {
+  childId: string;
+  stage: number;
+  expectedPolicyVersion: number;
+  reason: string;
+  idempotencyKey: string;
+};
+
+export type AdminDemeritOverrideResponse = {
+  id: string;
+  stage: number;
+  expiresAt: string;
+  duplicate: boolean;
+};
+
+export type AdminBehaviourReviewRequest = {
+  id: string;
+  childId: string;
+  behaviourEntryId: string | null;
+  demeritStageOverrideId: string | null;
+  kind: "SITE" | "HEAD";
+  stage: number;
+  policyVersion: number;
+  requestedAt: string;
+};
+
+export type AdminBehaviourReviewResponse = {
+  items: AdminBehaviourReviewRequest[];
+  nextCursor: string | null;
+};
+
 export class AdminBehaviourApiError extends Error {
   constructor(
     message: string,
@@ -1254,6 +1298,40 @@ export async function fetchBehaviourHistory(
   if (isUsingMockApi()) return { items: [] };
   return behaviourRequest<AdminBehaviourHistoryResponse>(
     `/ace/behaviour${behaviourQueryString(query)}`,
+  );
+}
+
+export function fetchDemeritStatus(
+  childId: string,
+  date: string,
+): Promise<AdminDemeritStatus | null> {
+  if (isUsingMockApi()) return Promise.resolve(null);
+  return behaviourRequest<AdminDemeritStatus | null>(
+    `/ace/behaviour/children/${encodeURIComponent(childId)}/demerit-status?date=${encodeURIComponent(date)}`,
+  );
+}
+
+export function createDemeritOverride(
+  input: AdminDemeritOverrideInput,
+): Promise<AdminDemeritOverrideResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("Demerit overrides are not available in mock mode.");
+  }
+  return behaviourRequest<AdminDemeritOverrideResponse>(
+    "/ace/behaviour/demerit-overrides",
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function fetchBehaviourReviewRequests(
+  childId: string,
+  cursor?: string,
+): Promise<AdminBehaviourReviewResponse> {
+  if (isUsingMockApi()) return Promise.resolve({ items: [], nextCursor: null });
+  const params = new URLSearchParams({ childId, limit: "10" });
+  if (cursor) params.set("cursor", cursor);
+  return behaviourRequest<AdminBehaviourReviewResponse>(
+    `/ace/behaviour/review-requests?${params.toString()}`,
   );
 }
 

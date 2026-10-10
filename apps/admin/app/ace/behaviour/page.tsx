@@ -5,12 +5,16 @@ import { useAdminContext } from "@/lib/admin-context";
 import { NoAccessCard } from "@/components/no-access-card";
 import { BehaviourForm } from "@/components/ace/behaviour/behaviour-form";
 import { BehaviourHistory } from "@/components/ace/behaviour/behaviour-history";
+import { BehaviourStageReview } from "@/components/ace/behaviour/behaviour-stage-review";
 import { isValidIanaTimeZone } from "@/components/ace/behaviour/behaviour-time";
 import {
   correctBehaviour,
+  createDemeritOverride,
   fetchBehaviourHistory,
   fetchBehaviourPolicy,
+  fetchBehaviourReviewRequests,
   fetchChildren,
+  fetchDemeritStatus,
   recordBehaviour,
   type AdminBehaviourCategory,
   type AdminBehaviourEntry,
@@ -26,6 +30,10 @@ export default function BehaviourPage() {
   const canSensitive = hasFreshPermission(
     permissions,
     "ace.behaviour.sensitive.read",
+  );
+  const canManagePolicy = hasFreshPermission(
+    permissions,
+    "ace.behaviour.policy.manage",
   );
   const [children, setChildren] = React.useState<
     Array<{ id: string; fullName: string }>
@@ -44,6 +52,7 @@ export default function BehaviourPage() {
   const siteTimeZone = activeSite?.timezone ?? null;
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [stageRefreshKey, setStageRefreshKey] = React.useState(0);
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -64,6 +73,7 @@ export default function BehaviourPage() {
       );
       setCategories(policy.categories);
       setHistory(nextHistory.items);
+      setStageRefreshKey((current) => current + 1);
     } catch (cause) {
       setError(
         requestFailure(cause, "Unable to load behaviour capture.").message,
@@ -111,6 +121,21 @@ export default function BehaviourPage() {
           disabled={isLoading}
           onSave={recordBehaviour}
           onSuccess={load}
+        />
+      ) : null}
+
+      {siteTimeZone && isValidIanaTimeZone(siteTimeZone) ? (
+        <BehaviourStageReview
+          key={`behaviour-stage-${activeSiteId}`}
+          children={children}
+          siteTimeZone={siteTimeZone}
+          canSensitive={canSensitive}
+          canManagePolicy={canManagePolicy}
+          refreshKey={stageRefreshKey}
+          loadStatus={fetchDemeritStatus}
+          loadRequests={fetchBehaviourReviewRequests}
+          saveOverride={createDemeritOverride}
+          onSaved={load}
         />
       ) : null}
 

@@ -6,6 +6,7 @@ import type {
   AdminBehaviourCommandInput,
   AdminBehaviourCommandResponse,
   AdminBehaviourEntry,
+  AdminBehaviourVisibility,
 } from "@/lib/api-client";
 import { formatSiteDateTime } from "./behaviour-time";
 
@@ -37,8 +38,11 @@ export function BehaviourHistory({
   onCorrect,
   onSuccess,
 }: BehaviourHistoryProps) {
+  const [visibility, setVisibility] =
+    React.useState<AdminBehaviourVisibility>("GENERAL");
+  const selectedVisibility = canSensitive ? visibility : "GENERAL";
   const visibleItems = items.filter(
-    (item) => item.visibility === "GENERAL" || canSensitive,
+    (item) => item.visibility === selectedVisibility,
   );
   const childNames = new Map(
     children.map((child) => [child.id, child.fullName]),
@@ -56,6 +60,10 @@ export function BehaviourHistory({
   }, [canSensitive, correctionTarget, items]);
 
   React.useEffect(() => {
+    if (!canSensitive) setVisibility("GENERAL");
+  }, [canSensitive]);
+
+  React.useEffect(() => {
     if (success) successRef.current?.focus();
   }, [success]);
 
@@ -66,10 +74,39 @@ export function BehaviourHistory({
           Behaviour history
         </h2>
         <p className="mt-1 text-sm text-text-muted">
-          Current records are shown newest first. Corrections create a linked
-          replacement and keep the original audit trail.
+          Up to 50 current records are shown newest first. Corrections create a
+          linked replacement and keep the original audit trail.
         </p>
       </div>
+
+      {canSensitive ? (
+        <fieldset className="mt-5">
+          <legend className="text-sm font-medium text-text-primary">
+            Record visibility
+          </legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(["GENERAL", "SENSITIVE"] as const).map((option) => (
+              <label
+                key={option}
+                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary"
+              >
+                <input
+                  type="radio"
+                  name="behaviour-history-visibility"
+                  value={option}
+                  checked={selectedVisibility === option}
+                  onChange={() => {
+                    setVisibility(option);
+                    setCorrectionTarget(null);
+                    setSuccess(null);
+                  }}
+                />
+                {option === "GENERAL" ? "General records" : "Sensitive records"}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
 
       {success ? (
         <div
@@ -109,7 +146,9 @@ export function BehaviourHistory({
 
       {!isLoading && !error && visibleItems.length === 0 ? (
         <p className="mt-5 rounded-md bg-muted p-4 text-sm text-text-muted">
-          No behaviour records yet.
+          {selectedVisibility === "SENSITIVE"
+            ? "No sensitive records in the recently loaded history."
+            : "No behaviour records yet."}
         </p>
       ) : null}
 
