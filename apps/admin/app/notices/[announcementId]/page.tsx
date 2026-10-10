@@ -10,6 +10,7 @@ import { requestFailure } from "@/lib/request-error";
 import { useAdminContext } from "@/lib/admin-context";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { hasPermission } from "@/lib/access";
+import { NoticeReceiptSummary } from "@/components/notices/notice-receipt-summary";
 import {
   AdminAnnouncementDetail,
   fetchAnnouncementById,
@@ -209,6 +210,11 @@ function NoticeDetailContent() {
               {announcement.audienceLabel ?? "Audience unavailable"}
             </p>
           </Card>
+          {announcement.status === "sent" &&
+          !announcement.legacyImportedAt &&
+          canPublish ? (
+            <NoticeReceiptSummary noticeId={announcementId} />
+          ) : null}
           {announcement.status === "sent" && canPublish ? (
             <Card title="Withdraw notice">
               {showWithdraw ? (

@@ -54,6 +54,15 @@ export class AceNoticeParentInboxController {
     );
   }
 
+  @Post(":id/acknowledge")
+  acknowledge(@Param("siteId") siteId: string, @Param("id") id: string) {
+    return this.service.acknowledge(
+      siteId,
+      this.userId(),
+      this.parse(noticeDraftIdSchema, id),
+    );
+  }
+
   private userId(): string {
     return this.requestContext.requireContext().user.userId;
   }

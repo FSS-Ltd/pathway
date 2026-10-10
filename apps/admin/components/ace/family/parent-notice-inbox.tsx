@@ -9,6 +9,7 @@ import {
   type NoticeSource,
 } from "@/components/notices/use-staff-notices";
 import {
+  acknowledgeParentNotice,
   fetchParentNotice,
   fetchParentNotices,
   markParentNoticeRead,
@@ -23,6 +24,7 @@ export function ParentNoticesView({ siteId }: { siteId: string }) {
       list: (cursor, signal) => fetchParentNotices(siteId, cursor, signal),
       get: (id, signal) => fetchParentNotice(siteId, id, signal),
       markRead: (id) => markParentNoticeRead(siteId, id),
+      acknowledge: (id) => acknowledgeParentNotice(siteId, id),
     }),
     [siteId],
   );

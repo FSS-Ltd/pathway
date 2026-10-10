@@ -25,6 +25,7 @@ const draftSelect = {
   title: true,
   body: true,
   audience: true,
+  requiresAcknowledgement: true,
   expiresAt: true,
   createdAt: true,
   updatedAt: true,
@@ -34,6 +35,7 @@ const draftSummarySelect = {
   id: true,
   title: true,
   audience: true,
+  requiresAcknowledgement: true,
   expiresAt: true,
   createdAt: true,
   updatedAt: true,
@@ -67,6 +69,7 @@ export class AceNoticeDraftsService {
           title: command.title,
           body: command.body,
           audience: command.audience,
+          requiresAcknowledgement: command.requiresAcknowledgement,
           expiresAt: command.expiresAt ? new Date(command.expiresAt) : null,
         },
         select: draftSelect,
@@ -171,6 +174,9 @@ export class AceNoticeDraftsService {
           title: command.title,
           body: command.body,
           audience: command.audience,
+          ...(command.requiresAcknowledgement !== undefined
+            ? { requiresAcknowledgement: command.requiresAcknowledgement }
+            : {}),
           expiresAt: command.expiresAt ? new Date(command.expiresAt) : null,
           updatedAt,
         },

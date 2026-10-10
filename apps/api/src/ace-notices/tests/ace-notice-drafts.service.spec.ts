@@ -17,6 +17,7 @@ const draft = {
   title: "School update",
   body: "Term starts Monday",
   audience: "PARENTS" as const,
+  requiresAcknowledgement: false,
   expiresAt: null,
   createdAt,
   updatedAt: revision,
@@ -25,6 +26,7 @@ const content = {
   title: draft.title,
   body: draft.body,
   audience: draft.audience,
+  requiresAcknowledgement: draft.requiresAcknowledgement,
   expiresAt: null,
 };
 
@@ -200,6 +202,24 @@ describe("AceNoticeDraftsService", () => {
       expect.objectContaining({
         data: expect.objectContaining({ action: "UPDATED" }),
       }),
+    );
+  });
+
+  it("preserves the acknowledgement setting when an older editor omits it", async () => {
+    const { service, tx } = createService();
+    await service.update(
+      draft.id,
+      {
+        title: draft.title,
+        body: draft.body,
+        audience: draft.audience,
+        expiresAt: null,
+        expectedUpdatedAt: revision.toISOString(),
+      },
+      actor,
+    );
+    expect(tx.aceNotice.updateMany.mock.calls[0]?.[0].data).not.toHaveProperty(
+      "requiresAcknowledgement",
     );
   });
 

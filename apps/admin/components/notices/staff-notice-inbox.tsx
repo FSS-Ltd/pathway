@@ -28,16 +28,29 @@ function audienceLabel(audience: NoticeSummary["audience"]): string {
   return audience === "STAFF" ? "Staff" : "Parents and staff";
 }
 
+function receiptStatus(notice: NoticeSummary): string {
+  if (notice.historical) return "Historical · read status unavailable";
+  const read = notice.readAt ? "Read" : "Unread";
+  if (!notice.requiresAcknowledgement) return read;
+  return `${read} · ${notice.acknowledgedAt ? "Acknowledged" : "Acknowledgement needed"}`;
+}
+
 function NoticeDetail({
   notice,
   readPending,
   readError,
   onRead,
+  ackPending,
+  ackError,
+  onAcknowledge,
 }: {
   notice: NoticeDetailData;
   readPending: boolean;
   readError: string | null;
   onRead: () => void;
+  ackPending: boolean;
+  ackError: string | null;
+  onAcknowledge: () => void;
 }) {
   return (
     <article className="min-w-0 space-y-5 p-5 sm:p-7">
@@ -60,23 +73,59 @@ function NoticeDetail({
           <p className="text-sm text-text-muted">
             Historical notice · read status was not recorded.
           </p>
-        ) : notice.readAt ? (
-          <p role="status" className="text-sm text-text-muted">
-            Marked as read {formatDate(notice.readAt)}
-          </p>
         ) : (
-          <Button
-            type="button"
-            className="min-h-11"
-            disabled={readPending}
-            onClick={onRead}
-          >
-            {readPending ? "Saving…" : "Mark as read"}
-          </Button>
+          <div className="space-y-3">
+            {notice.readAt ? (
+              <p role="status" className="text-sm text-text-muted">
+                Marked as read {formatDate(notice.readAt)}
+              </p>
+            ) : (
+              <Button
+                type="button"
+                variant={
+                  notice.requiresAcknowledgement ? "secondary" : "primary"
+                }
+                className="min-h-11"
+                disabled={readPending || ackPending}
+                onClick={onRead}
+              >
+                {readPending ? "Saving…" : "Mark as read"}
+              </Button>
+            )}
+            {notice.requiresAcknowledgement ? (
+              notice.acknowledgedAt ? (
+                <p
+                  role="status"
+                  className="text-sm font-medium text-status-success"
+                >
+                  Acknowledged {formatDate(notice.acknowledgedAt)}
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-text-muted">
+                    The publisher has requested your acknowledgement.
+                  </p>
+                  <Button
+                    type="button"
+                    className="min-h-11"
+                    disabled={ackPending || readPending}
+                    onClick={onAcknowledge}
+                  >
+                    {ackPending ? "Saving…" : "Acknowledge notice"}
+                  </Button>
+                </div>
+              )
+            ) : null}
+          </div>
         )}
         {readError ? (
           <p role="alert" className="mt-3 text-sm text-status-danger">
             {readError}
+          </p>
+        ) : null}
+        {ackError ? (
+          <p role="alert" className="mt-3 text-sm text-status-danger">
+            {ackError}
           </p>
         ) : null}
       </footer>
@@ -184,11 +233,7 @@ export function NoticeInboxView({
                     {formatDate(notice.publishedAt)}
                   </span>
                   <span className="mt-2 block text-xs font-medium text-accent-strong">
-                    {notice.historical
-                      ? "Historical · read status unavailable"
-                      : notice.readAt
-                        ? "Read"
-                        : "Unread"}
+                    {receiptStatus(notice)}
                   </span>
                 </button>
               </li>
@@ -253,6 +298,9 @@ export function NoticeInboxView({
               readPending={inbox.readPending}
               readError={inbox.readError}
               onRead={() => void inbox.markRead()}
+              ackPending={inbox.ackPending}
+              ackError={inbox.ackError}
+              onAcknowledge={() => void inbox.acknowledge()}
             />
           ) : null}
           {!inbox.selectedId ? (

@@ -409,6 +409,110 @@ describe("ACE notice draft API", () => {
     });
   });
 
+  it("records explicit acknowledgement once and reports only scoped aggregate receipts", async () => {
+    if (!app) return;
+    const created = await request(app.getHttpServer())
+      .post("/ace/notices/drafts")
+      .set("Authorization", managerAuthorization)
+      .send({
+        title: "Response requested",
+        body: "Please confirm that you read this notice.",
+        audience: "PARENTS_AND_STAFF",
+        requiresAcknowledgement: true,
+        expiresAt: null,
+      });
+    expect(created.status).toBe(201);
+    const preview = await request(app.getHttpServer())
+      .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+      .set("Authorization", managerAuthorization);
+    expect(preview.status).toBe(200);
+    const published = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send({
+        expectedUpdatedAt: created.body.updatedAt,
+        expectedAudienceVersion: preview.body.audienceVersion,
+      });
+    expect(published.status).toBe(201);
+
+    const parentDetail = await request(app.getHttpServer())
+      .get(`/ace/parent/sites/${siteId}/notices/${created.body.id}`)
+      .set("Authorization", guardianAuthorization);
+    expect(parentDetail.status).toBe(200);
+    expect(parentDetail.body).toMatchObject({
+      requiresAcknowledgement: true,
+      readAt: null,
+      acknowledgedAt: null,
+    });
+    const first = await request(app.getHttpServer())
+      .post(
+        `/ace/parent/sites/${siteId}/notices/${created.body.id}/acknowledge`,
+      )
+      .set("Authorization", guardianAuthorization);
+    expect(first.status).toBe(201);
+    expect(
+      new Date(first.body.acknowledgedAt).getTime(),
+    ).toBeGreaterThanOrEqual(new Date(first.body.readAt).getTime());
+    const repeated = await request(app.getHttpServer())
+      .post(
+        `/ace/parent/sites/${siteId}/notices/${created.body.id}/acknowledge`,
+      )
+      .set("Authorization", guardianAuthorization);
+    expect(repeated.status).toBe(201);
+    expect(repeated.body).toEqual(first.body);
+
+    const denied = await request(app.getHttpServer())
+      .get(`/ace/notices/${created.body.id}/receipts`)
+      .set("Authorization", readerAuthorization);
+    expect(denied.status).toBe(403);
+    const summary = await request(app.getHttpServer())
+      .get(`/ace/notices/${created.body.id}/receipts`)
+      .set("Authorization", managerAuthorization);
+    expect(summary.status).toBe(200);
+    expect(summary.body).toMatchObject({
+      recipientCount: preview.body.recipientCount,
+      deliveredCount: preview.body.recipientCount,
+      readCount: 1,
+      acknowledgedCount: 1,
+      requiresAcknowledgement: true,
+    });
+    await expect(
+      withTenantRlsContext(siteId, orgId, (tx) =>
+        tx.aceNotice.update({
+          where: { id: created.body.id },
+          data: { requiresAcknowledgement: false },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining(
+        "Published notice acknowledgement setting is immutable",
+      ),
+    });
+    const guardianReceipt = await withTenantRlsContext(siteId, orgId, (tx) =>
+      tx.aceNoticeReceipt.findFirst({
+        where: {
+          tenantId: siteId,
+          audienceMember: {
+            noticeId: created.body.id,
+            recipientUserId: guardianUserId,
+          },
+        },
+        select: { id: true },
+      }),
+    );
+    if (!guardianReceipt) throw new Error("Guardian receipt was not stored");
+    await expect(
+      withTenantRlsContext(siteId, orgId, (tx) =>
+        tx.aceNoticeReceipt.update({
+          where: { id: guardianReceipt.id },
+          data: { acknowledgedAt: null },
+        }),
+      ),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining("Notice acknowledgement is write-once"),
+    });
+  });
+
   it("lists only active staff-recipient notices and denies removed staff", async () => {
     if (!app) return;
     const created = await request(app.getHttpServer())

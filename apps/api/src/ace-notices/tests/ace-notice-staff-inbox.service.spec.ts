@@ -1,4 +1,8 @@
-import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { AceNoticeStaffInboxService } from "../ace-notice-staff-inbox.service";
 
@@ -10,6 +14,7 @@ const notice = {
   title: "Staff update",
   body: "Read this notice.",
   audience: "PARENTS_AND_STAFF" as const,
+  requiresAcknowledgement: false,
   publishedAt: new Date("2026-10-10T10:00:00.000Z"),
   expiresAt: null,
   legacyImportedAt: null,
@@ -19,6 +24,7 @@ const notice = {
         id: "receipt-a",
         deliveredAt: new Date("2026-10-10T10:00:00.000Z"),
         readAt: null,
+        acknowledgedAt: null,
       },
     },
   ],
@@ -45,6 +51,7 @@ function createTransaction() {
         readAt: new Date("2026-10-10T11:00:00.000Z"),
       }),
     },
+    $queryRaw: jest.fn(),
   };
 }
 
@@ -89,6 +96,8 @@ describe("AceNoticeStaffInboxService", () => {
         expiresAt: null,
         deliveredAt: notice.audienceMembers[0].receipt.deliveredAt,
         readAt: null,
+        requiresAcknowledgement: false,
+        acknowledgedAt: null,
       },
     ]);
     expect(page.nextCursor).toEqual(expect.any(String));
@@ -208,5 +217,48 @@ describe("AceNoticeStaffInboxService", () => {
       deliveredAt: null,
       readAt: null,
     });
+  });
+
+  it("acknowledges only a current recipient of a notice configured for acknowledgement", async () => {
+    const { service, tx } = createService();
+    tx.aceNotice.findFirst.mockResolvedValue({
+      ...notice,
+      requiresAcknowledgement: true,
+    });
+    const acknowledgement = {
+      readAt: new Date("2026-10-10T11:00:00.000Z"),
+      acknowledgedAt: new Date("2026-10-10T11:00:00.000Z"),
+    };
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: notice.id }])
+      .mockResolvedValueOnce([acknowledgement]);
+    await expect(service.acknowledge(notice.id, actor)).resolves.toEqual(
+      acknowledgement,
+    );
+    expect(tx.aceNotice.findFirst.mock.calls[0][0].where).toMatchObject({
+      id: notice.id,
+      tenantId: actor.tenantId,
+    });
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: notice.id }])
+      .mockResolvedValueOnce([]);
+    tx.aceNoticeReceipt.findFirst.mockResolvedValue(acknowledgement);
+    await expect(service.acknowledge(notice.id, actor)).resolves.toEqual(
+      acknowledgement,
+    );
+
+    tx.aceNotice.findFirst.mockResolvedValue({
+      ...notice,
+      requiresAcknowledgement: false,
+    });
+    await expect(service.acknowledge(notice.id, actor)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    tx.aceNotice.findFirst.mockResolvedValue(null);
+    await expect(service.acknowledge(notice.id, actor)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });

@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import type { Prisma } from "@pathway/db";
 import { withParentSiteAccess } from "../common/access/parent-site-access";
+import { acknowledgeNoticeReceipt } from "./ace-notice-acknowledgement";
 import {
   decodeNoticeCursor,
   encodeNoticeCursor,
@@ -16,6 +21,8 @@ export interface ParentNoticeSummary {
   expiresAt: Date | null;
   deliveredAt: Date;
   readAt: Date | null;
+  requiresAcknowledgement: boolean;
+  acknowledgedAt: Date | null;
 }
 
 export interface ParentNoticePage {
@@ -72,8 +79,13 @@ function summary(row: {
   title: string;
   publishedAt: Date | null;
   expiresAt: Date | null;
+  requiresAcknowledgement: boolean;
   audienceMembers: Array<{
-    receipt: { deliveredAt: Date | null; readAt: Date | null } | null;
+    receipt: {
+      deliveredAt: Date | null;
+      readAt: Date | null;
+      acknowledgedAt: Date | null;
+    } | null;
   }>;
 }): ParentNoticeSummary {
   const receipt = row.audienceMembers[0]?.receipt;
@@ -87,6 +99,8 @@ function summary(row: {
     expiresAt: row.expiresAt,
     deliveredAt: receipt.deliveredAt,
     readAt: receipt.readAt,
+    requiresAcknowledgement: row.requiresAcknowledgement,
+    acknowledgedAt: receipt.acknowledgedAt,
   };
 }
 
@@ -122,11 +136,18 @@ export class AceNoticeParentInboxService {
             title: true,
             publishedAt: true,
             expiresAt: true,
+            requiresAcknowledgement: true,
             audienceMembers: {
               where: recipientScope(siteId, userId, guardianId),
               take: 1,
               select: {
-                receipt: { select: { deliveredAt: true, readAt: true } },
+                receipt: {
+                  select: {
+                    deliveredAt: true,
+                    readAt: true,
+                    acknowledgedAt: true,
+                  },
+                },
               },
             },
           },
@@ -166,11 +187,18 @@ export class AceNoticeParentInboxService {
             body: true,
             publishedAt: true,
             expiresAt: true,
+            requiresAcknowledgement: true,
             audienceMembers: {
               where: recipientScope(siteId, userId, guardianId),
               take: 1,
               select: {
-                receipt: { select: { deliveredAt: true, readAt: true } },
+                receipt: {
+                  select: {
+                    deliveredAt: true,
+                    readAt: true,
+                    acknowledgedAt: true,
+                  },
+                },
               },
             },
           },
@@ -224,6 +252,42 @@ export class AceNoticeParentInboxService {
         });
         if (!current?.readAt) throw new NotFoundException("Notice not found");
         return { readAt: current.readAt };
+      },
+    );
+  }
+
+  async acknowledge(siteId: string, userId: string, id: string) {
+    return withParentSiteAccess(
+      siteId,
+      userId,
+      "ace.parent.notices.read",
+      "Notices not found",
+      async (tx, guardianId) => {
+        const notice = await tx.aceNotice.findFirst({
+          where: {
+            ...activeParentNoticeScope(siteId, userId, guardianId, new Date()),
+            id,
+          },
+          select: {
+            requiresAcknowledgement: true,
+            audienceMembers: {
+              where: recipientScope(siteId, userId, guardianId),
+              take: 1,
+              select: {
+                receipt: { select: { id: true, deliveredAt: true } },
+              },
+            },
+          },
+        });
+        const receipt = notice?.audienceMembers[0]?.receipt;
+        if (!notice || !receipt?.deliveredAt)
+          throw new NotFoundException("Notice not found");
+        if (!notice.requiresAcknowledgement) {
+          throw new ConflictException(
+            "This notice does not require acknowledgement",
+          );
+        }
+        return acknowledgeNoticeReceipt(tx, siteId, receipt.id);
       },
     );
   }

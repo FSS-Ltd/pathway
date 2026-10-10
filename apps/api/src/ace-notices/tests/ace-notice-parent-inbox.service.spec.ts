@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import { AceNoticeParentInboxService } from "../ace-notice-parent-inbox.service";
 
@@ -15,12 +19,14 @@ const notice = {
   body: "Please read this update.",
   publishedAt: new Date("2026-10-10T10:00:00.000Z"),
   expiresAt: null,
+  requiresAcknowledgement: false,
   audienceMembers: [
     {
       receipt: {
         id: "receipt-a",
         deliveredAt: new Date("2026-10-10T10:00:00.000Z"),
         readAt: null,
+        acknowledgedAt: null,
       },
     },
   ],
@@ -46,6 +52,7 @@ function setup() {
         readAt: new Date("2026-10-10T11:00:00.000Z"),
       }),
     },
+    $queryRaw: jest.fn(),
   };
   jest.mocked(prisma.tenant.findUnique).mockResolvedValue({
     orgId: "org-a",
@@ -84,6 +91,8 @@ describe("AceNoticeParentInboxService", () => {
         expiresAt: null,
         deliveredAt: notice.audienceMembers[0].receipt.deliveredAt,
         readAt: null,
+        requiresAcknowledgement: false,
+        acknowledgedAt: null,
       },
     ]);
     expect(page.nextCursor).toEqual(expect.any(String));
@@ -216,6 +225,40 @@ describe("AceNoticeParentInboxService", () => {
     tx.aceNotice.findFirst.mockResolvedValueOnce(null);
     await expect(
       service.markRead(siteId, userId, notice.id),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("acknowledges only the current guardian recipient when requested", async () => {
+    const { service, tx } = setup();
+    tx.aceNotice.findFirst.mockResolvedValue({
+      ...notice,
+      requiresAcknowledgement: true,
+    });
+    const result = {
+      readAt: new Date("2026-10-10T11:00:00.000Z"),
+      acknowledgedAt: new Date("2026-10-10T11:00:00.000Z"),
+    };
+    tx.$queryRaw
+      .mockResolvedValueOnce([{ id: notice.id }])
+      .mockResolvedValueOnce([result]);
+    await expect(
+      service.acknowledge(siteId, userId, notice.id),
+    ).resolves.toEqual(result);
+    expect(tx.aceNotice.findFirst.mock.calls[0][0].where).toMatchObject({
+      id: notice.id,
+      tenantId: siteId,
+      audienceMembers: {
+        some: { recipientKind: "GUARDIAN", guardianIdentityId: "guardian-a" },
+      },
+    });
+
+    tx.aceNotice.findFirst.mockResolvedValue(notice);
+    await expect(
+      service.acknowledge(siteId, userId, notice.id),
+    ).rejects.toBeInstanceOf(ConflictException);
+    tx.aceNotice.findFirst.mockResolvedValue(null);
+    await expect(
+      service.acknowledge(siteId, userId, notice.id),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

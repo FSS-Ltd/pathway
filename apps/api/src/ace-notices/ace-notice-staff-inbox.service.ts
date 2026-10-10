@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { withTenantRlsContext, type Prisma } from "@pathway/db";
+import { acknowledgeNoticeReceipt } from "./ace-notice-acknowledgement";
 import {
   assertNoticeActor,
   requireSiteNoticeStaffAccess,
@@ -22,6 +27,8 @@ export interface StaffNoticeSummary {
   expiresAt: Date | null;
   deliveredAt: Date | null;
   readAt: Date | null;
+  requiresAcknowledgement: boolean;
+  acknowledgedAt: Date | null;
 }
 
 export interface StaffNoticePage {
@@ -92,11 +99,18 @@ export class AceNoticeStaffInboxService {
           audience: true,
           publishedAt: true,
           expiresAt: true,
+          requiresAcknowledgement: true,
           legacyImportedAt: true,
           audienceMembers: {
             where: { tenantId: actor.tenantId, recipientUserId: actor.userId },
             select: {
-              receipt: { select: { deliveredAt: true, readAt: true } },
+              receipt: {
+                select: {
+                  deliveredAt: true,
+                  readAt: true,
+                  acknowledgedAt: true,
+                },
+              },
             },
           },
         },
@@ -126,11 +140,18 @@ export class AceNoticeStaffInboxService {
           audience: true,
           publishedAt: true,
           expiresAt: true,
+          requiresAcknowledgement: true,
           legacyImportedAt: true,
           audienceMembers: {
             where: { tenantId: actor.tenantId, recipientUserId: actor.userId },
             select: {
-              receipt: { select: { deliveredAt: true, readAt: true } },
+              receipt: {
+                select: {
+                  deliveredAt: true,
+                  readAt: true,
+                  acknowledgedAt: true,
+                },
+              },
             },
           },
         },
@@ -175,15 +196,49 @@ export class AceNoticeStaffInboxService {
     });
   }
 
+  async acknowledge(id: string, actor: NoticeActor) {
+    assertNoticeActor(actor);
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      await requireSiteNoticeStaffAccess(tx, actor);
+      const notice = await tx.aceNotice.findFirst({
+        where: { ...activeStaffNoticeScope(actor, new Date()), id },
+        select: {
+          requiresAcknowledgement: true,
+          audienceMembers: {
+            where: { tenantId: actor.tenantId, recipientUserId: actor.userId },
+            take: 1,
+            select: {
+              receipt: { select: { id: true, deliveredAt: true } },
+            },
+          },
+        },
+      });
+      const receipt = notice?.audienceMembers[0]?.receipt;
+      if (!notice || !receipt?.deliveredAt)
+        throw new NotFoundException("Notice not found");
+      if (!notice.requiresAcknowledgement) {
+        throw new ConflictException(
+          "This notice does not require acknowledgement",
+        );
+      }
+      return acknowledgeNoticeReceipt(tx, actor.tenantId, receipt.id);
+    });
+  }
+
   private summary(row: {
     id: string;
     title: string;
     audience: "PARENTS" | "STAFF" | "PARENTS_AND_STAFF";
     publishedAt: Date | null;
     expiresAt: Date | null;
+    requiresAcknowledgement: boolean;
     legacyImportedAt: Date | null;
     audienceMembers: Array<{
-      receipt: { deliveredAt: Date | null; readAt: Date | null } | null;
+      receipt: {
+        deliveredAt: Date | null;
+        readAt: Date | null;
+        acknowledgedAt: Date | null;
+      } | null;
     }>;
   }): StaffNoticeSummary {
     if (!row.publishedAt || row.audience === "PARENTS") {
@@ -199,6 +254,8 @@ export class AceNoticeStaffInboxService {
       expiresAt: row.expiresAt,
       deliveredAt: receipt?.deliveredAt ?? null,
       readAt: receipt?.readAt ?? null,
+      requiresAcknowledgement: row.requiresAcknowledgement,
+      acknowledgedAt: receipt?.acknowledgedAt ?? null,
     };
   }
 }
