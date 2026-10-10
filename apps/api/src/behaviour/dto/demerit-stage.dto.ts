@@ -26,6 +26,7 @@ export const demeritOverrideSchema = z
 export const reviewRequestsQuerySchema = z
   .object({
     childId: childId.optional(),
+    cursor: z.string().uuid().optional(),
     limit: z
       .string()
       .regex(/^(?:[1-9]|[1-9]\d|100)$/)

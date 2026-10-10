@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { withTenantRlsContext } from "@pathway/db";
+import { withTenantRlsContext, type Prisma } from "@pathway/db";
 import { EffectivePermissionsService } from "../access-control/effective-permissions.service";
 import { requireActiveBehaviourActor } from "./behaviour-actor";
 import type { BehaviourActor } from "./behaviour-command.service";
@@ -57,15 +58,39 @@ export class BehaviourReviewService {
       }
 
       const visibleKinds = kinds.includes("HEAD") ? ["SITE", "HEAD"] : ["SITE"];
-      const items = await tx.behaviourReviewRequest.findMany({
+      const scope: Prisma.BehaviourReviewRequestWhereInput = {
+        tenantId: actor.tenantId,
+        child: { isGuest: false },
+        kind: { in: visibleKinds },
+        ...(query.childId ? { childId: query.childId } : {}),
+      };
+      const cursor = query.cursor
+        ? await tx.behaviourReviewRequest.findFirst({
+            where: { ...scope, id: query.cursor },
+            select: { id: true, requestedAt: true },
+          })
+        : null;
+      if (query.cursor && !cursor)
+        throw new BadRequestException("Invalid review cursor");
+
+      const limit = query.limit ?? 50;
+      const rows = await tx.behaviourReviewRequest.findMany({
         where: {
-          tenantId: actor.tenantId,
-          child: { isGuest: false },
-          kind: { in: visibleKinds },
-          ...(query.childId ? { childId: query.childId } : {}),
+          ...scope,
+          ...(cursor
+            ? {
+                OR: [
+                  { requestedAt: { lt: cursor.requestedAt } },
+                  {
+                    requestedAt: cursor.requestedAt,
+                    id: { lt: cursor.id },
+                  },
+                ],
+              }
+            : {}),
         },
         orderBy: [{ requestedAt: "desc" }, { id: "desc" }],
-        take: query.limit ?? 50,
+        take: limit + 1,
         select: {
           id: true,
           childId: true,
@@ -77,7 +102,11 @@ export class BehaviourReviewService {
           requestedAt: true,
         },
       });
-      return { items };
+      const items = rows.slice(0, limit);
+      return {
+        items,
+        nextCursor: rows.length > limit ? (items.at(-1)?.id ?? null) : null,
+      };
     });
   }
 }

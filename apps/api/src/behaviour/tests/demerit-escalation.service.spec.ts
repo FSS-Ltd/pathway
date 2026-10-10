@@ -159,6 +159,78 @@ describe("DemeritEscalationService", () => {
     process.env.BEHAVIOUR_OUTBOX_SECRET = originalBehaviourOutboxSecret;
   });
 
+  it("delivers one guardian notice for a manual Stage 2 override", async () => {
+    const { tx, events } = transaction();
+    const mailerMock = mailer();
+    const { escalation } = service(mailerMock);
+    const input = {
+      actor,
+      childId: "child-1",
+      overrideId: "override-1",
+      policyVersion: 3,
+      occurredOn: "2026-08-12",
+      now,
+    };
+    await escalation.enqueueOverrideGuardianNotice(tx as never, input);
+    await escalation.enqueueOverrideGuardianNotice(tx as never, input);
+
+    expect(events.size).toBe(1);
+    const intent = [...events.values()][0];
+    expect(intent).toEqual(
+      expect.objectContaining({
+        aggregateType: "DEMERIT_STAGE_OVERRIDE",
+        aggregateId: input.overrideId,
+        eventType: "behaviour.guardian-notification.requested",
+        payload: expect.objectContaining({
+          demeritStageOverrideId: input.overrideId,
+          stage: 2,
+          recipientUserIds: ["guardian-1"],
+        }),
+      }),
+    );
+    jest
+      .mocked(withTenantRlsContext)
+      .mockImplementation(async (_tenantId, _orgId, callback) =>
+        callback({
+          tenant: {
+            findFirst: jest.fn().mockResolvedValue({ name: "ACE Site" }),
+          },
+          child: {
+            findFirst: jest.fn().mockResolvedValue({
+              firstName: "Learner",
+              lastName: "One",
+              preferredName: null,
+            }),
+          },
+          guardianChildRelationship: {
+            findMany: jest.fn().mockResolvedValue([
+              {
+                guardianIdentity: {
+                  user: {
+                    id: "guardian-1",
+                    email: "guardian@example.com",
+                    name: "Guardian One",
+                    displayName: null,
+                    firstName: null,
+                  },
+                },
+              },
+            ]),
+          },
+        } as never),
+      );
+    await expect(escalation.dispatch(intent)).resolves.toEqual({ sent: 1 });
+    expect(mailerMock.sendBehaviourNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "guardian@example.com",
+        stage: 2,
+        occurredOn: input.occurredOn,
+        idempotencyKey:
+          "behaviour-guardian-notification-override:override-1:2:guardian-1",
+      }),
+    );
+  });
+
   it.each([
     {
       priorUnits: 2,

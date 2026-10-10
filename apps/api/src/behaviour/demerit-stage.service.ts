@@ -18,12 +18,14 @@ import type { BehaviourActor } from "./behaviour-command.service";
 import {
   currentReviewerKinds,
   findActiveReviewers,
+  type ReviewKind,
 } from "./behaviour-review-access";
 import {
   currentLocalDate,
   isIanaTimezone,
   localDateWindowForDate,
 } from "./demerit-escalation.support";
+import { DemeritEscalationService } from "./demerit-escalation.service";
 import { loadDemeritStageSnapshot } from "./demerit-stage.snapshot";
 import type { DemeritOverrideDto } from "./dto/demerit-stage.dto";
 
@@ -33,6 +35,8 @@ export class DemeritStageService {
     @Inject(EffectivePermissionsService)
     private readonly permissions: EffectivePermissionsService,
     @Inject(OutboxService) private readonly outbox: OutboxService,
+    @Inject(DemeritEscalationService)
+    private readonly demeritEscalation: DemeritEscalationService,
   ) {}
 
   async status(actor: BehaviourActor, childId: string, date: string) {
@@ -197,15 +201,29 @@ export class DemeritStageService {
               reason: input.reason,
             },
           });
-          await this.createReviewRequest(
-            tx,
-            actor,
-            input.childId,
-            created.id,
-            input.stage,
-            current.policyVersion,
-            now,
-          );
+          if (input.stage === 2 && current.action !== "head-review") {
+            await this.demeritEscalation.enqueueOverrideGuardianNotice(tx, {
+              actor,
+              childId: input.childId,
+              overrideId: created.id,
+              policyVersion: current.policyVersion,
+              occurredOn: date,
+              now,
+            });
+          } else {
+            await this.createReviewRequest(
+              tx,
+              actor,
+              input.childId,
+              created.id,
+              input.stage === 3 || current.action === "head-review"
+                ? "HEAD"
+                : "SITE",
+              input.stage,
+              current.policyVersion,
+              now,
+            );
+          }
           return { ...created, duplicate: false };
         },
       );
@@ -227,12 +245,11 @@ export class DemeritStageService {
     actor: BehaviourActor,
     childId: string,
     overrideId: string,
+    kind: ReviewKind,
     stage: number,
     policyVersion: number,
     now: Date,
   ): Promise<void> {
-    if (stage === 2) return;
-    const kind = stage === 3 ? "HEAD" : "SITE";
     const recipientUserIds = await findActiveReviewers(tx, actor, kind, now);
     await this.outbox.enqueue(tx, {
       aggregateType: "DEMERIT_STAGE_OVERRIDE",
