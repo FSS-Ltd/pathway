@@ -41,8 +41,9 @@ site notice publish and withdraw API, merged in
 on head `6cb0918dd6820650bd45eee48befff6f412a6f0b` (CI run
 38069238757; CodeQL run 38069238052), and the PostgreSQL integration log
 confirms the ACE notice E2E suite ran. These site-scoped notice APIs have not
-been deployed to production. ACE-M13 remains incomplete: reader and receipt
-commands are outstanding. On 10 October the product decision was to share
+been deployed to production. ACE-M13 remains incomplete: the shared staff
+reader is merged, while the family reader, scheduling, and narrower audiences
+are outstanding. On 10 October the product decision was to share
 notice capabilities that benefit all site models, including scheduling and
 receipts, while keeping school-specific class and guardian targeting within
 an ACE extension with its own audience and access review. The current API
@@ -52,7 +53,7 @@ permissible slice after this PR merges must address those remaining plan
 requirements. ACE-M20's identity and security gate remains
 open before ACE-C01 through C05 homework tasks begin.
 
-Current build step 1.3e5f (in progress, not merged): consolidate site notices
+Build step 1.3e5f (merged, not deployed): consolidate site notices
 on one canonical record store across site models, import legacy announcements
 with original IDs and unknown historical author/receipt state, mirror writes
 from older app releases during cutover, and put staff reading and management
@@ -61,15 +62,24 @@ audience-preview, publish, and withdraw commands; parent-targeted drafts stay
 unpublished in the web UI until the family inbox is available. The live
 database read found 15 published legacy announcements at five sites and zero
 ACE notice rows. PR [#552](https://github.com/FSS-Ltd/pathway/pull/552)
-is open; this change has not been deployed or merged. Local API and admin
-type checks, 30 focused API unit tests, affected admin UI tests, lint,
-formatting, API and admin builds, Prisma schema validation, diff checks, and
-code Graphify refresh passed. The first CI run failed in three database jobs
-because the migration assumed `public."Announcement"` on fresh `app`-schema
-databases. The migration now discovers both layouts and fails on overlapping
-IDs; fresh CI verification is pending. This host cannot start a local PostgreSQL cluster
-(`shmget`: no free shared-memory segment). The plan-task count stays
-**42/150 (28%)** until a merged task is reconciled against the master plan.
+merged into `master` as `9b8835ba8eb750a53837fcc43253879b87a2d86f`
+from head `ed078be19a48520bf30ca3a60e7ac3db5e9b428a`. All eight latest-head
+checks passed, including Integration Tests and the three database jobs (CI run
+38076773221; CodeQL run 38076769974). The migration discovers both `app`
+and `public` legacy table layouts and rejects overlapping IDs. This host cannot
+start a local PostgreSQL cluster (`shmget`: no free shared-memory segment).
+
+Build step 1.3e5g (in progress): deliver the relationship-scoped parent notice
+API and web inbox on the canonical records, then allow parent audiences in the
+existing editor. PR [#553](https://github.com/FSS-Ltd/pathway/pull/553)
+is open from `feature/ace-parent-notice-inbox`; no merge or production
+deployment is claimed. API and admin type checks, focused
+unit and component tests, lint, formatting, and builds passed. The parent
+database E2E was added but could not execute locally because the test PostgreSQL
+server at `localhost:5433` is unavailable; CI must exercise it. ACE-M13 and
+M14 remain incomplete.
+The plan-task count remains **42/150 (28%)** because no complete ACE master-plan
+task was added by PR #552.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -754,7 +764,8 @@ journeys remain production verification work.
 | 1.3e5d   | ACE site notice draft API                                              | Merged  | [#546](https://github.com/FSS-Ltd/pathway/pull/546) to `master`                     | `ff32874ce639ce125b43b7b59a741ae4e5fad07a`; all eight checks passed: CI run 38065354098, CodeQL run 38065351413. The integration log confirms the draft API test ran.                                                       | `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0` |
 | 1.3e5d1  | ACE notice author lifecycle guard                                      | Merged  | [#548](https://github.com/FSS-Ltd/pathway/pull/548) to `master`                     | `40bdce5a7c1b7c0fecfd135b1c26590839acee69`; all eight checks passed: CI run 38067159085, CodeQL run 38067158033. The app and public schema notice author probes passed.                                                     | `24f6bcf4eda7227acc5c8e19fdd2684dde98a381` |
 | 1.3e5e   | ACE-M13 site notice publish and withdraw API                           | Merged  | [#550](https://github.com/FSS-Ltd/pathway/pull/550) to `master`                     | `6cb0918dd6820650bd45eee48befff6f412a6f0b`; all eight checks passed: CI run 38069238757, CodeQL run 38069238052. The notice E2E suite ran against PostgreSQL.                                                               | `0272b862a1339a979598f5a76d27a4d04af70b98` |
-| 1.3e5f   | Shared site notice records, staff inbox, and existing notices UI       | Pending | [#552](https://github.com/FSS-Ltd/pathway/pull/552) to `master`                     | Local checks passed; PostgreSQL migration and E2E require CI.                                                                                                                                                               | Not merged                                 |
+| 1.3e5f   | Shared site notice records, staff inbox, and existing notices UI       | Merged  | [#552](https://github.com/FSS-Ltd/pathway/pull/552) to `master`                     | `ed078be19a48520bf30ca3a60e7ac3db5e9b428a`; all eight checks passed: CI run 38076773221, CodeQL run 38076769974. PostgreSQL integration and database jobs passed.                                                           | `9b8835ba8eb750a53837fcc43253879b87a2d86f` |
+| 1.3e5g   | Parent notice API and family inbox                                     | Open    | [#553](https://github.com/FSS-Ltd/pathway/pull/553) to `master`                     | Local checks passed; database E2E and latest-head CI pending.                                                                                                                                                               | Not merged                                 |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                            | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                            | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                            | `193a569892c38be565ac6755456f41bcf498ed76` |

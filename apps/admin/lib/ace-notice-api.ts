@@ -61,6 +61,49 @@ export function markStaffNoticeRead(id: string): Promise<{ readAt: string }> {
   });
 }
 
+export type ParentNoticeSummary = Pick<
+  StaffNoticeSummary,
+  "id" | "title" | "publishedAt" | "expiresAt" | "deliveredAt" | "readAt"
+>;
+export type ParentNoticeDetail = ParentNoticeSummary & { body: string };
+export type ParentNoticePage = {
+  items: ParentNoticeSummary[];
+  nextCursor: string | null;
+};
+
+function parentNoticePath(siteId: string): string {
+  return `/ace/parent/sites/${encodeURIComponent(siteId)}/notices`;
+}
+
+export function fetchParentNotices(
+  siteId: string,
+  cursor?: string,
+  signal?: AbortSignal,
+): Promise<ParentNoticePage> {
+  const query = new URLSearchParams({ limit: "25" });
+  if (cursor) query.set("cursor", cursor);
+  return request(`${parentNoticePath(siteId)}?${query}`, { signal });
+}
+
+export function fetchParentNotice(
+  siteId: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<ParentNoticeDetail> {
+  return request(`${parentNoticePath(siteId)}/${encodeURIComponent(id)}`, {
+    signal,
+  });
+}
+
+export function markParentNoticeRead(
+  siteId: string,
+  id: string,
+): Promise<{ readAt: string }> {
+  return request(`${parentNoticePath(siteId)}/${encodeURIComponent(id)}/read`, {
+    method: "POST",
+  });
+}
+
 export type NoticeAudience = "PARENTS" | "STAFF" | "PARENTS_AND_STAFF";
 export type NoticeDraftInput = {
   title: string;

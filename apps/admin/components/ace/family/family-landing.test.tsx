@@ -113,6 +113,12 @@ async function run() {
       ),
       ["/ace/parent/sites/school-one/messages"],
     );
+    assert.deepEqual(
+      Array.from(container.querySelectorAll('a[href$="/notices"]')).map(
+        (anchor) => anchor.getAttribute("href"),
+      ),
+      ["/ace/parent/sites/school-one/notices"],
+    );
 
     mode = "denied";
     const requestCount = requested.length;

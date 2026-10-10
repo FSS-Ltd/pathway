@@ -94,6 +94,13 @@ function SchoolLinksList({ contexts }: { contexts: FamilyContext[] }) {
               </h3>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Link
+                  href={`/ace/parent/sites/${encodeURIComponent(siteId)}/notices`}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
+                >
+                  Notices{" "}
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link
                   href={`/ace/parent/sites/${encodeURIComponent(siteId)}/messages`}
                   className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
                 >

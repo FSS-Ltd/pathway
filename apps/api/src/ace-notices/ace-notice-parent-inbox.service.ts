@@ -1,0 +1,230 @@
+import { Injectable, NotFoundException } from "@nestjs/common";
+import type { Prisma } from "@pathway/db";
+import { withParentSiteAccess } from "../common/access/parent-site-access";
+import {
+  decodeNoticeCursor,
+  encodeNoticeCursor,
+  noticeCursorScope,
+  type NoticeCursorPosition,
+} from "./ace-notice-cursor";
+import type { ListNoticeInboxDto } from "./dto/ace-notice-inbox.dto";
+
+export interface ParentNoticeSummary {
+  id: string;
+  title: string;
+  publishedAt: Date;
+  expiresAt: Date | null;
+  deliveredAt: Date;
+  readAt: Date | null;
+}
+
+export interface ParentNoticePage {
+  items: ParentNoticeSummary[];
+  nextCursor: string | null;
+}
+
+export interface ParentNoticeDetail extends ParentNoticeSummary {
+  body: string;
+}
+
+function recipientScope(siteId: string, userId: string, guardianId: string) {
+  return {
+    tenantId: siteId,
+    recipientUserId: userId,
+    recipientKind: "GUARDIAN" as const,
+    guardianIdentityId: guardianId,
+    receipt: { is: { deliveredAt: { not: null } } },
+  };
+}
+
+function activeParentNoticeScope(
+  siteId: string,
+  userId: string,
+  guardianId: string,
+  now: Date,
+  cursor?: NoticeCursorPosition,
+): Prisma.AceNoticeWhereInput {
+  return {
+    tenantId: siteId,
+    audience: { in: ["PARENTS", "PARENTS_AND_STAFF"] },
+    legacyImportedAt: null,
+    publishedAt: { not: null, lte: now },
+    withdrawnAt: null,
+    audienceMembers: { some: recipientScope(siteId, userId, guardianId) },
+    AND: [
+      { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      ...(cursor
+        ? [
+            {
+              OR: [
+                { publishedAt: { lt: cursor.publishedAt } },
+                { publishedAt: cursor.publishedAt, id: { lt: cursor.id } },
+              ],
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+function summary(row: {
+  id: string;
+  title: string;
+  publishedAt: Date | null;
+  expiresAt: Date | null;
+  audienceMembers: Array<{
+    receipt: { deliveredAt: Date | null; readAt: Date | null } | null;
+  }>;
+}): ParentNoticeSummary {
+  const receipt = row.audienceMembers[0]?.receipt;
+  if (!row.publishedAt || !receipt?.deliveredAt) {
+    throw new Error("Parent notice query returned an invalid delivery");
+  }
+  return {
+    id: row.id,
+    title: row.title,
+    publishedAt: row.publishedAt,
+    expiresAt: row.expiresAt,
+    deliveredAt: receipt.deliveredAt,
+    readAt: receipt.readAt,
+  };
+}
+
+@Injectable()
+export class AceNoticeParentInboxService {
+  async list(
+    siteId: string,
+    userId: string,
+    query: ListNoticeInboxDto,
+  ): Promise<ParentNoticePage> {
+    return withParentSiteAccess(
+      siteId,
+      userId,
+      "ace.parent.notices.read",
+      "Notices not found",
+      async (tx, guardianId) => {
+        const scope = noticeCursorScope(siteId, userId, "parent", guardianId);
+        const cursor = query.cursor
+          ? decodeNoticeCursor(query.cursor, scope)
+          : undefined;
+        const rows = await tx.aceNotice.findMany({
+          where: activeParentNoticeScope(
+            siteId,
+            userId,
+            guardianId,
+            new Date(),
+            cursor,
+          ),
+          orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
+          take: query.limit + 1,
+          select: {
+            id: true,
+            title: true,
+            publishedAt: true,
+            expiresAt: true,
+            audienceMembers: {
+              where: recipientScope(siteId, userId, guardianId),
+              take: 1,
+              select: {
+                receipt: { select: { deliveredAt: true, readAt: true } },
+              },
+            },
+          },
+        });
+        const items = rows.slice(0, query.limit).map(summary);
+        const last = items.at(-1);
+        return {
+          items,
+          nextCursor:
+            rows.length > query.limit && last
+              ? encodeNoticeCursor(last, scope)
+              : null,
+        };
+      },
+    );
+  }
+
+  async get(
+    siteId: string,
+    userId: string,
+    id: string,
+  ): Promise<ParentNoticeDetail> {
+    return withParentSiteAccess(
+      siteId,
+      userId,
+      "ace.parent.notices.read",
+      "Notices not found",
+      async (tx, guardianId) => {
+        const row = await tx.aceNotice.findFirst({
+          where: {
+            ...activeParentNoticeScope(siteId, userId, guardianId, new Date()),
+            id,
+          },
+          select: {
+            id: true,
+            title: true,
+            body: true,
+            publishedAt: true,
+            expiresAt: true,
+            audienceMembers: {
+              where: recipientScope(siteId, userId, guardianId),
+              take: 1,
+              select: {
+                receipt: { select: { deliveredAt: true, readAt: true } },
+              },
+            },
+          },
+        });
+        if (!row) throw new NotFoundException("Notice not found");
+        return { ...summary(row), body: row.body };
+      },
+    );
+  }
+
+  async markRead(
+    siteId: string,
+    userId: string,
+    id: string,
+  ): Promise<{ readAt: Date }> {
+    return withParentSiteAccess(
+      siteId,
+      userId,
+      "ace.parent.notices.read",
+      "Notices not found",
+      async (tx, guardianId) => {
+        const row = await tx.aceNotice.findFirst({
+          where: {
+            ...activeParentNoticeScope(siteId, userId, guardianId, new Date()),
+            id,
+          },
+          select: {
+            audienceMembers: {
+              where: recipientScope(siteId, userId, guardianId),
+              take: 1,
+              select: {
+                receipt: {
+                  select: { id: true, deliveredAt: true, readAt: true },
+                },
+              },
+            },
+          },
+        });
+        const receipt = row?.audienceMembers[0]?.receipt;
+        if (!receipt?.deliveredAt)
+          throw new NotFoundException("Notice not found");
+        if (receipt.readAt) return { readAt: receipt.readAt };
+
+        await tx.aceNoticeReceipt.updateMany({
+          where: { id: receipt.id, tenantId: siteId, readAt: null },
+          data: { readAt: new Date() },
+        });
+        const current = await tx.aceNoticeReceipt.findFirst({
+          where: { id: receipt.id, tenantId: siteId },
+          select: { readAt: true },
+        });
+        if (!current?.readAt) throw new NotFoundException("Notice not found");
+        return { readAt: current.readAt };
+      },
+    );
+  }
+}

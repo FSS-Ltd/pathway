@@ -29,6 +29,7 @@ describe("ACE notice draft API", () => {
   let managerAuthorization = "";
   let readerAuthorization = "";
   let publisherAuthorization = "";
+  let guardianAuthorization = "";
   let managerRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
   let readerRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
   let publisherRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
@@ -103,13 +104,13 @@ describe("ACE notice draft API", () => {
       scope: "site",
       permissionKeys: ["notices.publish"],
     });
-    await prisma.user.create({
-      data: {
-        id: guardianUserId,
-        tenantId: siteId,
-        email: `${guardianUserId}@example.test`,
-      },
+    const guardian = await seedE2eAuthUser({
+      subject: `ace-notice-guardian-${guardianUserId}`,
+      userId: guardianUserId,
+      tenantId: siteId,
+      hasFamilyAccess: true,
     });
+    guardianAuthorization = guardian.authorization;
     await prisma.child.create({
       data: {
         id: childId,
@@ -164,6 +165,7 @@ describe("ACE notice draft API", () => {
     await clearE2eAuthAccess(readerId);
     await clearE2eAuthAccess(publisherId);
     await clearE2eAuthAccess(managerId);
+    await clearE2eAuthAccess(guardianUserId);
     await prisma.user.deleteMany({
       where: {
         id: { in: [managerId, readerId, publisherId, guardianUserId] },
@@ -531,5 +533,117 @@ describe("ACE notice draft API", () => {
       .post(`/ace/notices/${created.body.id}/read`)
       .set("Authorization", readerAuthorization);
     expect(withdrawnRead.status).toBe(404);
+  });
+
+  it("lets a linked guardian read only current parent deliveries", async () => {
+    if (!app) return;
+    const created = await request(app.getHttpServer())
+      .post("/ace/notices/drafts")
+      .set("Authorization", managerAuthorization)
+      .send({
+        title: "Family update",
+        body: "The school day starts at nine.",
+        audience: "PARENTS",
+        expiresAt: null,
+      });
+    expect(created.status).toBe(201);
+    const preview = await request(app.getHttpServer())
+      .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+      .set("Authorization", managerAuthorization);
+    expect(preview.status).toBe(200);
+    const published = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send({
+        expectedUpdatedAt: created.body.updatedAt,
+        expectedAudienceVersion: preview.body.audienceVersion,
+      });
+    expect(published.status).toBe(201);
+
+    const path = `/ace/parent/sites/${siteId}/notices`;
+    const listed = await request(app.getHttpServer())
+      .get(`${path}?limit=50`)
+      .set("Authorization", guardianAuthorization);
+    expect(listed.status).toBe(200);
+    const summary = listed.body.items.find(
+      (item: { id: string }) => item.id === created.body.id,
+    );
+    expect(summary).toBeDefined();
+    expect(summary).not.toHaveProperty("body");
+    expect(summary.deliveredAt).toBeTruthy();
+
+    const detail = await request(app.getHttpServer())
+      .get(`${path}/${created.body.id}`)
+      .set("Authorization", guardianAuthorization);
+    expect(detail.status).toBe(200);
+    expect(detail.body.body).toBe("The school day starts at nine.");
+    const read = await request(app.getHttpServer())
+      .post(`${path}/${created.body.id}/read`)
+      .set("Authorization", guardianAuthorization);
+    expect(read.status).toBe(201);
+    expect(read.body.readAt).toBeTruthy();
+    const repeated = await request(app.getHttpServer())
+      .post(`${path}/${created.body.id}/read`)
+      .set("Authorization", guardianAuthorization);
+    expect(repeated.body.readAt).toBe(read.body.readAt);
+
+    const staffOnly = await request(app.getHttpServer())
+      .get(`${path}/${created.body.id}`)
+      .set("Authorization", readerAuthorization);
+    expect(staffOnly.status).toBe(404);
+    const otherSite = await request(app.getHttpServer())
+      .get(`/ace/parent/sites/${otherSiteId}/notices/${created.body.id}`)
+      .set("Authorization", guardianAuthorization);
+    expect(otherSite.status).toBe(404);
+
+    await prisma.org.update({
+      where: { id: orgId },
+      data: { parentPortalEnabled: false },
+    });
+    try {
+      const closedPortal = await request(app.getHttpServer())
+        .get(`${path}/${created.body.id}`)
+        .set("Authorization", guardianAuthorization);
+      expect(closedPortal.status).toBe(404);
+    } finally {
+      await prisma.org.update({
+        where: { id: orgId },
+        data: { parentPortalEnabled: true },
+      });
+    }
+
+    await prisma.guardianChildRelationship.updateMany({
+      where: {
+        tenantId: siteId,
+        guardianIdentityId: parentGuardianId,
+        childId,
+      },
+      data: { endedAt: new Date() },
+    });
+    try {
+      const endedLink = await request(app.getHttpServer())
+        .post(`${path}/${created.body.id}/read`)
+        .set("Authorization", guardianAuthorization);
+      expect(endedLink.status).toBe(404);
+    } finally {
+      await prisma.guardianChildRelationship.updateMany({
+        where: {
+          tenantId: siteId,
+          guardianIdentityId: parentGuardianId,
+          childId,
+        },
+        data: { endedAt: null },
+      });
+    }
+
+    const withdrawn = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/withdraw`)
+      .set("Authorization", managerAuthorization)
+      .send({ reason: "Superseded" });
+    expect(withdrawn.status).toBe(201);
+    const hidden = await request(app.getHttpServer())
+      .get(`${path}/${created.body.id}`)
+      .set("Authorization", guardianAuthorization);
+    expect(hidden.status).toBe(404);
   });
 });
