@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import {
+  acknowledgeStaffNotice,
   fetchStaffNotice,
   fetchStaffNotices,
   markStaffNoticeRead,
@@ -26,6 +27,9 @@ export type NoticeSource = {
   list: (cursor?: string, signal?: AbortSignal) => Promise<NoticePage>;
   get: (id: string, signal?: AbortSignal) => Promise<NoticeDetail>;
   markRead: (id: string) => Promise<{ readAt: string }>;
+  acknowledge: (
+    id: string,
+  ) => Promise<{ readAt: string; acknowledgedAt: string }>;
 };
 
 const staffSource: NoticeSource = {
@@ -33,6 +37,7 @@ const staffSource: NoticeSource = {
   list: fetchStaffNotices,
   get: fetchStaffNotice,
   markRead: markStaffNoticeRead,
+  acknowledge: acknowledgeStaffNotice,
 };
 
 export function useNoticeInbox(source: NoticeSource) {
@@ -47,6 +52,8 @@ export function useNoticeInbox(source: NoticeSource) {
   const [detailError, setDetailError] = React.useState<string | null>(null);
   const [readPending, setReadPending] = React.useState(false);
   const [readError, setReadError] = React.useState<string | null>(null);
+  const [ackPending, setAckPending] = React.useState(false);
+  const [ackError, setAckError] = React.useState<string | null>(null);
   const [listRevision, setListRevision] = React.useState(0);
   const [detailRevision, setDetailRevision] = React.useState(0);
   const generation = React.useRef(0);
@@ -102,6 +109,7 @@ export function useNoticeInbox(source: NoticeSource) {
     setDetailLoading(true);
     setDetailError(null);
     setReadError(null);
+    setAckError(null);
     void source
       .get(selectedId, controller.signal)
       .then((notice) => {
@@ -217,6 +225,53 @@ export function useNoticeInbox(source: NoticeSource) {
     }
   }
 
+  async function acknowledge(): Promise<void> {
+    if (
+      !selectedId ||
+      !detail?.requiresAcknowledgement ||
+      detail.acknowledgedAt ||
+      detail.historical ||
+      ackPending
+    )
+      return;
+    const id = selectedId;
+    setAckPending(true);
+    setAckError(null);
+    try {
+      const result = await source.acknowledge(id);
+      setDetail((current) =>
+        current?.id === id ? { ...current, ...result } : current,
+      );
+      setItems((current) =>
+        current.map((item) => (item.id === id ? { ...item, ...result } : item)),
+      );
+    } catch (error) {
+      if (error instanceof ApiError && [401, 403].includes(error.status)) {
+        setItems([]);
+        setCursor(null);
+        setSelectedId(null);
+        setListError(errorMessage(error, `Unable to load ${source.label}.`));
+      } else if (error instanceof ApiError && error.status === 404) {
+        setItems((current) => current.filter((item) => item.id !== id));
+        if (selectedIdRef.current === id) {
+          setDetail(null);
+          setDetailError(
+            errorMessage(error, "This notice is no longer available."),
+          );
+        }
+      } else if (selectedIdRef.current === id) {
+        setAckError(
+          errorMessage(
+            error,
+            "Unable to acknowledge this notice. Please retry.",
+          ),
+        );
+      }
+    } finally {
+      setAckPending(false);
+    }
+  }
+
   return {
     items,
     cursor,
@@ -229,6 +284,8 @@ export function useNoticeInbox(source: NoticeSource) {
     detailError,
     readPending,
     readError,
+    ackPending,
+    ackError,
     select: setSelectedId,
     refresh: () => {
       setSelectedId(null);
@@ -237,6 +294,7 @@ export function useNoticeInbox(source: NoticeSource) {
     retryDetail: () => setDetailRevision((value) => value + 1),
     loadMore,
     markRead,
+    acknowledge,
   };
 }
 

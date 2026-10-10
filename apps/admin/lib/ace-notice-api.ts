@@ -15,6 +15,8 @@ export type StaffNoticeSummary = {
   expiresAt: string | null;
   deliveredAt: string | null;
   readAt: string | null;
+  requiresAcknowledgement: boolean;
+  acknowledgedAt: string | null;
 };
 
 export type StaffNoticeDetail = StaffNoticeSummary & { body: string };
@@ -61,9 +63,29 @@ export function markStaffNoticeRead(id: string): Promise<{ readAt: string }> {
   });
 }
 
+export type NoticeAcknowledgement = {
+  readAt: string;
+  acknowledgedAt: string;
+};
+
+export function acknowledgeStaffNotice(
+  id: string,
+): Promise<NoticeAcknowledgement> {
+  return request(`/ace/notices/${encodeURIComponent(id)}/acknowledge`, {
+    method: "POST",
+  });
+}
+
 export type ParentNoticeSummary = Pick<
   StaffNoticeSummary,
-  "id" | "title" | "publishedAt" | "expiresAt" | "deliveredAt" | "readAt"
+  | "id"
+  | "title"
+  | "publishedAt"
+  | "expiresAt"
+  | "deliveredAt"
+  | "readAt"
+  | "requiresAcknowledgement"
+  | "acknowledgedAt"
 >;
 export type ParentNoticeDetail = ParentNoticeSummary & { body: string };
 export type ParentNoticePage = {
@@ -104,11 +126,24 @@ export function markParentNoticeRead(
   });
 }
 
+export function acknowledgeParentNotice(
+  siteId: string,
+  id: string,
+): Promise<NoticeAcknowledgement> {
+  return request(
+    `${parentNoticePath(siteId)}/${encodeURIComponent(id)}/acknowledge`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export type NoticeAudience = "PARENTS" | "STAFF" | "PARENTS_AND_STAFF";
 export type NoticeDraftInput = {
   title: string;
   body: string;
   audience: NoticeAudience;
+  requiresAcknowledgement: boolean;
   expiresAt: string | null;
 };
 export type NoticeDraft = NoticeDraftInput & {
@@ -175,4 +210,19 @@ export function withdrawNotice(
     method: "POST",
     body: JSON.stringify({ reason }),
   });
+}
+
+export type NoticeReceiptSummary = {
+  recipientCount: number;
+  deliveredCount: number;
+  readCount: number;
+  acknowledgedCount: number;
+  requiresAcknowledgement: boolean;
+};
+
+export function fetchNoticeReceiptSummary(
+  id: string,
+  signal?: AbortSignal,
+): Promise<NoticeReceiptSummary> {
+  return request(`/ace/notices/${encodeURIComponent(id)}/receipts`, { signal });
 }

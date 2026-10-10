@@ -27,6 +27,8 @@ const notice = {
   expiresAt: null,
   deliveredAt: "2026-10-10T10:00:00.000Z",
   readAt: null,
+  requiresAcknowledgement: true,
+  acknowledgedAt: null,
 };
 
 function click(container: Element, label: string): void {
@@ -56,6 +58,12 @@ async function run() {
     if (url.endsWith("/read")) {
       return Response.json({ readAt: "2026-10-10T11:00:00.000Z" });
     }
+    if (url.endsWith("/acknowledge")) {
+      return Response.json({
+        readAt: "2026-10-10T11:00:00.000Z",
+        acknowledgedAt: "2026-10-10T11:05:00.000Z",
+      });
+    }
     if (url.endsWith(`/${notice.id}`)) {
       return Response.json({ ...notice, body: "Please read this update." });
     }
@@ -79,9 +87,17 @@ async function run() {
     assert.match(container.textContent ?? "", /Please read this update/);
     await act(async () => click(container, "Mark as read"));
     assert.match(container.textContent ?? "", /Marked as read/);
+    assert.match(container.textContent ?? "", /Acknowledgement needed/);
+    await act(async () => click(container, "Acknowledge notice"));
+    assert.match(container.textContent ?? "", /Acknowledged/);
     assert.ok(
       requested.includes(
         `POST http://api.test/ace/parent/sites/site-a/notices/${notice.id}/read`,
+      ),
+    );
+    assert.ok(
+      requested.includes(
+        `POST http://api.test/ace/parent/sites/site-a/notices/${notice.id}/acknowledge`,
       ),
     );
 

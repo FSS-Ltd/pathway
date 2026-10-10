@@ -49,6 +49,14 @@ export class AceNoticeStaffInboxController {
     );
   }
 
+  @Post(":id/acknowledge")
+  acknowledge(@Param("id") id: string) {
+    return this.service.acknowledge(
+      this.parse(noticeDraftIdSchema, id),
+      this.actor(),
+    );
+  }
+
   private actor() {
     const context = this.requestContext.requireContext();
     return {

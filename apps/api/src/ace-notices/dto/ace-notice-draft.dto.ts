@@ -4,13 +4,17 @@ const contentSchema = z.object({
   title: z.string().trim().min(1).max(200),
   body: z.string().trim().min(1).max(20_000),
   audience: z.enum(["PARENTS", "STAFF", "PARENTS_AND_STAFF"]),
+  requiresAcknowledgement: z.boolean().default(false),
   expiresAt: z.string().datetime({ offset: true }).nullable(),
 });
 
 export const noticeDraftIdSchema = z.string().uuid();
 export const createNoticeDraftSchema = contentSchema.strict();
 export const updateNoticeDraftSchema = contentSchema
-  .extend({ expectedUpdatedAt: z.string().datetime({ offset: true }) })
+  .extend({
+    requiresAcknowledgement: z.boolean().optional(),
+    expectedUpdatedAt: z.string().datetime({ offset: true }),
+  })
   .strict();
 export const listNoticeDraftsSchema = z
   .object({

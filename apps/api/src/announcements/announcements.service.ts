@@ -8,6 +8,7 @@ const noticeSelect = {
   title: true,
   body: true,
   audience: true,
+  requiresAcknowledgement: true,
   publishedAt: true,
   withdrawnAt: true,
   legacyImportedAt: true,

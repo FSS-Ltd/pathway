@@ -22,6 +22,7 @@ type FormState = {
   title: string;
   body: string;
   audience: NoticeAudience;
+  requiresAcknowledgement: boolean;
   expiresAtLocal: string;
 };
 
@@ -29,6 +30,7 @@ const emptyForm: FormState = {
   title: "",
   body: "",
   audience: "STAFF",
+  requiresAcknowledgement: false,
   expiresAtLocal: "",
 };
 
@@ -56,7 +58,13 @@ function validate(form: FormState): NoticeDraftInput {
   if (expiresAt && new Date(expiresAt).getTime() <= Date.now()) {
     throw new Error("Expiry must be in the future.");
   }
-  return { title, body, audience: form.audience, expiresAt };
+  return {
+    title,
+    body,
+    audience: form.audience,
+    requiresAcknowledgement: form.requiresAcknowledgement,
+    expiresAt,
+  };
 }
 
 export function NoticeEditor({ draftId }: { draftId?: string }) {
@@ -86,6 +94,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
           title: draft.title,
           body: draft.body,
           audience: draft.audience,
+          requiresAcknowledgement: draft.requiresAcknowledgement,
           expiresAtLocal: localDateTime(draft.expiresAt),
         });
         setRevision(draft.updatedAt);
@@ -227,6 +236,25 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                 onChange={(event) => change("body", event.target.value)}
               />
             </div>
+            <label className="flex items-start gap-3 rounded-xl border border-border-subtle bg-shell/70 p-4 text-sm text-text-primary">
+              <input
+                type="checkbox"
+                checked={form.requiresAcknowledgement}
+                onChange={(event) =>
+                  change("requiresAcknowledgement", event.target.checked)
+                }
+                className="mt-1 h-4 w-4 accent-accent-strong"
+              />
+              <span>
+                <span className="block font-medium">
+                  Request acknowledgement
+                </span>
+                <span className="mt-1 block text-text-muted">
+                  Recipients can confirm they have read this notice. Their
+                  response appears in the receipt totals.
+                </span>
+              </span>
+            </label>
             <div className="grid gap-5 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="notice-audience">Audience</Label>
@@ -299,6 +327,12 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
               ? " Publication makes this notice available in their in-app inbox."
               : " No one can receive this notice yet. Check site memberships or guardian access before publishing."}
           </p>
+          {form.requiresAcknowledgement ? (
+            <p className="mt-2 text-sm text-text-muted">
+              Recipients will be asked to acknowledge this notice after
+              publication.
+            </p>
+          ) : null}
           <Button
             type="button"
             className="mt-4"

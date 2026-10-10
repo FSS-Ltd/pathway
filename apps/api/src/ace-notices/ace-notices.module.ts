@@ -6,6 +6,7 @@ import { AceNoticeDraftsController } from "./ace-notice-drafts.controller";
 import { AceNoticeDraftsService } from "./ace-notice-drafts.service";
 import { AceNoticePublicationController } from "./ace-notice-publication.controller";
 import { AceNoticePublicationService } from "./ace-notice-publication.service";
+import { AceNoticeReceiptSummaryService } from "./ace-notice-receipt-summary.service";
 import { AceNoticeParentInboxController } from "./ace-notice-parent-inbox.controller";
 import { AceNoticeParentInboxService } from "./ace-notice-parent-inbox.service";
 import { AceNoticeStaffInboxController } from "./ace-notice-staff-inbox.controller";
@@ -22,6 +23,7 @@ import { AceNoticeStaffInboxService } from "./ace-notice-staff-inbox.service";
   providers: [
     AceNoticeDraftsService,
     AceNoticePublicationService,
+    AceNoticeReceiptSummaryService,
     AceNoticeParentInboxService,
     AceNoticeStaffInboxService,
   ],

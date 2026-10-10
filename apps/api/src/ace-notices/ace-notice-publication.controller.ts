@@ -14,6 +14,7 @@ import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { AceNoticePublicationService } from "./ace-notice-publication.service";
+import { AceNoticeReceiptSummaryService } from "./ace-notice-receipt-summary.service";
 import { noticeDraftIdSchema } from "./dto/ace-notice-draft.dto";
 import {
   publishNoticeSchema,
@@ -26,6 +27,8 @@ export class AceNoticePublicationController {
   constructor(
     @Inject(AceNoticePublicationService)
     private readonly service: AceNoticePublicationService,
+    @Inject(AceNoticeReceiptSummaryService)
+    private readonly receipts: AceNoticeReceiptSummaryService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
@@ -47,6 +50,12 @@ export class AceNoticePublicationController {
       this.parse(publishNoticeSchema, body),
       this.actor(),
     );
+  }
+
+  @Get(":id/receipts")
+  @RequirePermission("notices.publish")
+  receiptSummary(@Param("id") id: string) {
+    return this.receipts.get(this.parse(noticeDraftIdSchema, id), this.actor());
   }
 
   @Post(":id/withdraw")

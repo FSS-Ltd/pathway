@@ -125,6 +125,15 @@ same receipt. The author does not receive a reader receipt solely for
 authoring. Administrators see aggregate delivered/read counts, not unrelated
 readers' private details by default.
 
+An author may request acknowledgement on a draft. The setting becomes
+immutable at publication. An active recipient can explicitly acknowledge
+after opening the notice; that command sets a missing read time and a
+write-once acknowledgement time atomically. It is idempotent, and neither a
+message open nor an email tracking event counts as acknowledgement. The
+publisher's receipt summary returns only frozen recipient, delivered, read,
+and acknowledged totals. Historical imports have no receipt summary because
+their original delivery state is unknown.
+
 ## API and web slices
 
 | Slice                | Contract                                                                                                                                                                          |
