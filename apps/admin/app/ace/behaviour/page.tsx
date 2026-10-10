@@ -13,6 +13,7 @@ import {
   fetchBehaviourHistory,
   fetchBehaviourPolicy,
   fetchBehaviourReviewRequests,
+  fetchBehaviourReviewFact,
   fetchChildren,
   fetchDemeritStatus,
   recordBehaviour,
@@ -134,6 +135,7 @@ export default function BehaviourPage() {
           refreshKey={stageRefreshKey}
           loadStatus={fetchDemeritStatus}
           loadRequests={fetchBehaviourReviewRequests}
+          loadFact={fetchBehaviourReviewFact}
           saveOverride={createDemeritOverride}
           onSaved={load}
         />

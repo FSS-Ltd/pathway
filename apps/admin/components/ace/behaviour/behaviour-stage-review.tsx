@@ -5,6 +5,7 @@ import { Label } from "@pathway/ui";
 import {
   AdminBehaviourApiError,
   type AdminBehaviourReviewResponse,
+  type AdminBehaviourEntry,
   type AdminDemeritOverrideInput,
   type AdminDemeritOverrideResponse,
   type AdminDemeritStatus,
@@ -31,6 +32,7 @@ type BehaviourStageReviewProps = {
     childId: string,
     cursor?: string,
   ) => Promise<AdminBehaviourReviewResponse>;
+  loadFact: (requestId: string) => Promise<{ entry: AdminBehaviourEntry }>;
   saveOverride: (
     input: AdminDemeritOverrideInput,
   ) => Promise<AdminDemeritOverrideResponse>;
@@ -45,6 +47,7 @@ export function BehaviourStageReview({
   refreshKey,
   loadStatus,
   loadRequests,
+  loadFact,
   saveOverride,
   onSaved,
 }: BehaviourStageReviewProps) {
@@ -207,6 +210,7 @@ export function BehaviourStageReview({
               siteTimeZone={siteTimeZone}
               reviews={reviews}
               loadRequests={loadRequests}
+              loadFact={loadFact}
               onDenied={() => setReviews({ kind: "denied" })}
               onRetry={retry}
             />

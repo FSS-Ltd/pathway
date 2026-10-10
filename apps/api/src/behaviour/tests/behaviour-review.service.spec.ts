@@ -1,5 +1,9 @@
 import "reflect-metadata";
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
 import { BehaviourReviewService } from "../behaviour-review.service";
@@ -33,6 +37,7 @@ function arrange(
       findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn().mockResolvedValue([]),
     },
+    behaviourEntry: { findFirst: jest.fn().mockResolvedValue(null) },
   };
   jest
     .mocked(withTenantRlsContext)
@@ -162,5 +167,87 @@ describe("BehaviourReviewService", () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(tx.behaviourReviewRequest.findMany).not.toHaveBeenCalled();
+  });
+
+  it("opens the current corrected fact for a scoped Head request", async () => {
+    const { tx, service } = arrange({ head: true });
+    const requestId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const originalId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const currentId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    tx.behaviourReviewRequest.findFirst.mockResolvedValue({
+      childId: "child-1",
+      behaviourEntryId: originalId,
+    });
+    const currentEntry = {
+      id: currentId,
+      childId: "child-1",
+      category: "conduct",
+      categoryPolicyVersion: 2,
+      categoryIsSerious: false,
+      type: "DEMERIT",
+      visibility: "SENSITIVE",
+      pointsDelta: -2,
+      occurredAt: new Date("2026-10-09T10:00:00.000Z"),
+      recordedByUserId: "reviewer-1",
+      reason: "Corrected reason",
+      note: "Restricted detail",
+      correctsBehaviourEntryId: originalId,
+      createdAt: new Date("2026-10-09T10:05:00.000Z"),
+    };
+    tx.behaviourEntry.findFirst
+      .mockResolvedValueOnce({ id: currentId })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(currentEntry);
+
+    await expect(service.fact(actor, requestId)).resolves.toEqual({
+      entry: expect.objectContaining({
+        id: currentId,
+        reason: "Corrected reason",
+      }),
+    });
+    expect(tx.behaviourReviewRequest.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: requestId,
+        tenantId: actor.tenantId,
+        child: { isGuest: false },
+        kind: { in: ["SITE", "HEAD"] },
+      },
+      select: { childId: true, behaviourEntryId: true },
+    });
+    expect(tx.behaviourEntry.findFirst).toHaveBeenLastCalledWith({
+      where: { id: currentId, tenantId: actor.tenantId, childId: "child-1" },
+      select: expect.objectContaining({ reason: true, note: true }),
+    });
+  });
+
+  it("does not open a Head request to a Lead or a tag-only actor", async () => {
+    const lead = arrange({ lead: true });
+    await expect(lead.service.fact(actor, "request-1")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(lead.tx.behaviourReviewRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ kind: { in: ["SITE"] } }),
+      }),
+    );
+    expect(lead.tx.behaviourEntry.findFirst).not.toHaveBeenCalled();
+
+    const tagOnly = arrange();
+    await expect(
+      tagOnly.service.fact(actor, "request-1"),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(tagOnly.tx.behaviourReviewRequest.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("does not expose a fact for an override-only request", async () => {
+    const { tx, service } = arrange({ head: true });
+    tx.behaviourReviewRequest.findFirst.mockResolvedValue({
+      childId: "child-1",
+      behaviourEntryId: null,
+    });
+    await expect(service.fact(actor, "request-1")).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(tx.behaviourEntry.findFirst).not.toHaveBeenCalled();
   });
 });

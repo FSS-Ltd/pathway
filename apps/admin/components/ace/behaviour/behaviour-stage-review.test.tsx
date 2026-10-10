@@ -3,6 +3,7 @@ import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import {
   AdminBehaviourApiError,
+  type AdminBehaviourEntry,
   type AdminDemeritStatus,
   type AdminDemeritOverrideInput,
 } from "@/lib/api-client";
@@ -41,6 +42,24 @@ let requestCount = 0;
 let saved = 0;
 let conflict = true;
 const commands: AdminDemeritOverrideInput[] = [];
+const reviewId = "55555555-5555-4555-8555-555555555555";
+const originalEntryId = "66666666-6666-4666-8666-666666666666";
+const correctedEntry: AdminBehaviourEntry = {
+  id: "77777777-7777-4777-8777-777777777777",
+  childId: child.id,
+  category: "conduct",
+  categoryPolicyVersion: 4,
+  categoryIsSerious: false,
+  type: "DEMERIT",
+  visibility: "SENSITIVE",
+  pointsDelta: -2,
+  occurredAt: new Date().toISOString(),
+  recordedByUserId: "88888888-8888-4888-8888-888888888888",
+  reason: "Corrected current reason",
+  note: "Restricted follow-up",
+  correctsBehaviourEntryId: originalEntryId,
+  createdAt: new Date().toISOString(),
+};
 
 const status = (): AdminDemeritStatus | null =>
   policyAvailable
@@ -79,7 +98,26 @@ const loaders = {
         ],
         nextCursor: null,
       };
-    return { items: [], nextCursor: "22222222-2222-4222-8222-222222222222" };
+    return {
+      items: [
+        {
+          id: reviewId,
+          childId: child.id,
+          behaviourEntryId: originalEntryId,
+          demeritStageOverrideId: null,
+          kind: "HEAD" as const,
+          stage: 3,
+          policyVersion: 4,
+          requestedAt: new Date().toISOString(),
+        },
+      ],
+      nextCursor: "22222222-2222-4222-8222-222222222222",
+    };
+  },
+  loadFact: async (requestId: string) => {
+    assert.equal(requestId, reviewId);
+    if (!reviewerAllowed) throw new AdminBehaviourApiError("Denied", 403);
+    return { entry: correctedEntry };
   },
   saveOverride: async (input: AdminDemeritOverrideInput) => {
     commands.push(input);
@@ -218,6 +256,24 @@ async function run() {
     assert.match(container.textContent ?? "", /Escalation saved/);
     assert.match(container.textContent ?? "", /Guardian notice/);
 
+    const viewFact = [
+      ...container.querySelectorAll<HTMLButtonElement>("button"),
+    ].find((button) => button.textContent?.includes("View current fact"));
+    assert.ok(viewFact);
+    await act(async () => viewFact.click());
+    assert.match(container.textContent ?? "", /Current corrected fact/);
+    assert.match(container.textContent ?? "", /Corrected current reason/);
+    const hideFact = [
+      ...container.querySelectorAll<HTMLButtonElement>("button"),
+    ].find((button) => button.textContent?.includes("Hide current fact"));
+    assert.ok(hideFact);
+    assert.equal(hideFact.getAttribute("aria-expanded"), "true");
+    await act(async () => hideFact.click());
+    assert.equal(
+      container.textContent?.includes("Corrected current reason"),
+      false,
+    );
+
     const more = element<HTMLButtonElement>(container, "button");
     assert.ok(more);
     const loadMore = [
@@ -228,6 +284,16 @@ async function run() {
     assert.match(container.textContent ?? "", /Head review · Stage 3/);
 
     reviewerAllowed = false;
+    const reopenFact = [
+      ...container.querySelectorAll<HTMLButtonElement>("button"),
+    ].find((button) => button.textContent?.includes("View current fact"));
+    assert.ok(reopenFact);
+    await act(async () => reopenFact.click());
+    assert.match(container.textContent ?? "", /current Head or Lead role/);
+    assert.equal(
+      container.textContent?.includes("Corrected current reason"),
+      false,
+    );
     await act(async () => root.render(view(true, true, 1)));
     assert.match(container.textContent ?? "", /current Head or Lead role/);
     assert.equal(

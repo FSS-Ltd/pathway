@@ -1335,6 +1335,17 @@ export function fetchBehaviourReviewRequests(
   );
 }
 
+export function fetchBehaviourReviewFact(
+  requestId: string,
+): Promise<{ entry: AdminBehaviourEntry }> {
+  if (isUsingMockApi()) {
+    throw new Error("Behaviour review facts are not available in mock mode.");
+  }
+  return behaviourRequest<{ entry: AdminBehaviourEntry }>(
+    `/ace/behaviour/review-requests/${encodeURIComponent(requestId)}/fact`,
+  );
+}
+
 export function recordBehaviour(
   input: AdminBehaviourCommandInput,
 ): Promise<AdminBehaviourCommandResponse> {
