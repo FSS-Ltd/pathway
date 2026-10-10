@@ -13,6 +13,19 @@ reconciled task by task; 28% is a documented minimum, not an estimate of all
 delivered outcomes. Earlier 81% and 52% qualitative estimates below use a
 different basis and should not be read as plan-task completion.
 
+For a core school pilot, the plan groups 88 foundation, operations, messaging,
+and core-journey tasks with 9 pilot/launch tasks: **97/150 (about 65%)** if all
+53 optional add-on tasks are deferred. This is a task-count milestone, not an
+automatic readiness threshold; the nine launch tasks require UAT, security,
+accessibility, performance, restore, support, and staged go/no-go evidence.
+With 42 tasks currently evidenced, 55 core/launch tasks remain to be verified
+or completed; some later work is already partially merged. The delivery waves
+are: reconcile ACE-M and ACE-C task evidence against merged PRs, finish the
+remaining ACE-M messaging/notices/identity tasks through the M20 gate, finish
+the remaining ACE-C core journeys, then execute ACE-L01 to L09. Keep each
+numbered build step in its own PR with latest-head green CI and a confirmed
+merge before starting the next step. Reconcile the count after each merge.
+
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
 `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0`. All eight checks passed
@@ -21,11 +34,20 @@ integration log confirms the new draft route test ran. Step 1.3e5d1 merged in
 [PR #548](https://github.com/FSS-Ltd/pathway/pull/548) at
 `24f6bcf4eda7227acc5c8e19fdd2684dde98a381`; all eight checks passed
 on head `40bdce5a7c1b7c0fecfd135b1c26590839acee69`, including the notice
-author regression in both identity schema layouts. The site-scoped ACE notice
-draft API and author-guard fix are merged but have not been deployed to
-production. The next C12 journey slice is the audited publish and withdraw
-API. The ACE-M20 identity and security gate remains open before the ACE-C01
-through C05 homework plan tasks begin.
+author regression in both identity schema layouts. Step 1.3e5e, the ACE-M13
+site notice publish and withdraw API, merged in
+[PR #550](https://github.com/FSS-Ltd/pathway/pull/550) at
+`0272b862a1339a979598f5a76d27a4d04af70b98`. All eight checks passed
+on head `6cb0918dd6820650bd45eee48befff6f412a6f0b` (CI run
+38069238757; CodeQL run 38069238052), and the PostgreSQL integration log
+confirms the ACE notice E2E suite ran. These site-scoped notice APIs have not
+been deployed to production. ACE-M13 remains incomplete: reader and receipt
+commands are outstanding. Its master task also names scheduling and
+class/group audiences, while the later approved notice design specifies
+site-wide notices; that scope conflict needs a product decision before M13 can
+be closed. The next permissible slice after this evidence PR merges is the
+ACE-M13 reader and receipt API. ACE-M20's identity and security gate remains
+open before ACE-C01 through C05 homework tasks begin.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
@@ -709,6 +731,7 @@ journeys remain production verification work.
 | 1.3e5c2  | ACE notice expiry, withdrawal, immutable publication and read receipts | Merged  | [#503](https://github.com/FSS-Ltd/pathway/pull/503) to `master`                     | `3a3b2c7a6b2d6b2b0ddeec3bf69488635231da78`; all eight checks passed: CI run 37833550859, CodeQL run 37833546948.                                                                                                            | `70cc53502f37da07a0e449e5604ce51ee862c015` |
 | 1.3e5d   | ACE site notice draft API                                              | Merged  | [#546](https://github.com/FSS-Ltd/pathway/pull/546) to `master`                     | `ff32874ce639ce125b43b7b59a741ae4e5fad07a`; all eight checks passed: CI run 38065354098, CodeQL run 38065351413. The integration log confirms the draft API test ran.                                                       | `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0` |
 | 1.3e5d1  | ACE notice author lifecycle guard                                      | Merged  | [#548](https://github.com/FSS-Ltd/pathway/pull/548) to `master`                     | `40bdce5a7c1b7c0fecfd135b1c26590839acee69`; all eight checks passed: CI run 38067159085, CodeQL run 38067158033. The app and public schema notice author probes passed.                                                     | `24f6bcf4eda7227acc5c8e19fdd2684dde98a381` |
+| 1.3e5e   | ACE-M13 site notice publish and withdraw API                           | Merged  | [#550](https://github.com/FSS-Ltd/pathway/pull/550) to `master`                     | `6cb0918dd6820650bd45eee48befff6f412a6f0b`; all eight checks passed: CI run 38069238757, CodeQL run 38069238052. The notice E2E suite ran against PostgreSQL.                                                               | `0272b862a1339a979598f5a76d27a4d04af70b98` |
 | REL-2    | Portable family discovery migration and layout replay test             | Merged  | [#504](https://github.com/FSS-Ltd/pathway/pull/504) to `master`                     | `3154ba8f79f5397561643a6be3ce891972eea952`; all eight checks passed: CI run 37836040820, CodeQL run 37836026220.                                                                                                            | `26d43e4b6d194be5370bbc34f709bea4b025a351` |
 | REL-3    | Explicit API filter injection under production TSX loader              | Merged  | [#505](https://github.com/FSS-Ltd/pathway/pull/505) to `master`                     | `cdfce7d5617883be34e64d34c483e5e11642c021`; all eight checks passed: CI run 37839063716, CodeQL run 37839059599.                                                                                                            | `9e09089cf84c41649e62bfebc10907768aef6e98` |
 | REL-4    | Explicit RLS interceptor injection under production TSX loader         | Merged  | [#506](https://github.com/FSS-Ltd/pathway/pull/506) to `master`                     | `fe10f8d44e50c033fa9c29b851ac17fccf82f4bb`; all eight checks passed: CI run 37841594092, CodeQL run 37841590061.                                                                                                            | `193a569892c38be565ac6755456f41bcf498ed76` |
