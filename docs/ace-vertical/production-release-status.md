@@ -183,13 +183,16 @@ E2E suites ran; 79 suites and 492 tests passed. GitHub confirmed
 `f46405a4841f9ad615217d04fccbb412b50884e2`. The exact ACE master-plan
 count remains **42/150 (28%)** because M16 and M18 are incomplete.
 
-Build step 1.3e5n (in progress on `feature/ace-student-identity-web`):
+Build step 1.3e5n ([draft PR #562](https://github.com/FSS-Ltd/pathway/pull/562),
+in progress on `feature/ace-student-identity-web`):
 add ACE school student identity invitations, verified-email acceptance,
 site policy controls, active-link revocation, and student site discovery to
 the web and API. The student identity ADR in the source matrix remains open;
 the product owner must confirm the age and safeguarding rule before this
-step can merge. The PostgreSQL invitation E2E also requires an executed CI
-result because the local test database is unavailable. Mobile work remains
+step can merge. Local API and admin typechecks, lint, tests, and builds passed
+on implementation commit `3dee066a`; the PostgreSQL invitation E2E requires
+an executed latest-head CI result because the local test database is unavailable.
+Mobile work remains
 paused. The verified master-plan count remains **42/150 (28%)**; ACE-M15 is
 not complete.
 
