@@ -135,6 +135,21 @@ export class BehaviourController {
     }
   }
 
+  @Get("review-requests/:requestId/fact")
+  @RequirePermission("ace.behaviour.sensitive.read")
+  async reviewFact(@Param("requestId") requestId: string) {
+    try {
+      return await this.reviewService.fact(
+        this.actor(),
+        z.string().uuid().parse(requestId),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
   @Post()
   @RequirePermission("ace.behaviour.record")
   async recordEntry(@Body() body: unknown) {

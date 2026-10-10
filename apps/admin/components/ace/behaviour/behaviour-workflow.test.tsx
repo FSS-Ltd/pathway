@@ -381,6 +381,70 @@ async function run(): Promise<void> {
     );
     assert.match(container.textContent ?? "", /No behaviour records yet\./);
 
+    await render(
+      root,
+      <BehaviourHistory
+        isLoading={false}
+        error={null}
+        items={[
+          entry,
+          {
+            ...entry,
+            id: "55555555-5555-4555-8555-555555555555",
+            visibility: "SENSITIVE",
+            reason: "Private review",
+          },
+        ]}
+        children={[child]}
+        canCorrect={false}
+        canSensitive
+        siteTimeZone="America/Los_Angeles"
+        onRetry={() => undefined}
+        onCorrect={async () => ({ entry, duplicate: false })}
+      />,
+    );
+    assert.match(container.textContent ?? "", /Disrupted the lesson/);
+    assert.equal(container.textContent?.includes("Private review"), false);
+    await click(
+      element<HTMLInputElement>(
+        container,
+        'input[name="behaviour-history-visibility"][value="SENSITIVE"]',
+      ),
+    );
+    assert.match(container.textContent ?? "", /Private review/);
+    assert.equal(
+      container.textContent?.includes("Disrupted the lesson"),
+      false,
+    );
+
+    await render(
+      root,
+      <BehaviourHistory
+        isLoading={false}
+        error={null}
+        items={[
+          entry,
+          {
+            ...entry,
+            id: "55555555-5555-4555-8555-555555555555",
+            visibility: "SENSITIVE",
+            reason: "Private review",
+          },
+        ]}
+        children={[child]}
+        canCorrect={false}
+        canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
+        onRetry={() => undefined}
+        onCorrect={async () => ({ entry, duplicate: false })}
+      />,
+    );
+    assert.equal(
+      container.textContent?.includes("Private review"),
+      false,
+      "hides sensitive history immediately after access changes",
+    );
+
     const corrections: Array<{
       entryId: string;
       input: AdminBehaviourCommandInput;

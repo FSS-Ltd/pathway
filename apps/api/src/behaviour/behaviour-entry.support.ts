@@ -80,6 +80,10 @@ export const behaviourEntryQuerySelect = {
   commandFingerprint: false,
 } satisfies Prisma.BehaviourEntrySelect;
 
+export type BehaviourEntryResponseRecord = Prisma.BehaviourEntryGetPayload<{
+  select: typeof behaviourEntryQuerySelect;
+}>;
+
 export function behaviourClientCommandKeyHash(
   tenantId: string,
   clientKey: string,
@@ -125,7 +129,7 @@ export function behaviourIdempotencyConflict(): ConflictException {
   });
 }
 
-export function toBehaviourEntryResponse(entry: BehaviourEntryRecord) {
+export function toBehaviourEntryResponse(entry: BehaviourEntryResponseRecord) {
   return {
     id: entry.id,
     childId: entry.childId,
