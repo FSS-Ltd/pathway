@@ -7,18 +7,52 @@ import { Button, Card } from "@pathway/ui";
 import {
   fetchFamilyContexts,
   type FamilyContext,
+  type FamilySection,
 } from "@/lib/family-contexts-api";
 import { useSession, type SessionStatus } from "@/lib/use-session-compat";
 import { familyTimetableHref } from "@/components/ace/timetable/family-timetable-navigation";
 
 function contextHref(
   context: FamilyContext,
-  view: "attendance" | "timetable",
+  view: "attendance" | "sessions",
 ): string {
   const site = encodeURIComponent(context.siteId);
+  const route = view === "sessions" ? "timetable" : view;
   return context.kind === "student"
-    ? `/ace/student/sites/${site}/${view}`
-    : `/ace/parent/sites/${site}/children/${encodeURIComponent(context.childId)}/${view}`;
+    ? `/ace/student/sites/${site}/${route}`
+    : `/ace/parent/sites/${site}/children/${encodeURIComponent(context.childId)}/${route}`;
+}
+
+const childLinks = [
+  { section: "attendance", label: "Attendance" },
+  { section: "sessions", label: "Sessions" },
+  { section: "subject-timetable", label: "Subject timetable" },
+] as const satisfies ReadonlyArray<{ section: FamilySection; label: string }>;
+
+const schoolLinks = [
+  { section: "notices", label: "Notices", route: "notices" },
+  { section: "messages", label: "Messages", route: "messages" },
+  {
+    section: "volunteering",
+    label: "Help at school",
+    route: "volunteering",
+  },
+] as const satisfies ReadonlyArray<{
+  section: FamilySection;
+  label: string;
+  route: string;
+}>;
+
+function SectionLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong motion-reduce:transition-none"
+    >
+      {label}
+      <ChevronRight aria-hidden="true" className="h-4 w-4" />
+    </Link>
+  );
 }
 
 function ContextList({
@@ -47,24 +81,25 @@ function ContextList({
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                {(["attendance", "timetable"] as const).map((view) => (
-                  <Link
-                    key={view}
-                    href={contextHref(context, view)}
-                    className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong motion-reduce:transition-none"
-                  >
-                    {view === "attendance" ? "Attendance" : "Sessions"}
-                    <ChevronRight aria-hidden="true" className="h-4 w-4" />
-                  </Link>
-                ))}
-                <Link
-                  href={familyTimetableHref(context, "subjects")}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong motion-reduce:transition-none"
-                >
-                  Subject timetable
-                  <ChevronRight aria-hidden="true" className="h-4 w-4" />
-                </Link>
+                {childLinks
+                  .filter(({ section }) => context.sections.includes(section))
+                  .map(({ section, label }) => (
+                    <SectionLink
+                      key={section}
+                      href={
+                        section === "subject-timetable"
+                          ? familyTimetableHref(context, "subjects")
+                          : contextHref(context, section)
+                      }
+                      label={label}
+                    />
+                  ))}
               </div>
+              {context.sections.length === 0 ? (
+                <p className="mt-3 text-sm text-text-muted">
+                  School services are updating. Try again shortly.
+                </p>
+              ) : null}
             </div>
           </li>
         ))}
@@ -75,9 +110,9 @@ function ContextList({
 
 function SchoolLinksList({ contexts }: { contexts: FamilyContext[] }) {
   const schools = Array.from(
-    new Map(
-      contexts.map(({ siteId, siteName }) => [siteId, siteName]),
-    ).entries(),
+    new Map(contexts.map((context) => [context.siteId, context])).values(),
+  ).filter((context) =>
+    schoolLinks.some(({ section }) => context.sections.includes(section)),
   );
   if (schools.length === 0) return null;
   return (
@@ -86,34 +121,22 @@ function SchoolLinksList({ contexts }: { contexts: FamilyContext[] }) {
         Your schools
       </h2>
       <ul className="grid gap-3 sm:grid-cols-2">
-        {schools.map(([siteId, siteName]) => (
-          <li key={siteId}>
+        {schools.map((context) => (
+          <li key={context.siteId}>
             <div className="rounded-xl border border-border-subtle bg-surface px-5 py-4 shadow-card">
               <h3 className="font-heading text-lg font-semibold text-text-primary">
-                {siteName}
+                {context.siteName}
               </h3>
               <div className="mt-2 flex flex-wrap gap-2">
-                <Link
-                  href={`/ace/parent/sites/${encodeURIComponent(siteId)}/notices`}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
-                >
-                  Notices{" "}
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-                <Link
-                  href={`/ace/parent/sites/${encodeURIComponent(siteId)}/messages`}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
-                >
-                  Messages{" "}
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
-                <Link
-                  href={`/ace/parent/sites/${encodeURIComponent(siteId)}/volunteering`}
-                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong"
-                >
-                  Help at school{" "}
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </Link>
+                {schoolLinks
+                  .filter(({ section }) => context.sections.includes(section))
+                  .map(({ section, label, route }) => (
+                    <SectionLink
+                      key={section}
+                      href={`/ace/parent/sites/${encodeURIComponent(context.siteId)}/${route}`}
+                      label={label}
+                    />
+                  ))}
               </div>
             </div>
           </li>
@@ -163,9 +186,8 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
           Your family
         </h1>
         <p className="max-w-2xl text-base leading-7 text-text-muted">
-          Choose a linked child or your own student record to see attendance and
-          published subject timetables and sessions. Parents can message their
-          school team and choose days to help at school.
+          Choose a linked child or your own student record. The available school
+          services appear below and update when your access changes.
         </p>
       </header>
 

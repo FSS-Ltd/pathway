@@ -166,6 +166,16 @@ confirms the guardian E2E and invitation email migration ran; 79 suites and
 `6c8cfce9b67df2a555c8ddaa3e876c1496156c5b`. The verified master-plan
 task count remains **42/150 (28%)** because M15 and M20 are not yet complete.
 
+Build step 1.3e5m (in progress, web only): return available family sections
+with each current guardian or student context and render only those sections at
+`/ace/family`. Parent inbox links follow active notice and messaging reader
+permissions; volunteering remains ACE school only. Existing destination APIs
+continue to enforce their own relationship and publication checks. The new
+response is additive, with a web fallback for older API responses during
+rollout. This is part of the web shell work, not completion of ACE-M16 or M18;
+mobile remains paused. The plan-task count remains **42/150 (28%)** pending a
+green latest-head PR and confirmed merge.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of

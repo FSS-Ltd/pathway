@@ -26,7 +26,7 @@ async function run() {
   document.body.append(container);
   const root = createRoot(container);
   const requested: string[] = [];
-  let mode: "linked" | "empty" | "denied" = "linked";
+  let mode: "linked" | "partial" | "legacy" | "empty" | "denied" = "linked";
   const originalFetch = globalThis.fetch;
   setApiClientToken("family-token");
   globalThis.fetch = async (input, init) => {
@@ -48,6 +48,19 @@ async function run() {
                   siteName: "Alpha School",
                   childId: "child-one",
                   childName: "Ari Alpha",
+                  sections:
+                    mode === "legacy"
+                      ? undefined
+                      : mode === "partial"
+                        ? ["attendance", "notices"]
+                        : [
+                            "attendance",
+                            "sessions",
+                            "subject-timetable",
+                            "notices",
+                            "messages",
+                            "volunteering",
+                          ],
                 },
                 {
                   kind: "parent",
@@ -55,6 +68,19 @@ async function run() {
                   siteName: "Alpha School",
                   childId: "child-three",
                   childName: "Cia Alpha",
+                  sections:
+                    mode === "legacy"
+                      ? undefined
+                      : mode === "partial"
+                        ? ["attendance", "notices"]
+                        : [
+                            "attendance",
+                            "sessions",
+                            "subject-timetable",
+                            "notices",
+                            "messages",
+                            "volunteering",
+                          ],
                 },
                 {
                   kind: "student",
@@ -62,6 +88,12 @@ async function run() {
                   siteName: "Bravo School",
                   childId: "child-two",
                   childName: "Bea Bravo",
+                  sections:
+                    mode === "legacy"
+                      ? undefined
+                      : mode === "partial"
+                        ? ["attendance"]
+                        : ["attendance", "sessions", "subject-timetable"],
                 },
               ],
       }),
@@ -118,6 +150,39 @@ async function run() {
         (anchor) => anchor.getAttribute("href"),
       ),
       ["/ace/parent/sites/school-one/notices"],
+    );
+
+    mode = "partial";
+    await act(async () =>
+      root.render(<FamilyLandingView status="unauthenticated" />),
+    );
+    await act(async () =>
+      root.render(<FamilyLandingView status="authenticated" />),
+    );
+    assert.equal(container.querySelectorAll('a[href$="/messages"]').length, 0);
+    assert.equal(
+      container.querySelectorAll('a[href$="/volunteering"]').length,
+      0,
+    );
+    assert.equal(container.querySelectorAll('a[href$="/timetable"]').length, 0);
+    assert.equal(
+      container.querySelectorAll('a[href$="/subject-timetable"]').length,
+      0,
+    );
+    assert.equal(container.querySelectorAll('a[href$="/notices"]').length, 1);
+
+    mode = "legacy";
+    await act(async () =>
+      root.render(<FamilyLandingView status="unauthenticated" />),
+    );
+    await act(async () =>
+      root.render(<FamilyLandingView status="authenticated" />),
+    );
+    assert.match(container.textContent ?? "", /Ari Alpha/);
+    assert.match(container.textContent ?? "", /School services are updating/);
+    assert.equal(
+      container.querySelectorAll('a[href*="/ace/parent/sites/"]').length,
+      0,
     );
 
     mode = "denied";

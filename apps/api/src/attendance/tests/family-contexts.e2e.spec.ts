@@ -46,10 +46,10 @@ describe("ACE family context discovery", () => {
       ],
     });
     await prisma.orgVertical.createMany({
-      data: [orgAId, orgBId].map((orgId) => ({
-        orgId,
-        vertical: "ACE_SCHOOL",
-      })),
+      data: [
+        { orgId: orgAId, vertical: "ACE_SCHOOL" },
+        { orgId: orgBId, vertical: "INDEPENDENT_SCHOOL" },
+      ],
     });
     await prisma.tenant.createMany({
       data: [
@@ -204,6 +204,33 @@ describe("ACE family context discovery", () => {
   it("discovers only active full guardian and student contexts across sites", async () => {
     if (!app) return;
     const server = app.getHttpServer();
+    const activePermissions = new Set(
+      (
+        await prisma.permissionDefinition.findMany({
+          where: {
+            key: {
+              in: [
+                "ace.parent.notices.read",
+                "messaging.conversations.read",
+                "messaging.messages.read",
+              ],
+            },
+            isActive: true,
+          },
+          select: { key: true },
+        })
+      ).map(({ key }) => key),
+    );
+    const parentSections = [
+      "attendance",
+      "sessions",
+      "subject-timetable",
+      ...(activePermissions.has("ace.parent.notices.read") ? ["notices"] : []),
+      ...(activePermissions.has("messaging.conversations.read") &&
+      activePermissions.has("messaging.messages.read")
+        ? ["messages"]
+        : []),
+    ];
     const full = await request(server)
       .get(route)
       .set("Authorization", fullAuthorization);
@@ -216,6 +243,7 @@ describe("ACE family context discovery", () => {
           siteName: "Alpha School",
           childId: childAId,
           childName: "Ari Alpha",
+          sections: [...parentSections, "volunteering"],
         },
         {
           kind: "parent",
@@ -223,6 +251,7 @@ describe("ACE family context discovery", () => {
           siteName: "Bravo School",
           childId: childBId,
           childName: "Bea Bravo",
+          sections: parentSections,
         },
       ],
     });
@@ -239,6 +268,7 @@ describe("ACE family context discovery", () => {
           siteName: "Gamma School",
           childId: studentChildId,
           childName: "Sam Student",
+          sections: ["attendance", "sessions", "subject-timetable"],
         },
       ],
     });
@@ -253,6 +283,27 @@ describe("ACE family context discovery", () => {
       expect(response.body).toEqual({ items: [] });
     }
     expect((await request(server).get(route)).status).toBe(401);
+  });
+
+  it("does not advertise parent inboxes to an account with a student identity", async () => {
+    if (!app) return;
+    const identity = await withTenantRlsContext(siteAId, orgAId, (tx) =>
+      tx.studentIdentity.create({
+        data: { tenantId: siteAId, userId: fullUserId },
+      }),
+    );
+    try {
+      const response = await request(app.getHttpServer())
+        .get(route)
+        .set("Authorization", fullAuthorization);
+      expect(response.status).toBe(200);
+      expect(response.body.items[0].sections).not.toContain("messages");
+      expect(response.body.items[0].sections).not.toContain("notices");
+    } finally {
+      await withTenantRlsContext(siteAId, orgAId, (tx) =>
+        tx.studentIdentity.delete({ where: { id: identity.id } }),
+      );
+    }
   });
 
   it("removes disabled, revoked and ended links on the next read", async () => {
