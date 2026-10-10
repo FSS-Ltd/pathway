@@ -87,7 +87,7 @@ describe("ACE notice draft API", () => {
       tenantId: siteId,
       userId: managerId,
       scope: "site",
-      permissionKeys: ["notices.manage", "notices.publish"],
+      permissionKeys: ["notices.manage", "notices.publish", "notices.read"],
     });
     readerRole = await seedE2eTypedRole({
       orgId,
@@ -405,5 +405,131 @@ describe("ACE notice draft API", () => {
       recipientKind: "GUARDIAN",
       guardianIdentityId: managerGuardianId,
     });
+  });
+
+  it("lists only active staff-recipient notices and denies removed staff", async () => {
+    if (!app) return;
+    const created = await request(app.getHttpServer())
+      .post("/ace/notices/drafts")
+      .set("Authorization", managerAuthorization)
+      .send({
+        title: "Staff inbox notice",
+        body: "Read this from the staff inbox.",
+        audience: "PARENTS_AND_STAFF",
+        expiresAt: null,
+      });
+    expect(created.status).toBe(201);
+    const preview = await request(app.getHttpServer())
+      .get(`/ace/notices/drafts/${created.body.id}/audience-preview`)
+      .set("Authorization", managerAuthorization);
+    expect(preview.status).toBe(200);
+    const published = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send({
+        expectedUpdatedAt: created.body.updatedAt,
+        expectedAudienceVersion: preview.body.audienceVersion,
+      });
+    expect(published.status).toBe(201);
+
+    const denied = await request(app.getHttpServer())
+      .get(`/ace/notices/${created.body.id}`)
+      .set("Authorization", publisherAuthorization);
+    expect(denied.status).toBe(403);
+    const listed = await request(app.getHttpServer())
+      .get("/ace/notices?limit=50")
+      .set("Authorization", readerAuthorization);
+    expect(listed.status).toBe(200);
+    const summary = listed.body.items.find(
+      (item: { id: string }) => item.id === created.body.id,
+    );
+    expect(summary).toBeDefined();
+    expect(summary).not.toHaveProperty("body");
+    expect(summary.deliveredAt).toBeTruthy();
+    const detail = await request(app.getHttpServer())
+      .get(`/ace/notices/${created.body.id}`)
+      .set("Authorization", readerAuthorization);
+    expect(detail.status).toBe(200);
+    expect(detail.body.body).toBe("Read this from the staff inbox.");
+    expect(detail.body.readAt).toBeNull();
+    const read = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/read`)
+      .set("Authorization", readerAuthorization);
+    expect(read.status).toBe(201);
+    expect(read.body.readAt).toBeTruthy();
+    const repeatedRead = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/read`)
+      .set("Authorization", readerAuthorization);
+    expect(repeatedRead.status).toBe(201);
+    expect(repeatedRead.body.readAt).toBe(read.body.readAt);
+    const deniedRead = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/read`)
+      .set("Authorization", publisherAuthorization);
+    expect(deniedRead.status).toBe(403);
+
+    const managerDetail = await request(app.getHttpServer())
+      .get(`/ace/notices/${created.body.id}`)
+      .set("Authorization", managerAuthorization);
+    expect(managerDetail.status).toBe(200);
+    expect(managerDetail.body.audience).toBe("PARENTS_AND_STAFF");
+
+    const parentsOnly = await request(app.getHttpServer())
+      .post("/ace/notices/drafts")
+      .set("Authorization", managerAuthorization)
+      .send({
+        title: "Families only",
+        body: "A family notice.",
+        audience: "PARENTS",
+        expiresAt: null,
+      });
+    expect(parentsOnly.status).toBe(201);
+    const parentPreview = await request(app.getHttpServer())
+      .get(`/ace/notices/drafts/${parentsOnly.body.id}/audience-preview`)
+      .set("Authorization", managerAuthorization);
+    expect(parentPreview.status).toBe(200);
+    const parentPublished = await request(app.getHttpServer())
+      .post(`/ace/notices/${parentsOnly.body.id}/publish`)
+      .set("Authorization", managerAuthorization)
+      .send({
+        expectedUpdatedAt: parentsOnly.body.updatedAt,
+        expectedAudienceVersion: parentPreview.body.audienceVersion,
+      });
+    expect(parentPublished.status).toBe(201);
+    const hiddenParentNotice = await request(app.getHttpServer())
+      .get(`/ace/notices/${parentsOnly.body.id}`)
+      .set("Authorization", readerAuthorization);
+    expect(hiddenParentNotice.status).toBe(404);
+
+    await prisma.siteMembership.delete({
+      where: { tenantId_userId: { tenantId: siteId, userId: readerId } },
+    });
+    try {
+      const removed = await request(app.getHttpServer())
+        .get(`/ace/notices/${created.body.id}`)
+        .set("Authorization", readerAuthorization);
+      expect(removed.status).toBe(403);
+      const removedRead = await request(app.getHttpServer())
+        .post(`/ace/notices/${created.body.id}/read`)
+        .set("Authorization", readerAuthorization);
+      expect(removedRead.status).toBe(403);
+    } finally {
+      await prisma.siteMembership.create({
+        data: { tenantId: siteId, userId: readerId, role: "STAFF" },
+      });
+    }
+
+    const withdrawn = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/withdraw`)
+      .set("Authorization", managerAuthorization)
+      .send({ reason: "Superseded" });
+    expect(withdrawn.status).toBe(201);
+    const hidden = await request(app.getHttpServer())
+      .get(`/ace/notices/${created.body.id}`)
+      .set("Authorization", readerAuthorization);
+    expect(hidden.status).toBe(404);
+    const withdrawnRead = await request(app.getHttpServer())
+      .post(`/ace/notices/${created.body.id}/read`)
+      .set("Authorization", readerAuthorization);
+    expect(withdrawnRead.status).toBe(404);
   });
 });

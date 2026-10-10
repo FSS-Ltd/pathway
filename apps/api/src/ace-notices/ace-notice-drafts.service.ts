@@ -9,7 +9,7 @@ import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import {
   assertNoticeActor,
-  requireAceNoticeAuthor,
+  requireSiteNoticeStaffAccess,
   type NoticeActor,
 } from "./ace-notice-access";
 import type {
@@ -59,7 +59,7 @@ export class AceNoticeDraftsService {
     assertNoticeActor(actor);
     this.assertFutureExpiry(command.expiresAt);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireAceNoticeAuthor(tx, actor);
+      await requireSiteNoticeStaffAccess(tx, actor);
       const notice = await tx.aceNotice.create({
         data: {
           tenantId: actor.tenantId,
@@ -88,10 +88,11 @@ export class AceNoticeDraftsService {
   ): Promise<NoticeDraftPage> {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireAceNoticeAuthor(tx, actor);
+      await requireSiteNoticeStaffAccess(tx, actor);
       const scope: Prisma.AceNoticeWhereInput = {
         tenantId: actor.tenantId,
         publishedAt: null,
+        legacyImportedAt: null,
       };
       const cursor = query.cursor
         ? await tx.aceNotice.findFirst({
@@ -130,9 +131,14 @@ export class AceNoticeDraftsService {
   async get(id: string, actor: NoticeDraftActor): Promise<NoticeDraft> {
     assertNoticeActor(actor);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireAceNoticeAuthor(tx, actor);
+      await requireSiteNoticeStaffAccess(tx, actor);
       const notice = await tx.aceNotice.findFirst({
-        where: { id, tenantId: actor.tenantId, publishedAt: null },
+        where: {
+          id,
+          tenantId: actor.tenantId,
+          publishedAt: null,
+          legacyImportedAt: null,
+        },
         select: draftSelect,
       });
       if (!notice) throw new NotFoundException("Notice draft not found");
@@ -152,12 +158,13 @@ export class AceNoticeDraftsService {
       Math.max(Date.now(), expectedUpdatedAt.getTime() + 1),
     );
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await requireAceNoticeAuthor(tx, actor);
+      await requireSiteNoticeStaffAccess(tx, actor);
       const result = await tx.aceNotice.updateMany({
         where: {
           id,
           tenantId: actor.tenantId,
           publishedAt: null,
+          legacyImportedAt: null,
           updatedAt: expectedUpdatedAt,
         },
         data: {

@@ -35,9 +35,6 @@ function createTransaction() {
         org: { parentPortalEnabled: true },
       }),
     },
-    orgVertical: {
-      findFirst: jest.fn().mockResolvedValue({ orgId: actor.orgId }),
-    },
     siteMembership: {
       findFirst: jest.fn().mockResolvedValue({ id: "member-a" }),
     },
@@ -95,12 +92,8 @@ describe("AceNoticeDraftsService", () => {
     );
   });
 
-  it("rejects non-ACE, cross-organisation, non-member, and student authors", async () => {
+  it("rejects a wrong organisation, non-member, and student author", async () => {
     const { service, tx } = createService();
-    tx.orgVertical.findFirst.mockResolvedValueOnce(null);
-    await expect(service.create(content, actor)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
     tx.tenant.findFirst.mockResolvedValueOnce(null);
     await expect(service.create(content, actor)).rejects.toBeInstanceOf(
       NotFoundException,
@@ -138,7 +131,12 @@ describe("AceNoticeDraftsService", () => {
       nextCursor: draft.id,
     });
     expect(tx.aceNotice.findFirst).toHaveBeenCalledWith({
-      where: { id: draft.id, tenantId: actor.tenantId, publishedAt: null },
+      where: {
+        id: draft.id,
+        tenantId: actor.tenantId,
+        publishedAt: null,
+        legacyImportedAt: null,
+      },
       select: { id: true, createdAt: true },
     });
     expect(tx.aceNotice.findMany).toHaveBeenCalledWith(
@@ -146,6 +144,7 @@ describe("AceNoticeDraftsService", () => {
         where: expect.objectContaining({
           tenantId: actor.tenantId,
           publishedAt: null,
+          legacyImportedAt: null,
         }),
         take: 2,
       }),
@@ -168,8 +167,13 @@ describe("AceNoticeDraftsService", () => {
       NotFoundException,
     );
     expect(tx.aceNotice.findFirst).toHaveBeenCalledWith({
-      where: { id: draft.id, tenantId: actor.tenantId, publishedAt: null },
-      select: expect.any(Object),
+      where: {
+        id: draft.id,
+        tenantId: actor.tenantId,
+        publishedAt: null,
+        legacyImportedAt: null,
+      },
+      select: expect.objectContaining({ id: true }),
     });
   });
 
@@ -187,6 +191,7 @@ describe("AceNoticeDraftsService", () => {
         id: draft.id,
         tenantId: actor.tenantId,
         publishedAt: null,
+        legacyImportedAt: null,
         updatedAt: revision,
       },
       data: expect.objectContaining({ title: draft.title, body: draft.body }),

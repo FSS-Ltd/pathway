@@ -111,10 +111,10 @@ const navItemsWithAccess: (SidebarNavItem & {
   },
   {
     ...defaultSidebarItems[9],
-    access: "site-admin-or-higher",
+    access: "staff-or-admin",
     permission: "notices.read",
     group: "Communication",
-  }, // Notices & Announcements (admins only)
+  }, // Shared site notices
   {
     label: "Messages",
     href: "/ace/messages",

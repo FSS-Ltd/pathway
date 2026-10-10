@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { canAccessRoute } from "@/lib/permissions";
-import { hasPermission } from "@/lib/access";
+import { hasPermission, isSiteAdminOrHigher } from "@/lib/access";
 import { NoAccessCard } from "@/components/no-access-card";
 
 export default function NoticesLayout({
@@ -15,14 +15,17 @@ export default function NoticesLayout({
   const { role, permissions, isLoading } = useAdminAccess();
   const canAccess =
     canAccessRoute(pathname, role) &&
-    hasPermission(permissions, "notices.read");
+    hasPermission(permissions, "notices.read") &&
+    (pathname === "/notices" ||
+      (isSiteAdminOrHigher(role) &&
+        hasPermission(permissions, "notices.manage")));
 
   if (isLoading) return null;
   if (!canAccess) {
     return (
       <NoAccessCard
         title="Notices & Announcements"
-        message="This section is only available to site and organisation administrators."
+        message="You do not have access to notices for this site."
       />
     );
   }

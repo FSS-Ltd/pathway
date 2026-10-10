@@ -6,10 +6,20 @@ import { AceNoticeDraftsController } from "./ace-notice-drafts.controller";
 import { AceNoticeDraftsService } from "./ace-notice-drafts.service";
 import { AceNoticePublicationController } from "./ace-notice-publication.controller";
 import { AceNoticePublicationService } from "./ace-notice-publication.service";
+import { AceNoticeStaffInboxController } from "./ace-notice-staff-inbox.controller";
+import { AceNoticeStaffInboxService } from "./ace-notice-staff-inbox.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [AceNoticeDraftsController, AceNoticePublicationController],
-  providers: [AceNoticeDraftsService, AceNoticePublicationService],
+  controllers: [
+    AceNoticeDraftsController,
+    AceNoticePublicationController,
+    AceNoticeStaffInboxController,
+  ],
+  providers: [
+    AceNoticeDraftsService,
+    AceNoticePublicationService,
+    AceNoticeStaffInboxService,
+  ],
 })
 export class AceNoticesModule {}

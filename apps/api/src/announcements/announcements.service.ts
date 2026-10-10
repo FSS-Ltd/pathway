@@ -1,136 +1,88 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
-import { prisma } from "@pathway/db";
-import type { Prisma } from "@pathway/db";
-import { createAnnouncementDto, updateAnnouncementDto } from "./dto";
+import { GoneException, Injectable, NotFoundException } from "@nestjs/common";
+import { withTenantRlsContext, type Prisma } from "@pathway/db";
 
 export type Audience = "ALL" | "PARENTS" | "STAFF";
 
+const noticeSelect = {
+  id: true,
+  title: true,
+  body: true,
+  audience: true,
+  publishedAt: true,
+  withdrawnAt: true,
+  legacyImportedAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
+type NoticeRow = Prisma.AceNoticeGetPayload<{
+  select: typeof noticeSelect;
+}>;
+
+function legacyAudience(audience: NoticeRow["audience"]): Audience {
+  return audience === "PARENTS_AND_STAFF" ? "ALL" : audience;
+}
+
+function presentNotice(row: NoticeRow) {
+  const status = row.withdrawnAt
+    ? "archived"
+    : row.publishedAt
+      ? row.publishedAt.getTime() > Date.now()
+        ? "scheduled"
+        : "sent"
+      : "draft";
+  return {
+    ...row,
+    audience: legacyAudience(row.audience),
+    status,
+    scheduledAt: status === "scheduled" ? row.publishedAt : null,
+  };
+}
+
+/** Transitional read adapter for the existing admin and dashboard screens. */
 @Injectable()
 export class AnnouncementsService {
-  constructor() {}
-
-  async create(raw: unknown, tenantId: string) {
-    const dto = await createAnnouncementDto.parseAsync(raw);
-    if (dto.tenantId !== tenantId) {
-      throw new BadRequestException("tenantId must match current tenant");
-    }
-
-    // Ensure tenant exists BEFORE attempting the create so 404 is not swallowed by catch
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: tenantId },
-      select: { id: true },
-    });
-    if (!tenant) throw new NotFoundException("Tenant not found");
-
-    try {
-      return await prisma.announcement.create({
-        data: {
-          tenantId,
-          title: dto.title,
-          body: dto.body,
-          audience: dto.audience,
-          publishedAt: dto.publishedAt ?? null,
-        },
-      });
-    } catch (e: unknown) {
-      this.handlePrismaError(e, "create");
-    }
-  }
-
   async findAll(filters: {
     tenantId: string;
+    orgId: string;
     audience?: Audience;
     publishedOnly?: boolean;
   }) {
-    const where: Prisma.AnnouncementWhereInput = {
-      tenantId: filters.tenantId,
-      ...(filters.audience ? { audience: filters.audience } : {}),
-      ...(filters.publishedOnly ? { publishedAt: { not: null } } : {}),
-    };
-
-    return prisma.announcement.findMany({
-      where,
-      orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
-    });
-  }
-
-  async findOne(id: string, tenantId: string) {
-    const a = await prisma.announcement.findFirst({ where: { id, tenantId } });
-    if (!a) throw new NotFoundException("Announcement not found");
-    return a;
-  }
-
-  async update(id: string, raw: unknown, tenantId: string) {
-    const dto = await updateAnnouncementDto.parseAsync(raw);
-    const existing = await prisma.announcement.findFirst({
-      where: { id, tenantId },
-      select: { id: true },
-    });
-    if (!existing) throw new NotFoundException("Announcement not found");
-    try {
-      return await prisma.announcement.update({
-        where: { id },
-        data: {
-          title: dto.title ?? undefined,
-          body: dto.body ?? undefined,
-          audience: dto.audience ?? undefined,
-          publishedAt: dto.publishedAt ?? undefined,
+    return withTenantRlsContext(filters.tenantId, filters.orgId, async (tx) => {
+      const rows = await tx.aceNotice.findMany({
+        where: {
+          tenantId: filters.tenantId,
+          ...(filters.audience
+            ? {
+                audience:
+                  filters.audience === "ALL"
+                    ? "PARENTS_AND_STAFF"
+                    : filters.audience,
+              }
+            : {}),
+          ...(filters.publishedOnly ? { publishedAt: { not: null } } : {}),
         },
+        orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+        select: noticeSelect,
       });
-    } catch (e: unknown) {
-      this.handlePrismaError(e, "update", id);
-    }
-  }
-
-  async remove(id: string, tenantId: string) {
-    const existing = await prisma.announcement.findFirst({
-      where: { id, tenantId },
-      select: { id: true },
+      return rows.map(presentNotice);
     });
-    if (!existing) throw new NotFoundException("Announcement not found");
-    try {
-      return await prisma.announcement.delete({ where: { id } });
-    } catch (e: unknown) {
-      this.handlePrismaError(e, "delete", id);
-    }
   }
 
-  private handlePrismaError(
-    e: unknown,
-    action: "create" | "update" | "delete",
-    id?: string,
-  ): never {
-    const code =
-      typeof e === "object" && e !== null && "code" in e
-        ? String((e as { code?: unknown }).code)
-        : undefined;
-    const message =
-      typeof e === "object" &&
-      e !== null &&
-      "message" in e &&
-      typeof (e as { message?: unknown }).message === "string"
-        ? (e as { message: string }).message
-        : "Unknown error";
+  async findOne(id: string, tenantId: string, orgId: string) {
+    return withTenantRlsContext(tenantId, orgId, async (tx) => {
+      const row = await tx.aceNotice.findFirst({
+        where: { id, tenantId },
+        select: noticeSelect,
+      });
+      if (!row) throw new NotFoundException("Notice not found");
+      return presentNotice(row);
+    });
+  }
 
-    if (code === "P2025")
-      throw new NotFoundException(
-        id ? `Announcement with id ${id} not found` : "Announcement not found",
-      );
-    if (code === "P2002")
-      throw new BadRequestException(
-        `Duplicate value violates a unique constraint: ${message}`,
-      );
-    if (code === "P2003")
-      throw new BadRequestException(
-        `Invalid reference for announcement ${action}: ${message}`,
-      );
-
-    throw new BadRequestException(
-      `Failed to ${action} announcement: ${message}`,
+  retiredWrite(): never {
+    throw new GoneException(
+      "Use the site notice draft, preview, publish, and withdraw commands",
     );
   }
 }
