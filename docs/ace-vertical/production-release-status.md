@@ -126,13 +126,15 @@ validation, formatting, 39 focused API unit tests, and the staff picker
 component test passed. The plan-task count remains **42/150 (28%)** while
 ACE-M13 and M14 are not yet fully reconciled.
 
-Build step 1.3e5k (web notice confirmation, in progress): require a second
+Build step 1.3e5k ([PR #557](https://github.com/FSS-Ltd/pathway/pull/557),
+CI pending): require a second
 publisher confirmation after an audience selection changes or a publish/schedule
 conflict invalidates the preview. Keep the current server-side revision and
 audience-version checks. The admin test covers empty audience, stale-preview
-conflict, and reconfirmation. Complete local web checks, raise its PR, and wait
-for latest-head green CI and confirmed merge before another build step. Mobile
-notice work is paused at the user's request and excluded from this step.
+conflict, reconfirmation, and both send controls. Local admin tests, typecheck,
+lint, build with test configuration, formatting, and structural Graphify passed.
+Wait for latest-head green CI and confirmed merge before another build step.
+Mobile notice work is paused at the user's request and excluded from this PR.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
