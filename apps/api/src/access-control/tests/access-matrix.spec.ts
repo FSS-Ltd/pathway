@@ -60,6 +60,10 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R72: "migrated",
   R73: "migrated",
   R74: "migrated",
+  R75: "migrated",
+  R76: "migrated",
+  R77: "migrated",
+  R78: "migrated",
 };
 
 for (let n = 15; n <= 68; n += 1) {
@@ -163,5 +167,13 @@ describe("access route matrix", () => {
     expect(byId.R72).toMatchObject({ method: "POST", path: "/ace/subjects", permission: "ace.settings.manage" });
     expect(byId.R73).toMatchObject({ method: "PATCH", path: "/ace/subjects/:id", permission: "ace.settings.manage" });
     expect(byId.R74).toMatchObject({ method: "POST", path: "/ace/subjects/:id/deactivate", permission: "ace.settings.manage" });
+  });
+
+  it("requires notice management for every ACE draft route", () => {
+    const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
+    expect(byId.R75).toMatchObject({ method: "POST", path: "/ace/notices/drafts", permission: "notices.manage" });
+    expect(byId.R76).toMatchObject({ method: "GET", path: "/ace/notices/drafts", permission: "notices.manage" });
+    expect(byId.R77).toMatchObject({ method: "GET", path: "/ace/notices/drafts/:id", permission: "notices.manage" });
+    expect(byId.R78).toMatchObject({ method: "PUT", path: "/ace/notices/drafts/:id", permission: "notices.manage" });
   });
 });

@@ -8,6 +8,7 @@ import { PaceModule } from "./pace/pace.module";
 import { BehaviourModule } from "./behaviour/behaviour.module";
 import { AceDashboardModule } from "./ace-dashboard/ace-dashboard.module";
 import { MessagingModule } from "./messaging/messaging.module";
+import { AceNoticesModule } from "./ace-notices/ace-notices.module";
 
 // Core modules
 import { HealthModule } from "./health/health.module";
@@ -82,6 +83,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     BehaviourModule,
     AceDashboardModule,
     MessagingModule,
+    AceNoticesModule,
     LeadsModule,
     StaffModule,
     PublicSignupModule,

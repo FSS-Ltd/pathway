@@ -225,6 +225,19 @@ module, and they do not grant access to Learning logs or evidence.
 | R73 | PATCH | `/ace/subjects/:id` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | subject belongs to active site | audited subject rename | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 | R74 | POST | `/ace/subjects/:id/deactivate` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | subject belongs to active site | audited deactivation; existing placements retained | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 
+## ACE site notice draft routes
+
+Draft management is ACE core and does not publish a notice or grant reader access.
+Every route also checks the ACE vertical, current site membership, and absence
+of a student identity in the selected site.
+
+| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R75 | POST | `/ace/notices/drafts` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | active ACE site | audited draft creation; no publication | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+| R76 | GET | `/ace/notices/drafts` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | active ACE site | bounded draft list | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+| R77 | GET | `/ace/notices/drafts/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | draft belongs to selected site | draft detail only | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+| R78 | PUT | `/ace/notices/drafts/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | draft belongs to selected site | audited edit with optimistic revision | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
+
 ## NexSteps legacy surface (Batch A)
 
 Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cutover, using `platform.access.*`-family keys already active in `PLATFORM_CORE_CAPABILITIES` for every vertical. Not part of the 68 exact ACE routes; recorded separately so that count stays accurate. Migration is bounded to the two controllers that authorised from no role check at all (announcements, attendance) - see the ACE-F14 build plan for the controllers still blocked on a missing permission key or a commercial-entitlement decision (children, classes, parents, lessons, orgs, staff, session assignments, learning).
