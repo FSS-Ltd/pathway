@@ -69,6 +69,12 @@ trigger already rejects a published notice without recipients and freezes its
 audience. API retries must return the same published notice, not duplicate
 recipients or notifications.
 
+The database checks the original author's current site membership and student
+identity when a draft is inserted. It keeps the author and site immutable
+afterwards; an author leaving the site must not prevent a currently authorised
+publisher from withdrawing an issued notice. The author guard resolves
+identity tables in either supported `app` or `public` schema layout.
+
 The schema needs additive `expiresAt` and `withdrawnAt` fields for Oasis's
 active and expiry behavior. Validate future expiry at publish; an expired or
 withdrawn notice leaves the normal reader inbox and cannot gain new read

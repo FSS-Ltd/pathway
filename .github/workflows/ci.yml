@@ -384,6 +384,7 @@ jobs:
           src/__tests__/portable-message-creator.integration.spec.ts
           src/__tests__/portable-message-participant.integration.spec.ts
           src/__tests__/portable-notice-guardian-eligibility.integration.spec.ts
+          src/__tests__/portable-notice-author.integration.spec.ts
           src/__tests__/portable-family-discovery-policy.integration.spec.ts
           src/__tests__/public-ace-message-bridge.integration.spec.ts
 
@@ -465,6 +466,7 @@ jobs:
           pnpm --filter @pathway/db exec
           jest --config jest.config.ts --runInBand --runTestsByPath
           src/__tests__/portable-notice-guardian-eligibility.integration.spec.ts
+          src/__tests__/portable-notice-author.integration.spec.ts
           src/__tests__/portable-family-discovery-policy.integration.spec.ts
           src/__tests__/public-ace-message-bridge.integration.spec.ts
 
