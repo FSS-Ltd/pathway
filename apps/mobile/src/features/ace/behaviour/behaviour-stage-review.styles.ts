@@ -1,0 +1,98 @@
+import { StyleSheet } from "react-native";
+
+import { mobileTokens } from "@/design/tokens";
+
+export const styles = StyleSheet.create({
+  container: { gap: mobileTokens.spacing.sm },
+  muted: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.md.size,
+    lineHeight: mobileTokens.typography.body.md.lineHeight,
+    color: mobileTokens.colors.text.muted,
+  },
+  label: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontWeight: mobileTokens.typography.weight.semibold,
+    fontSize: mobileTokens.typography.body.md.size,
+    color: mobileTokens.colors.text.primary,
+  },
+  choices: { gap: mobileTokens.spacing.xs },
+  choice: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.border.strong,
+    borderRadius: mobileTokens.radius.md,
+    paddingHorizontal: mobileTokens.spacing.sm,
+    paddingVertical: mobileTokens.spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: mobileTokens.spacing.xs,
+  },
+  selectedChoice: { borderColor: mobileTokens.colors.accent.serve },
+  pressed: { opacity: 0.7 },
+  disabled: { opacity: 0.5 },
+  choiceText: {
+    flexShrink: 1,
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.md.size,
+    color: mobileTokens.colors.text.primary,
+  },
+  selectedText: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.sm.size,
+    color: mobileTokens.colors.text.muted,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+    gap: mobileTokens.spacing.xs,
+  },
+  dateField: { flexGrow: 1, flexBasis: 180, gap: mobileTokens.spacing.xxs },
+  input: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.border.strong,
+    borderRadius: mobileTokens.radius.md,
+    paddingHorizontal: mobileTokens.spacing.sm,
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.md.size,
+    color: mobileTokens.colors.text.primary,
+  },
+  todayButton: {
+    minHeight: 52,
+    paddingHorizontal: mobileTokens.spacing.md,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.accent.serve,
+    borderRadius: mobileTokens.radius.md,
+    justifyContent: "center",
+  },
+  todayText: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontWeight: mobileTokens.typography.weight.semibold,
+    fontSize: mobileTokens.typography.body.md.size,
+    color: mobileTokens.colors.text.primary,
+  },
+  error: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.sm.size,
+    color: "#B42318",
+  },
+  success: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.md.size,
+    color: mobileTokens.colors.text.primary,
+    backgroundColor: "#ECFDF3",
+    borderRadius: mobileTokens.radius.md,
+    padding: mobileTokens.spacing.sm,
+  },
+  feedbackError: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.md.size,
+    color: "#B42318",
+    backgroundColor: "#FEF3F2",
+    borderRadius: mobileTokens.radius.md,
+    padding: mobileTokens.spacing.sm,
+  },
+});

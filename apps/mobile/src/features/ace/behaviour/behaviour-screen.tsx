@@ -30,6 +30,8 @@ import {
   type BehaviourDraftValidation,
 } from "./behaviour-capture-form";
 import { BehaviourHistoryList } from "./behaviour-history-list";
+import { BehaviourStageReview } from "./behaviour-stage-review";
+import { isValidIanaTimeZone } from "./behaviour-time";
 
 type Feedback = { tone: "success" | "error"; message: string };
 
@@ -51,6 +53,7 @@ export function BehaviourScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [stageRefreshKey, setStageRefreshKey] = useState(0);
   const submitting = useRef(false);
   const commandAttempted = useRef(false);
   const commandOccurredAt = useRef<string | null>(null);
@@ -76,6 +79,7 @@ export function BehaviourScreen() {
   const canRead = permissions.includes("ace.behaviour.read");
   const canRecord = permissions.includes("ace.behaviour.record");
   const canSensitive = permissions.includes("ace.behaviour.sensitive.read");
+  const canManagePolicy = permissions.includes("ace.behaviour.policy.manage");
 
   const load = useCallback(async () => {
     const request = ++loadRequest.current;
@@ -118,12 +122,9 @@ export function BehaviourScreen() {
           (item) => item.visibility === "GENERAL" || sensitive,
         ),
       );
+      setStageRefreshKey((current) => current + 1);
       setDraft((current) => {
-        const safeDraft = sanitiseDraft(
-          current,
-          policy.categories,
-          sensitive,
-        );
+        const safeDraft = sanitiseDraft(current, policy.categories, sensitive);
         if (safeDraft.idempotencyKey !== current.idempotencyKey) {
           commandOccurredAt.current = null;
         }
@@ -295,8 +296,7 @@ export function BehaviourScreen() {
     setIsSubmitting(true);
     setFeedback(null);
     const note = draft.note.trim();
-    const occurredAt =
-      commandOccurredAt.current ?? new Date().toISOString();
+    const occurredAt = commandOccurredAt.current ?? new Date().toISOString();
     commandOccurredAt.current = occurredAt;
     void recordBehaviour({
       idempotencyKey: draft.idempotencyKey,
@@ -370,54 +370,71 @@ export function BehaviourScreen() {
         </BrandedCard>
       ) : null}
 
-      {!isLoading && ready && canRead && !loadError ? (
-        <>
-          {canRecord ? (
-            <BrandedCard>
-              <SectionTitle
-                title="New record"
-                subtitle="Sensitive mode appears only after current server authorisation."
-              />
-              <BehaviourCaptureForm
-                children={children}
-                categories={categories}
-                canSensitive={canSensitive}
-                disabled={isSubmitting}
-                draft={draft}
-                validation={validation}
-                visibility={visibility}
-                onChange={updateDraft}
-                onSelectChild={selectChild}
-                onSelectCategory={selectCategory}
-                onSelectVisibility={selectVisibility}
-                onSubmit={submit}
-              />
-              {feedback ? <FeedbackCallout feedback={feedback} /> : null}
-            </BrandedCard>
-          ) : null}
+      {!isLoading && ready && canRead && !loadError && canRecord ? (
+        <BrandedCard>
+          <SectionTitle
+            title="New record"
+            subtitle="Sensitive mode appears only after current server authorisation."
+          />
+          <BehaviourCaptureForm
+            children={children}
+            categories={categories}
+            canSensitive={canSensitive}
+            disabled={isSubmitting}
+            draft={draft}
+            validation={validation}
+            visibility={visibility}
+            onChange={updateDraft}
+            onSelectChild={selectChild}
+            onSelectCategory={selectCategory}
+            onSelectVisibility={selectVisibility}
+            onSubmit={submit}
+          />
+          {feedback ? <FeedbackCallout feedback={feedback} /> : null}
+        </BrandedCard>
+      ) : null}
 
-          <BrandedCard>
-            <SectionTitle
-              title="Behaviour history"
-              subtitle="Current records are shown newest first."
-            />
-            <BehaviourHistoryList
-              items={history}
-              children={children}
-              canCorrect={canRecord}
-              disabled={isSubmitting}
-              siteTimeZone={siteTimeZone!}
-              onCorrect={correctBehaviour}
-              onSuccess={async () => {
-                setFeedback({
-                  tone: "success",
-                  message: "Correction recorded.",
-                });
-                await load();
-              }}
-            />
-          </BrandedCard>
-        </>
+      {ready && canRead && !loadError && siteTimeZone ? (
+        <BrandedCard>
+          <SectionTitle
+            title="Demerit stage and review"
+            subtitle="Site-local stage and current reviewer requests."
+          />
+          <BehaviourStageReview
+            key={`behaviour-stage-${siteId}`}
+            children={children}
+            siteTimeZone={siteTimeZone}
+            canSensitive={canSensitive}
+            canManagePolicy={canManagePolicy}
+            accessLoading={isLoading}
+            refreshKey={stageRefreshKey}
+          />
+        </BrandedCard>
+      ) : null}
+
+      {!isLoading && ready && canRead && !loadError ? (
+        <BrandedCard>
+          <SectionTitle
+            title="Behaviour history"
+            subtitle="Current records are shown newest first."
+          />
+          <BehaviourHistoryList
+            items={history}
+            children={children}
+            canCorrect={canRecord}
+            canSensitive={canSensitive}
+            disabled={isSubmitting}
+            siteTimeZone={siteTimeZone!}
+            onCorrect={correctBehaviour}
+            onSuccess={async () => {
+              setFeedback({
+                tone: "success",
+                message: "Correction recorded.",
+              });
+              await load();
+            }}
+          />
+        </BrandedCard>
       ) : null}
     </Screen>
   );
@@ -558,15 +575,6 @@ function createCommandKey(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   if (uuid) return uuid;
   return `behaviour-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function isValidIanaTimeZone(timeZone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone }).format();
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 const styles = StyleSheet.create({

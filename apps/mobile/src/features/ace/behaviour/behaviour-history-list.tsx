@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { StandardButton } from "@/components/primitives/ui";
@@ -8,12 +8,15 @@ import type {
   BehaviourCommandInput,
   BehaviourCommandResponse,
   BehaviourEntry,
+  BehaviourVisibility,
 } from "@/lib/api/behaviour";
+import { formatSiteDateTime } from "./behaviour-time";
 
 type BehaviourHistoryListProps = {
   items: BehaviourEntry[];
   children: BehaviourChild[];
   canCorrect: boolean;
+  canSensitive: boolean;
   disabled: boolean;
   siteTimeZone: string;
   onCorrect: (
@@ -27,6 +30,7 @@ export function BehaviourHistoryList({
   items,
   children,
   canCorrect,
+  canSensitive,
   disabled,
   siteTimeZone,
   onCorrect,
@@ -34,14 +38,53 @@ export function BehaviourHistoryList({
 }: BehaviourHistoryListProps) {
   const names = new Map(children.map((child) => [child.id, child.displayName]));
   const [correctionTarget, setCorrectionTarget] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<BehaviourVisibility>("GENERAL");
+  const selectedVisibility = canSensitive ? visibility : "GENERAL";
+  const visibleItems = items.filter(
+    (item) => item.visibility === selectedVisibility,
+  );
 
-  if (items.length === 0) {
-    return <Text style={styles.stateText}>No behaviour records yet.</Text>;
-  }
+  useEffect(() => {
+    if (!canSensitive) {
+      setVisibility("GENERAL");
+      setCorrectionTarget(null);
+    }
+  }, [canSensitive]);
 
   return (
     <View style={styles.list}>
-      {items.map((item) => (
+      {canSensitive ? (
+        <View accessibilityRole="radiogroup" style={styles.visibilityChoices}>
+          {(["GENERAL", "SENSITIVE"] as const).map((option) => (
+            <Pressable
+              key={option}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: selectedVisibility === option }}
+              onPress={() => {
+                setVisibility(option);
+                setCorrectionTarget(null);
+              }}
+              style={({ pressed }) => [
+                styles.visibilityChoice,
+                selectedVisibility === option && styles.selectedVisibility,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.visibilityText}>
+                {option === "GENERAL" ? "General history" : "Sensitive history"}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {visibleItems.length === 0 ? (
+        <Text style={styles.stateText}>
+          {selectedVisibility === "SENSITIVE"
+            ? "No sensitive records in the recently loaded history."
+            : "No behaviour records yet."}
+        </Text>
+      ) : null}
+      {visibleItems.map((item) => (
         <View key={item.id} style={styles.entry}>
           <Text style={styles.entryTitle}>
             {names.get(item.childId) ?? "Learner"} ·{" "}
@@ -49,7 +92,7 @@ export function BehaviourHistoryList({
           </Text>
           <Text style={styles.entryMeta}>
             {formatType(item.type)} · {formatPoints(item.pointsDelta)} ·{" "}
-            {formatDateTime(item.occurredAt, siteTimeZone)}
+            {formatSiteDateTime(item.occurredAt, siteTimeZone)}
           </Text>
           <Text style={styles.entryReason}>{item.reason}</Text>
           {item.note ? <Text style={styles.entryNote}>{item.note}</Text> : null}
@@ -210,16 +253,6 @@ function formatPoints(points: number): string {
   return "No points";
 }
 
-function formatDateTime(value: string, timeZone: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone,
-  }).format(date);
-}
-
 function createCommandKey(): string {
   const uuid = globalThis.crypto?.randomUUID?.();
   if (uuid) return uuid;
@@ -228,6 +261,28 @@ function createCommandKey(): string {
 
 const styles = StyleSheet.create({
   list: { gap: mobileTokens.spacing.sm },
+  visibilityChoices: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: mobileTokens.spacing.xs,
+  },
+  visibilityChoice: {
+    minHeight: 52,
+    flexGrow: 1,
+    flexBasis: 140,
+    borderWidth: 1,
+    borderColor: mobileTokens.colors.border.strong,
+    borderRadius: mobileTokens.radius.md,
+    paddingHorizontal: mobileTokens.spacing.sm,
+    justifyContent: "center",
+  },
+  selectedVisibility: { borderColor: mobileTokens.colors.accent.serve },
+  pressed: { opacity: 0.7 },
+  visibilityText: {
+    fontFamily: mobileTokens.typography.fontFamily.body,
+    fontSize: mobileTokens.typography.body.md.size,
+    color: mobileTokens.colors.text.primary,
+  },
   entry: {
     borderWidth: 1,
     borderColor: mobileTokens.colors.border.subtle,
