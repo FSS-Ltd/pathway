@@ -31,7 +31,7 @@ SET search_path = ''
 AS $$
 BEGIN
   IF TG_OP = 'INSERT' AND NOT EXISTS (
-    SELECT 1 FROM public."Announcement" source
+    SELECT 1 FROM app."Announcement" source
     WHERE source."id" = NEW."id" AND source."tenantId" = NEW."tenantId"
   ) THEN
     RAISE EXCEPTION 'Historical notice requires a matching announcement'
@@ -134,7 +134,7 @@ SET row_security = off;
 DO $$
 BEGIN
   IF EXISTS (
-    SELECT 1 FROM public."Announcement" source
+    SELECT 1 FROM app."Announcement" source
     JOIN app."AceNotice" notice ON notice."id" = source."id"
   ) THEN
     RAISE EXCEPTION 'Notice ID collision blocks historical import';
@@ -199,7 +199,7 @@ REVOKE ALL ON FUNCTION app.mirror_legacy_announcement() FROM PUBLIC;
 -- Creating the trigger locks the source for the remainder of this migration,
 -- so the backfill and future writes cannot race past one another.
 CREATE TRIGGER "Announcement_mirror_to_site_notice"
-  AFTER INSERT OR UPDATE OR DELETE ON public."Announcement"
+  AFTER INSERT OR UPDATE OR DELETE ON app."Announcement"
   FOR EACH ROW EXECUTE FUNCTION app.mirror_legacy_announcement();
 
 INSERT INTO app."AceNotice" (
@@ -214,6 +214,6 @@ SELECT
     ELSE 'STAFF'::app."AceNoticeAudience"
   END,
   source."publishedAt", source."createdAt", source."updatedAt", pg_catalog.clock_timestamp()
-FROM public."Announcement" source;
+FROM app."Announcement" source;
 
 RESET row_security;

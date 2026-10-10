@@ -70,6 +70,15 @@ separate gated change.
   Notices are site-wide; child-specific content needs a separately reviewed
   audience model and must not be placed in a site-wide notice.
 
+The shared notice record, lifecycle, scheduling, delivery, and receipt model
+applies across site models. Scheduling and cancellation before publication
+remain ACE-M13 requirements and are not delivered by the current immediate
+publication API. Class, group, and guardian-specific targeting must use an
+audience source and access policy verified for the relevant sector. School
+class and guardian relationship rules belong to the ACE extension; they must
+not widen access to the shared site-wide notice stream. ACE-M13 remains open
+until these audience and scheduling requirements are delivered and tested.
+
 ## Data and lifecycle
 
 `AceNotice` has a draft (`publishedAt = null`) and a published state. Draft

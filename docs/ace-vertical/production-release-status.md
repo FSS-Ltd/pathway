@@ -42,11 +42,14 @@ on head `6cb0918dd6820650bd45eee48befff6f412a6f0b` (CI run
 38069238757; CodeQL run 38069238052), and the PostgreSQL integration log
 confirms the ACE notice E2E suite ran. These site-scoped notice APIs have not
 been deployed to production. ACE-M13 remains incomplete: reader and receipt
-commands are outstanding. Its master task also names scheduling and
-class/group audiences, while the later approved notice design specifies
-site-wide notices; that scope conflict needs a product decision before M13 can
-be closed. The next permissible slice after this evidence PR merges is the
-ACE-M13 reader and receipt API. ACE-M20's identity and security gate remains
+commands are outstanding. On 10 October the product decision was to share
+notice capabilities that benefit all site models, including scheduling and
+receipts, while keeping school-specific class and guardian targeting within
+an ACE extension with its own audience and access review. The current API
+publishes site-wide notices immediately; scheduling, cancellation before
+publication, and class/group/guardian targeting remain M13 work. The next
+permissible slice after this PR merges must address those remaining plan
+requirements. ACE-M20's identity and security gate remains
 open before ACE-C01 through C05 homework tasks begin.
 
 Current build step 1.3e5f (in progress, not merged): consolidate site notices
@@ -61,9 +64,11 @@ ACE notice rows. PR [#552](https://github.com/FSS-Ltd/pathway/pull/552)
 is open; this change has not been deployed or merged. Local API and admin
 type checks, 30 focused API unit tests, affected admin UI tests, lint,
 formatting, API and admin builds, Prisma schema validation, diff checks, and
-code Graphify refresh passed. PostgreSQL
-integration verification is pending CI because this host cannot start a local
-cluster (`shmget`: no free shared-memory segment). The plan-task count stays
+code Graphify refresh passed. The first CI run failed in three database jobs
+because the migration named `public."Announcement"` although the source table
+lives in `app`; the source references are corrected in this PR and fresh CI
+verification is pending. This host cannot start a local PostgreSQL cluster
+(`shmget`: no free shared-memory segment). The plan-task count stays
 **42/150 (28%)** until a merged task is reconciled against the master plan.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
