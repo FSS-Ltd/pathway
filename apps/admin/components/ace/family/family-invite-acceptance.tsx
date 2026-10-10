@@ -102,7 +102,13 @@ export function FamilyInviteAcceptance({ kind }: { kind: InviteKind }) {
     }
   }
 
+  const studentAccessUnavailable =
+    kind === "student" &&
+    invite?.acceptedAt &&
+    "accessAvailable" in invite &&
+    invite.accessAvailable === false;
   const unavailable =
+    studentAccessUnavailable ||
     invite?.revokedAt ||
     (invite &&
       !invite.acceptedAt &&
@@ -142,8 +148,9 @@ export function FamilyInviteAcceptance({ kind }: { kind: InviteKind }) {
             </p>
             {unavailable ? (
               <p role="status" className="text-sm text-text-secondary">
-                This invitation is no longer available. Ask the school to send a
-                new one.
+                {studentAccessUnavailable
+                  ? "Student access is currently unavailable. Ask the school to review this account."
+                  : "This invitation is no longer available. Ask the school to send a new one."}
               </p>
             ) : (
               <>

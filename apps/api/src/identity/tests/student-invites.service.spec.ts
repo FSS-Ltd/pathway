@@ -222,4 +222,31 @@ describe("student identity invitations", () => {
     expect(tx.familyIdentityInvite.update).not.toHaveBeenCalled();
     expect(mailer.sendStudentInviteEmail).not.toHaveBeenCalled();
   });
+
+  it("reports accepted student access as unavailable after revocation or policy disablement", async () => {
+    const { tx, invite, acceptance } = setup();
+    tx.familyIdentityInvite.findFirst.mockResolvedValue({
+      ...invite,
+      acceptedAt: new Date(),
+      acceptedStudentIdentityId: "student-identity-a",
+    });
+    tx.studentIdentityLink.findFirst.mockResolvedValue(null);
+    await expect(
+      acceptance.getForInvitee(tenantId, inviteId, userId, email),
+    ).resolves.toEqual(expect.objectContaining({ accessAvailable: false }));
+
+    tx.studentIdentityLink.findFirst.mockResolvedValue({
+      id: "student-link-a",
+    });
+    await expect(
+      acceptance.getForInvitee(tenantId, inviteId, userId, email),
+    ).resolves.toEqual(expect.objectContaining({ accessAvailable: true }));
+
+    tx.studentPortalPolicy.findUnique.mockResolvedValue({
+      studentPortalEnabled: false,
+    });
+    await expect(
+      acceptance.getForInvitee(tenantId, inviteId, userId, email),
+    ).resolves.toEqual(expect.objectContaining({ accessAvailable: false }));
+  });
 });

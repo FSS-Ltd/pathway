@@ -47,6 +47,8 @@ export class StudentInviteAcceptanceService {
           id: true,
           expiresAt: true,
           acceptedAt: true,
+          acceptedStudentIdentityId: true,
+          childId: true,
           revokedAt: true,
           invitedEmail: true,
           invitedUserId: true,
@@ -61,12 +63,37 @@ export class StudentInviteAcceptanceService {
       });
       if (!invite) throw new NotFoundException("Invitation not found");
       this.assertInvitee(invite, userId, verifiedEmail);
+      let accessAvailable: boolean | null = null;
+      if (invite.acceptedAt) {
+        accessAvailable = false;
+        if (invite.childId && invite.acceptedStudentIdentityId) {
+          const [policy, link] = await Promise.all([
+            tx.studentPortalPolicy.findUnique({
+              where: { tenantId },
+              select: { studentPortalEnabled: true },
+            }),
+            tx.studentIdentityLink.findFirst({
+              where: {
+                tenantId,
+                childId: invite.childId,
+                studentIdentityId: invite.acceptedStudentIdentityId,
+                endedAt: null,
+                revokedAt: null,
+                studentIdentity: { userId, user: { isActive: true } },
+              },
+              select: { id: true },
+            }),
+          ]);
+          accessAvailable = Boolean(policy?.studentPortalEnabled && link);
+        }
+      }
       return {
         id: invite.id,
         siteName: invite.tenant.name,
         expiresAt: invite.expiresAt,
         acceptedAt: invite.acceptedAt,
         revokedAt: invite.revokedAt,
+        accessAvailable,
       };
     });
   }

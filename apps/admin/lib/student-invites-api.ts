@@ -28,6 +28,7 @@ export interface StudentInviteForRecipient {
   expiresAt: string;
   acceptedAt: string | null;
   revokedAt: string | null;
+  accessAvailable: boolean | null;
 }
 
 async function request<T>(
