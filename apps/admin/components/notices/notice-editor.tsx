@@ -17,6 +17,7 @@ import {
   type NoticeDraftInput,
 } from "@/lib/ace-notice-api";
 import { requestFailure } from "@/lib/request-error";
+import { ApiError } from "@/lib/api-transport";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { hasPermission } from "@/lib/access";
 import { NoticeAudiencePicker } from "./notice-audience-picker";
@@ -30,6 +31,31 @@ type FormState = {
   requiresAcknowledgement: boolean;
   expiresAtLocal: string;
 };
+
+type AudienceSelection = Pick<
+  FormState,
+  "audience" | "audienceScope" | "audienceTargetId"
+>;
+
+function audienceSelection(form: FormState): AudienceSelection {
+  return {
+    audience: form.audience,
+    audienceScope: form.audienceScope,
+    audienceTargetId: form.audienceTargetId,
+  };
+}
+
+function audienceChanged(
+  previous: AudienceSelection | null,
+  current: AudienceSelection,
+): boolean {
+  return (
+    previous !== null &&
+    (previous.audience !== current.audience ||
+      previous.audienceScope !== current.audienceScope ||
+      previous.audienceTargetId !== current.audienceTargetId)
+  );
+}
 
 const emptyForm: FormState = {
   title: "",
@@ -95,6 +121,11 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
   const [preview, setPreview] = React.useState<NoticeAudiencePreview | null>(
     null,
   );
+  const [reviewedAudience, setReviewedAudience] =
+    React.useState<AudienceSelection | null>(null);
+  const [reconfirmationRequired, setReconfirmationRequired] =
+    React.useState(false);
+  const [reconfirmed, setReconfirmed] = React.useState(false);
   const [loading, setLoading] = React.useState(Boolean(draftId));
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -139,6 +170,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
     setForm((current) => ({ ...current, [key]: value }));
     setDirty(true);
     setPreview(null);
+    setReconfirmed(false);
     setSuccess(null);
   }
 
@@ -152,6 +184,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
     }));
     setDirty(true);
     setPreview(null);
+    setReconfirmed(false);
     setSuccess(null);
   }
 
@@ -174,7 +207,13 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
     setError(null);
     try {
       if (action === "publish" || action === "schedule") {
-        if (!id || !preview || dirty) return;
+        if (
+          !id ||
+          !preview ||
+          dirty ||
+          (reconfirmationRequired && !reconfirmed)
+        )
+          return;
         if (action === "schedule") {
           const date = new Date(scheduledAtLocal);
           if (
@@ -198,11 +237,24 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
       if (action === "save" && !dirty) setSuccess("Draft already saved.");
       if (action === "preview") {
         const result = await previewNoticeAudience(savedId);
+        if (audienceChanged(reviewedAudience, audienceSelection(form))) {
+          setReconfirmationRequired(true);
+        }
+        setReviewedAudience(audienceSelection(form));
+        setReconfirmed(false);
         setPreview(result);
         setSuccess(null);
       }
     } catch (cause) {
       setPreview(null);
+      if (
+        (action === "publish" || action === "schedule") &&
+        cause instanceof ApiError &&
+        cause.status === 409
+      ) {
+        setReconfirmationRequired(true);
+        setReconfirmed(false);
+      }
       setError(
         requestFailure(
           cause,
@@ -284,6 +336,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
               <Input
                 id="notice-title"
                 required
+                disabled={pending}
                 maxLength={200}
                 value={form.title}
                 onChange={(event) => change("title", event.target.value)}
@@ -294,6 +347,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
               <Textarea
                 id="notice-body"
                 required
+                disabled={pending}
                 maxLength={20_000}
                 rows={10}
                 value={form.body}
@@ -304,6 +358,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
               <input
                 type="checkbox"
                 checked={form.requiresAcknowledgement}
+                disabled={pending}
                 onChange={(event) =>
                   change("requiresAcknowledgement", event.target.checked)
                 }
@@ -325,6 +380,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                 <Select
                   id="notice-audience"
                   value={form.audience}
+                  disabled={pending}
                   onChange={(event) =>
                     change("audience", event.target.value as NoticeAudience)
                   }
@@ -346,6 +402,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                   id="notice-expiry"
                   type="datetime-local"
                   value={form.expiresAtLocal}
+                  disabled={pending}
                   onChange={(event) =>
                     change("expiresAtLocal", event.target.value)
                   }
@@ -412,10 +469,27 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
               publication.
             </p>
           ) : null}
+          {reconfirmationRequired ? (
+            <label className="mt-4 flex items-start gap-3 rounded-xl border border-border-subtle bg-shell/70 p-4 text-sm text-text-primary">
+              <input
+                type="checkbox"
+                checked={reconfirmed}
+                onChange={(event) => setReconfirmed(event.target.checked)}
+                className="mt-1 h-4 w-4 accent-accent-strong"
+              />
+              <span>
+                I reviewed the current audience and recipient count again.
+              </span>
+            </label>
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-3">
             <Button
               type="button"
-              disabled={pending || preview.recipientCount === 0}
+              disabled={
+                pending ||
+                preview.recipientCount === 0 ||
+                (reconfirmationRequired && !reconfirmed)
+              }
               onClick={() => void act("publish")}
             >
               {pending ? "Working…" : "Publish now"}
@@ -436,6 +510,7 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                 id="notice-scheduled-at"
                 type="datetime-local"
                 value={scheduledAtLocal}
+                disabled={pending}
                 onChange={(event) => setScheduledAtLocal(event.target.value)}
                 className="max-w-xs"
               />
@@ -443,7 +518,10 @@ export function NoticeEditor({ draftId }: { draftId?: string }) {
                 type="button"
                 variant="secondary"
                 disabled={
-                  pending || preview.recipientCount === 0 || !scheduledAtLocal
+                  pending ||
+                  preview.recipientCount === 0 ||
+                  !scheduledAtLocal ||
+                  (reconfirmationRequired && !reconfirmed)
                 }
                 onClick={() => void act("schedule")}
               >
