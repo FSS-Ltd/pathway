@@ -106,6 +106,17 @@ readers' private details by default.
 | Attachments          | Private tenant/notice keys, short-lived upload and download grants, file type and byte checks, stored hash, no public URL, and the same current audience check on every download. |
 | Email                | Outbox worker after commit, one notification per user, opt-out checks, retry and failure audit; email failures do not roll back published in-app notices.                         |
 
+The draft API uses `POST /ace/notices/drafts`, `GET /ace/notices/drafts`,
+`GET /ace/notices/drafts/:id`, and `PUT /ace/notices/drafts/:id`. Create and
+full-replacement edit accept a trimmed title (1–200 characters), trimmed body
+(1–20,000 characters), one of the three audience values, and a nullable future
+ISO expiry. Edit also requires the draft's last `updatedAt` as
+`expectedUpdatedAt`; a stale revision or publication returns HTTP 409. The
+list accepts a site-scoped `cursor` and `limit` of 1–50 (default 25), returns
+summary rows without body text, and uses `createdAt` plus ID for stable order.
+The selected site comes only from the authenticated context. These routes
+do not publish a notice or expose one to readers.
+
 Use existing `@pathway/ui` tokens. Staff and family notice lists are separate
 from private chat, show audience and publication time clearly, and expose
 unread state in text as well as colour. The publisher sees a recipient-count
