@@ -20,12 +20,13 @@ resend after a fresh school-policy confirmation, revoke, or end access. The
 invitation and policy decisions are audited.
 
 **Product decision (11 October 2026):** the product owner approved school
-approval per student for web account invitations. There is no platform-wide
-minimum age in this step. The school must confirm that each account meets its
-age, consent, and safeguarding policy when creating an invitation and again
-when resending it. The API requires that confirmation, and the invitation audit
-records the acting admin. This decision resolves the web invitation rule; the
-broader student identity ADR remains open for later identity work.
+approval per student for **all ACE student identities**, including future
+clients. There is no platform-wide minimum age. The school is responsible for
+confirming each account meets its age, consent, and safeguarding policy before
+an invitation is created or resent. The shared API requires that confirmation
+at its boundary and in the invitation service; the invitation audit records the
+acting admin. Mobile implementation remains paused, but it must use the same
+server rule when resumed.
 
 ## Data, access, and failure behavior
 

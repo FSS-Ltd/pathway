@@ -195,6 +195,20 @@ describe("student web identity invitation lifecycle", () => {
     expect(sendStudentInviteEmail).toHaveBeenCalledTimes(1);
     const inviteId = created.body.id as string;
     expect(
+      await prisma.auditEvent.findFirst({
+        where: { actorUserId: adminId, entityId: inviteId },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: {
+        kind: "FAMILY_IDENTITY_INVITE",
+        action: "create",
+        target: "STUDENT",
+        childId,
+        schoolApproval: "confirmed",
+      },
+    });
+    expect(
       await prisma.studentIdentityLink.count({
         where: { tenantId: siteId, childId },
       }),
@@ -312,6 +326,23 @@ describe("student web identity invitation lifecycle", () => {
       .set("Authorization", adminAuthorization)
       .send({ confirmedSchoolApproval: true });
     expect(resent.status).toBe(201);
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: {
+          actorUserId: adminId,
+          entityId: inviteId,
+          metadata: { path: ["action"], equals: "resend" },
+        },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: {
+        kind: "FAMILY_IDENTITY_INVITE",
+        action: "resend",
+        target: "STUDENT",
+        schoolApproval: "reconfirmed",
+      },
+    });
     await prisma.user.update({
       where: { id: secondStudentId },
       data: { isActive: false },
