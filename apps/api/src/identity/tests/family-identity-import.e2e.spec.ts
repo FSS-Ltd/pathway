@@ -181,7 +181,7 @@ describe("family identity invitation import", () => {
           },
         ],
       });
-    expect(denied.status).toBe(403);
+    expect(denied.status).toBe(401);
     expect(
       await prisma.familyIdentityInvite.count({ where: { tenantId: siteId } }),
     ).toBe(0);
