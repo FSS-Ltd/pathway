@@ -79,6 +79,7 @@ describe("ACE dashboard daily operations", () => {
         "ace.pace.correct",
         "ace.behaviour.policy.manage",
         "ace.behaviour.record",
+        "ace.behaviour.correct",
         "attendance.manage",
         "ace.dashboard.read",
       ],

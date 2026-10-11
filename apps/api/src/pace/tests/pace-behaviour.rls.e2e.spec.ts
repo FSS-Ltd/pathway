@@ -186,6 +186,7 @@ async function deletePaceBehaviourRowsIfPresent(
       "PacePolicyOverride",
       "PacePolicy",
       "BehaviourReviewRequest",
+      "BehaviourEntryRetraction",
       "BehaviourEntry",
       "DemeritStageOverride",
       "DemeritPolicy"
