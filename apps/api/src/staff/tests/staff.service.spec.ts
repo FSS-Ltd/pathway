@@ -321,15 +321,16 @@ describe("StaffService", () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
-  it("records an organisation admin's account disable in the same transaction", async () => {
+  it("records a platform superuser's account disable in the same transaction", async () => {
     userFindUnique.mockResolvedValue({
       isActive: true,
+      superUser: true,
       tenantId: "site",
       siteMemberships: [],
     });
-    orgMembershipFindFirst.mockResolvedValue({ id: "org_admin" });
+    orgMembershipFindFirst.mockResolvedValue(null);
     userOrgRoleFindFirst.mockResolvedValue(null);
-    siteMembershipFindFirst.mockResolvedValue(null);
+    siteMembershipFindFirst.mockResolvedValue({ id: "site_manager" });
     userTenantRoleFindFirst.mockResolvedValue(null);
     orgFindUnique.mockResolvedValue({ isMasterOrg: false });
     const update = jest.fn().mockResolvedValue({ id: "target" });
@@ -346,7 +347,7 @@ describe("StaffService", () => {
       "site",
       "org",
       { isActive: false },
-      "org_admin",
+      "platform_admin",
     );
 
     expect(update).toHaveBeenCalledWith({
@@ -355,7 +356,7 @@ describe("StaffService", () => {
     });
     expect(audit).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        actorUserId: "org_admin",
+        actorUserId: "platform_admin",
         entityId: "target",
         metadata: { kind: "STAFF_ACCOUNT_STATUS", action: "disable" },
       }),

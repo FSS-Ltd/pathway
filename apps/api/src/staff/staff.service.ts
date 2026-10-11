@@ -836,13 +836,22 @@ export class StaffService {
     );
     if (
       !isCallerOrgAdmin &&
-      (dto.role !== undefined ||
-        dto.isActive !== undefined ||
-        dto.hasServeAccess !== undefined)
+      (dto.role !== undefined || dto.hasServeAccess !== undefined)
     ) {
       throw new ForbiddenException(
-        "Only an Organisation admin can change staff roles or account access",
+        "Only an Organisation admin can change staff roles or serve access",
       );
+    }
+    if (dto.isActive !== undefined) {
+      const caller = await prisma.user.findUnique({
+        where: { id: callerUserId },
+        select: { superUser: true },
+      });
+      if (!caller?.superUser) {
+        throw new ForbiddenException(
+          "Only a platform administrator can change global account status",
+        );
+      }
     }
     await assertStaffInTenant(userId, tenantId);
 

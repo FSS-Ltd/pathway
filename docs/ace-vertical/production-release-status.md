@@ -261,14 +261,33 @@ count remains **42/150 (28%)** because the remaining ACE-M15 and M20 work is
 not yet complete.
 
 Build step 1.3e5r ([PR #567](https://github.com/FSS-Ltd/pathway/pull/567),
-open) is the next web family access gate. It adds real HTTP probes
+merged on 11 October 2026) is the web family access gate. It adds real HTTP probes
 for staff membership removal, parent notice IDs, guardian and student invitation
 IDs, and child edit IDs across account and site boundaries. The
 [web security evidence record](../evidence/ace-family-messaging-release-gate.md)
 lists what these probes cover and what remains for ACE-M20. The four affected
 PostgreSQL HTTP suites passed (18 tests) locally; API typecheck, lint, build,
-formatting, and Graphify passed. Mobile remains paused. Latest-head CI and
-merge evidence are pending; this step is not complete.
+formatting, and Graphify passed. All eight latest-head checks passed on
+`6c6bf612218a926ca4940a01daa942b52f858beb`. The Integration Tests log
+confirms all four affected PostgreSQL HTTP suites ran: 83 suites and 506 tests
+passed, plus 2 single-connection suites and 13 tests. GitHub confirmed the
+merge to `master` as `f1440cb17aafeba6db9814018feafc3b434b2309`.
+Mobile remains paused. The master-plan count remains **42/150 (28%)** because
+ACE-M20 is open.
+
+Build step 1.3e5s corrects the shared staff account status boundary exposed
+after PR #566. An organisation admin could disable a global user account,
+affecting a staff member's access to other organisations. The staff API now
+reserves global account status changes for a platform superuser who also has
+staff-management access in the selected site. The existing People screens
+show that control only to platform superusers and explain its cross-organisation
+effect. A PostgreSQL HTTP regression suite covers multi-organisation and
+single-organisation staff accounts and the audited platform-admin action.
+The PostgreSQL HTTP suite passed all 5 cases, and the focused staff unit suite
+passed 11 tests. API/admin typechecks, targeted lint, formatting, and both
+production builds passed locally. Its PR, CI, and merge evidence are pending.
+It does not complete another ACE master-plan task, so the count remains
+**42/150 (28%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
