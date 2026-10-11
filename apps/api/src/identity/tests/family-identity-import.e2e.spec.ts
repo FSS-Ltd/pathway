@@ -20,14 +20,17 @@ const secondChildId = randomUUID();
 const otherChildId = randomUUID();
 const adminId = randomUUID();
 const staffId = randomUUID();
+const otherAdminId = randomUUID();
 const guardianEmail = `bulk-guardian-${randomUUID()}@example.test`;
 const studentEmail = `bulk-student-${randomUUID()}@example.test`;
 const failedEmail = `bulk-undelivered-${randomUUID()}@example.test`;
+const crossTenantEmail = `bulk-cross-tenant-${randomUUID()}@example.test`;
 
 describe("family identity invitation import", () => {
   let app: INestApplication | undefined;
   let adminAuthorization = "";
   let staffAuthorization = "";
+  let otherAdminAuthorization = "";
   const sendFamilyInviteEmail = jest.fn().mockResolvedValue(undefined);
   const sendStudentInviteEmail = jest.fn().mockResolvedValue(undefined);
 
@@ -88,6 +91,16 @@ describe("family identity invitation import", () => {
         orgRole: "ORG_MEMBER",
       })
     ).authorization;
+    otherAdminAuthorization = (
+      await seedE2eAuthUser({
+        subject: `bulk-other-admin-${otherAdminId}`,
+        userId: otherAdminId,
+        tenantId: otherSiteId,
+        siteRole: "SITE_ADMIN",
+        orgId: otherOrgId,
+        orgRole: "ORG_ADMIN",
+      })
+    ).authorization;
     for (const userId of [adminId, staffId]) {
       await seedE2eTypedRole({
         orgId,
@@ -97,6 +110,13 @@ describe("family identity invitation import", () => {
         permissionKeys: ["students.manage"],
       });
     }
+    await seedE2eTypedRole({
+      orgId: otherOrgId,
+      tenantId: otherSiteId,
+      userId: otherAdminId,
+      scope: "site",
+      permissionKeys: ["students.manage"],
+    });
     await withTenantRlsContext(siteId, orgId, (tx) =>
       tx.child.createMany({
         data: [
@@ -324,5 +344,60 @@ describe("family identity invitation import", () => {
         },
       }),
     ).toBe(1);
+  });
+
+  it("reuses one email account across tenants without granting access", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const first = await request(server)
+      .post("/family-identity-import")
+      .set("Authorization", adminAuthorization)
+      .send({
+        rows: [
+          {
+            target: "GUARDIAN",
+            childId: firstChildId,
+            email: crossTenantEmail,
+            reviewBasis: "SCHOOL_RECORDS",
+            confirmedLegalAccess: true,
+          },
+        ],
+      });
+    const second = await request(server)
+      .post("/family-identity-import")
+      .set("Authorization", otherAdminAuthorization)
+      .send({
+        rows: [
+          {
+            target: "GUARDIAN",
+            childId: otherChildId,
+            email: crossTenantEmail,
+            reviewBasis: "SCHOOL_RECORDS",
+            confirmedLegalAccess: true,
+          },
+        ],
+      });
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(201);
+    expect(first.body[0].status).toBe("invited");
+    expect(second.body[0].status).toBe("invited");
+    expect(
+      await prisma.user.count({ where: { email: crossTenantEmail } }),
+    ).toBe(1);
+    expect(
+      await prisma.familyIdentityInvite.count({
+        where: { tenantId: siteId, invitedEmail: crossTenantEmail },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.familyIdentityInvite.count({
+        where: { tenantId: otherSiteId, invitedEmail: crossTenantEmail },
+      }),
+    ).toBe(1);
+    expect(
+      await prisma.guardianChildRelationship.count({
+        where: { tenantId: { in: [siteId, otherSiteId] } },
+      }),
+    ).toBe(0);
   });
 });
