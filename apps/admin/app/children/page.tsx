@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
 import {
@@ -14,10 +15,12 @@ import {
 } from "@pathway/ui";
 import { AdminChildRow, fetchChildren } from "../../lib/api-client";
 import { useOrgLabel } from "@/lib/use-org-ui";
+import { useAdminAccess } from "@/lib/use-admin-access";
 
 export default function ChildrenPage() {
   const title = useOrgLabel("/children", "Children");
   const { data: session, status: sessionStatus } = useSession();
+  const { role } = useAdminAccess();
   const [data, setData] = React.useState<AdminChildRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -115,7 +118,9 @@ export default function ChildrenPage() {
               <Badge variant="accent">Additional needs</Badge>
             ) : null}
             <Badge variant={row.hasPhotoConsent ? "success" : "default"}>
-              {row.hasPhotoConsent ? "Org photo/video consent" : "No org photo/video consent"}
+              {row.hasPhotoConsent
+                ? "Org photo/video consent"
+                : "No org photo/video consent"}
             </Badge>
           </div>
         ),
@@ -137,16 +142,25 @@ export default function ChildrenPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-text-primary font-heading">
             {title}
           </h1>
           <p className="text-sm text-text-muted">
-            Child records for this organisation, including needs awareness and organisation photo/video consent.
+            Child records for this organisation, including needs awareness and
+            organisation photo/video consent.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {role?.isOrgAdmin ? (
+            <Link
+              href="/children/import-family-access"
+              className="text-sm font-medium text-accent-primary underline"
+            >
+              Import family invitations
+            </Link>
+          ) : null}
           <Button variant="secondary" size="sm" onClick={load}>
             Refresh
           </Button>

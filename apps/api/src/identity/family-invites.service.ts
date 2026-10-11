@@ -10,6 +10,7 @@ import { withTenantRlsContext } from "@pathway/db";
 import { MailerService } from "../mailer/mailer.service";
 import {
   auditFamilyInvite,
+  findPriorImportInvite,
   lockFamilyInvite,
 } from "./family-invite-operations";
 
@@ -39,10 +40,55 @@ export class FamilyInvitesService {
     email: string,
     reviewBasis: GuardianInviteReviewBasis,
   ): Promise<GuardianInviteSummary> {
+    const result = await this.createGuardianInviteInternal(
+      tenantId,
+      orgId,
+      actorUserId,
+      childId,
+      email,
+      reviewBasis,
+      false,
+    );
+    return result.summary;
+  }
+
+  async createForImport(
+    tenantId: string,
+    orgId: string,
+    actorUserId: string,
+    childId: string,
+    email: string,
+    reviewBasis: GuardianInviteReviewBasis,
+  ): Promise<"invited" | "existing"> {
+    const result = await this.createGuardianInviteInternal(
+      tenantId,
+      orgId,
+      actorUserId,
+      childId,
+      email,
+      reviewBasis,
+      true,
+    );
+    return result.status;
+  }
+
+  private async createGuardianInviteInternal(
+    tenantId: string,
+    orgId: string,
+    actorUserId: string,
+    childId: string,
+    email: string,
+    reviewBasis: GuardianInviteReviewBasis,
+    importMode: boolean,
+  ): Promise<{
+    summary: GuardianInviteSummary;
+    status: "invited" | "existing";
+  }> {
     const normalizedEmail = email.trim().toLowerCase();
     const result = await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await lockFamilyInvite(tx, tenantId, childId, normalizedEmail);
-      const [site, child, matchingUsers] = await Promise.all([
+      await lockFamilyInvite(tx, "email", normalizedEmail);
+      const [site, child, matchingUsers, priorInvite] = await Promise.all([
         tx.tenant.findFirst({
           where: { id: tenantId, orgId },
           select: {
@@ -59,12 +105,29 @@ export class FamilyInvitesService {
           select: { id: true, isActive: true, email: true },
           take: 2,
         }),
+        importMode
+          ? findPriorImportInvite(
+              tx,
+              tenantId,
+              childId,
+              "GUARDIAN",
+              normalizedEmail,
+            )
+          : Promise.resolve(null),
       ]);
       if (!site || !child) throw new NotFoundException("Child not found");
       if (!site.org.parentPortalEnabled) {
         throw new ConflictException(
           "The family portal is not enabled for this site",
         );
+      }
+      if (priorInvite) {
+        return {
+          invite: priorInvite,
+          siteName: site.name,
+          email: normalizedEmail,
+          shouldSend: false,
+        };
       }
       if (matchingUsers.length > 1 || matchingUsers[0]?.isActive === false) {
         throw new ConflictException("This account needs an identity review");
@@ -83,6 +146,23 @@ export class FamilyInvitesService {
       ) {
         throw new ConflictException(
           "A student account cannot be invited as a guardian",
+        );
+      }
+      const pendingStudent = await tx.familyIdentityInvite.findMany({
+        where: {
+          tenantId,
+          invitedUserId: user.id,
+          target: "STUDENT",
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        select: { id: true },
+        take: 1,
+      });
+      if (pendingStudent.length) {
+        throw new ConflictException(
+          "This account has a student invitation pending",
         );
       }
       const guardian = await tx.guardianIdentity.findUnique({
@@ -157,10 +237,21 @@ export class FamilyInvitesService {
         invite,
         siteName: site.name,
         email: normalizedEmail,
+        shouldSend: true,
       };
     });
-    await this.send(result.email, result.siteName, tenantId, result.invite.id);
-    return this.summary(result.invite, result.email);
+    if (result.shouldSend) {
+      await this.send(
+        result.email,
+        result.siteName,
+        tenantId,
+        result.invite.id,
+      );
+    }
+    return {
+      summary: this.summary(result.invite, result.email),
+      status: result.shouldSend ? "invited" : "existing",
+    };
   }
 
   async listGuardianInvites(

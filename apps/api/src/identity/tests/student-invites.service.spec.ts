@@ -77,6 +77,7 @@ function setup() {
     userRoleAssignment: { findFirst: jest.fn().mockResolvedValue(null) },
     familyIdentityInvite: {
       findFirst: jest.fn().mockResolvedValue(invite),
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue(invite),
       update: jest.fn().mockResolvedValue(invite),
     },
@@ -105,6 +106,37 @@ function setup() {
 
 describe("student identity invitations", () => {
   beforeEach(() => jest.clearAllMocks());
+
+  it("keeps a previous import invitation unchanged without sending twice", async () => {
+    const { tx, service, mailer } = setup();
+    await expect(
+      service.createForImport(tenantId, orgId, "admin-a", childId, email),
+    ).resolves.toBe("existing");
+    expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
+    expect(tx.familyIdentityInvite.update).not.toHaveBeenCalled();
+    expect(mailer.sendStudentInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it("rejects a student invitation while a guardian invitation is pending", async () => {
+    const { tx, service } = setup();
+    tx.familyIdentityInvite.findMany.mockResolvedValue([
+      { id: "pending-guardian" },
+    ]);
+    await expect(
+      service.create(tenantId, orgId, "admin-a", childId, email),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("rejects an account with a student invitation for another child", async () => {
+    const { tx, service } = setup();
+    tx.familyIdentityInvite.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "other-child-invite" });
+    await expect(
+      service.create(tenantId, orgId, "admin-a", childId, email),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
+  });
 
   it("creates a pending invite without granting student access", async () => {
     const { tx, service, mailer } = setup();

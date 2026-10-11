@@ -10,6 +10,7 @@ import { withTenantRlsContext } from "@pathway/db";
 import { MailerService } from "../mailer/mailer.service";
 import {
   auditFamilyInvite,
+  findPriorImportInvite,
   lockFamilyInvite,
 } from "./family-invite-operations";
 import { hasOtherSiteAccess } from "./student-account-eligibility";
@@ -41,43 +42,102 @@ export class StudentInvitesService {
     childId: string,
     email: string,
   ): Promise<StudentInviteSummary> {
+    const result = await this.createInternal(
+      tenantId,
+      orgId,
+      actorUserId,
+      childId,
+      email,
+      false,
+    );
+    return result.summary;
+  }
+
+  async createForImport(
+    tenantId: string,
+    orgId: string,
+    actorUserId: string,
+    childId: string,
+    email: string,
+  ): Promise<"invited" | "existing"> {
+    const result = await this.createInternal(
+      tenantId,
+      orgId,
+      actorUserId,
+      childId,
+      email,
+      true,
+    );
+    return result.status;
+  }
+
+  private async createInternal(
+    tenantId: string,
+    orgId: string,
+    actorUserId: string,
+    childId: string,
+    email: string,
+    importMode: boolean,
+  ): Promise<{
+    summary: StudentInviteSummary;
+    status: "invited" | "existing";
+  }> {
     const normalizedEmail = email.trim().toLowerCase();
     const result = await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await lockFamilyInvite(tx, tenantId, childId);
+      await lockFamilyInvite(tx, "email", normalizedEmail);
       await requireAceStudentSite(tx, tenantId, orgId);
-      const [site, child, matchingUsers, activeLink, pendingInvite] =
-        await Promise.all([
-          tx.tenant.findFirst({
-            where: { id: tenantId, orgId },
-            select: { name: true },
-          }),
-          tx.child.findFirst({
-            where: { id: childId, tenantId, isGuest: false },
-            select: { id: true },
-          }),
-          tx.user.findMany({
-            where: { email: { equals: normalizedEmail, mode: "insensitive" } },
-            select: { id: true, isActive: true },
-            take: 2,
-          }),
-          tx.studentIdentityLink.findFirst({
-            where: { tenantId, childId, endedAt: null, revokedAt: null },
-            select: { id: true },
-          }),
-          tx.familyIdentityInvite.findFirst({
-            where: {
+      const [
+        site,
+        child,
+        matchingUsers,
+        activeLink,
+        pendingInvite,
+        priorInvite,
+      ] = await Promise.all([
+        tx.tenant.findFirst({
+          where: { id: tenantId, orgId },
+          select: { name: true },
+        }),
+        tx.child.findFirst({
+          where: { id: childId, tenantId, isGuest: false },
+          select: { id: true },
+        }),
+        tx.user.findMany({
+          where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+          select: { id: true, isActive: true },
+          take: 2,
+        }),
+        tx.studentIdentityLink.findFirst({
+          where: { tenantId, childId, endedAt: null, revokedAt: null },
+          select: { id: true },
+        }),
+        tx.familyIdentityInvite.findFirst({
+          where: {
+            tenantId,
+            childId,
+            target: "STUDENT",
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true, invitedUserId: true },
+        }),
+        importMode
+          ? findPriorImportInvite(
+              tx,
               tenantId,
               childId,
-              target: "STUDENT",
-              acceptedAt: null,
-              revokedAt: null,
-              expiresAt: { gt: new Date() },
-            },
-            select: { id: true, invitedUserId: true },
-          }),
-        ]);
+              "STUDENT",
+              normalizedEmail,
+            )
+          : Promise.resolve(null),
+      ]);
       if (!site || !child) throw new NotFoundException("Child not found");
       await requireEnabledStudentPortal(tx, tenantId);
+      if (priorInvite) {
+        return { invite: priorInvite, siteName: site.name, shouldSend: false };
+      }
       if (activeLink) {
         throw new ConflictException("This child already has student access");
       }
@@ -95,7 +155,13 @@ export class StudentInvitesService {
           "Revoke the current student invitation first",
         );
       }
-      const [guardian, identity, otherAccess] = await Promise.all([
+      const [
+        guardian,
+        identity,
+        otherAccess,
+        pendingGuardian,
+        pendingOtherStudent,
+      ] = await Promise.all([
         tx.guardianIdentity.findUnique({
           where: { tenantId_userId: { tenantId, userId: user.id } },
           select: { id: true },
@@ -111,8 +177,38 @@ export class StudentInvitesService {
           },
         }),
         hasOtherSiteAccess(tx, tenantId, orgId, user.id),
+        tx.familyIdentityInvite.findMany({
+          where: {
+            tenantId,
+            invitedUserId: user.id,
+            target: "GUARDIAN",
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+          take: 1,
+        }),
+        tx.familyIdentityInvite.findFirst({
+          where: {
+            tenantId,
+            invitedUserId: user.id,
+            childId: { not: childId },
+            target: "STUDENT",
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+        }),
       ]);
-      if (guardian || identity?.links.length || otherAccess) {
+      if (
+        guardian ||
+        identity?.links.length ||
+        otherAccess ||
+        pendingGuardian.length ||
+        pendingOtherStudent
+      ) {
         throw new ConflictException(
           "This account cannot be invited as a student",
         );
@@ -143,15 +239,20 @@ export class StudentInvitesService {
         pendingInvite ? "resend" : "create",
         { childId, target: "STUDENT", schoolApproval: "confirmed" },
       );
-      return { invite, siteName: site.name };
+      return { invite, siteName: site.name, shouldSend: true };
     });
-    await this.send(
-      normalizedEmail,
-      result.siteName,
-      tenantId,
-      result.invite.id,
-    );
-    return this.summary(result.invite, normalizedEmail);
+    if (result.shouldSend) {
+      await this.send(
+        normalizedEmail,
+        result.siteName,
+        tenantId,
+        result.invite.id,
+      );
+    }
+    return {
+      summary: this.summary(result.invite, normalizedEmail),
+      status: result.shouldSend ? "invited" : "existing",
+    };
   }
 
   async list(
