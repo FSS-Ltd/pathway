@@ -13,6 +13,7 @@ import {
 
 const orgId = randomUUID();
 const siteId = randomUUID();
+const otherSiteId = randomUUID();
 const childId = randomUUID();
 const otherChildId = randomUUID();
 const adminId = randomUUID();
@@ -41,13 +42,21 @@ describe("guardian invitation lifecycle", () => {
     await prisma.orgVertical.create({
       data: { orgId, vertical: "ACE_SCHOOL" },
     });
-    await prisma.tenant.create({
-      data: {
-        id: siteId,
-        orgId,
-        name: "Guardian School",
-        slug: `guardian-site-${siteId}`,
-      },
+    await prisma.tenant.createMany({
+      data: [
+        {
+          id: siteId,
+          orgId,
+          name: "Guardian School",
+          slug: `guardian-site-${siteId}`,
+        },
+        {
+          id: otherSiteId,
+          orgId,
+          name: "Another Guardian School",
+          slug: `guardian-site-${otherSiteId}`,
+        },
+      ],
     });
     adminAuthorization = (
       await seedE2eAuthUser({
@@ -159,6 +168,14 @@ describe("guardian invitation lifecycle", () => {
       .set("Authorization", guardianAuthorization);
     expect(acceptedInvite.status).toBe(200);
     expect(acceptedInvite.body.acceptedAt).toBeTruthy();
+    const hiddenFromAnotherAccount = await request(server)
+      .get(`/family-invites/sites/${siteId}/${inviteId}`)
+      .set("Authorization", strangerAuthorization);
+    expect(hiddenFromAnotherAccount.status).toBe(404);
+    const hiddenAtAnotherSite = await request(server)
+      .get(`/family-invites/sites/${otherSiteId}/${inviteId}`)
+      .set("Authorization", guardianAuthorization);
+    expect(hiddenAtAnotherSite.status).toBe(404);
     const staffInvites = await request(server)
       .get(`/family-invites/guardian/children/${childId}`)
       .set("Authorization", adminAuthorization);
@@ -197,6 +214,14 @@ describe("guardian invitation lifecycle", () => {
       .get(`/children/${otherChildId}`)
       .set("Authorization", guardianAuthorization);
     expect(other.status).toBe(404);
+    const otherEdit = await request(server)
+      .patch(`/children/${otherChildId}`)
+      .set("Authorization", guardianAuthorization)
+      .send({ firstName: "Changed" });
+    expect(otherEdit.status).toBe(404);
+    expect(
+      await prisma.child.findUnique({ where: { id: otherChildId } }),
+    ).toMatchObject({ firstName: "Other" });
     const list = await request(server)
       .get("/children")
       .set("Authorization", guardianAuthorization);

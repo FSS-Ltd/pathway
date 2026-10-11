@@ -379,4 +379,41 @@ describe("ACE family messaging web security gate", () => {
       .set("Authorization", authorization.guardian);
     expect(ended.status).toBe(404);
   });
+
+  it("denies a removed staff member even when their messaging tag remains", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const messageCount = await prisma.message.count({
+      where: { tenantId: siteId, conversationId: staffConversationId },
+    });
+    await prisma.siteMembership.delete({
+      where: { tenantId_userId: { tenantId: siteId, userId: teacherId } },
+    });
+    try {
+      const paths = [staffPath, `${staffPath}/${staffConversationId}/messages`];
+      for (const path of paths) {
+        const response = await request(server)
+          .get(path)
+          .set("Authorization", authorization.teacher);
+        expect([403, 404]).toContain(response.status);
+      }
+      const send = await request(server)
+        .post(`${staffPath}/${staffConversationId}/messages`)
+        .set("Authorization", authorization.teacher)
+        .send({
+          clientRequestId: randomUUID(),
+          body: "A former member must not send this",
+        });
+      expect([403, 404]).toContain(send.status);
+      expect(
+        await prisma.message.count({
+          where: { tenantId: siteId, conversationId: staffConversationId },
+        }),
+      ).toBe(messageCount);
+    } finally {
+      await prisma.siteMembership.create({
+        data: { tenantId: siteId, userId: teacherId, role: "STAFF" },
+      });
+    }
+  });
 });

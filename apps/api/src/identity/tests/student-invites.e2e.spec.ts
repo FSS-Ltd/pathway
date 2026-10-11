@@ -223,6 +223,14 @@ describe("student web identity invitation lifecycle", () => {
       .set("Authorization", studentAuthorization);
     expect(acceptedInvite.status).toBe(200);
     expect(acceptedInvite.body.accessAvailable).toBe(true);
+    const hiddenFromAnotherAccount = await request(server)
+      .get(`/student-invites/sites/${siteId}/${inviteId}`)
+      .set("Authorization", strangerAuthorization);
+    expect(hiddenFromAnotherAccount.status).toBe(404);
+    const hiddenAtAnotherSite = await request(server)
+      .get(`/student-invites/sites/${otherSiteId}/${inviteId}`)
+      .set("Authorization", studentAuthorization);
+    expect(hiddenAtAnotherSite.status).toBe(404);
 
     const sites = await request(server)
       .get("/auth/active-site")
