@@ -16,6 +16,7 @@ const siteId = randomUUID();
 const otherSiteId = randomUUID();
 const childId = randomUUID();
 const otherChildId = randomUUID();
+const thirdChildId = randomUUID();
 const adminId = randomUUID();
 const guardianId = randomUUID();
 const strangerId = randomUUID();
@@ -109,6 +110,12 @@ describe("guardian invitation lifecycle", () => {
             firstName: "Other",
             lastName: "Child",
           },
+          {
+            id: thirdChildId,
+            tenantId: siteId,
+            firstName: "Third",
+            lastName: "Child",
+          },
         ],
       });
     });
@@ -143,6 +150,24 @@ describe("guardian invitation lifecycle", () => {
     expect(sendFamilyInviteEmail).toHaveBeenCalledTimes(1);
     const inviteId = created.body.id as string;
     expect(
+      await prisma.auditEvent.findFirst({
+        where: {
+          actorUserId: adminId,
+          entityId: inviteId,
+          metadata: { path: ["action"], equals: "create" },
+        },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: {
+        kind: "FAMILY_IDENTITY_INVITE",
+        action: "create",
+        childId,
+        reviewBasis: "SCHOOL_RECORDS",
+        legalAccess: "confirmed",
+      },
+    });
+    expect(
       await prisma.guardianChildRelationship.count({
         where: { tenantId: siteId, childId },
       }),
@@ -163,6 +188,18 @@ describe("guardian invitation lifecycle", () => {
       .set("Authorization", guardianAuthorization);
     expect(accepted.status).toBe(201);
     expect(accepted.body.acceptedAt).toBeTruthy();
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: {
+          actorUserId: guardianId,
+          entityId: inviteId,
+          metadata: { path: ["action"], equals: "accept" },
+        },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: { kind: "FAMILY_IDENTITY_INVITE", action: "accept", childId },
+    });
     const acceptedInvite = await request(server)
       .get(`/family-invites/sites/${siteId}/${inviteId}`)
       .set("Authorization", guardianAuthorization);
@@ -193,6 +230,23 @@ describe("guardian invitation lifecycle", () => {
         },
       }),
     ).toBe(1);
+    const relationship =
+      await prisma.guardianChildRelationship.findFirstOrThrow({
+        where: {
+          tenantId: siteId,
+          childId,
+          guardianIdentity: { userId: guardianId },
+        },
+        select: { id: true },
+      });
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: { actorUserId: guardianId, entityId: relationship.id },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: { kind: "GUARDIAN_RELATIONSHIP", childId },
+    });
     expect(
       await prisma.siteMembership.count({
         where: { tenantId: siteId, userId: guardianId },
@@ -226,5 +280,130 @@ describe("guardian invitation lifecycle", () => {
       .get("/children")
       .set("Authorization", guardianAuthorization);
     expect(list.status).toBe(403);
+
+    const sharedInvite = await request(server)
+      .post(`/family-invites/guardian/children/${otherChildId}`)
+      .set("Authorization", adminAuthorization)
+      .send({
+        email: guardianEmail,
+        reviewBasis: "SCHOOL_RECORDS",
+        confirmedLegalAccess: true,
+      });
+    expect(sharedInvite.status).toBe(201);
+    const sharedAcceptance = await request(server)
+      .post(
+        `/family-invites/sites/${siteId}/${sharedInvite.body.id as string}/accept`,
+      )
+      .set("Authorization", guardianAuthorization);
+    expect(sharedAcceptance.status).toBe(201);
+    expect(
+      await prisma.guardianChildRelationship.count({
+        where: {
+          tenantId: siteId,
+          childId: { in: [childId, otherChildId] },
+          guardianIdentity: { userId: guardianId },
+          revokedAt: null,
+        },
+      }),
+    ).toBe(2);
+  });
+
+  it("blocks expired and revoked invitations and audits fresh legal review on resend", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const unconfirmed = await request(server)
+      .post(`/family-invites/guardian/children/${thirdChildId}`)
+      .set("Authorization", adminAuthorization)
+      .send({
+        email: guardianEmail,
+        reviewBasis: "SCHOOL_RECORDS",
+        confirmedLegalAccess: false,
+      });
+    expect(unconfirmed.status).toBe(400);
+
+    const created = await request(server)
+      .post(`/family-invites/guardian/children/${thirdChildId}`)
+      .set("Authorization", adminAuthorization)
+      .send({
+        email: guardianEmail,
+        reviewBasis: "SCHOOL_RECORDS",
+        confirmedLegalAccess: true,
+      });
+    expect(created.status).toBe(201);
+    const inviteId = created.body.id as string;
+    await prisma.familyIdentityInvite.update({
+      where: { id: inviteId },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+    const expiredAcceptance = await request(server)
+      .post(`/family-invites/sites/${siteId}/${inviteId}/accept`)
+      .set("Authorization", guardianAuthorization);
+    expect(expiredAcceptance.status).toBe(409);
+    expect(
+      await prisma.guardianChildRelationship.count({
+        where: { tenantId: siteId, childId: thirdChildId },
+      }),
+    ).toBe(0);
+
+    const missingReview = await request(server)
+      .post(`/family-invites/guardian/${inviteId}/resend`)
+      .set("Authorization", adminAuthorization);
+    expect(missingReview.status).toBe(400);
+    const falseReview = await request(server)
+      .post(`/family-invites/guardian/${inviteId}/resend`)
+      .set("Authorization", adminAuthorization)
+      .send({ reviewBasis: "LEGAL_DOCUMENT", confirmedLegalAccess: false });
+    expect(falseReview.status).toBe(400);
+    const resent = await request(server)
+      .post(`/family-invites/guardian/${inviteId}/resend`)
+      .set("Authorization", adminAuthorization)
+      .send({ reviewBasis: "LEGAL_DOCUMENT", confirmedLegalAccess: true });
+    expect(resent.status).toBe(201);
+    expect(new Date(resent.body.expiresAt as string).getTime()).toBeGreaterThan(
+      Date.now(),
+    );
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: {
+          actorUserId: adminId,
+          entityId: inviteId,
+          metadata: { path: ["action"], equals: "resend" },
+        },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: {
+        kind: "FAMILY_IDENTITY_INVITE",
+        action: "resend",
+        childId: thirdChildId,
+        reviewBasis: "LEGAL_DOCUMENT",
+        legalAccess: "reconfirmed",
+      },
+    });
+    const revoked = await request(server)
+      .post(`/family-invites/guardian/${inviteId}/revoke`)
+      .set("Authorization", adminAuthorization);
+    expect(revoked.status).toBe(201);
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: {
+          actorUserId: adminId,
+          entityId: inviteId,
+          metadata: { path: ["action"], equals: "revoke" },
+        },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: { kind: "FAMILY_IDENTITY_INVITE", action: "revoke" },
+    });
+    const revokedAcceptance = await request(server)
+      .post(`/family-invites/sites/${siteId}/${inviteId}/accept`)
+      .set("Authorization", guardianAuthorization);
+    expect(revokedAcceptance.status).toBe(409);
+    expect(
+      await prisma.guardianChildRelationship.count({
+        where: { tenantId: siteId, childId: thirdChildId },
+      }),
+    ).toBe(0);
   });
 });

@@ -33,6 +33,10 @@ const createGuardianInviteSchema = z
     confirmedLegalAccess: z.literal(true),
   })
   .strict();
+const resendGuardianInviteSchema = createGuardianInviteSchema.pick({
+  reviewBasis: true,
+  confirmedLegalAccess: true,
+});
 
 interface AuthenticatedRequest extends Request {
   authUserId?: string;
@@ -70,6 +74,7 @@ export class GuardianInvitesStaffController {
       childId,
       parsed.data.email,
       parsed.data.reviewBasis,
+      parsed.data.confirmedLegalAccess,
     );
   }
 
@@ -91,10 +96,13 @@ export class GuardianInvitesStaffController {
   @Post(":inviteId/resend")
   async resend(
     @Param("inviteId") inviteId: string,
+    @Body() body: unknown,
     @Req() request: AuthenticatedRequest,
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
   ) {
+    const parsed = resendGuardianInviteSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
     const actorUserId = await assertOrgAdminAccess(
       request.authUserId,
       orgId,
@@ -105,6 +113,8 @@ export class GuardianInvitesStaffController {
       orgId,
       actorUserId,
       inviteId,
+      parsed.data.reviewBasis,
+      parsed.data.confirmedLegalAccess,
     );
   }
 

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -110,6 +111,7 @@ describe("guardian identity invitations", () => {
         childId,
         email,
         "SCHOOL_RECORDS",
+        true,
       ),
     ).resolves.toBe("existing");
     expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
@@ -130,6 +132,7 @@ describe("guardian identity invitations", () => {
         childId,
         email,
         "SCHOOL_RECORDS",
+        true,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
@@ -152,6 +155,7 @@ describe("guardian identity invitations", () => {
         childId,
         email,
         "SCHOOL_RECORDS",
+        true,
       ),
     ).resolves.toEqual(expect.objectContaining({ id: inviteId, email }));
     expect(tx.familyIdentityInvite.create).toHaveBeenCalledWith({
@@ -169,6 +173,73 @@ describe("guardian identity invitations", () => {
       expect.objectContaining({ to: email }),
     );
     expect(recordAuditEventInTransaction).toHaveBeenCalled();
+  });
+
+  it("requires a legal-access confirmation before creation, import, or resend", async () => {
+    const { tx, service, mailer } = setup();
+    await expect(
+      service.createGuardianInvite(
+        tenantId,
+        orgId,
+        "admin-a",
+        childId,
+        email,
+        "SCHOOL_RECORDS",
+        false,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.createForImport(
+        tenantId,
+        orgId,
+        "admin-a",
+        childId,
+        email,
+        "SCHOOL_RECORDS",
+        false,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.resendGuardianInvite(
+        tenantId,
+        orgId,
+        "admin-a",
+        inviteId,
+        "LEGAL_DOCUMENT",
+        false,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(withTenantRlsContext).not.toHaveBeenCalled();
+    expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
+    expect(tx.familyIdentityInvite.update).not.toHaveBeenCalled();
+    expect(mailer.sendFamilyInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it("audits the fresh review basis when resending a pending invitation", async () => {
+    const { service, mailer } = setup();
+    await expect(
+      service.resendGuardianInvite(
+        tenantId,
+        orgId,
+        "admin-a",
+        inviteId,
+        "LEGAL_DOCUMENT",
+        true,
+      ),
+    ).resolves.toMatchObject({ id: inviteId, email });
+    expect(recordAuditEventInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          kind: "FAMILY_IDENTITY_INVITE",
+          action: "resend",
+          childId,
+          reviewBasis: "LEGAL_DOCUMENT",
+          legalAccess: "reconfirmed",
+        }),
+      }),
+    );
+    expect(mailer.sendFamilyInviteEmail).toHaveBeenCalledTimes(1);
   });
 
   it("binds a newly verified account and creates only the selected child relationship on acceptance", async () => {

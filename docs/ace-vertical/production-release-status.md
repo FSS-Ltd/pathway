@@ -297,8 +297,8 @@ manage access to their own school.
 It does not complete another ACE master-plan task, so the count remains
 **42/150 (28%)**.
 
-Build step 1.3e5t ([PR #569](https://github.com/FSS-Ltd/pathway/pull/569))
-applies the product owner's 11 October decision that school
+Build step 1.3e5t ([PR #569](https://github.com/FSS-Ltd/pathway/pull/569),
+merged on 11 October 2026) applies the product owner's decision that school
 approval per student governs all ACE student identities. The existing web
 invitation and import routes already validate approval; this step requires it
 again in their shared student invitation service before creation or resend, so
@@ -306,12 +306,30 @@ future callers cannot record a false approval. PostgreSQL HTTP tests verify the
 approval audit for direct and bulk invitations. A read-only inventory of the
 live ACE database on 11 October found zero `StudentIdentity` and zero
 `StudentIdentityLink` rows, so there are no existing student links to review
-under the newly approved rule. CI and merge evidence are pending. Mobile
+under the newly approved rule. All eight latest-head checks passed on
+`a9ec59d568c584ca39be017f12479ef82fdb3908` (CI run 38163101398;
+CodeQL run 38163098959). The PostgreSQL integration job ran both affected
+invitation E2E suites: 83 suites and 508 tests passed, plus 2
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+as `b6706e538a344b1029c4734063838eb54f383e09`. Mobile
 implementation remains paused. ACE-M15 needs task-level reconciliation before
 it can be counted complete; the verified master-plan count stays
 **42/150 (28%)**. Local API typecheck, lint, build, focused unit suites (12
 tests), and five PostgreSQL E2E suites (18 tests) passed. Targeted formatting
 and diff checks passed.
+
+Build step 1.3e5u closes the remaining web/API ACE-M15 invitation lifecycle
+gap: guardian resend now requires a fresh legal-access review and audits its
+evidence basis; shared guardian and student invitation flows have PostgreSQL
+expiry, revocation, relationship, and audit tests. The child-profile resend
+control includes an explicit review step. The
+[ACE-M15 evidence record](../evidence/ace-m15-identity-provisioning.md)
+maps each checklist item to code and tests. CI and merge evidence are pending;
+the verified count remains **42/150 (28%)** until the task gate is satisfied.
+API/admin typechecks, targeted lint, and production builds passed locally;
+the full API unit suite (178 suites, 1,304 tests) and full admin unit script
+passed, including the new guardian card test. Four PostgreSQL identity suites
+passed 14 E2E tests. Mobile interface work remains paused.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
