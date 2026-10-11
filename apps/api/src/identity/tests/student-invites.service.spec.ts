@@ -127,6 +127,17 @@ describe("student identity invitations", () => {
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
+  it("rejects an account with a student invitation for another child", async () => {
+    const { tx, service } = setup();
+    tx.familyIdentityInvite.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: "other-child-invite" });
+    await expect(
+      service.create(tenantId, orgId, "admin-a", childId, email),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
+  });
+
   it("creates a pending invite without granting student access", async () => {
     const { tx, service, mailer } = setup();
     tx.familyIdentityInvite.findFirst.mockResolvedValue(null);

@@ -219,6 +219,12 @@ describe("family identity invitation import", () => {
       {
         target: "STUDENT",
         childId: secondChildId,
+        email: studentEmail,
+        confirmedSchoolApproval: true,
+      },
+      {
+        target: "STUDENT",
+        childId: secondChildId,
         email: guardianEmail,
         confirmedSchoolApproval: true,
       },
@@ -239,6 +245,7 @@ describe("family identity invitation import", () => {
       "invited",
       "invited",
       "invited",
+      "failed",
       "failed",
       "failed",
     ]);
@@ -268,6 +275,7 @@ describe("family identity invitation import", () => {
       "existing",
       "existing",
       "existing",
+      "failed",
       "failed",
       "failed",
     ]);

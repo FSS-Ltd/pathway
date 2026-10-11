@@ -155,41 +155,59 @@ export class StudentInvitesService {
           "Revoke the current student invitation first",
         );
       }
-      const [guardian, identity, otherAccess, pendingGuardian] =
-        await Promise.all([
-          tx.guardianIdentity.findUnique({
-            where: { tenantId_userId: { tenantId, userId: user.id } },
-            select: { id: true },
-          }),
-          tx.studentIdentity.findUnique({
-            where: { tenantId_userId: { tenantId, userId: user.id } },
-            select: {
-              links: {
-                where: { tenantId, endedAt: null, revokedAt: null },
-                select: { id: true },
-                take: 1,
-              },
+      const [
+        guardian,
+        identity,
+        otherAccess,
+        pendingGuardian,
+        pendingOtherStudent,
+      ] = await Promise.all([
+        tx.guardianIdentity.findUnique({
+          where: { tenantId_userId: { tenantId, userId: user.id } },
+          select: { id: true },
+        }),
+        tx.studentIdentity.findUnique({
+          where: { tenantId_userId: { tenantId, userId: user.id } },
+          select: {
+            links: {
+              where: { tenantId, endedAt: null, revokedAt: null },
+              select: { id: true },
+              take: 1,
             },
-          }),
-          hasOtherSiteAccess(tx, tenantId, orgId, user.id),
-          tx.familyIdentityInvite.findMany({
-            where: {
-              tenantId,
-              invitedUserId: user.id,
-              target: "GUARDIAN",
-              acceptedAt: null,
-              revokedAt: null,
-              expiresAt: { gt: new Date() },
-            },
-            select: { id: true },
-            take: 1,
-          }),
-        ]);
+          },
+        }),
+        hasOtherSiteAccess(tx, tenantId, orgId, user.id),
+        tx.familyIdentityInvite.findMany({
+          where: {
+            tenantId,
+            invitedUserId: user.id,
+            target: "GUARDIAN",
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+          take: 1,
+        }),
+        tx.familyIdentityInvite.findFirst({
+          where: {
+            tenantId,
+            invitedUserId: user.id,
+            childId: { not: childId },
+            target: "STUDENT",
+            acceptedAt: null,
+            revokedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+          select: { id: true },
+        }),
+      ]);
       if (
         guardian ||
         identity?.links.length ||
         otherAccess ||
-        pendingGuardian.length
+        pendingGuardian.length ||
+        pendingOtherStudent
       ) {
         throw new ConflictException(
           "This account cannot be invited as a student",
