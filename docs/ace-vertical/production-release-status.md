@@ -204,7 +204,9 @@ The school approval decision and PR #562 merge evidence were recorded in
 `8460f187be4ce2b2dd5a434d48a08dcbaacfaf21` with all eight checks passing
 and merged to `master` as `d1f531f36829f227757b83ce75b8cf4a07187585`.
 Build step 1.3e5o is the web and API family identity invitation import on
-`feature/ace-family-identity-bulk-import`. Its current PR is pending. The
+`feature/ace-family-identity-bulk-import` in
+[PR #564](https://github.com/FSS-Ltd/pathway/pull/564). Latest-head CI and
+merge evidence are pending. The
 design is in [25-family-identity-bulk-import-design.md](25-family-identity-bulk-import-design.md).
 The import uses the existing invitation services with bounded, restartable
 row processing, per-person approvals, and no duplicate account creation on
