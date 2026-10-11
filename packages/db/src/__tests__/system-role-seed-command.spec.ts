@@ -15,10 +15,10 @@ const REPOSITORY_ROOT = path.resolve(__dirname, "../../../..");
 const APPROVED_GRANTS = {
   "Organisation Head": [
     "ace.attendance.export",
+    "ace.behaviour.correct",
     "ace.behaviour.policy.manage",
     "ace.behaviour.read",
     "ace.behaviour.record",
-    "ace.behaviour.correct",
     "ace.community.moderate",
     "ace.community.read",
     "ace.community.report",
@@ -70,10 +70,10 @@ const APPROVED_GRANTS = {
   ],
   "Site Lead": [
     "ace.attendance.export",
+    "ace.behaviour.correct",
     "ace.behaviour.policy.manage",
     "ace.behaviour.read",
     "ace.behaviour.record",
-    "ace.behaviour.correct",
     "ace.community.moderate",
     "ace.community.read",
     "ace.community.report",
