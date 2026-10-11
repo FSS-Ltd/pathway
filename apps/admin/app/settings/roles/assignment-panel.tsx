@@ -21,7 +21,7 @@ import {
   type PersonRow,
 } from "@/lib/api-client";
 import { formatAssignmentWindow, parseCodedError } from "@/lib/roles";
-import { requestFailure } from "@/lib/request-error";
+import { useCursorPage } from "./use-cursor-page";
 
 export type AssignmentPanelProps = {
   roles: AdminRoleDefinition[];
@@ -50,13 +50,11 @@ export function AssignmentPanel({
       (role.scope === "organisation" ||
         (activeSiteId !== null && role.tenantId === activeSiteId)),
   );
-  const [assignments, setAssignments] = React.useState<AdminRoleAssignment[]>(
-    [],
+  const assignmentsPage = useCursorPage(
+    fetchRoleAssignments,
+    "Unable to load assignments.",
+    activeSiteId,
   );
-  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
 
   const [assignUserId, setAssignUserId] = React.useState("");
   const [assignRoleId, setAssignRoleId] = React.useState("");
@@ -68,38 +66,6 @@ export function AssignmentPanel({
   React.useEffect(() => {
     setAssignRoleId("");
   }, [activeSiteId]);
-
-  const load = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await fetchRoleAssignments();
-      setAssignments(result.items);
-      setNextCursor(result.nextCursor);
-    } catch (err) {
-      setError(requestFailure(err, "Unable to load assignments.").message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleLoadMore = async () => {
-    if (!nextCursor) return;
-    setIsLoadingMore(true);
-    try {
-      const result = await fetchRoleAssignments({ cursor: nextCursor });
-      setAssignments((prev) => [...prev, ...result.items]);
-      setNextCursor(result.nextCursor);
-    } catch (err) {
-      setError(requestFailure(err, "Unable to load more assignments.").message);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
 
   const handleAssign = async () => {
     setAssignError(null);
@@ -120,7 +86,7 @@ export function AssignmentPanel({
       setAssignRoleId("");
       setStartsAt("");
       setExpiresAt("");
-      await load();
+      assignmentsPage.refresh();
     } catch (err) {
       const { message } = parseCodedError(err);
       setAssignError(message);
@@ -134,7 +100,7 @@ export function AssignmentPanel({
     try {
       await revokeRoleAssignment(assignmentId);
       toast.success("Assignment revoked");
-      await load();
+      assignmentsPage.refresh();
     } catch (err) {
       const { message } = parseCodedError(err);
       toast.error(message);
@@ -158,6 +124,7 @@ export function AssignmentPanel({
         <Badge variant="default">{roleName(roles, row.roleDefinitionId)}</Badge>
       ),
       width: "180px",
+      priority: "secondary",
     },
     {
       id: "window",
@@ -168,6 +135,7 @@ export function AssignmentPanel({
         </span>
       ),
       width: "220px",
+      priority: "secondary",
     },
     {
       id: "status",
@@ -179,6 +147,7 @@ export function AssignmentPanel({
           <Badge variant="success">Active</Badge>
         ),
       width: "100px",
+      priority: "secondary",
     },
     {
       id: "actions",
@@ -275,36 +244,24 @@ export function AssignmentPanel({
       </Card>
 
       <Card title="Assignments">
-        {error && (
-          <div className="mb-3 rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-sm text-status-danger">
-            {error}
-          </div>
-        )}
-        {isLoading ? (
-          <div className="py-8 text-center text-sm text-text-muted">
-            Loading...
-          </div>
-        ) : (
-          <>
-            <DataTable
-              columns={columns}
-              data={assignments}
-              emptyMessage="No role assignments yet."
-            />
-            {nextCursor && (
-              <div className="mt-3 flex justify-center">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleLoadMore}
-                  disabled={isLoadingMore}
-                >
-                  {isLoadingMore ? "Loading…" : "Load more"}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
+        <DataTable
+          columns={columns}
+          data={assignmentsPage.items}
+          caption="Role assignments"
+          rowKey={(assignment) => assignment.id}
+          isLoading={assignmentsPage.isLoading}
+          errorMessage={assignmentsPage.error}
+          onRetry={assignmentsPage.refresh}
+          emptyMessage="No role assignments yet."
+          pagination={{
+            mode: "server",
+            pageIndex: assignmentsPage.pageIndex,
+            pageSize: assignmentsPage.pageSize,
+            hasNextPage: assignmentsPage.hasNextPage,
+            onPageChange: assignmentsPage.changePage,
+            onPageSizeChange: assignmentsPage.changePageSize,
+          }}
+        />
       </Card>
     </div>
   );
