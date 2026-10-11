@@ -4,6 +4,10 @@ import React, { act } from "react";
 import { useCursorPage } from "./use-cursor-page";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>");
+Object.defineProperty(globalThis, "navigator", {
+  configurable: true,
+  value: dom.window.navigator,
+});
 Object.assign(globalThis, {
   window: dom.window,
   document: dom.window.document,
