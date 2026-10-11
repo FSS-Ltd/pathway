@@ -3,9 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  Logger,
   NotFoundException,
-  ServiceUnavailableException,
 } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
@@ -18,25 +16,21 @@ import {
   orgIdForInviteSite,
 } from "./family-invite-operations";
 import { verifiedFamilyInviteEmail } from "./family-verified-email";
+import { hasOtherSiteAccess } from "./student-account-eligibility";
+import {
+  requireAceStudentSite,
+  requireEnabledStudentPortal,
+} from "./student-portal-policy.service";
 
 @Injectable()
-export class GuardianInviteAcceptanceService {
-  private readonly logger = new Logger(GuardianInviteAcceptanceService.name);
-
+export class StudentInviteAcceptanceService {
   constructor(
     @Inject(ClerkManagementService)
     private readonly clerk: ClerkManagementService,
   ) {}
 
-  async verifiedEmail(principal: VerifiedPrincipal): Promise<string | null> {
-    try {
-      return await verifiedFamilyInviteEmail(principal, this.clerk);
-    } catch {
-      this.logger.error("Guardian identity verification is unavailable");
-      throw new ServiceUnavailableException(
-        "Identity verification is temporarily unavailable",
-      );
-    }
+  verifiedEmail(principal: VerifiedPrincipal): Promise<string | null> {
+    return verifiedFamilyInviteEmail(principal, this.clerk);
   }
 
   async getForInvitee(
@@ -48,15 +42,13 @@ export class GuardianInviteAcceptanceService {
     const orgId = await orgIdForInviteSite(tenantId);
     return withTenantRlsContext(tenantId, orgId, async (tx) => {
       const invite = await tx.familyIdentityInvite.findFirst({
-        where: {
-          id: inviteId,
-          tenantId,
-          target: "GUARDIAN",
-        },
+        where: { id: inviteId, tenantId, target: "STUDENT" },
         select: {
           id: true,
           expiresAt: true,
           acceptedAt: true,
+          acceptedStudentIdentityId: true,
+          childId: true,
           revokedAt: true,
           invitedEmail: true,
           invitedUserId: true,
@@ -71,17 +63,42 @@ export class GuardianInviteAcceptanceService {
       });
       if (!invite) throw new NotFoundException("Invitation not found");
       this.assertInvitee(invite, userId, verifiedEmail);
+      let accessAvailable: boolean | null = null;
+      if (invite.acceptedAt) {
+        accessAvailable = false;
+        if (invite.childId && invite.acceptedStudentIdentityId) {
+          const [policy, link] = await Promise.all([
+            tx.studentPortalPolicy.findUnique({
+              where: { tenantId },
+              select: { studentPortalEnabled: true },
+            }),
+            tx.studentIdentityLink.findFirst({
+              where: {
+                tenantId,
+                childId: invite.childId,
+                studentIdentityId: invite.acceptedStudentIdentityId,
+                endedAt: null,
+                revokedAt: null,
+                studentIdentity: { userId, user: { isActive: true } },
+              },
+              select: { id: true },
+            }),
+          ]);
+          accessAvailable = Boolean(policy?.studentPortalEnabled && link);
+        }
+      }
       return {
         id: invite.id,
         siteName: invite.tenant.name,
         expiresAt: invite.expiresAt,
         acceptedAt: invite.acceptedAt,
         revokedAt: invite.revokedAt,
+        accessAvailable,
       };
     });
   }
 
-  async acceptGuardianInvite(
+  async accept(
     tenantId: string,
     inviteId: string,
     userId: string,
@@ -92,11 +109,7 @@ export class GuardianInviteAcceptanceService {
     return withTenantRlsContext(tenantId, orgId, async (tx) => {
       await lockFamilyInvite(tx, tenantId, inviteId);
       const invite = await tx.familyIdentityInvite.findFirst({
-        where: {
-          id: inviteId,
-          tenantId,
-          target: "GUARDIAN",
-        },
+        where: { id: inviteId, tenantId, target: "STUDENT" },
         include: {
           invitedUser: {
             select: {
@@ -123,10 +136,11 @@ export class GuardianInviteAcceptanceService {
         select: { isActive: true, lastActiveTenantId: true },
       });
       if (!user?.isActive) {
-        throw new ForbiddenException("Guardian account is inactive");
+        throw new ForbiddenException("Student account is inactive");
       }
-      if (invite.acceptedAt)
+      if (invite.acceptedAt) {
         return { id: inviteId, acceptedAt: invite.acceptedAt };
+      }
       if (
         invite.revokedAt ||
         invite.expiresAt <= new Date() ||
@@ -134,19 +148,50 @@ export class GuardianInviteAcceptanceService {
       ) {
         throw new ConflictException("Invitation is no longer available");
       }
-      await lockFamilyInvite(tx, tenantId, userId, invite.childId);
-      const [child, studentIdentity] = await Promise.all([
-        tx.child.findFirst({
-          where: { id: invite.childId, tenantId, isGuest: false },
-          select: { id: true },
-        }),
-        tx.studentIdentity.findUnique({
-          where: { tenantId_userId: { tenantId, userId } },
-          select: { id: true },
-        }),
-      ]);
-      if (!child || studentIdentity) {
-        throw new ConflictException("Guardian access requires review");
+      await lockFamilyInvite(tx, tenantId, invite.childId);
+      await lockFamilyInvite(tx, tenantId, userId);
+      await requireAceStudentSite(tx, tenantId, orgId);
+      await requireEnabledStudentPortal(tx, tenantId);
+      const [child, guardian, activeChildLink, currentIdentity, otherAccess] =
+        await Promise.all([
+          tx.child.findFirst({
+            where: { id: invite.childId, tenantId, isGuest: false },
+            select: { id: true },
+          }),
+          tx.guardianIdentity.findUnique({
+            where: { tenantId_userId: { tenantId, userId } },
+            select: { id: true },
+          }),
+          tx.studentIdentityLink.findFirst({
+            where: {
+              tenantId,
+              childId: invite.childId,
+              endedAt: null,
+              revokedAt: null,
+            },
+            select: { id: true },
+          }),
+          tx.studentIdentity.findUnique({
+            where: { tenantId_userId: { tenantId, userId } },
+            select: {
+              id: true,
+              links: {
+                where: { tenantId, endedAt: null, revokedAt: null },
+                select: { id: true },
+                take: 1,
+              },
+            },
+          }),
+          hasOtherSiteAccess(tx, tenantId, orgId, userId),
+        ]);
+      if (
+        !child ||
+        guardian ||
+        activeChildLink ||
+        currentIdentity?.links.length ||
+        otherAccess
+      ) {
+        throw new ConflictException("Student access requires review");
       }
       if (invite.invitedUserId !== userId) {
         await tx.familyIdentityInvite.update({
@@ -154,78 +199,43 @@ export class GuardianInviteAcceptanceService {
           data: { invitedUserId: userId },
         });
       }
-      const guardian = await tx.guardianIdentity.upsert({
-        where: { tenantId_userId: { tenantId, userId } },
-        create: { tenantId, userId },
-        update: {},
-        select: { id: true },
-      });
-      const relationship = await tx.guardianChildRelationship.findFirst({
-        where: {
-          tenantId,
-          guardianIdentityId: guardian.id,
-          childId: child.id,
-          legalAccess: "FULL",
-          startsAt: { lte: new Date() },
-          endedAt: null,
-          revokedAt: null,
-        },
-        select: { id: true },
-      });
-      const created =
-        relationship ??
-        (await tx.guardianChildRelationship.create({
-          data: {
-            tenantId,
-            guardianIdentityId: guardian.id,
-            childId: child.id,
-            legalAccess: "FULL",
-          },
+      const identity =
+        currentIdentity ??
+        (await tx.studentIdentity.create({
+          data: { tenantId, userId },
           select: { id: true },
         }));
-      if (!relationship) {
-        await recordAuditEventInTransaction(tx, {
-          actorUserId: userId,
-          tenantId,
-          orgId,
-          entityType: AuditEntityType.ACE_RECORD,
-          entityId: created.id,
-          action: AuditAction.CREATED,
-          metadata: {
-            kind: "GUARDIAN_RELATIONSHIP",
-            source: "FAMILY_INVITE",
-            inviteId,
-            childId: child.id,
-            legalAccess: "FULL",
-          },
-        });
-      }
-      // Keep existing parent profiles in sync; the reviewed relationship remains
-      // the access check for family data and child records.
-      await tx.child.update({
-        where: { id: child.id },
-        data: { guardians: { connect: { id: userId } } },
+      const link = await tx.studentIdentityLink.create({
+        data: { tenantId, studentIdentityId: identity.id, childId: child.id },
+        select: { id: true },
       });
-      await tx.userTenantRole.upsert({
-        where: { userId_tenantId_role: { userId, tenantId, role: "PARENT" } },
-        create: { userId, tenantId, role: "PARENT" },
-        update: {},
+      await recordAuditEventInTransaction(tx, {
+        actorUserId: userId,
+        tenantId,
+        orgId,
+        entityType: AuditEntityType.ACE_RECORD,
+        entityId: link.id,
+        action: AuditAction.CREATED,
+        metadata: {
+          kind: "STUDENT_IDENTITY_LINK",
+          source: "FAMILY_INVITE",
+          inviteId,
+          childId: child.id,
+        },
       });
       await tx.user.update({
         where: { id: userId },
-        data: {
-          hasFamilyAccess: true,
-          lastActiveTenantId: user.lastActiveTenantId ?? tenantId,
-        },
+        data: { lastActiveTenantId: user.lastActiveTenantId ?? tenantId },
       });
       const acceptedAt = new Date();
       await tx.familyIdentityInvite.update({
         where: { id_tenantId: { id: inviteId, tenantId } },
-        data: { acceptedAt, acceptedGuardianIdentityId: guardian.id },
+        data: { acceptedAt, acceptedStudentIdentityId: identity.id },
       });
       await auditFamilyInvite(tx, tenantId, orgId, userId, inviteId, "accept", {
+        target: "STUDENT",
         childId: child.id,
-        relationshipId: created.id,
+        linkId: link.id,
       });
       return { id: inviteId, acceptedAt };
     });
