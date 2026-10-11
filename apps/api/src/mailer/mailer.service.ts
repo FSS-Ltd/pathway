@@ -51,6 +51,8 @@ export type SendFamilyInviteEmailParams = {
   siteName: string;
 };
 
+export type SendStudentInviteEmailParams = SendFamilyInviteEmailParams;
+
 /** Params for toolkit download link email. */
 export type SendToolkitLinkParams = {
   to: string;
@@ -553,6 +555,20 @@ If you didn't request this, you can safely ignore this email.
       subject: `Guardian invitation from ${params.siteName}`,
       html: `<p>${siteName} invited you to access your child's information on Nexsteps.</p><p><a href="${inviteUrl}">Review invitation</a></p><p>Sign in with this email address. The invitation expires in seven days.</p>`,
       text: `${params.siteName} invited you to access your child's information on Nexsteps.\nReview invitation: ${params.inviteUrl}\nSign in with this email address. The invitation expires in seven days.`,
+    });
+    if (result.error) throw new Error("Email delivery failed");
+  }
+
+  async sendStudentInviteEmail(params: SendStudentInviteEmailParams): Promise<void> {
+    if (!this.resend) throw new Error("Email delivery is unavailable");
+    const siteName = escapeHtml(params.siteName);
+    const inviteUrl = escapeHtml(params.inviteUrl);
+    const result = await this.resend.emails.send({
+      from: this.fromAddress,
+      to: params.to,
+      subject: `Student invitation from ${params.siteName}`,
+      html: `<p>${siteName} invited you to use your student account on Nexsteps.</p><p><a href="${inviteUrl}">Review invitation</a></p><p>Sign in with this email address. The invitation expires in seven days.</p>`,
+      text: `${params.siteName} invited you to use your student account on Nexsteps.\nReview invitation: ${params.inviteUrl}\nSign in with this email address. The invitation expires in seven days.`,
     });
     if (result.error) throw new Error("Email delivery failed");
   }

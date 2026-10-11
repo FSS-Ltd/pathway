@@ -17,6 +17,7 @@ import {
   lockFamilyInvite,
   orgIdForInviteSite,
 } from "./family-invite-operations";
+import { verifiedFamilyInviteEmail } from "./family-verified-email";
 
 @Injectable()
 export class GuardianInviteAcceptanceService {
@@ -28,13 +29,8 @@ export class GuardianInviteAcceptanceService {
   ) {}
 
   async verifiedEmail(principal: VerifiedPrincipal): Promise<string | null> {
-    if (principal.provider === "auth0") {
-      return principal.emailVerified
-        ? (principal.email?.trim().toLowerCase() ?? null)
-        : null;
-    }
     try {
-      return await this.clerk.getVerifiedPrimaryEmail(principal.sub);
+      return await verifiedFamilyInviteEmail(principal, this.clerk);
     } catch {
       this.logger.error("Guardian identity verification is unavailable");
       throw new ServiceUnavailableException(

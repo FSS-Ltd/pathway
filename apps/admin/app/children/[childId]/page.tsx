@@ -8,6 +8,7 @@ import { ArrowLeft, Download } from "lucide-react";
 import { Badge, Button, Card, Input, Label, Select } from "@pathway/ui";
 import { ProfileHeaderCard } from "../../../components/profile-header-card";
 import { GuardianInviteCard } from "../../../components/parents/guardian-invite-card";
+import { StudentInviteCard } from "../../../components/ace/family/student-invite-card";
 import {
   canAccessAdminSection,
   canAccessSafeguardingAdmin,
@@ -77,13 +78,15 @@ export default function ChildDetailPage() {
     toLocalDateKey(new Date()),
   );
   const { data: session } = useSession();
-  const { role, isLoading: isLoadingAccess } = useAdminAccess();
+  const { role, capabilities, isLoading: isLoadingAccess } = useAdminAccess();
   const isAdmin = canAccessAdminSection(role);
   const currentUserId = (session?.user as { id?: string })?.id ?? null;
   const guardianIds = child?.guardianIds ?? [];
   const canEdit =
     isAdmin || (!!currentUserId && guardianIds.includes(currentUserId));
   const canInviteParent = role?.isOrgAdmin ?? false;
+  const canInviteStudent =
+    canInviteParent && capabilities.includes("ace.student.self.read");
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -427,6 +430,7 @@ export default function ChildDetailPage() {
           </div>
 
           {canInviteParent ? <GuardianInviteCard childId={childId} /> : null}
+          {canInviteStudent ? <StudentInviteCard childId={childId} /> : null}
 
           {childDetail.guardianContacts.length > 0 ? (
             <Card title="Parent / guardian contacts">

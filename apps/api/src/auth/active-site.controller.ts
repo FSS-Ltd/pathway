@@ -11,8 +11,10 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { prisma, OrgRole, SiteRole } from "@pathway/db";
+import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
 import { AuthUserGuard } from "./auth-user.guard";
 import { UserRolesService } from "./user-roles.service";
+import { listStudentActiveSites } from "./student-active-sites";
 
 interface AuthenticatedRequest extends Request {
   authUserId?: string;
@@ -47,6 +49,7 @@ export class ActiveSiteController {
   ) {}
 
   @UseGuards(AuthUserGuard)
+  @IndependentTransaction()
   @Get()
   async getActiveSite(
     @Req() req: AuthenticatedRequest,
@@ -118,6 +121,8 @@ export class ActiveSiteController {
         select: { tenant: { include: { org: true } } },
       });
 
+    const studentSites = await listStudentActiveSites(userId);
+
     const orgTenantIds =
       orgMemberships.length > 0
         ? await prisma.tenant.findMany({
@@ -154,6 +159,15 @@ export class ActiveSiteController {
         role: null,
         timezone: tenant.timezone ?? null,
       })),
+      ...studentSites.map<SiteSummary>((site) => ({
+        id: site.id,
+        name: site.name,
+        orgId: site.orgId,
+        orgName: site.org.name,
+        orgSlug: site.org.slug,
+        role: null,
+        timezone: site.timezone ?? null,
+      })),
     ];
 
     // De-dupe by tenantId
@@ -172,6 +186,7 @@ export class ActiveSiteController {
   }
 
   @UseGuards(AuthUserGuard)
+  @IndependentTransaction()
   @Post()
   async setActiveSite(
     @Req() req: AuthenticatedRequest,
