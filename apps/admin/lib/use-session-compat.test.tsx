@@ -19,10 +19,15 @@ Object.defineProperty(globalThis, "navigator", {
 
 const nativeFetch = globalThis.fetch;
 let session: ReturnType<typeof useSession>;
+const renderedSessions: Array<{ status: string; userId: string | null }> = [];
 const currentData = () => session.data;
 
 function Viewer() {
   session = useSession();
+  renderedSessions.push({
+    status: session.status,
+    userId: session.data?.user.id ?? null,
+  });
   return (
     <div data-status={session.status} data-id={session.data?.user.id ?? ""} />
   );
@@ -121,7 +126,19 @@ async function run(): Promise<void> {
   assert.equal(identityCalls, 2, "token getter updates do not reload identity");
 
   const lateToken = deferred<string | null>();
+  const previousRenders = renderedSessions.length;
   await render(true, () => lateToken.promise, "clerk-2");
+  assert.equal(
+    renderedSessions
+      .slice(previousRenders)
+      .some(
+        (rendered) =>
+          rendered.status === "authenticated" &&
+          rendered.userId === "internal-1",
+      ),
+    false,
+    "switching Clerk accounts must never render the previous API identity",
+  );
   assert.equal(session.status, "loading");
   await render(false, () => Promise.resolve(null), "clerk-2");
   lateToken.resolve("old-token");

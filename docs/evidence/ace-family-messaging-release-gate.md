@@ -111,3 +111,22 @@ recipient, school-team, history, send, and read-cursor access even if a typed
 messaging permission remains. The local disposable PostgreSQL run executed all
 eight suite cases successfully. Full ACE-M20 sign-off still requires the
 signed-in web keyboard and screen-reader check and the paused mobile baselines.
+
+## Web account-bound view state (step 1.3e5z)
+
+The shared admin session adapter masks its previous verified API identity on
+the first render after a Clerk account change, before the session effect can
+clear its state. ACE family deep-link views and invitation acceptance are
+keyed to the current account and session status so their local data, forms,
+and pending UI state cannot carry into another account. Timetable headings
+also hide the prior child's name as soon as the session is no longer
+authenticated.
+
+The session regression records every render across an account change and
+rejects any frame containing the previous API identity. The timetable web
+test loads a child's sessions, switches to another Clerk account while its
+token is pending, and verifies that the old child's name and sessions vanish
+before the new account's request returns. The signed-out timetable tests
+check that a previous child's name is absent. This is component-level web
+evidence; signed-in browser keyboard and screen-reader checks and mobile
+baselines remain required for the full ACE-M20 gate.

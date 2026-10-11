@@ -81,7 +81,10 @@ export function SessionRuntime({
   getToken,
   identity,
 }: SessionRuntimeProps) {
-  const [session, setSession] = useState<CompatSession | null>(null);
+  const [verifiedSession, setVerifiedSession] = useState<{
+    clerkUserId: string | null;
+    session: CompatSession;
+  } | null>(null);
   const [status, setStatus] = useState<SessionStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
@@ -100,7 +103,7 @@ export function SessionRuntime({
       cancelApiReads();
       activeIdentity.current = nextIdentity;
     }
-    setSession(null);
+    setVerifiedSession(null);
     setError(null);
     setStatus("loading");
     setApiClientToken(null);
@@ -122,13 +125,19 @@ export function SessionRuntime({
         throw new Error("Your account identity is unavailable.");
       if (requestGeneration !== generation.current) return;
       setApiClientToken(token);
-      setSession({ accessToken: token, user: { id: me.userId, name, email } });
+      setVerifiedSession({
+        clerkUserId,
+        session: {
+          accessToken: token,
+          user: { id: me.userId, name, email },
+        },
+      });
       setStatus("authenticated");
     } catch {
       if (requestGeneration !== generation.current) return;
       setApiTokenGetter(null);
       setApiClientToken(null);
-      setSession(null);
+      setVerifiedSession(null);
       setError("Unable to verify your account. Please retry.");
       setStatus("error");
     }
@@ -143,9 +152,29 @@ export function SessionRuntime({
     };
   }, [resolve, clerkUserId]);
 
+  const currentSession =
+    isLoaded &&
+    isSignedIn &&
+    clerkUserId &&
+    verifiedSession?.clerkUserId === clerkUserId
+      ? verifiedSession.session
+      : null;
+  const currentStatus: SessionStatus = !isLoaded
+    ? "loading"
+    : !isSignedIn
+      ? "unauthenticated"
+      : activeIdentity.current !== clerkUserId ||
+          (status === "authenticated" && !currentSession)
+        ? "loading"
+        : status;
   const value = useMemo(
-    () => ({ data: session, status, error, update: resolve }),
-    [session, status, error, resolve],
+    () => ({
+      data: currentSession,
+      status: currentStatus,
+      error: currentStatus === "error" ? error : null,
+      update: resolve,
+    }),
+    [currentSession, currentStatus, error, resolve],
   );
 
   return (

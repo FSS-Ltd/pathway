@@ -123,7 +123,9 @@ export function FamilyTimetableView({
         </Link>
         <p className="text-sm font-medium text-accent-strong">ACE / Sessions</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
-          {data ? `${data.childName}’s sessions` : "Sessions"}
+          {status === "authenticated" && data
+            ? `${data.childName}’s sessions`
+            : "Sessions"}
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-text-muted">
           Published school sessions for this week. Your school will share
@@ -240,8 +242,14 @@ export function FamilyTimetableWorkspace({
 }: {
   scope: FamilyTimetableScope;
 }) {
-  const { status } = useSession();
+  const { data, status } = useSession();
   const key =
     scope.kind === "parent" ? `${scope.siteId}:${scope.childId}` : scope.siteId;
-  return <FamilyTimetableView key={key} scope={scope} status={status} />;
+  return (
+    <FamilyTimetableView
+      key={`${status}:${data?.user.id ?? ""}:${key}`}
+      scope={scope}
+      status={status}
+    />
+  );
 }

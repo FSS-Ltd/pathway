@@ -4,7 +4,7 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { Button, Card } from "@pathway/ui";
-import { useSession } from "@/lib/use-session-compat";
+import { useSession, type SessionStatus } from "@/lib/use-session-compat";
 import {
   acceptGuardianInvite,
   getGuardianInviteForRecipient,
@@ -46,9 +46,31 @@ export function FamilyInviteAcceptance({ kind }: { kind: InviteKind }) {
     siteId: string;
     inviteId: string;
   }>();
+  const { data, status } = useSession();
+  return (
+    <FamilyInviteAcceptanceView
+      key={`${kind}:${status}:${data?.user.id ?? ""}:${siteId}:${inviteId}`}
+      kind={kind}
+      siteId={siteId}
+      inviteId={inviteId}
+      status={status}
+    />
+  );
+}
+
+function FamilyInviteAcceptanceView({
+  kind,
+  siteId,
+  inviteId,
+  status,
+}: {
+  kind: InviteKind;
+  siteId: string;
+  inviteId: string;
+  status: SessionStatus;
+}) {
   const router = useRouter();
   const { redirectToSignIn, signOut } = useClerk();
-  const { status } = useSession();
   const [invite, setInvite] = React.useState<GuardianInviteForRecipient | null>(
     null,
   );
