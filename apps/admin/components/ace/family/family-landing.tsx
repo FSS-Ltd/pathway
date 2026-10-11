@@ -146,34 +146,47 @@ function SchoolLinksList({ contexts }: { contexts: FamilyContext[] }) {
   );
 }
 
-export function FamilyLandingView({ status }: { status: SessionStatus }) {
-  const [contexts, setContexts] = React.useState<FamilyContext[] | null>(null);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+type LoadState =
+  | { accountId: string; state: "loading" }
+  | { accountId: string; state: "ready"; contexts: FamilyContext[] }
+  | { accountId: string; state: "error"; message: string };
+
+export function FamilyLandingView({
+  status,
+  accountId,
+}: {
+  status: SessionStatus;
+  accountId: string | null;
+}) {
+  const [load, setLoad] = React.useState<LoadState | null>(null);
   const [revision, setRevision] = React.useState(0);
 
   React.useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || !accountId) return;
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    setContexts(null);
+    setLoad({ accountId, state: "loading" });
     void fetchFamilyContexts(controller.signal)
-      .then(setContexts)
+      .then((contexts) => {
+        if (!controller.signal.aborted) {
+          setLoad({ accountId, state: "ready", contexts });
+        }
+      })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Family access could not be loaded. Please try again.",
-        );
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
+        setLoad({
+          accountId,
+          state: "error",
+          message:
+            cause instanceof Error
+              ? cause.message
+              : "Family access could not be loaded. Please try again.",
+        });
       });
     return () => controller.abort();
-  }, [status, revision]);
+  }, [status, accountId, revision]);
 
+  const currentLoad = load?.accountId === accountId ? load : null;
+  const contexts = currentLoad?.state === "ready" ? currentLoad.contexts : null;
   const parentContexts =
     contexts?.filter((item) => item.kind === "parent") ?? [];
   const studentContexts =
@@ -191,7 +204,9 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
         </p>
       </header>
 
-      {status === "loading" || (status === "authenticated" && loading) ? (
+      {status === "loading" ||
+      (status === "authenticated" &&
+        (!currentLoad || currentLoad.state === "loading")) ? (
         <Card>
           <p role="status" className="text-sm text-text-muted">
             Loading your school links…
@@ -206,13 +221,13 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
             <Link href="/login?returnTo=%2Face%2Ffamily">Sign in</Link>
           </Button>
         </Card>
-      ) : error ? (
+      ) : currentLoad?.state === "error" ? (
         <Card>
           <div
             role="alert"
             className="flex flex-wrap items-center justify-between gap-4"
           >
-            <p className="text-sm text-text-primary">{error}</p>
+            <p className="text-sm text-text-primary">{currentLoad.message}</p>
             <Button
               type="button"
               variant="outline"
@@ -241,6 +256,12 @@ export function FamilyLandingView({ status }: { status: SessionStatus }) {
 }
 
 export function FamilyLanding() {
-  const { status } = useSession();
-  return <FamilyLandingView status={status} />;
+  const { data, status } = useSession();
+  return (
+    <FamilyLandingView
+      key={`${status}:${data?.user.id ?? ""}`}
+      status={status}
+      accountId={data?.user.id ?? null}
+    />
+  );
 }

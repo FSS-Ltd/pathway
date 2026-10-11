@@ -26,7 +26,9 @@ async function run() {
   document.body.append(container);
   const root = createRoot(container);
   const requested: string[] = [];
-  let mode: "linked" | "partial" | "legacy" | "empty" | "denied" = "linked";
+  let mode: "linked" | "partial" | "legacy" | "empty" | "denied" | "deferred" =
+    "linked";
+  let releaseDeferred: ((response: Response) => void) | undefined;
   const originalFetch = globalThis.fetch;
   setApiClientToken("family-token");
   globalThis.fetch = async (input, init) => {
@@ -36,6 +38,11 @@ async function run() {
       "Bearer family-token",
     );
     if (mode === "denied") return new Response("", { status: 403 });
+    if (mode === "deferred") {
+      return new Promise<Response>((resolve) => {
+        releaseDeferred = resolve;
+      });
+    }
     return new Response(
       JSON.stringify({
         items:
@@ -103,7 +110,9 @@ async function run() {
 
   try {
     await act(async () =>
-      root.render(<FamilyLandingView status="authenticated" />),
+      root.render(
+        <FamilyLandingView status="authenticated" accountId="family-a" />,
+      ),
     );
     assert.deepEqual(requested, ["http://api.test/ace/family/contexts"]);
     assert.match(container.textContent ?? "", /Ari Alpha/);
@@ -154,10 +163,14 @@ async function run() {
 
     mode = "partial";
     await act(async () =>
-      root.render(<FamilyLandingView status="unauthenticated" />),
+      root.render(
+        <FamilyLandingView status="unauthenticated" accountId={null} />,
+      ),
     );
     await act(async () =>
-      root.render(<FamilyLandingView status="authenticated" />),
+      root.render(
+        <FamilyLandingView status="authenticated" accountId="family-a" />,
+      ),
     );
     assert.equal(container.querySelectorAll('a[href$="/messages"]').length, 0);
     assert.equal(
@@ -173,10 +186,14 @@ async function run() {
 
     mode = "legacy";
     await act(async () =>
-      root.render(<FamilyLandingView status="unauthenticated" />),
+      root.render(
+        <FamilyLandingView status="unauthenticated" accountId={null} />,
+      ),
     );
     await act(async () =>
-      root.render(<FamilyLandingView status="authenticated" />),
+      root.render(
+        <FamilyLandingView status="authenticated" accountId="family-a" />,
+      ),
     );
     assert.match(container.textContent ?? "", /Ari Alpha/);
     assert.match(container.textContent ?? "", /School services are updating/);
@@ -188,12 +205,16 @@ async function run() {
     mode = "denied";
     const requestCount = requested.length;
     await act(async () =>
-      root.render(<FamilyLandingView status="unauthenticated" />),
+      root.render(
+        <FamilyLandingView status="unauthenticated" accountId={null} />,
+      ),
     );
     assert.equal(requested.length, requestCount);
     assert.match(container.textContent ?? "", /Sign in to continue/);
     await act(async () =>
-      root.render(<FamilyLandingView status="authenticated" />),
+      root.render(
+        <FamilyLandingView status="authenticated" accountId="family-a" />,
+      ),
     );
     assert.match(container.textContent ?? "", /could not be verified/);
     assert.doesNotMatch(container.textContent ?? "", /Ari Alpha/);
@@ -209,6 +230,39 @@ async function run() {
       container.querySelectorAll("a[href*='/attendance']").length,
       0,
     );
+
+    mode = "linked";
+    await act(async () =>
+      root.render(
+        <FamilyLandingView status="unauthenticated" accountId={null} />,
+      ),
+    );
+    await act(async () =>
+      root.render(
+        <FamilyLandingView status="authenticated" accountId="family-a" />,
+      ),
+    );
+    assert.match(container.textContent ?? "", /Ari Alpha/);
+
+    mode = "deferred";
+    await act(async () =>
+      root.render(
+        <FamilyLandingView status="authenticated" accountId="family-b" />,
+      ),
+    );
+    assert.match(container.textContent ?? "", /Loading your school links/);
+    assert.doesNotMatch(container.textContent ?? "", /Ari Alpha/);
+    assert.equal(
+      container.querySelectorAll("a[href*='/ace/parent/sites/']").length,
+      0,
+    );
+    assert.ok(releaseDeferred);
+    await act(async () =>
+      releaseDeferred(
+        new Response(JSON.stringify({ items: [] }), { status: 200 }),
+      ),
+    );
+    assert.match(container.textContent ?? "", /No school links yet/);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;

@@ -205,17 +205,31 @@ The school approval decision and PR #562 merge evidence were recorded in
 and merged to `master` as `d1f531f36829f227757b83ce75b8cf4a07187585`.
 Build step 1.3e5o is the web and API family identity invitation import on
 `feature/ace-family-identity-bulk-import` in
-[PR #564](https://github.com/FSS-Ltd/pathway/pull/564). Latest-head CI and
-merge evidence are pending. The
+[PR #564](https://github.com/FSS-Ltd/pathway/pull/564). All eight latest-head
+checks passed at `6db481cf805e7d20f78fe6a95be93e9643e15990` (CI run
+38147363590), including the database integration job: 81 suites and 498 tests
+passed, and the family identity import E2E ran against PostgreSQL. GitHub
+confirmed the merge to `master` at
+`1d24bafbeeff2d3fdbdbd8d67866fafd3912e735`. The
 design is in [25-family-identity-bulk-import-design.md](25-family-identity-bulk-import-design.md).
 The import uses the existing invitation services with bounded, restartable
 row processing, per-person approvals, and no duplicate account creation on
 retry. Local API/admin typechecks, lint, focused API and CSV tests, API/admin
-builds, formatting, and Graphify passed. The local database E2E command
-reported skipped assertions because PostgreSQL at `localhost:5433` is
-unavailable; its actual execution in CI remains a merge gate. The verified
+builds, formatting, and Graphify passed. The verified
 master-plan count remains **42/150 (28%)** until a complete ACE-M15 checklist
 is evidenced and merged.
+
+Build step 1.3e5p is the web family messaging security gate on
+`feature/ace-family-web-security-gate`. It adds real HTTP role, conversation-ID,
+student compose, and relationship revocation probes, and prevents child names
+from an earlier account appearing in the family landing during an account
+change. The [web evidence record](../evidence/ace-family-messaging-release-gate.md)
+lists covered cases and remaining ACE-M20 release work. Seven local PostgreSQL
+messaging, identity, notice, and family-context suites passed together (73 tests);
+API/admin typechecks, lint, formatting, focused UI test, and builds passed.
+PR, latest-head CI, and merge
+evidence are pending. Mobile work remains paused. The exact master-plan count
+remains **42/150 (28%)** while ACE-M20 is open.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
