@@ -157,6 +157,7 @@ export type AdminChildDetail = {
   hasAdditionalNeeds: boolean;
   status: "active" | "inactive";
   guardianContacts: AdminChildGuardianContact[];
+  guardianIds?: string[];
 };
 
 export type AdminChildGuardianContact = {
@@ -3043,6 +3044,7 @@ type ApiChild = {
   hasPhotoConsent?: boolean | null;
   photoConsent?: boolean | null;
   status?: string | null;
+  guardians?: Array<{ id: string }> | null;
   guardianContacts?: Array<{
     id: string;
     fullName: string;
@@ -3084,6 +3086,7 @@ const mapApiChildDetailToAdmin = (c: ApiChildDetail): AdminChildDetail => ({
     (Array.isArray(c.disabilities) && c.disabilities.length > 0) ||
     (Array.isArray(c.additionalNeeds) && c.additionalNeeds.length > 0),
   status: c.status === "inactive" ? "inactive" : "active",
+  guardianIds: c.guardians?.map((guardian) => guardian.id) ?? [],
   guardianContacts: (c.guardianContacts ?? []).map((contact) => ({
     id: contact.id,
     fullName: contact.fullName,
@@ -3195,6 +3198,7 @@ export async function fetchChildById(
     cache: "no-store",
   });
 
+  if (res.status === 404) return null;
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(
