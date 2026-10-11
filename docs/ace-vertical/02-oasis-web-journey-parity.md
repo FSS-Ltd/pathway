@@ -15,7 +15,7 @@ relationship checks, release policy, and the stated entitlement. Oasis paths
 below are in the read-only sibling `oasis-portal` repository. The ACE access
 matrix remains the permission contract; this matrix tracks end-to-end work.
 
-Roles & Access is delivered as RA-1 (backend badge matrix and exclusions), RA-2 (shared table), RA-3 (people-first workspace), and RA-4 (admin table adoption). RA-1 is in progress on `feature/roles-access-badge-matrix`; the UI parity remains open until RA-3 and RA-4. No invitation controls belong in Roles & Access.
+Roles & Access is delivered as RA-1 (backend badge matrix and exclusions), RA-2 (shared table), RA-3 (people-first workspace), and RA-4 (admin table adoption). RA-1 is in [PR #580](https://github.com/FSS-Ltd/pathway/pull/580), opened at revision `4508a4f0624c20ea6c1176b55fb9c125a9d058c3`; current-revision CI and merge are pending. The UI parity remains open until RA-3 and RA-4. No invitation controls belong in Roles & Access.
 
 | State       | Meaning                                                                                          |
 | ----------- | ------------------------------------------------------------------------------------------------ |
