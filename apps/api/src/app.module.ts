@@ -22,6 +22,7 @@ import { LessonsModule } from "./lessons/lessons.module";
 import { LearningModule } from "./learning/learning.module";
 import { FamilyPlannerModule } from "./family-planner/family-planner.module";
 import { FamilyModule } from "./family/family.module";
+import { StudentSelfModule } from "./student-self/student-self.module";
 
 // // Scheduling / Rota
 import { SessionsModule } from "./sessions/sessions.module";
@@ -68,6 +69,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     LearningModule,
     FamilyPlannerModule,
     FamilyModule,
+    StudentSelfModule,
     SessionsModule,
     AssignmentsModule,
     PreferencesModule,

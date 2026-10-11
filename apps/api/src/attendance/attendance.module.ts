@@ -38,6 +38,10 @@ import { FamilyContextsService } from "./family-contexts.service";
     ParentDailyAttendanceService,
     FamilyContextsService,
   ],
-  exports: [AttendanceService, ParentDailyAttendanceService],
+  exports: [
+    AttendanceService,
+    ParentDailyAttendanceService,
+    StudentDailyAttendanceService,
+  ],
 })
 export class AttendanceModule {}

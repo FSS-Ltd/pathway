@@ -1,5 +1,5 @@
 import { HttpException } from "@nestjs/common";
-import { Vertical, type Prisma } from "@prisma/client";
+import { AccessTagKey, Vertical, type Prisma } from "@prisma/client";
 import { assertCanGrantAccessTag } from "../access-tags.delegation";
 import type { RoleActorContext } from "../roles.service";
 
@@ -22,6 +22,7 @@ interface FixtureOptions {
   moduleActive?: boolean;
   permissionScope?: "organisation" | "site";
   vertical?: Vertical;
+  excludedTag?: "attendance-recorder";
 }
 
 function fixture(options: FixtureOptions = {}) {
@@ -35,6 +36,7 @@ function fixture(options: FixtureOptions = {}) {
     moduleActive = false,
     permissionScope = "site",
     vertical = Vertical.ACE_SCHOOL,
+    excludedTag,
   } = options;
   const knownKeys = permissionKeys ?? [heldKey ?? "attendance.manage"];
   const actorKeys = permissionKeys ?? (heldKey ? [heldKey] : []);
@@ -89,6 +91,13 @@ function fixture(options: FixtureOptions = {}) {
         ),
     },
     accessTagGrant: { findMany: jest.fn().mockResolvedValue([]) },
+    accessTagExclusion: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue(
+          excludedTag ? [{ tagKey: AccessTagKey.ATTENDANCE_RECORDER }] : [],
+        ),
+    },
   };
   return { tx: tx as unknown as Prisma.TransactionClient, roleFindMany };
 }
@@ -113,6 +122,19 @@ async function deniedCode(operation: Promise<unknown>): Promise<string> {
 }
 
 describe("access-tag delegation", () => {
+  it("does not let an excluded permission satisfy the head's delegation ceiling", async () => {
+    const { tx } = fixture({ excludedTag: "attendance-recorder" });
+    await expect(
+      deniedCode(
+        assertCanGrantAccessTag(
+          tx,
+          ACTOR,
+          { userId: "staff-1", tagKey: "attendance-recorder", scope: "site" },
+          NOW,
+        ),
+      ),
+    ).resolves.toBe("ACCESS_TAG_CANNOT_DELEGATE");
+  });
   it("allows an organisation head to grant a held platform capability", async () => {
     const { tx, roleFindMany } = fixture();
 

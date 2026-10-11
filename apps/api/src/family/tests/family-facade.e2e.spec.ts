@@ -31,6 +31,7 @@ describe("ACE family read facade", () => {
   let guardianAuthorization = "";
   let limitedAuthorization = "";
   let unrelatedAuthorization = "";
+  let staffAuthorization = "";
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
@@ -75,14 +76,16 @@ describe("ACE family read facade", () => {
         tenantId: siteId,
       })
     ).authorization;
-    await seedE2eAuthUser({
-      subject: `family-facade-recorder-${recorderUserId}`,
-      userId: recorderUserId,
-      tenantId: siteId,
-      siteRole: "SITE_ADMIN",
-      orgId,
-      orgRole: "ORG_MEMBER",
-    });
+    staffAuthorization = (
+      await seedE2eAuthUser({
+        subject: `family-facade-recorder-${recorderUserId}`,
+        userId: recorderUserId,
+        tenantId: siteId,
+        siteRole: "SITE_ADMIN",
+        orgId,
+        orgRole: "ORG_MEMBER",
+      })
+    ).authorization;
 
     await withTenantRlsContext(siteId, orgId, async (tx) => {
       const academicYearId = randomUUID();
@@ -264,6 +267,65 @@ describe("ACE family read facade", () => {
     expect((await request(server).get(route(siteId, childId))).status).toBe(
       401,
     );
+  });
+
+  it("denies staff and a guardian account with a student identity", async () => {
+    if (!app) return;
+    const staff = await request(app.getHttpServer())
+      .get(route(siteId, childId))
+      .set("Authorization", staffAuthorization);
+    expect(staff.status).toBe(404);
+
+    const student = await withTenantRlsContext(siteId, orgId, (tx) =>
+      tx.studentIdentity.create({
+        data: { tenantId: siteId, userId: guardianUserId },
+      }),
+    );
+    try {
+      const response = await request(app.getHttpServer())
+        .get(route(siteId, childId))
+        .set("Authorization", guardianAuthorization);
+      expect(response.status).toBe(404);
+    } finally {
+      await withTenantRlsContext(siteId, orgId, (tx) =>
+        tx.studentIdentity.delete({ where: { id: student.id } }),
+      );
+    }
+  });
+
+  it("denies a disabled parent portal and inactive guardian account", async () => {
+    if (!app) return;
+    await prisma.org.update({
+      where: { id: orgId },
+      data: { parentPortalEnabled: false },
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .get(route(siteId, childId))
+        .set("Authorization", guardianAuthorization);
+      expect(response.status).toBe(404);
+    } finally {
+      await prisma.org.update({
+        where: { id: orgId },
+        data: { parentPortalEnabled: true },
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: guardianUserId },
+      data: { isActive: false },
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .get(route(siteId, childId))
+        .set("Authorization", guardianAuthorization);
+      expect(response.status).toBe(404);
+    } finally {
+      await prisma.user.update({
+        where: { id: guardianUserId },
+        data: { isActive: true },
+      });
+    }
   });
 
   it("removes access after a relationship is revoked", async () => {

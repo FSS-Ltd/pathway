@@ -25,6 +25,7 @@ function contextHref(
 
 const childLinks = [
   { section: "ace-summary", label: "Overview" },
+  { section: "student-summary", label: "Overview" },
   { section: "attendance", label: "Attendance" },
   { section: "sessions", label: "Sessions" },
   { section: "subject-timetable", label: "Subject timetable" },
@@ -44,13 +45,22 @@ const schoolLinks = [
   route: string;
 }>;
 
-function SectionLink({ href, label }: { href: string; label: string }) {
+function SectionLink({
+  href,
+  label,
+  contextLabel,
+}: {
+  href: string;
+  label: string;
+  contextLabel: string;
+}) {
   return (
     <Link
       href={href}
       className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-medium text-accent-strong transition-colors hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-strong motion-reduce:transition-none"
     >
       {label}
+      <span className="sr-only"> {contextLabel}</span>
       <ChevronRight aria-hidden="true" className="h-4 w-4" />
     </Link>
   );
@@ -90,11 +100,14 @@ function ContextList({
                       href={
                         section === "ace-summary"
                           ? `/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/summary`
-                          : section === "subject-timetable"
-                            ? familyTimetableHref(context, "subjects")
-                            : contextHref(context, section)
+                          : section === "student-summary"
+                            ? `/ace/student/sites/${encodeURIComponent(context.siteId)}/summary`
+                            : section === "subject-timetable"
+                              ? familyTimetableHref(context, "subjects")
+                              : contextHref(context, section)
                       }
                       label={label}
+                      contextLabel={`for ${context.childName} at ${context.siteName}`}
                     />
                   ))}
               </div>
@@ -138,6 +151,7 @@ function SchoolLinksList({ contexts }: { contexts: FamilyContext[] }) {
                       key={section}
                       href={`/ace/parent/sites/${encodeURIComponent(context.siteId)}/${route}`}
                       label={label}
+                      contextLabel={`at ${context.siteName}`}
                     />
                   ))}
               </div>

@@ -670,6 +670,27 @@ model AccessTagGrant {
   @@index([orgId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
+model AccessTagExclusion {
+  id           String       @id @default(uuid())
+  orgId        String
+  tenantId     String?
+  userId       String
+  tagKey       AccessTagKey
+  excludedById String
+  revokedAt    DateTime?
+  revokedById  String?
+  createdAt    DateTime     @default(now())
+
+  org        Org     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant     Tenant? @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  user       User    @relation("AccessTagExclusionAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  excludedBy User    @relation("AccessTagExcluder", fields: [excludedById], references: [id], onDelete: Restrict)
+  revokedBy  User?   @relation("AccessTagExclusionRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([orgId, userId, revokedAt])
+  @@index([tenantId, userId, revokedAt])
+}
+
 model OutboxEvent {
   id             String   @id @default(uuid())
   orgId          String   @default(dbgenerated("app.current_org_id()"))
@@ -920,6 +941,7 @@ model Org {
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
   accessTagGrants     AccessTagGrant[]
+  accessTagExclusions AccessTagExclusion[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -951,6 +973,7 @@ model Tenant {
   pendingOrders   PendingOrder[]
   siteMemberships        SiteMembership[]
   accessTagGrants        AccessTagGrant[]
+  accessTagExclusions    AccessTagExclusion[]
   lastActiveUsers        User[]                  @relation("UserLastActiveTenant")
   staffUnavailableDates  StaffUnavailableDate[]
   staffPreferredGroups   StaffPreferredGroup[]
@@ -1078,6 +1101,7 @@ model Tenant {
 
   @@unique([id, orgId])
   @@index([orgId])
+  childRegistrationSubmissions ChildRegistrationSubmission[]
 }
 
 model UserTenantRole {
@@ -1234,6 +1258,9 @@ model User {
   accessTagGrants         AccessTagGrant[]        @relation("AccessTagGrantAssignee")
   accessTagGrantsIssued   AccessTagGrant[]        @relation("AccessTagGrantor")
   accessTagGrantsRevoked  AccessTagGrant[]        @relation("AccessTagGrantRevoker")
+  accessTagExclusions        AccessTagExclusion[] @relation("AccessTagExclusionAssignee")
+  accessTagExclusionsIssued  AccessTagExclusion[] @relation("AccessTagExcluder")
+  accessTagExclusionsRevoked AccessTagExclusion[] @relation("AccessTagExclusionRevoker")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.
@@ -1568,6 +1595,22 @@ model ChildGuardianContact {
   @@index([tenantId, contactType])
 }
 
+// Immutable snapshot of the submitted public registration. payload is encrypted at rest.
+// A child may have multiple submissions if a later registration replaces an earlier one.
+model ChildRegistrationSubmission {
+  id          String   @id @default(uuid())
+  tenantId    String
+  childId     String
+  formVersion String
+  payload     Json
+  submittedAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  child  Child  @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@index([tenantId, childId, submittedAt])
+}
+
 // allergies/additionalNeedsNotes/gpName/gpPhone/specialNeedsOther/notes are encrypted
 // at rest — see packages/db/src/pii-encryption.ts. dateOfBirth is NOT yet encrypted
 // (would require a DateTime -> String column change; tracked as a follow-up).
@@ -1595,6 +1638,7 @@ model Child {
   tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
   guardians                  User[]                      @relation("ParentChildren")
   guardianContacts           ChildGuardianContact[]
+  registrationSubmissions    ChildRegistrationSubmission[]
   groupId                    String?
   group                      Group?                      @relation(fields: [groupId], references: [id])
   disabilities               String[]                    @default([])

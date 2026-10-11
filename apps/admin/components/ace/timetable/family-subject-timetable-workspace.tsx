@@ -131,7 +131,7 @@ export function FamilySubjectTimetableView({
           ACE / Learning week
         </p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
-          {periods
+          {status === "authenticated" && periods
             ? `${periods.childName}’s subject timetable`
             : "Subject timetable"}
         </h1>
@@ -228,8 +228,14 @@ export function FamilySubjectTimetableWorkspace({
 }: {
   scope: FamilyTimetableScope;
 }) {
-  const { status } = useSession();
+  const { data, status } = useSession();
   const key =
     scope.kind === "parent" ? `${scope.siteId}:${scope.childId}` : scope.siteId;
-  return <FamilySubjectTimetableView key={key} scope={scope} status={status} />;
+  return (
+    <FamilySubjectTimetableView
+      key={`${status}:${data?.user.id ?? ""}:${key}`}
+      scope={scope}
+      status={status}
+    />
+  );
 }

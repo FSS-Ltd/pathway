@@ -341,7 +341,7 @@ passed, including the new guardian card test. Four PostgreSQL identity suites
 passed 14 E2E tests. Mobile interface work remains paused.
 
 Build step 1.3e5v ([PR #571](https://github.com/FSS-Ltd/pathway/pull/571),
-current branch `feature/ace-m16-family-read-facade`) adds
+merged on 11 October 2026) adds
 the first ACE-M16 family read facade slice and web overview. Current full
 guardian relationship, active enrolment, ACE school, account, permission, and
 tenant RLS checks guard the request. Attendance is child-scoped; notices and
@@ -350,8 +350,108 @@ Each supported section has an independent server-owned disable flag and error
 result. Homework, reports, slips, Faith, and finance remain unavailable until
 their release sources and rules exist. The
 [M16 release record](../evidence/ace-m16-family-read-facade.md) lists those
-gaps. This slice does not complete ACE-M16 or change the **43/150 (28⅔%,
-28.67%)** count. PR, CI, and merge evidence are pending.
+gaps. All eight latest-head checks passed on
+`41415cadeda0393320ff23967ff6ad4fe43c7553` (CI run 38167562322;
+CodeQL run 38167559365). The PostgreSQL integration log confirms the family
+facade HTTP suite ran: 84 suites and 515 tests passed, plus two
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+as `748dd8e4befbd95750cb69cb47eefa245d2d089b`. This slice does not
+complete ACE-M16 or change the **43/150 (28⅔%, 28.67%)** count.
+
+Build step 1.3e5w ([PR #572](https://github.com/FSS-Ltd/pathway/pull/572),
+merged on 11 October 2026) adds
+direct family-summary denials for site staff, student identities, a disabled
+parent portal, and inactive guardian accounts. The family web landing gives
+repeated child and school links distinct accessible names while retaining
+their visible labels. This is web/API evidence toward ACE-M20, not full M20
+sign-off; signed-in browser screen-reader checks and mobile baselines remain
+open. All eight latest-head checks passed on
+`e77b3d926c514058106ebfa7b6c86dfdb068c5e5` (CI run 38169068895;
+CodeQL run 38169066051). The PostgreSQL integration log confirms the family
+facade HTTP suite ran: 84 suites and 517 tests passed, plus two
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+as `19811c6f96b6f15c111dcbc9928ec06441b9371f`. The master-plan count
+stays **43/150 (28⅔%, 28.67%)**.
+
+Build step 1.3e5x ([PR #574](https://github.com/FSS-Ltd/pathway/pull/574),
+branch `feature/ace-student-self-web-facade`) adds a
+self-only ACE student summary API and web overview. The summary derives its
+single child from the current student identity link, requires an active school
+enrolment and enabled student portal, and rechecks access after reading. It
+shows existing self-scoped daily attendance and advertises the overview only
+to eligible students. Homework, PACE, Faith, reports, slips, and Community
+remain unavailable until their student release rules and readers are ready.
+The [M17 release record](../evidence/ace-m17-student-self-web-facade.md)
+lists the remaining full-task gaps. This is a web slice of ACE-M17, not full
+M17 completion; the verified master-plan count remains **43/150 (28⅔%,
+28.67%)**. All eight latest-head checks passed on
+`3c8cf5a1302b8fe909ef9d7a92b959f4cd8e9735` (CI run 38171507247;
+CodeQL run 38171503470). The PostgreSQL integration log confirms the
+student-self HTTP suite ran: 85 E2E suites and 524 tests passed, plus two
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+on 11 October 2026 as `ee0fd874647bc833a01be7151b175b60da5f5916`.
+Mobile work remains paused.
+
+Build step 1.3e5y ([PR #575](https://github.com/FSS-Ltd/pathway/pull/575),
+branch `feature/ace-web-security-gate`) extends the
+[ACE-M20 web security evidence](../evidence/ace-family-messaging-release-gate.md)
+with direct HTTP probes for unjoined and wrong-site message writes and read
+cursors, a message sequence from a different conversation, disabled accounts,
+and revoked parent and staff access across direct routes. Denied operations
+must leave messages and read cursors unchanged. This remains a web/API slice
+of ACE-M20; signed-in browser accessibility evidence and paused mobile
+baselines are still open. The master-plan count stays **43/150 (28⅔%,
+28.67%)**. All eight latest-head checks passed on
+`fa9f63f04bb9fb45909a72ce64b96858023c40e7` (CI run 38173591420;
+CodeQL run 38173588522). The PostgreSQL integration log confirms the
+family-messaging-security HTTP suite ran: 85 E2E suites and 527 tests passed,
+plus two single-connection suites and 13 tests. GitHub confirmed the merge to
+`master` on 11 October 2026 at 20:56 UTC as
+`1c44a281bbabb10547a77b24adf7a4c11c7c54e6`.
+
+Build step 1.3e5z ([PR #576](https://github.com/FSS-Ltd/pathway/pull/576),
+branch `fix/ace-web-account-boundary`) closes a web session
+boundary for the shared admin session adapter and ACE family routes. A Clerk
+account change must immediately hide the prior API identity; family deep-link
+views and invitations must discard state on account, session, or route change.
+Signed-out timetable headings must not retain a child's name. This is a web
+security slice of ACE-M20 and ACE-M18, not full completion of either task;
+mobile baselines and signed-in browser accessibility evidence remain open.
+The verified master-plan count remains **43/150 (28⅔%, 28.67%)**. All eight
+latest-head checks passed on `ba40f7cf8f7cae60c490c81166b6519223ce2856`
+(CI run 38178783370; CodeQL run 38178779023). GitHub confirmed the merge
+to `master` on 11 October 2026 at 22:16 UTC as
+`7beba35a2a90c98844231055a0fe628a5f3e8697`.
+
+Build step 1.3e6a ([PR #577](https://github.com/FSS-Ltd/pathway/pull/577),
+branch `feature/ace-family-child-navigation-web`) adds
+child context and switching to the guardian overview, attendance, sessions,
+and subject timetable web routes. The switcher derives current school and
+child links from the existing family-context API, filters each route to its
+released section, and excludes student identities and other schools. A
+failed navigation read does not disable an otherwise permitted page; direct
+page APIs continue to enforce their own access rules. This is a web slice of
+ACE-M18, not full M18 completion. The verified master-plan count remains
+**43/150 (28⅔%, 28.67%)**.
+
+All eight latest-head checks for step 1.3e6a passed on
+`6d03a5f13886612a14c97cc24fd31faaf7c7243e` (CI run 38180583121;
+CodeQL run 38180580520). The PostgreSQL integration job ran the family
+contexts HTTP suite: 85 E2E suites and 527 tests passed, plus two
+single-connection suites and 13 tests. GitHub confirmed PR #577 merged to
+`master` on 11 October 2026 at 22:40 UTC as
+`c137c9228b3720d775059790c40cb4a073fd6d33`.
+
+Build step 1.3e6b ([PR #579](https://github.com/FSS-Ltd/pathway/pull/579),
+open against `master`) is the ACE-M01 shared recipient policy and web/API
+messaging contract. It applies one pure, tested participant decision to parent-staff,
+staff-direct, and staffroom creation while preserving the current site,
+relationship, responder-capability, and RLS checks. The shared DTO schemas
+match the existing inbox, history, compose, cursor, and recipient responses;
+student direct messaging is absent from the conversation kind type and schema.
+Local verification passed. Current-head CI and merge evidence are pending. The
+verified master-plan count remains **43/150 (28⅔%, 28.67%)** until this step
+passes CI and merges.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

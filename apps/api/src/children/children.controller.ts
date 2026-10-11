@@ -15,7 +15,7 @@ import {
   Header,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
-import { CurrentTenant } from "@pathway/auth";
+import { CurrentOrg, CurrentTenant } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { ChildrenService } from "./children.service";
 import { createChildSchema, CreateChildDto } from "./dto/create-child.dto";
@@ -63,6 +63,23 @@ export class ChildrenController {
     }
     res.setHeader("Content-Type", result.contentType);
     res.send(result.buffer);
+  }
+
+  @Get(":id/registration")
+  async getRegistration(
+    @Param("id") id: string,
+    @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    this.assertStaff(req);
+    if (!req.authUserId) throw new ForbiddenException("Staff access required");
+    return this.childrenService.getRegistration(
+      id,
+      tenantId,
+      orgId,
+      req.authUserId,
+    );
   }
 
   @Get(":id")

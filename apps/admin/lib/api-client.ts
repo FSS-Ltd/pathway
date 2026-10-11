@@ -3096,6 +3096,79 @@ const mapApiChildDetailToAdmin = (c: ApiChildDetail): AdminChildDetail => ({
   })),
 });
 
+export type AdminChildRegistration = {
+  id: string;
+  formVersion: string;
+  submittedAt: string;
+  snapshot: {
+    household: { homeAddress: string | null };
+    guardian: {
+      name: string;
+      email: string;
+      phone: string;
+      relationship: string | null;
+    };
+    emergencyContacts: Array<{
+      name: string;
+      phone: string;
+      relationship: string | null;
+      secondaryPhone?: string | null;
+      email?: string | null;
+      canPickUp?: boolean;
+      identificationNote?: string | null;
+    }>;
+    pickupContacts: Array<{
+      name: string;
+      phone: string;
+      relationship: string | null;
+      secondaryPhone?: string | null;
+      email?: string | null;
+      canPickUp?: boolean;
+      identificationNote?: string | null;
+    }>;
+    care: {
+      homeLanguage: string | null;
+      medicalConditions: string | null;
+      medicationAtCentre: string | null;
+      dietaryRestrictions: string | null;
+      learningSupport: string | null;
+      interestsStrengths: string | null;
+      settlingComfortNotes: string | null;
+      allergies: string | null;
+      additionalNeedsNotes: string | null;
+      gpName: string | null;
+      gpPhone: string | null;
+      schoolName: string | null;
+      yearGroup: string | null;
+      specialNeedsType: string | null;
+      specialNeedsOther: string | null;
+      pickupPermissions: string | null;
+      photoConsent: boolean;
+    };
+    registrationLevel: string | null;
+    consents: Record<
+      string,
+      { wording: string; granted: boolean; initials: string }
+    >;
+  };
+};
+
+export async function fetchChildRegistration(
+  childId: string,
+): Promise<AdminChildRegistration | null> {
+  if (isUsingMockApi()) return null;
+  const response = await fetch(
+    `${API_BASE_URL}/children/${encodeURIComponent(childId)}/registration`,
+    {
+      headers: buildAuthHeaders(),
+      cache: "no-store",
+    },
+  );
+  if (!response.ok)
+    throw new Error(`Unable to load registration (${response.status}).`);
+  return (await response.json()) as AdminChildRegistration | null;
+}
+
 export async function fetchChildById(
   id: string,
 ): Promise<AdminChildDetail | null> {

@@ -213,6 +213,16 @@ describe("staff direct conversations", () => {
     expect(tx.messageConversation.create).not.toHaveBeenCalled();
   });
 
+  it("rejects a recipient who also has a student identity", async () => {
+    const { tx, service } = setup();
+    tx.studentIdentity.findUnique.mockResolvedValueOnce(null);
+    tx.studentIdentity.findUnique.mockResolvedValueOnce({ id: "student-a" });
+    await expect(service.openStaffDirect(actor, input)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(tx.messageConversation.create).not.toHaveBeenCalled();
+  });
+
   it("reuses an existing pair under the pair lock", async () => {
     const { tx, service } = setup();
     tx.messageConversation.findFirst.mockResolvedValue({ id: "existing" });
@@ -426,6 +436,18 @@ describe("site staff room", () => {
     await expect(service.openStaffRoom(actor)).rejects.toHaveProperty(
       "status",
       409,
+    );
+    expect(tx.messageConversation.create).not.toHaveBeenCalled();
+  });
+
+  it("does not create a staff room if the actor left after the access check", async () => {
+    const { tx, service } = setup();
+    tx.siteMembership.findMany.mockResolvedValue([
+      { userId: recipientUserId },
+      { userId: "another-current-staff" },
+    ]);
+    await expect(service.openStaffRoom(actor)).rejects.toBeInstanceOf(
+      NotFoundException,
     );
     expect(tx.messageConversation.create).not.toHaveBeenCalled();
   });

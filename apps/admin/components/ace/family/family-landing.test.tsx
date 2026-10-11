@@ -102,7 +102,12 @@ async function run() {
                       ? undefined
                       : mode === "partial"
                         ? ["attendance"]
-                        : ["attendance", "sessions", "subject-timetable"],
+                        : [
+                            "student-summary",
+                            "attendance",
+                            "sessions",
+                            "subject-timetable",
+                          ],
                 },
               ],
       }),
@@ -127,8 +132,29 @@ async function run() {
       [
         "/ace/parent/sites/school-one/children/child-one/summary",
         "/ace/parent/sites/school-one/children/child-three/summary",
+        "/ace/student/sites/school-two/summary",
       ],
     );
+    assert.deepEqual(
+      Array.from(container.querySelectorAll('a[href$="/summary"]')).map(
+        (anchor) => anchor.textContent?.replace(/\s+/g, " ").trim(),
+      ),
+      [
+        "Overview for Ari Alpha at Alpha School",
+        "Overview for Cia Alpha at Alpha School",
+        "Overview for Bea Bravo at Bravo School",
+      ],
+    );
+    assert.equal(
+      container.querySelector('a[href$="/summary"]')?.querySelector(".sr-only")
+        ?.textContent,
+      " for Ari Alpha at Alpha School",
+    );
+    const overview = container.querySelector<HTMLAnchorElement>(
+      'a[href$="/summary"]',
+    );
+    assert.ok(overview);
+    assert.equal(overview.tabIndex, 0);
     assert.deepEqual(
       Array.from(container.querySelectorAll("a[href*='/attendance']")).map(
         (anchor) => anchor.getAttribute("href"),
@@ -164,6 +190,10 @@ async function run() {
         (anchor) => anchor.getAttribute("href"),
       ),
       ["/ace/parent/sites/school-one/messages"],
+    );
+    assert.match(
+      container.querySelector('a[href$="/messages"]')?.textContent ?? "",
+      /Messages at Alpha School/,
     );
     assert.deepEqual(
       Array.from(container.querySelectorAll('a[href$="/notices"]')).map(

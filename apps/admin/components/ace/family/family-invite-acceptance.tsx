@@ -4,7 +4,7 @@ import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { Button, Card } from "@pathway/ui";
-import { useSession } from "@/lib/use-session-compat";
+import { useSession, type SessionStatus } from "@/lib/use-session-compat";
 import {
   acceptGuardianInvite,
   getGuardianInviteForRecipient,
@@ -46,17 +46,47 @@ export function FamilyInviteAcceptance({ kind }: { kind: InviteKind }) {
     siteId: string;
     inviteId: string;
   }>();
+  const { data, status } = useSession();
+  return (
+    <FamilyInviteAcceptanceView
+      key={`${kind}:${status}:${data?.user.id ?? ""}:${siteId}:${inviteId}`}
+      kind={kind}
+      siteId={siteId}
+      inviteId={inviteId}
+      status={status}
+    />
+  );
+}
+
+function FamilyInviteAcceptanceView({
+  kind,
+  siteId,
+  inviteId,
+  status,
+}: {
+  kind: InviteKind;
+  siteId: string;
+  inviteId: string;
+  status: SessionStatus;
+}) {
   const router = useRouter();
   const { redirectToSignIn, signOut } = useClerk();
-  const { status } = useSession();
   const [invite, setInvite] = React.useState<GuardianInviteForRecipient | null>(
     null,
   );
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const activeView = React.useRef(true);
   const actions = inviteActions[kind];
   const returnTo = `/${actions.path}/${encodeURIComponent(siteId)}/${encodeURIComponent(inviteId)}`;
+
+  React.useEffect(() => {
+    activeView.current = true;
+    return () => {
+      activeView.current = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (status !== "authenticated") return;
@@ -90,9 +120,12 @@ export function FamilyInviteAcceptance({ kind }: { kind: InviteKind }) {
     setError(null);
     try {
       if (!invite?.acceptedAt) await actions.accept(siteId, inviteId);
+      if (!activeView.current) return;
       await setActiveSite(siteId);
+      if (!activeView.current) return;
       router.push("/ace/family");
     } catch (cause) {
+      if (!activeView.current) return;
       setError(
         cause instanceof Error
           ? cause.message

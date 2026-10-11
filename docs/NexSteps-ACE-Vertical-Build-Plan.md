@@ -461,6 +461,10 @@ Replace Capability = string with a const registry and derived union. Make vertic
 
 - role changes are versioned, audited, and invalidate effective-access caches immediately or within a documented 60-second maximum.
 
+- platform-owned access tags have a complete role-coverage matrix. An individual exclusion subtracts every mapped permission from ordinary roles and tag grants in its organisation or site scope until explicitly revoked. Organisation exclusions apply across sites; platform superusers remain exempt. Empty or unsupported tag mappings grant nothing.
+
+- badge state changes require an Organisation Head, an explicit site or organisation scope, a current revision, transactional audit/outbox evidence, and a stable request ID for idempotent retries. A site-level enable action cannot clear an overlapping organisation exclusion. Return blocking sources instead.
+
 ## 5.4 Authorisation formula
 
 ```text
@@ -798,6 +802,10 @@ GET/POST /access/assignments
 DELETE /access/assignments/:assignmentId
 GET /access/users/:userId/effective-permissions
 GET /access/users/:userId/access-summary
+GET /access/users?limit=10&cursor=:userId&search=:query&roleDefinitionId=:id
+GET /access/tags/matrix
+GET /access/tags/users/:userId/matrix
+PUT /access/tags/users/:userId/:tagKey
 GET /access/audit
 ```
 

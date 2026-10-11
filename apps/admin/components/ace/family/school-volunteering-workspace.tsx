@@ -315,6 +315,12 @@ export function SchoolVolunteeringView({
 }
 
 export function SchoolVolunteeringWorkspace({ siteId }: { siteId: string }) {
-  const { status } = useSession();
-  return <SchoolVolunteeringView siteId={siteId} status={status} />;
+  const { data, status } = useSession();
+  return (
+    <SchoolVolunteeringView
+      key={`${status}:${data?.user.id ?? ""}:${siteId}`}
+      siteId={siteId}
+      status={status}
+    />
+  );
 }

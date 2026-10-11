@@ -11,6 +11,19 @@ export type SignupPreflightResult = {
   displayName?: string;
 };
 
+export type RegistrationConsentKey =
+  | "contact"
+  | "emergencyMedical"
+  | "localActivities"
+  | "photoVideo"
+  | "accuracy"
+  | "dataProcessing"
+  | "firstAid";
+export type RegistrationConsentDecision = {
+  granted: boolean;
+  initials: string;
+};
+
 export type PublicSignupConfig = {
   orgName: string;
   siteName: string;
@@ -18,6 +31,8 @@ export type PublicSignupConfig = {
   parentPortalEnabled: boolean;
   requiredConsents: string[];
   formVersion: string;
+  consentWording: Record<RegistrationConsentKey, string>;
+  aceRegistrationLevels?: readonly string[];
 };
 
 export type PublicSignupSubmitPayload = {
@@ -33,6 +48,17 @@ export type PublicSignupSubmitPayload = {
     name: string;
     phone: string;
     relationship?: string;
+    secondaryPhone?: string;
+    email?: string;
+    canPickUp?: boolean;
+  }>;
+  homeAddress: string;
+  formVersion: string;
+  pickupContacts?: Array<{
+    name: string;
+    phone: string;
+    relationship?: string;
+    identificationNote?: string;
   }>;
   children: Array<{
     firstName: string;
@@ -53,10 +79,19 @@ export type PublicSignupSubmitPayload = {
     photoBase64?: string;
     photoContentType?: string;
     pickupPermissions?: string;
+    homeLanguage?: string;
+    medicalConditions?: string;
+    medicationAtCentre?: string;
+    dietaryRestrictions?: string;
+    learningSupport?: string;
+    interestsStrengths?: string;
+    settlingComfortNotes?: string;
+    registrationLevel?: string;
   }>;
   consents: {
     dataProcessingConsent: boolean;
     firstAidConsent?: boolean;
+    registration: Record<RegistrationConsentKey, RegistrationConsentDecision>;
   };
 };
 
@@ -77,7 +112,10 @@ export type PublicSignupContactOnlyPayload = Omit<
  * Clerk client-side first (useSignIn()) and this call is made with that
  * session's bearer token instead.
  */
-export type ExistingUserSignupPayload = Omit<PublicSignupSubmitPayload, "parent"> & {
+export type ExistingUserSignupPayload = Omit<
+  PublicSignupSubmitPayload,
+  "parent"
+> & {
   parent: {
     fullName: string;
     email: string;
@@ -93,7 +131,10 @@ export async function signupPreflight(
   const res = await fetch(`${API_BASE_URL}/public/signup/preflight`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ inviteToken: token, email: email.trim().toLowerCase() }),
+    body: JSON.stringify({
+      inviteToken: token,
+      email: email.trim().toLowerCase(),
+    }),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -108,19 +149,22 @@ export async function linkChildrenExistingUser(
   childIds: string[],
   authHeaders: HeadersInit,
 ): Promise<{ success: true; linkedCount: number }> {
-  const res = await fetch(`${API_BASE_URL}/parents/link-children-existing-user`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders,
+  const res = await fetch(
+    `${API_BASE_URL}/parents/link-children-existing-user`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeaders,
+      },
+      credentials: "include",
+      body: JSON.stringify({
+        inviteToken: token,
+        children: childIds.map((childId) => ({ childId })),
+      }),
+      cache: "no-store",
     },
-    credentials: "include",
-    body: JSON.stringify({
-      inviteToken: token,
-      children: childIds.map((childId) => ({ childId })),
-    }),
-    cache: "no-store",
-  });
+  );
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || "Failed to link children");
@@ -162,12 +206,18 @@ export async function submitExistingUserSignup(
   payload: ExistingUserSignupPayload,
   token: string,
 ): Promise<{ success: true; message: string }> {
-  const res = await fetch(`${API_BASE_URL}/public/signup/submit-existing-user`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `${API_BASE_URL}/public/signup/submit-existing-user`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    },
+  );
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(text || "Registration failed. Please try again.");

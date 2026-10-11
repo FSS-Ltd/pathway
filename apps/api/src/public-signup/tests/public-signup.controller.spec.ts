@@ -31,7 +31,9 @@ describe("PublicSignupController", () => {
       .overrideGuard(VerifiedPrincipalGuard)
       .useValue({
         canActivate: (context: ExecutionContext) => {
-          const req = context.switchToHttp().getRequest<RequestWithVerifiedPrincipal>();
+          const req = context
+            .switchToHttp()
+            .getRequest<RequestWithVerifiedPrincipal>();
           req.verifiedPrincipal = verifiedPrincipal;
           return true;
         },
@@ -70,7 +72,7 @@ describe("PublicSignupController", () => {
         siteName: "Test Site",
         siteTimezone: "Europe/London",
         requiredConsents: ["data_processing"],
-        formVersion: "1.0",
+        formVersion: "2.0",
       };
       serviceMock.getConfig.mockResolvedValue(config);
 
@@ -158,7 +160,9 @@ describe("PublicSignupController", () => {
     it("returns 400 when service throws BadRequestException", async () => {
       const body = { ...validBody, consents: { dataProcessingConsent: false } };
       const { BadRequestException } = await import("@nestjs/common");
-      serviceMock.submit.mockRejectedValueOnce(new BadRequestException("Data processing consent is required"));
+      serviceMock.submit.mockRejectedValueOnce(
+        new BadRequestException("Data processing consent is required"),
+      );
 
       await request(app.getHttpServer())
         .post("/public/signup/submit")
@@ -233,14 +237,19 @@ describe("PublicSignupController", () => {
         .send(validBody)
         .expect(201);
 
-      expect(serviceMock.submitExistingUser).toHaveBeenCalledWith(validBody, verifiedPrincipal);
+      expect(serviceMock.submitExistingUser).toHaveBeenCalledWith(
+        validBody,
+        verifiedPrincipal,
+      );
       expect(res.body.success).toBe(true);
     });
 
     it("returns 400 when the service reports no matching account", async () => {
       const { BadRequestException } = await import("@nestjs/common");
       serviceMock.submitExistingUser.mockRejectedValueOnce(
-        new BadRequestException("Account not found. Please sign in via the app first, or use a different email."),
+        new BadRequestException(
+          "Account not found. Please sign in via the app first, or use a different email.",
+        ),
       );
 
       await request(app.getHttpServer())

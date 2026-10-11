@@ -60,6 +60,14 @@ const SAFE_MESSAGES: Readonly<Record<string, string>> = {
   ACCESS_TAG_ALREADY_GRANTED: "This access tag has already been granted.",
   ACCESS_TAG_GRANT_NOT_FOUND: "The access-tag grant was not found.",
   ACCESS_TAG_ALREADY_REVOKED: "This access-tag grant is already revoked.",
+  BADGE_STATE_CONFLICT:
+    "This badge was changed by another request. Refresh and try again.",
+  BADGE_BLOCKED_BY_EXCLUSION:
+    "Another badge exclusion still blocks one or more permissions.",
+  ACCESS_TAG_SUPERUSER_EXEMPT:
+    "Platform superusers are exempt from individual badge changes.",
+  ACCESS_TAG_INVALID_SCOPE:
+    "This badge is not available in the selected scope.",
 };
 
 export function roleApiError(

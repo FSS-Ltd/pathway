@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { AccessTagKey } from "@prisma/client";
 import { Test, type TestingModule } from "@nestjs/testing";
 import {
   applyTenantContext,
@@ -273,6 +274,9 @@ describe("effective permission RLS resolution", () => {
 
   afterAll(async () => {
     if (isDatabaseAvailable()) {
+      await prisma.accessTagExclusion.deleteMany({
+        where: { orgId: fixture.orgA },
+      });
       await prisma.userRoleAssignment.deleteMany({
         where: {
           roleDefinitionId: {
@@ -369,6 +373,40 @@ describe("effective permission RLS resolution", () => {
       reason: "allowed",
       sourceRoleIds: [fixture.orgARole],
     });
+  });
+
+  it("subtracts an organisation exclusion from a role under RLS", async () => {
+    if (!service) return;
+    const exclusion = await prisma.accessTagExclusion.create({
+      data: {
+        id: randomUUID(),
+        orgId: fixture.orgA,
+        userId: fixture.allowedUser,
+        tagKey: AccessTagKey.PACE_FULL_ACCESS,
+        excludedById: fixture.allowedUser,
+      },
+    });
+    try {
+      await expect(
+        service.resolve({
+          userId: fixture.allowedUser,
+          orgId: fixture.orgA,
+          permission: "ace.pace.read",
+          now: NOW,
+        }),
+      ).resolves.toEqual({
+        allowed: false,
+        reason: "permission-missing",
+        sourceRoleIds: [],
+      });
+      await expect(
+        withRoleRlsOrgContext(fixture.orgB, (tx) =>
+          tx.accessTagExclusion.findMany({ where: { orgId: fixture.orgA } }),
+        ),
+      ).resolves.toEqual([]);
+    } finally {
+      await prisma.accessTagExclusion.delete({ where: { id: exclusion.id } });
+    }
   });
 
   it("reads uncommitted retirement changes instead of a cached assignment", async () => {

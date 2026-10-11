@@ -7,4 +7,9 @@ describe("@pathway/platform barrel exports", () => {
     expect(typeof platform.getOrgCapabilities).toBe("function");
     expect(typeof platform.orgHasCapability).toBe("function");
   });
+
+  it("exports shared messaging contracts and recipient policy", () => {
+    expect(typeof platform.canStartConversation).toBe("function");
+    expect(platform.composeMessageSchema.safeParse({}).success).toBe(false);
+  });
 });

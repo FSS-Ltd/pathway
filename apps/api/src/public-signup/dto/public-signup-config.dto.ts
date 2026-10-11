@@ -9,5 +9,7 @@ export class PublicSignupConfigDto {
   /** e.g. ["photo", "emergency_contact", "data_processing"] */
   requiredConsents!: string[];
   formVersion!: string;
+  consentWording!: Record<string, string>;
+  aceRegistrationLevels?: readonly string[];
   parentPortalEnabled!: boolean;
 }

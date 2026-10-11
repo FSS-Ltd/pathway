@@ -77,3 +77,57 @@ database participant and sequence checks; the latter needs a separate gate if
 realtime is introduced. Full ACE-M20 sign-off still needs the remaining access
 matrix, signed-in web keyboard and screen-reader checks, and the mobile work
 that the product owner paused.
+
+## Family summary and web link follow-up (step 1.3e5w, [PR #572](https://github.com/FSS-Ltd/pathway/pull/572))
+
+The family facade HTTP suite extends the release matrix with staff without a
+guardian relationship, a guardian account that also has a student identity,
+the disabled parent portal, and an inactive guardian account. Each direct
+summary request must return no child data. The tests restore changed policy
+and account state so later cases prove current access independently.
+
+The family landing keeps the short visible labels that fit the existing card
+layout. Each repeated child link includes the child's and school's names in
+screen-reader text; each school link includes the school name. The component
+test checks distinct link text and normal keyboard tab stops for a two-child
+household. A signed-in browser screen-reader and keyboard session remains
+required before the full ACE-M20 release gate can be claimed. Mobile work
+remains paused.
+
+## Direct message route follow-up (step 1.3e5y)
+
+The PostgreSQL HTTP suite now probes sends and read cursors using an unjoined
+staff conversation, an unjoined guardian conversation, and a valid conversation
+ID under another school's route. Each request is denied without storing a
+message or cursor. It also sends real messages to two conversations, then
+checks that a sequence existing only in the other conversation cannot advance
+the current participant's read cursor.
+
+The suite checks that a disabled staff or guardian account loses direct
+history, send, and read-cursor access. When the parent portal is disabled or
+the guardian relationship ends, the parent list and direct routes return 404;
+denied sends leave the stored-message count unchanged. Removed staff also lose
+recipient, school-team, history, send, and read-cursor access even if a typed
+messaging permission remains. The local disposable PostgreSQL run executed all
+eight suite cases successfully. Full ACE-M20 sign-off still requires the
+signed-in web keyboard and screen-reader check and the paused mobile baselines.
+
+## Web account-bound view state (step 1.3e5z)
+
+The shared admin session adapter masks its previous verified API identity on
+the first render after a Clerk account change, before the session effect can
+clear its state. ACE family deep-link views and invitation acceptance are
+keyed to the current account and session status so their local data, forms,
+and pending UI state cannot carry into another account. Timetable headings
+also hide the prior child's name as soon as the session is no longer
+authenticated. An invitation acceptance that finishes after its account-bound
+view unmounts cannot continue to change the active site or navigate.
+
+The session regression records every render across an account change and
+rejects any frame containing the previous API identity. The timetable web
+test loads a child's sessions, switches to another Clerk account while its
+token is pending, and verifies that the old child's name and sessions vanish
+before the new account's request returns. The signed-out timetable tests
+check that a previous child's name is absent. This is component-level web
+evidence; signed-in browser keyboard and screen-reader checks and mobile
+baselines remain required for the full ACE-M20 gate.
