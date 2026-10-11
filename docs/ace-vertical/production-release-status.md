@@ -237,9 +237,10 @@ the merge to `master` as `5b35f5884b1cb90770f0d8d206ee15cffc2ce23b`
 on 11 October 2026. Mobile work remains paused. The exact master-plan count
 remains **42/150 (28%)** while ACE-M20 is open.
 
-Build step 1.3e5q is the shared staff administration security fix on
-`feature/ace-staff-administration-security`. It closes a route-level IDOR in
-staff detail reads and edits, limits those routes and assignment lookup to
+Build step 1.3e5q ([PR #566](https://github.com/FSS-Ltd/pathway/pull/566),
+merged on 11 October 2026) is the shared staff administration security fix.
+It closes a route-level IDOR in staff detail reads and edits, limits those
+routes and assignment lookup to
 current site leaders and organisation admins, reserves global account status,
 site role, and serve-access changes for organisation admins, scopes staff
 profile children to the selected site, and audits account status changes in
@@ -250,9 +251,23 @@ unavailable to site leaders. This uses the existing roles while the distinct
 separate permissions migration. The PostgreSQL HTTP E2E ran and passed all
 three cases; 178 API unit suites (1,301 tests), admin tests, API/admin
 typechecks, lint, builds, targeted formatting, and Graphify passed locally.
-Latest-head CI and merge evidence are pending; the step is not complete.
-The master-plan count remains **42/150 (28%)** until a complete plan task is
-evidenced and merged.
+All eight latest-head checks passed on
+`848681f8606ab591804e6b48be5d4f8243896d81` (CI run 38156816546;
+CodeQL run 38156808805). The Integration Tests log confirms the staff
+administration security database E2E ran: 83 suites and 505 tests passed,
+plus 2 single-connection suites and 13 tests. GitHub confirmed the merge to
+`master` as `d4f2f9f1c27dca35055d59fe80e9fb156a93f159`. The master-plan
+count remains **42/150 (28%)** because the remaining ACE-M15 and M20 work is
+not yet complete.
+
+Build step 1.3e5r is the next web family access gate. It adds real HTTP probes
+for staff membership removal, parent notice IDs, guardian and student invitation
+IDs, and child edit IDs across account and site boundaries. The
+[web security evidence record](../evidence/ace-family-messaging-release-gate.md)
+lists what these probes cover and what remains for ACE-M20. The four affected
+PostgreSQL HTTP suites passed (18 tests) locally; API typecheck, lint, build,
+formatting, and Graphify passed. Mobile remains paused. CI, PR, and merge
+evidence are pending; this step is not complete.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

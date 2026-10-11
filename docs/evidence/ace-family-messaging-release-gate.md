@@ -54,3 +54,26 @@ from a previous account are absent during the next account's loading state.
 
 **Rollback:** revert the account-bound family landing change independently;
 the existing server-side access rules and stored messages remain intact.
+
+## Follow-up web ID and membership probes (step 1.3e5r)
+
+The follow-up database HTTP suites exercise these access boundaries without
+changing production authorization behavior:
+
+All four affected suites ran against disposable PostgreSQL locally and passed
+(18 tests). API typecheck, lint, build, formatting, and Graphify also passed.
+
+| Resource or change                                                | Probe                                                           | Required result                |
+| ----------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------ |
+| Staff membership removed while a messaging permission tag remains | Staff conversation list, known conversation history, and send   | Denied; no message stored      |
+| Staff-only notice ID                                              | Guardian detail, read, acknowledgement, and another-site detail | Hidden                         |
+| Guardian invitation ID                                            | Other signed-in account and another real site                   | Hidden                         |
+| Student invitation ID                                             | Other signed-in account and another school site                 | Hidden                         |
+| Unlinked child ID                                                 | Guardian detail and edit                                        | Hidden; child record unchanged |
+
+The current web API has conversation-ID and message-sequence routes, but no
+standalone message-ID route or realtime-topic claim endpoint. The former has
+database participant and sequence checks; the latter needs a separate gate if
+realtime is introduced. Full ACE-M20 sign-off still needs the remaining access
+matrix, signed-in web keyboard and screen-reader checks, and the mobile work
+that the product owner paused.

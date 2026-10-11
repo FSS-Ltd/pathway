@@ -322,6 +322,27 @@ describe("ACE notice draft API", () => {
     );
     expect(stored.notice?.publishedAt).not.toBeNull();
 
+    const parentPath = `/ace/parent/sites/${siteId}/notices/${created.body.id}`;
+    for (const path of [
+      parentPath,
+      `${parentPath}/read`,
+      `${parentPath}/acknowledge`,
+    ]) {
+      const response =
+        path === parentPath
+          ? await request(app.getHttpServer())
+              .get(path)
+              .set("Authorization", guardianAuthorization)
+          : await request(app.getHttpServer())
+              .post(path)
+              .set("Authorization", guardianAuthorization);
+      expect(response.status).toBe(404);
+    }
+    const wrongSite = await request(app.getHttpServer())
+      .get(`/ace/parent/sites/${otherSiteId}/notices/${created.body.id}`)
+      .set("Authorization", guardianAuthorization);
+    expect(wrongSite.status).toBe(404);
+
     await prisma.siteMembership.delete({
       where: { tenantId_userId: { tenantId: siteId, userId: managerId } },
     });
