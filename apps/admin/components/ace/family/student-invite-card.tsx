@@ -132,7 +132,7 @@ export function StudentInviteCard({ childId }: { childId: string }) {
     if (busy) return;
     const confirmation =
       action === "resend"
-        ? "I confirm this student account still meets the school’s age and safeguarding policy. Resend the invitation?"
+        ? "I confirm the school still approves this student’s account under its age, consent, and safeguarding policy. Resend the invitation?"
         : "Revoke this pending student invitation?";
     if (!window.confirm(confirmation)) return;
     setBusy(true);
@@ -252,8 +252,8 @@ export function StudentInviteCard({ childId }: { childId: string }) {
                   className="mt-1"
                 />
                 <span>
-                  I confirmed this student account meets the school’s age and
-                  safeguarding policy.
+                  I confirm the school approved this student’s account under its
+                  age, consent, and safeguarding policy.
                 </span>
               </label>
               <Button
