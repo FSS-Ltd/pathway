@@ -1,4 +1,5 @@
 import { HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { SYSTEM_ROLE_TEMPLATES } from "@pathway/auth";
 import {
   ACCESS_TAG_DEFINITIONS,
   isAccessTagAvailable,
@@ -105,46 +106,90 @@ export class BadgeMatrixService {
           { tenantId: null },
           ...(actor.tenantId ? [{ tenantId: actor.tenantId }] : []),
         ];
-        const [assignments, grants, exclusions] = await Promise.all([
-          tx.userRoleAssignment.findMany({
-            where: {
-              orgId: actor.orgId,
-              userId,
-              revokedAt: null,
-              startsAt: { lte: now },
-              AND: [
-                { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-                { OR: scopes },
-              ],
-              roleDefinition: { isActive: true, OR: scopes },
-            },
-            select: {
-              id: true,
-              roleDefinitionId: true,
-              tenantId: true,
-              startsAt: true,
-              expiresAt: true,
-            },
-          }),
-          tx.accessTagGrant.findMany({
-            where: {
-              orgId: actor.orgId,
-              userId,
-              revokedAt: null,
-              startsAt: { lte: now },
-              AND: [
-                { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-                { OR: scopes },
-              ],
-            },
-            select: { id: true, tagKey: true, tenantId: true, expiresAt: true },
-          }),
-          tx.accessTagExclusion.findMany({
-            where: { orgId: actor.orgId, userId, revokedAt: null, OR: scopes },
-            select: { id: true, tagKey: true, tenantId: true },
-          }),
-        ]);
-        return { user: member.user, assignments, grants, exclusions };
+        const [assignments, grants, exclusions, actorHead, targetSite] =
+          await Promise.all([
+            tx.userRoleAssignment.findMany({
+              where: {
+                orgId: actor.orgId,
+                userId,
+                revokedAt: null,
+                startsAt: { lte: now },
+                AND: [
+                  { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+                  { OR: scopes },
+                ],
+                roleDefinition: { isActive: true, OR: scopes },
+              },
+              select: {
+                id: true,
+                roleDefinitionId: true,
+                tenantId: true,
+                startsAt: true,
+                expiresAt: true,
+              },
+            }),
+            tx.accessTagGrant.findMany({
+              where: {
+                orgId: actor.orgId,
+                userId,
+                revokedAt: null,
+                startsAt: { lte: now },
+                AND: [
+                  { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+                  { OR: scopes },
+                ],
+              },
+              select: {
+                id: true,
+                tagKey: true,
+                tenantId: true,
+                expiresAt: true,
+              },
+            }),
+            tx.accessTagExclusion.findMany({
+              where: {
+                orgId: actor.orgId,
+                userId,
+                revokedAt: null,
+                OR: scopes,
+              },
+              select: { id: true, tagKey: true, tenantId: true },
+            }),
+            tx.userRoleAssignment.findFirst({
+              where: {
+                orgId: actor.orgId,
+                userId: actor.userId,
+                tenantId: null,
+                revokedAt: null,
+                startsAt: { lte: now },
+                OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+                roleDefinition: {
+                  isActive: true,
+                  isSystem: true,
+                  tenantId: null,
+                  scope: "organisation",
+                  name: SYSTEM_ROLE_TEMPLATES.organisationHead.name,
+                },
+              },
+              select: { id: true },
+            }),
+            actor.tenantId
+              ? tx.siteMembership.findUnique({
+                  where: {
+                    tenantId_userId: { tenantId: actor.tenantId, userId },
+                  },
+                  select: { id: true },
+                })
+              : Promise.resolve(null),
+          ]);
+        return {
+          user: member.user,
+          assignments,
+          grants,
+          exclusions,
+          canAdministerBadges: actorHead !== null,
+          targetInSelectedSite: targetSite !== null,
+        };
       }),
     ]);
     const effective = await this.effective.listForUserWithSources(
@@ -157,6 +202,8 @@ export class BadgeMatrixService {
       ...catalogue,
       user: userState.user,
       superUserExempt: userState.user.superUser && userState.user.isActive,
+      canAdministerBadges: userState.canAdministerBadges,
+      targetInSelectedSite: userState.targetInSelectedSite,
       assignments: userState.assignments,
       effectivePermissions: effective,
       badges: catalogue.badges.map((badge) => {
@@ -187,6 +234,13 @@ export class BadgeMatrixService {
           .map(({ tagKey }) => fromStoredAccessTagKey(tagKey));
         return {
           ...badge,
+          editableScopes: badge.allowedScopes.filter(
+            (scope) =>
+              badge.available &&
+              userState.canAdministerBadges &&
+              !(userState.user.superUser && userState.user.isActive) &&
+              (scope === "organisation" || userState.targetInSelectedSite),
+          ),
           selected:
             badge.available &&
             badgeCoverage(badge.permissionKeys, effectiveKeys) === "full",

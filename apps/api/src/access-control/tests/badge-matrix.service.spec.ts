@@ -76,6 +76,7 @@ describe("BadgeMatrixService", () => {
         }),
       },
       userRoleAssignment: {
+        findFirst: jest.fn().mockResolvedValue({ id: "head-assignment" }),
         findMany: jest.fn().mockResolvedValue([
           {
             id: "assignment-1",
@@ -95,6 +96,9 @@ describe("BadgeMatrixService", () => {
             tenantId: "site-1",
           },
         ]),
+      },
+      siteMembership: {
+        findUnique: jest.fn().mockResolvedValue({ id: "site-member" }),
       },
     };
     const transaction: RolesTransactionBoundary = {
@@ -126,5 +130,7 @@ describe("BadgeMatrixService", () => {
       exclusions: [{ id: "exclusion-1", tenantId: "site-1" }],
     });
     expect(result.superUserExempt).toBe(false);
+    expect(result.canAdministerBadges).toBe(true);
+    expect(badge?.editableScopes).toContain("site");
   });
 });
