@@ -275,8 +275,9 @@ merge to `master` as `f1440cb17aafeba6db9814018feafc3b434b2309`.
 Mobile remains paused. The master-plan count remains **42/150 (28%)** because
 ACE-M20 is open.
 
-Build step 1.3e5s corrects the shared staff account status boundary exposed
-after PR #566. An organisation admin could disable a global user account,
+Build step 1.3e5s ([PR #568](https://github.com/FSS-Ltd/pathway/pull/568),
+open) corrects the shared staff account status boundary exposed after PR #566.
+An organisation admin could disable a global user account,
 affecting a staff member's access to other organisations. The staff API now
 reserves global account status changes for a platform superuser who also has
 staff-management access in the selected site. The existing People screens
@@ -285,7 +286,9 @@ effect. A PostgreSQL HTTP regression suite covers multi-organisation and
 single-organisation staff accounts and the audited platform-admin action.
 The PostgreSQL HTTP suite passed all 5 cases, and the focused staff unit suite
 passed 11 tests. API/admin typechecks, targeted lint, formatting, and both
-production builds passed locally. Its PR, CI, and merge evidence are pending.
+production builds passed locally. The locally checked code revision was
+`d7be441392e0bfa797911fb6395995ad875ee324`. Latest-head CI and merge
+evidence are pending.
 It does not complete another ACE master-plan task, so the count remains
 **42/150 (28%)**.
 
