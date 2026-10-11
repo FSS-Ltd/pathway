@@ -1,5 +1,8 @@
 # ACE-M01 messaging policy evidence
 
+Build step 1.3e6b: [PR #579](https://github.com/FSS-Ltd/pathway/pull/579)
+against `master`.
+
 Step 1.3e6b adds a shared, framework-free recipient policy for the three
 supported conversation kinds. Its input facts come from the existing
 tenant-scoped staff membership, active guardian-child relationship, and

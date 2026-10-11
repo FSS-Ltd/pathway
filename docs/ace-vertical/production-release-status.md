@@ -442,14 +442,16 @@ single-connection suites and 13 tests. GitHub confirmed PR #577 merged to
 `master` on 11 October 2026 at 22:40 UTC as
 `c137c9228b3720d775059790c40cb4a073fd6d33`.
 
-Build step 1.3e6b is the ACE-M01 shared recipient policy and web/API messaging
-contract. It applies one pure, tested participant decision to parent-staff,
+Build step 1.3e6b ([PR #579](https://github.com/FSS-Ltd/pathway/pull/579),
+open against `master`) is the ACE-M01 shared recipient policy and web/API
+messaging contract. It applies one pure, tested participant decision to parent-staff,
 staff-direct, and staffroom creation while preserving the current site,
 relationship, responder-capability, and RLS checks. The shared DTO schemas
 match the existing inbox, history, compose, cursor, and recipient responses;
 student direct messaging is absent from the conversation kind type and schema.
-This step is in local verification. The verified master-plan count remains
-**43/150 (28⅔%, 28.67%)** until this step passes CI and merges.
+Local verification passed. Current-head CI and merge evidence are pending. The
+verified master-plan count remains **43/150 (28⅔%, 28.67%)** until this step
+passes CI and merges.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
