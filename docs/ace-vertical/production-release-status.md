@@ -220,7 +220,10 @@ master-plan count remains **42/150 (28%)** until a complete ACE-M15 checklist
 is evidenced and merged.
 
 Build step 1.3e5p is the web family messaging security gate on
-`feature/ace-family-web-security-gate`. It adds real HTTP role, conversation-ID,
+`feature/ace-family-web-security-gate` in
+[PR #565](https://github.com/FSS-Ltd/pathway/pull/565). Its initial published
+revision is `d65ee31a`; latest-head CI and merge evidence are pending. It adds
+real HTTP role, conversation-ID,
 student compose, and relationship revocation probes, and prevents child names
 from an earlier account appearing in the family landing during an account
 change. The [web evidence record](../evidence/ace-family-messaging-release-gate.md)
