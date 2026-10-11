@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
+import { canStartConversation } from "@pathway/platform";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import type { CreateStaffDirectConversationInput } from "./dto/messaging-command.dto";
@@ -108,7 +109,26 @@ export class MessagingConversationService {
           select: { id: true },
         }),
       ]);
-      if (!recipient?.user.isActive || student) {
+      const decision = canStartConversation({
+        kind: "STAFF_DIRECT",
+        actor: {
+          userId: actor.userId,
+          tenantId: actor.tenantId,
+          relationship: "staff",
+          isActive: true,
+          isVisible: true,
+        },
+        recipients: [
+          {
+            userId: input.recipientUserId,
+            tenantId: actor.tenantId,
+            relationship: student ? "student" : "staff",
+            isActive: recipient?.user.isActive ?? false,
+            isVisible: Boolean(recipient),
+          },
+        ],
+      });
+      if (!decision.allowed) {
         throw new NotFoundException("Staff recipient not found");
       }
 
@@ -195,7 +215,29 @@ export class MessagingConversationService {
         select: { userId: true },
       });
       const staffIds = memberships.map((member) => member.userId).sort();
-      if (staffIds.length < 2) {
+      const decision = canStartConversation({
+        kind: "STAFF_ROOM",
+        actor: {
+          userId: actor.userId,
+          tenantId: actor.tenantId,
+          relationship: "staff",
+          isActive: true,
+          isVisible: staffIds.includes(actor.userId),
+        },
+        recipients: staffIds
+          .filter((userId) => userId !== actor.userId)
+          .map((userId) => ({
+            userId,
+            tenantId: actor.tenantId,
+            relationship: "staff" as const,
+            isActive: true,
+            isVisible: true,
+          })),
+      });
+      if (!decision.allowed) {
+        if (decision.code === "HIDDEN_PARTICIPANT") {
+          throw new NotFoundException("Staff room unavailable");
+        }
         throw new BadRequestException(
           "At least two current staff members are required",
         );

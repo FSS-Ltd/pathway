@@ -21,7 +21,8 @@
     "backfill:org-vertical": "tsx scripts/backfill-org-vertical.ts"
   },
   "dependencies": {
-    "@pathway/db": "workspace:*"
+    "@pathway/db": "workspace:*",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@prisma/client": "^5.18.0",

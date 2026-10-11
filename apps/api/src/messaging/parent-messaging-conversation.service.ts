@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@pathway/db";
-import type { PermissionKey } from "@pathway/platform";
+import { canStartConversation, type PermissionKey } from "@pathway/platform";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import type { CreateParentConversationInput } from "./dto/messaging-command.dto";
@@ -142,6 +142,42 @@ export class ParentMessagingConversationService {
               })
             : null;
         if (!recipient) {
+          throw new NotFoundException("Staff responder not found");
+        }
+
+        const currentChild = await tx.guardianChildRelationship.findFirst({
+          where: {
+            tenantId: siteId,
+            guardianIdentityId: guardianId,
+            legalAccess: "FULL",
+            startsAt: { lte: new Date() },
+            endedAt: null,
+            revokedAt: null,
+            child: { tenantId: siteId, isGuest: false },
+          },
+          select: { childId: true },
+        });
+        const decision = canStartConversation({
+          kind: "PARENT_STAFF",
+          actor: {
+            userId,
+            tenantId: siteId,
+            relationship: "guardian",
+            isActive: true,
+            isVisible: true,
+            hasCurrentChild: Boolean(currentChild),
+          },
+          recipients: [
+            {
+              userId: recipient.userId,
+              tenantId: siteId,
+              relationship: "staff",
+              isActive: true,
+              isVisible: true,
+            },
+          ],
+        });
+        if (!decision.allowed) {
           throw new NotFoundException("Staff responder not found");
         }
 
