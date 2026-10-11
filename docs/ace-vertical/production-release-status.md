@@ -189,12 +189,13 @@ add ACE school student identity invitations, verified-email acceptance,
 site policy controls, active-link revocation, and student site discovery to
 the web and API. The student identity ADR in the source matrix remains open;
 the product owner must confirm the age and safeguarding rule before this
-step can merge. Local API and admin typechecks, lint, tests, and builds passed
-on implementation commit `3dee066a`; the PostgreSQL invitation E2E requires
-an executed latest-head CI result because the local test database is unavailable.
-Mobile work remains
-paused. The verified master-plan count remains **42/150 (28%)**; ACE-M15 is
-not complete.
+step can merge. Local API and admin typechecks, lint, tests, and builds passed.
+On checked head `8a656009`, seven checks passed; the PostgreSQL integration
+job failed because active-site discovery started a read-only transaction inside
+an existing tenant transaction. Its log confirms the student invitation E2E
+suite ran and passed. The active-site transaction fix is being verified in this
+PR; latest-head CI must pass before review or merge. Mobile work remains paused.
+The verified master-plan count remains **42/150 (28%)**; ACE-M15 is not complete.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
