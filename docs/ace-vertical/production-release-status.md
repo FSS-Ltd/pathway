@@ -297,7 +297,8 @@ manage access to their own school.
 It does not complete another ACE master-plan task, so the count remains
 **42/150 (28%)**.
 
-Build step 1.3e5t applies the product owner's 11 October decision that school
+Build step 1.3e5t ([PR #569](https://github.com/FSS-Ltd/pathway/pull/569))
+applies the product owner's 11 October decision that school
 approval per student governs all ACE student identities. The existing web
 invitation and import routes already validate approval; this step requires it
 again in their shared student invitation service before creation or resend, so
