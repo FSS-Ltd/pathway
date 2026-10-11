@@ -102,7 +102,12 @@ async function run() {
                       ? undefined
                       : mode === "partial"
                         ? ["attendance"]
-                        : ["attendance", "sessions", "subject-timetable"],
+                        : [
+                            "student-summary",
+                            "attendance",
+                            "sessions",
+                            "subject-timetable",
+                          ],
                 },
               ],
       }),
@@ -127,6 +132,7 @@ async function run() {
       [
         "/ace/parent/sites/school-one/children/child-one/summary",
         "/ace/parent/sites/school-one/children/child-three/summary",
+        "/ace/student/sites/school-two/summary",
       ],
     );
     assert.deepEqual(
@@ -136,6 +142,7 @@ async function run() {
       [
         "Overview for Ari Alpha at Alpha School",
         "Overview for Cia Alpha at Alpha School",
+        "Overview for Bea Bravo at Bravo School",
       ],
     );
     assert.equal(

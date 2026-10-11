@@ -25,6 +25,7 @@ function contextHref(
 
 const childLinks = [
   { section: "ace-summary", label: "Overview" },
+  { section: "student-summary", label: "Overview" },
   { section: "attendance", label: "Attendance" },
   { section: "sessions", label: "Sessions" },
   { section: "subject-timetable", label: "Subject timetable" },
@@ -99,9 +100,11 @@ function ContextList({
                       href={
                         section === "ace-summary"
                           ? `/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/summary`
-                          : section === "subject-timetable"
-                            ? familyTimetableHref(context, "subjects")
-                            : contextHref(context, section)
+                          : section === "student-summary"
+                            ? `/ace/student/sites/${encodeURIComponent(context.siteId)}/summary`
+                            : section === "subject-timetable"
+                              ? familyTimetableHref(context, "subjects")
+                              : contextHref(context, section)
                       }
                       label={label}
                       contextLabel={`for ${context.childName} at ${context.siteName}`}
