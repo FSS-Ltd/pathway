@@ -37,5 +37,6 @@ import { AceNoticeTargetsService } from "./ace-notice-targets.service";
     AceNoticeScheduleRunnerService,
     AceNoticeTargetsService,
   ],
+  exports: [AceNoticeParentInboxService],
 })
 export class AceNoticesModule {}

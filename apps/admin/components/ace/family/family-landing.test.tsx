@@ -61,6 +61,7 @@ async function run() {
                       : mode === "partial"
                         ? ["attendance", "notices"]
                         : [
+                            "ace-summary",
                             "attendance",
                             "sessions",
                             "subject-timetable",
@@ -81,6 +82,7 @@ async function run() {
                       : mode === "partial"
                         ? ["attendance", "notices"]
                         : [
+                            "ace-summary",
                             "attendance",
                             "sessions",
                             "subject-timetable",
@@ -118,6 +120,15 @@ async function run() {
     assert.match(container.textContent ?? "", /Ari Alpha/);
     assert.match(container.textContent ?? "", /Cia Alpha/);
     assert.match(container.textContent ?? "", /Bea Bravo/);
+    assert.deepEqual(
+      Array.from(container.querySelectorAll('a[href$="/summary"]')).map(
+        (anchor) => anchor.getAttribute("href"),
+      ),
+      [
+        "/ace/parent/sites/school-one/children/child-one/summary",
+        "/ace/parent/sites/school-one/children/child-three/summary",
+      ],
+    );
     assert.deepEqual(
       Array.from(container.querySelectorAll("a[href*='/attendance']")).map(
         (anchor) => anchor.getAttribute("href"),

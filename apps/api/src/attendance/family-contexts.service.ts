@@ -9,6 +9,7 @@ import {
   parentSectionsForSite,
   type FamilySection,
 } from "./family-context-sections";
+import { localDate } from "./family-daily-attendance-history";
 
 export interface FamilyContext {
   kind: "parent" | "student";
@@ -66,6 +67,7 @@ export class FamilyContextsService {
           where: {
             key: {
               in: [
+                "ace.parent.progress.read",
                 "ace.parent.notices.read",
                 "messaging.conversations.read",
                 "messaging.messages.read",
@@ -84,6 +86,7 @@ export class FamilyContextsService {
         id: true,
         name: true,
         orgId: true,
+        timezone: true,
         org: {
           select: {
             parentPortalEnabled: true,
@@ -95,6 +98,8 @@ export class FamilyContextsService {
     const items: FamilyContext[] = [];
     const now = new Date();
     for (const site of sites) {
+      const isAceSchool = site.org.orgVertical?.vertical === "ACE_SCHOOL";
+      const schoolDay = localDate(now, site.timezone ?? "");
       const scoped = await withTenantRlsContext(
         site.id,
         site.orgId,
@@ -139,8 +144,34 @@ export class FamilyContextsService {
               take: 2,
             }),
           ]);
+          const activeParentChildIds =
+            isAceSchool && schoolDay && relationships.length > 0
+              ? await tx.aceSchoolEnrollment.findMany({
+                  where: {
+                    tenantId: site.id,
+                    childId: {
+                      in: relationships.map(({ child }) => child.id),
+                    },
+                    startsOn: {
+                      lte: new Date(`${schoolDay}T00:00:00.000Z`),
+                    },
+                    OR: [
+                      { endsOn: null },
+                      {
+                        endsOn: {
+                          gte: new Date(`${schoolDay}T00:00:00.000Z`),
+                        },
+                      },
+                    ],
+                  },
+                  select: { childId: true },
+                })
+              : [];
           return {
             parentChildren: relationships.map(({ child }) => child),
+            activeParentChildIds: new Set(
+              activeParentChildIds.map(({ childId }) => childId),
+            ),
             studentChild:
               policy?.studentPortalEnabled && links.length === 1
                 ? links[0].child
@@ -152,7 +183,7 @@ export class FamilyContextsService {
       const parentSections = parentSectionsForSite(
         activePermissions,
         discovery.studentSiteIds.has(site.id),
-        site.org.orgVertical?.vertical === "ACE_SCHOOL",
+        isAceSchool,
       );
       for (const child of scoped.parentChildren) {
         items.push({
@@ -161,7 +192,12 @@ export class FamilyContextsService {
           siteName: site.name,
           childId: child.id,
           childName: `${child.firstName} ${child.lastName}`.trim(),
-          sections: parentSections,
+          sections:
+            scoped.activeParentChildIds.has(child.id) &&
+            activePermissions.has("ace.parent.progress.read") &&
+            !discovery.studentSiteIds.has(site.id)
+              ? ["ace-summary", ...parentSections]
+              : parentSections,
         });
       }
       if (scoped.studentChild) {

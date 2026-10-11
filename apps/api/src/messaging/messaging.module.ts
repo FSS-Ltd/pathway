@@ -34,5 +34,6 @@ import { StaffSchoolTeamService } from "./staff-school-team.service";
     ParentMessagingHistoryService,
     ParentMessagingReadCursorService,
   ],
+  exports: [ParentMessagingService],
 })
 export class MessagingModule {}

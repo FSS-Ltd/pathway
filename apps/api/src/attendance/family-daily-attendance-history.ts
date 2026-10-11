@@ -59,7 +59,7 @@ export async function readFamilyDailyAttendanceHistory(
   return { siteId, childId, from: query.from, to: query.to, counts, items };
 }
 
-function localDate(now: Date, timezone: string): string | null {
+export function localDate(now: Date, timezone: string): string | null {
   try {
     const parts = new Intl.DateTimeFormat("en-GB", {
       timeZone: timezone,

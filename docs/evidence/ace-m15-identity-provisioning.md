@@ -1,7 +1,10 @@
 # ACE-M15 identity provisioning evidence
 
-**Build step:** 1.3e5u. **Status:** awaiting this step's CI and merge. Mobile
-interface work remains paused; ACE-M15 itself is the shared API identity task.
+**Build step:** 1.3e5u. **Status:** merged in
+[PR #570](https://github.com/FSS-Ltd/pathway/pull/570) as
+`6eeb4782410314060257911ac7e75ad2179c7258` after all eight checks passed
+on head `9db055cc1a2becad5c2036abb3f9160010cbcaf6`. Mobile interface work
+remains paused; ACE-M15 itself is the shared API identity task.
 
 The [ACE-M15 implementation checklist](../superpowers/plans/2026-07-25-ace-core-family-messaging.md)
 requires invitation lifecycle and collision tests, provider-safe identity
@@ -54,10 +57,9 @@ the review body to either API version; after the API changes, an older open
 staff page receives HTTP 400 on guardian resend until it is refreshed. No
 pending invitation is extended or mailed by that denied request.
 
-**Task counting:** The verified ACE master-plan count stays **42/150 (28%)**
-until this step passes latest-head CI and merges. If those gates pass, the
-shared API scope of ACE-M15 is evidenced as one additional complete task:
-**43/150 (28⅔%, or 28.67%)**. ACE-M16 through M20, signed-in end-to-end portal
+**Task counting:** The shared API scope of ACE-M15 is evidenced as one
+additional complete task: **43/150 (28⅔%, or 28.67%)**. ACE-M16 through M20,
+signed-in end-to-end portal
 UAT, and mobile interface work remain separate gates. This record does not
 approve a school pilot or claim every family reader has passed the ACE-M20
 access matrix.

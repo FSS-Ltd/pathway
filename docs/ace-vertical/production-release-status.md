@@ -6,10 +6,11 @@ The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through C07f are now served by all three apps.
 The [ACE master implementation plan](../superpowers/plans/2026-07-25-ace-vertical-master-plan.md)
-defines 150 delivery tasks. Merged task PRs are evidenced for its 22 foundation
-and 20 daily-operations tasks: **42/150, or 28% verified plan-task completion**.
-The later messaging, learning, add-on, and launch tracks have not been fully
-reconciled task by task; 28% is a documented minimum, not an estimate of all
+defines 150 delivery tasks. Merged task PRs are evidenced for its 22 foundation,
+20 daily-operations, and ACE-M15 identity tasks: **43/150, or 28⅔% (28.67%)
+verified plan-task completion**. The later messaging, learning, add-on, and
+launch tracks have not been fully reconciled task by task; this is a documented
+minimum, not an estimate of all
 delivered outcomes. Earlier 81% and 52% qualitative estimates below use a
 different basis and should not be read as plan-task completion.
 
@@ -18,7 +19,7 @@ and core-journey tasks with 9 pilot/launch tasks: **97/150 (about 65%)** if all
 53 optional add-on tasks are deferred. This is a task-count milestone, not an
 automatic readiness threshold; the nine launch tasks require UAT, security,
 accessibility, performance, restore, support, and staged go/no-go evidence.
-With 42 tasks currently evidenced, 55 core/launch tasks remain to be verified
+With 43 tasks currently evidenced, 54 core/launch tasks remain to be verified
 or completed; some later work is already partially merged. The delivery waves
 are: reconcile ACE-M and ACE-C task evidence against merged PRs, finish the
 remaining ACE-M messaging/notices/identity tasks through the M20 gate, finish
@@ -318,19 +319,39 @@ it can be counted complete; the verified master-plan count stays
 tests), and five PostgreSQL E2E suites (18 tests) passed. Targeted formatting
 and diff checks passed.
 
-Build step 1.3e5u ([PR #570](https://github.com/FSS-Ltd/pathway/pull/570))
+Build step 1.3e5u ([PR #570](https://github.com/FSS-Ltd/pathway/pull/570),
+merged on 11 October 2026)
 closes the remaining web/API ACE-M15 invitation lifecycle
 gap: guardian resend now requires a fresh legal-access review and audits its
 evidence basis; shared guardian and student invitation flows have PostgreSQL
 expiry, revocation, relationship, and audit tests. The child-profile resend
 control includes an explicit review step. The
 [ACE-M15 evidence record](../evidence/ace-m15-identity-provisioning.md)
-maps each checklist item to code and tests. CI and merge evidence are pending;
-the verified count remains **42/150 (28%)** until the task gate is satisfied.
+maps each checklist item to code and tests. All eight latest-head checks passed
+on `9db055cc1a2becad5c2036abb3f9160010cbcaf6` (CI run 38164732684;
+CodeQL run 38164729244). The PostgreSQL integration log confirms all four
+identity E2E suites actually ran: 83 suites and 509 tests passed, plus two
+single-connection suites and 13 tests. The admin unit run included the new
+guardian invitation card test. GitHub confirmed the merge to `master` as
+`6eeb4782410314060257911ac7e75ad2179c7258`. The verified master-plan
+count is **43/150 (28⅔%, 28.67%)** because ACE-M15 is now fully evidenced.
 API/admin typechecks, targeted lint, and production builds passed locally;
 the full API unit suite (178 suites, 1,304 tests) and full admin unit script
 passed, including the new guardian card test. Four PostgreSQL identity suites
 passed 14 E2E tests. Mobile interface work remains paused.
+
+Build step 1.3e5v ([PR #571](https://github.com/FSS-Ltd/pathway/pull/571),
+current branch `feature/ace-m16-family-read-facade`) adds
+the first ACE-M16 family read facade slice and web overview. Current full
+guardian relationship, active enrolment, ACE school, account, permission, and
+tenant RLS checks guard the request. Attendance is child-scoped; notices and
+messages remain guardian-level school summaries and are labelled accordingly.
+Each supported section has an independent server-owned disable flag and error
+result. Homework, reports, slips, Faith, and finance remain unavailable until
+their release sources and rules exist. The
+[M16 release record](../evidence/ace-m16-family-read-facade.md) lists those
+gaps. This slice does not complete ACE-M16 or change the **43/150 (28⅔%,
+28.67%)** count. PR, CI, and merge evidence are pending.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
