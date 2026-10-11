@@ -359,14 +359,31 @@ as `748dd8e4befbd95750cb69cb47eefa245d2d089b`. This slice does not
 complete ACE-M16 or change the **43/150 (28⅔%, 28.67%)** count.
 
 Build step 1.3e5w ([PR #572](https://github.com/FSS-Ltd/pathway/pull/572),
-current branch `feature/ace-family-web-access-gate`) adds
+merged on 11 October 2026) adds
 direct family-summary denials for site staff, student identities, a disabled
 parent portal, and inactive guardian accounts. The family web landing gives
 repeated child and school links distinct accessible names while retaining
 their visible labels. This is web/API evidence toward ACE-M20, not full M20
 sign-off; signed-in browser screen-reader checks and mobile baselines remain
-open. The master-plan count stays **43/150 (28⅔%, 28.67%)**. PR, CI, and merge
-evidence are pending.
+open. All eight latest-head checks passed on
+`e77b3d926c514058106ebfa7b6c86dfdb068c5e5` (CI run 38169068895;
+CodeQL run 38169066051). The PostgreSQL integration log confirms the family
+facade HTTP suite ran: 84 suites and 517 tests passed, plus two
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+as `19811c6f96b6f15c111dcbc9928ec06441b9371f`. The master-plan count
+stays **43/150 (28⅔%, 28.67%)**.
+
+Build step 1.3e5x (branch `feature/ace-student-self-web-facade`) adds a
+self-only ACE student summary API and web overview. The summary derives its
+single child from the current student identity link, requires an active school
+enrolment and enabled student portal, and rechecks access after reading. It
+shows existing self-scoped daily attendance and advertises the overview only
+to eligible students. Homework, PACE, Faith, reports, slips, and Community
+remain unavailable until their student release rules and readers are ready.
+The [M17 release record](../evidence/ace-m17-student-self-web-facade.md)
+lists the remaining full-task gaps. This is a web slice of ACE-M17, not full
+M17 completion; the verified master-plan count remains **43/150 (28⅔%,
+28.67%)**. PR, CI, and merge evidence are pending. Mobile work remains paused.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

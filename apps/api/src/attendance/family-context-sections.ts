@@ -1,5 +1,6 @@
 export type FamilySection =
   | "ace-summary"
+  | "student-summary"
   | "attendance"
   | "sessions"
   | "subject-timetable"

@@ -167,15 +167,38 @@ export class FamilyContextsService {
                   select: { childId: true },
                 })
               : [];
+          const studentChild =
+            policy?.studentPortalEnabled && links.length === 1
+              ? links[0].child
+              : null;
+          const studentEnrollment =
+            isAceSchool && schoolDay && studentChild
+              ? await tx.aceSchoolEnrollment.findFirst({
+                  where: {
+                    tenantId: site.id,
+                    childId: studentChild.id,
+                    startsOn: {
+                      lte: new Date(`${schoolDay}T00:00:00.000Z`),
+                    },
+                    OR: [
+                      { endsOn: null },
+                      {
+                        endsOn: {
+                          gte: new Date(`${schoolDay}T00:00:00.000Z`),
+                        },
+                      },
+                    ],
+                  },
+                  select: { id: true },
+                })
+              : null;
           return {
             parentChildren: relationships.map(({ child }) => child),
             activeParentChildIds: new Set(
               activeParentChildIds.map(({ childId }) => childId),
             ),
-            studentChild:
-              policy?.studentPortalEnabled && links.length === 1
-                ? links[0].child
-                : null,
+            studentChild,
+            studentSummaryEnabled: Boolean(studentEnrollment),
           };
         },
       );
@@ -208,7 +231,9 @@ export class FamilyContextsService {
           childId: scoped.studentChild.id,
           childName:
             `${scoped.studentChild.firstName} ${scoped.studentChild.lastName}`.trim(),
-          sections: CHILD_SECTIONS,
+          sections: scoped.studentSummaryEnabled
+            ? ["student-summary", ...CHILD_SECTIONS]
+            : CHILD_SECTIONS,
         });
       }
     }
