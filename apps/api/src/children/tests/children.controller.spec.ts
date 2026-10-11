@@ -15,6 +15,7 @@ const tenantId = "t1";
 
 const listMock: jest.Mock<Promise<unknown[]>, [string]> = jest.fn();
 const getByIdMock: jest.Mock<Promise<unknown>, [string, string]> = jest.fn();
+const getRegistrationMock = jest.fn();
 const createMock: jest.Mock<
   Promise<unknown>,
   [CreateChildDto, string]
@@ -32,6 +33,7 @@ const staffRequest = {
 const mockService: ChildrenService = {
   list: listMock as unknown as ChildrenService["list"],
   getById: getByIdMock as unknown as ChildrenService["getById"],
+  getRegistration: getRegistrationMock as ChildrenService["getRegistration"],
   create: createMock as unknown as ChildrenService["create"],
   update: updateMock as unknown as ChildrenService["update"],
   assertCanViewChild: assertCanViewChildMock,
@@ -93,6 +95,28 @@ describe("ChildrenController", () => {
     const res = await controller.getById("c1", tenantId, staffRequest);
     expect(res).toBe(child);
     expect(getByIdMock).toHaveBeenCalledWith("c1", tenantId);
+  });
+
+  it("returns a submitted registration only for staff in the active tenant", async () => {
+    getRegistrationMock.mockResolvedValueOnce(null);
+    await expect(
+      controller.getRegistration("c1", tenantId, "org-1", staffRequest),
+    ).resolves.toBeNull();
+    expect(getRegistrationMock).toHaveBeenCalledWith(
+      "c1",
+      tenantId,
+      "org-1",
+      "staff-a",
+    );
+
+    const guardianRequest = {
+      authUserId: "guardian-a",
+      __pathwayContext: { siteRole: "VIEWER" },
+    } as Parameters<ChildrenController["getRegistration"]>[3];
+    await expect(
+      controller.getRegistration("c1", tenantId, "org-1", guardianRequest),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(getRegistrationMock).toHaveBeenCalledTimes(1);
   });
 
   it("create should validate and call service", async () => {

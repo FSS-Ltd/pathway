@@ -8,7 +8,8 @@ import { AuthIdentityService } from "../../auth/auth-identity.service";
 import type { VerifiedPrincipal } from "../../auth/token-verifier";
 
 jest.mock("@pathway/db", () => {
-  const { ChildGuardianContactType, Role } = jest.requireActual("@prisma/client");
+  const { ChildGuardianContactType, Role } =
+    jest.requireActual("@prisma/client");
   return {
     ChildGuardianContactType,
     Role,
@@ -36,6 +37,7 @@ jest.mock("@pathway/db", () => {
       childGuardianContact: {
         createMany: jest.fn(),
       },
+      childRegistrationSubmission: { createMany: jest.fn() },
       guardianIdentity: {
         upsert: jest.fn(),
       },
@@ -45,14 +47,14 @@ jest.mock("@pathway/db", () => {
       emergencyContact: {
         createMany: jest.fn(),
       },
-    parentSignupConsent: {
-      create: jest.fn(),
+      parentSignupConsent: {
+        create: jest.fn(),
+      },
+      $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
+        const p = jest.requireMock("@pathway/db").prisma;
+        return fn(p);
+      }),
     },
-    $transaction: jest.fn((fn: (tx: unknown) => Promise<unknown>) => {
-      const p = jest.requireMock("@pathway/db").prisma;
-      return fn(p);
-    }),
-  },
     withTenantRlsContext: jest.fn(
       (
         _tenantId: string,
@@ -105,10 +107,15 @@ describe("PublicSignupService", () => {
 
   describe("signupPreflight", () => {
     it("returns NEW_USER when email does not exist", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
 
-      const result = await service.signupPreflight("a".repeat(32), "new@example.com");
+      const result = await service.signupPreflight(
+        "a".repeat(32),
+        "new@example.com",
+      );
 
       expect(result).toEqual({
         email: "new@example.com",
@@ -118,7 +125,9 @@ describe("PublicSignupService", () => {
     });
 
     it("returns EXISTING_USER when email exists", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       (prisma.user.findFirst as jest.Mock).mockResolvedValue({
         id: "user-1",
         email: "existing@example.com",
@@ -126,7 +135,10 @@ describe("PublicSignupService", () => {
         displayName: "Jane Doe",
       });
 
-      const result = await service.signupPreflight("a".repeat(32), "Existing@Example.com");
+      const result = await service.signupPreflight(
+        "a".repeat(32),
+        "Existing@Example.com",
+      );
 
       expect(result).toMatchObject({
         email: "existing@example.com",
@@ -159,7 +171,9 @@ describe("PublicSignupService", () => {
 
   describe("linkChildrenExistingUser", () => {
     it("rejects attempts to claim existing children from a signup link", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       await expect(
         service.linkChildrenExistingUser("user-1", "a".repeat(32), ["child-1"]),
       ).rejects.toThrow(BadRequestException);
@@ -169,7 +183,9 @@ describe("PublicSignupService", () => {
     });
 
     it("sets family access without a child relationship when no child is supplied", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       (prisma.user.update as jest.Mock).mockResolvedValue({});
       (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.userTenantRole.create as jest.Mock).mockResolvedValue({});
@@ -185,14 +201,18 @@ describe("PublicSignupService", () => {
     });
 
     it("creates children with internal profile pictures without organisation photo consent", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       (prisma.child.create as jest.Mock).mockResolvedValue({ id: "child-1" });
-      (prisma.child.findMany as jest.Mock).mockResolvedValue([{ id: "child-1" }]);
+      (prisma.child.findMany as jest.Mock).mockResolvedValue([
+        { id: "child-1" },
+      ]);
       (prisma.user.update as jest.Mock).mockResolvedValue({});
       (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.userTenantRole.create as jest.Mock).mockResolvedValue({});
-      (prisma.$transaction as jest.Mock).mockImplementation((fn: (tx: unknown) => Promise<unknown>) =>
-        fn(prisma),
+      (prisma.$transaction as jest.Mock).mockImplementation(
+        (fn: (tx: unknown) => Promise<unknown>) => fn(prisma),
       );
 
       const result = await service.linkChildrenExistingUser(
@@ -259,9 +279,27 @@ describe("PublicSignupService", () => {
         siteName: "Test Site",
         siteTimezone: "Europe/London",
         parentPortalEnabled: true,
-        formVersion: "1.0",
+        formVersion: "2.0",
       });
       expect(config.requiredConsents).toContain("data_processing");
+    });
+
+    it("exposes ACE levels only for ACE school links", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue({
+        ...validLink,
+        org: { ...validLink.org, orgVertical: { vertical: "ACE_SCHOOL" } },
+      });
+      const ace = await service.getConfig("any-token");
+      expect(ace.aceRegistrationLevels).toEqual([
+        "ABC",
+        "Primary",
+        "Secondary",
+      ]);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
+      const other = await service.getConfig("any-token");
+      expect(other.aceRegistrationLevels).toBeUndefined();
     });
 
     it("returns disabled parent portal config when org has disabled it", async () => {
@@ -282,22 +320,35 @@ describe("PublicSignupService", () => {
   describe("submit", () => {
     const validDto = {
       token: "a".repeat(32),
+      formVersion: "2.0",
+      homeAddress: "1 Main Street",
       parent: {
         fullName: "Jane Doe",
         email: "jane@example.com",
         password: "SecurePass1",
+        phone: "07700900111",
       },
-      emergencyContacts: [
-        { name: "Emergency Contact", phone: "07700900123" },
-      ],
+      emergencyContacts: [{ name: "Emergency Contact", phone: "07700900123" }],
       children: [
         {
           firstName: "Child",
           lastName: "One",
+          dateOfBirth: "2016-04-12",
           photoConsent: false,
         },
       ],
-      consents: { dataProcessingConsent: true },
+      consents: {
+        dataProcessingConsent: true,
+        registration: {
+          contact: { granted: true, initials: "JD" },
+          emergencyMedical: { granted: true, initials: "JD" },
+          localActivities: { granted: false, initials: "JD" },
+          photoVideo: { granted: false, initials: "JD" },
+          accuracy: { granted: true, initials: "JD" },
+          dataProcessing: { granted: true, initials: "JD" },
+          firstAid: { granted: false, initials: "JD" },
+        },
+      },
     };
 
     it("throws when data processing consent is false", async () => {
@@ -308,7 +359,7 @@ describe("PublicSignupService", () => {
       await expect(
         service.submit({
           ...validDto,
-          consents: { dataProcessingConsent: false },
+          consents: { ...validDto.consents, dataProcessingConsent: false },
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -361,6 +412,32 @@ describe("PublicSignupService", () => {
       expect(prisma.child.create).toHaveBeenCalled();
       expect(prisma.emergencyContact.createMany).toHaveBeenCalled();
       expect(prisma.parentSignupConsent.create).toHaveBeenCalled();
+      expect(
+        prisma.childRegistrationSubmission.createMany,
+      ).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            tenantId: "tenant-1",
+            childId: "child-1",
+            formVersion: "2.0",
+            payload: expect.objectContaining({
+              household: { homeAddress: "1 Main Street" },
+              consents: expect.objectContaining({
+                accuracy: {
+                  wording: expect.any(String),
+                  granted: true,
+                  initials: "JD",
+                },
+                localActivities: {
+                  wording: expect.any(String),
+                  granted: false,
+                  initials: "JD",
+                },
+              }),
+            }),
+          }),
+        ],
+      });
       expect(prisma.guardianIdentity.upsert).toHaveBeenCalledWith({
         where: { tenantId_userId: { tenantId: "tenant-1", userId: "user-1" } },
         create: { tenantId: "tenant-1", userId: "user-1" },
@@ -380,16 +457,24 @@ describe("PublicSignupService", () => {
     });
 
     it("does not attach a new child to an existing account by email alone", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
-      (prisma.user.findFirst as jest.Mock).mockResolvedValue({ id: "existing-user" });
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
+      (prisma.user.findFirst as jest.Mock).mockResolvedValue({
+        id: "existing-user",
+      });
 
-      await expect(service.submit(validDto)).rejects.toThrow(BadRequestException);
+      await expect(service.submit(validDto)).rejects.toThrow(
+        BadRequestException,
+      );
       expect(prisma.child.create).not.toHaveBeenCalled();
       expect(prisma.guardianIdentity.upsert).not.toHaveBeenCalled();
     });
 
     it("does not grant guardian access when consent cannot be recorded", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
       (prisma.user.create as jest.Mock).mockResolvedValue({ id: "user-1" });
       (prisma.userTenantRole.findFirst as jest.Mock).mockResolvedValue(null);
@@ -398,7 +483,9 @@ describe("PublicSignupService", () => {
         new Error("Consent write failed"),
       );
 
-      await expect(service.submit(validDto)).rejects.toThrow("Consent write failed");
+      await expect(service.submit(validDto)).rejects.toThrow(
+        "Consent write failed",
+      );
       expect(prisma.guardianIdentity.upsert).not.toHaveBeenCalled();
     });
 
@@ -444,6 +531,29 @@ describe("PublicSignupService", () => {
       );
     });
 
+    it("rejects ACE registration level for non-ACE organisations", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
+      await expect(
+        service.submit({
+          ...validDto,
+          children: [{ ...validDto.children[0], registrationLevel: "Primary" }],
+        }),
+      ).rejects.toThrow("only available to ACE schools");
+      expect(prisma.child.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a stale version before creating an account", async () => {
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
+      await expect(
+        service.submit({ ...validDto, formVersion: "1.0" }),
+      ).rejects.toThrow("Registration form has changed");
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
     it("rejects portal account submission when parent portal is disabled", async () => {
       (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
         portalDisabledLink,
@@ -473,10 +583,10 @@ describe("PublicSignupService", () => {
       );
       (prisma.child.create as jest.Mock).mockResolvedValue({ id: "child-1" });
       (
-        (prisma as unknown as {
+        prisma as unknown as {
           childGuardianContact: { createMany: jest.Mock };
-        }).childGuardianContact.createMany
-      ).mockResolvedValue({ count: 2 });
+        }
+      ).childGuardianContact.createMany.mockResolvedValue({ count: 2 });
       (prisma.publicSignupLink.update as jest.Mock).mockResolvedValue({});
 
       const result = await service.submitContactOnly({
@@ -504,9 +614,11 @@ describe("PublicSignupService", () => {
       expect(auth0Mock.createUser).not.toHaveBeenCalled();
       expect(mailerMock.sendParentSignupCompleteEmail).not.toHaveBeenCalled();
       expect(
-        (prisma as unknown as {
-          childGuardianContact: { createMany: jest.Mock };
-        }).childGuardianContact.createMany,
+        (
+          prisma as unknown as {
+            childGuardianContact: { createMany: jest.Mock };
+          }
+        ).childGuardianContact.createMany,
       ).toHaveBeenCalledWith({
         data: expect.arrayContaining([
           expect.objectContaining({
@@ -543,40 +655,64 @@ describe("PublicSignupService", () => {
 
     const validDto = {
       token: "a".repeat(32),
+      formVersion: "2.0",
+      homeAddress: "1 Main Street",
       parent: {
         fullName: "Sarah Doe",
         email: "sarah@example.com",
+        phone: "07700900111",
       },
       emergencyContacts: [{ name: "Emergency Contact", phone: "07700900123" }],
       children: [
         {
           firstName: "Child",
           lastName: "One",
+          dateOfBirth: "2016-04-12",
           photoConsent: false,
         },
       ],
-      consents: { dataProcessingConsent: true },
+      consents: {
+        dataProcessingConsent: true,
+        registration: {
+          contact: { granted: true, initials: "SD" },
+          emergencyMedical: { granted: true, initials: "SD" },
+          localActivities: { granted: false, initials: "SD" },
+          photoVideo: { granted: false, initials: "SD" },
+          accuracy: { granted: true, initials: "SD" },
+          dataProcessing: { granted: true, initials: "SD" },
+          firstAid: { granted: false, initials: "SD" },
+        },
+      },
     };
 
     it("rejects an unverified principal without consulting the database", async () => {
       await expect(
-        service.submitExistingUser(validDto, { ...principal, emailVerified: false }),
+        service.submitExistingUser(validDto, {
+          ...principal,
+          emailVerified: false,
+        }),
       ).rejects.toThrow(BadRequestException);
 
-      expect(authIdentityMock.findExistingUserByPrincipal).not.toHaveBeenCalled();
+      expect(
+        authIdentityMock.findExistingUserByPrincipal,
+      ).not.toHaveBeenCalled();
     });
 
     it("rejects when no existing user resolves from the principal", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       authIdentityMock.findExistingUserByPrincipal.mockResolvedValue(null);
 
-      await expect(service.submitExistingUser(validDto, principal)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.submitExistingUser(validDto, principal),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it("links children and completes signup for the resolved user - no password anywhere", async () => {
-      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(validLink);
+      (prisma.publicSignupLink.findFirst as jest.Mock).mockResolvedValue(
+        validLink,
+      );
       authIdentityMock.findExistingUserByPrincipal.mockResolvedValue({
         id: "user-1",
         email: "sarah@example.com",
@@ -594,10 +730,15 @@ describe("PublicSignupService", () => {
       const result = await service.submitExistingUser(validDto, principal);
 
       expect(result.success).toBe(true);
-      expect(authIdentityMock.findExistingUserByPrincipal).toHaveBeenCalledWith(principal);
+      expect(authIdentityMock.findExistingUserByPrincipal).toHaveBeenCalledWith(
+        principal,
+      );
       expect(prisma.user.update).toHaveBeenCalledWith({
         where: { id: "user-1" },
-        data: expect.objectContaining({ tenantId: "tenant-1", hasFamilyAccess: true }),
+        data: expect.objectContaining({
+          tenantId: "tenant-1",
+          hasFamilyAccess: true,
+        }),
       });
       expect(prisma.child.create).toHaveBeenCalled();
       expect(auth0Mock.createUser).not.toHaveBeenCalled();

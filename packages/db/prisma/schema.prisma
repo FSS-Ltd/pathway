@@ -1013,6 +1013,7 @@ model Tenant {
 
   @@unique([id, orgId])
   @@index([orgId])
+  childRegistrationSubmissions ChildRegistrationSubmission[]
 }
 
 model UserTenantRole {
@@ -1503,6 +1504,22 @@ model ChildGuardianContact {
   @@index([tenantId, contactType])
 }
 
+// Immutable snapshot of the submitted public registration. payload is encrypted at rest.
+// A child may have multiple submissions if a later registration replaces an earlier one.
+model ChildRegistrationSubmission {
+  id          String   @id @default(uuid())
+  tenantId    String
+  childId     String
+  formVersion String
+  payload     Json
+  submittedAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  child  Child  @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@index([tenantId, childId, submittedAt])
+}
+
 // allergies/additionalNeedsNotes/gpName/gpPhone/specialNeedsOther/notes are encrypted
 // at rest — see packages/db/src/pii-encryption.ts. dateOfBirth is NOT yet encrypted
 // (would require a DateTime -> String column change; tracked as a follow-up).
@@ -1530,6 +1547,7 @@ model Child {
   tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
   guardians                  User[]                      @relation("ParentChildren")
   guardianContacts           ChildGuardianContact[]
+  registrationSubmissions    ChildRegistrationSubmission[]
   groupId                    String?
   group                      Group?                      @relation(fields: [groupId], references: [id])
   disabilities               String[]                    @default([])

@@ -13,6 +13,7 @@ export type AdminRoleInfo = {
   isOrgOwner: boolean;
   isSiteAdmin: boolean;
   isStaff: boolean;
+  isRegistrationStaff?: boolean;
   isSafeguardingStaff: boolean;
   isSuperUser: boolean;
 };
@@ -34,6 +35,7 @@ export function getAdminRoleInfoFromApiResponse(
     isOrgOwner: false,
     isSiteAdmin: false,
     isStaff: false,
+    isRegistrationStaff: false,
     isSafeguardingStaff: false,
     isSuperUser: false,
   };
@@ -65,6 +67,15 @@ export function getAdminRoleInfoFromApiResponse(
     siteRoles.has("VIEWER") ||
     (!isOrgAdmin && !isSiteAdmin && !isSuperUser);
 
+  const isRegistrationStaff = [
+    "STAFF",
+    "SITE_ADMIN",
+    "ADMIN",
+    "COORDINATOR",
+    "TEACHER",
+    "LEAD",
+    "SUPPORT",
+  ].some((siteRole) => siteRoles.has(siteRole));
   const isSafeguardingStaff = isSafeguardingLead;
 
   return {
@@ -72,6 +83,7 @@ export function getAdminRoleInfoFromApiResponse(
     isOrgOwner,
     isSiteAdmin,
     isStaff,
+    isRegistrationStaff,
     isSafeguardingStaff,
     isSuperUser,
   };
