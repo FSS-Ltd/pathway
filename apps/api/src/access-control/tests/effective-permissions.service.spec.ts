@@ -68,6 +68,7 @@ function createService({
   capabilities = ["ace.pace.read" as PermissionKey],
   activePermissionKeys = capabilities,
   available = true,
+  exclusions = [],
 }: {
   hasMembership?: boolean;
   isSuperUser?: boolean;
@@ -76,6 +77,7 @@ function createService({
   capabilities?: readonly PermissionKey[];
   activePermissionKeys?: readonly PermissionKey[];
   available?: boolean;
+  exclusions?: Array<{ tenantId: string | null; permissionKey: PermissionKey }>;
 } = {}): EffectivePermissionsService {
   const reader: EffectivePermissionsReader = {
     isActiveSuperUser: async () => isSuperUser,
@@ -84,6 +86,7 @@ function createService({
       keys.filter((key) => activePermissionKeys.includes(key)),
     findAssignments: async () => grants,
     findTagGrants: async () => tagGrants,
+    findExclusions: async () => exclusions,
   };
   const capabilityReader: OrgCapabilitiesReader = {
     get: async () => capabilities,
@@ -121,6 +124,42 @@ async function resolve(
 }
 
 describe("EffectivePermissionsService", () => {
+  it("blocks ordinary role and tag grants when an organisation exclusion covers the permission", async () => {
+    const service = createService({
+      grants: [grant()],
+      tagGrants: [tagGrant()],
+      exclusions: [{ tenantId: null, permissionKey: "ace.pace.read" }],
+    });
+
+    await expect(
+      resolve(service, { tenantId: SITE_ID }),
+    ).resolves.toMatchObject({
+      allowed: false,
+    });
+    await expect(
+      service.listForUser(USER_ID, ORG_ID, SITE_ID),
+    ).resolves.toEqual([]);
+    await expect(
+      service.listForUserWithSources(USER_ID, ORG_ID, SITE_ID),
+    ).resolves.toEqual([]);
+  });
+
+  it("keeps an exclusion confined to its site", async () => {
+    const service = createService({
+      exclusions: [{ tenantId: SITE_ID, permissionKey: "ace.pace.read" }],
+    });
+
+    await expect(
+      resolve(service, { tenantId: SITE_ID }),
+    ).resolves.toMatchObject({
+      allowed: false,
+    });
+    await expect(
+      resolve(service, { tenantId: OTHER_SITE_ID }),
+    ).resolves.toMatchObject({
+      allowed: true,
+    });
+  });
   it("grants an admitted superuser active operational permissions without a role", async () => {
     const service = createService({ isSuperUser: true, grants: [] });
 
@@ -251,6 +290,7 @@ describe("EffectivePermissionsService", () => {
         return [grant({ roleScope: "site", roleTenantId: SITE_ID })];
       },
       findTagGrants: async () => [],
+      findExclusions: async () => [],
     };
     const service = new EffectivePermissionsService(
       reader,
@@ -279,6 +319,7 @@ describe("EffectivePermissionsService", () => {
         findActivePermissionKeys: async () => [],
         findAssignments,
         findTagGrants: async () => [],
+        findExclusions: async () => [],
       },
       { get: async () => ["ace.pace.read"] },
       { isAvailable: async () => true },
@@ -311,6 +352,7 @@ describe("EffectivePermissionsService", () => {
         findActivePermissionKeys: async () => [],
         findAssignments,
         findTagGrants: async () => [],
+        findExclusions: async () => [],
       },
       { get: async () => ["ace.pace.read"] },
       { isAvailable: async () => true },
@@ -425,6 +467,7 @@ describe("EffectivePermissionsService", () => {
         findActivePermissionKeys: async () => [],
         findAssignments: async () => [grant()],
         findTagGrants: async () => [],
+        findExclusions: async () => [],
       } satisfies EffectivePermissionsReader)
       .overrideProvider(ORG_CAPABILITIES_READER)
       .useValue({
@@ -465,6 +508,7 @@ describe("EffectivePermissionsService", () => {
           grant({ permissionKey: "unregistered.key" as PermissionKey }),
         ],
         findTagGrants: async () => [],
+        findExclusions: async () => [],
       } satisfies EffectivePermissionsReader)
       .overrideProvider(ORG_CAPABILITIES_READER)
       .useValue({
@@ -732,6 +776,7 @@ describe("EffectivePermissionsService", () => {
       findActivePermissionKeys: async () => [],
       findAssignments: async () => [],
       findTagGrants,
+      findExclusions: async () => [],
     };
     const service = new EffectivePermissionsService(
       reader,

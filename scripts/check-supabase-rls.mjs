@@ -25,6 +25,7 @@ const REQUIRED_RLS_TABLES = [
   "OrgRoleRevision",
   "UserRoleAssignment",
   "AccessTagGrant",
+  "AccessTagExclusion",
   "AuditEvent",
   "OutboxEvent",
   "AcademicYear",

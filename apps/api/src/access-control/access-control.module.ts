@@ -43,6 +43,9 @@ import { AccessUsersController } from "./access-users.controller";
 import { AccessUsersService } from "./access-users.service";
 import { AccessTagsController } from "./access-tags.controller";
 import { AccessTagsService } from "./access-tags.service";
+import { BadgeStateController } from "./badge-state.controller";
+import { BadgeStateService } from "./badge-state.service";
+import { BadgeMatrixService } from "./badge-matrix.service";
 import { fromStoredAccessTagKey } from "./access-tag-keys";
 import { AssignmentsController } from "./assignments.controller";
 import { AssignmentsService } from "./assignments.service";
@@ -238,6 +241,26 @@ const effectivePermissionsReader: EffectivePermissionsReader = {
       })),
     );
   },
+
+  async findExclusions(userId, orgId, tenantId) {
+    const exclusions = await prisma.accessTagExclusion.findMany({
+      where: {
+        orgId,
+        userId,
+        revokedAt: null,
+        OR: [{ tenantId: null }, ...(tenantId ? [{ tenantId }] : [])],
+      },
+      select: { tenantId: true, tagKey: true },
+    });
+    return exclusions.flatMap(({ tenantId: scopeTenantId, tagKey }) =>
+      accessTagPermissionKeys(fromStoredAccessTagKey(tagKey)).map(
+        (permissionKey) => ({
+          tenantId: scopeTenantId,
+          permissionKey,
+        }),
+      ),
+    );
+  },
 };
 
 const orgCapabilitiesReader: OrgCapabilitiesReader = {
@@ -285,6 +308,7 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
     RolesController,
     AccessUsersController,
     AccessTagsController,
+    BadgeStateController,
     AccessAuditController,
     AccessPermissionsController,
   ],
@@ -293,6 +317,8 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
     RolesService,
     AccessUsersService,
     AccessTagsService,
+    BadgeStateService,
+    BadgeMatrixService,
     AccessAuditService,
     AccessPermissionsService,
     RoleSafetyService,
