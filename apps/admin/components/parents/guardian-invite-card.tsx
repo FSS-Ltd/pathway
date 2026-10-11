@@ -6,10 +6,12 @@ import { toast } from "sonner";
 import {
   createGuardianInvite,
   listGuardianInvites,
-  updateGuardianInvite,
+  resendGuardianInvite,
+  revokeGuardianInvite,
   type GuardianInvite,
   type GuardianInviteReviewBasis,
 } from "../../lib/api-client";
+import { GuardianInviteResendReview } from "./guardian-invite-resend-review";
 
 function inviteStatus(invite: GuardianInvite): string {
   if (invite.acceptedAt) return "Accepted";
@@ -26,6 +28,10 @@ export function GuardianInviteCard({ childId }: { childId: string }) {
   const [invites, setInvites] = React.useState<GuardianInvite[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState<string | null>(null);
+  const [resendInviteId, setResendInviteId] = React.useState<string | null>(
+    null,
+  );
+  const resendButtonRef = React.useRef<HTMLButtonElement>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   const refresh = React.useCallback(async () => {
@@ -66,26 +72,37 @@ export function GuardianInviteCard({ childId }: { childId: string }) {
     }
   };
 
-  const change = async (inviteId: string, action: "resend" | "revoke") => {
+  const change = async (
+    inviteId: string,
+    action:
+      | { type: "resend"; basis: GuardianInviteReviewBasis }
+      | { type: "revoke" },
+  ) => {
     if (busy) return;
     if (
-      action === "revoke" &&
+      action.type === "revoke" &&
       !window.confirm("Revoke this pending invitation?")
     )
       return;
     setBusy(inviteId);
     setError(null);
     try {
-      await updateGuardianInvite(inviteId, action);
+      if (action.type === "resend") {
+        await resendGuardianInvite(inviteId, action.basis);
+      } else {
+        await revokeGuardianInvite(inviteId);
+      }
+      if (action.type === "resend") resendButtonRef.current?.focus();
+      setResendInviteId(null);
       await refresh();
       toast.success(
-        action === "revoke" ? "Invitation revoked." : "Invitation resent.",
+        action.type === "revoke" ? "Invitation revoked." : "Invitation resent.",
       );
     } catch (cause) {
       setError(
         cause instanceof Error
           ? cause.message
-          : `Unable to ${action} invitation.`,
+          : `Unable to ${action.type} invitation.`,
       );
     } finally {
       setBusy(null);
@@ -185,10 +202,25 @@ export function GuardianInviteCard({ childId }: { childId: string }) {
                     </Badge>
                     {status === "Pending" || status === "Expired" ? (
                       <Button
+                        ref={
+                          resendInviteId === invite.id
+                            ? resendButtonRef
+                            : undefined
+                        }
                         size="sm"
                         variant="secondary"
                         disabled={busy !== null}
-                        onClick={() => void change(invite.id, "resend")}
+                        aria-expanded={resendInviteId === invite.id}
+                        aria-controls={
+                          resendInviteId === invite.id
+                            ? `guardian-resend-review-${invite.id}`
+                            : undefined
+                        }
+                        onClick={() =>
+                          setResendInviteId((current) =>
+                            current === invite.id ? null : invite.id,
+                          )
+                        }
                       >
                         Resend
                       </Button>
@@ -198,12 +230,28 @@ export function GuardianInviteCard({ childId }: { childId: string }) {
                         size="sm"
                         variant="outline"
                         disabled={busy !== null}
-                        onClick={() => void change(invite.id, "revoke")}
+                        onClick={() =>
+                          void change(invite.id, { type: "revoke" })
+                        }
                       >
                         Revoke
                       </Button>
                     ) : null}
                   </div>
+                  {resendInviteId === invite.id ? (
+                    <GuardianInviteResendReview
+                      inviteId={invite.id}
+                      busy={busy !== null}
+                      resending={busy === invite.id}
+                      onConfirm={(basis) =>
+                        void change(invite.id, { type: "resend", basis })
+                      }
+                      onCancel={() => {
+                        resendButtonRef.current?.focus();
+                        setResendInviteId(null);
+                      }}
+                    />
+                  ) : null}
                 </li>
               );
             })}

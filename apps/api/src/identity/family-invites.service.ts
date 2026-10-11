@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -39,6 +40,7 @@ export class FamilyInvitesService {
     childId: string,
     email: string,
     reviewBasis: GuardianInviteReviewBasis,
+    confirmedLegalAccess: boolean,
   ): Promise<GuardianInviteSummary> {
     const result = await this.createGuardianInviteInternal(
       tenantId,
@@ -47,6 +49,7 @@ export class FamilyInvitesService {
       childId,
       email,
       reviewBasis,
+      confirmedLegalAccess,
       false,
     );
     return result.summary;
@@ -59,6 +62,7 @@ export class FamilyInvitesService {
     childId: string,
     email: string,
     reviewBasis: GuardianInviteReviewBasis,
+    confirmedLegalAccess: boolean,
   ): Promise<"invited" | "existing"> {
     const result = await this.createGuardianInviteInternal(
       tenantId,
@@ -67,6 +71,7 @@ export class FamilyInvitesService {
       childId,
       email,
       reviewBasis,
+      confirmedLegalAccess,
       true,
     );
     return result.status;
@@ -79,11 +84,13 @@ export class FamilyInvitesService {
     childId: string,
     email: string,
     reviewBasis: GuardianInviteReviewBasis,
+    confirmedLegalAccess: boolean,
     importMode: boolean,
   ): Promise<{
     summary: GuardianInviteSummary;
     status: "invited" | "existing";
   }> {
+    this.requireLegalAccessConfirmation(confirmedLegalAccess);
     const normalizedEmail = email.trim().toLowerCase();
     const result = await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await lockFamilyInvite(tx, tenantId, childId, normalizedEmail);
@@ -231,6 +238,7 @@ export class FamilyInvitesService {
         {
           childId,
           reviewBasis,
+          legalAccess: "confirmed",
         },
       );
       return {
@@ -292,7 +300,10 @@ export class FamilyInvitesService {
     orgId: string,
     actorUserId: string,
     inviteId: string,
+    reviewBasis: GuardianInviteReviewBasis,
+    confirmedLegalAccess: boolean,
   ): Promise<GuardianInviteSummary> {
+    this.requireLegalAccessConfirmation(confirmedLegalAccess);
     const result = await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await lockFamilyInvite(tx, tenantId, inviteId);
       const invite = await tx.familyIdentityInvite.findFirst({
@@ -303,7 +314,8 @@ export class FamilyInvitesService {
       if (
         invite.acceptedAt ||
         invite.revokedAt ||
-        !invite.invitedUser.isActive
+        !invite.invitedUser.isActive ||
+        !invite.childId
       ) {
         throw new ConflictException("Invitation is no longer pending");
       }
@@ -326,6 +338,11 @@ export class FamilyInvitesService {
         actorUserId,
         inviteId,
         "resend",
+        {
+          childId: invite.childId,
+          reviewBasis,
+          legalAccess: "reconfirmed",
+        },
       );
       return {
         invite: updated,
@@ -335,6 +352,14 @@ export class FamilyInvitesService {
     });
     await this.send(result.email, result.siteName, tenantId, inviteId);
     return this.summary(result.invite, result.email);
+  }
+
+  private requireLegalAccessConfirmation(confirmed: boolean): void {
+    if (!confirmed) {
+      throw new BadRequestException(
+        "School confirmation of guardian legal access is required",
+      );
+    }
   }
 
   async revokeGuardianInvite(

@@ -225,6 +225,13 @@ describe("family identity invitation import", () => {
       },
       {
         target: "GUARDIAN",
+        childId: firstChildId,
+        email: guardianEmail,
+        reviewBasis: "SCHOOL_RECORDS",
+        confirmedLegalAccess: true,
+      },
+      {
+        target: "GUARDIAN",
         childId: secondChildId,
         email: guardianEmail,
         reviewBasis: "SCHOOL_RECORDS",
@@ -263,6 +270,7 @@ describe("family identity invitation import", () => {
     expect(first.status).toBe(201);
     expect(first.body.map((row: { status: string }) => row.status)).toEqual([
       "invited",
+      "existing",
       "invited",
       "invited",
       "failed",
@@ -310,6 +318,7 @@ describe("family identity invitation import", () => {
       .send({ rows });
     expect(repeated.status).toBe(201);
     expect(repeated.body.map((row: { status: string }) => row.status)).toEqual([
+      "existing",
       "existing",
       "existing",
       "existing",

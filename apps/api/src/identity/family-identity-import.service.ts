@@ -50,6 +50,7 @@ export class FamilyIdentityImportService {
                 row.childId,
                 row.email,
                 row.reviewBasis,
+                row.confirmedLegalAccess,
               )
             : await this.students.createForImport(
                 tenantId,

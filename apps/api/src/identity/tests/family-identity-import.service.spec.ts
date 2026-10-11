@@ -49,6 +49,15 @@ it("continues after a row failure and reports only safe per-row outcomes", async
     },
   ]);
   expect(guardians.createForImport).toHaveBeenCalledTimes(2);
+  expect(guardians.createForImport).toHaveBeenCalledWith(
+    "site-a",
+    "org-a",
+    "admin-a",
+    "child-a",
+    "parent@example.test",
+    "SCHOOL_RECORDS",
+    true,
+  );
   expect(students.createForImport).toHaveBeenCalledWith(
     "site-a",
     "org-a",

@@ -3387,13 +3387,32 @@ export async function createGuardianInvite(
   return response.json() as Promise<GuardianInvite>;
 }
 
-export async function updateGuardianInvite(
+export async function resendGuardianInvite(
   inviteId: string,
-  action: "resend" | "revoke",
-): Promise<void> {
+  reviewBasis: GuardianInviteReviewBasis,
+): Promise<GuardianInvite> {
   if (isUsingMockApi()) throw new Error("Invitations require the API.");
   const response = await fetch(
-    `${API_BASE_URL}/family-invites/guardian/${inviteId}/${action}`,
+    `${API_BASE_URL}/family-invites/guardian/${inviteId}/resend`,
+    {
+      method: "POST",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      body: JSON.stringify({ reviewBasis, confirmedLegalAccess: true }),
+    },
+  );
+  if (!response.ok)
+    throw await apiErrorFromResponse(
+      response,
+      "Unable to resend guardian invitation.",
+    );
+  return response.json() as Promise<GuardianInvite>;
+}
+
+export async function revokeGuardianInvite(inviteId: string): Promise<void> {
+  if (isUsingMockApi()) throw new Error("Invitations require the API.");
+  const response = await fetch(
+    `${API_BASE_URL}/family-invites/guardian/${inviteId}/revoke`,
     {
       method: "POST",
       headers: buildAuthHeaders(),
@@ -3403,7 +3422,7 @@ export async function updateGuardianInvite(
   if (!response.ok)
     throw await apiErrorFromResponse(
       response,
-      `Unable to ${action} guardian invitation.`,
+      "Unable to revoke guardian invitation.",
     );
 }
 

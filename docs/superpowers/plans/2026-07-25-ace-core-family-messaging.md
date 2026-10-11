@@ -380,7 +380,7 @@ export type MessageRealtimeEvent =
 - Test: `apps/api/src/identity/tests/family-identity.e2e.spec.ts`
 
 - [ ] Test invited/accepted/expired/revoked states, duplicate email, shared guardian across children, student age/policy restriction, and cross-tenant email collision.
-- [ ] Provision Auth0 identity only through the existing identity abstraction; store no reusable invite token.
+- [ ] Bind a verified provider identity through the existing identity abstraction (Clerk, or legacy Auth0); store no reusable invite token. The provider signs the recipient in before acceptance; invitation creation does not provision an external account.
 - [ ] Bind accepted identity to an explicit guardian-child or student-child relationship before granting any portal access.
 - [ ] Audit invite, resend, revoke, accept, relationship add/remove, and account disable.
 - [ ] Make bulk import deterministic and restartable without duplicate accounts.

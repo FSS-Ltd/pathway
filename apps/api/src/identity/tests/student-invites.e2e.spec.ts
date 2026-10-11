@@ -228,10 +228,34 @@ describe("student web identity invitation lifecycle", () => {
       .set("Authorization", studentAuthorization);
     expect(acceptedAgain.status).toBe(201);
     expect(
+      await prisma.auditEvent.findFirst({
+        where: {
+          actorUserId: studentId,
+          entityId: inviteId,
+          metadata: { path: ["action"], equals: "accept" },
+        },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: { kind: "FAMILY_IDENTITY_INVITE", action: "accept", childId },
+    });
+    expect(
       await prisma.studentIdentityLink.count({
         where: { tenantId: siteId, childId },
       }),
     ).toBe(1);
+    const studentLink = await prisma.studentIdentityLink.findFirstOrThrow({
+      where: { tenantId: siteId, childId, revokedAt: null },
+      select: { id: true },
+    });
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: { actorUserId: studentId, entityId: studentLink.id },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: { kind: "STUDENT_IDENTITY_LINK", childId },
+    });
     const acceptedInvite = await request(server)
       .get(`/student-invites/sites/${siteId}/${inviteId}`)
       .set("Authorization", studentAuthorization);
@@ -302,6 +326,14 @@ describe("student web identity invitation lifecycle", () => {
       .send({ reason: "Student account moved to a new school" });
     expect(revoked.status).toBe(200);
     expect(revoked.body.revokedAt).toBeTruthy();
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: { actorUserId: adminId, entityId: studentLink.id },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: { kind: "STUDENT_ACCESS_REVOKED", childId },
+    });
   });
 
   it("supports resend and revocation without activating a pending identity", async () => {
@@ -317,6 +349,14 @@ describe("student web identity invitation lifecycle", () => {
       .send({ email: secondEmail, confirmedSchoolApproval: true });
     expect(created.status).toBe(201);
     const inviteId = created.body.id as string;
+    await prisma.familyIdentityInvite.update({
+      where: { id: inviteId },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+    const expired = await request(server)
+      .post(`/student-invites/sites/${siteId}/${inviteId}/accept`)
+      .set("Authorization", secondAuthorization);
+    expect(expired.status).toBe(409);
     const missingApproval = await request(server)
       .post(`/student-invites/${inviteId}/resend`)
       .set("Authorization", adminAuthorization);
