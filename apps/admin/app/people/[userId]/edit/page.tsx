@@ -192,7 +192,7 @@ export default function EditStaffPage() {
         role: userRole.isOrgAdmin
           ? (role as "SITE_ADMIN" | "STAFF" | "VIEWER")
           : undefined,
-        isActive: userRole.isOrgAdmin ? isActive : undefined,
+        isActive: userRole.isSuperUser ? isActive : undefined,
       };
       if (staff.canEditAvailability) {
         payload.weeklyAvailability = weeklyAvailability.map((r) => ({
@@ -303,33 +303,42 @@ export default function EditStaffPage() {
               </div>
             </div>
             {userRole.isOrgAdmin ? (
-              <>
-                <div>
-                  <Label htmlFor="role">Role</Label>
-                  <Select
-                    id="role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+              <div>
+                <Label htmlFor="role">Role</Label>
+                <Select
+                  id="role"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                >
+                  {ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            ) : (
+              <p className="text-sm text-text-muted">
+                Role is managed by an organisation admin.
+              </p>
+            )}
+            {userRole.isSuperUser ? (
+              <div>
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="isActive"
                     checked={isActive}
                     onChange={(e) => setIsActive(e.target.checked)}
                   />
-                  <Label htmlFor="isActive">Active</Label>
+                  <Label htmlFor="isActive">Account active</Label>
                 </div>
-              </>
+                <p className="mt-1 text-sm text-text-muted">
+                  Disabling this account blocks access to every organisation.
+                </p>
+              </div>
             ) : (
               <p className="text-sm text-text-muted">
-                Role and account status are managed by an organisation admin.
+                Global account status is managed by a platform administrator.
               </p>
             )}
             {staff.email && (
