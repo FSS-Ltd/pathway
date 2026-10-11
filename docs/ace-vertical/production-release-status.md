@@ -183,18 +183,20 @@ E2E suites ran; 79 suites and 492 tests passed. GitHub confirmed
 `f46405a4841f9ad615217d04fccbb412b50884e2`. The exact ACE master-plan
 count remains **42/150 (28%)** because M16 and M18 are incomplete.
 
-Build step 1.3e5n ([draft PR #562](https://github.com/FSS-Ltd/pathway/pull/562),
+Build step 1.3e5n ([PR #562](https://github.com/FSS-Ltd/pathway/pull/562),
 in progress on `feature/ace-student-identity-web`):
 add ACE school student identity invitations, verified-email acceptance,
 site policy controls, active-link revocation, and student site discovery to
-the web and API. The student identity ADR in the source matrix remains open;
-the product owner must confirm the age and safeguarding rule before this
-step can merge. Local API and admin typechecks, lint, tests, and builds passed.
-On checked head `8a656009`, seven checks passed; the PostgreSQL integration
-job failed because active-site discovery started a read-only transaction inside
-an existing tenant transaction. Its log confirms the student invitation E2E
-suite ran and passed. The active-site transaction fix is being verified in this
-PR; latest-head CI must pass before review or merge. Mobile work remains paused.
+the web and API. On 11 October 2026 the product owner approved school approval
+per student for web invitations: the school confirms its age, consent, and
+safeguarding policy at creation and resend. The broader student identity ADR
+remains open for later work. Local API and admin typechecks, lint, tests, and
+builds passed. On checked head `587cf669`, all eight PR checks passed in
+[CI run 38098085820](https://github.com/FSS-Ltd/pathway/actions/runs/38098085820)
+and [CodeQL run 38098083772](https://github.com/FSS-Ltd/pathway/actions/runs/38098083772).
+The PostgreSQL integration job ran the student invitation E2E and passed all
+80 suites and 494 tests. The decision-record and confirmation-copy revision
+requires latest-head CI before merge. Mobile work remains paused.
 The verified master-plan count remains **42/150 (28%)**; ACE-M15 is not complete.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
