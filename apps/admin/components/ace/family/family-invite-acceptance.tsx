@@ -77,8 +77,16 @@ function FamilyInviteAcceptanceView({
   const [loading, setLoading] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const activeView = React.useRef(true);
   const actions = inviteActions[kind];
   const returnTo = `/${actions.path}/${encodeURIComponent(siteId)}/${encodeURIComponent(inviteId)}`;
+
+  React.useEffect(() => {
+    activeView.current = true;
+    return () => {
+      activeView.current = false;
+    };
+  }, []);
 
   React.useEffect(() => {
     if (status !== "authenticated") return;
@@ -112,9 +120,12 @@ function FamilyInviteAcceptanceView({
     setError(null);
     try {
       if (!invite?.acceptedAt) await actions.accept(siteId, inviteId);
+      if (!activeView.current) return;
       await setActiveSite(siteId);
+      if (!activeView.current) return;
       router.push("/ace/family");
     } catch (cause) {
+      if (!activeView.current) return;
       setError(
         cause instanceof Error
           ? cause.message

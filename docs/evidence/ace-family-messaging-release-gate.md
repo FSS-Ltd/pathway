@@ -120,7 +120,8 @@ clear its state. ACE family deep-link views and invitation acceptance are
 keyed to the current account and session status so their local data, forms,
 and pending UI state cannot carry into another account. Timetable headings
 also hide the prior child's name as soon as the session is no longer
-authenticated.
+authenticated. An invitation acceptance that finishes after its account-bound
+view unmounts cannot continue to change the active site or navigate.
 
 The session regression records every render across an account change and
 rejects any frame containing the previous API identity. The timetable web
