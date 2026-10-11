@@ -199,6 +199,22 @@ ADR remains open for later work. Mobile work remains paused. The verified
 master-plan count remains **42/150 (28%)** because ACE-M15 still lacks
 deterministic bulk import.
 
+The school approval decision and PR #562 merge evidence were recorded in
+[PR #563](https://github.com/FSS-Ltd/pathway/pull/563), checked at head
+`8460f187be4ce2b2dd5a434d48a08dcbaacfaf21` with all eight checks passing
+and merged to `master` as `d1f531f36829f227757b83ce75b8cf4a07187585`.
+Build step 1.3e5o is the web and API family identity invitation import on
+`feature/ace-family-identity-bulk-import`. Its current PR is pending. The
+design is in [25-family-identity-bulk-import-design.md](25-family-identity-bulk-import-design.md).
+The import uses the existing invitation services with bounded, restartable
+row processing, per-person approvals, and no duplicate account creation on
+retry. Local API/admin typechecks, lint, focused API and CSV tests, API/admin
+builds, formatting, and Graphify passed. The local database E2E command
+reported skipped assertions because PostgreSQL at `localhost:5433` is
+unavailable; its actual execution in CI remains a merge gate. The verified
+master-plan count remains **42/150 (28%)** until a complete ACE-M15 checklist
+is evidenced and merged.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of

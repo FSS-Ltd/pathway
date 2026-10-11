@@ -22,6 +22,37 @@ export async function lockFamilyInvite(
   );
 }
 
+export function findPriorImportInvite(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  childId: string,
+  target: "GUARDIAN" | "STUDENT",
+  email: string,
+): Promise<{
+  id: string;
+  expiresAt: Date;
+  acceptedAt: Date | null;
+  revokedAt: Date | null;
+} | null> {
+  return tx.familyIdentityInvite.findFirst({
+    where: {
+      tenantId,
+      childId,
+      target,
+      OR: [
+        { invitedEmail: { equals: email, mode: "insensitive" } },
+        { invitedUser: { email: { equals: email, mode: "insensitive" } } },
+      ],
+    },
+    select: {
+      id: true,
+      expiresAt: true,
+      acceptedAt: true,
+      revokedAt: true,
+    },
+  });
+}
+
 export async function auditFamilyInvite(
   tx: Prisma.TransactionClient,
   tenantId: string,

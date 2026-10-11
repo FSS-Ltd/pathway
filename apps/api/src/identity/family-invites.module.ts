@@ -17,6 +17,8 @@ import { StudentInvitesService } from "./student-invites.service";
 import { StudentInviteAcceptanceService } from "./student-invite-acceptance.service";
 import { StudentPortalPolicyService } from "./student-portal-policy.service";
 import { StudentAccessService } from "./student-access.service";
+import { FamilyIdentityImportController } from "./family-identity-import.controller";
+import { FamilyIdentityImportService } from "./family-identity-import.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule, MailerModule],
@@ -25,6 +27,7 @@ import { StudentAccessService } from "./student-access.service";
     GuardianInvitesAcceptanceController,
     StudentInvitesStaffController,
     StudentInvitesAcceptanceController,
+    FamilyIdentityImportController,
   ],
   providers: [
     FamilyInvitesService,
@@ -33,6 +36,7 @@ import { StudentAccessService } from "./student-access.service";
     StudentInviteAcceptanceService,
     StudentPortalPolicyService,
     StudentAccessService,
+    FamilyIdentityImportService,
   ],
 })
 export class FamilyInvitesModule {}

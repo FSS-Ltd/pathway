@@ -73,7 +73,7 @@ function setup() {
     },
     familyIdentityInvite: {
       findFirst: jest.fn().mockResolvedValue(invite),
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest.fn().mockResolvedValue(invite),
     },
@@ -99,6 +99,40 @@ function setup() {
 
 describe("guardian identity invitations", () => {
   beforeEach(() => jest.clearAllMocks());
+
+  it("keeps a previous import invitation unchanged without sending twice", async () => {
+    const { tx, service, mailer } = setup();
+    await expect(
+      service.createForImport(
+        tenantId,
+        orgId,
+        "admin-a",
+        childId,
+        email,
+        "SCHOOL_RECORDS",
+      ),
+    ).resolves.toBe("existing");
+    expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
+    expect(tx.familyIdentityInvite.update).not.toHaveBeenCalled();
+    expect(mailer.sendFamilyInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it("rejects a guardian invitation while a student invitation is pending", async () => {
+    const { tx, service } = setup();
+    tx.familyIdentityInvite.findMany.mockResolvedValue([
+      { id: "pending-student" },
+    ]);
+    await expect(
+      service.createGuardianInvite(
+        tenantId,
+        orgId,
+        "admin-a",
+        childId,
+        email,
+        "SCHOOL_RECORDS",
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
 
   it("creates a pending child invitation without granting access", async () => {
     const { tx, service, mailer } = setup();
