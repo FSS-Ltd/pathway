@@ -409,7 +409,8 @@ plus two single-connection suites and 13 tests. GitHub confirmed the merge to
 `master` on 11 October 2026 at 20:56 UTC as
 `1c44a281bbabb10547a77b24adf7a4c11c7c54e6`.
 
-Build step 1.3e5z (branch `fix/ace-web-account-boundary`) closes a web session
+Build step 1.3e5z ([PR #576](https://github.com/FSS-Ltd/pathway/pull/576),
+branch `fix/ace-web-account-boundary`) closes a web session
 boundary for the shared admin session adapter and ACE family routes. A Clerk
 account change must immediately hide the prior API identity; family deep-link
 views and invitations must discard state on account, session, or route change.
