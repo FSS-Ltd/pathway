@@ -8,10 +8,12 @@ import {
   Optional,
   Post,
   Req,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import {
   prisma,
+  applyTenantContext,
   SubscriptionStatus,
   Prisma,
   PendingOrderStatus,
@@ -19,7 +21,7 @@ import {
   OrgRole,
   OrgSector,
   Module,
-  ModuleStatus,
+  ModuleChangeStatus,
 } from "@pathway/db";
 import {
   getConfiguratorPlanPolicy,
@@ -45,6 +47,15 @@ import { ClerkManagementService } from "../auth/clerk-management.service";
 import { getAuthProviderMode } from "../config/runtime-env";
 import Stripe from "stripe";
 import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
+import {
+  cancelPaidSourceGrants,
+  reconcileSubscriptionModuleGrants,
+  updateSubscriptionGrantPeriod,
+} from "./module-grants";
+import {
+  claimBillingEvent,
+  finishBillingEvent,
+} from "./billing-event-processing";
 
 type WebhookResult =
   | { status: "ok"; eventId: string }
@@ -205,16 +216,10 @@ export class BillingWebhookController {
   ): Promise<WebhookResult> {
     const sig = signature ?? stripeSignature;
     const rawBody = req?.rawBody;
-    let event = await this.provider.verifyAndParse(body, sig, rawBody);
+    const event = await this.provider.verifyAndParse(body, sig, rawBody);
 
-    const alreadyHandled = await prisma.billingEvent.findFirst({
-      where: {
-        provider: event.provider,
-        payloadJson: { path: ["eventId"], equals: event.eventId },
-      },
-      select: { id: true },
-    });
-    if (alreadyHandled) {
+    const claim = await claimBillingEvent(event);
+    if (claim.status === "duplicate") {
       this.logger.info("Duplicate webhook ignored", {
         provider: event.provider,
         eventId: event.eventId,
@@ -223,29 +228,29 @@ export class BillingWebhookController {
       return { status: "ignored_duplicate", eventId: event.eventId };
     }
 
+    try {
+      return await this.processClaimedEvent(event, claim.id);
+    } catch (error) {
+      await finishBillingEvent(claim.id, event.orgId, false);
+      throw error;
+    }
+  }
+
+  private async processClaimedEvent(
+    event: ParsedBillingWebhookEvent,
+    claimId: string,
+  ): Promise<WebhookResult> {
     // If orgId is "pending", resolve the actual orgId from the pending order
-    if (event.orgId === "pending" && event.providerCheckoutId) {
-      const pendingOrder = await prisma.pendingOrder.findFirst({
-        where: {
-          provider: event.provider,
-          providerCheckoutId: event.providerCheckoutId,
-        },
-      });
+    if (event.orgId === "pending" || !event.orgId) {
+      const pendingOrder = await this.findPendingOrder(event);
 
-      if (pendingOrder?.pendingOrgDetails && !pendingOrder.orgId) {
+      if (
+        pendingOrder?.pendingOrgDetails &&
+        !pendingOrder.orgId &&
+        event.kind === "invoice.paid"
+      ) {
         // Create org/tenant/user NOW before processing the event
-        const created = await this.createOrgFromPendingDetails(
-          pendingOrder.pendingOrgDetails,
-        );
-
-        // Update the pending order with the real orgId
-        await prisma.pendingOrder.update({
-          where: { id: pendingOrder.id },
-          data: {
-            orgId: created.orgId,
-            tenantId: created.tenantId,
-          },
-        });
+        const created = await this.createOrgFromPendingDetails(pendingOrder);
 
         // Update the event orgId for subsequent processing
         event = { ...event, orgId: created.orgId };
@@ -260,23 +265,18 @@ export class BillingWebhookController {
       }
     }
 
+    if (
+      event.kind === "invoice.paid" &&
+      (!event.orgId || event.orgId === "pending")
+    ) {
+      throw new ServiceUnavailableException(
+        "Billing organisation is not available for this payment event.",
+      );
+    }
+
     const applied = await this.applyEvent(event);
 
-    // Only create billing event if we have a valid orgId
-    if (event.orgId && event.orgId !== "pending") {
-      await prisma.billingEvent.create({
-        data: {
-          orgId: event.orgId,
-          provider: event.provider,
-          type: event.kind,
-          payloadJson: {
-            eventId: event.eventId,
-            subscriptionId: event.subscriptionId,
-            orgId: event.orgId,
-          },
-        },
-      });
-    }
+    await finishBillingEvent(claimId, event.orgId, true);
 
     if (applied) {
       // Warm the resolver; no enforcement here.
@@ -314,6 +314,7 @@ export class BillingWebhookController {
         return true;
       case "invoice.payment_failed":
         {
+          if (!event.orgId || event.orgId === "pending") return true;
           const pendingOrder = await this.findPendingOrder(event);
           await this.upsertSubscription(
             event,
@@ -346,14 +347,22 @@ export class BillingWebhookController {
     }
 
     const pendingOrder = await this.findPendingOrder(event);
+    const awaitingPayment =
+      pendingOrder !== null &&
+      pendingOrder.status !== PendingOrderStatus.COMPLETED &&
+      event.kind !== "invoice.paid";
+    const effectiveStatus = awaitingPayment
+      ? SubscriptionStatus.INCOMPLETE
+      : status;
     const shouldApplyPendingOrder =
       pendingOrder !== null &&
       pendingOrder.status !== PendingOrderStatus.COMPLETED &&
+      event.kind === "invoice.paid" &&
       status === SubscriptionStatus.ACTIVE;
     if (!shouldApplyPendingOrder) {
       await this.upsertSubscription(
         event,
-        status,
+        effectiveStatus,
         prisma,
         subscriptionPlanCode(event, pendingOrder),
       );
@@ -365,8 +374,12 @@ export class BillingWebhookController {
       );
     }
 
+    if (event.kind === "invoice.paid" && status === SubscriptionStatus.ACTIVE) {
+      await this.applyScheduledModuleChange(event);
+    }
+
     if (pendingOrder) {
-      if (status !== SubscriptionStatus.ACTIVE) return;
+      if (effectiveStatus !== SubscriptionStatus.ACTIVE) return;
 
       if (pendingOrder.status !== PendingOrderStatus.COMPLETED) {
         await this.applyPendingOrder(event, status, pendingOrder);
@@ -405,42 +418,144 @@ export class BillingWebhookController {
     const paidModules = selectedModules.filter(
       (module) => !includedModuleSet.has(module),
     );
-    const entitlementSources = new Map<Module, "plan" | "add-on">();
+    await reconcileSubscriptionModuleGrants(
+      tx,
+      orgId,
+      event.subscriptionId,
+      { included: includedModules, paid: paidModules },
+      event.periodEnd ?? null,
+    );
+  }
 
-    for (const module of includedModules) {
-      entitlementSources.set(module, "plan");
-    }
-    for (const module of paidModules) {
-      if (!entitlementSources.has(module)) {
-        entitlementSources.set(module, "add-on");
-      }
-    }
-    if (entitlementSources.size === 0) return;
-
-    const now = new Date();
-    for (const [module, entitlementSource] of entitlementSources) {
-      const metadata = {
-        billingSource: "subscription",
-        subscriptionId: event.subscriptionId,
-        entitlementSource,
-      };
-      await tx.orgModule.upsert({
-        where: { orgId_module: { orgId, module } },
-        create: {
-          orgId,
-          module,
-          status: ModuleStatus.ACTIVE,
-          activatedAt: now,
-          expiresAt: event.periodEnd ?? null,
-          metadata,
+  private async applyScheduledModuleChange(
+    event: ParsedBillingWebhookEvent,
+  ): Promise<void> {
+    if (!event.periodStart || !event.orgId || !event.subscriptionId) return;
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, "", event.orgId);
+      const change = await tx.moduleChange.findFirst({
+        where: {
+          orgId: event.orgId,
+          providerSubId: event.subscriptionId,
+          status: ModuleChangeStatus.SCHEDULED,
+          effectiveAt: { lte: event.periodStart! },
         },
-        update: {
-          status: ModuleStatus.ACTIVE,
-          expiresAt: event.periodEnd ?? null,
-          metadata,
-        },
+        orderBy: { effectiveAt: "desc" },
       });
-    }
+      if (!change) return;
+      const claim = await tx.moduleChange.updateMany({
+        where: { id: change.id, status: ModuleChangeStatus.SCHEDULED },
+        data: { status: ModuleChangeStatus.APPLIED },
+      });
+      if (claim.count !== 1) return;
+      await reconcileSubscriptionModuleGrants(
+        tx,
+        event.orgId,
+        event.subscriptionId,
+        { included: change.includedModules, paid: change.paidModules },
+        event.periodEnd ?? null,
+      );
+      const providerItems = change.providerItems;
+      if (
+        isRecord(providerItems) &&
+        Array.isArray(providerItems.retiredSources)
+      ) {
+        for (const source of providerItems.retiredSources) {
+          if (
+            !isRecord(source) ||
+            typeof source.sourceId !== "string" ||
+            !Array.isArray(source.modules) ||
+            !source.modules.every(
+              (module) =>
+                typeof module === "string" &&
+                Object.values(Module).includes(module as Module),
+            )
+          ) {
+            throw new Error(
+              "Scheduled change has invalid retired grant sources",
+            );
+          }
+          await cancelPaidSourceGrants(
+            tx,
+            event.orgId,
+            source.sourceId,
+            source.modules as Module[],
+          );
+        }
+      }
+      const current = await tx.subscription.findUnique({
+        where: { providerSubId: event.subscriptionId },
+        select: { planCode: true },
+      });
+      if (current) {
+        const previous = await tx.orgEntitlementSnapshot.findFirst({
+          where: { orgId: event.orgId },
+          orderBy: { createdAt: "desc" },
+        });
+        const priorFlags = isRecord(previous?.flagsJson)
+          ? previous.flagsJson
+          : {};
+        // Subscription updates can arrive before the paid invoice. The latest
+        // entitlement snapshot, not the subscription row, records the paid tier.
+        const paidPlanCode =
+          typeof priorFlags.planCode === "string"
+            ? priorFlags.planCode
+            : current.planCode;
+        if (paidPlanCode !== change.planCode) {
+          const oldPlan = getPlanDefinition(paidPlanCode);
+          const nextPlan = getPlanDefinition(change.planCode);
+          if (!nextPlan)
+            throw new Error("Scheduled plan is no longer recognised");
+          const retainExtras = (
+            currentValue: number | null | undefined,
+            oldBase: number | null | undefined,
+            nextBase: number | null | undefined,
+          ): number =>
+            (nextBase ?? currentValue ?? 0) +
+            (oldBase === null ||
+            oldBase === undefined ||
+            currentValue === null ||
+            currentValue === undefined
+              ? 0
+              : Math.max(0, currentValue - oldBase));
+          await tx.orgEntitlementSnapshot.create({
+            data: {
+              orgId: event.orgId,
+              av30Included: retainExtras(
+                previous?.av30Included,
+                oldPlan?.av30Included,
+                nextPlan.av30Included,
+              ),
+              maxSites: retainExtras(
+                previous?.maxSites,
+                oldPlan?.maxSitesIncluded,
+                nextPlan.maxSitesIncluded,
+              ),
+              storageGbIncluded: retainExtras(
+                previous?.storageGbIncluded,
+                oldPlan?.storageGbIncluded,
+                nextPlan.storageGbIncluded,
+              ),
+              leaderSeatsIncluded: retainExtras(
+                previous?.leaderSeatsIncluded,
+                oldPlan?.leaderSeatsIncluded,
+                nextPlan.leaderSeatsIncluded,
+              ),
+              flagsJson: {
+                ...priorFlags,
+                planCode: change.planCode,
+                planTier: nextPlan.tier,
+              },
+              source: "module_change",
+            },
+          });
+        }
+        await tx.subscription.update({
+          where: { providerSubId: event.subscriptionId },
+          data: { planCode: change.planCode },
+        });
+      }
+    });
   }
 
   private async extendActiveModulesExpiry(
@@ -450,13 +565,9 @@ export class BillingWebhookController {
   ): Promise<void> {
     if (!periodEnd) return;
 
-    await prisma.orgModule.updateMany({
-      where: {
-        orgId,
-        status: ModuleStatus.ACTIVE,
-        metadata: { path: ["subscriptionId"], equals: subscriptionId },
-      },
-      data: { expiresAt: periodEnd },
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, "", orgId);
+      await updateSubscriptionGrantPeriod(tx, orgId, subscriptionId, periodEnd);
     });
   }
 
@@ -464,13 +575,9 @@ export class BillingWebhookController {
     orgId: string,
     subscriptionId: string,
   ): Promise<void> {
-    await prisma.orgModule.updateMany({
-      where: {
-        orgId,
-        status: ModuleStatus.ACTIVE,
-        metadata: { path: ["subscriptionId"], equals: subscriptionId },
-      },
-      data: { status: ModuleStatus.CANCELLED },
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, "", orgId);
+      await updateSubscriptionGrantPeriod(tx, orgId, subscriptionId, null);
     });
   }
 
@@ -523,6 +630,7 @@ export class BillingWebhookController {
     }
 
     await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, actualTenantId ?? "", actualOrgId);
       await this.upsertSubscription(
         event,
         status,
@@ -746,9 +854,9 @@ export class BillingWebhookController {
   }
 
   private async createOrgFromPendingDetails(
-    pendingDetails: Prisma.JsonValue,
-  ): Promise<{ orgId: string; tenantId: string; userId: string }> {
-    const details = pendingDetails as Record<string, string>;
+    pendingOrder: PendingOrderRecord,
+  ): Promise<{ orgId: string; tenantId: string }> {
+    const details = pendingOrder.pendingOrgDetails as Record<string, string>;
     const orgName = details.orgName;
     const slug = details.slug;
     const contactName = details.contactName;
@@ -768,6 +876,17 @@ export class BillingWebhookController {
 
     // Wrap all DB operations in a transaction
     return await prisma.$transaction(async (tx) => {
+      // Different provider events for one order can arrive together. Lock the
+      // order and persist its org link in this same transaction.
+      await tx.$queryRaw`SELECT id FROM "PendingOrder" WHERE id = ${pendingOrder.id} FOR UPDATE`;
+      const currentOrder = await tx.pendingOrder.findUnique({
+        where: { id: pendingOrder.id },
+      });
+      if (!currentOrder)
+        throw new Error("Pending order disappeared during provisioning");
+      if (currentOrder.orgId && currentOrder.tenantId) {
+        return { orgId: currentOrder.orgId, tenantId: currentOrder.tenantId };
+      }
       // Create org
       const org = await tx.org.create({
         data: {
@@ -1060,10 +1179,13 @@ export class BillingWebhookController {
         },
       );
 
+      await tx.pendingOrder.update({
+        where: { id: pendingOrder.id },
+        data: { orgId: org.id, tenantId: tenant.id },
+      });
       return {
         orgId: org.id,
         tenantId: tenant.id,
-        userId: user.id,
       };
     });
   }

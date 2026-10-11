@@ -1,6 +1,7 @@
 import {
   CONFIGURATOR_MODULE_CODES,
   getConfiguratorPlanPolicy,
+  isConfiguratorModuleReady,
 } from "@pathway/pricing";
 
 const allModules = [
@@ -14,11 +15,17 @@ const allModules = [
   "ADVANCED_REPORTING",
   "LEARNING",
 ] as const;
+const optionalModules = allModules.filter((module) => module !== "LEARNING");
 
 describe("configurator plan policy", () => {
   it("publishes the complete eligible module catalogue as an immutable list", () => {
     expect(CONFIGURATOR_MODULE_CODES).toEqual(allModules);
     expect(Object.isFrozen(CONFIGURATOR_MODULE_CODES)).toBe(true);
+  });
+
+  it("keeps all optional modules unavailable until launch readiness is approved", () => {
+    expect(optionalModules.every((module) => !isConfiguratorModuleReady(module))).toBe(true);
+    expect(isConfiguratorModuleReady("LEARNING")).toBe(false);
   });
 
   it.each(["STARTER_49_MONTHLY", "STARTER_49_YEARLY"])(
@@ -27,7 +34,7 @@ describe("configurator plan policy", () => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
         includedModuleLimit: 0,
-        eligibleOptionalModules: allModules,
+        eligibleOptionalModules: optionalModules,
       });
     },
   );
@@ -38,7 +45,7 @@ describe("configurator plan policy", () => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
         includedModuleLimit: 3,
-        eligibleOptionalModules: allModules,
+        eligibleOptionalModules: optionalModules,
         legacyIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
       });
     },
@@ -50,7 +57,7 @@ describe("configurator plan policy", () => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
         includedModuleLimit: 6,
-        eligibleOptionalModules: allModules,
+        eligibleOptionalModules: optionalModules,
         legacyIncludedModules: [
           "FINANCE",
           "EVENTS",
@@ -86,7 +93,7 @@ describe("configurator plan policy", () => {
     expect(getConfiguratorPlanPolicy(planCode)).toEqual({
       outcome: "checkout",
       includedModuleLimit: 0,
-      eligibleOptionalModules: allModules,
+      eligibleOptionalModules: optionalModules,
       legacyIncludedModules: [],
     });
   });

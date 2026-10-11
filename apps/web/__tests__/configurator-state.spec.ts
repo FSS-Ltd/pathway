@@ -36,6 +36,7 @@ const PRICES = {
   MODULE_MEALS_MONTHLY: { amountMajor: 18 },
   MODULE_HR_MONTHLY: { amountMajor: 20 },
   MODULE_ASSET_MANAGEMENT_MONTHLY: { amountMajor: 22 },
+  MODULE_ASSET_MANAGEMENT_YEARLY: { amountMajor: 220 },
   MODULE_AI_WORKSPACE_MONTHLY: { amountMajor: 25 },
   MODULE_ADVANCED_REPORTING_MONTHLY: { amountMajor: 27 },
 };
@@ -47,7 +48,7 @@ const completeState = (
   step: "modules",
   orgType: "CHURCH",
   vertical: "CHURCH",
-  selectedOptionalModules: ["LEARNING"],
+  selectedOptionalModules: ["ASSET_MANAGEMENT"],
   selectedIncludedModules: [],
   planCode: "STARTER_49_MONTHLY",
   frequency: "monthly",
@@ -192,14 +193,14 @@ describe("configurator state", () => {
     expect(availableIncludedChoice.selectedOptionalModules).toContain(
       "ADVANCED_REPORTING",
     );
-    const noIncludedSlots = toggleModule(availableIncludedChoice, "LEARNING", {
+    const noIncludedSlots = toggleModule(availableIncludedChoice, "ASSET_MANAGEMENT", {
       ...PRICES,
       MODULE_AI_WORKSPACE_MONTHLY: { amountMajor: 25 },
       MODULE_ADVANCED_REPORTING_MONTHLY: { amountMajor: 27 },
     });
     const unavailablePaidExtra = toggleModule(
       noIncludedSlots,
-      "ASSET_MANAGEMENT",
+      "LEARNING",
       {},
     );
     expect(unavailablePaidExtra).toBe(noIncludedSlots);
@@ -212,11 +213,11 @@ describe("configurator state", () => {
       PRICES,
     );
     expect(includedModuleLimitForState(growth)).toBe(3);
-    const chosen = ["TRANSPORT", "MEALS", "EVENTS", "LEARNING"].reduce(
+    const chosen = ["TRANSPORT", "MEALS", "EVENTS", "ASSET_MANAGEMENT"].reduce(
       (state, module) =>
         toggleModule(
           state,
-          module as "TRANSPORT" | "MEALS" | "EVENTS" | "LEARNING",
+          module as "TRANSPORT" | "MEALS" | "EVENTS" | "ASSET_MANAGEMENT",
           PRICES,
         ),
       growth,
@@ -226,13 +227,13 @@ describe("configurator state", () => {
       "MEALS",
       "EVENTS",
     ]);
-    expect(chosen.selectedOptionalModules).toEqual(["LEARNING"]);
+    expect(chosen.selectedOptionalModules).toEqual(["ASSET_MANAGEMENT"]);
 
     const deselected = toggleModule(chosen, "TRANSPORT", PRICES);
     expect(deselected.selectedIncludedModules).toEqual([
       "MEALS",
       "EVENTS",
-      "LEARNING",
+      "ASSET_MANAGEMENT",
     ]);
     expect(deselected.selectedOptionalModules).toEqual([]);
   });
@@ -247,7 +248,7 @@ describe("configurator state", () => {
       "TRANSPORT",
       "MEALS",
       "EVENTS",
-      "LEARNING",
+      "ASSET_MANAGEMENT",
       "FINANCE",
       "HR",
       "AI_WORKSPACE",
@@ -259,7 +260,7 @@ describe("configurator state", () => {
             | "TRANSPORT"
             | "MEALS"
             | "EVENTS"
-            | "LEARNING"
+            | "ASSET_MANAGEMENT"
             | "FINANCE"
             | "HR"
             | "AI_WORKSPACE",
@@ -271,7 +272,7 @@ describe("configurator state", () => {
       "TRANSPORT",
       "MEALS",
       "EVENTS",
-      "LEARNING",
+      "ASSET_MANAGEMENT",
       "FINANCE",
       "HR",
     ]);
@@ -282,7 +283,7 @@ describe("configurator state", () => {
     const growth = {
       ...selectPlan(INITIAL_CONFIGURATOR_STATE, "GROWTH_99_MONTHLY", PRICES),
       selectedIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
-      selectedOptionalModules: ["LEARNING"],
+      selectedOptionalModules: ["ASSET_MANAGEMENT"],
     };
     const yearly = selectFrequency(growth, "yearly", PRICES);
     expect(yearly.selectedIncludedModules).toEqual([
@@ -290,28 +291,44 @@ describe("configurator state", () => {
       "EVENTS",
       "ADVANCED_REPORTING",
     ]);
-    expect(yearly.selectedOptionalModules).toEqual(["LEARNING"]);
+    expect(yearly.selectedOptionalModules).toEqual(["ASSET_MANAGEMENT"]);
 
     const starter = selectPlan(yearly, "STARTER_49_YEARLY", {
       ...PRICES,
       MODULE_FINANCE_YEARLY: { amountMajor: 190 },
       MODULE_EVENTS_YEARLY: { amountMajor: 120 },
       MODULE_ADVANCED_REPORTING_YEARLY: { amountMajor: 270 },
+      MODULE_ASSET_MANAGEMENT_YEARLY: { amountMajor: 220 },
     });
     expect(starter.selectedIncludedModules).toEqual([]);
     expect(starter.selectedOptionalModules).toEqual([
       "FINANCE",
       "EVENTS",
       "ADVANCED_REPORTING",
-      "LEARNING",
+      "ASSET_MANAGEMENT",
     ]);
+  });
+
+  it("keeps an explicit empty module choice when changing plans or frequency", () => {
+    const growth = selectPlan(
+      INITIAL_CONFIGURATOR_STATE,
+      "GROWTH_99_MONTHLY",
+      PRICES,
+    );
+    const starter = selectPlan(growth, "STARTER_49_MONTHLY", PRICES);
+    expect(starter.selectedIncludedModules).toEqual([]);
+    expect(starter.selectedOptionalModules).toEqual([]);
+
+    const yearly = selectFrequency(growth, "yearly", PRICES);
+    expect(yearly.selectedIncludedModules).toEqual([]);
+    expect(yearly.selectedOptionalModules).toEqual([]);
   });
 
   it("moves deselected inclusions into any remaining included slots before charging them", () => {
     const state: ConfiguratorState = {
       ...selectPlan(INITIAL_CONFIGURATOR_STATE, "GROWTH_99_MONTHLY", PRICES),
       selectedIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
-      selectedOptionalModules: ["LEARNING"],
+      selectedOptionalModules: ["ASSET_MANAGEMENT"],
     };
 
     const changed = toggleModule(state, "EVENTS", PRICES);
@@ -319,7 +336,7 @@ describe("configurator state", () => {
     expect(changed.selectedIncludedModules).toEqual([
       "FINANCE",
       "ADVANCED_REPORTING",
-      "LEARNING",
+      "ASSET_MANAGEMENT",
     ]);
     expect(changed.selectedOptionalModules).toEqual([]);
   });
@@ -328,21 +345,21 @@ describe("configurator state", () => {
     const state: ConfiguratorState = {
       ...selectPlan(INITIAL_CONFIGURATOR_STATE, "GROWTH_99_MONTHLY", PRICES),
       selectedIncludedModules: ["FINANCE", "FINANCE"],
-      selectedOptionalModules: ["FINANCE", "LEARNING"],
+      selectedOptionalModules: ["FINANCE", "ASSET_MANAGEMENT"],
     };
-    expect(configuredModulesForState(state)).toEqual(["FINANCE", "LEARNING"]);
+    expect(configuredModulesForState(state)).toEqual(["FINANCE", "ASSET_MANAGEMENT"]);
   });
 
   it("returns a deduplicated included and optional module union", () => {
     const state = completeState({
       planCode: "GROWTH_99_MONTHLY",
       selectedIncludedModules: ["FINANCE", "EVENTS"],
-      selectedOptionalModules: ["LEARNING", "MEALS"],
+      selectedOptionalModules: ["ASSET_MANAGEMENT", "MEALS"],
     });
     expect(configuredModulesForState(state)).toEqual([
       "FINANCE",
       "EVENTS",
-      "LEARNING",
+      "ASSET_MANAGEMENT",
       "MEALS",
     ]);
   });

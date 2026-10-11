@@ -12,7 +12,7 @@ import {
   type StripePriceMap,
 } from "../billing-provider.config";
 import type { PlanCode } from "../billing-plans";
-import { getConfiguratorPlanPolicy } from "@pathway/pricing";
+import { getConfiguratorPlanPolicy, isConfiguratorModuleReady } from "@pathway/pricing";
 
 @Injectable()
 export class StripeBuyNowProvider extends BuyNowProvider {
@@ -95,6 +95,13 @@ export class StripeBuyNowProvider extends BuyNowProvider {
     const invalidIncludedModules = selectedIncludedModules.filter(
       (module) => !policy?.eligibleOptionalModules.includes(module),
     );
+    const requestedModules = [...selectedIncludedModules, ...selectedModules];
+    if (requestedModules.some((module) =>
+      !policy?.eligibleOptionalModules.some((code) =>
+        code === module && isConfiguratorModuleReady(code),
+      ))) {
+      throw new Error("Selected modules are not yet available.");
+    }
     if (
       !addonsOnly &&
       (!policy ||

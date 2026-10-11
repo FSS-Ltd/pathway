@@ -51,12 +51,28 @@ export function isConfiguratorPlanCode(
  */
 export function initialStateFromSubscription(
   planCode: string | null | undefined,
+  modules: { included: readonly WebModule[]; paid: readonly WebModule[] } = {
+    included: [],
+    paid: [],
+  },
 ): ConfiguratorState {
   if (!isConfiguratorPlanCode(planCode)) return INITIAL_CONFIGURATOR_STATE;
+  const policy = getConfiguratorPlanPolicy(planCode);
+  const included = [...new Set(modules.included)]
+    .filter((module) => policy?.eligibleOptionalModules.includes(module))
+    .slice(0, policy?.includedModuleLimit ?? 0);
+  const includedSet = new Set(included);
+  const paid = [...new Set(modules.paid)].filter(
+    (module) =>
+      !includedSet.has(module) &&
+      policy?.eligibleOptionalModules.includes(module),
+  );
   return {
     ...INITIAL_CONFIGURATOR_STATE,
     planCode,
     frequency: planCode.endsWith("YEARLY") ? "yearly" : "monthly",
+    selectedIncludedModules: included,
+    selectedOptionalModules: paid,
   };
 }
 
@@ -164,6 +180,18 @@ export function toggleModule(
 
   const selectedIncluded = state.selectedIncludedModules.includes(module);
   const selectedOptional = state.selectedOptionalModules.includes(module);
+  if (
+    selectedOptional &&
+    state.selectedIncludedModules.length < policy.includedModuleLimit
+  ) {
+    return {
+      ...state,
+      selectedIncludedModules: [...state.selectedIncludedModules, module],
+      selectedOptionalModules: state.selectedOptionalModules.filter(
+        (item) => item !== module,
+      ),
+    };
+  }
   const selectedModules = [
     ...state.selectedIncludedModules,
     ...state.selectedOptionalModules,
@@ -205,17 +233,8 @@ export function selectPlan(
   planCode: PlanCode,
   prices: OptionPriceLookup,
 ): ConfiguratorState {
-  const previousPolicy = state.planCode
-    ? getConfiguratorPlanPolicy(state.planCode)
-    : undefined;
   const reconciled = reconcileModules(
-    [
-      ...state.selectedIncludedModules,
-      ...(state.selectedIncludedModules.length === 0
-        ? (previousPolicy?.legacyIncludedModules ?? [])
-        : []),
-      ...state.selectedOptionalModules,
-    ],
+    [...state.selectedIncludedModules, ...state.selectedOptionalModules],
     planCode,
     state.frequency,
     prices,
@@ -237,17 +256,8 @@ export function selectFrequency(
   const planCode = state.planCode
     ? remapPlanFrequency(state.planCode, frequency)
     : null;
-  const previousPolicy = state.planCode
-    ? getConfiguratorPlanPolicy(state.planCode)
-    : undefined;
   const reconciled = reconcileModules(
-    [
-      ...state.selectedIncludedModules,
-      ...(state.selectedIncludedModules.length === 0
-        ? (previousPolicy?.legacyIncludedModules ?? [])
-        : []),
-      ...state.selectedOptionalModules,
-    ],
+    [...state.selectedIncludedModules, ...state.selectedOptionalModules],
     planCode,
     frequency,
     prices,

@@ -13,6 +13,8 @@ import { BuyNowService } from "./buy-now.service";
 import { BuyNowController } from "./buy-now.controller";
 import { BillingPricingController } from "./pricing.controller";
 import { BillingPricingService } from "./pricing.service";
+import { ModuleChangeController } from "./module-change.controller";
+import { ModuleChangeService } from "./module-change.service";
 import {
   BillingWebhookController,
 } from "./webhook.controller";
@@ -35,6 +37,7 @@ import { BILLING_WEBHOOK_PROVIDER } from "./billing-webhook.provider";
     PlanPreviewController,
     BuyNowController,
     BillingPricingController,
+    ModuleChangeController,
   ],
   providers: [
     BillingService,
@@ -43,6 +46,7 @@ import { BILLING_WEBHOOK_PROVIDER } from "./billing-webhook.provider";
     PlanPreviewService,
     BuyNowService,
     BillingPricingService,
+    ModuleChangeService,
     {
       provide: BILLING_PROVIDER_CONFIG,
       useFactory: () => loadBillingProviderConfig(),

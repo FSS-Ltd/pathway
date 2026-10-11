@@ -1,4 +1,5 @@
 import { PriceChip } from "../../../components/configurator/price-chip";
+import { isConfiguratorModuleReady } from "@pathway/pricing";
 import {
   SelectionCard,
   SelectionCardGroup,
@@ -66,8 +67,8 @@ export function ModulesStep({
           Add optional modules
         </h2>
         <p className="text-text-muted">
-          Choose up to {includedModuleLimit} modules included with {planLabel}.
-          Other selected modules are charged at the prices shown.
+          {planLabel} includes up to {includedModuleLimit} optional modules when
+          they become available. Module selection is currently closed.
         </p>
       </div>
       <SelectionCardGroup className="grid gap-3">
@@ -78,9 +79,10 @@ export function ModulesStep({
               selectedIncludedSet.has(module) || selectedOptionalSet.has(module)
             }
             isDisabled={
-              delta.status === "coming-soon" &&
-              availableIncludedSlots === 0 &&
-              !selectedIncludedSet.has(module)
+              !isConfiguratorModuleReady(module) ||
+              (delta.status === "coming-soon" &&
+                availableIncludedSlots === 0 &&
+                !selectedIncludedSet.has(module))
             }
             onClick={() => onToggle(module)}
           >
@@ -94,7 +96,11 @@ export function ModulesStep({
                 </span>
               </span>
               <span className="flex flex-col items-end gap-1">
-                {selectedIncludedSet.has(module) ? (
+                {!isConfiguratorModuleReady(module) ? (
+                  <span className="whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-text-muted">
+                    Coming soon
+                  </span>
+                ) : selectedIncludedSet.has(module) ? (
                   <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-text-primary">
                     Included in {planLabel}
                   </span>

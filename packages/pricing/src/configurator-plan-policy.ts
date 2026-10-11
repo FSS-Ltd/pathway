@@ -12,6 +12,22 @@ export const CONFIGURATOR_MODULE_CODES = Object.freeze([
 
 export type ConfiguratorModuleCode = (typeof CONFIGURATOR_MODULE_CODES)[number];
 
+// Learning is a core platform capability. Keep its historical code readable,
+// while excluding it from every optional-module allowance and new purchase.
+const OPTIONAL_MODULE_CODES = Object.freeze(
+  CONFIGURATOR_MODULE_CODES.filter((code) => code !== "LEARNING"),
+);
+
+// Product launch gate. Modules remain in the catalogue for display and legacy
+// order decoding, but none may be newly selected until their offering is ready.
+const READY_OPTIONAL_MODULES: ReadonlySet<ConfiguratorModuleCode> = new Set();
+
+export function isConfiguratorModuleReady(
+  module: ConfiguratorModuleCode,
+): boolean {
+  return READY_OPTIONAL_MODULES.has(module);
+}
+
 export interface ConfiguratorPlanPolicy {
   outcome: "checkout" | "contact";
   includedModuleLimit: number;
@@ -34,21 +50,21 @@ function freezePolicy(policy: ConfiguratorPlanPolicy): ConfiguratorPlanPolicy {
 const STARTER_POLICY = freezePolicy({
   outcome: "checkout",
   includedModuleLimit: 0,
-  eligibleOptionalModules: CONFIGURATOR_MODULE_CODES,
+  eligibleOptionalModules: OPTIONAL_MODULE_CODES,
   legacyIncludedModules: NO_MODULES,
 });
 
 const GROWTH_POLICY = freezePolicy({
   outcome: "checkout",
   includedModuleLimit: 3,
-  eligibleOptionalModules: CONFIGURATOR_MODULE_CODES,
+  eligibleOptionalModules: OPTIONAL_MODULE_CODES,
   legacyIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
 });
 
 const PROFESSIONAL_POLICY = freezePolicy({
   outcome: "checkout",
   includedModuleLimit: 6,
-  eligibleOptionalModules: CONFIGURATOR_MODULE_CODES,
+  eligibleOptionalModules: OPTIONAL_MODULE_CODES,
   legacyIncludedModules: [
     "FINANCE",
     "EVENTS",

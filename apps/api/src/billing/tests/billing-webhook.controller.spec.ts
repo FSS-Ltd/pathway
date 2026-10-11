@@ -9,8 +9,18 @@ import { ModuleRef } from "@nestjs/core";
 import { LoggingService } from "../../common/logging/logging.service";
 import type { BillingProviderConfig } from "../billing-provider.config";
 import {
+  claimBillingEvent,
+  finishBillingEvent,
+} from "../billing-event-processing";
+
+jest.mock("../billing-event-processing", () => ({
+  claimBillingEvent: jest.fn(),
+  finishBillingEvent: jest.fn(),
+}));
+import {
   BillingProvider,
   Module,
+  ModuleGrantSource,
   ModuleStatus,
   SubscriptionStatus,
   PendingOrderStatus,
@@ -18,24 +28,53 @@ import {
 
 const prismaMock: {
   billingEvent: { findFirst: jest.Mock; create: jest.Mock };
-  subscription: { upsert: jest.Mock; findMany: jest.Mock; update: jest.Mock };
-  orgEntitlementSnapshot: { create: jest.Mock };
-  orgModule: { upsert: jest.Mock; updateMany: jest.Mock };
+  subscription: {
+    upsert: jest.Mock;
+    findMany: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+  };
+  orgEntitlementSnapshot: { create: jest.Mock; findFirst: jest.Mock };
+  orgModule: {
+    upsert: jest.Mock;
+    update: jest.Mock;
+    findUnique: jest.Mock;
+    updateMany: jest.Mock;
+  };
+  moduleGrant: {
+    findMany: jest.Mock;
+    updateMany: jest.Mock;
+    upsert: jest.Mock;
+  };
+  moduleChange: { findFirst: jest.Mock; updateMany: jest.Mock };
   pendingOrder: {
     findUnique: jest.Mock;
     findFirst: jest.Mock;
     update: jest.Mock;
   };
   $transaction: jest.Mock;
+  $executeRawUnsafe: jest.Mock;
 } = {
   billingEvent: { findFirst: jest.fn(), create: jest.fn() },
   subscription: {
     upsert: jest.fn(),
     findMany: jest.fn().mockResolvedValue([]),
+    findUnique: jest.fn(),
     update: jest.fn().mockResolvedValue(undefined),
   },
-  orgEntitlementSnapshot: { create: jest.fn() },
-  orgModule: { upsert: jest.fn(), updateMany: jest.fn() },
+  orgEntitlementSnapshot: { create: jest.fn(), findFirst: jest.fn() },
+  orgModule: {
+    upsert: jest.fn(),
+    update: jest.fn(),
+    findUnique: jest.fn(),
+    updateMany: jest.fn(),
+  },
+  moduleGrant: {
+    findMany: jest.fn().mockResolvedValue([]),
+    updateMany: jest.fn(),
+    upsert: jest.fn(),
+  },
+  moduleChange: { findFirst: jest.fn(), updateMany: jest.fn() },
   pendingOrder: {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
@@ -44,6 +83,7 @@ const prismaMock: {
   $transaction: jest.fn((cb: (tx: typeof prismaMock) => unknown) =>
     Promise.resolve(cb(prismaMock)),
   ),
+  $executeRawUnsafe: jest.fn(),
 };
 
 jest.mock("@pathway/db", () => {
@@ -65,8 +105,8 @@ describe("BillingWebhookController", () => {
     subscriptionId: "sub_1",
     planCode: "pro",
     status: SubscriptionStatus.ACTIVE,
-    periodStart: new Date("2024-01-01T00:00:00Z"),
-    periodEnd: new Date("2024-02-01T00:00:00Z"),
+    periodStart: new Date("2030-01-01T00:00:00Z"),
+    periodEnd: new Date("2030-02-01T00:00:00Z"),
     cancelAtPeriodEnd: false,
     entitlements: {
       av30Included: 50,
@@ -83,6 +123,64 @@ describe("BillingWebhookController", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (claimBillingEvent as jest.Mock).mockResolvedValue({
+      status: "claimed",
+      id: "billing_event_1",
+    });
+    (finishBillingEvent as jest.Mock).mockResolvedValue(undefined);
+    const grants: Array<{
+      orgId: string;
+      module: Module;
+      source: ModuleGrantSource;
+      sourceId: string;
+      status: ModuleStatus;
+      expiresAt: Date | null;
+    }> = [];
+    const matches = (
+      grant: (typeof grants)[number],
+      where: {
+        orgId?: string;
+        module?: Module;
+        sourceId?: string;
+        status?: ModuleStatus;
+        source?: { in: ModuleGrantSource[] };
+      },
+    ) =>
+      (!where.orgId || grant.orgId === where.orgId) &&
+      (!where.module || grant.module === where.module) &&
+      (!where.sourceId || grant.sourceId === where.sourceId) &&
+      (!where.status || grant.status === where.status) &&
+      (!where.source || where.source.in.includes(grant.source));
+    prismaMock.moduleGrant.findMany.mockImplementation(async ({ where }) =>
+      grants.filter((grant) => matches(grant, where)),
+    );
+    prismaMock.moduleGrant.updateMany.mockImplementation(
+      async ({ where, data }) => {
+        for (const grant of grants.filter((row) => matches(row, where))) {
+          Object.assign(grant, data);
+        }
+      },
+    );
+    prismaMock.moduleGrant.upsert.mockImplementation(
+      async ({ where, create, update }) => {
+        const key = where.orgId_module_source_sourceId;
+        const existing = grants.find(
+          (grant) =>
+            grant.orgId === key.orgId &&
+            grant.module === key.module &&
+            grant.source === key.source &&
+            grant.sourceId === key.sourceId,
+        );
+        if (existing) Object.assign(existing, update);
+        else grants.push({ ...create });
+      },
+    );
+    prismaMock.orgModule.findUnique.mockResolvedValue(null);
+    prismaMock.moduleChange.findFirst.mockResolvedValue(null);
+    prismaMock.moduleChange.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.subscription.findUnique.mockResolvedValue({
+      planCode: "GROWTH_99_MONTHLY",
+    });
     prismaMock.pendingOrder.findUnique.mockResolvedValue(null);
     prismaMock.pendingOrder.findFirst.mockResolvedValue(null);
 
@@ -131,18 +229,17 @@ describe("BillingWebhookController", () => {
     expect(result.status).toBe("ok");
     expect(prismaMock.subscription.upsert).toHaveBeenCalledTimes(1);
     expect(prismaMock.orgEntitlementSnapshot.create).toHaveBeenCalledTimes(1);
-    expect(prismaMock.billingEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          payloadJson: expect.objectContaining({ eventId: baseEvent.eventId }),
-        }),
-      }),
+    expect(claimBillingEvent).toHaveBeenCalledWith(baseEvent);
+    expect(finishBillingEvent).toHaveBeenCalledWith(
+      "billing_event_1",
+      baseEvent.orgId,
+      true,
     );
     expect(entitlements.resolve).toHaveBeenCalledWith(baseEvent.orgId);
   });
 
   it("skips duplicate events idempotently", async () => {
-    prismaMock.billingEvent.findFirst.mockResolvedValue({ id: "existing" });
+    (claimBillingEvent as jest.Mock).mockResolvedValue({ status: "duplicate" });
 
     const result = await controller.handleWebhook(
       { dummy: true },
@@ -152,7 +249,7 @@ describe("BillingWebhookController", () => {
     expect(result.status).toBe("ignored_duplicate");
     expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
     expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
-    expect(prismaMock.billingEvent.create).not.toHaveBeenCalled();
+    expect(finishBillingEvent).not.toHaveBeenCalled();
     expect(entitlements.resolve).not.toHaveBeenCalled();
   });
 
@@ -183,7 +280,11 @@ describe("BillingWebhookController", () => {
     expect(result.status).toBe("ignored_unknown");
     expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
     expect(prismaMock.orgEntitlementSnapshot.create).not.toHaveBeenCalled();
-    expect(prismaMock.billingEvent.create).toHaveBeenCalled();
+    expect(finishBillingEvent).toHaveBeenCalledWith(
+      "billing_event_1",
+      baseEvent.orgId,
+      true,
+    );
   });
 
   it("applies pending order caps and completes the order", async () => {
@@ -206,6 +307,7 @@ describe("BillingWebhookController", () => {
     };
     const eventWithPending: ParsedBillingWebhookEvent = {
       ...baseEvent,
+      kind: "invoice.paid",
       pendingOrderId: pending.id,
     };
     prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
@@ -271,6 +373,7 @@ describe("BillingWebhookController", () => {
     };
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
+      kind: "invoice.paid",
       pendingOrderId: pending.id,
     });
     prismaMock.billingEvent.findFirst.mockResolvedValue(null);
@@ -292,11 +395,10 @@ describe("BillingWebhookController", () => {
         create: expect.objectContaining({
           status: ModuleStatus.ACTIVE,
           expiresAt: baseEvent.periodEnd,
-          metadata: {
+          metadata: expect.objectContaining({
             billingSource: "subscription",
             subscriptionId: baseEvent.subscriptionId,
-            entitlementSource: "plan",
-          },
+          }),
         }),
         update: expect.objectContaining({
           status: ModuleStatus.ACTIVE,
@@ -310,14 +412,23 @@ describe("BillingWebhookController", () => {
           orgId_module: { orgId: baseEvent.orgId, module: Module.MEALS },
         },
         create: expect.objectContaining({
-          metadata: {
+          metadata: expect.objectContaining({
             billingSource: "subscription",
             subscriptionId: baseEvent.subscriptionId,
-            entitlementSource: "add-on",
-          },
+          }),
         }),
       }),
     );
+    expect(
+      prismaMock.moduleGrant.upsert.mock.calls.map(
+        ([args]) => args.create.source,
+      ),
+    ).toEqual([
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PAID_ADDON,
+    ]);
     const firstActivation = prismaMock.orgModule.upsert.mock.calls[0][0];
     expect(firstActivation.update).not.toHaveProperty("activatedAt");
   });
@@ -343,6 +454,7 @@ describe("BillingWebhookController", () => {
     };
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
+      kind: "invoice.paid",
       subscriptionId: "sub_add_on",
       pendingOrderId: pending.id,
     });
@@ -372,13 +484,15 @@ describe("BillingWebhookController", () => {
           },
         },
         create: expect.objectContaining({
-          metadata: {
+          metadata: expect.objectContaining({
             billingSource: "subscription",
             subscriptionId: "sub_add_on",
-            entitlementSource: "add-on",
-          },
+          }),
         }),
       }),
+    );
+    expect(prismaMock.moduleGrant.upsert.mock.calls[0][0].create.source).toBe(
+      ModuleGrantSource.PAID_ADDON,
     );
   });
 
@@ -419,6 +533,7 @@ describe("BillingWebhookController", () => {
     (provider.verifyAndParse as jest.Mock).mockResolvedValueOnce({
       ...baseEvent,
       eventId: "evt_active",
+      kind: "invoice.paid",
       status: SubscriptionStatus.ACTIVE,
       pendingOrderId: pending.id,
     });
@@ -503,15 +618,8 @@ describe("BillingWebhookController", () => {
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
     expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
-    expect(prismaMock.orgModule.updateMany).toHaveBeenCalledWith({
-      where: {
-        orgId: baseEvent.orgId,
-        status: ModuleStatus.ACTIVE,
-        metadata: {
-          path: ["subscriptionId"],
-          equals: baseEvent.subscriptionId,
-        },
-      },
+    expect(prismaMock.moduleGrant.updateMany).toHaveBeenCalledWith({
+      where: { orgId: baseEvent.orgId, sourceId: baseEvent.subscriptionId },
       data: { expiresAt: baseEvent.periodEnd },
     });
   });
@@ -533,6 +641,7 @@ describe("BillingWebhookController", () => {
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
       eventId: "evt_plan_change",
+      kind: "invoice.paid",
       subscriptionId: "sub_new_plan",
       pendingOrderId: pending.id,
     });
@@ -602,6 +711,7 @@ describe("BillingWebhookController", () => {
     };
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
+      kind: "invoice.paid",
       pendingOrderId: pending.id,
     });
     prismaMock.billingEvent.findFirst.mockResolvedValue(null);
@@ -624,10 +734,18 @@ describe("BillingWebhookController", () => {
       Module.LEARNING,
     ]);
     expect(
-      prismaMock.orgModule.upsert.mock.calls.map(
-        ([args]) => args.create.metadata.entitlementSource,
+      prismaMock.moduleGrant.upsert.mock.calls.map(
+        ([args]) => args.create.source,
       ),
-    ).toEqual(["plan", "plan", "plan", "plan", "plan", "plan", "add-on"]);
+    ).toEqual([
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PAID_ADDON,
+    ]);
   });
 
   it("deduplicates malformed pending selections before applying the included allowance", async () => {
@@ -659,6 +777,7 @@ describe("BillingWebhookController", () => {
     };
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
+      kind: "invoice.paid",
       pendingOrderId: pending.id,
     });
     prismaMock.billingEvent.findFirst.mockResolvedValue(null);
@@ -672,10 +791,14 @@ describe("BillingWebhookController", () => {
       ),
     ).toEqual([Module.FINANCE, Module.EVENTS, Module.HR]);
     expect(
-      prismaMock.orgModule.upsert.mock.calls.map(
-        ([args]) => args.create.metadata.entitlementSource,
+      prismaMock.moduleGrant.upsert.mock.calls.map(
+        ([args]) => args.create.source,
       ),
-    ).toEqual(["plan", "plan", "add-on"]);
+    ).toEqual([
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PAID_ADDON,
+    ]);
   });
 
   it("preserves the historical fixed bundle for legacy pending Growth orders", async () => {
@@ -699,6 +822,7 @@ describe("BillingWebhookController", () => {
     };
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
+      kind: "invoice.paid",
       pendingOrderId: pending.id,
     });
     prismaMock.billingEvent.findFirst.mockResolvedValue(null);
@@ -717,10 +841,15 @@ describe("BillingWebhookController", () => {
       Module.MEALS,
     ]);
     expect(
-      prismaMock.orgModule.upsert.mock.calls.map(
-        ([args]) => args.create.metadata.entitlementSource,
+      prismaMock.moduleGrant.upsert.mock.calls.map(
+        ([args]) => args.create.source,
       ),
-    ).toEqual(["plan", "plan", "plan", "add-on"]);
+    ).toEqual([
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PLAN,
+      ModuleGrantSource.PAID_ADDON,
+    ]);
   });
 
   it("honours an explicitly empty inclusion selection without applying the legacy bundle", async () => {
@@ -744,6 +873,7 @@ describe("BillingWebhookController", () => {
     };
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
+      kind: "invoice.paid",
       pendingOrderId: pending.id,
     });
     prismaMock.billingEvent.findFirst.mockResolvedValue(null);
@@ -758,13 +888,15 @@ describe("BillingWebhookController", () => {
           orgId_module: { orgId: baseEvent.orgId, module: Module.MEALS },
         },
         create: expect.objectContaining({
-          metadata: {
+          metadata: expect.objectContaining({
             billingSource: "subscription",
             subscriptionId: baseEvent.subscriptionId,
-            entitlementSource: "add-on",
-          },
+          }),
         }),
       }),
+    );
+    expect(prismaMock.moduleGrant.upsert.mock.calls[0][0].create.source).toBe(
+      ModuleGrantSource.PAID_ADDON,
     );
   });
 
@@ -791,6 +923,7 @@ describe("BillingWebhookController", () => {
     };
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...baseEvent,
+      kind: "invoice.paid",
       pendingOrderId: pending.id,
     });
     prismaMock.billingEvent.findFirst.mockResolvedValue(null);
@@ -803,9 +936,9 @@ describe("BillingWebhookController", () => {
       ([args]) => args.where.orgId_module.module === Module.FINANCE,
     );
     expect(financeActivation).toBeDefined();
-    expect(financeActivation?.[0].create.metadata.entitlementSource).toBe(
-      "plan",
-    );
+    expect(financeActivation?.[0].create.metadata.grantSources).toEqual([
+      { source: ModuleGrantSource.PLAN, sourceId: baseEvent.subscriptionId },
+    ]);
     expect(
       prismaMock.orgModule.upsert.mock.calls.filter(
         ([args]) => args.where.orgId_module.module === Module.FINANCE,
@@ -822,15 +955,8 @@ describe("BillingWebhookController", () => {
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
-    expect(prismaMock.orgModule.updateMany).toHaveBeenCalledWith({
-      where: {
-        orgId: baseEvent.orgId,
-        status: ModuleStatus.ACTIVE,
-        metadata: {
-          path: ["subscriptionId"],
-          equals: baseEvent.subscriptionId,
-        },
-      },
+    expect(prismaMock.moduleGrant.updateMany).toHaveBeenCalledWith({
+      where: { orgId: baseEvent.orgId, sourceId: baseEvent.subscriptionId },
       data: { expiresAt: baseEvent.periodEnd },
     });
     expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
@@ -853,17 +979,99 @@ describe("BillingWebhookController", () => {
         }),
       }),
     );
-    expect(prismaMock.orgModule.updateMany).toHaveBeenCalledWith({
-      where: {
-        orgId: baseEvent.orgId,
-        status: ModuleStatus.ACTIVE,
-        metadata: {
-          path: ["subscriptionId"],
-          equals: baseEvent.subscriptionId,
-        },
-      },
+    expect(prismaMock.moduleGrant.updateMany).toHaveBeenCalledWith({
+      where: { orgId: baseEvent.orgId, sourceId: baseEvent.subscriptionId },
       data: { status: ModuleStatus.CANCELLED },
     });
     expect(prismaMock.orgModule.upsert).not.toHaveBeenCalled();
+  });
+
+  it("applies a scheduled module swap only after the renewal invoice is paid", async () => {
+    const change = {
+      id: "change_1",
+      planCode: "GROWTH_99_MONTHLY",
+      includedModules: [Module.FINANCE],
+      paidModules: [Module.MEALS],
+      providerItems: {
+        retiredSources: [
+          {
+            sourceId: "sub_addon",
+            modules: [Module.FINANCE],
+          },
+        ],
+      },
+    };
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.moduleChange.findFirst.mockResolvedValue(change);
+    (provider.verifyAndParse as jest.Mock).mockResolvedValueOnce({
+      ...baseEvent,
+      kind: "subscription.updated",
+      eventId: "evt_before_payment",
+    });
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+    expect(prismaMock.moduleChange.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.moduleGrant.upsert).not.toHaveBeenCalled();
+
+    (provider.verifyAndParse as jest.Mock).mockResolvedValueOnce({
+      ...baseEvent,
+      kind: "invoice.paid",
+      eventId: "evt_paid_renewal",
+    });
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+    expect(prismaMock.moduleChange.updateMany).toHaveBeenCalledWith({
+      where: { id: change.id, status: "SCHEDULED" },
+      data: { status: "APPLIED" },
+    });
+    expect(
+      prismaMock.moduleGrant.upsert.mock.calls.map(
+        ([args]) => args.create.source,
+      ),
+    ).toEqual([ModuleGrantSource.PLAN, ModuleGrantSource.PAID_ADDON]);
+    expect(prismaMock.moduleGrant.updateMany).toHaveBeenCalledWith({
+      where: {
+        orgId: baseEvent.orgId,
+        sourceId: "sub_addon",
+        source: ModuleGrantSource.PAID_ADDON,
+        module: { in: [Module.FINANCE] },
+        status: ModuleStatus.ACTIVE,
+      },
+      data: { status: ModuleStatus.CANCELLED },
+    });
+  });
+
+  it("updates the paid tier even when a subscription update arrived before the invoice", async () => {
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.moduleChange.findFirst.mockResolvedValue({
+      id: "change_tier",
+      planCode: "GROWTH_99_MONTHLY",
+      includedModules: [],
+      paidModules: [],
+      providerItems: { retiredSources: [] },
+    });
+    prismaMock.subscription.findUnique.mockResolvedValue({
+      planCode: "GROWTH_99_MONTHLY",
+    });
+    prismaMock.orgEntitlementSnapshot.findFirst.mockResolvedValue({
+      av30Included: 50,
+      maxSites: 1,
+      storageGbIncluded: 100,
+      leaderSeatsIncluded: 1,
+      flagsJson: { planCode: "STARTER_49_MONTHLY" },
+    });
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      kind: "invoice.paid",
+      eventId: "evt_paid_tier",
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.orgEntitlementSnapshot.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        orgId: baseEvent.orgId,
+        flagsJson: expect.objectContaining({ planCode: "GROWTH_99_MONTHLY" }),
+        source: "module_change",
+      }),
+    });
   });
 });

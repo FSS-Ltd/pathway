@@ -162,12 +162,16 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
 
   private mapInvoicePaid(event: Stripe.InvoicePaidEvent): ParsedBillingWebhookEvent {
     const invoice = event.data.object;
+    const metadata = invoice.subscription_details?.metadata ?? invoice.metadata;
     const subId =
       typeof invoice.subscription === "string"
         ? invoice.subscription
         : invoice.subscription?.id ?? "";
-    const orgId = invoice.metadata?.orgId ?? "";
-    const pendingOrderId = invoice.metadata?.pendingOrderId ?? null;
+    const orgId = metadata?.orgId ?? "";
+    const pendingOrderId = metadata?.pendingOrderId ?? null;
+    const subscriptionLine = invoice.lines.data.find((line) =>
+      (typeof line.subscription === "string" ? line.subscription : line.subscription?.id) === subId,
+    );
     const customerId =
       typeof invoice.customer === "string"
         ? invoice.customer
@@ -180,8 +184,14 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       orgId,
       subscriptionId: subId,
       pendingOrderId,
-      providerCheckoutId: invoice.metadata?.providerCheckoutId ?? null,
+      providerCheckoutId: metadata?.providerCheckoutId ?? null,
       providerCustomerId: customerId,
+      periodStart: subscriptionLine?.period?.start
+        ? new Date(subscriptionLine.period.start * 1000)
+        : null,
+      periodEnd: subscriptionLine?.period?.end
+        ? new Date(subscriptionLine.period.end * 1000)
+        : null,
     };
   }
 

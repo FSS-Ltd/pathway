@@ -11,18 +11,25 @@ import {
   PLAN_PRICES,
   type PlanCode,
 } from "../../../lib/configurator-pricing";
-import type { OptionPriceLookup, WebModule } from "../../../lib/module-catalog";
+import {
+  MODULE_CATALOG,
+  type OptionPriceLookup,
+  type WebModule,
+} from "../../../lib/module-catalog";
 import {
   configuratorStepVariants,
   reducedStepVariants,
   type StepDirection,
 } from "../../../lib/motion";
 import {
+  acceptModuleChange,
   createBuyNowPurchase,
   fetchBillingOverview,
   fetchBillingPrices,
   fetchOrgModules,
+  previewModuleChange,
   type AdminBillingOverview,
+  type AdminModuleChangePreview,
 } from "../../../lib/api-client";
 import { getPlanDisplayName } from "../../../lib/plan-info";
 import { useAdminAccess } from "../../../lib/use-admin-access";
@@ -58,7 +65,12 @@ import {
 type ConfiguratorAction =
   | { type: "next" }
   | { type: "back" }
-  | { type: "seed"; planCode: PlanCode }
+  | {
+      type: "seed";
+      planCode: PlanCode;
+      included: WebModule[];
+      paid: WebModule[];
+    }
   | { type: "plan"; planCode: PlanCode; prices: OptionPriceLookup }
   | {
       type: "frequency";
@@ -85,7 +97,7 @@ function configuratorReducer(
     case "back":
       return prevStep(state);
     case "seed":
-      return initialStateFromSubscription(action.planCode);
+      return initialStateFromSubscription(action.planCode, action);
     case "plan":
       return selectPlan(state, action.planCode, action.prices);
     case "frequency":
@@ -133,11 +145,20 @@ export default function ConfigurePlanPage() {
   );
   const [overview, setOverview] = useState<AdminBillingOverview | null>(null);
   const [ownedModules, setOwnedModules] = useState<WebModule[]>([]);
+  const [currentModules, setCurrentModules] = useState<{
+    included: WebModule[];
+    paid: WebModule[];
+  }>({ included: [], paid: [] });
+  const [moduleChangePreview, setModuleChangePreview] =
+    useState<AdminModuleChangePreview | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isCheckoutPending, setIsCheckoutPending] = useState(false);
   const [stepDirection, setStepDirection] = useState<StepDirection>("forward");
   const checkoutInFlightRef = useRef(false);
+  const acceptanceKeyRef = useRef<{ changeId: string; key: string } | null>(
+    null,
+  );
   const seededRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -172,7 +193,28 @@ export default function ConfigurePlanPage() {
           isConfiguratorPlanCode(overviewResult.planCode)
         ) {
           seededRef.current = true;
-          dispatch({ type: "seed", planCode: overviewResult.planCode });
+          const active = modulesResult.filter(
+            (module) => module.status === "ACTIVE",
+          );
+          const included = active
+            .filter((module) =>
+              module.grantSources?.some((grant) => grant.source === "PLAN"),
+            )
+            .map((module) => module.module as WebModule);
+          const paid = active
+            .filter((module) =>
+              module.grantSources?.some(
+                (grant) => grant.source === "PAID_ADDON",
+              ),
+            )
+            .map((module) => module.module as WebModule);
+          setCurrentModules({ included, paid });
+          dispatch({
+            type: "seed",
+            planCode: overviewResult.planCode,
+            included,
+            paid,
+          });
         }
       }
       setOwnedModules(
@@ -224,17 +266,68 @@ export default function ConfigurePlanPage() {
     ? reducedStepVariants
     : configuratorStepVariants;
 
-  const hasAddons =
-    state.storageChoice !== "none" ||
-    state.selectedOptionalModules.length > 0 ||
-    state.selectedIncludedModules.length > 0;
-  const isSamePlan = Boolean(
-    state.planCode && currentPlanCode && state.planCode === currentPlanCode,
+  const isExistingSubscription = Boolean(
+    currentPlanCode && overview?.subscriptionStatus === "ACTIVE",
   );
+  const sameModules = (
+    left: readonly WebModule[],
+    right: readonly WebModule[],
+  ) =>
+    left.length === right.length &&
+    left.every((module) => right.includes(module));
   const disabledReason =
-    isSamePlan && !hasAddons
-      ? "This is your current plan. Add an add-on or choose a different plan to continue."
+    isExistingSubscription &&
+    state.planCode === currentPlanCode &&
+    sameModules(state.selectedIncludedModules, currentModules.included) &&
+    sameModules(state.selectedOptionalModules, currentModules.paid)
+      ? "No plan or module changes selected."
       : null;
+
+  useEffect(() => {
+    setModuleChangePreview(null);
+    acceptanceKeyRef.current = null;
+  }, [
+    state.planCode,
+    state.selectedIncludedModules,
+    state.selectedOptionalModules,
+  ]);
+
+  const handleModuleChange = async (accept: boolean) => {
+    if (checkoutInFlightRef.current || !state.planCode) return;
+    checkoutInFlightRef.current = true;
+    setCheckoutError(null);
+    setIsCheckoutPending(true);
+    try {
+      if (accept && moduleChangePreview) {
+        const previous = acceptanceKeyRef.current;
+        const key =
+          previous?.changeId === moduleChangePreview.id
+            ? previous.key
+            : crypto.randomUUID();
+        acceptanceKeyRef.current = { changeId: moduleChangePreview.id, key };
+        setModuleChangePreview(
+          await acceptModuleChange(moduleChangePreview.id, key),
+        );
+      } else {
+        setModuleChangePreview(
+          await previewModuleChange({
+            planCode: state.planCode,
+            includedModules: state.selectedIncludedModules,
+            paidModules: state.selectedOptionalModules,
+          }),
+        );
+      }
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error
+          ? error.message
+          : "Unable to schedule this change. Please try again.",
+      );
+    } finally {
+      setIsCheckoutPending(false);
+      checkoutInFlightRef.current = false;
+    }
+  };
 
   const handleCheckout = async () => {
     if (checkoutInFlightRef.current || !state.planCode) return;
@@ -304,11 +397,12 @@ export default function ConfigurePlanPage() {
               ← Back to billing
             </button>
             <h1 className="font-heading text-2xl font-bold text-text-primary sm:text-3xl">
-              Upgrade your plan
+              Change your plan and modules
             </h1>
             <p className="text-sm text-text-muted">
-              Change your plan or add optional modules and storage. You only pay
-              the difference, confirmed at secure checkout.
+              {isExistingSubscription
+                ? "Choose the plan and modules for your next renewal. No changes are charged today."
+                : "Choose a plan, modules and storage before secure checkout."}
             </p>
           </header>
           {notice ? (
@@ -339,6 +433,12 @@ export default function ConfigurePlanPage() {
               overview={overview}
               newPlanCode={state.planCode}
               storageChoice={state.storageChoice}
+              currentModules={[
+                ...new Set([
+                  ...currentModules.included,
+                  ...currentModules.paid,
+                ]),
+              ]}
               selectedOptionalModules={[
                 ...state.selectedIncludedModules,
                 ...state.selectedOptionalModules,
@@ -412,6 +512,7 @@ export default function ConfigurePlanPage() {
               {currentStep === "storage" ? (
                 <StorageStep
                   storageChoice={state.storageChoice}
+                  isExistingSubscription={isExistingSubscription}
                   frequency={state.frequency}
                   prices={storagePrices}
                   onSelect={(storageChoice) =>
@@ -436,6 +537,10 @@ export default function ConfigurePlanPage() {
                   isCheckoutPending={isCheckoutPending}
                   checkoutError={checkoutError}
                   disabledReason={disabledReason}
+                  isExistingSubscription={isExistingSubscription}
+                  moduleChangePreview={moduleChangePreview}
+                  onPreviewChange={() => void handleModuleChange(false)}
+                  onAcceptChange={() => void handleModuleChange(true)}
                 />
               ) : null}
             </motion.div>
@@ -447,20 +552,28 @@ export default function ConfigurePlanPage() {
               overview={overview}
               newPlanCode={state.planCode}
               storageChoice={state.storageChoice}
+              currentModules={[
+                ...new Set([
+                  ...currentModules.included,
+                  ...currentModules.paid,
+                ]),
+              ]}
               selectedOptionalModules={[
                 ...state.selectedIncludedModules,
                 ...state.selectedOptionalModules,
               ]}
             />
           </div>
-          <div className="rounded-2xl border border-border-subtle bg-surface p-5 shadow-card">
-            <RunningTotal
-              state={state}
-              planPrices={mergedPlanPrices}
-              addonPrices={mergedAddonPrices}
-              modulePrices={billingPrices.modulePrices}
-            />
-          </div>
+          {!isExistingSubscription ? (
+            <div className="rounded-2xl border border-border-subtle bg-surface p-5 shadow-card">
+              <RunningTotal
+                state={state}
+                planPrices={mergedPlanPrices}
+                addonPrices={mergedAddonPrices}
+                modulePrices={billingPrices.modulePrices}
+              />
+            </div>
+          ) : null}
         </aside>
       </div>
     </main>
@@ -471,6 +584,7 @@ type PlanComparisonProps = {
   overview: AdminBillingOverview | null;
   newPlanCode: PlanCode | null;
   storageChoice: ConfiguratorState["storageChoice"];
+  currentModules: WebModule[];
   selectedOptionalModules: WebModule[];
 };
 
@@ -478,6 +592,7 @@ function PlanComparison({
   overview,
   newPlanCode,
   storageChoice,
+  currentModules,
   selectedOptionalModules,
 }: PlanComparisonProps) {
   const newPlan = newPlanCode ? PLANS[newPlanCode] : null;
@@ -512,6 +627,26 @@ function PlanComparison({
           next={fmt(newPlan?.maxSitesIncluded)}
         />
       </dl>
+      {overview?.subscriptionStatus === "ACTIVE" ? (
+        <div className="space-y-1 border-t border-border-subtle pt-3 text-sm">
+          <p>
+            <span className="text-text-muted">Active modules:</span>{" "}
+            {currentModules.length
+              ? currentModules
+                  .map((module) => MODULE_CATALOG[module].label)
+                  .join(", ")
+              : "None"}
+          </p>
+          <p>
+            <span className="text-text-muted">Chosen for renewal:</span>{" "}
+            {selectedOptionalModules.length
+              ? selectedOptionalModules
+                  .map((module) => MODULE_CATALOG[module].label)
+                  .join(", ")
+              : "None"}
+          </p>
+        </div>
+      ) : null}
       {storageChip || selectedOptionalModules.length ? (
         <div className="flex flex-wrap gap-1.5 border-t border-border-subtle pt-3">
           {storageChip ? <Chip label={storageChip} /> : null}

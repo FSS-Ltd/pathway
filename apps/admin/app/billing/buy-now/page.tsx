@@ -86,7 +86,6 @@ export default function BuyNowPage() {
   const [planTier, setPlanTier] = React.useState<(typeof planOptions)[number]["code"]>("STARTER");
   const [billingPeriod, setBillingPeriod] = React.useState<"monthly" | "yearly">("monthly");
   const [storageChoice, setStorageChoice] = React.useState<"none" | "100" | "200" | "1000">("none");
-  const [learningModule, setLearningModule] = React.useState(false);
   const [planPriceOverrides, setPlanPriceOverrides] = React.useState<
     Partial<Record<PlanCode, (typeof PLAN_PRICES)[Exclude<PlanCode, "ENTERPRISE_CONTACT">]>>
   >({});
@@ -108,6 +107,7 @@ export default function BuyNowPage() {
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
   const [isCheckoutLoading, setIsCheckoutLoading] = React.useState(false);
   const [currentPlanCode, setCurrentPlanCode] = React.useState<string | null>(null);
+  const [isCurrentPlanLoading, setIsCurrentPlanLoading] = React.useState(true);
 
   const planCode: PlanCode | null = React.useMemo(() => {
     if (planTier === "ENTERPRISE_CONTACT") return "ENTERPRISE_CONTACT";
@@ -187,6 +187,9 @@ export default function BuyNowPage() {
       })
       .catch(() => {
         if (!cancelled) setCurrentPlanCode(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsCurrentPlanLoading(false);
       });
     return () => {
       cancelled = true;
@@ -254,16 +257,15 @@ export default function BuyNowPage() {
   ]);
 
   const isCurrentPlan = Boolean(planCode && currentPlanCode && planCode === currentPlanCode);
-  const hasAddons = storageChoice !== "none" || learningModule;
 
   const handleCheckout = async () => {
     setCheckoutError(null);
-    if (!planCode || planTier === "ENTERPRISE_CONTACT") {
-      setCheckoutError("Enterprise is contact-only. Please reach out to sales.");
+    if (isCurrentPlanLoading || currentPlanCode) {
+      setCheckoutError("Use the renewal change flow for an existing subscription.");
       return;
     }
-    if (isCurrentPlan && !hasAddons) {
-      setCheckoutError("Add add-ons above to checkout, or choose a different plan.");
+    if (!planCode || planTier === "ENTERPRISE_CONTACT") {
+      setCheckoutError("Enterprise is contact-only. Please reach out to sales.");
       return;
     }
     setIsCheckoutLoading(true);
@@ -298,7 +300,6 @@ export default function BuyNowPage() {
         extraSites: 0,
         extraStorageGb,
         extraLeaderSeats: 0,
-        selectedModules: learningModule ? ["LEARNING"] : undefined,
         successUrl,
         cancelUrl,
       });
@@ -337,7 +338,6 @@ export default function BuyNowPage() {
   const storage100 = mergedAddonPrices[`STORAGE_100GB_${storageSuffix}` as keyof typeof mergedAddonPrices];
   const storage200 = mergedAddonPrices[`STORAGE_200GB_${storageSuffix}` as keyof typeof mergedAddonPrices];
   const storage1tb = mergedAddonPrices[`STORAGE_1TB_${storageSuffix}` as keyof typeof mergedAddonPrices];
-  const learningPrice = mergedAddonPrices[`MODULE_LEARNING_${storageSuffix}` as keyof typeof mergedAddonPrices];
   const storageOptions = [
     { value: "none", meta: null, label: "No additional storage" },
     {
@@ -367,7 +367,6 @@ export default function BuyNowPage() {
         {
           planCode,
           storageChoice,
-          learningModule,
         },
         {
           planPrices: mergedPlanPrices,
@@ -504,23 +503,6 @@ export default function BuyNowPage() {
                   Storage add-ons are charged as {billingPeriod} line items at checkout.
                 </p>
               </div>
-              <label className="flex cursor-pointer items-start gap-3 rounded-md border border-border-subtle p-3 text-sm md:col-span-2">
-                <input
-                  type="checkbox"
-                  checked={learningModule}
-                  onChange={(event) => setLearningModule(event.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-border-subtle"
-                />
-                <span>
-                  <span className="block font-medium text-text-primary">Learning module</span>
-                  <span className="block text-text-muted">
-                    £{formatAmount(learningPrice?.amountMajor ?? (billingPeriod === "yearly" ? 290 : 29))} / {billingPeriod === "yearly" ? "year" : "month"}
-                  </span>
-                  <span className="block text-xs text-text-muted">
-                    Available to organisations other than home-education providers.
-                  </span>
-                </span>
-              </label>
             </div>
           </Card>
 
@@ -665,32 +647,25 @@ export default function BuyNowPage() {
 
           <Card title="Checkout">
             <div className="space-y-3 text-sm">
-              <p className="text-text-muted">
-                Continuing will open the checkout session with the current selection. No card
-                details are collected in this app.
-              </p>
+              <p className="text-text-muted">{currentPlanCode
+                ? "Plan changes take effect at renewal without a charge today."
+                : "Continuing will open secure checkout. No card details are collected in this app."}</p>
               {checkoutError && (
                 <div className="rounded-md border border-status-danger/30 bg-status-danger/5 px-3 py-2 text-xs text-status-danger">
                   {checkoutError}
                 </div>
               )}
-              {isCurrentPlan && !hasAddons && (
-                <p className="text-xs text-text-muted">
-                  Add add-ons above to checkout, or choose a different plan.
-                </p>
+              {currentPlanCode ? (
+                <Link href="/billing/configure" className="inline-flex w-full justify-center rounded-md bg-accent-primary px-4 py-2 text-sm font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2">
+                  Review renewal changes
+                </Link>
+              ) : (
+                <Button className="w-full" onClick={handleCheckout}
+                  disabled={isCheckoutLoading || isCurrentPlanLoading}>
+                  {isCurrentPlanLoading ? "Checking subscription…" :
+                    isCheckoutLoading ? "Starting checkout..." : "Continue to checkout"}
+                </Button>
               )}
-              {isCurrentPlan && hasAddons && (
-                <p className="text-xs text-text-muted">
-                  Checkout will charge only for add-ons (you're already on this plan).
-                </p>
-              )}
-              <Button
-                className="w-full"
-                onClick={handleCheckout}
-                disabled={isCheckoutLoading || (isCurrentPlan && !hasAddons)}
-              >
-                {isCheckoutLoading ? "Starting checkout..." : "Continue to checkout"}
-              </Button>
             </div>
           </Card>
         </div>

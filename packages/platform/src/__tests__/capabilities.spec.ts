@@ -9,16 +9,17 @@ jest.mock("@pathway/db", () => ({
 }));
 
 import { getOrgCapabilities, orgHasCapability } from "../capabilities";
+import { MODULE_CAPABILITIES } from "../capability-maps";
 
 describe("getOrgCapabilities", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it("returns [] when there is no vertical and no modules", async () => {
+  it("includes core Learning even when there is no vertical or module grant", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([]);
-    expect(await getOrgCapabilities("org-1")).toEqual([]);
+    expect(await getOrgCapabilities("org-1")).toEqual(MODULE_CAPABILITIES.LEARNING);
   });
 
   it("returns the vertical's capabilities when only a vertical is set", async () => {
@@ -57,7 +58,7 @@ describe("getOrgCapabilities", () => {
     orgModuleFindMany.mockResolvedValueOnce([
       { module: "FINANCE", expiresAt: new Date(Date.now() - 1_000_000) },
     ]);
-    expect(await getOrgCapabilities("org-1")).toEqual([]);
+    expect(await getOrgCapabilities("org-1")).toEqual(MODULE_CAPABILITIES.LEARNING);
   });
 
   it("returns a deduped union of vertical + active module capabilities", async () => {

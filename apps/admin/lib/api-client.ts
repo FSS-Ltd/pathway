@@ -510,6 +510,7 @@ export type AdminOrgModule = {
   activatedAt: string | null;
   expiresAt: string | null;
   billingSource: string | null;
+  grantSources?: Array<{ source: "PLAN" | "PAID_ADDON" | "MANUAL"; sourceId: string }>;
 };
 
 export type AdminOrgOverview = {
@@ -5352,6 +5353,48 @@ export async function createBuyNowPurchase(
         })
       : undefined,
   };
+}
+
+export type AdminModuleChangePreview = {
+  id: string;
+  planCode: string;
+  includedModules: AdminModule[];
+  paidModules: AdminModule[];
+  subtotalPence: number;
+  effectiveAt: string;
+  expiresAt: string;
+  status: "PREVIEW" | "ACCEPTED" | "SCHEDULED" | "APPLIED" | "REVIEW_REQUIRED";
+};
+
+export async function previewModuleChange(input: {
+  planCode: string;
+  includedModules: AdminModule[];
+  paidModules: AdminModule[];
+}): Promise<AdminModuleChangePreview> {
+  const res = await fetch(`${API_BASE_URL}/billing/module-changes/preview`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(`Unable to preview renewal change: ${await res.text()}`);
+  return res.json() as Promise<AdminModuleChangePreview>;
+}
+
+export async function acceptModuleChange(
+  changeId: string,
+  idempotencyKey: string,
+): Promise<AdminModuleChangePreview> {
+  const res = await fetch(`${API_BASE_URL}/billing/module-changes/accept`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({ changeId, idempotencyKey }),
+  });
+  if (!res.ok) throw new Error(`Unable to schedule renewal change: ${await res.text()}`);
+  return res.json() as Promise<AdminModuleChangePreview>;
 }
 
 type ApiOrg = {

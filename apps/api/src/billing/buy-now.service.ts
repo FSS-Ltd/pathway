@@ -17,8 +17,8 @@ import {
 } from "@pathway/db";
 import {
   getConfiguratorPlanPolicy,
+  isConfiguratorModuleReady,
   LEGACY_PLAN_CODES,
-  type ConfiguratorModuleCode,
 } from "@pathway/pricing";
 import { getPlanDefinition } from "./billing-plans";
 import type { PlanTier } from "./billing-plans";
@@ -265,7 +265,7 @@ export class BuyNowService {
       );
     }
 
-    const eligibleOptionalModules = new Set<ConfiguratorModuleCode>(
+    const eligibleOptionalModules = new Set<string>(
       policy.eligibleOptionalModules,
     );
     const uniqueExplicitIncludedModules = [
@@ -283,10 +283,7 @@ export class BuyNowService {
         "Included modules must not also be submitted as paid modules.",
       );
     }
-    const includedModules =
-      explicitlyIncludedModules !== undefined
-        ? uniqueExplicitIncludedModules
-        : [...policy.legacyIncludedModules];
+    const includedModules = uniqueExplicitIncludedModules;
     const uniqueModules = [
       ...new Set([...includedModules, ...normalizedSelectedModules]),
     ];
@@ -308,6 +305,12 @@ export class BuyNowService {
       throw new BadRequestException(
         "Selected modules are not eligible for the selected plan.",
       );
+    }
+    if (uniqueModules.some((module) =>
+      policy.eligibleOptionalModules.some((code) =>
+        code === module && !isConfiguratorModuleReady(code),
+      ))) {
+      throw new BadRequestException("Selected modules are not yet available.");
     }
 
     const includedModuleSet = new Set(includedModules);
@@ -403,7 +406,9 @@ export class BuyNowService {
       paidModules: selectedModules,
     } = resolvedModules;
 
-    // 2. If org has active subscription and selected plan is the same: allow checkout only for add-ons
+    // Existing subscription module changes are applied at renewal through
+    // ModuleChangeService; Checkout would charge immediately and lose the
+    // included selection.
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         orgId,
@@ -416,6 +421,12 @@ export class BuyNowService {
       },
       select: { planCode: true },
     });
+
+    if (activeSubscription) {
+      throw new BadRequestException(
+        "Use the renewal change flow to update an existing subscription.",
+      );
+    }
 
     const addonsOnly =
       Boolean(activeSubscription) &&

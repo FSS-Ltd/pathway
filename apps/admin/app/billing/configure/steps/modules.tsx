@@ -1,4 +1,5 @@
 import { PriceChip } from "../../../../components/configurator/price-chip";
+import { isConfiguratorModuleReady } from "@pathway/pricing";
 import {
   SelectionCard,
   SelectionCardGroup,
@@ -42,7 +43,7 @@ export function ModulesStep({
     includedModuleLimit - selectedIncludedModules.length,
   );
 
-  // Optional modules the org already owns show as active, not chargeable again.
+  // Active modules remain selectable so a paid module can use an included slot.
   const ownedOptional = eligibleOptionalModules
     .filter((module) => ownedSet.has(module))
     .map((module) => ({ module, entry: MODULE_CATALOG[module] }));
@@ -78,17 +79,19 @@ export function ModulesStep({
           Add optional modules
         </h2>
         <p className="text-text-muted">
-          Choose up to {includedModuleLimit} modules included with {planLabel}.
-          Other selected modules are charged at the prices shown.
+          {planLabel} includes up to {includedModuleLimit} optional modules when
+          they become available. Module selection is currently closed.
         </p>
       </div>
       <SelectionCardGroup className="grid gap-3">
         {ownedOptional.map(({ module, entry }) => (
           <SelectionCard
             key={module}
-            isSelected
-            isDisabled
-            onClick={() => undefined}
+            isSelected={
+              selectedIncludedSet.has(module) || selectedOptionalSet.has(module)
+            }
+            isDisabled={!isConfiguratorModuleReady(module)}
+            onClick={() => onToggle(module)}
           >
             <span className="flex items-start justify-between gap-3">
               <span>
@@ -96,11 +99,17 @@ export function ModulesStep({
                   {entry.label}
                 </span>
                 <span className="mt-1 block text-sm text-text-muted">
-                  Already active on your organisation
+                  Active now on your organisation
                 </span>
               </span>
               <span className="text-sm font-semibold text-text-muted">
-                Active
+                {selectedIncludedSet.has(module)
+                  ? "Included at renewal"
+                  : selectedOptionalSet.has(module)
+                    ? availableIncludedSlots > 0
+                      ? "Use included slot"
+                      : "Paid at renewal"
+                    : "Remove at renewal"}
               </span>
             </span>
           </SelectionCard>
@@ -112,9 +121,10 @@ export function ModulesStep({
               selectedIncludedSet.has(module) || selectedOptionalSet.has(module)
             }
             isDisabled={
-              delta.status === "coming-soon" &&
-              availableIncludedSlots === 0 &&
-              !selectedIncludedSet.has(module)
+              !isConfiguratorModuleReady(module) ||
+              (delta.status === "coming-soon" &&
+                availableIncludedSlots === 0 &&
+                !selectedIncludedSet.has(module))
             }
             onClick={() => onToggle(module)}
           >
@@ -128,7 +138,11 @@ export function ModulesStep({
                 </span>
               </span>
               <span className="flex flex-col items-end gap-1">
-                {selectedIncludedSet.has(module) ? (
+                {!isConfiguratorModuleReady(module) ? (
+                  <span className="whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-text-muted">
+                    Coming soon
+                  </span>
+                ) : selectedIncludedSet.has(module) ? (
                   <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-text-primary">
                     Included in {planLabel}
                   </span>

@@ -14,8 +14,8 @@ import {
 } from "./state";
 
 const PRICES: OptionPriceLookup = {
-  MODULE_LEARNING_MONTHLY: { amountMajor: 29 },
-  MODULE_LEARNING_YEARLY: { amountMajor: 290 },
+  MODULE_ASSET_MANAGEMENT_MONTHLY: { amountMajor: 29 },
+  MODULE_ASSET_MANAGEMENT_YEARLY: { amountMajor: 290 },
   MODULE_FINANCE_MONTHLY: { amountMajor: 19 },
 };
 
@@ -33,6 +33,14 @@ const PRICES: OptionPriceLookup = {
     "legacy/unknown plan codes leave the plan unselected",
   );
   assert.equal(initialStateFromSubscription(null).planCode, null);
+  const withModules = initialStateFromSubscription("GROWTH_99_MONTHLY", {
+    included: ["EVENTS"], paid: ["FINANCE"],
+  });
+  assert.deepEqual(withModules.selectedIncludedModules, ["EVENTS"]);
+  assert.deepEqual(withModules.selectedOptionalModules, ["FINANCE"]);
+  const moved = toggleModule(withModules, "FINANCE", PRICES);
+  assert.deepEqual(moved.selectedIncludedModules, ["EVENTS", "FINANCE"]);
+  assert.deepEqual(moved.selectedOptionalModules, []);
 }
 
 // --- the plan step gates everything else ---
@@ -85,10 +93,10 @@ const PRICES: OptionPriceLookup = {
     "STARTER_49_MONTHLY",
     PRICES,
   );
-  // LEARNING is priced + eligible -> toggles on then off.
+  // Asset Management is priced and eligible in the future catalogue.
   assert.deepEqual(
-    toggleModule(starter, "LEARNING", PRICES).selectedOptionalModules,
-    ["LEARNING"],
+    toggleModule(starter, "ASSET_MANAGEMENT", PRICES).selectedOptionalModules,
+    ["ASSET_MANAGEMENT"],
   );
   // A module without a price is not selectable.
   assert.deepEqual(
@@ -122,18 +130,18 @@ const PRICES: OptionPriceLookup = {
     MODULE_EVENTS_MONTHLY: { amountMajor: 10 },
     MODULE_MEALS_MONTHLY: { amountMajor: 12 },
   };
-  const afterExtraSelections = ["LEARNING", "EVENTS", "MEALS"].reduce(
+  const afterExtraSelections = ["ASSET_MANAGEMENT", "EVENTS", "MEALS"].reduce(
     (current, module) =>
       toggleModule(
         current,
-        module as "LEARNING" | "EVENTS" | "MEALS",
+        module as "ASSET_MANAGEMENT" | "EVENTS" | "MEALS",
         growthPrices,
       ),
     onGrowth,
   );
   assert.deepEqual(afterExtraSelections.selectedIncludedModules, [
     "FINANCE",
-    "LEARNING",
+    "ASSET_MANAGEMENT",
     "EVENTS",
   ]);
   assert.deepEqual(afterExtraSelections.selectedOptionalModules, ["MEALS"]);
@@ -149,6 +157,21 @@ const PRICES: OptionPriceLookup = {
   const yearly = selectFrequency(monthly, "yearly", PRICES);
   assert.equal(yearly.planCode, "STARTER_49_YEARLY");
   assert.equal(yearly.frequency, "yearly");
+}
+
+// An empty selection is intentional, including when a customer changes plans.
+{
+  const growth = selectPlan(
+    INITIAL_CONFIGURATOR_STATE,
+    "GROWTH_99_MONTHLY",
+    PRICES,
+  );
+  const starter = selectPlan(growth, "STARTER_49_MONTHLY", PRICES);
+  assert.deepEqual(starter.selectedIncludedModules, []);
+  assert.deepEqual(starter.selectedOptionalModules, []);
+  const yearly = selectFrequency(growth, "yearly", PRICES);
+  assert.deepEqual(yearly.selectedIncludedModules, []);
+  assert.deepEqual(yearly.selectedOptionalModules, []);
 }
 
 console.log("admin configurator state.test.ts: all assertions passed");

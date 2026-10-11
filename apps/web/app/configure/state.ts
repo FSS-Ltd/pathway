@@ -263,14 +263,8 @@ export function selectPlan(
   planCode: PlanCode,
   prices: OptionPriceLookup,
 ): ConfiguratorState {
-  const previousPolicy = state.planCode
-    ? getConfiguratorPlanPolicy(state.planCode)
-    : undefined;
   const selectedModules = [
     ...state.selectedIncludedModules,
-    ...(state.selectedIncludedModules.length === 0
-      ? (previousPolicy?.legacyIncludedModules ?? [])
-      : []),
     ...state.selectedOptionalModules,
   ];
   const reconciled = reconcileModules(
@@ -296,17 +290,8 @@ export function selectFrequency(
   const planCode = state.planCode
     ? remapPlanFrequency(state.planCode, frequency)
     : null;
-  const previousPolicy = state.planCode
-    ? getConfiguratorPlanPolicy(state.planCode)
-    : undefined;
   const reconciled = reconcileModules(
-    [
-      ...state.selectedIncludedModules,
-      ...(state.selectedIncludedModules.length === 0
-        ? (previousPolicy?.legacyIncludedModules ?? [])
-        : []),
-      ...state.selectedOptionalModules,
-    ],
+    [...state.selectedIncludedModules, ...state.selectedOptionalModules],
     planCode,
     frequency,
     prices,

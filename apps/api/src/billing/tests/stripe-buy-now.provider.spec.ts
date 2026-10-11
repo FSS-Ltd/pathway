@@ -3,6 +3,12 @@ import type { BuyNowCheckoutParams } from "../buy-now.provider";
 import type { BillingProviderConfig } from "../billing-provider.config";
 import { StripeBuyNowProvider } from "../providers/stripe-buy-now.provider";
 
+// Exercise price construction while optional-module launch readiness is closed.
+jest.mock("@pathway/pricing", () => ({
+  ...jest.requireActual("@pathway/pricing"),
+  isConfiguratorModuleReady: jest.fn(() => true),
+}));
+
 const params: BuyNowCheckoutParams = {
   plan: {
     planCode: "STARTER_MONTHLY",
@@ -137,11 +143,11 @@ describe("StripeBuyNowProvider", () => {
     );
   });
 
-  it("adds the Learning module price to checkout", async () => {
+  it("adds the Asset Management module price to checkout", async () => {
     const provider = new StripeBuyNowProvider(
       createConfig({
         STARTER_MONTHLY: "price_starter",
-        MODULE_LEARNING_MONTHLY: "price_learning",
+        MODULE_ASSET_MANAGEMENT_MONTHLY: "price_asset_management",
       }),
     );
     const create = jest.fn().mockResolvedValue({
@@ -159,7 +165,7 @@ describe("StripeBuyNowProvider", () => {
     await provider.createCheckoutSession(
       {
         ...params,
-        plan: { ...params.plan, selectedModules: [Module.LEARNING] },
+        plan: { ...params.plan, selectedModules: [Module.ASSET_MANAGEMENT] },
       },
       { tenantId: "tenant_1", orgId: "org_1" },
     );
@@ -168,7 +174,7 @@ describe("StripeBuyNowProvider", () => {
       expect.objectContaining({
         line_items: [
           { price: "price_starter", quantity: 1 },
-          { price: "price_learning", quantity: 1 },
+          { price: "price_asset_management", quantity: 1 },
         ],
       }),
     );

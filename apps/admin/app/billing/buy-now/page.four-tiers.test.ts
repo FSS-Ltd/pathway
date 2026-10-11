@@ -32,10 +32,10 @@ assert.ok(!source.includes("AV30 included:"));
 assert.ok(!source.includes("AV30 cap:"));
 
 assert.ok(
-  source.includes("Learning module"),
-  "admin buy-now page must expose the Learning module add-on",
+  !source.includes("Learning module"),
+  "Learning is core platform functionality, not a purchasable add-on",
 );
 assert.ok(
-  source.includes('selectedModules: learningModule ? ["LEARNING"] : undefined'),
-  "admin buy-now page must include the Learning module in checkout requests",
+  !source.includes('selectedModules: learningModule ? ["LEARNING"] : undefined'),
+  "admin buy-now page must not charge for Learning",
 );
