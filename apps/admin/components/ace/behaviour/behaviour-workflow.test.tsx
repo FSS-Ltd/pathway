@@ -4,6 +4,7 @@ import React, { act } from "react";
 import type {
   AdminBehaviourCategory,
   AdminBehaviourCommandInput,
+  AdminBehaviourCorrectionInput,
   AdminBehaviourEntry,
 } from "@/lib/api-client";
 import { BehaviourForm } from "./behaviour-form";
@@ -331,9 +332,17 @@ async function run(): Promise<void> {
         error={null}
         items={[]}
         children={[child]}
+        categories={categories}
+        canVoid={false}
         canCorrect={false}
         canSensitive={false}
         siteTimeZone="America/Los_Angeles"
+        onRetract={async () => ({
+          id: "void",
+          entryId: entry.id,
+          retractedAt: entry.occurredAt,
+          duplicate: false,
+        })}
         onRetry={() => {
           retried += 1;
         }}
@@ -351,9 +360,17 @@ async function run(): Promise<void> {
         error="History is temporarily unavailable."
         items={[]}
         children={[child]}
+        categories={categories}
+        canVoid={false}
         canCorrect={false}
         canSensitive={false}
         siteTimeZone="America/Los_Angeles"
+        onRetract={async () => ({
+          id: "void",
+          entryId: entry.id,
+          retractedAt: entry.occurredAt,
+          duplicate: false,
+        })}
         onRetry={() => {
           retried += 1;
         }}
@@ -372,9 +389,17 @@ async function run(): Promise<void> {
         error={null}
         items={[]}
         children={[child]}
+        categories={categories}
+        canVoid={false}
         canCorrect={false}
         canSensitive={false}
         siteTimeZone="America/Los_Angeles"
+        onRetract={async () => ({
+          id: "void",
+          entryId: entry.id,
+          retractedAt: entry.occurredAt,
+          duplicate: false,
+        })}
         onRetry={() => undefined}
         onCorrect={async () => ({ entry, duplicate: false })}
       />,
@@ -396,9 +421,17 @@ async function run(): Promise<void> {
           },
         ]}
         children={[child]}
+        categories={categories}
+        canVoid={false}
         canCorrect={false}
         canSensitive
         siteTimeZone="America/Los_Angeles"
+        onRetract={async () => ({
+          id: "void",
+          entryId: entry.id,
+          retractedAt: entry.occurredAt,
+          duplicate: false,
+        })}
         onRetry={() => undefined}
         onCorrect={async () => ({ entry, duplicate: false })}
       />,
@@ -432,9 +465,17 @@ async function run(): Promise<void> {
           },
         ]}
         children={[child]}
+        categories={categories}
+        canVoid={false}
         canCorrect={false}
         canSensitive={false}
         siteTimeZone="America/Los_Angeles"
+        onRetract={async () => ({
+          id: "void",
+          entryId: entry.id,
+          retractedAt: entry.occurredAt,
+          duplicate: false,
+        })}
         onRetry={() => undefined}
         onCorrect={async () => ({ entry, duplicate: false })}
       />,
@@ -447,7 +488,7 @@ async function run(): Promise<void> {
 
     const corrections: Array<{
       entryId: string;
-      input: AdminBehaviourCommandInput;
+      input: AdminBehaviourCorrectionInput;
     }> = [];
     let correctionAttempt = 0;
     await render(
@@ -457,9 +498,17 @@ async function run(): Promise<void> {
         error={null}
         items={[entry]}
         children={[child]}
+        categories={categories}
+        canVoid={false}
         canCorrect
         canSensitive={false}
         siteTimeZone="America/Los_Angeles"
+        onRetract={async () => ({
+          id: "void",
+          entryId: entry.id,
+          retractedAt: entry.occurredAt,
+          duplicate: false,
+        })}
         onRetry={() => undefined}
         onCorrect={async (entryId, input) => {
           corrections.push({ entryId, input });
@@ -482,24 +531,42 @@ async function run(): Promise<void> {
       'form[aria-label="Correct behaviour record"]',
     );
     await submit(correctionForm);
-    const reason = element<HTMLInputElement>(
+    const correctionReason = element<HTMLTextAreaElement>(
       container,
       `#behaviour-correction-reason-${entry.id}`,
     );
-    assert.equal(reason.getAttribute("aria-invalid"), "true");
-    await change(reason, "Correct the recorded context");
+    await change(correctionReason, "Correct the recorded context");
+    await change(
+      element<HTMLInputElement>(
+        container,
+        `#behaviour-correction-fact-reason-${entry.id}`,
+      ),
+      "Updated behaviour description",
+    );
+    await change(
+      element<HTMLInputElement>(
+        container,
+        `#behaviour-correction-points-${entry.id}`,
+      ),
+      "-3",
+    );
     await submit(correctionForm);
     assert.match(
       container.textContent ?? "",
       /Correction temporarily unavailable/,
     );
-    await change(reason, "Correct the recorded context and outcome");
+    await change(correctionReason, "Correct the recorded context and outcome");
     await submit(correctionForm);
     assert.equal(corrections.length, 2);
     assert.equal(corrections[0]?.entryId, entry.id);
-    assert.equal(corrections[0]?.input.reason, "Correct the recorded context");
+    assert.equal(corrections[0]?.input.reason, "Updated behaviour description");
+    assert.equal(corrections[0]?.input.pointsDelta, -3);
     assert.equal(
-      corrections[1]?.input.reason,
+      corrections[0]?.input.correctionReason,
+      "Correct the recorded context",
+    );
+    assert.equal(
+      corrections[1]?.input.correctionReason,
       "Correct the recorded context and outcome",
     );
     assert.notEqual(
@@ -517,6 +584,58 @@ async function run(): Promise<void> {
       correctionSuccess,
       "focuses correction success feedback",
     );
+
+    const retractions: Array<{ entryId: string; reason: string }> = [];
+    await render(
+      root,
+      <BehaviourHistory
+        isLoading={false}
+        error={null}
+        items={[entry]}
+        children={[child]}
+        categories={categories}
+        canCorrect={false}
+        canVoid
+        canSensitive={false}
+        siteTimeZone="America/Los_Angeles"
+        onRetry={() => undefined}
+        onCorrect={async () => ({ entry, duplicate: false })}
+        onRetract={async (entryId, input) => {
+          retractions.push({ entryId, reason: input.reason });
+          return {
+            id: "void-1",
+            entryId,
+            retractedAt: entry.occurredAt,
+            duplicate: false,
+          };
+        }}
+      />,
+    );
+    await click(
+      element<HTMLButtonElement>(container, `#behaviour-void-${entry.id}`),
+    );
+    const voidForm = element<HTMLFormElement>(
+      container,
+      'form[aria-label="Void behaviour record"]',
+    );
+    await submit(voidForm);
+    assert.equal(
+      retractions.length,
+      0,
+      "requires a reason and explicit confirmation",
+    );
+    await change(
+      element<HTMLTextAreaElement>(
+        container,
+        `#behaviour-void-reason-${entry.id}`,
+      ),
+      "Duplicate entry",
+    );
+    await click(element<HTMLInputElement>(container, 'input[type="checkbox"]'));
+    await submit(voidForm);
+    assert.deepEqual(retractions, [
+      { entryId: entry.id, reason: "Duplicate entry" },
+    ]);
 
     const zonedCommands: AdminBehaviourCommandInput[] = [];
     await render(
@@ -569,9 +688,17 @@ async function run(): Promise<void> {
         error={null}
         items={[{ ...entry, occurredAt: "2026-06-01T00:30:00.000Z" }]}
         children={[child]}
+        categories={categories}
+        canVoid={false}
         canCorrect={false}
         canSensitive={false}
         siteTimeZone="America/Los_Angeles"
+        onRetract={async () => ({
+          id: "void",
+          entryId: entry.id,
+          retractedAt: entry.occurredAt,
+          duplicate: false,
+        })}
         onRetry={() => undefined}
         onCorrect={async () => ({ entry, duplicate: false })}
       />,

@@ -279,6 +279,12 @@ function behaviourAggregateQuery(input: {
           WHERE successor."tenantId" = ${input.tenantId}
             AND successor."correctsBehaviourEntryId" = fact.id
         )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "BehaviourEntryRetraction" AS retraction
+          WHERE retraction."tenantId" = ${input.tenantId}
+            AND retraction."entryId" = fact.id
+        )
     ),
     fact_lineage AS (
       SELECT

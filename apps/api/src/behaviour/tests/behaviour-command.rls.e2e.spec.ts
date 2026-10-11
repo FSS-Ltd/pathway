@@ -15,6 +15,7 @@ import { OutboxService } from "../../common/outbox/outbox.service";
 import type { MailerService } from "../../mailer/mailer.service";
 import { BehaviourCommandService } from "../behaviour-command.service";
 import { BehaviourQueryService } from "../behaviour-query.service";
+import { BehaviourRetractionService } from "../behaviour-retraction.service";
 import { DemeritEscalationService } from "../demerit-escalation.service";
 import { findActiveReviewers } from "../behaviour-review-access";
 
@@ -156,6 +157,7 @@ describe("ACE behaviour command database boundary", () => {
           "SET LOCAL session_replication_role = replica",
         );
         await tx.behaviourReviewRequest.deleteMany({ where: { tenantId } });
+        await tx.behaviourEntryRetraction.deleteMany({ where: { tenantId } });
         await tx.behaviourEntry.deleteMany({ where: { tenantId } });
         await tx.behaviourCategory.deleteMany({ where: { tenantId } });
         await tx.demeritPolicy.deleteMany({ where: { tenantId } });
@@ -490,6 +492,7 @@ describe("ACE behaviour command database boundary", () => {
     await expect(
       allowedQuery.list(actor, { childId: fixture.childAId }),
     ).resolves.toEqual({
+      canVoid: false,
       items: expect.arrayContaining([
         expect.objectContaining({ id: created.entry.id, note: plaintext }),
       ]),
@@ -569,6 +572,125 @@ describe("ACE behaviour command database boundary", () => {
     ]);
   });
 
+  it("voids a merit once, keeps its audit trail, and hides it across tenant boundaries", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgId,
+      userId: fixture.actorAId,
+    };
+    const roleId = randomUUID();
+    const assignmentId = randomUUID();
+    await prisma.orgMembership.create({
+      data: { orgId: actor.orgId, userId: actor.userId, role: "ORG_MEMBER" },
+    });
+    await withSystemRoleFixtureWrites((tx) =>
+      tx.orgRoleDefinition.create({
+        data: {
+          id: roleId,
+          orgId: fixture!.orgId,
+          tenantId: fixture!.tenantAId,
+          name: "Site Lead",
+          scope: "site",
+          isSystem: true,
+          createdById: actor.userId,
+          updatedById: actor.userId,
+        },
+      }),
+    );
+    await withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
+      tx.userRoleAssignment.create({
+        data: {
+          id: assignmentId,
+          orgId: actor.orgId,
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          roleDefinitionId: roleId,
+          assignedById: actor.userId,
+          startsAt: new Date(Date.now() - 1_000),
+        },
+      }),
+    );
+    try {
+      const created = await commandService().record(
+        {
+          idempotencyKey: randomUUID(),
+          childId: fixture.childAId,
+          category: "service",
+          type: "MERIT",
+          visibility: "GENERAL",
+          pointsDelta: 2,
+          occurredAt: "2026-08-12T13:00:00.000Z",
+          reason: "Merit to void",
+        },
+        actor,
+      );
+      const service = new BehaviourRetractionService(
+        permissions(true),
+        new OutboxService(),
+      );
+      const command = {
+        idempotencyKey: randomUUID(),
+        reason: "Recorded against the wrong event",
+      };
+      const first = await service.retract(created.entry.id, command, actor);
+      const replay = await service.retract(created.entry.id, command, actor);
+      expect(first.duplicate).toBe(false);
+      expect(replay).toMatchObject({ id: first.id, duplicate: true });
+
+      const evidence = await withTenantRlsContext(
+        actor.tenantId,
+        actor.orgId,
+        async (tx) => ({
+          retraction: await tx.behaviourEntryRetraction.findUniqueOrThrow({
+            where: { id: first.id },
+          }),
+          auditCount: await tx.auditEvent.count({
+            where: {
+              tenantId: actor.tenantId,
+              entityId: created.entry.id,
+            },
+          }),
+          adjustments: await tx.outboxEvent.findMany({
+            where: { aggregateId: first.id },
+            select: { payload: true },
+          }),
+        }),
+      );
+      expect(evidence.retraction.reason).toBe(command.reason);
+      expect(evidence.auditCount).toBe(2);
+      expect(evidence.adjustments).toEqual([
+        { payload: expect.objectContaining({ pointsDelta: -2 }) },
+      ]);
+      const history = await new BehaviourQueryService(permissions(true)).list(
+        actor,
+        { childId: fixture.childAId },
+      );
+      expect(history.items.some((item) => item.id === created.entry.id)).toBe(
+        false,
+      );
+      const crossTenantCount = await withBehaviourRlsContext(
+        fixture.tenantBId,
+        fixture.orgId,
+        (tx) =>
+          tx.behaviourEntryRetraction.count({
+            where: { tenantId: fixture!.tenantAId },
+          }),
+      );
+      expect(crossTenantCount).toBe(0);
+    } finally {
+      await prisma.userRoleAssignment.deleteMany({
+        where: { id: assignmentId },
+      });
+      await withSystemRoleFixtureWrites((tx) =>
+        tx.orgRoleDefinition.deleteMany({ where: { id: roleId } }),
+      );
+      await prisma.orgMembership.deleteMany({
+        where: { orgId: actor.orgId, userId: actor.userId },
+      });
+    }
+  });
+
   it("accepts an organisation-scoped behaviour recorder and keeps tenant scope forced", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     const service = commandService();
@@ -635,9 +757,7 @@ async function withBehaviourRlsContext<T>(
   callback: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   return withTenantRlsContext(tenantId, orgId, async (tx) => {
-    if (process.env.E2E_USE_GLOBAL_SETUP === "true") {
-      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${TENANT_RLS_ROLE}"`);
-    }
+    await tx.$executeRawUnsafe(`SET LOCAL ROLE "${TENANT_RLS_ROLE}"`);
 
     return callback(tx);
   });

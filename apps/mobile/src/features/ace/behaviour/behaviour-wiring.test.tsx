@@ -73,7 +73,11 @@ const historyEntry: behaviourApi.BehaviourEntry = {
 };
 
 function appReady(
-  permissions = ["ace.behaviour.read", "ace.behaviour.record"],
+  permissions = [
+    "ace.behaviour.read",
+    "ace.behaviour.record",
+    "ace.behaviour.correct",
+  ],
 ) {
   return {
     isReady: true,
@@ -129,7 +133,11 @@ beforeEach(() => {
   jest.spyOn(behaviourApi, "fetchBehaviourPermissions").mockResolvedValue({
     orgId: "org-1",
     tenantId: "site-1",
-    permissions: ["ace.behaviour.read", "ace.behaviour.record"],
+    permissions: [
+      "ace.behaviour.read",
+      "ace.behaviour.record",
+      "ace.behaviour.correct",
+    ],
   });
   jest
     .spyOn(behaviourApi, "fetchBehaviourChildren")
@@ -205,6 +213,18 @@ describe("behaviour API contracts", () => {
 });
 
 describe("BehaviourScreen", () => {
+  it("hides correction when the correction permission is revoked", async () => {
+    jest.spyOn(behaviourApi, "fetchBehaviourPermissions").mockResolvedValue({
+      orgId: "org-1",
+      tenantId: "site-1",
+      permissions: ["ace.behaviour.read", "ace.behaviour.record"],
+    });
+    const screen = render(<BehaviourScreen />);
+    await waitFor(() => expect(screen.getByText("Jordan Smith")).toBeTruthy());
+    expect(screen.queryByText("Correct record")).toBeNull();
+    expect(screen.getByText("Record behaviour")).toBeTruthy();
+  });
+
   it("separates sensitive history and keeps review text out of the saved draft", async () => {
     jest.spyOn(behaviourApi, "fetchBehaviourPermissions").mockResolvedValue({
       orgId: "org-1",

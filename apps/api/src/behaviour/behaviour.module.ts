@@ -7,6 +7,7 @@ import { BehaviourCommandService } from "./behaviour-command.service";
 import { BehaviourPolicyService } from "./behaviour-policy.service";
 import { BehaviourQueryService } from "./behaviour-query.service";
 import { BehaviourReviewService } from "./behaviour-review.service";
+import { BehaviourRetractionService } from "./behaviour-retraction.service";
 import { BehaviourController } from "./behaviour.controller";
 import { DemeritEscalationService } from "./demerit-escalation.service";
 import { DemeritStageService } from "./demerit-stage.service";
@@ -20,6 +21,7 @@ import { BehaviourOutboxController } from "./behaviour-outbox.controller";
     BehaviourCommandService,
     BehaviourQueryService,
     BehaviourReviewService,
+    BehaviourRetractionService,
     DemeritEscalationService,
     DemeritStageService,
   ],

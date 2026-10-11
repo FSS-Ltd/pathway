@@ -95,6 +95,7 @@ function entry(overrides: Partial<Record<string, unknown>> = {}) {
 function transaction() {
   return {
     $executeRaw: jest.fn().mockResolvedValue(0),
+    $queryRaw: jest.fn().mockResolvedValue([]),
     tenant: { findFirst: jest.fn() },
     child: { findFirst: jest.fn() },
     behaviourCategory: { aggregate: jest.fn(), findFirst: jest.fn() },
@@ -174,7 +175,7 @@ function arrange(options: { sensitive?: boolean } = {}) {
 describe("behaviour entry boundary", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("uses the registered read and record permissions on create, list, and correction routes", () => {
+  it("uses distinct permissions for recording, correcting, and voiding", () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSION,
@@ -190,9 +191,15 @@ describe("behaviour entry boundary", () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSION,
+        BehaviourController.prototype.retractEntry,
+      ),
+    ).toBe("ace.behaviour.policy.manage");
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSION,
         BehaviourController.prototype.correctEntry,
       ),
-    ).toBe("ace.behaviour.record");
+    ).toBe("ace.behaviour.correct");
   });
 
   it("strictly validates bounded commands, queries, and type/delta consistency", () => {
@@ -534,6 +541,7 @@ describe("BehaviourCommandService", () => {
         occurredAt: true,
         categoryIsSerious: true,
         correction: { select: { id: true } },
+        retraction: { select: { id: true } },
       },
     });
     expect(tx.behaviourEntry.create).toHaveBeenCalledWith({
@@ -544,6 +552,45 @@ describe("BehaviourCommandService", () => {
       }),
       select: expect.any(Object),
     });
+  });
+
+  it("stores the replacement fact reason separately from the audited correction reason", async () => {
+    const { commandService, tx } = arrange();
+    tx.behaviourEntry.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(
+        entry({ id: originalId, correction: null, retraction: null }),
+      );
+    tx.behaviourEntry.create.mockResolvedValue(
+      entry({ id: "correction-2", correctsBehaviourEntryId: originalId }),
+    );
+
+    await commandService.correct(
+      originalId,
+      correction({
+        reason: "Helped another learner",
+        correctionReason: "The original points were entered incorrectly",
+      }),
+      actor,
+    );
+
+    expect(tx.behaviourEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        reason: "Helped another learner",
+        correctionReason: "The original points were entered incorrectly",
+      }),
+      select: expect.any(Object),
+    });
+    expect(tx.auditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            operation: "BEHAVIOUR_ENTRY_CORRECTED",
+            correctsBehaviourEntryId: originalId,
+          }),
+        }),
+      }),
+    );
   });
 
   it("requires sensitive permission when the correction predecessor is sensitive", async () => {
@@ -681,6 +728,7 @@ describe("BehaviourQueryService", () => {
       queryService.list(actor, { childId, limit: 25 }),
     ).resolves.toEqual({
       items: [expect.objectContaining({ id: "entry-1" })],
+      canVoid: false,
     });
     expect(tx.behaviourEntry.findMany).toHaveBeenCalledWith({
       where: {
@@ -688,6 +736,7 @@ describe("BehaviourQueryService", () => {
         childId,
         visibility: "GENERAL",
         correction: { is: null },
+        retraction: { is: null },
       },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
       take: 25,
@@ -717,6 +766,7 @@ describe("BehaviourQueryService", () => {
         where: {
           tenantId: actor.tenantId,
           correction: { is: null },
+          retraction: { is: null },
         },
       }),
     );

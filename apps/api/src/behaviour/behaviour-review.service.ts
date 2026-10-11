@@ -129,6 +129,7 @@ export class BehaviourReviewService {
             id: entryId,
             tenantId: actor.tenantId,
             childId: request.childId,
+            retraction: { is: null },
           },
           select: behaviourEntryQuerySelect,
         });

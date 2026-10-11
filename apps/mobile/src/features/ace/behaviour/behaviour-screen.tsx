@@ -78,6 +78,7 @@ export function BehaviourScreen() {
     : null;
   const canRead = permissions.includes("ace.behaviour.read");
   const canRecord = permissions.includes("ace.behaviour.record");
+  const canCorrect = permissions.includes("ace.behaviour.correct");
   const canSensitive = permissions.includes("ace.behaviour.sensitive.read");
   const canManagePolicy = permissions.includes("ace.behaviour.policy.manage");
 
@@ -421,7 +422,7 @@ export function BehaviourScreen() {
           <BehaviourHistoryList
             items={history}
             children={children}
-            canCorrect={canRecord}
+            canCorrect={canCorrect}
             canSensitive={canSensitive}
             disabled={isSubmitting}
             siteTimeZone={siteTimeZone!}

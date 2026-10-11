@@ -110,6 +110,9 @@ export function behaviourCommandFingerprint(
       occurredAt: new Date(command.occurredAt).toISOString(),
       reason: command.reason.trim(),
       note: command.note?.trim() ?? null,
+      ...("correctionReason" in command && command.correctionReason
+        ? { correctionReason: command.correctionReason.trim() }
+        : {}),
     }),
   );
 }

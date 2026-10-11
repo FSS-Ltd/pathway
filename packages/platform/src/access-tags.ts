@@ -58,6 +58,12 @@ export const ACCESS_TAG_DEFINITIONS = {
     description: "View behaviour records within existing site and child scope.",
     permissionKeys: ["ace.behaviour.read"],
   },
+  "behaviour-corrector": {
+    label: "Behaviour corrector",
+    description:
+      "Correct behaviour records within existing site and child scope.",
+    permissionKeys: ["ace.behaviour.correct"],
+  },
   "student-drillthrough-viewer": {
     label: "Student drillthrough viewer",
     description:

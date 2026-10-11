@@ -12,6 +12,7 @@ const availableTags = [
   "attendance-exporter",
   "attendance-recorder",
   "behaviour-viewer",
+  "behaviour-corrector",
   "pace-full-access",
   "parent-message-responder",
 ] as const satisfies readonly AccessTagKey[];
@@ -59,6 +60,12 @@ describe("access-tag catalogue", () => {
   it("maps the exporter tag only to ACE attendance export", () => {
     expect(accessTagPermissionKeys("attendance-exporter")).toEqual([
       "ace.attendance.export",
+    ]);
+  });
+
+  it("grants correction without granting recording or voiding", () => {
+    expect(accessTagPermissionKeys("behaviour-corrector")).toEqual([
+      "ace.behaviour.correct",
     ]);
   });
 

@@ -17,6 +17,7 @@ import {
   fetchChildren,
   fetchDemeritStatus,
   recordBehaviour,
+  retractBehaviour,
   type AdminBehaviourCategory,
   type AdminBehaviourEntry,
 } from "@/lib/api-client";
@@ -28,6 +29,7 @@ export default function BehaviourPage() {
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
   const canRead = hasFreshPermission(permissions, "ace.behaviour.read");
   const canRecord = hasFreshPermission(permissions, "ace.behaviour.record");
+  const canCorrect = hasFreshPermission(permissions, "ace.behaviour.correct");
   const canSensitive = hasFreshPermission(
     permissions,
     "ace.behaviour.sensitive.read",
@@ -43,6 +45,7 @@ export default function BehaviourPage() {
     [],
   );
   const [history, setHistory] = React.useState<AdminBehaviourEntry[]>([]);
+  const [canVoid, setCanVoid] = React.useState(false);
   const activeSite =
     adminState.status === "ready"
       ? adminState.snapshot.sites.find(
@@ -58,6 +61,8 @@ export default function BehaviourPage() {
   const load = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setHistory([]);
+    setCanVoid(false);
     try {
       const [nextChildren, policy, nextHistory] = await Promise.all([
         fetchChildren(),
@@ -74,16 +79,18 @@ export default function BehaviourPage() {
       );
       setCategories(policy.categories);
       setHistory(nextHistory.items);
+      setCanVoid(nextHistory.canVoid === true);
       setStageRefreshKey((current) => current + 1);
     } catch (cause) {
       setError(
         requestFailure(cause, "Unable to load behaviour capture.").message,
       );
       setHistory([]);
+      setCanVoid(false);
     } finally {
       setIsLoading(false);
     }
-  }, [siteTimeZone]);
+  }, [activeSiteId, siteTimeZone]);
 
   React.useEffect(() => {
     if (isLoadingAccess || !canRead) return;
@@ -147,11 +154,14 @@ export default function BehaviourPage() {
         error={error}
         items={history}
         children={children}
-        canCorrect={canRecord}
+        categories={categories}
+        canCorrect={canCorrect}
+        canVoid={canVoid && canManagePolicy}
         canSensitive={canSensitive}
         siteTimeZone={siteTimeZone ?? "UTC"}
         onRetry={() => void load()}
         onCorrect={correctBehaviour}
+        onRetract={retractBehaviour}
         onSuccess={load}
       />
     </div>

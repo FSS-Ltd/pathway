@@ -112,6 +112,7 @@ async function clearBehaviourPolicyFixtures(fixture: Fixture): Promise<void> {
       "PacePolicyOverride",
       "PacePolicy",
       "BehaviourReviewRequest",
+      "BehaviourEntryRetraction",
       "BehaviourEntry",
       "DemeritStageOverride",
       "DemeritPolicy",

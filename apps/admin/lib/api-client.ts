@@ -1204,6 +1204,22 @@ export type AdminBehaviourCommandInput = {
   note?: string;
 };
 
+export type AdminBehaviourCorrectionInput = AdminBehaviourCommandInput & {
+  correctionReason: string;
+};
+
+export type AdminBehaviourRetractionInput = {
+  idempotencyKey: string;
+  reason: string;
+};
+
+export type AdminBehaviourRetractionResponse = {
+  id: string;
+  entryId: string;
+  retractedAt: string;
+  duplicate: boolean;
+};
+
 export type AdminBehaviourCommandResponse = {
   entry: AdminBehaviourEntry;
   duplicate: boolean;
@@ -1211,6 +1227,7 @@ export type AdminBehaviourCommandResponse = {
 
 export type AdminBehaviourHistoryResponse = {
   items: AdminBehaviourEntry[];
+  canVoid?: boolean;
 };
 
 export type AdminBehaviourHistoryQuery = {
@@ -1347,11 +1364,24 @@ export function recordBehaviour(
 
 export function correctBehaviour(
   entryId: string,
-  input: AdminBehaviourCommandInput,
+  input: AdminBehaviourCorrectionInput,
 ): Promise<AdminBehaviourCommandResponse> {
   return behaviourCommandRequest(
     `/ace/behaviour/${encodeURIComponent(entryId)}/corrections`,
     input,
+  );
+}
+
+export function retractBehaviour(
+  entryId: string,
+  input: AdminBehaviourRetractionInput,
+): Promise<AdminBehaviourRetractionResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("Behaviour retractions are not available in mock mode.");
+  }
+  return behaviourRequest<AdminBehaviourRetractionResponse>(
+    `/ace/behaviour/${encodeURIComponent(entryId)}/retractions`,
+    { method: "POST", body: JSON.stringify(input) },
   );
 }
 
