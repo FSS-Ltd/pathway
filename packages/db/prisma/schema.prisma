@@ -650,6 +650,27 @@ model AccessTagGrant {
   @@index([orgId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
+model AccessTagExclusion {
+  id           String       @id @default(uuid())
+  orgId        String
+  tenantId     String?
+  userId       String
+  tagKey       AccessTagKey
+  excludedById String
+  revokedAt    DateTime?
+  revokedById  String?
+  createdAt    DateTime     @default(now())
+
+  org        Org     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant     Tenant? @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  user       User    @relation("AccessTagExclusionAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  excludedBy User    @relation("AccessTagExcluder", fields: [excludedById], references: [id], onDelete: Restrict)
+  revokedBy  User?   @relation("AccessTagExclusionRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([orgId, userId, revokedAt])
+  @@index([tenantId, userId, revokedAt])
+}
+
 model OutboxEvent {
   id             String   @id @default(uuid())
   orgId          String   @default(dbgenerated("app.current_org_id()"))
@@ -855,6 +876,7 @@ model Org {
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
   accessTagGrants     AccessTagGrant[]
+  accessTagExclusions AccessTagExclusion[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -886,6 +908,7 @@ model Tenant {
   pendingOrders   PendingOrder[]
   siteMemberships        SiteMembership[]
   accessTagGrants        AccessTagGrant[]
+  accessTagExclusions    AccessTagExclusion[]
   lastActiveUsers        User[]                  @relation("UserLastActiveTenant")
   staffUnavailableDates  StaffUnavailableDate[]
   staffPreferredGroups   StaffPreferredGroup[]
@@ -1169,6 +1192,9 @@ model User {
   accessTagGrants         AccessTagGrant[]        @relation("AccessTagGrantAssignee")
   accessTagGrantsIssued   AccessTagGrant[]        @relation("AccessTagGrantor")
   accessTagGrantsRevoked  AccessTagGrant[]        @relation("AccessTagGrantRevoker")
+  accessTagExclusions        AccessTagExclusion[] @relation("AccessTagExclusionAssignee")
+  accessTagExclusionsIssued  AccessTagExclusion[] @relation("AccessTagExcluder")
+  accessTagExclusionsRevoked AccessTagExclusion[] @relation("AccessTagExclusionRevoker")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.

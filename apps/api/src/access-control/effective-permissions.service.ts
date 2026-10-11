@@ -41,6 +41,11 @@ export interface EffectiveTagPermissionGrant {
   revokedAt: Date | null;
 }
 
+export interface EffectivePermissionExclusion {
+  tenantId: string | null;
+  permissionKey: PermissionKey;
+}
+
 export interface EffectivePermissionsReader {
   isActiveSuperUser(userId: string): Promise<boolean>;
   getMembership(
@@ -64,6 +69,12 @@ export interface EffectivePermissionsReader {
     tenantId: string | undefined,
     now: Date,
   ): Promise<readonly EffectiveTagPermissionGrant[]>;
+  findExclusions(
+    userId: string,
+    orgId: string,
+    tenantId: string | undefined,
+    now: Date,
+  ): Promise<readonly EffectivePermissionExclusion[]>;
 }
 
 export interface OrgCapabilitiesReader {
@@ -216,6 +227,23 @@ export class EffectivePermissionsService {
         : denied("feature-disabled");
     }
 
+    const exclusions = await this.reader.findExclusions(
+      request.userId,
+      request.orgId,
+      request.tenantId,
+      request.now,
+    );
+    if (
+      exclusions.some(
+        (exclusion) =>
+          exclusion.permissionKey === request.permission &&
+          (exclusion.tenantId === null ||
+            exclusion.tenantId === request.tenantId),
+      )
+    ) {
+      return denied("permission-missing");
+    }
+
     const tagGrants = await this.reader.findTagGrants(
       request.userId,
       request.orgId,
@@ -293,6 +321,15 @@ export class EffectivePermissionsService {
       now,
     );
 
+    const excludedKeys = new Set(
+      (await this.reader.findExclusions(userId, orgId, tenantId, now))
+        .filter(
+          (exclusion) =>
+            exclusion.tenantId === null || exclusion.tenantId === tenantId,
+        )
+        .map((exclusion) => exclusion.permissionKey),
+    );
+
     const availableCapabilities = new Set(snapshot.capabilities);
     const superUserKeys = snapshot.isSuperUser
       ? await this.reader.findActivePermissionKeys(snapshot.capabilities)
@@ -333,7 +370,10 @@ export class EffectivePermissionsService {
     );
 
     return availability
-      .filter(({ available }) => available)
+      .filter(
+        ({ available, permission }) =>
+          available && (snapshot.isSuperUser || !excludedKeys.has(permission)),
+      )
       .map(({ permission }) => permission);
   }
 
@@ -362,6 +402,15 @@ export class EffectivePermissionsService {
       orgId,
       tenantId,
       now,
+    );
+
+    const excludedKeys = new Set(
+      (await this.reader.findExclusions(userId, orgId, tenantId, now))
+        .filter(
+          (exclusion) =>
+            exclusion.tenantId === null || exclusion.tenantId === tenantId,
+        )
+        .map((exclusion) => exclusion.permissionKey),
     );
 
     const availableCapabilities = new Set(snapshot.capabilities);
@@ -417,7 +466,10 @@ export class EffectivePermissionsService {
     );
 
     return availability
-      .filter(({ available }) => available)
+      .filter(
+        ({ available, permission }) =>
+          available && (snapshot.isSuperUser || !excludedKeys.has(permission)),
+      )
       .map(({ permission }) => ({
         permissionKey: permission,
         sourceRoleIds: [...(roleIdsByKey.get(permission) ?? [])].sort(),

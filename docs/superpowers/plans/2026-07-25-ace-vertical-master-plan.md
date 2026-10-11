@@ -30,6 +30,12 @@
 - Controllers stay thin. Deterministic ACE, finance, and merit rules stay outside controllers and React components.
 - No production deployment is authorised by these plans.
 
+## Roles & Access delivery amendment (RA-1 to RA-4)
+
+Deliver the approved Roles & Access workspace sequentially from verified `FSS-Ltd/pathway` `master`, one branch and PR per step. RA-1 provides the badge matrix, scoped individual exclusions, read/mutation APIs, and permission enforcement; RA-2 extends the existing shared `DataTable`; RA-3 adds the people-first workspace; RA-4 migrates suitable admin lists. The next step starts only after the current PR passes current-revision CI and required review and the host confirms its merge. Oasis is a read-only interaction reference.
+
+RA-1 keeps the platform-owned access-tag catalogue and fixed role definitions. Exclusions are additive, audited, forced-RLS rows; they subtract mapped permissions from ordinary role and badge grants in their scope, persist across role changes, and never override the platform-superuser boundary. Badge changes require an explicit scope and revision and preserve entitlement, relationship, feature-toggle, last-head, and self-lockout boundaries. Rollback after exclusions become active must retain exclusion enforcement; reverting to an API that ignores them is unsafe.
+
 ---
 
 ## 1. Source precedence
