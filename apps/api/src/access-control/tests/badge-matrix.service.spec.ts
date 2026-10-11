@@ -121,6 +121,7 @@ describe("BadgeMatrixService", () => {
       selected: false,
       effectiveCoverage: "none",
       revision: "e:exclusion-1",
+      revisions: { organisation: "", site: "e:exclusion-1" },
       sourceRoleIds: ["role-1"],
       exclusions: [{ id: "exclusion-1", tenantId: "site-1" }],
     });

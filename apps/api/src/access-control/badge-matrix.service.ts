@@ -76,7 +76,6 @@ export class BadgeMatrixService {
   }
 
   async forUser(actor: RoleActorContext, userId: string) {
-    const scopeTenantId = actor.tenantId ?? null;
     const [catalogue, userState] = await Promise.all([
       this.catalogue(actor),
       this.transaction.run(actor, async (tx) => {
@@ -167,6 +166,17 @@ export class BadgeMatrixService {
         const directExclusions = userState.exclusions.filter(
           ({ tagKey }) => fromStoredAccessTagKey(tagKey) === badge.key,
         );
+        const revisionFor = (tenantId: string | null) =>
+          badgeRevision({
+            grants: directGrants.filter((grant) => grant.tenantId === tenantId),
+            exclusions: directExclusions.filter(
+              (exclusion) => exclusion.tenantId === tenantId,
+            ),
+          });
+        const revisions = {
+          organisation: revisionFor(null),
+          site: actor.tenantId ? revisionFor(actor.tenantId) : null,
+        };
         const permissionSet = new Set(badge.permissionKeys);
         const blockingTags = userState.exclusions
           .filter(({ tagKey }) =>
@@ -200,14 +210,8 @@ export class BadgeMatrixService {
             tenantId,
           })),
           blockingTags: [...new Set(blockingTags)] as AccessTagKey[],
-          revision: badgeRevision({
-            grants: directGrants.filter(
-              ({ tenantId }) => tenantId === scopeTenantId,
-            ),
-            exclusions: directExclusions.filter(
-              ({ tenantId }) => tenantId === scopeTenantId,
-            ),
-          }),
+          revisions,
+          revision: revisions.site ?? revisions.organisation,
         };
       }),
     };
