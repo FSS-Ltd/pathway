@@ -6,3 +6,5 @@ export * from "./capabilities";
 export * from "./access-tags";
 export * from "./capability-maps";
 export * from "./permission-definition-sync";
+export * from "./messaging/contracts";
+export * from "./messaging/recipient-policy";

@@ -699,6 +699,9 @@ importers:
       '@pathway/db':
         specifier: workspace:*
         version: link:../db
+      zod:
+        specifier: ^3.23.8
+        version: 3.25.76
     devDependencies:
       '@prisma/client':
         specifier: ^5.18.0

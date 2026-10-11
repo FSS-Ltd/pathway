@@ -32,6 +32,9 @@ function setup() {
     guardianIdentity: {
       findFirst: jest.fn().mockResolvedValue({ id: "guardian-a" }),
     },
+    guardianChildRelationship: {
+      findFirst: jest.fn().mockResolvedValue({ childId: "child-a" }),
+    },
     studentIdentity: { findUnique: jest.fn().mockResolvedValue(null) },
     permissionDefinition: {
       findUnique: jest.fn().mockResolvedValue({ isActive: true }),
@@ -129,6 +132,15 @@ describe("parent school-team conversation", () => {
       where: expect.objectContaining({ tenantId: siteId, userId: responderId }),
       select: { userId: true },
     });
+    expect(tx.guardianChildRelationship.findFirst).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        tenantId: siteId,
+        guardianIdentityId: "guardian-a",
+        legalAccess: "FULL",
+        revokedAt: null,
+      }),
+      select: { childId: true },
+    });
     expect(tx.messageConversation.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         kind: "PARENT_STAFF",
@@ -180,6 +192,15 @@ describe("parent school-team conversation", () => {
       NotFoundException,
     );
     tx.guardianIdentity.findFirst.mockResolvedValueOnce(null);
+    await expect(service.open(siteId, parentId, input)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(tx.messageConversation.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a relationship removed after initial parent access verification", async () => {
+    const { tx, service } = setup();
+    tx.guardianChildRelationship.findFirst.mockResolvedValue(null);
     await expect(service.open(siteId, parentId, input)).rejects.toBeInstanceOf(
       NotFoundException,
     );

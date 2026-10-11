@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { composeMessageSchema } from "@pathway/platform";
 
 export const createStaffDirectConversationSchema = z
   .object({
@@ -28,11 +29,6 @@ export const createStaffConversationSchema = z.discriminatedUnion("kind", [
   createStaffRoomConversationSchema,
 ]);
 
-export const sendMessageSchema = z
-  .object({
-    clientRequestId: z.string().uuid(),
-    body: z.string().trim().min(1).max(4000),
-  })
-  .strict();
+export const sendMessageSchema = composeMessageSchema;
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
