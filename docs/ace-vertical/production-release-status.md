@@ -260,14 +260,15 @@ plus 2 single-connection suites and 13 tests. GitHub confirmed the merge to
 count remains **42/150 (28%)** because the remaining ACE-M15 and M20 work is
 not yet complete.
 
-Build step 1.3e5r is the next web family access gate. It adds real HTTP probes
+Build step 1.3e5r ([PR #567](https://github.com/FSS-Ltd/pathway/pull/567),
+open) is the next web family access gate. It adds real HTTP probes
 for staff membership removal, parent notice IDs, guardian and student invitation
 IDs, and child edit IDs across account and site boundaries. The
 [web security evidence record](../evidence/ace-family-messaging-release-gate.md)
 lists what these probes cover and what remains for ACE-M20. The four affected
 PostgreSQL HTTP suites passed (18 tests) locally; API typecheck, lint, build,
-formatting, and Graphify passed. Mobile remains paused. CI, PR, and merge
-evidence are pending; this step is not complete.
+formatting, and Graphify passed. Mobile remains paused. Latest-head CI and
+merge evidence are pending; this step is not complete.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
