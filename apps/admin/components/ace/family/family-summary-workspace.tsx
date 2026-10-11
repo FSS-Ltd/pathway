@@ -247,7 +247,7 @@ export function FamilySummaryWorkspace({
   const { data, status } = useSession();
   return (
     <FamilySummaryView
-      key={`${data?.user.id ?? ""}:${siteId}:${childId}`}
+      key={`${status}:${data?.user.id ?? ""}:${siteId}:${childId}`}
       siteId={siteId}
       childId={childId}
       status={status}

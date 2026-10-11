@@ -140,11 +140,22 @@ async function run() {
     assert.match(container.textContent ?? "", /not available for this account/);
     assert.doesNotMatch(container.textContent ?? "", /Reading/);
 
+    denied = false;
+    await act(async () => {
+      root.render(
+        <FamilySubjectTimetableView
+          scope={{ kind: "parent", siteId: "site-one", childId: "child-one" }}
+          status="authenticated"
+        />,
+      );
+    });
+    assert.match(container.textContent ?? "", /Ari’s subject timetable/);
+
     const requestCount = requested.length;
     await act(async () => {
       root.render(
         <FamilySubjectTimetableView
-          scope={{ kind: "student", siteId: "site-two" }}
+          scope={{ kind: "parent", siteId: "site-one", childId: "child-one" }}
           status="unauthenticated"
         />,
       );
@@ -154,6 +165,7 @@ async function run() {
       container.textContent ?? "",
       /Sign in to view your subject timetable/,
     );
+    assert.doesNotMatch(container.textContent ?? "", /Ari/);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;

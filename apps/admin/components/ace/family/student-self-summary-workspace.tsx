@@ -155,6 +155,12 @@ export function StudentSelfSummaryView({
 }
 
 export function StudentSelfSummaryWorkspace({ siteId }: { siteId: string }) {
-  const { status } = useSession();
-  return <StudentSelfSummaryView siteId={siteId} status={status} />;
+  const { data, status } = useSession();
+  return (
+    <StudentSelfSummaryView
+      key={`${status}:${data?.user.id ?? ""}:${siteId}`}
+      siteId={siteId}
+      status={status}
+    />
+  );
 }

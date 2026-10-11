@@ -189,10 +189,16 @@ export function FamilyAttendanceWorkspace({
 }: {
   scope: FamilyAttendanceScope;
 }) {
-  const { status } = useSession();
+  const { data, status } = useSession();
   const scopeKey =
     scope.kind === "student"
       ? `student:${scope.siteId}`
       : `parent:${scope.siteId}:${scope.childId}`;
-  return <FamilyAttendanceView key={scopeKey} scope={scope} status={status} />;
+  return (
+    <FamilyAttendanceView
+      key={`${status}:${data?.user.id ?? ""}:${scopeKey}`}
+      scope={scope}
+      status={status}
+    />
+  );
 }

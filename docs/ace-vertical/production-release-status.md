@@ -392,7 +392,8 @@ single-connection suites and 13 tests. GitHub confirmed the merge to `master`
 on 11 October 2026 as `ee0fd874647bc833a01be7151b175b60da5f5916`.
 Mobile work remains paused.
 
-Build step 1.3e5y (branch `feature/ace-web-security-gate`) extends the
+Build step 1.3e5y ([PR #575](https://github.com/FSS-Ltd/pathway/pull/575),
+branch `feature/ace-web-security-gate`) extends the
 [ACE-M20 web security evidence](../evidence/ace-family-messaging-release-gate.md)
 with direct HTTP probes for unjoined and wrong-site message writes and read
 cursors, a message sequence from a different conversation, disabled accounts,
@@ -400,7 +401,24 @@ and revoked parent and staff access across direct routes. Denied operations
 must leave messages and read cursors unchanged. This remains a web/API slice
 of ACE-M20; signed-in browser accessibility evidence and paused mobile
 baselines are still open. The master-plan count stays **43/150 (28⅔%,
-28.67%)**. PR, latest-head CI, and merge evidence are pending.
+28.67%)**. All eight latest-head checks passed on
+`fa9f63f04bb9fb45909a72ce64b96858023c40e7` (CI run 38173591420;
+CodeQL run 38173588522). The PostgreSQL integration log confirms the
+family-messaging-security HTTP suite ran: 85 E2E suites and 527 tests passed,
+plus two single-connection suites and 13 tests. GitHub confirmed the merge to
+`master` on 11 October 2026 at 20:56 UTC as
+`1c44a281bbabb10547a77b24adf7a4c11c7c54e6`.
+
+Build step 1.3e5z ([PR #576](https://github.com/FSS-Ltd/pathway/pull/576),
+branch `fix/ace-web-account-boundary`) closes a web session
+boundary for the shared admin session adapter and ACE family routes. A Clerk
+account change must immediately hide the prior API identity; family deep-link
+views and invitations must discard state on account, session, or route change.
+Signed-out timetable headings must not retain a child's name. This is a web
+security slice of ACE-M20 and ACE-M18, not full completion of either task;
+mobile baselines and signed-in browser accessibility evidence remain open.
+The verified master-plan count remains **43/150 (28⅔%, 28.67%)**. PR,
+latest-head CI, and merge evidence are pending.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
