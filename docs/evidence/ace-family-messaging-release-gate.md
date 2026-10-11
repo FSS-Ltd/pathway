@@ -93,3 +93,21 @@ test checks distinct link text and normal keyboard tab stops for a two-child
 household. A signed-in browser screen-reader and keyboard session remains
 required before the full ACE-M20 release gate can be claimed. Mobile work
 remains paused.
+
+## Direct message route follow-up (step 1.3e5y)
+
+The PostgreSQL HTTP suite now probes sends and read cursors using an unjoined
+staff conversation, an unjoined guardian conversation, and a valid conversation
+ID under another school's route. Each request is denied without storing a
+message or cursor. It also sends real messages to two conversations, then
+checks that a sequence existing only in the other conversation cannot advance
+the current participant's read cursor.
+
+The suite checks that a disabled staff or guardian account loses direct
+history, send, and read-cursor access. When the parent portal is disabled or
+the guardian relationship ends, the parent list and direct routes return 404;
+denied sends leave the stored-message count unchanged. Removed staff also lose
+recipient, school-team, history, send, and read-cursor access even if a typed
+messaging permission remains. The local disposable PostgreSQL run executed all
+eight suite cases successfully. Full ACE-M20 sign-off still requires the
+signed-in web keyboard and screen-reader check and the paused mobile baselines.

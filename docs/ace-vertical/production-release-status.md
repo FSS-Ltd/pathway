@@ -384,8 +384,23 @@ remain unavailable until their student release rules and readers are ready.
 The [M17 release record](../evidence/ace-m17-student-self-web-facade.md)
 lists the remaining full-task gaps. This is a web slice of ACE-M17, not full
 M17 completion; the verified master-plan count remains **43/150 (28⅔%,
-28.67%)**. Latest-head CI and merge evidence are pending. Mobile work remains
-paused.
+28.67%)**. All eight latest-head checks passed on
+`3c8cf5a1302b8fe909ef9d7a92b959f4cd8e9735` (CI run 38171507247;
+CodeQL run 38171503470). The PostgreSQL integration log confirms the
+student-self HTTP suite ran: 85 E2E suites and 524 tests passed, plus two
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+on 11 October 2026 as `ee0fd874647bc833a01be7151b175b60da5f5916`.
+Mobile work remains paused.
+
+Build step 1.3e5y (branch `feature/ace-web-security-gate`) extends the
+[ACE-M20 web security evidence](../evidence/ace-family-messaging-release-gate.md)
+with direct HTTP probes for unjoined and wrong-site message writes and read
+cursors, a message sequence from a different conversation, disabled accounts,
+and revoked parent and staff access across direct routes. Denied operations
+must leave messages and read cursors unchanged. This remains a web/API slice
+of ACE-M20; signed-in browser accessibility evidence and paused mobile
+baselines are still open. The master-plan count stays **43/150 (28⅔%,
+28.67%)**. PR, latest-head CI, and merge evidence are pending.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

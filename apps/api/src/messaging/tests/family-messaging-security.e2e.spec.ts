@@ -176,6 +176,16 @@ describe("ACE family messaging web security gate", () => {
     }
 
     await withTenantRlsContext(siteId, orgId, async (tx) => {
+      await tx.accessTagGrant.create({
+        data: {
+          orgId,
+          tenantId: siteId,
+          userId: teacherId,
+          tagKey: "PARENT_MESSAGE_RESPONDER",
+          grantedById: headId,
+          startsAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        },
+      });
       await tx.child.create({
         data: {
           id: childId,
@@ -345,6 +355,128 @@ describe("ACE family messaging web security gate", () => {
     expect(wrongSite.status).toBe(404);
   });
 
+  it("denies sends and read cursors for unjoined or wrong-site conversations", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const staffConversation = `${staffPath}/${staffConversationId}`;
+    const parentConversation = `${parentPath(siteId)}/${parentConversationId}`;
+    const wrongSiteConversation = `${parentPath(otherSiteId)}/${parentConversationId}`;
+    const beforeMessages = await prisma.message.count({
+      where: { tenantId: siteId },
+    });
+    const beforeCursors = await prisma.messageParticipantReadCursor.count({
+      where: { tenantId: siteId },
+    });
+
+    for (const [actor, path] of [
+      ["supervisor", staffConversation],
+      ["otherSiteStaff", staffConversation],
+      ["otherGuardian", parentConversation],
+      ["guardian", wrongSiteConversation],
+    ] as const) {
+      const send = await request(server)
+        .post(`${path}/messages`)
+        .set("Authorization", authorization[actor])
+        .send({ clientRequestId: randomUUID(), body: "Private message" });
+      const read = await request(server)
+        .put(`${path}/read-cursor`)
+        .set("Authorization", authorization[actor])
+        .send({ sequence: 1 });
+      expect(send.status).toBe(404);
+      expect(read.status).toBe(404);
+    }
+    expect(await prisma.message.count({ where: { tenantId: siteId } })).toBe(
+      beforeMessages,
+    );
+    expect(
+      await prisma.messageParticipantReadCursor.count({
+        where: { tenantId: siteId },
+      }),
+    ).toBe(beforeCursors);
+  });
+
+  it("rejects a message sequence from another conversation before advancing a cursor", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const staffConversation = `${staffPath}/${staffConversationId}`;
+    const parentConversation = `${parentPath(siteId)}/${parentConversationId}`;
+    for (const [actor, path] of [
+      ["teacher", staffConversation],
+      ["guardian", parentConversation],
+    ] as const) {
+      const response = await request(server)
+        .post(`${path}/messages`)
+        .set("Authorization", authorization[actor])
+        .send({ clientRequestId: randomUUID(), body: "First message" });
+      expect(response.status).toBe(200);
+    }
+    const secondParentMessage = await request(server)
+      .post(`${parentConversation}/messages`)
+      .set("Authorization", authorization.guardian)
+      .send({ clientRequestId: randomUUID(), body: "Second message" });
+    expect(secondParentMessage.status).toBe(200);
+
+    const wrongSequence = await request(server)
+      .put(`${staffConversation}/read-cursor`)
+      .set("Authorization", authorization.teacher)
+      .send({ sequence: 2 });
+    expect(wrongSequence.status).toBe(400);
+    expect(
+      await prisma.messageParticipantReadCursor.count({
+        where: { tenantId: siteId, conversationId: staffConversationId },
+      }),
+    ).toBe(0);
+  });
+
+  it("denies disabled staff and guardian accounts on direct message routes", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const beforeMessages = await prisma.message.count({
+      where: { tenantId: siteId },
+    });
+    const beforeCursors = await prisma.messageParticipantReadCursor.count({
+      where: { tenantId: siteId },
+    });
+    for (const [actor, userId, path] of [
+      ["teacher", teacherId, `${staffPath}/${staffConversationId}`],
+      ["guardian", guardianId, `${parentPath(siteId)}/${parentConversationId}`],
+    ] as const) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { isActive: false },
+      });
+      try {
+        const history = await request(server)
+          .get(`${path}/messages`)
+          .set("Authorization", authorization[actor]);
+        const send = await request(server)
+          .post(`${path}/messages`)
+          .set("Authorization", authorization[actor])
+          .send({ clientRequestId: randomUUID(), body: "Blocked message" });
+        const read = await request(server)
+          .put(`${path}/read-cursor`)
+          .set("Authorization", authorization[actor])
+          .send({ sequence: 1 });
+        for (const response of [history, send, read]) {
+          expect([401, 403, 404]).toContain(response.status);
+        }
+      } finally {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { isActive: true },
+        });
+      }
+    }
+    expect(await prisma.message.count({ where: { tenantId: siteId } })).toBe(
+      beforeMessages,
+    );
+    expect(
+      await prisma.messageParticipantReadCursor.count({
+        where: { tenantId: siteId },
+      }),
+    ).toBe(beforeCursors);
+  });
+
   it("removes family messaging when the parent portal or relationship ends", async () => {
     if (!app) return;
     const server = app.getHttpServer();
@@ -353,15 +485,36 @@ describe("ACE family messaging web security gate", () => {
       .get(path)
       .set("Authorization", authorization.guardian);
     expect(linked.status).toBe(200);
+    const unavailableRoutes = [
+      () => request(server).get(path),
+      () => request(server).get(`${path}/${parentConversationId}/messages`),
+      () =>
+        request(server)
+          .post(`${path}/${parentConversationId}/messages`)
+          .send({ clientRequestId: randomUUID(), body: "Blocked message" }),
+      () =>
+        request(server)
+          .put(`${path}/${parentConversationId}/read-cursor`)
+          .send({ sequence: 1 }),
+    ];
+    const expectUnavailable = async () => {
+      for (const makeRequest of unavailableRoutes) {
+        const response = await makeRequest().set(
+          "Authorization",
+          authorization.guardian,
+        );
+        expect(response.status).toBe(404);
+      }
+    };
+    const beforeMessages = await prisma.message.count({
+      where: { tenantId: siteId, conversationId: parentConversationId },
+    });
     await prisma.org.update({
       where: { id: orgId },
       data: { parentPortalEnabled: false },
     });
     try {
-      const disabled = await request(server)
-        .get(path)
-        .set("Authorization", authorization.guardian);
-      expect(disabled.status).toBe(404);
+      await expectUnavailable();
     } finally {
       await prisma.org.update({
         where: { id: orgId },
@@ -374,10 +527,12 @@ describe("ACE family messaging web security gate", () => {
         data: { endedAt: new Date() },
       }),
     );
-    const ended = await request(server)
-      .get(path)
-      .set("Authorization", authorization.guardian);
-    expect(ended.status).toBe(404);
+    await expectUnavailable();
+    expect(
+      await prisma.message.count({
+        where: { tenantId: siteId, conversationId: parentConversationId },
+      }),
+    ).toBe(beforeMessages);
   });
 
   it("denies a removed staff member even when their messaging tag remains", async () => {
@@ -390,7 +545,12 @@ describe("ACE family messaging web security gate", () => {
       where: { tenantId_userId: { tenantId: siteId, userId: teacherId } },
     });
     try {
-      const paths = [staffPath, `${staffPath}/${staffConversationId}/messages`];
+      const paths = [
+        staffPath,
+        `${staffPath}/recipients`,
+        `${staffPath}/school-team`,
+        `${staffPath}/${staffConversationId}/messages`,
+      ];
       for (const path of paths) {
         const response = await request(server)
           .get(path)
@@ -405,6 +565,11 @@ describe("ACE family messaging web security gate", () => {
           body: "A former member must not send this",
         });
       expect([403, 404]).toContain(send.status);
+      const read = await request(server)
+        .put(`${staffPath}/${staffConversationId}/read-cursor`)
+        .set("Authorization", authorization.teacher)
+        .send({ sequence: 1 });
+      expect([403, 404]).toContain(read.status);
       expect(
         await prisma.message.count({
           where: { tenantId: siteId, conversationId: staffConversationId },
