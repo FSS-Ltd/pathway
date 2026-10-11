@@ -373,7 +373,8 @@ single-connection suites and 13 tests. GitHub confirmed the merge to `master`
 as `19811c6f96b6f15c111dcbc9928ec06441b9371f`. The master-plan count
 stays **43/150 (28⅔%, 28.67%)**.
 
-Build step 1.3e5x (branch `feature/ace-student-self-web-facade`) adds a
+Build step 1.3e5x ([PR #574](https://github.com/FSS-Ltd/pathway/pull/574),
+branch `feature/ace-student-self-web-facade`) adds a
 self-only ACE student summary API and web overview. The summary derives its
 single child from the current student identity link, requires an active school
 enrolment and enabled student portal, and rechecks access after reading. It
@@ -383,7 +384,8 @@ remain unavailable until their student release rules and readers are ready.
 The [M17 release record](../evidence/ace-m17-student-self-web-facade.md)
 lists the remaining full-task gaps. This is a web slice of ACE-M17, not full
 M17 completion; the verified master-plan count remains **43/150 (28⅔%,
-28.67%)**. PR, CI, and merge evidence are pending. Mobile work remains paused.
+28.67%)**. Latest-head CI and merge evidence are pending. Mobile work remains
+paused.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

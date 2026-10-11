@@ -1,7 +1,8 @@
 # ACE-M17 student self facade: first web slice
 
-**Build step:** 1.3e5x. **Plan task:** ACE-M17, still incomplete. Mobile work
-is paused.
+**Build step:** 1.3e5x in
+[PR #574](https://github.com/FSS-Ltd/pathway/pull/574). **Plan task:** ACE-M17,
+still incomplete. Mobile work is paused.
 
 The student summary route takes only a site ID. It derives one current child
 from a student identity link inside the tenant RLS context, requires an active
