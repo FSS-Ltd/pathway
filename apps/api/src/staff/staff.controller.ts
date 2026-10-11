@@ -128,12 +128,22 @@ export class StaffController {
 
   @Get("for-session-assignment")
   async getForSessionAssignment(
+    @Req() req: Request & { authUserId?: string },
     @Query() query: unknown,
     @CurrentTenant("tenantId") tenantId: string,
+    @CurrentOrg("orgId") orgId: string,
   ) {
-    if (!tenantId) {
+    if (!tenantId || !orgId) {
       throw new BadRequestException("Active site context required");
     }
+    if (!req.authUserId) {
+      throw new BadRequestException("Not authenticated");
+    }
+    await this.staffService.assertStaffManagerAccess(
+      req.authUserId,
+      tenantId,
+      orgId,
+    );
     const parsed = forSessionAssignmentQuery.safeParse(query);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten());
@@ -149,18 +159,23 @@ export class StaffController {
   @Get(":userId")
   async getById(
     @Param("userId") userId: string,
+    @Req() req: Request & { authUserId?: string },
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
   ) {
     if (!tenantId || !orgId) {
       throw new BadRequestException("Active site context required");
     }
-    try {
-      return await this.staffService.getById(userId, tenantId, orgId);
-    } catch (e) {
-      if (e instanceof NotFoundException) throw e;
-      throw e;
+    const callerUserId = req.authUserId;
+    if (!callerUserId) {
+      throw new BadRequestException("Not authenticated");
     }
+    return this.staffService.getByIdForAdmin(
+      userId,
+      tenantId,
+      orgId,
+      callerUserId,
+    );
   }
 
   @Patch(":userId")

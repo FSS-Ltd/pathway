@@ -221,8 +221,7 @@ is evidenced and merged.
 
 Build step 1.3e5p is the web family messaging security gate on
 `feature/ace-family-web-security-gate` in
-[PR #565](https://github.com/FSS-Ltd/pathway/pull/565). Its initial published
-revision is `d65ee31a`; latest-head CI and merge evidence are pending. It adds
+[PR #565](https://github.com/FSS-Ltd/pathway/pull/565). It adds
 real HTTP role, conversation-ID,
 student compose, and relationship revocation probes, and prevents child names
 from an earlier account appearing in the family landing during an account
@@ -230,9 +229,30 @@ change. The [web evidence record](../evidence/ace-family-messaging-release-gate.
 lists covered cases and remaining ACE-M20 release work. Seven local PostgreSQL
 messaging, identity, notice, and family-context suites passed together (73 tests);
 API/admin typechecks, lint, formatting, focused UI test, and builds passed.
-PR, latest-head CI, and merge
-evidence are pending. Mobile work remains paused. The exact master-plan count
+All eight latest-head checks passed on
+`bfc7494dd1345e24c78427d6c8e0803a1bbe2452` (CI run 38149891957;
+CodeQL run 38149890126). The database integration log confirms the family
+messaging security E2E ran: 82 suites and 502 tests passed. GitHub confirmed
+the merge to `master` as `5b35f5884b1cb90770f0d8d206ee15cffc2ce23b`
+on 11 October 2026. Mobile work remains paused. The exact master-plan count
 remains **42/150 (28%)** while ACE-M20 is open.
+
+Build step 1.3e5q is the shared staff administration security fix on
+`feature/ace-staff-administration-security`. It closes a route-level IDOR in
+staff detail reads and edits, limits those routes and assignment lookup to
+current site leaders and organisation admins, reserves global account status,
+site role, and serve-access changes for organisation admins, scopes staff
+profile children to the selected site, and audits account status changes in
+the same transaction. The two existing People edit screens hide controls
+unavailable to site leaders. This uses the existing roles while the distinct
+`staff.manage` capability proposed in
+[nexsteps-batch-b-c-decisions.md](nexsteps-batch-b-c-decisions.md) awaits its
+separate permissions migration. The PostgreSQL HTTP E2E ran and passed all
+three cases; 178 API unit suites (1,301 tests), admin tests, API/admin
+typechecks, lint, builds, targeted formatting, and Graphify passed locally.
+Latest-head CI and merge evidence are pending; the step is not complete.
+The master-plan count remains **42/150 (28%)** until a complete plan task is
+evidenced and merged.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
