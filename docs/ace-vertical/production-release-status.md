@@ -358,7 +358,8 @@ single-connection suites and 13 tests. GitHub confirmed the merge to `master`
 as `748dd8e4befbd95750cb69cb47eefa245d2d089b`. This slice does not
 complete ACE-M16 or change the **43/150 (28⅔%, 28.67%)** count.
 
-Build step 1.3e5w (current branch `feature/ace-family-web-access-gate`) adds
+Build step 1.3e5w ([PR #572](https://github.com/FSS-Ltd/pathway/pull/572),
+current branch `feature/ace-family-web-access-gate`) adds
 direct family-summary denials for site staff, student identities, a disabled
 parent portal, and inactive guardian accounts. The family web landing gives
 repeated child and school links distinct accessible names while retaining

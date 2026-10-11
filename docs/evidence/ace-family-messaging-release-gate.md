@@ -78,7 +78,7 @@ realtime is introduced. Full ACE-M20 sign-off still needs the remaining access
 matrix, signed-in web keyboard and screen-reader checks, and the mobile work
 that the product owner paused.
 
-## Family summary and web link follow-up (step 1.3e5w)
+## Family summary and web link follow-up (step 1.3e5w, [PR #572](https://github.com/FSS-Ltd/pathway/pull/572))
 
 The family facade HTTP suite extends the release matrix with staff without a
 guardian relationship, a guardian account that also has a student identity,
