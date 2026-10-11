@@ -77,3 +77,19 @@ database participant and sequence checks; the latter needs a separate gate if
 realtime is introduced. Full ACE-M20 sign-off still needs the remaining access
 matrix, signed-in web keyboard and screen-reader checks, and the mobile work
 that the product owner paused.
+
+## Family summary and web link follow-up (step 1.3e5w, [PR #572](https://github.com/FSS-Ltd/pathway/pull/572))
+
+The family facade HTTP suite extends the release matrix with staff without a
+guardian relationship, a guardian account that also has a student identity,
+the disabled parent portal, and an inactive guardian account. Each direct
+summary request must return no child data. The tests restore changed policy
+and account state so later cases prove current access independently.
+
+The family landing keeps the short visible labels that fit the existing card
+layout. Each repeated child link includes the child's and school's names in
+screen-reader text; each school link includes the school name. The component
+test checks distinct link text and normal keyboard tab stops for a two-child
+household. A signed-in browser screen-reader and keyboard session remains
+required before the full ACE-M20 release gate can be claimed. Mobile work
+remains paused.

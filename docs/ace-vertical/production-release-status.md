@@ -341,7 +341,7 @@ passed, including the new guardian card test. Four PostgreSQL identity suites
 passed 14 E2E tests. Mobile interface work remains paused.
 
 Build step 1.3e5v ([PR #571](https://github.com/FSS-Ltd/pathway/pull/571),
-current branch `feature/ace-m16-family-read-facade`) adds
+merged on 11 October 2026) adds
 the first ACE-M16 family read facade slice and web overview. Current full
 guardian relationship, active enrolment, ACE school, account, permission, and
 tenant RLS checks guard the request. Attendance is child-scoped; notices and
@@ -350,8 +350,23 @@ Each supported section has an independent server-owned disable flag and error
 result. Homework, reports, slips, Faith, and finance remain unavailable until
 their release sources and rules exist. The
 [M16 release record](../evidence/ace-m16-family-read-facade.md) lists those
-gaps. This slice does not complete ACE-M16 or change the **43/150 (28⅔%,
-28.67%)** count. PR, CI, and merge evidence are pending.
+gaps. All eight latest-head checks passed on
+`41415cadeda0393320ff23967ff6ad4fe43c7553` (CI run 38167562322;
+CodeQL run 38167559365). The PostgreSQL integration log confirms the family
+facade HTTP suite ran: 84 suites and 515 tests passed, plus two
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+as `748dd8e4befbd95750cb69cb47eefa245d2d089b`. This slice does not
+complete ACE-M16 or change the **43/150 (28⅔%, 28.67%)** count.
+
+Build step 1.3e5w ([PR #572](https://github.com/FSS-Ltd/pathway/pull/572),
+current branch `feature/ace-family-web-access-gate`) adds
+direct family-summary denials for site staff, student identities, a disabled
+parent portal, and inactive guardian accounts. The family web landing gives
+repeated child and school links distinct accessible names while retaining
+their visible labels. This is web/API evidence toward ACE-M20, not full M20
+sign-off; signed-in browser screen-reader checks and mobile baselines remain
+open. The master-plan count stays **43/150 (28⅔%, 28.67%)**. PR, CI, and merge
+evidence are pending.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
