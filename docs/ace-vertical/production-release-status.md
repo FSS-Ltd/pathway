@@ -276,7 +276,7 @@ Mobile remains paused. The master-plan count remains **42/150 (28%)** because
 ACE-M20 is open.
 
 Build step 1.3e5s ([PR #568](https://github.com/FSS-Ltd/pathway/pull/568),
-open) corrects the shared staff account status boundary exposed after PR #566.
+merged on 11 October 2026) corrects the shared staff account status boundary exposed after PR #566.
 An organisation admin could disable a global user account,
 affecting a staff member's access to other organisations. The staff API now
 reserves global account status changes for a platform superuser who also has
@@ -286,11 +286,31 @@ effect. A PostgreSQL HTTP regression suite covers multi-organisation and
 single-organisation staff accounts and the audited platform-admin action.
 The PostgreSQL HTTP suite passed all 5 cases, and the focused staff unit suite
 passed 11 tests. API/admin typechecks, targeted lint, formatting, and both
-production builds passed locally. The locally checked code revision was
-`d7be441392e0bfa797911fb6395995ad875ee324`. Latest-head CI and merge
-evidence are pending.
+production builds passed locally. All eight latest-head checks passed on
+`f218ee417e17ca2306e2fb63ef3431baa206e9e2` (CI run 38160793933;
+CodeQL run 38160790596). The database integration log confirms the staff
+administration security E2E ran: 83 suites and 508 tests passed, plus 2
+single-connection suites and 13 tests. GitHub confirmed the merge to `master`
+as `94c01e7c6018263d51ce9baa3da6340943d90405`. The product owner confirmed
+that only platform superusers may change global account status; school admins
+manage access to their own school.
 It does not complete another ACE master-plan task, so the count remains
 **42/150 (28%)**.
+
+Build step 1.3e5t applies the product owner's 11 October decision that school
+approval per student governs all ACE student identities. The existing web
+invitation and import routes already validate approval; this step requires it
+again in their shared student invitation service before creation or resend, so
+future callers cannot record a false approval. PostgreSQL HTTP tests verify the
+approval audit for direct and bulk invitations. A read-only inventory of the
+live ACE database on 11 October found zero `StudentIdentity` and zero
+`StudentIdentityLink` rows, so there are no existing student links to review
+under the newly approved rule. CI and merge evidence are pending. Mobile
+implementation remains paused. ACE-M15 needs task-level reconciliation before
+it can be counted complete; the verified master-plan count stays
+**42/150 (28%)**. Local API typecheck, lint, build, focused unit suites (12
+tests), and five PostgreSQL E2E suites (18 tests) passed. Targeted formatting
+and diff checks passed.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

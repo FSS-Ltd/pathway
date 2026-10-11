@@ -285,6 +285,24 @@ describe("family identity invitation import", () => {
     expect(
       await prisma.studentIdentityLink.count({ where: { tenantId: siteId } }),
     ).toBe(0);
+    const studentInvite = await prisma.familyIdentityInvite.findFirstOrThrow({
+      where: { tenantId: siteId, childId: firstChildId, target: "STUDENT" },
+      select: { id: true },
+    });
+    expect(
+      await prisma.auditEvent.findFirst({
+        where: { actorUserId: adminId, entityId: studentInvite.id },
+        select: { metadata: true },
+      }),
+    ).toMatchObject({
+      metadata: {
+        kind: "FAMILY_IDENTITY_INVITE",
+        action: "create",
+        target: "STUDENT",
+        childId: firstChildId,
+        schoolApproval: "confirmed",
+      },
+    });
 
     const repeated = await request(server)
       .post("/family-identity-import")
@@ -307,6 +325,9 @@ describe("family identity invitation import", () => {
     expect(
       await prisma.familyIdentityInvite.count({ where: { tenantId: siteId } }),
     ).toBe(3);
+    expect(
+      await prisma.auditEvent.count({ where: { entityId: studentInvite.id } }),
+    ).toBe(1);
   });
 
   it("leaves a saved invitation unchanged after an email delivery failure", async () => {

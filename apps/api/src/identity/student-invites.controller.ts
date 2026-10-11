@@ -127,6 +127,7 @@ export class StudentInvitesStaffController {
       actorUserId,
       childId,
       parsed.data.email,
+      parsed.data.confirmedSchoolApproval,
     );
   }
 
@@ -184,7 +185,13 @@ export class StudentInvitesStaffController {
       orgId,
       "resend a student invitation",
     );
-    return this.invites.resend(tenantId, orgId, actorUserId, inviteId);
+    return this.invites.resend(
+      tenantId,
+      orgId,
+      actorUserId,
+      inviteId,
+      parsed.data.confirmedSchoolApproval,
+    );
   }
 
   @Post(":inviteId/revoke")

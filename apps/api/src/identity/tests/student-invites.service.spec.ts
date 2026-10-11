@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -110,11 +111,35 @@ describe("student identity invitations", () => {
   it("keeps a previous import invitation unchanged without sending twice", async () => {
     const { tx, service, mailer } = setup();
     await expect(
-      service.createForImport(tenantId, orgId, "admin-a", childId, email),
+      service.createForImport(tenantId, orgId, "admin-a", childId, email, true),
     ).resolves.toBe("existing");
     expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
     expect(tx.familyIdentityInvite.update).not.toHaveBeenCalled();
     expect(mailer.sendStudentInviteEmail).not.toHaveBeenCalled();
+  });
+
+  it("requires school approval in the shared service before creating or resending", async () => {
+    const { tx, service, mailer } = setup();
+    await expect(
+      service.create(tenantId, orgId, "admin-a", childId, email, false),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.createForImport(
+        tenantId,
+        orgId,
+        "admin-a",
+        childId,
+        email,
+        false,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.resend(tenantId, orgId, "admin-a", inviteId, false),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
+    expect(tx.familyIdentityInvite.update).not.toHaveBeenCalled();
+    expect(mailer.sendStudentInviteEmail).not.toHaveBeenCalled();
+    expect(withTenantRlsContext).not.toHaveBeenCalled();
   });
 
   it("rejects a student invitation while a guardian invitation is pending", async () => {
@@ -123,7 +148,7 @@ describe("student identity invitations", () => {
       { id: "pending-guardian" },
     ]);
     await expect(
-      service.create(tenantId, orgId, "admin-a", childId, email),
+      service.create(tenantId, orgId, "admin-a", childId, email, true),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -133,7 +158,7 @@ describe("student identity invitations", () => {
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({ id: "other-child-invite" });
     await expect(
-      service.create(tenantId, orgId, "admin-a", childId, email),
+      service.create(tenantId, orgId, "admin-a", childId, email, true),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.familyIdentityInvite.create).not.toHaveBeenCalled();
   });
@@ -142,7 +167,7 @@ describe("student identity invitations", () => {
     const { tx, service, mailer } = setup();
     tx.familyIdentityInvite.findFirst.mockResolvedValue(null);
     await expect(
-      service.create(tenantId, orgId, "admin-a", childId, email),
+      service.create(tenantId, orgId, "admin-a", childId, email, true),
     ).resolves.toEqual(expect.objectContaining({ id: inviteId, email }));
     expect(tx.familyIdentityInvite.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -211,7 +236,7 @@ describe("student identity invitations", () => {
       studentPortalEnabled: false,
     });
     await expect(
-      service.create(tenantId, orgId, "admin-a", childId, email),
+      service.create(tenantId, orgId, "admin-a", childId, email, true),
     ).rejects.toBeInstanceOf(ConflictException);
     tx.studentPortalPolicy.findUnique.mockResolvedValue({
       studentPortalEnabled: true,
@@ -232,7 +257,7 @@ describe("student identity invitations", () => {
     const { tx, service, acceptance } = setup();
     tx.siteMembership.findFirst.mockResolvedValue({ id: "staff-site-a" });
     await expect(
-      service.create(tenantId, orgId, "admin-a", childId, email),
+      service.create(tenantId, orgId, "admin-a", childId, email, true),
     ).rejects.toBeInstanceOf(ConflictException);
     tx.siteMembership.findFirst.mockResolvedValue(null);
     tx.userRoleAssignment.findFirst.mockResolvedValue({ id: "staff-role-a" });
@@ -249,7 +274,7 @@ describe("student identity invitations", () => {
       .mockResolvedValueOnce({ id: "newer-invite" });
 
     await expect(
-      service.resend(tenantId, orgId, "admin-a", inviteId),
+      service.resend(tenantId, orgId, "admin-a", inviteId, true),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.familyIdentityInvite.update).not.toHaveBeenCalled();
     expect(mailer.sendStudentInviteEmail).not.toHaveBeenCalled();

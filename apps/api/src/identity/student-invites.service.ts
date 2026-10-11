@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -41,6 +42,7 @@ export class StudentInvitesService {
     actorUserId: string,
     childId: string,
     email: string,
+    confirmedSchoolApproval: boolean,
   ): Promise<StudentInviteSummary> {
     const result = await this.createInternal(
       tenantId,
@@ -48,6 +50,7 @@ export class StudentInvitesService {
       actorUserId,
       childId,
       email,
+      confirmedSchoolApproval,
       false,
     );
     return result.summary;
@@ -59,6 +62,7 @@ export class StudentInvitesService {
     actorUserId: string,
     childId: string,
     email: string,
+    confirmedSchoolApproval: boolean,
   ): Promise<"invited" | "existing"> {
     const result = await this.createInternal(
       tenantId,
@@ -66,6 +70,7 @@ export class StudentInvitesService {
       actorUserId,
       childId,
       email,
+      confirmedSchoolApproval,
       true,
     );
     return result.status;
@@ -77,11 +82,13 @@ export class StudentInvitesService {
     actorUserId: string,
     childId: string,
     email: string,
+    confirmedSchoolApproval: boolean,
     importMode: boolean,
   ): Promise<{
     summary: StudentInviteSummary;
     status: "invited" | "existing";
   }> {
+    this.requireSchoolApproval(confirmedSchoolApproval);
     const normalizedEmail = email.trim().toLowerCase();
     const result = await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await lockFamilyInvite(tx, tenantId, childId);
@@ -294,7 +301,9 @@ export class StudentInvitesService {
     orgId: string,
     actorUserId: string,
     inviteId: string,
+    confirmedSchoolApproval: boolean,
   ): Promise<StudentInviteSummary> {
+    this.requireSchoolApproval(confirmedSchoolApproval);
     const result = await withTenantRlsContext(tenantId, orgId, async (tx) => {
       await lockFamilyInvite(tx, tenantId, inviteId);
       await requireAceStudentSite(tx, tenantId, orgId);
@@ -403,6 +412,14 @@ export class StudentInvitesService {
     });
     await this.send(result.email, result.siteName, tenantId, inviteId);
     return this.summary(result.invite, result.email);
+  }
+
+  private requireSchoolApproval(confirmed: boolean): void {
+    if (!confirmed) {
+      throw new BadRequestException(
+        "School approval is required for this student",
+      );
+    }
   }
 
   async revoke(

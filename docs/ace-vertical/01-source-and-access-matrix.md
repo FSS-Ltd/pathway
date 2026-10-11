@@ -308,7 +308,7 @@ its accountable owner records approval.
 | --- | --- | --- | --- |
 | Detailed capability/permission matrix approved | Approved for `ACE-F02` through `ACE-F14` | Jean-Fidele Ntagengwa (Product & Engineering) | consumed by `ACE-F02` through `ACE-F14` |
 | Access-control/delegation ADR approved | Approved for `ACE-F02` through `ACE-F14` | Jean-Fidele Ntagengwa (Product & Engineering) | governs `ACE-F02` through `ACE-F14`, especially `ACE-F12` and `ACE-F14` |
-| Student identity ADR / web invitation policy | School approval per student approved for web invitations on 11 October 2026; broader ADR open | Jean-Fidele Ntagengwa (Product & Engineering) | Age and consent rule resolved for step `1.3e5n`; remaining `ACE-F17`, `ACE-M15` through `ACE-M20`, and identity-dependent pilot gates stay open |
+| Student identity ADR / invitation policy | Approved on 11 October 2026: school approval per student governs all ACE student identities; the school owns age, consent, and safeguarding approval; no platform-wide minimum age | Jean-Fidele Ntagengwa (Product & Engineering) | The policy decision is closed. `ACE-M15` through `ACE-M20` and identity-dependent pilot gates still require their implementation and release evidence; mobile work remains paused. |
 | PACE correction model approved | Open | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F16`, `ACE-O02`, `ACE-O03`, and `ACE-O09` through `ACE-O13` |
 | RLS launch blockers assigned | Open | Technical Agent | `ACE-F03`, `ACE-F15` through `ACE-F22`, every add-on schema PR, `ACE-L05`, and `ACE-L09` |
 | UK-only versus EU residency confirmed | Open | Jean-Fidele Ntagengwa (Product & Engineering), with Legal/Commercial review | child-data onboarding; `ACE-L04`, `ACE-L05`, and `ACE-L09` |

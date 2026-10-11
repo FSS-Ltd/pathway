@@ -55,5 +55,6 @@ it("continues after a row failure and reports only safe per-row outcomes", async
     "admin-a",
     "child-b",
     "student@example.test",
+    true,
   );
 });

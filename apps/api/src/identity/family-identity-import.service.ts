@@ -57,6 +57,7 @@ export class FamilyIdentityImportService {
                 actorUserId,
                 row.childId,
                 row.email,
+                row.confirmedSchoolApproval,
               );
         results.push({
           rowNumber: index + 1,
