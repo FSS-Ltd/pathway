@@ -10,6 +10,7 @@ export type BuyNowPlanSelection = {
   extraSmsMessages?: number;
   extraLeaderSeats?: number;
   selectedModules?: Module[];
+  selectedIncludedModules?: Module[];
 };
 
 export type BuyNowOrgDetails = {
@@ -40,6 +41,7 @@ export type OrgPurchaseRequest = {
   extraSmsMessages?: number;
   extraLeaderSeats?: number;
   selectedModules?: Module[];
+  selectedIncludedModules?: Module[];
 };
 
 export type BuyNowCheckoutPreview = {

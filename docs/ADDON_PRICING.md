@@ -29,11 +29,11 @@ These are the official monthly storage prices supplied by the product owner.
 They replace all older storage-price figures in implementation notes, UI
 fallbacks, tests, and Stripe configuration.
 
-| Code | Storage | Monthly price | Annual price | Status | Notes |
-| --- | ---: | ---: | ---: | --- | --- |
-| `STORAGE_100GB` | 100GB | £1.49 | To be confirmed | **Approved monthly** | |
-| `STORAGE_200GB` | 200GB | £2.49 | To be confirmed | **Approved monthly** | |
-| `STORAGE_1TB` | 1TB | £5.99 | To be confirmed | **Approved monthly** | |
+| Code            | Storage | Monthly price |    Annual price | Status               | Notes |
+| --------------- | ------: | ------------: | --------------: | -------------------- | ----- |
+| `STORAGE_100GB` |   100GB |         £1.49 | To be confirmed | **Approved monthly** |       |
+| `STORAGE_200GB` |   200GB |         £2.49 | To be confirmed | **Approved monthly** |       |
+| `STORAGE_1TB`   |     1TB |         £5.99 | To be confirmed | **Approved monthly** |       |
 
 The current product code uses 200GB. Any historical reference to a 500GB tier
 is obsolete unless this catalogue is deliberately amended.
@@ -44,18 +44,18 @@ The modules below are the planned purchasable modules. The initial prices are
 recommendations based on the July 2026 market review and the current feature
 descriptions; they are not approved Stripe prices yet.
 
-| Code | Module | Current scope | Recommended monthly | Recommended annual | Status |
-| --- | --- | --- | ---: | ---: | --- |
-| `FINANCE` | Finance | Invoices, payments and financial reporting | £15 | £150 | Proposed |
-| `EVENTS` | Events | Services, sessions and event sign-ups | £9 | £90 | Proposed |
-| `TRANSPORT` | Transport | Routes, vehicles and passenger lists | £15 | £150 | Proposed |
-| `MEALS` | Meals | Menus, dietary needs and meal counts | £12 | £120 | Proposed |
-| `ASSET_MANAGEMENT` | Asset Management | Equipment and resource tracking | £9 | £90 | Proposed |
-| `HR` | HR | Staff records, roles and onboarding | £15 | £150 | Proposed |
-| `CLUBS` | Clubs | Club sign-ups, rosters, sessions, attendance, notices, and scoped club leads | £12 | £120 | Proposed; included for the Clubs sector |
-| `AI_WORKSPACE` | AI Workspace | Drafting, summaries and admin assistance | £15 base | £150 base | Proposed — define included users and fair use first |
-| `ADVANCED_REPORTING` | Advanced Reporting | Cross-platform analytics, trends and exports | £10 | £100 | Proposed |
-| `LEARNING` | Learning | Learning logs, evidence and progress reports | £19 | £190 | Proposed |
+| Code                 | Module             | Current scope                                                                | Recommended monthly | Recommended annual | Status                                              |
+| -------------------- | ------------------ | ---------------------------------------------------------------------------- | ------------------: | -----------------: | --------------------------------------------------- |
+| `FINANCE`            | Finance            | Invoices, payments and financial reporting                                   |                 £15 |               £150 | Proposed                                            |
+| `EVENTS`             | Events             | Services, sessions and event sign-ups                                        |                  £9 |                £90 | Proposed                                            |
+| `TRANSPORT`          | Transport          | Routes, vehicles and passenger lists                                         |                 £15 |               £150 | Proposed                                            |
+| `MEALS`              | Meals              | Menus, dietary needs and meal counts                                         |                 £12 |               £120 | Proposed                                            |
+| `ASSET_MANAGEMENT`   | Asset Management   | Equipment and resource tracking                                              |                  £9 |                £90 | Proposed                                            |
+| `HR`                 | HR                 | Staff records, roles and onboarding                                          |                 £15 |               £150 | Proposed                                            |
+| `CLUBS`              | Clubs              | Club sign-ups, rosters, sessions, attendance, notices, and scoped club leads |                 £12 |               £120 | Proposed; included for the Clubs sector             |
+| `AI_WORKSPACE`       | AI Workspace       | Drafting, summaries and admin assistance                                     |            £15 base |          £150 base | Proposed — define included users and fair use first |
+| `ADVANCED_REPORTING` | Advanced Reporting | Cross-platform analytics, trends and exports                                 |                 £10 |               £100 | Proposed                                            |
+| `LEARNING`           | Learning           | Learning logs, evidence and progress reports                                 |                 £19 |               £190 | Proposed                                            |
 
 ## ACE-originated add-ons
 
@@ -64,9 +64,9 @@ Clubs is a reusable, global module and is included in the Clubs sector. Child
 Merit Market remains ACE-only. Both must use the existing module entitlement
 engine.
 
-| Code | Module | Current scope | Recommended monthly | Recommended annual | Status |
-| --- | --- | --- | ---: | ---: | --- |
-| `CHILD_MERIT_MARKET` | Child Merit Market | Wallet/ledger, savings, giving/tithe, Merit Shop, simulated investments, and positive leaderboards | £19 | £190 | Proposed — confirm market-data licence cost before launch |
+| Code                 | Module             | Current scope                                                                                      | Recommended monthly | Recommended annual | Status                                                    |
+| -------------------- | ------------------ | -------------------------------------------------------------------------------------------------- | ------------------: | -----------------: | --------------------------------------------------------- |
+| `CHILD_MERIT_MARKET` | Child Merit Market | Wallet/ledger, savings, giving/tithe, Merit Shop, simulated investments, and positive leaderboards |                 £19 |               £190 | Proposed — confirm market-data licence cost before launch |
 
 PACE progress, behaviour capture, homework and evidence, Faith Corner, site-level
 ACE reporting, and Student Community are ACE-core capabilities. They must not
@@ -75,10 +75,10 @@ multi-site ACE analytics and benchmarking.
 
 ## Module bundle
 
-| Code | Bundle | Included selection | Monthly price | Annual price | Status |
-| --- | --- | --- | ---: | ---: | --- |
-| `OPERATIONS_BUNDLE` | Operations bundle | Any four eligible operations modules | £39 | £390 | Proposed |
-| `ALL_INCLUDED_BUNDLE` | All Included bundle | Every non-AI module, plus 1TB storage | £79 | £790 | Proposed |
+| Code                  | Bundle              | Included selection                    | Monthly price | Annual price | Status   |
+| --------------------- | ------------------- | ------------------------------------- | ------------: | -----------: | -------- |
+| `OPERATIONS_BUNDLE`   | Operations bundle   | Any four eligible operations modules  |           £39 |         £390 | Proposed |
+| `ALL_INCLUDED_BUNDLE` | All Included bundle | Every non-AI module, plus 1TB storage |           £79 |         £790 | Proposed |
 
 Eligible operations modules are Finance, Events, Transport, Meals, Asset
 Management, HR, Clubs, and Advanced Reporting. Learning is excluded because it
@@ -122,20 +122,44 @@ immediate second add-on charge when attaching evidence.
 
 ## Plan inclusions
 
-These inclusion rules apply before optional-module charges are calculated.
+Growth and Professional each include a fixed number of eligible module
+entitlements, chosen by the customer during checkout. Selected modules within
+the allowance are included in the plan price; additional selected modules are
+charged at their published individual prices. Starter includes no module slots;
+Enterprise remains a commercial agreement.
 
-| Plan | Included modules |
-| --- | --- |
-| Starter | None |
-| Growth | Finance, Events, Advanced Reporting |
-| Professional | Finance, Events, Advanced Reporting, HR, Asset Management, AI Workspace |
-| Enterprise | Commercial agreement |
+| Plan         | Included module slots | Eligible choices                            |
+| ------------ | --------------------: | ------------------------------------------- |
+| Starter      |                     0 | All self-serve modules, individually priced |
+| Growth       |                     3 | All self-serve modules                      |
+| Professional |                     6 | All self-serve modules                      |
+| Enterprise   |  Commercial agreement | Set during sales                            |
+
+For existing Growth and Professional subscriptions created before customer
+selection was introduced, retain their established bundle: Growth (Finance,
+Events, Advanced Reporting) and Professional (Finance, Events, Advanced
+Reporting, HR, Asset Management, AI Workspace). Do not reinterpret an existing
+subscription's included entitlements from new configurator selections.
+
+This selection model does not change a module's Proposed commercial status or
+authorize creating its Stripe Product or Price.
+
+## Decision log
+
+| Date       | Decision                                                                                                                                                  | Owner                |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 2026-10-11 | Growth includes three customer-selected eligible modules and Professional includes six; preserve the historical fixed bundles for existing subscriptions. | Product owner        |
+| 2026-07-25 | Storage monthly prices set to £1.49 / £2.49 / £5.99 for 100GB / 200GB / 1TB. Annual prices remain unconfirmed.                                            | Product owner        |
+| 2026-07-25 | Learning launch recommendation changed from £29/month to £19/month, pending commercial approval.                                                          | Product / Commercial |
+| 2026-07-25 | Operations bundle proposed: select any four eligible operations modules for £39/month or £390/year; Learning and AI Workspace excluded.                   | Product / Commercial |
+| 2026-07-25 | ACE-originated pricing proposed: global Clubs at £12/month (included for the Clubs sector) and ACE-only Child Merit Market at £19/month.                  | Product / Commercial |
+| 2026-07-25 | All Included bundle proposed: every non-AI module plus 1TB storage for £79/month or £790/year.                                                            | Product / Commercial |
 
 ## Vertical inclusions
 
-| Vertical | Included module | Rule |
-| --- | --- | --- |
-| Clubs | Clubs | Included as a built-in sector capability; it is not separately charged. |
+| Vertical | Included module | Rule                                                                    |
+| -------- | --------------- | ----------------------------------------------------------------------- |
+| Clubs    | Clubs           | Included as a built-in sector capability; it is not separately charged. |
 
 ## Implementation checklist
 
@@ -145,18 +169,9 @@ For each approved item:
 2. Add the production and test Stripe Price IDs to the price map.
 3. Update checkout allow-lists, public pricing fallbacks, configurator copy,
    and tests from this catalogue.
-4. Confirm included-plan modules cannot be selected or charged separately.
+4. Confirm included-plan modules cannot also be selected as paid add-ons in a
+   single checkout.
 5. For bundles, grant every listed entitlement once and block duplicate module
    or storage charges.
 6. Validate a Stripe Checkout session using both monthly and yearly intervals.
 7. Update this document if a commercial decision changes before release.
-
-## Decision log
-
-| Date | Decision | Owner |
-| --- | --- | --- |
-| 2026-07-25 | Storage monthly prices set to £1.49 / £2.49 / £5.99 for 100GB / 200GB / 1TB. Annual prices remain unconfirmed. | Product owner |
-| 2026-07-25 | Learning launch recommendation changed from £29/month to £19/month, pending commercial approval. | Product / Commercial |
-| 2026-07-25 | Operations bundle proposed: select any four eligible operations modules for £39/month or £390/year; Learning and AI Workspace excluded. | Product / Commercial |
-| 2026-07-25 | ACE-originated pricing proposed: global Clubs at £12/month (included for the Clubs sector) and ACE-only Child Merit Market at £19/month. | Product / Commercial |
-| 2026-07-25 | All Included bundle proposed: every non-AI module plus 1TB storage for £79/month or £790/year. | Product / Commercial |

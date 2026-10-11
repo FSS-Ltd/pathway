@@ -32,8 +32,14 @@ import {
   ParsedBillingWebhookEvent,
 } from "./billing-webhook.provider";
 import { getPlanDefinition } from "./billing-plans";
-import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
-import { LoggingService, StructuredLogger } from "../common/logging/logging.service";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+} from "./billing-provider.config";
+import {
+  LoggingService,
+  StructuredLogger,
+} from "../common/logging/logging.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 import { ClerkManagementService } from "../auth/clerk-management.service";
 import { getAuthProviderMode } from "../config/runtime-env";
@@ -45,9 +51,7 @@ type WebhookResult =
   | { status: "ignored_duplicate"; eventId: string }
   | { status: "ignored_unknown"; eventId: string };
 
-type PendingOrderRecord = Prisma.PendingOrderGetPayload<
-  Record<string, never>
->;
+type PendingOrderRecord = Prisma.PendingOrderGetPayload<Record<string, never>>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -55,9 +59,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isAddOnOnlyOrder(pendingOrder: PendingOrderRecord): boolean {
   return (
-    isRecord(pendingOrder.flags) &&
-    pendingOrder.flags.purchaseKind === "add-on"
+    isRecord(pendingOrder.flags) && pendingOrder.flags.purchaseKind === "add-on"
   );
+}
+
+function includedModulesFromPendingOrder(
+  pendingOrder: PendingOrderRecord,
+  selectedModules: readonly Module[],
+): Module[] {
+  if (isAddOnOnlyOrder(pendingOrder)) return [];
+
+  const policy = getConfiguratorPlanPolicy(pendingOrder.planCode);
+  if (!policy || policy.outcome !== "checkout") return [];
+
+  const moduleSelection = isRecord(pendingOrder.flags)
+    ? pendingOrder.flags.moduleSelection
+    : undefined;
+  if (
+    isRecord(moduleSelection) &&
+    Array.isArray(moduleSelection.includedModules)
+  ) {
+    const includedSelection = moduleSelection.includedModules;
+    if (includedSelection.length > policy.includedModuleLimit) return [];
+    const selected = new Set(selectedModules);
+    const included = includedSelection.filter(
+      (module): module is Module =>
+        typeof module === "string" &&
+        selected.has(module as Module) &&
+        policy.eligibleOptionalModules.includes(
+          module as ConfiguratorModuleCode,
+        ),
+    );
+    return [...new Set(included)].slice(0, policy.includedModuleLimit);
+  }
+
+  // Legacy orders predate explicit included choices and module selections.
+  return [...policy.legacyIncludedModules] as Module[];
 }
 
 function subscriptionPlanCode(
@@ -69,21 +106,6 @@ function subscriptionPlanCode(
     ? addOnSubscriptionPlanCode(pendingOrder.planCode)
     : pendingOrder.planCode;
 }
-
-const PRISMA_MODULE_BY_CONFIGURATOR_CODE: Record<
-  ConfiguratorModuleCode,
-  Module
-> = {
-  FINANCE: Module.FINANCE,
-  EVENTS: Module.EVENTS,
-  TRANSPORT: Module.TRANSPORT,
-  MEALS: Module.MEALS,
-  ASSET_MANAGEMENT: Module.ASSET_MANAGEMENT,
-  HR: Module.HR,
-  AI_WORKSPACE: Module.AI_WORKSPACE,
-  ADVANCED_REPORTING: Module.ADVANCED_REPORTING,
-  LEARNING: Module.LEARNING,
-};
 
 export function isOrgSector(value: string | undefined): value is OrgSector {
   return !!value && (Object.values(OrgSector) as string[]).includes(value);
@@ -105,7 +127,8 @@ export class BillingWebhookController {
     @Inject(EntitlementsService)
     private readonly entitlements: EntitlementsService,
     @Inject(ModuleRef) private readonly moduleRef: ModuleRef,
-    @Inject(BILLING_PROVIDER_CONFIG) private readonly billingConfig: BillingProviderConfig,
+    @Inject(BILLING_PROVIDER_CONFIG)
+    private readonly billingConfig: BillingProviderConfig,
     @Optional()
     @Inject(LoggingService)
     logging?: LoggingService,
@@ -113,7 +136,7 @@ export class BillingWebhookController {
     this.logger = logging
       ? logging.createLogger(BillingWebhookController.name)
       : this.createFallbackLogger();
-    
+
     this.logger.info("BillingWebhookController initialized", {
       hasModuleRef: !!this.moduleRef,
       moduleRefType: typeof this.moduleRef,
@@ -126,7 +149,9 @@ export class BillingWebhookController {
   private getAuth0Service(): Auth0ManagementService | null {
     if (!this.auth0Management) {
       try {
-        this.auth0Management = this.moduleRef.get(Auth0ManagementService, { strict: false });
+        this.auth0Management = this.moduleRef.get(Auth0ManagementService, {
+          strict: false,
+        });
         this.logger.info("Auth0ManagementService lazy-loaded", {
           isReady: this.auth0Management?.isReady(),
         });
@@ -145,7 +170,9 @@ export class BillingWebhookController {
   private getClerkService(): ClerkManagementService | null {
     if (!this.clerkManagement) {
       try {
-        this.clerkManagement = this.moduleRef.get(ClerkManagementService, { strict: false });
+        this.clerkManagement = this.moduleRef.get(ClerkManagementService, {
+          strict: false,
+        });
         this.logger.info("ClerkManagementService lazy-loaded", {
           isReady: this.clerkManagement?.isReady(),
         });
@@ -207,8 +234,10 @@ export class BillingWebhookController {
 
       if (pendingOrder?.pendingOrgDetails && !pendingOrder.orgId) {
         // Create org/tenant/user NOW before processing the event
-        const created = await this.createOrgFromPendingDetails(pendingOrder.pendingOrgDetails);
-        
+        const created = await this.createOrgFromPendingDetails(
+          pendingOrder.pendingOrgDetails,
+        );
+
         // Update the pending order with the real orgId
         await prisma.pendingOrder.update({
           where: { id: pendingOrder.id },
@@ -220,7 +249,7 @@ export class BillingWebhookController {
 
         // Update the event orgId for subsequent processing
         event = { ...event, orgId: created.orgId };
-        
+
         this.logger.info("Resolved pending orgId", {
           pendingOrderId: pendingOrder.id,
           orgId: created.orgId,
@@ -273,9 +302,7 @@ export class BillingWebhookController {
     return { status: "ignored_unknown", eventId: event.eventId };
   }
 
-  private async applyEvent(
-    event: ParsedBillingWebhookEvent,
-  ): Promise<boolean> {
+  private async applyEvent(event: ParsedBillingWebhookEvent): Promise<boolean> {
     switch (event.kind) {
       case "subscription.updated":
       case "subscription.created":
@@ -369,20 +396,21 @@ export class BillingWebhookController {
     pendingOrder: PendingOrderRecord,
     event: ParsedBillingWebhookEvent,
   ): Promise<void> {
-    const policy = getConfiguratorPlanPolicy(pendingOrder.planCode);
-    const includedModules =
-      !isAddOnOnlyOrder(pendingOrder) && policy?.outcome === "checkout"
-        ? policy.includedModules.map(
-            (moduleCode) => PRISMA_MODULE_BY_CONFIGURATOR_CODE[moduleCode],
-          )
-        : [];
-    const selectedModules = pendingOrder.selectedModules ?? [];
+    const selectedModules = [...new Set(pendingOrder.selectedModules ?? [])];
+    const includedModules = includedModulesFromPendingOrder(
+      pendingOrder,
+      selectedModules,
+    );
+    const includedModuleSet = new Set(includedModules);
+    const paidModules = selectedModules.filter(
+      (module) => !includedModuleSet.has(module),
+    );
     const entitlementSources = new Map<Module, "plan" | "add-on">();
 
     for (const module of includedModules) {
       entitlementSources.set(module, "plan");
     }
-    for (const module of selectedModules) {
+    for (const module of paidModules) {
       if (!entitlementSources.has(module)) {
         entitlementSources.set(module, "add-on");
       }
@@ -481,11 +509,11 @@ export class BillingWebhookController {
     pendingOrder: PendingOrderRecord,
   ) {
     const now = new Date();
-    
+
     // Use orgId from the event (which has been resolved in handleWebhook)
     const actualOrgId = event.orgId;
     const actualTenantId = pendingOrder.tenantId;
-    
+
     if (!actualOrgId || actualOrgId === "pending") {
       this.logger.error("Cannot apply pending order: orgId not resolved", {
         pendingOrderId: pendingOrder.id,
@@ -493,7 +521,7 @@ export class BillingWebhookController {
       });
       throw new Error("Cannot apply pending order without resolved orgId");
     }
-    
+
     await prisma.$transaction(async (tx) => {
       await this.upsertSubscription(
         event,
@@ -521,7 +549,7 @@ export class BillingWebhookController {
           event,
         );
       }
-      
+
       // Store Stripe customer ID on org
       if (event.providerCustomerId && actualOrgId) {
         await tx.org.update({
@@ -529,7 +557,7 @@ export class BillingWebhookController {
           data: { stripeCustomerId: event.providerCustomerId },
         });
       }
-      
+
       await tx.pendingOrder.update({
         where: { id: pendingOrder.id },
         data: {
@@ -554,7 +582,10 @@ export class BillingWebhookController {
       event.subscriptionId &&
       !isAddOnOnlyOrder(pendingOrder)
     ) {
-      await this.cancelOtherActiveSubscriptionsForOrg(actualOrgId, event.subscriptionId);
+      await this.cancelOtherActiveSubscriptionsForOrg(
+        actualOrgId,
+        event.subscriptionId,
+      );
     }
   }
 
@@ -570,7 +601,9 @@ export class BillingWebhookController {
       where: {
         orgId,
         providerSubId: { not: currentProviderSubId },
-        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE] },
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
+        },
       },
       select: { id: true, providerSubId: true, planCode: true },
     });
@@ -584,12 +617,20 @@ export class BillingWebhookController {
     for (const sub of others) {
       if (stripe && sub.providerSubId) {
         try {
-          await this.refundProratedAndCancelSubscription(stripe, orgId, sub.providerSubId, sub.planCode);
+          await this.refundProratedAndCancelSubscription(
+            stripe,
+            orgId,
+            sub.providerSubId,
+            sub.planCode,
+          );
         } catch (err) {
-          this.logger.warn("Failed to refund/cancel Stripe subscription; marking CANCELED in DB", {
-            providerSubId: sub.providerSubId,
-            error: err instanceof Error ? err.message : String(err),
-          });
+          this.logger.warn(
+            "Failed to refund/cancel Stripe subscription; marking CANCELED in DB",
+            {
+              providerSubId: sub.providerSubId,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
           await stripe.subscriptions.cancel(sub.providerSubId).catch(() => {});
         }
       }
@@ -629,7 +670,7 @@ export class BillingWebhookController {
     const chargeId =
       invoice?.charge && typeof invoice.charge === "string"
         ? invoice.charge
-        : (invoice?.charge as Stripe.Charge)?.id ?? null;
+        : ((invoice?.charge as Stripe.Charge)?.id ?? null);
     const amountPaidCents = invoice?.amount_paid ?? 0;
 
     if (chargeId && amountPaidCents > 0 && remainingSeconds > 0) {
@@ -657,10 +698,16 @@ export class BillingWebhookController {
             remainingDays: Math.round(remainingSeconds / 86400),
           });
         } catch (refundErr) {
-          this.logger.warn("Prorated refund failed; still canceling subscription", {
-            providerSubId,
-            error: refundErr instanceof Error ? refundErr.message : String(refundErr),
-          });
+          this.logger.warn(
+            "Prorated refund failed; still canceling subscription",
+            {
+              providerSubId,
+              error:
+                refundErr instanceof Error
+                  ? refundErr.message
+                  : String(refundErr),
+            },
+          );
         }
       }
     }
@@ -681,7 +728,10 @@ export class BillingWebhookController {
     if (planDefinition?.maxChildrenIncluded !== null) {
       flags.maxChildrenIncluded = planDefinition?.maxChildrenIncluded;
     }
-    if (pendingOrder.smsMessagesCap !== null && pendingOrder.smsMessagesCap !== undefined) {
+    if (
+      pendingOrder.smsMessagesCap !== null &&
+      pendingOrder.smsMessagesCap !== undefined
+    ) {
       flags.smsMessagesCap = pendingOrder.smsMessagesCap;
     }
     if (pendingOrder.flags) {
@@ -690,7 +740,9 @@ export class BillingWebhookController {
     if (pendingOrder.warnings) {
       flags.pendingOrderWarnings = pendingOrder.warnings;
     }
-    return Object.keys(flags).length ? (flags as Prisma.InputJsonValue) : undefined;
+    return Object.keys(flags).length
+      ? (flags as Prisma.InputJsonValue)
+      : undefined;
   }
 
   private async createOrgFromPendingDetails(
@@ -751,7 +803,10 @@ export class BillingWebhookController {
             hasServeAccess: true, // Enable staff access by default
           },
         });
-        this.logger.info("Created new user", { userId: user.id, email: contactEmail });
+        this.logger.info("Created new user", {
+          userId: user.id,
+          email: contactEmail,
+        });
       } else {
         // Update existing user with tenantId if not set
         if (!user.tenantId) {
@@ -760,7 +815,10 @@ export class BillingWebhookController {
             data: { tenantId: tenant.id },
           });
         }
-        this.logger.info("User already exists", { userId: user.id, email: contactEmail });
+        this.logger.info("User already exists", {
+          userId: user.id,
+          email: contactEmail,
+        });
       }
 
       // Check if user already has an identity, on either provider
@@ -829,10 +887,13 @@ export class BillingWebhookController {
               // Don't fail the whole transaction if Auth0 creation fails
             }
           } else {
-            this.logger.warn("Auth0ManagementService not ready (credentials missing or invalid)", {
-              userId: user.id,
-              email: contactEmail,
-            });
+            this.logger.warn(
+              "Auth0ManagementService not ready (credentials missing or invalid)",
+              {
+                userId: user.id,
+                email: contactEmail,
+              },
+            );
           }
         } else {
           // "dual" and "clerk": new org accounts land on Clerk.
@@ -890,10 +951,13 @@ export class BillingWebhookController {
               // Don't fail the whole transaction if Clerk creation fails
             }
           } else {
-            this.logger.warn("ClerkManagementService not ready (secret key missing)", {
-              userId: user.id,
-              email: contactEmail,
-            });
+            this.logger.warn(
+              "ClerkManagementService not ready (secret key missing)",
+              {
+                userId: user.id,
+                email: contactEmail,
+              },
+            );
           }
         }
       } else if (existingIdentity) {
@@ -903,10 +967,13 @@ export class BillingWebhookController {
           provider: existingIdentity.provider,
         });
       } else if (!password) {
-        this.logger.warn("No password provided, skipping identity provider user creation", {
-          userId: user.id,
-          email: contactEmail,
-        });
+        this.logger.warn(
+          "No password provided, skipping identity provider user creation",
+          {
+            userId: user.id,
+            email: contactEmail,
+          },
+        );
       }
 
       // Link user to tenant and org
@@ -984,11 +1051,14 @@ export class BillingWebhookController {
       });
       this.logger.info("✅ Created SiteMembership");
 
-      this.logger.info("Successfully created org/tenant/user and linked memberships", {
-        orgId: org.id,
-        tenantId: tenant.id,
-        userId: user.id,
-      });
+      this.logger.info(
+        "Successfully created org/tenant/user and linked memberships",
+        {
+          orgId: org.id,
+          tenantId: tenant.id,
+          userId: user.id,
+        },
+      );
 
       return {
         orgId: org.id,

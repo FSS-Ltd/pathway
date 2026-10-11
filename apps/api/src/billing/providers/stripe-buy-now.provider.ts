@@ -12,6 +12,7 @@ import {
   type StripePriceMap,
 } from "../billing-provider.config";
 import type { PlanCode } from "../billing-plans";
+import { getConfiguratorPlanPolicy } from "@pathway/pricing";
 
 @Injectable()
 export class StripeBuyNowProvider extends BuyNowProvider {
@@ -72,31 +73,64 @@ export class StripeBuyNowProvider extends BuyNowProvider {
     if (extraStorageGb > 0) {
       const storageSuffix = intervalSuffix; // MONTHLY or YEARLY
       if (extraStorageGb === 100) {
-        const id = priceMap[`STORAGE_100GB_${storageSuffix}` as keyof StripePriceMap];
+        const id =
+          priceMap[`STORAGE_100GB_${storageSuffix}` as keyof StripePriceMap];
         if (id) lineItems.push({ price: id, quantity: 1 });
       } else if (extraStorageGb === 200) {
-        const id = priceMap[`STORAGE_200GB_${storageSuffix}` as keyof StripePriceMap];
+        const id =
+          priceMap[`STORAGE_200GB_${storageSuffix}` as keyof StripePriceMap];
         if (id) lineItems.push({ price: id, quantity: 1 });
       } else if (extraStorageGb === 1000) {
-        const id = priceMap[`STORAGE_1TB_${storageSuffix}` as keyof StripePriceMap];
+        const id =
+          priceMap[`STORAGE_1TB_${storageSuffix}` as keyof StripePriceMap];
         if (id) lineItems.push({ price: id, quantity: 1 });
       }
     }
 
+    // Included selections belong to the plan; only eligible paid modules get line items.
+    const policy = getConfiguratorPlanPolicy(params.plan.planCode);
     const selectedModules = params.plan.selectedModules ?? [];
-    const missingModules = selectedModules.filter(
+    const selectedIncludedModules = params.plan.selectedIncludedModules ?? [];
+    const includedModuleSet = new Set(selectedIncludedModules);
+    const invalidIncludedModules = selectedIncludedModules.filter(
+      (module) => !policy?.eligibleOptionalModules.includes(module),
+    );
+    if (
+      !addonsOnly &&
+      (!policy ||
+        selectedIncludedModules.length > policy.includedModuleLimit ||
+        invalidIncludedModules.length > 0 ||
+        selectedIncludedModules.some((module) =>
+          selectedModules.includes(module),
+        ))
+    ) {
+      throw new Error("Included module selection is not valid for this plan.");
+    }
+    if (
+      selectedModules.some(
+        (module) =>
+          !policy?.eligibleOptionalModules.includes(module) ||
+          (!addonsOnly && includedModuleSet.has(module)),
+      )
+    ) {
+      throw new Error("Selected module is not eligible for this plan.");
+    }
+    const paidModules = selectedModules.filter(
+      (module) => !includedModuleSet.has(module),
+    );
+    const missingModules = paidModules.filter(
       (module) =>
-        !priceMap[
-          `MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap
-        ],
+        !priceMap[`MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap],
     );
     if (missingModules.length > 0) {
       this.logger.warn(
         `Stripe price configuration missing for modules: ${missingModules.join(", ")}`,
       );
-      throw new Error("Missing Stripe price configuration for selected modules.");
+      throw new Error(
+        "Missing Stripe price configuration for selected modules.",
+      );
     }
-    for (const module of selectedModules) {
+    for (const module of paidModules) {
       const price =
         priceMap[`MODULE_${module}_${intervalSuffix}` as keyof StripePriceMap];
       if (price) {
@@ -107,7 +141,9 @@ export class StripeBuyNowProvider extends BuyNowProvider {
     // Phase 0 PR 0.3: SMS add-on removed from the purchase path entirely.
 
     if (addonsOnly && lineItems.length === 0) {
-      this.logger.warn("addonsOnly checkout but no add-on line items; API should validate hasAddons");
+      this.logger.warn(
+        "addonsOnly checkout but no add-on line items; API should validate hasAddons",
+      );
       throw new Error("No add-ons to charge. Add add-ons above to checkout.");
     }
 
@@ -159,7 +195,11 @@ export class StripeBuyNowProvider extends BuyNowProvider {
         /similar object exists in test mode.*live mode/i.test(msg) ||
         /similar object exists in live mode.*test mode/i.test(msg);
 
-      if (isCustomerModeMismatch && params.stripeCustomerId && params.org.contactEmail) {
+      if (
+        isCustomerModeMismatch &&
+        params.stripeCustomerId &&
+        params.org.contactEmail
+      ) {
         this.logger.warn(
           `Stripe customer ${params.stripeCustomerId} not valid for current mode; creating session with customer_email instead`,
         );

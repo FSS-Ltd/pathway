@@ -31,7 +31,9 @@ export function verticalToSector(vertical: Vertical): Sector {
     case "HOME_EDUCATION":
       // NexSteps Home has its own onboarding (docs/NexStepsV2/07-nexsteps-home.md)
       // and is never selectable through this institutional configurator.
-      throw new Error("Home Education does not use the institutional checkout flow.");
+      throw new Error(
+        "Home Education does not use the institutional checkout flow.",
+      );
   }
 }
 
@@ -49,10 +51,8 @@ export function buildCheckoutPayload(
     storageAddon100Gb: state.storageChoice === "100" ? 1 : 0,
     storageAddon200Gb: state.storageChoice === "200" ? 1 : 0,
     storageAddon1Tb: state.storageChoice === "1000" ? 1 : 0,
-    selectedModules:
-      state.selectedOptionalModules.length > 0
-        ? state.selectedOptionalModules
-        : undefined,
+    selectedModules: state.selectedOptionalModules,
+    selectedIncludedModules: state.selectedIncludedModules,
     orgName: organisation.organisationName,
     contactName: organisation.contactName,
     contactEmail: organisation.workEmail,

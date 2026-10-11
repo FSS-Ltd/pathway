@@ -57,7 +57,11 @@ describe("StripeBuyNowProvider", () => {
       id: "cs_123",
       url: "https://checkout.stripe.test/cs_123",
     });
-    (provider as unknown as { stripe: { checkout: { sessions: { create: jest.Mock } } } }).stripe = {
+    (
+      provider as unknown as {
+        stripe: { checkout: { sessions: { create: jest.Mock } } };
+      }
+    ).stripe = {
       checkout: { sessions: { create } },
     };
 
@@ -77,6 +81,47 @@ describe("StripeBuyNowProvider", () => {
     );
   });
 
+  it("does not add a Stripe line item for included modules, but charges paid extras", async () => {
+    const provider = new StripeBuyNowProvider(
+      createConfig({
+        GROWTH_99_MONTHLY: "price_growth",
+        MODULE_MEALS_MONTHLY: "price_meals",
+      }),
+    );
+    const create = jest.fn().mockResolvedValue({
+      id: "cs_included",
+      url: "https://checkout.stripe.test/cs_included",
+    });
+    (
+      provider as unknown as {
+        stripe: { checkout: { sessions: { create: jest.Mock } } };
+      }
+    ).stripe = {
+      checkout: { sessions: { create } },
+    };
+
+    await provider.createCheckoutSession(
+      {
+        ...params,
+        plan: {
+          planCode: "GROWTH_99_MONTHLY",
+          selectedIncludedModules: [Module.FINANCE, Module.EVENTS, Module.HR],
+          selectedModules: [Module.MEALS],
+        },
+      },
+      { tenantId: "tenant_1", orgId: "org_1" },
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        line_items: [
+          { price: "price_growth", quantity: 1 },
+          { price: "price_meals", quantity: 1 },
+        ],
+      }),
+    );
+  });
+
   it("rejects checkout rather than omitting a selected module without a price", async () => {
     const provider = new StripeBuyNowProvider(
       createConfig({ STARTER_MONTHLY: "price_starter" }),
@@ -87,7 +132,9 @@ describe("StripeBuyNowProvider", () => {
         tenantId: "tenant_1",
         orgId: "org_1",
       }),
-    ).rejects.toThrow("Missing Stripe price configuration for selected modules");
+    ).rejects.toThrow(
+      "Missing Stripe price configuration for selected modules",
+    );
   });
 
   it("adds the Learning module price to checkout", async () => {
@@ -101,7 +148,11 @@ describe("StripeBuyNowProvider", () => {
       id: "cs_learning",
       url: "https://checkout.stripe.test/cs_learning",
     });
-    (provider as unknown as { stripe: { checkout: { sessions: { create: jest.Mock } } } }).stripe = {
+    (
+      provider as unknown as {
+        stripe: { checkout: { sessions: { create: jest.Mock } } };
+      }
+    ).stripe = {
       checkout: { sessions: { create } },
     };
 

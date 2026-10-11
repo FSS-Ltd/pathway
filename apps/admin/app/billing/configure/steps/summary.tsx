@@ -10,6 +10,7 @@ type SummaryStepProps = {
   frequency: "monthly" | "yearly";
   includedModules: WebModule[];
   selectedOptionalModules: WebModule[];
+  includedModuleLimit: number;
   storageChoice: StorageChoice;
   onCheckout: () => void;
   isCheckoutPending: boolean;
@@ -28,6 +29,7 @@ export function SummaryStep({
   frequency,
   includedModules,
   selectedOptionalModules,
+  includedModuleLimit,
   storageChoice,
   onCheckout,
   isCheckoutPending,
@@ -46,10 +48,14 @@ export function SummaryStep({
           Review your upgrade
         </h2>
         <p className="text-text-muted">
-          Check your changes. You'll confirm the exact amount due today at secure
-          checkout.
+          Check your changes. You'll confirm the exact amount due today at
+          secure checkout.
         </p>
       </div>
+      <p className="text-sm text-text-muted">
+        Your plan includes up to {includedModuleLimit} chosen modules. Paid
+        module add-ons are listed separately.
+      </p>
       <dl className="grid gap-3 rounded-xl border border-border-subtle bg-surface p-5 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-text-muted">Current plan</dt>

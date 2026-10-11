@@ -40,7 +40,11 @@ describe("configurator step contracts", () => {
         ...selectPlan(INITIAL_CONFIGURATOR_STATE, monthly, PRICES),
         selectedOptionalModules: ["LEARNING" as const],
       };
-      const yearlyState = selectFrequency(state, "yearly", PRICES);
+      const yearlyPrices = {
+        ...PRICES,
+        MODULE_LEARNING_YEARLY: { amountMajor: 290 },
+      };
+      const yearlyState = selectFrequency(state, "yearly", yearlyPrices);
 
       expect(yearlyState).toMatchObject({
         planCode: yearly,
@@ -101,7 +105,9 @@ describe("configurator step contracts", () => {
     expect(page).toContain(
       "selectedOptionalModules={state.selectedOptionalModules}",
     );
-    expect(page).toContain("includedModules={includedModules}");
+    expect(page).toContain(
+      "selectedIncludedModules={state.selectedIncludedModules}",
+    );
     expect(page).toContain("eligibleOptionalModules={eligibleOptionalModules}");
     expect(page.indexOf('{currentStep === "plan"')).toBeLessThan(
       page.indexOf('{currentStep === "org-type"'),
@@ -119,10 +125,10 @@ describe("configurator step contracts", () => {
   it("distinguishes included, eligible, and unavailable modules", () => {
     const modules = readFileSync(join(stepsDirectory, "modules.tsx"), "utf8");
 
-    expect(modules).toContain("includedModules");
+    expect(modules).toContain("selectedIncludedModules");
     expect(modules).toContain("eligibleOptionalModules");
     expect(modules).toContain("Included in {planLabel}");
-    expect(modules).toContain("isDisabled={true}");
+    expect(modules).toContain('delta.status === "coming-soon"');
     expect(modules).toContain("eligibleOptionalModules.includes(module)");
   });
 

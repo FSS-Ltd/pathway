@@ -448,6 +448,7 @@ export type AdminBuyNowPurchaseRequest = {
   extraLeaderSeats?: number | null;
   extraSites?: number | null;
   selectedModules?: AdminModule[];
+  selectedIncludedModules?: AdminModule[];
   successUrl?: string | null;
   cancelUrl?: string | null;
 };
@@ -5296,6 +5297,7 @@ export async function createBuyNowPurchase(
       extraSmsMessages: input.extraSmsMessages ?? 0,
       extraLeaderSeats: input.extraLeaderSeats ?? 0,
       selectedModules: input.selectedModules,
+      selectedIncludedModules: input.selectedIncludedModules,
     }),
   });
 

@@ -20,6 +20,7 @@ type SummaryStepProps = {
   vertical: Vertical;
   includedModules: WebModule[];
   selectedOptionalModules: WebModule[];
+  includedModuleLimit: number;
   planCode: PlanCode;
   frequency: "monthly" | "yearly";
   storageChoice: StorageChoice;
@@ -34,6 +35,7 @@ export function SummaryStep({
   vertical,
   includedModules,
   selectedOptionalModules,
+  includedModuleLimit,
   planCode,
   frequency,
   storageChoice,
@@ -92,6 +94,10 @@ export function SummaryStep({
           workspace.
         </p>
       </div>
+      <p className="text-sm text-text-muted">
+        Your plan includes up to {includedModuleLimit} chosen modules. Paid
+        module add-ons are listed separately.
+      </p>
       <dl className="grid gap-3 rounded-xl border border-border-subtle bg-surface p-5 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-text-muted">Setting</dt>

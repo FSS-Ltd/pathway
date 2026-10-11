@@ -241,7 +241,7 @@ describe("BillingWebhookController", () => {
     );
   });
 
-  it("activates Growth inclusions plus its paid add-on when a pending order completes", async () => {
+  it("activates three customer-selected Growth inclusions plus paid extras", async () => {
     const pending = {
       id: "po_modules",
       orgId: baseEvent.orgId,
@@ -252,8 +252,17 @@ describe("BillingWebhookController", () => {
       smsMessagesCap: 500,
       leaderSeatsIncluded: 5,
       maxSites: 2,
-      selectedModules: [Module.TRANSPORT],
-      flags: null,
+      selectedModules: [
+        Module.FINANCE,
+        Module.EVENTS,
+        Module.TRANSPORT,
+        Module.MEALS,
+      ],
+      flags: {
+        moduleSelection: {
+          includedModules: [Module.FINANCE, Module.EVENTS, Module.TRANSPORT],
+        },
+      },
       warnings: null,
       provider: BillingProvider.STRIPE,
       providerCheckoutId: "co_1",
@@ -274,12 +283,7 @@ describe("BillingWebhookController", () => {
       prismaMock.orgModule.upsert.mock.calls.map(
         ([args]) => args.where.orgId_module.module,
       ),
-    ).toEqual([
-      Module.FINANCE,
-      Module.EVENTS,
-      Module.ADVANCED_REPORTING,
-      Module.TRANSPORT,
-    ]);
+    ).toEqual([Module.FINANCE, Module.EVENTS, Module.TRANSPORT, Module.MEALS]);
     expect(prismaMock.orgModule.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -303,7 +307,7 @@ describe("BillingWebhookController", () => {
     expect(prismaMock.orgModule.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          orgId_module: { orgId: baseEvent.orgId, module: Module.TRANSPORT },
+          orgId_module: { orgId: baseEvent.orgId, module: Module.MEALS },
         },
         create: expect.objectContaining({
           metadata: {
@@ -558,7 +562,7 @@ describe("BillingWebhookController", () => {
     });
   });
 
-  it("activates the six Professional inclusions without paid module selections", async () => {
+  it("activates six customer-selected Professional inclusions and a paid seventh module", async () => {
     const pending = {
       id: "po_professional_modules",
       orgId: baseEvent.orgId,
@@ -569,7 +573,123 @@ describe("BillingWebhookController", () => {
       smsMessagesCap: 500,
       leaderSeatsIncluded: 5,
       maxSites: 2,
-      selectedModules: [],
+      selectedModules: [
+        Module.MEALS,
+        Module.AI_WORKSPACE,
+        Module.FINANCE,
+        Module.TRANSPORT,
+        Module.HR,
+        Module.EVENTS,
+        Module.LEARNING,
+      ],
+      flags: {
+        moduleSelection: {
+          includedModules: [
+            Module.MEALS,
+            Module.AI_WORKSPACE,
+            Module.FINANCE,
+            Module.TRANSPORT,
+            Module.HR,
+            Module.EVENTS,
+          ],
+        },
+      },
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_1",
+      providerSubscriptionId: null,
+      status: PendingOrderStatus.PENDING,
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      pendingOrderId: pending.id,
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(7);
+    expect(
+      prismaMock.orgModule.upsert.mock.calls.map(
+        ([args]) => args.where.orgId_module.module,
+      ),
+    ).toEqual([
+      Module.MEALS,
+      Module.AI_WORKSPACE,
+      Module.FINANCE,
+      Module.TRANSPORT,
+      Module.HR,
+      Module.EVENTS,
+      Module.LEARNING,
+    ]);
+    expect(
+      prismaMock.orgModule.upsert.mock.calls.map(
+        ([args]) => args.create.metadata.entitlementSource,
+      ),
+    ).toEqual(["plan", "plan", "plan", "plan", "plan", "plan", "add-on"]);
+  });
+
+  it("deduplicates malformed pending selections before applying the included allowance", async () => {
+    const pending = {
+      id: "po_duplicate_included",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "GROWTH_99_MONTHLY",
+      selectedModules: [
+        Module.FINANCE,
+        Module.FINANCE,
+        Module.EVENTS,
+        Module.HR,
+      ],
+      flags: {
+        moduleSelection: {
+          includedModules: [
+            Module.FINANCE,
+            Module.EVENTS,
+            Module.ADVANCED_REPORTING,
+          ],
+        },
+      },
+      warnings: null,
+      provider: BillingProvider.STRIPE,
+      providerCheckoutId: "co_duplicate_included",
+      providerSubscriptionId: null,
+      status: PendingOrderStatus.PENDING,
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      pendingOrderId: pending.id,
+    });
+    prismaMock.billingEvent.findFirst.mockResolvedValue(null);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(
+      prismaMock.orgModule.upsert.mock.calls.map(
+        ([args]) => args.where.orgId_module.module,
+      ),
+    ).toEqual([Module.FINANCE, Module.EVENTS, Module.HR]);
+    expect(
+      prismaMock.orgModule.upsert.mock.calls.map(
+        ([args]) => args.create.metadata.entitlementSource,
+      ),
+    ).toEqual(["plan", "plan", "add-on"]);
+  });
+
+  it("preserves the historical fixed bundle for legacy pending Growth orders", async () => {
+    const pending = {
+      id: "po_legacy_modules",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "GROWTH_99_MONTHLY",
+      av30Cap: 75,
+      storageGbCap: 100,
+      smsMessagesCap: 500,
+      leaderSeatsIncluded: 5,
+      maxSites: 2,
+      selectedModules: [Module.MEALS],
       flags: null,
       warnings: null,
       provider: BillingProvider.STRIPE,
@@ -586,7 +706,6 @@ describe("BillingWebhookController", () => {
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
-    expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(6);
     expect(
       prismaMock.orgModule.upsert.mock.calls.map(
         ([args]) => args.where.orgId_module.module,
@@ -595,33 +714,31 @@ describe("BillingWebhookController", () => {
       Module.FINANCE,
       Module.EVENTS,
       Module.ADVANCED_REPORTING,
-      Module.HR,
-      Module.ASSET_MANAGEMENT,
-      Module.AI_WORKSPACE,
+      Module.MEALS,
     ]);
     expect(
       prismaMock.orgModule.upsert.mock.calls.map(
         ([args]) => args.create.metadata.entitlementSource,
       ),
-    ).toEqual(Array(6).fill("plan"));
+    ).toEqual(["plan", "plan", "plan", "add-on"]);
   });
 
-  it("activates only purchased modules for legacy plans", async () => {
+  it("honours an explicitly empty inclusion selection without applying the legacy bundle", async () => {
     const pending = {
-      id: "po_legacy_modules",
+      id: "po_empty_inclusions",
       orgId: baseEvent.orgId,
       tenantId: "tenant_1",
-      planCode: "GROWTH_MONTHLY",
+      planCode: "GROWTH_99_MONTHLY",
       av30Cap: 75,
       storageGbCap: 100,
       smsMessagesCap: 500,
       leaderSeatsIncluded: 5,
       maxSites: 2,
       selectedModules: [Module.MEALS],
-      flags: null,
+      flags: { moduleSelection: { includedModules: [] } },
       warnings: null,
       provider: BillingProvider.STRIPE,
-      providerCheckoutId: "co_1",
+      providerCheckoutId: "co_empty_inclusions",
       providerSubscriptionId: null,
       status: PendingOrderStatus.PENDING,
     };
@@ -663,7 +780,9 @@ describe("BillingWebhookController", () => {
       leaderSeatsIncluded: 5,
       maxSites: 2,
       selectedModules: [Module.FINANCE, Module.FINANCE, Module.LEARNING],
-      flags: null,
+      flags: {
+        moduleSelection: { includedModules: [Module.FINANCE] },
+      },
       warnings: null,
       provider: BillingProvider.STRIPE,
       providerCheckoutId: "co_1",
@@ -679,7 +798,7 @@ describe("BillingWebhookController", () => {
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
-    expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(4);
+    expect(prismaMock.orgModule.upsert).toHaveBeenCalledTimes(2);
     const financeActivation = prismaMock.orgModule.upsert.mock.calls.find(
       ([args]) => args.where.orgId_module.module === Module.FINANCE,
     );

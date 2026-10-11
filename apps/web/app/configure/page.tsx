@@ -40,6 +40,7 @@ import { SummaryStep, type AccountDetails } from "./steps/summary";
 import { VerticalStep } from "./steps/vertical";
 import {
   firstIncompleteStep,
+  includedModuleLimitForState,
   includedModulesForState,
   INITIAL_CONFIGURATOR_STATE,
   nextStep,
@@ -191,6 +192,7 @@ export default function ConfigurePage() {
           ?.eligibleOptionalModules ?? []),
       ]
     : [];
+  const includedModuleLimit = includedModuleLimitForState(state);
   const progressSteps: ConfiguratorProgressStep[] = progressStepsForOrgType(
     state.orgType,
   ).map((step) => ({ id: step, label: STEP_LABELS[step] }));
@@ -366,8 +368,9 @@ export default function ConfigurePage() {
               ) : null}
               {currentStep === "modules" ? (
                 <ModulesStep
-                  includedModules={includedModules}
                   selectedOptionalModules={state.selectedOptionalModules}
+                  selectedIncludedModules={state.selectedIncludedModules}
+                  includedModuleLimit={includedModuleLimit}
                   eligibleOptionalModules={eligibleOptionalModules}
                   frequency={state.frequency}
                   prices={billingPrices.modulePrices}
@@ -400,6 +403,7 @@ export default function ConfigurePage() {
                   vertical={state.vertical}
                   includedModules={includedModules}
                   selectedOptionalModules={state.selectedOptionalModules}
+                  includedModuleLimit={includedModuleLimit}
                   planCode={state.planCode}
                   frequency={state.frequency}
                   storageChoice={state.storageChoice}

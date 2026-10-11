@@ -2,6 +2,7 @@ import { VERTICAL_OPTIONS, type Vertical } from "@pathway/types";
 import {
   configuredModulesForState,
   firstIncompleteStep,
+  includedModuleLimitForState,
   includedModulesForState,
   INITIAL_CONFIGURATOR_STATE,
   nextStep,
@@ -15,6 +16,7 @@ import {
   verticalsForOrgType,
   type ConfiguratorState,
   type OrgType,
+  type WebModule,
 } from "../app/configure/state";
 
 const ORG_VERTICALS: Record<OrgType, Vertical[]> = {
@@ -29,6 +31,13 @@ const PRICES = {
   MODULE_LEARNING_MONTHLY: { amountMajor: 29 },
   MODULE_LEARNING_YEARLY: { amountMajor: 290 },
   MODULE_FINANCE_MONTHLY: { amountMajor: 19 },
+  MODULE_EVENTS_MONTHLY: { amountMajor: 12 },
+  MODULE_TRANSPORT_MONTHLY: { amountMajor: 15 },
+  MODULE_MEALS_MONTHLY: { amountMajor: 18 },
+  MODULE_HR_MONTHLY: { amountMajor: 20 },
+  MODULE_ASSET_MANAGEMENT_MONTHLY: { amountMajor: 22 },
+  MODULE_AI_WORKSPACE_MONTHLY: { amountMajor: 25 },
+  MODULE_ADVANCED_REPORTING_MONTHLY: { amountMajor: 27 },
 };
 
 const completeState = (
@@ -39,6 +48,7 @@ const completeState = (
   orgType: "CHURCH",
   vertical: "CHURCH",
   selectedOptionalModules: ["LEARNING"],
+  selectedIncludedModules: [],
   planCode: "STARTER_49_MONTHLY",
   frequency: "monthly",
   storageChoice: "200",
@@ -138,11 +148,7 @@ describe("configurator state", () => {
 
   it("keeps the current selection step visible until Continue advances it", () => {
     const organisationStep = {
-      ...selectPlan(
-        INITIAL_CONFIGURATOR_STATE,
-        "STARTER_49_MONTHLY",
-        PRICES,
-      ),
+      ...selectPlan(INITIAL_CONFIGURATOR_STATE, "STARTER_49_MONTHLY", PRICES),
       step: "org-type" as const,
     };
     const school = selectOrgType(organisationStep, "SCHOOL");
@@ -152,62 +158,192 @@ describe("configurator state", () => {
     const settingStep = nextStep(school);
     expect(settingStep.step).toBe("vertical");
 
-    const selectedSetting = selectVertical(
-      settingStep,
-      "INDEPENDENT_SCHOOL",
-    );
+    const selectedSetting = selectVertical(settingStep, "INDEPENDENT_SCHOOL");
     expect(firstIncompleteStep(selectedSetting)).toBe("vertical");
     expect(nextStep(selectedSetting).step).toBe("included");
   });
 
-  it("stores only eligible live-priced optional modules", () => {
+  it("offers an unpriced module as a free included choice but never as a paid extra", () => {
     const growth = selectPlan(
       INITIAL_CONFIGURATOR_STATE,
       "GROWTH_99_MONTHLY",
       PRICES,
     );
-    expect(includedModulesForState(growth)).toEqual([
+    const five = ["FINANCE", "EVENTS", "TRANSPORT", "MEALS", "HR"].reduce(
+      (state, module) => toggleModule(state, module as WebModule, PRICES),
+      selectPlan(
+        INITIAL_CONFIGURATOR_STATE,
+        "PROFESSIONAL_149_MONTHLY",
+        PRICES,
+      ),
+    );
+
+    expect(toggleModule(growth, "HR", PRICES).selectedIncludedModules).toEqual([
+      "HR",
+    ]);
+    const newlyIncluded = toggleModule(five, "AI_WORKSPACE", PRICES);
+    expect(newlyIncluded.selectedIncludedModules).toContain("AI_WORKSPACE");
+    expect(newlyIncluded.selectedOptionalModules).not.toContain("AI_WORKSPACE");
+    const availableIncludedChoice = toggleModule(
+      newlyIncluded,
+      "ADVANCED_REPORTING",
+      PRICES,
+    );
+    expect(availableIncludedChoice.selectedOptionalModules).toContain(
+      "ADVANCED_REPORTING",
+    );
+    const noIncludedSlots = toggleModule(availableIncludedChoice, "LEARNING", {
+      ...PRICES,
+      MODULE_AI_WORKSPACE_MONTHLY: { amountMajor: 25 },
+      MODULE_ADVANCED_REPORTING_MONTHLY: { amountMajor: 27 },
+    });
+    const unavailablePaidExtra = toggleModule(
+      noIncludedSlots,
+      "ASSET_MANAGEMENT",
+      {},
+    );
+    expect(unavailablePaidExtra).toBe(noIncludedSlots);
+  });
+
+  it("allows three customer-chosen included Growth modules and prices further choices", () => {
+    const growth = selectPlan(
+      INITIAL_CONFIGURATOR_STATE,
+      "GROWTH_99_MONTHLY",
+      PRICES,
+    );
+    expect(includedModuleLimitForState(growth)).toBe(3);
+    const chosen = ["TRANSPORT", "MEALS", "EVENTS", "LEARNING"].reduce(
+      (state, module) =>
+        toggleModule(
+          state,
+          module as "TRANSPORT" | "MEALS" | "EVENTS" | "LEARNING",
+          PRICES,
+        ),
+      growth,
+    );
+    expect(chosen.selectedIncludedModules).toEqual([
+      "TRANSPORT",
+      "MEALS",
+      "EVENTS",
+    ]);
+    expect(chosen.selectedOptionalModules).toEqual(["LEARNING"]);
+
+    const deselected = toggleModule(chosen, "TRANSPORT", PRICES);
+    expect(deselected.selectedIncludedModules).toEqual([
+      "MEALS",
+      "EVENTS",
+      "LEARNING",
+    ]);
+    expect(deselected.selectedOptionalModules).toEqual([]);
+  });
+
+  it("allows six customer-chosen included Professional modules", () => {
+    const professional = selectPlan(
+      INITIAL_CONFIGURATOR_STATE,
+      "PROFESSIONAL_149_MONTHLY",
+      PRICES,
+    );
+    const chosen = [
+      "TRANSPORT",
+      "MEALS",
+      "EVENTS",
+      "LEARNING",
+      "FINANCE",
+      "HR",
+      "AI_WORKSPACE",
+    ].reduce(
+      (state, module) =>
+        toggleModule(
+          state,
+          module as
+            | "TRANSPORT"
+            | "MEALS"
+            | "EVENTS"
+            | "LEARNING"
+            | "FINANCE"
+            | "HR"
+            | "AI_WORKSPACE",
+          PRICES,
+        ),
+      professional,
+    );
+    expect(chosen.selectedIncludedModules).toEqual([
+      "TRANSPORT",
+      "MEALS",
+      "EVENTS",
+      "LEARNING",
+      "FINANCE",
+      "HR",
+    ]);
+    expect(chosen.selectedOptionalModules).toEqual(["AI_WORKSPACE"]);
+  });
+
+  it("reconciles customer-chosen inclusions safely across plan and frequency changes", () => {
+    const growth = {
+      ...selectPlan(INITIAL_CONFIGURATOR_STATE, "GROWTH_99_MONTHLY", PRICES),
+      selectedIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
+      selectedOptionalModules: ["LEARNING"],
+    };
+    const yearly = selectFrequency(growth, "yearly", PRICES);
+    expect(yearly.selectedIncludedModules).toEqual([
       "FINANCE",
       "EVENTS",
       "ADVANCED_REPORTING",
     ]);
-    expect(toggleModule(growth, "FINANCE", PRICES)).toBe(growth);
-    expect(toggleModule(growth, "TRANSPORT", PRICES)).toBe(growth);
-    expect(
-      toggleModule(growth, "LEARNING", PRICES).selectedOptionalModules,
-    ).toEqual(["LEARNING"]);
-  });
-
-  it("reconciles optionals safely across plan and frequency changes", () => {
-    const growth = {
-      ...selectPlan(INITIAL_CONFIGURATOR_STATE, "GROWTH_99_MONTHLY", PRICES),
-      selectedOptionalModules: ["LEARNING", "FINANCE"],
-    };
-    const yearly = selectFrequency(growth, "yearly", PRICES);
     expect(yearly.selectedOptionalModules).toEqual(["LEARNING"]);
 
-    expect(
-      selectPlan(yearly, "STARTER_49_YEARLY", PRICES).selectedOptionalModules,
-    ).toEqual(["LEARNING"]);
-    expect(
-      selectPlan(
-        { ...growth, selectedOptionalModules: ["FINANCE"] },
-        "STARTER_49_MONTHLY",
-        PRICES,
-      ).selectedOptionalModules,
-    ).toEqual([]);
+    const starter = selectPlan(yearly, "STARTER_49_YEARLY", {
+      ...PRICES,
+      MODULE_FINANCE_YEARLY: { amountMajor: 190 },
+      MODULE_EVENTS_YEARLY: { amountMajor: 120 },
+      MODULE_ADVANCED_REPORTING_YEARLY: { amountMajor: 270 },
+    });
+    expect(starter.selectedIncludedModules).toEqual([]);
+    expect(starter.selectedOptionalModules).toEqual([
+      "FINANCE",
+      "EVENTS",
+      "ADVANCED_REPORTING",
+      "LEARNING",
+    ]);
+  });
+
+  it("moves deselected inclusions into any remaining included slots before charging them", () => {
+    const state: ConfiguratorState = {
+      ...selectPlan(INITIAL_CONFIGURATOR_STATE, "GROWTH_99_MONTHLY", PRICES),
+      selectedIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
+      selectedOptionalModules: ["LEARNING"],
+    };
+
+    const changed = toggleModule(state, "EVENTS", PRICES);
+
+    expect(changed.selectedIncludedModules).toEqual([
+      "FINANCE",
+      "ADVANCED_REPORTING",
+      "LEARNING",
+    ]);
+    expect(changed.selectedOptionalModules).toEqual([]);
+  });
+
+  it("deduplicates module state when selections cross included and paid lists", () => {
+    const state: ConfiguratorState = {
+      ...selectPlan(INITIAL_CONFIGURATOR_STATE, "GROWTH_99_MONTHLY", PRICES),
+      selectedIncludedModules: ["FINANCE", "FINANCE"],
+      selectedOptionalModules: ["FINANCE", "LEARNING"],
+    };
+    expect(configuredModulesForState(state)).toEqual(["FINANCE", "LEARNING"]);
   });
 
   it("returns a deduplicated included and optional module union", () => {
     const state = completeState({
       planCode: "GROWTH_99_MONTHLY",
-      selectedOptionalModules: ["LEARNING", "FINANCE"],
+      selectedIncludedModules: ["FINANCE", "EVENTS"],
+      selectedOptionalModules: ["LEARNING", "MEALS"],
     });
     expect(configuredModulesForState(state)).toEqual([
       "FINANCE",
       "EVENTS",
-      "ADVANCED_REPORTING",
       "LEARNING",
+      "MEALS",
     ]);
   });
 });

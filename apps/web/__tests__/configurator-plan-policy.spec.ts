@@ -22,40 +22,36 @@ describe("configurator plan policy", () => {
   });
 
   it.each(["STARTER_49_MONTHLY", "STARTER_49_YEARLY"])(
-    "%s includes no modules and exposes every module as optional",
+    "%s has no included allowance and exposes every module as optional",
     (planCode) => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
-        includedModules: [],
+        includedModuleLimit: 0,
         eligibleOptionalModules: allModules,
       });
     },
   );
 
   it.each(["GROWTH_99_MONTHLY", "GROWTH_99_YEARLY"])(
-    "%s includes the Growth module bundle",
+    "%s allows three customer-chosen included modules and paid extras",
     (planCode) => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
-        includedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
-        eligibleOptionalModules: [
-          "TRANSPORT",
-          "MEALS",
-          "ASSET_MANAGEMENT",
-          "HR",
-          "AI_WORKSPACE",
-          "LEARNING",
-        ],
+        includedModuleLimit: 3,
+        eligibleOptionalModules: allModules,
+        legacyIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
       });
     },
   );
 
   it.each(["PROFESSIONAL_149_MONTHLY", "PROFESSIONAL_149_YEARLY"])(
-    "%s includes the Professional module bundle",
+    "%s allows six customer-chosen included modules and paid extras",
     (planCode) => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
-        includedModules: [
+        includedModuleLimit: 6,
+        eligibleOptionalModules: allModules,
+        legacyIncludedModules: [
           "FINANCE",
           "EVENTS",
           "ADVANCED_REPORTING",
@@ -63,7 +59,6 @@ describe("configurator plan policy", () => {
           "ASSET_MANAGEMENT",
           "AI_WORKSPACE",
         ],
-        eligibleOptionalModules: ["TRANSPORT", "MEALS", "LEARNING"],
       });
     },
   );
@@ -71,8 +66,9 @@ describe("configurator plan policy", () => {
   it("routes Enterprise plans to contact without modules", () => {
     expect(getConfiguratorPlanPolicy("ENTERPRISE_CONTACT")).toEqual({
       outcome: "contact",
-      includedModules: [],
+      includedModuleLimit: 0,
       eligibleOptionalModules: [],
+      legacyIncludedModules: [],
       contactPath: "/demo?plan=enterprise",
     });
   });
@@ -89,8 +85,9 @@ describe("configurator plan policy", () => {
   ])("preserves %s as a no-bundle legacy checkout plan", (planCode) => {
     expect(getConfiguratorPlanPolicy(planCode)).toEqual({
       outcome: "checkout",
-      includedModules: [],
+      includedModuleLimit: 0,
       eligibleOptionalModules: allModules,
+      legacyIncludedModules: [],
     });
   });
 
@@ -107,16 +104,12 @@ describe("configurator plan policy", () => {
     "PROFESSIONAL_149_MONTHLY",
     "ENTERPRISE_CONTACT",
     "CORE_MONTHLY",
-  ])("keeps %s included and optional modules disjoint and immutable", (planCode) => {
+  ])("keeps %s policy and eligible modules immutable", (planCode) => {
     const policy = getConfiguratorPlanPolicy(planCode);
 
     expect(policy).toBeDefined();
-    expect(Object.isFrozen(policy!.includedModules)).toBe(true);
+    expect(Object.isFrozen(policy)).toBe(true);
     expect(Object.isFrozen(policy!.eligibleOptionalModules)).toBe(true);
-    expect(
-      policy!.includedModules.some((module) =>
-        policy!.eligibleOptionalModules.includes(module),
-      ),
-    ).toBe(false);
+    expect(Object.isFrozen(policy!.legacyIncludedModules)).toBe(true);
   });
 });
