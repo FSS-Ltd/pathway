@@ -318,7 +318,8 @@ it can be counted complete; the verified master-plan count stays
 tests), and five PostgreSQL E2E suites (18 tests) passed. Targeted formatting
 and diff checks passed.
 
-Build step 1.3e5u closes the remaining web/API ACE-M15 invitation lifecycle
+Build step 1.3e5u ([PR #570](https://github.com/FSS-Ltd/pathway/pull/570))
+closes the remaining web/API ACE-M15 invitation lifecycle
 gap: guardian resend now requires a fresh legal-access review and audits its
 evidence basis; shared guardian and student invitation flows have PostgreSQL
 expiry, revocation, relationship, and audit tests. The child-profile resend
