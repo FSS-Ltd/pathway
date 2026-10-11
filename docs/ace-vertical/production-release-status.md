@@ -27,6 +27,20 @@ the remaining ACE-C core journeys, then execute ACE-L01 to L09. Keep each
 numbered build step in its own PR with latest-head green CI and a confirmed
 merge before starting the next step. Reconcile the count after each merge.
 
+## ACE behaviour workspace upgrade (12 October 2026)
+
+Step ACE-B01, correction and void controls, is in
+[PR #581](https://github.com/FSS-Ltd/pathway/pull/581). The code revision
+`6f747ef925c339cb2aa3faecaf61f9e2773e4c52` passed the repository
+pre-commit lint, API unit, worker, and auth checks; rebased affected type,
+format, lint, admin interaction, API unit (90 tests), guarded PostgreSQL
+integration (7 tests), API build, and admin build checks also passed. The
+admin build used local public Clerk configuration and explicit mock API mode.
+Browser review blocked an external sign-in redirect for local visual
+inspection; the user chose to continue without it. Latest-head CI and merge
+evidence are pending. ACE-B02 batch recording cannot start until this PR has
+passing CI and is confirmed merged into `master`.
+
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
 `5a09d22f02e9a2ea28a4c227e1dd994f56ae81b0`. All eight checks passed
