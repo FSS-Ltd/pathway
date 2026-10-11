@@ -1,6 +1,6 @@
 # ACE family messaging release gate: web evidence
 
-**Build step:** 1.3e5p. **Status:** web security slice under review; ACE-M20 remains open.
+**Build step:** 1.3e5p. **Status:** merged in PR #565; ACE-M20 remains open.
 Mobile verification is paused by product direction. This record does not approve
 the full family, identity, and messaging release.
 
@@ -43,8 +43,8 @@ from a previous account are absent during the next account's loading state.
 - The web component regression test, API/admin typechecks, lint, formatting,
   and builds passed locally. The admin build used a syntactically valid local
   Clerk test key and a test API URL; it did not contact a live school account.
-  Latest-head CI is required before merge; record its actual result in the
-  release status.
+  All eight latest-head checks passed before merge; the checked revision and
+  merge commit are recorded in the release status.
 - The complete ACE-M20 matrix still needs independent probes for every notice,
   child, identity, message, and realtime topic ID, plus removed site membership
   across all routes. Web keyboard and screen-reader checks also need a signed-in

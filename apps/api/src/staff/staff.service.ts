@@ -6,9 +6,19 @@ import {
   Inject,
   Optional,
 } from "@nestjs/common";
-import { prisma, Weekday, OrgRole } from "@pathway/db";
+import {
+  prisma,
+  runTransaction,
+  Weekday,
+  OrgRole,
+  SiteRole,
+  Role,
+  type Prisma,
+} from "@pathway/db";
 import type { UpdateStaffDto } from "./dto/update-staff.dto";
 import type { UpdateProfileDto } from "./dto/update-profile.dto";
+import { recordAuditEventInTransaction } from "../audit/audit.service";
+import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { staffAvatarKey } from "../common/storage/storage-key.util";
 
@@ -339,6 +349,7 @@ export class StaffService {
         where: { id: userId },
         select: {
           children: {
+            where: { tenantId },
             select: {
               id: true,
               firstName: true,
@@ -410,6 +421,16 @@ export class StaffService {
     };
   }
 
+  async getByIdForAdmin(
+    userId: string,
+    tenantId: string,
+    orgId: string,
+    callerUserId: string,
+  ): ReturnType<StaffService["getById"]> {
+    await this.assertStaffManagerAccess(callerUserId, tenantId, orgId);
+    return this.getById(userId, tenantId, orgId);
+  }
+
   /**
    * Get current user's profile including assignments and children.
    * Used for the staff profile page (self-service).
@@ -468,6 +489,7 @@ export class StaffService {
         where: { id: currentUserId },
         select: {
           children: {
+            where: { tenantId },
             select: {
               id: true,
               firstName: true,
@@ -763,6 +785,34 @@ export class StaffService {
     return membership !== null || orgRole !== null;
   }
 
+  async assertStaffManagerAccess(
+    callerUserId: string,
+    tenantId: string,
+    orgId: string,
+  ): Promise<boolean> {
+    const [caller, isOrgAdmin, siteAdmin, legacySiteAdmin] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: callerUserId },
+        select: { isActive: true },
+      }),
+      this.isOrgAdmin(callerUserId, orgId),
+      prisma.siteMembership.findFirst({
+        where: { userId: callerUserId, tenantId, role: SiteRole.SITE_ADMIN },
+        select: { id: true },
+      }),
+      prisma.userTenantRole.findFirst({
+        where: { userId: callerUserId, tenantId, role: Role.ADMIN },
+        select: { id: true },
+      }),
+    ]);
+    if (!caller?.isActive || (!isOrgAdmin && !siteAdmin && !legacySiteAdmin)) {
+      throw new ForbiddenException(
+        "Staff administration requires a current leader role",
+      );
+    }
+    return isOrgAdmin;
+  }
+
   private async resolvePlanTier(orgId: string): Promise<boolean> {
     const org = await prisma.org.findUnique({
       where: { id: orgId },
@@ -779,10 +829,24 @@ export class StaffService {
     dto: UpdateStaffDto,
     callerUserId: string,
   ): Promise<ReturnType<StaffService["getById"]>> {
+    const isCallerOrgAdmin = await this.assertStaffManagerAccess(
+      callerUserId,
+      tenantId,
+      orgId,
+    );
+    if (
+      !isCallerOrgAdmin &&
+      (dto.role !== undefined ||
+        dto.isActive !== undefined ||
+        dto.hasServeAccess !== undefined)
+    ) {
+      throw new ForbiddenException(
+        "Only an Organisation admin can change staff roles or account access",
+      );
+    }
     await assertStaffInTenant(userId, tenantId);
 
     const canEditAvailability = await this.resolvePlanTier(orgId);
-    const isCallerOrgAdmin = await this.isOrgAdmin(callerUserId, orgId);
     if (!canEditAvailability) {
       const availabilityFields: (keyof UpdateStaffDto)[] = [
         "weeklyAvailability",
@@ -799,29 +863,39 @@ export class StaffService {
       }
     }
 
-    const userData: Record<string, unknown> = {};
+    const userData: Prisma.UserUpdateInput = {};
     if (dto.firstName !== undefined) userData.firstName = dto.firstName;
     if (dto.lastName !== undefined) userData.lastName = dto.lastName;
     if (dto.dateOfBirth !== undefined) {
       userData.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
     }
     if (dto.isActive !== undefined) userData.isActive = dto.isActive;
-    if (dto.hasServeAccess !== undefined && isCallerOrgAdmin) {
+    if (dto.hasServeAccess !== undefined) {
       userData.hasServeAccess = dto.hasServeAccess;
     }
     if (Object.keys(userData).length > 0) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: userData as never,
-      });
+      if (dto.isActive === undefined) {
+        await prisma.user.update({ where: { id: userId }, data: userData });
+      } else {
+        await runTransaction(async (tx) => {
+          await tx.user.update({ where: { id: userId }, data: userData });
+          await recordAuditEventInTransaction(tx, {
+            actorUserId: callerUserId,
+            tenantId,
+            orgId,
+            entityType: AuditEntityType.ACE_RECORD,
+            entityId: userId,
+            action: AuditAction.UPDATED,
+            metadata: {
+              kind: "STAFF_ACCOUNT_STATUS",
+              action: dto.isActive ? "enable" : "disable",
+            },
+          });
+        });
+      }
     }
 
     if (dto.role !== undefined) {
-      if (!isCallerOrgAdmin) {
-        throw new ForbiddenException(
-          "Only an Organisation admin can change a staff member's site role",
-        );
-      }
       await prisma.siteMembership.upsert({
         where: { tenantId_userId: { tenantId, userId } },
         create: { tenantId, userId, role: dto.role },

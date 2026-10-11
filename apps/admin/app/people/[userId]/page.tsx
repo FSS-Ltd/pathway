@@ -213,8 +213,10 @@ export default function StaffDetailPage() {
         lastName: lastName.trim() || undefined,
         dateOfBirth: dateOfBirth.trim() || null,
         hasServeAccess: userRole.isOrgAdmin ? hasServeAccess : undefined,
-        role: role as "SITE_ADMIN" | "STAFF" | "VIEWER",
-        isActive,
+        role: userRole.isOrgAdmin
+          ? (role as "SITE_ADMIN" | "STAFF" | "VIEWER")
+          : undefined,
+        isActive: userRole.isOrgAdmin ? isActive : undefined,
       };
       if (staff.canEditAvailability) {
         payload.weeklyAvailability = weeklyAvailability.map((r) => ({
@@ -386,29 +388,38 @@ export default function StaffDetailPage() {
                     <Label htmlFor="hasServeAccess">Has serve access</Label>
                   </div>
                 )}
-                <div>
-                  <Label htmlFor="role">Role</Label>
-                  <Select
-                    id="role"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="mt-1"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="isActive"
-                    checked={isActive}
-                    onChange={(e) => setIsActive(e.target.checked)}
-                  />
-                  <Label htmlFor="isActive">Active</Label>
-                </div>
+                {userRole.isOrgAdmin ? (
+                  <>
+                    <div>
+                      <Label htmlFor="role">Role</Label>
+                      <Select
+                        id="role"
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="mt-1"
+                      >
+                        {ROLES.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="isActive"
+                        checked={isActive}
+                        onChange={(e) => setIsActive(e.target.checked)}
+                      />
+                      <Label htmlFor="isActive">Active</Label>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-text-muted">
+                    Role and account status are managed by an organisation
+                    admin.
+                  </p>
+                )}
                 {staff.email && (
                   <div className="sm:col-span-2">
                     <Label>Email</Label>
