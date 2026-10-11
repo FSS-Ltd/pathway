@@ -340,7 +340,8 @@ the full API unit suite (178 suites, 1,304 tests) and full admin unit script
 passed, including the new guardian card test. Four PostgreSQL identity suites
 passed 14 E2E tests. Mobile interface work remains paused.
 
-Build step 1.3e5v (current branch `feature/ace-m16-family-read-facade`) adds
+Build step 1.3e5v ([PR #571](https://github.com/FSS-Ltd/pathway/pull/571),
+current branch `feature/ace-m16-family-read-facade`) adds
 the first ACE-M16 family read facade slice and web overview. Current full
 guardian relationship, active enrolment, ACE school, account, permission, and
 tenant RLS checks guard the request. Attendance is child-scoped; notices and

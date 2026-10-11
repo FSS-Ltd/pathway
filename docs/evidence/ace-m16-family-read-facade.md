@@ -1,7 +1,8 @@
 # ACE-M16 family read facade: first web slice
 
-**Build step:** 1.3e5v. **Plan task:** ACE-M16, still incomplete. Mobile work is
-paused.
+**Build step:** 1.3e5v in
+[PR #571](https://github.com/FSS-Ltd/pathway/pull/571). **Plan task:** ACE-M16,
+still incomplete. Mobile work is paused.
 
 The family overview accepts a site and child ID, but derives authority from a
 current full guardian relationship in that site, an active ACE school enrolment,
