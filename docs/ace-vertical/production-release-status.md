@@ -417,8 +417,22 @@ views and invitations must discard state on account, session, or route change.
 Signed-out timetable headings must not retain a child's name. This is a web
 security slice of ACE-M20 and ACE-M18, not full completion of either task;
 mobile baselines and signed-in browser accessibility evidence remain open.
-The verified master-plan count remains **43/150 (28⅔%, 28.67%)**. PR,
-latest-head CI, and merge evidence are pending.
+The verified master-plan count remains **43/150 (28⅔%, 28.67%)**. All eight
+latest-head checks passed on `ba40f7cf8f7cae60c490c81166b6519223ce2856`
+(CI run 38178783370; CodeQL run 38178779023). GitHub confirmed the merge
+to `master` on 11 October 2026 at 22:16 UTC as
+`7beba35a2a90c98844231055a0fe628a5f3e8697`.
+
+Build step 1.3e6a ([PR #577](https://github.com/FSS-Ltd/pathway/pull/577),
+branch `feature/ace-family-child-navigation-web`) adds
+child context and switching to the guardian overview, attendance, sessions,
+and subject timetable web routes. The switcher derives current school and
+child links from the existing family-context API, filters each route to its
+released section, and excludes student identities and other schools. A
+failed navigation read does not disable an otherwise permitted page; direct
+page APIs continue to enforce their own access rules. This is a web slice of
+ACE-M18, not full M18 completion. The verified master-plan count remains
+**43/150 (28⅔%, 28.67%)**. PR, latest-head CI, and merge evidence are pending.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
