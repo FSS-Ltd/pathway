@@ -13,6 +13,7 @@ import {
 } from "./behaviour-entry.support";
 import type { BehaviourActor } from "./behaviour-command.service";
 import type { BehaviourListQuery } from "./dto/behaviour-entry.dto";
+import { currentReviewerKinds } from "./behaviour-review-access";
 
 const DEFAULT_LIST_LIMIT = 50;
 
@@ -59,6 +60,7 @@ export class BehaviourQueryService {
             }
           : {}),
         correction: { is: null },
+        retraction: { is: null },
       };
       const entries = (await tx.behaviourEntry.findMany({
         where,
@@ -67,7 +69,11 @@ export class BehaviourQueryService {
         select: behaviourEntryQuerySelect,
       })) as BehaviourEntryRecord[];
 
-      return { items: entries.map(toBehaviourEntryResponse) };
+      const reviewerKinds = await currentReviewerKinds(tx, actor, new Date());
+      return {
+        items: entries.map(toBehaviourEntryResponse),
+        canVoid: reviewerKinds.length > 0,
+      };
     });
   }
 

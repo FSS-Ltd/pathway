@@ -175,6 +175,12 @@ export class BehaviourCommandService {
               occurredAt: new Date(command.occurredAt),
               recordedByUserId: actor.userId,
               reason: command.reason.trim(),
+              correctionReason:
+                operation === "correct"
+                  ? "correctionReason" in command && command.correctionReason
+                    ? command.correctionReason.trim()
+                    : command.reason.trim()
+                  : null,
               note: command.note?.trim(),
               correctsBehaviourEntryId: predecessor?.id,
               clientCommandKeyHash,
@@ -334,11 +340,15 @@ export class BehaviourCommandService {
         occurredAt: true,
         categoryIsSerious: true,
         correction: { select: { id: true } },
+        retraction: { select: { id: true } },
       },
     });
     if (!predecessor) throw new NotFoundException("Behaviour entry not found");
     if (predecessor.correction) {
       throw new ConflictException("Behaviour entry is already superseded");
+    }
+    if (predecessor.retraction) {
+      throw new ConflictException("Behaviour entry is already retracted");
     }
     return {
       id: predecessor.id,

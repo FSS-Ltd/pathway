@@ -79,6 +79,7 @@ const SECTION_5_2_KEYS = [
   "ace.pace.diagnostics.manage",
   "ace.behaviour.read",
   "ace.behaviour.record",
+  "ace.behaviour.correct",
   "ace.behaviour.sensitive.read",
   "ace.behaviour.policy.manage",
   "ace.reports.read",
@@ -172,8 +173,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 115 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(115);
+  it("contains exactly the 116 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(116);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );

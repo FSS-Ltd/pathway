@@ -156,6 +156,8 @@ describe("DemeritStageService", () => {
         where: expect.objectContaining({
           tenantId: actor.tenantId,
           childId: "child-1",
+          correction: { is: null },
+          retraction: { is: null },
         }),
       }),
     );

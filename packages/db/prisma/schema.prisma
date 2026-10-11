@@ -208,6 +208,7 @@ enum AccessTagKey {
   AUDIT_VIEWER                @map("audit-viewer")
   SENSITIVE_NOTE_VIEWER       @map("sensitive-note-viewer")
   BEHAVIOUR_VIEWER            @map("behaviour-viewer")
+  BEHAVIOUR_CORRECTOR         @map("behaviour-corrector")
   STUDENT_DRILLTHROUGH_VIEWER @map("student-drillthrough-viewer")
   PACE_FULL_ACCESS            @map("pace-full-access")
   SUPERVISOR_ALL_STUDENTS     @map("supervisor-all-students")
@@ -930,6 +931,7 @@ model Tenant {
   pacePolicies           PacePolicy[]
   pacePolicyOverrides    PacePolicyOverride[]
   behaviourEntries       BehaviourEntry[]
+  behaviourRetractions    BehaviourEntryRetraction[]
   behaviourCategories    BehaviourCategory[]
   demeritPolicies        DemeritPolicy[]
   demeritStageOverrides  DemeritStageOverride[]
@@ -1130,6 +1132,7 @@ model User {
   createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
   authorisedPaceOverrides    PacePolicyOverride[]        @relation("PacePolicyOverrideAuthorisedBy")
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
+  retractedBehaviourEntries BehaviourEntryRetraction[]  @relation("BehaviourEntryRetractionRecordedBy")
   correctedAttendance       Attendance[]                 @relation("AttendanceCorrectedBy")
   attendanceCorrectionEvents AttendanceCorrectionEvent[] @relation("AttendanceCorrectionEventRecordedBy")
   aceDailyAttendanceRecorded AceDailyAttendance[] @relation("AceDailyAttendanceRecordedBy")
@@ -3349,12 +3352,14 @@ model BehaviourEntry {
   recordedByUserId         String
   recordedBy               User                @relation("BehaviourEntryRecordedBy", fields: [recordedByUserId], references: [id])
   reason                   String              @db.Text
+  correctionReason         String?             @db.Text
   note                     String?             @db.Text
   correctsBehaviourEntryId String?
   clientCommandKeyHash     String?
   commandFingerprint       String?
   correctsBehaviourEntry   BehaviourEntry?     @relation("BehaviourEntryCorrections", fields: [correctsBehaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict, map: "BehaviourEntry_correction_target_fkey")
   correction               BehaviourEntry?     @relation("BehaviourEntryCorrections")
+  retraction               BehaviourEntryRetraction?
   reviewRequests           BehaviourReviewRequest[]
   createdAt                DateTime            @default(now())
 
@@ -3365,6 +3370,26 @@ model BehaviourEntry {
   @@index([tenantId, childId, occurredAt])
   @@index([tenantId, type, occurredAt])
   @@index([tenantId, correctsBehaviourEntryId])
+}
+
+model BehaviourEntryRetraction {
+  id                 String         @id @default(uuid())
+  tenantId           String
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId            String
+  entryId            String
+  entry              BehaviourEntry @relation(fields: [entryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict)
+  reason             String         @db.Text
+  retractedByUserId  String
+  retractedBy        User           @relation("BehaviourEntryRetractionRecordedBy", fields: [retractedByUserId], references: [id], onDelete: Restrict)
+  clientCommandKeyHash String
+  commandFingerprint String
+  retractedAt        DateTime       @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([entryId, tenantId, childId])
+  @@unique([tenantId, clientCommandKeyHash])
+  @@index([tenantId, retractedAt, id])
 }
 
 model DemeritPolicy {

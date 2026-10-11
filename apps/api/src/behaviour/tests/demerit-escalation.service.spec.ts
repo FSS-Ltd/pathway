@@ -479,6 +479,7 @@ describe("DemeritEscalationService", () => {
         childId: "child-1",
         type: "DEMERIT",
         correction: { is: null },
+        retraction: { is: null },
         id: { not: "entry-1" },
         occurredAt: {
           gte: new Date("2026-07-13T23:00:00.000Z"),

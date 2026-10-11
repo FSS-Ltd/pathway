@@ -65,6 +65,7 @@ export class DemeritEscalationService {
         childId: input.entry.childId,
         type: "DEMERIT",
         correction: { is: null },
+        retraction: { is: null },
         id: { not: input.entry.id },
         occurredAt: { gte: window.start, lt: window.end },
       },

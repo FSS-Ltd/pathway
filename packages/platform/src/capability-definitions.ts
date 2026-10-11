@@ -549,7 +549,15 @@ export const CAPABILITY_DEFINITIONS = {
   ),
   "ace.behaviour.record": defineCapability(
     "Record behaviour",
-    "Create and correct behaviour facts",
+    "Create behaviour facts",
+    "site",
+    "sensitive",
+    true,
+    aceRequirement,
+  ),
+  "ace.behaviour.correct": defineCapability(
+    "Correct behaviour",
+    "Create linked corrections for behaviour facts",
     "site",
     "sensitive",
     true,

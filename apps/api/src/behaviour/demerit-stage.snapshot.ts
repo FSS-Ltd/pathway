@@ -34,6 +34,7 @@ export async function loadDemeritStageSnapshot(
         childId,
         type: "DEMERIT",
         correction: { is: null },
+        retraction: { is: null },
         occurredAt: { gte: window.start, lte: asOf },
       },
       select: { pointsDelta: true, categoryIsSerious: true, occurredAt: true },

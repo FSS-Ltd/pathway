@@ -19,10 +19,12 @@ import { BehaviourCommandService } from "./behaviour-command.service";
 import { BehaviourPolicyService } from "./behaviour-policy.service";
 import { BehaviourQueryService } from "./behaviour-query.service";
 import { BehaviourReviewService } from "./behaviour-review.service";
+import { BehaviourRetractionService } from "./behaviour-retraction.service";
 import { DemeritStageService } from "./demerit-stage.service";
 import {
   behaviourCorrectionSchema,
   behaviourListQuerySchema,
+  behaviourRetractionSchema,
   createBehaviourEntrySchema,
 } from "./dto/behaviour-entry.dto";
 import { updateBehaviourPolicySchema } from "./dto/behaviour-policy.dto";
@@ -46,6 +48,8 @@ export class BehaviourController {
     private readonly demeritStageService: DemeritStageService,
     @Inject(BehaviourReviewService)
     private readonly reviewService: BehaviourReviewService,
+    @Inject(BehaviourRetractionService)
+    private readonly retractionService: BehaviourRetractionService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
@@ -167,12 +171,29 @@ export class BehaviourController {
   }
 
   @Post(":id/corrections")
-  @RequirePermission("ace.behaviour.record")
+  @RequirePermission("ace.behaviour.correct")
   async correctEntry(@Param("id") id: string, @Body() body: unknown) {
     try {
       return await this.commandService.correct(
         id,
         await behaviourCorrectionSchema.parseAsync(body),
+        this.actor(),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(error.flatten());
+      }
+      throw error;
+    }
+  }
+
+  @Post(":id/retractions")
+  @RequirePermission("ace.behaviour.policy.manage")
+  async retractEntry(@Param("id") id: string, @Body() body: unknown) {
+    try {
+      return await this.retractionService.retract(
+        id,
+        await behaviourRetractionSchema.parseAsync(body),
         this.actor(),
       );
     } catch (error) {

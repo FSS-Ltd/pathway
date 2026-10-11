@@ -215,7 +215,12 @@ describe("BehaviourReviewService", () => {
       select: { childId: true, behaviourEntryId: true },
     });
     expect(tx.behaviourEntry.findFirst).toHaveBeenLastCalledWith({
-      where: { id: currentId, tenantId: actor.tenantId, childId: "child-1" },
+      where: {
+        id: currentId,
+        tenantId: actor.tenantId,
+        childId: "child-1",
+        retraction: { is: null },
+      },
       select: expect.objectContaining({ reason: true, note: true }),
     });
   });

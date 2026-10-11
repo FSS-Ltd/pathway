@@ -51,9 +51,17 @@ export const createBehaviourEntrySchema = z
   .superRefine(enforceTypeDelta);
 
 export const behaviourCorrectionSchema = z
-  .object(behaviourEntryFields)
+  .object({
+    ...behaviourEntryFields,
+    // Older mobile clients retain the original command shape.
+    correctionReason: reason.optional(),
+  })
   .strict()
   .superRefine(enforceTypeDelta);
+
+export const behaviourRetractionSchema = z
+  .object({ idempotencyKey, reason })
+  .strict();
 
 const listLimit = z
   .string()
@@ -88,4 +96,5 @@ export type CreateBehaviourEntryDto = z.infer<
   typeof createBehaviourEntrySchema
 >;
 export type BehaviourCorrectionDto = z.infer<typeof behaviourCorrectionSchema>;
+export type BehaviourRetractionDto = z.infer<typeof behaviourRetractionSchema>;
 export type BehaviourListQuery = z.infer<typeof behaviourListQuerySchema>;

@@ -64,6 +64,7 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R76: "migrated",
   R77: "migrated",
   R78: "migrated",
+  R79: "migrated",
 };
 
 for (let n = 15; n <= 68; n += 1) {
@@ -103,20 +104,76 @@ describe("access route matrix", () => {
   it("gives each migrated /access/* route its expected permission key", () => {
     const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
 
-    expect(byId.R01).toMatchObject({ method: "GET", path: "/access/roles", permission: "platform.access.roles.read" });
-    expect(byId.R02).toMatchObject({ method: "POST", path: "/access/roles", permission: "platform.access.roles.manage" });
-    expect(byId.R03).toMatchObject({ method: "GET", path: "/access/roles/:roleId", permission: "platform.access.roles.read" });
-    expect(byId.R04).toMatchObject({ method: "PATCH", path: "/access/roles/:roleId", permission: "platform.access.roles.manage" });
-    expect(byId.R05).toMatchObject({ method: "POST", path: "/access/roles/:roleId/clone", permission: "platform.access.roles.manage" });
-    expect(byId.R06).toMatchObject({ method: "PUT", path: "/access/roles/:roleId/permissions", permission: "platform.access.roles.manage" });
-    expect(byId.R07).toMatchObject({ method: "POST", path: "/access/roles/:roleId/retire", permission: "platform.access.roles.manage" });
-    expect(byId.R08).toMatchObject({ method: "GET", path: "/access/permissions", permission: "platform.access.permissions.read" });
-    expect(byId.R09).toMatchObject({ method: "GET", path: "/access/assignments", permission: "platform.access.assignments.read" });
-    expect(byId.R10).toMatchObject({ method: "POST", path: "/access/assignments", permission: "platform.access.assignments.manage" });
-    expect(byId.R11).toMatchObject({ method: "DELETE", path: "/access/assignments/:assignmentId", permission: "platform.access.assignments.manage" });
-    expect(byId.R12).toMatchObject({ method: "GET", path: "/access/users/:userId/effective-permissions", permission: "platform.access.users.read" });
-    expect(byId.R13).toMatchObject({ method: "GET", path: "/access/users/:userId/access-summary", permission: "platform.access.users.read" });
-    expect(byId.R14).toMatchObject({ method: "GET", path: "/access/audit", permission: "platform.access.audit.read" });
+    expect(byId.R01).toMatchObject({
+      method: "GET",
+      path: "/access/roles",
+      permission: "platform.access.roles.read",
+    });
+    expect(byId.R02).toMatchObject({
+      method: "POST",
+      path: "/access/roles",
+      permission: "platform.access.roles.manage",
+    });
+    expect(byId.R03).toMatchObject({
+      method: "GET",
+      path: "/access/roles/:roleId",
+      permission: "platform.access.roles.read",
+    });
+    expect(byId.R04).toMatchObject({
+      method: "PATCH",
+      path: "/access/roles/:roleId",
+      permission: "platform.access.roles.manage",
+    });
+    expect(byId.R05).toMatchObject({
+      method: "POST",
+      path: "/access/roles/:roleId/clone",
+      permission: "platform.access.roles.manage",
+    });
+    expect(byId.R06).toMatchObject({
+      method: "PUT",
+      path: "/access/roles/:roleId/permissions",
+      permission: "platform.access.roles.manage",
+    });
+    expect(byId.R07).toMatchObject({
+      method: "POST",
+      path: "/access/roles/:roleId/retire",
+      permission: "platform.access.roles.manage",
+    });
+    expect(byId.R08).toMatchObject({
+      method: "GET",
+      path: "/access/permissions",
+      permission: "platform.access.permissions.read",
+    });
+    expect(byId.R09).toMatchObject({
+      method: "GET",
+      path: "/access/assignments",
+      permission: "platform.access.assignments.read",
+    });
+    expect(byId.R10).toMatchObject({
+      method: "POST",
+      path: "/access/assignments",
+      permission: "platform.access.assignments.manage",
+    });
+    expect(byId.R11).toMatchObject({
+      method: "DELETE",
+      path: "/access/assignments/:assignmentId",
+      permission: "platform.access.assignments.manage",
+    });
+    expect(byId.R12).toMatchObject({
+      method: "GET",
+      path: "/access/users/:userId/effective-permissions",
+      permission: "platform.access.users.read",
+    });
+    expect(byId.R13).toMatchObject({
+      method: "GET",
+      path: "/access/users/:userId/access-summary",
+      permission: "platform.access.users.read",
+    });
+    expect(byId.R14).toMatchObject({
+      method: "GET",
+      path: "/access/audit",
+      permission: "platform.access.audit.read",
+    });
   });
 
   it("gives the behaviour routes their registered permission keys", () => {
@@ -135,7 +192,7 @@ describe("access route matrix", () => {
     expect(byId.R29).toMatchObject({
       method: "POST",
       path: "/ace/behaviour/:id/corrections",
-      permission: "ace.behaviour.record",
+      permission: "ace.behaviour.correct",
     });
     expect(byId.R30).toMatchObject({
       method: "GET",
@@ -163,17 +220,49 @@ describe("access route matrix", () => {
   it("gives core subject setup its ACE settings permissions", () => {
     const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
 
-    expect(byId.R71).toMatchObject({ method: "GET", path: "/ace/subjects", permission: "ace.settings.read" });
-    expect(byId.R72).toMatchObject({ method: "POST", path: "/ace/subjects", permission: "ace.settings.manage" });
-    expect(byId.R73).toMatchObject({ method: "PATCH", path: "/ace/subjects/:id", permission: "ace.settings.manage" });
-    expect(byId.R74).toMatchObject({ method: "POST", path: "/ace/subjects/:id/deactivate", permission: "ace.settings.manage" });
+    expect(byId.R71).toMatchObject({
+      method: "GET",
+      path: "/ace/subjects",
+      permission: "ace.settings.read",
+    });
+    expect(byId.R72).toMatchObject({
+      method: "POST",
+      path: "/ace/subjects",
+      permission: "ace.settings.manage",
+    });
+    expect(byId.R73).toMatchObject({
+      method: "PATCH",
+      path: "/ace/subjects/:id",
+      permission: "ace.settings.manage",
+    });
+    expect(byId.R74).toMatchObject({
+      method: "POST",
+      path: "/ace/subjects/:id/deactivate",
+      permission: "ace.settings.manage",
+    });
   });
 
   it("requires notice management for every ACE draft route", () => {
     const byId = Object.fromEntries(rows.map((row) => [row.id, row]));
-    expect(byId.R75).toMatchObject({ method: "POST", path: "/ace/notices/drafts", permission: "notices.manage" });
-    expect(byId.R76).toMatchObject({ method: "GET", path: "/ace/notices/drafts", permission: "notices.manage" });
-    expect(byId.R77).toMatchObject({ method: "GET", path: "/ace/notices/drafts/:id", permission: "notices.manage" });
-    expect(byId.R78).toMatchObject({ method: "PUT", path: "/ace/notices/drafts/:id", permission: "notices.manage" });
+    expect(byId.R75).toMatchObject({
+      method: "POST",
+      path: "/ace/notices/drafts",
+      permission: "notices.manage",
+    });
+    expect(byId.R76).toMatchObject({
+      method: "GET",
+      path: "/ace/notices/drafts",
+      permission: "notices.manage",
+    });
+    expect(byId.R77).toMatchObject({
+      method: "GET",
+      path: "/ace/notices/drafts/:id",
+      permission: "notices.manage",
+    });
+    expect(byId.R78).toMatchObject({
+      method: "PUT",
+      path: "/ace/notices/drafts/:id",
+      permission: "notices.manage",
+    });
   });
 });
