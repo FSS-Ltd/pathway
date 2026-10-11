@@ -423,7 +423,8 @@ latest-head checks passed on `ba40f7cf8f7cae60c490c81166b6519223ce2856`
 to `master` on 11 October 2026 at 22:16 UTC as
 `7beba35a2a90c98844231055a0fe628a5f3e8697`.
 
-Build step 1.3e6a (branch `feature/ace-family-child-navigation-web`) adds
+Build step 1.3e6a ([PR #577](https://github.com/FSS-Ltd/pathway/pull/577),
+branch `feature/ace-family-child-navigation-web`) adds
 child context and switching to the guardian overview, attendance, sessions,
 and subject timetable web routes. The switcher derives current school and
 child links from the existing family-context API, filters each route to its
