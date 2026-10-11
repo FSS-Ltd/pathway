@@ -19,11 +19,13 @@ signs in with the verified invited email and accepts it. An admin can list,
 resend after a fresh school-policy confirmation, revoke, or end access. The
 invitation and policy decisions are audited.
 
-**Product decision pending:** the ACE source matrix still marks the student
-identity ADR open. The current implementation assumption is per-student school
-approval rather than a fixed age threshold. If the product owner specifies a
-minimum age, the API must enforce that from the child's recorded birth date
-before this PR is merged. The UI confirmation alone is not an age check.
+**Product decision (11 October 2026):** the product owner approved school
+approval per student for web account invitations. There is no platform-wide
+minimum age in this step. The school must confirm that each account meets its
+age, consent, and safeguarding policy when creating an invitation and again
+when resending it. The API requires that confirmation, and the invitation audit
+records the acting admin. This decision resolves the web invitation rule; the
+broader student identity ADR remains open for later identity work.
 
 ## Data, access, and failure behavior
 
