@@ -195,7 +195,7 @@ async function main() {
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname IN ('app', 'public')
-        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AccessTagGrant', 'AuditEvent', 'OutboxEvent')
+        AND c.relname IN ('PermissionDefinition', 'OrgRoleDefinition', 'OrgRolePermission', 'OrgRoleRevision', 'UserRoleAssignment', 'AccessTagGrant', 'AccessTagExclusion', 'AuditEvent', 'OutboxEvent')
       ORDER BY c.relname, p.polname
     `),
     ]);

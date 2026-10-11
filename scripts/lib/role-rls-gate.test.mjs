@@ -14,6 +14,7 @@ const REQUIRED_TABLES = [
   "OrgRoleRevision",
   "UserRoleAssignment",
   "AccessTagGrant",
+  "AccessTagExclusion",
   "AuditEvent",
   "OutboxEvent",
 ];
@@ -73,6 +74,24 @@ const reviewedPolicies = [
   policy(
     "AccessTagGrant",
     "AccessTagGrant_rls_update",
+    reviewedRoleQualifier,
+    { command: "w" },
+  ),
+  policy(
+    "AccessTagExclusion",
+    "AccessTagExclusion_rls_select",
+    reviewedRoleQualifier,
+    { command: "r", check_qualifier: null },
+  ),
+  policy(
+    "AccessTagExclusion",
+    "AccessTagExclusion_rls_insert",
+    null,
+    { command: "a", check_qualifier: reviewedRoleQualifier },
+  ),
+  policy(
+    "AccessTagExclusion",
+    "AccessTagExclusion_rls_update",
     reviewedRoleQualifier,
     { command: "w" },
   ),
