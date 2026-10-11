@@ -36,9 +36,10 @@ record and staff can resend from the child profile.
 
 The CSV template comes from the current site roster so child IDs need not be
 typed. The browser checks each uploaded child name against that roster to
-catch spreadsheet row mismatches before any email is sent. The browser parses a strict UTF-8 CSV with headers
-`childId,target,email,reviewBasis,confirmed`; `confirmed` must be `yes` on
-each populated row. `reviewBasis` is required for guardians and blank for
+catch spreadsheet row mismatches before any email is sent. The browser parses
+a strict UTF-8 CSV with headers
+`childId,childName,target,email,reviewBasis,confirmed`; `confirmed` must be
+`yes` on each populated row. `reviewBasis` is required for guardians and blank for
 students. The preview shows count and validation errors before the send action.
 The file is handled in browser memory and is not stored. API responses avoid
 returning child or email data because the staff page already has the source
