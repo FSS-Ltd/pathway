@@ -11,6 +11,7 @@ import { UpdateChildDto } from "./dto/update-child.dto";
 import { getPlanDefinition } from "../billing/billing-plans";
 import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "../billing/subscription-plan-code";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
+import { readRegistrationSubmission } from "../public-signup/registration-submission";
 import { childPhotoKey } from "../common/storage/storage-key.util";
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB
@@ -74,6 +75,16 @@ export class ChildrenService {
       select: childSelect,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
+  }
+
+  async getRegistration(
+    id: string,
+    tenantId: string,
+    orgId: string,
+    userId: string,
+  ) {
+    await this.getById(id, tenantId);
+    return readRegistrationSubmission(tenantId, orgId, id, userId);
   }
 
   async getById(id: string, tenantId: string) {

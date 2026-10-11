@@ -20,10 +20,7 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
   ],
   ChildGuardianContact: ["fullName", "phone", "relationshipToChild"],
   EmergencyContact: ["name", "phone", "relationship"],
-  ParentSignupConsent: [
-    "consentingAdultName",
-    "consentingAdultRelationship",
-  ],
+  ParentSignupConsent: ["consentingAdultName", "consentingAdultRelationship"],
   Concern: ["summary", "details"],
   ChildNote: ["text"],
   BehaviourEntry: ["note"],
@@ -46,6 +43,7 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
  */
 const ENCRYPTED_JSON_FIELDS: Record<string, readonly string[]> = {
   PendingOrder: ["pendingOrgDetails"],
+  ChildRegistrationSubmission: ["payload"],
 };
 
 type JsonEnvelope = { __enc: string };
@@ -70,10 +68,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   );
 }
 
-function encryptDataObject(
-  model: string,
-  data: unknown,
-): unknown {
+function encryptDataObject(model: string, data: unknown): unknown {
   if (!isPlainObject(data)) return data;
 
   const stringFields = ENCRYPTED_STRING_FIELDS[model];
@@ -84,7 +79,11 @@ function encryptDataObject(
 
   for (const field of stringFields ?? []) {
     const value = next[field];
-    if (typeof value === "string" && value.length > 0 && !isEncryptedField(value)) {
+    if (
+      typeof value === "string" &&
+      value.length > 0 &&
+      !isEncryptedField(value)
+    ) {
       next[field] = encryptField(value);
     }
   }
@@ -92,7 +91,9 @@ function encryptDataObject(
   for (const field of jsonFields ?? []) {
     const value = next[field];
     if (value !== null && value !== undefined && !isJsonEnvelope(value)) {
-      next[field] = { __enc: encryptField(JSON.stringify(value)) } satisfies JsonEnvelope;
+      next[field] = {
+        __enc: encryptField(JSON.stringify(value)),
+      } satisfies JsonEnvelope;
     }
   }
 
@@ -173,9 +174,9 @@ export function withPiiEncryption<T extends PrismaClient>(client: T): T {
  * Wrap its model delegates instead so tenant-scoped transactions preserve the
  * same encryption-at-rest contract as the canonical Prisma client.
  */
-export function withPiiEncryptionTransaction<T extends Prisma.TransactionClient>(
-  client: T,
-): T {
+export function withPiiEncryptionTransaction<
+  T extends Prisma.TransactionClient,
+>(client: T): T {
   return new Proxy<T>(client, {
     get(target, property, receiver) {
       const value = Reflect.get(target, property, receiver);

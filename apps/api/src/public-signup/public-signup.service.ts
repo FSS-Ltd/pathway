@@ -20,6 +20,15 @@ import type { VerifiedPrincipal } from "../auth/token-verifier";
 import { getAuthProviderMode } from "../config/runtime-env";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { childPhotoKey } from "../common/storage/storage-key.util";
+import {
+  REGISTRATION_FORM_VERSION,
+  REGISTRATION_CONSENT_WORDING,
+  ACE_REGISTRATION_LEVELS,
+} from "./registration-form";
+import {
+  recordRegistrationSubmissions,
+  validateRegistrationSubmission,
+} from "./registration-submission";
 import type { PublicSignupConfigDto } from "./dto/public-signup-config.dto";
 import type {
   ChildSignupDto,
@@ -32,11 +41,7 @@ import type {
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-const FORM_VERSION = "1.0";
-const REQUIRED_CONSENTS = [
-  "data_processing",
-  "emergency_contact",
-];
+const REQUIRED_CONSENTS = ["data_processing", "emergency_contact"];
 
 type ResolvedLink = {
   id: string;
@@ -46,12 +51,22 @@ type ResolvedLink = {
   siteName: string;
   siteTimezone: string | null;
   parentPortalEnabled: boolean;
+  isAceSchool: boolean;
 };
 
 type CommonSignupPayload = {
   consents: { dataProcessingConsent: boolean; firstAidConsent?: boolean };
   emergencyContacts: EmergencyContactDto[];
   children: ChildSignupDto[];
+  formVersion?: string;
+  homeAddress?: string;
+  parent: {
+    fullName: string;
+    email: string;
+    phone?: string;
+    relationshipToChild?: string;
+  };
+  pickupContacts?: import("./dto/public-signup-submit.dto").PickupContactDto[];
 };
 
 @Injectable()
@@ -92,7 +107,13 @@ export class PublicSignupService {
       },
       include: {
         tenant: { select: { name: true, timezone: true } },
-        org: { select: { name: true, parentPortalEnabled: true } },
+        org: {
+          select: {
+            name: true,
+            parentPortalEnabled: true,
+            orgVertical: { select: { vertical: true } },
+          },
+        },
       },
     });
 
@@ -108,6 +129,7 @@ export class PublicSignupService {
       siteName: link.tenant.name,
       siteTimezone: link.tenant.timezone ?? null,
       parentPortalEnabled: link.org.parentPortalEnabled,
+      isAceSchool: link.org.orgVertical?.vertical === "ACE_SCHOOL",
     };
   }
 
@@ -119,7 +141,11 @@ export class PublicSignupService {
       siteTimezone: link.siteTimezone,
       parentPortalEnabled: link.parentPortalEnabled,
       requiredConsents: REQUIRED_CONSENTS,
-      formVersion: FORM_VERSION,
+      formVersion: REGISTRATION_FORM_VERSION,
+      consentWording: REGISTRATION_CONSENT_WORDING,
+      ...(link.isAceSchool
+        ? { aceRegistrationLevels: ACE_REGISTRATION_LEVELS }
+        : {}),
     };
   }
 
@@ -317,10 +343,12 @@ export class PublicSignupService {
     const link = await this.resolveLink(dto.token);
     this.assertParentPortalEnabled(link);
 
-    this.assertCommonSignupRequirements(dto);
+    this.assertCommonSignupRequirements(dto, link.isAceSchool);
 
     if (!principal.email || !principal.emailVerified) {
-      throw new BadRequestException("Please verify your email before continuing.");
+      throw new BadRequestException(
+        "Please verify your email before continuing.",
+      );
     }
     const email = principal.email.trim().toLowerCase();
 
@@ -385,6 +413,14 @@ export class PublicSignupService {
           dto.parent.relationshipToChild?.trim() || null,
       },
     });
+    await recordRegistrationSubmissions(
+      link.tenantId,
+      link.orgId,
+      childIds,
+      dto,
+      link.isAceSchool,
+      now,
+    );
     await this.createGuardianAccessForNewChildren(
       link.tenantId,
       link.orgId,
@@ -423,7 +459,7 @@ export class PublicSignupService {
     const link = await this.resolveLink(dto.token);
     this.assertParentPortalEnabled(link);
 
-    this.assertCommonSignupRequirements(dto);
+    this.assertCommonSignupRequirements(dto, link.isAceSchool);
 
     const email = dto.parent.email.trim().toLowerCase();
     const fullName = dto.parent.fullName.trim();
@@ -517,6 +553,14 @@ export class PublicSignupService {
           dto.parent.relationshipToChild?.trim() || null,
       },
     });
+    await recordRegistrationSubmissions(
+      link.tenantId,
+      link.orgId,
+      childIds,
+      dto,
+      link.isAceSchool,
+      now,
+    );
     await this.createGuardianAccessForNewChildren(
       link.tenantId,
       link.orgId,
@@ -558,7 +602,7 @@ export class PublicSignupService {
       );
     }
 
-    this.assertCommonSignupRequirements(dto);
+    this.assertCommonSignupRequirements(dto, link.isAceSchool);
 
     const now = new Date();
     const childIds: string[] = [];
@@ -598,6 +642,15 @@ export class PublicSignupService {
     await prisma.childGuardianContact.createMany({
       data: contactRows,
     });
+
+    await recordRegistrationSubmissions(
+      link.tenantId,
+      link.orgId,
+      childIds,
+      dto,
+      link.isAceSchool,
+      now,
+    );
 
     await prisma.publicSignupLink.update({
       where: { id: link.id },
@@ -642,7 +695,11 @@ export class PublicSignupService {
     });
   }
 
-  private assertCommonSignupRequirements(dto: CommonSignupPayload): void {
+  private assertCommonSignupRequirements(
+    dto: CommonSignupPayload,
+    isAceSchool: boolean,
+  ): void {
+    validateRegistrationSubmission(dto, isAceSchool);
     if (!dto.consents.dataProcessingConsent) {
       throw new BadRequestException("Data processing consent is required");
     }

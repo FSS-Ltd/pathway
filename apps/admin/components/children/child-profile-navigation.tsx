@@ -5,13 +5,16 @@ const sections = [
   { id: "overview", label: "Overview" },
   { id: "details", label: "Details" },
   { id: "guardians", label: "Contacts" },
+  { id: "registration", label: "Registration" },
   { id: "attendance", label: "Attendance" },
 ] as const;
 
 export function ChildProfileNavigation({
   showAttendance,
+  showRegistration = false,
 }: {
   showAttendance: boolean;
+  showRegistration?: boolean;
 }) {
   return (
     <Card className="p-2">
@@ -20,7 +23,11 @@ export function ChildProfileNavigation({
         className="flex flex-wrap gap-1 sm:flex-nowrap"
       >
         {sections
-          .filter(({ id }) => id !== "attendance" || showAttendance)
+          .filter(
+            ({ id }) =>
+              (id !== "attendance" || showAttendance) &&
+              (id !== "registration" || showRegistration),
+          )
           .map(({ id, label }) => (
             <a
               key={id}

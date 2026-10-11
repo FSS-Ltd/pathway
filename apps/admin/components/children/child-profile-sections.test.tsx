@@ -5,15 +5,17 @@ import { ChildProfileNavigation } from "./child-profile-navigation";
 import { ChildGuardianSection } from "./child-guardian-section";
 
 const staffNavigation = renderToStaticMarkup(
-  <ChildProfileNavigation showAttendance />,
+  <ChildProfileNavigation showAttendance showRegistration />,
 );
 assert.match(staffNavigation, /href="#attendance"/);
+assert.match(staffNavigation, /href="#registration"/);
 assert.match(staffNavigation, /aria-label="Profile sections"/);
 
 const limitedNavigation = renderToStaticMarkup(
   <ChildProfileNavigation showAttendance={false} />,
 );
 assert.doesNotMatch(limitedNavigation, /href="#attendance"/);
+assert.doesNotMatch(limitedNavigation, /href="#registration"/);
 assert.match(limitedNavigation, /href="#guardians"/);
 
 const emptyContacts = renderToStaticMarkup(

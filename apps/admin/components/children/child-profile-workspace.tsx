@@ -21,6 +21,7 @@ import { ChildProfileOverview } from "./child-profile-overview";
 import { ChildDetailsEditor } from "./child-details-editor";
 import { ChildGuardianSection } from "./child-guardian-section";
 import { ChildAttendanceSection } from "./child-attendance-section";
+import { ChildRegistrationSection } from "./child-registration-section";
 import { useChildProfile } from "./use-child-profile";
 
 const PERSON_LABEL: Record<OrgUiKey, string> = {
@@ -56,6 +57,8 @@ export function ChildProfileWorkspace({ childId }: { childId: string }) {
     );
   const canInviteParent = role?.isOrgAdmin ?? false;
   const canViewAttendance = permissions?.includes("attendance.read") ?? isAdmin;
+  const canViewRegistration =
+    !isLoadingAccess && (isAdmin || role.isRegistrationStaff === true);
   const canInviteStudent =
     canInviteParent &&
     orgKey === "ACE_SCHOOL" &&
@@ -145,7 +148,10 @@ export function ChildProfileWorkspace({ childId }: { childId: string }) {
               Identity, care, contacts and attendance in one place.
             </p>
           </header>
-          <ChildProfileNavigation showAttendance={canViewAttendance} />
+          <ChildProfileNavigation
+            showAttendance={canViewAttendance}
+            showRegistration={canViewRegistration}
+          />
           {profile.error ? (
             <p
               role="alert"
@@ -193,6 +199,12 @@ export function ChildProfileWorkspace({ childId }: { childId: string }) {
               </>
             }
           />
+          {canViewRegistration ? (
+            <ChildRegistrationSection
+              childId={childId}
+              isAceSchool={orgKey === "ACE_SCHOOL"}
+            />
+          ) : null}
           {canViewAttendance ? (
             <ChildAttendanceSection childId={childId} canExport={isAdmin} />
           ) : null}
