@@ -119,38 +119,44 @@ export default function AcademicCalendarPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-4">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-text-primary">
-          Academic setup
-        </h1>
-        <p className="text-sm text-text-muted">
-          Set the academic year, subjects, and PACE assessment rules for the
-          active site.
-        </p>
-      </div>
-      <AcademicCalendarForm
-        key={siteRevision}
-        isLoading={isLoading}
-        academicYears={calendar?.academicYears ?? []}
-        isSaving={isSaving}
-        error={error}
-        success={success}
-        canManage={canManage}
-        timezone={calendar?.timezone ?? null}
-        onSave={save}
-      />
-      {canManage ? (
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
+          <h1 className="font-heading text-2xl font-semibold text-text-primary">
+            Academic setup
+          </h1>
+          <p className="text-sm text-text-muted">
+            Set the academic year, subjects, and PACE assessment rules for the
+            active site.
+          </p>
+        </div>
+        {canManage ? (
           <Button asChild variant="outline" className="min-h-11">
             <Link href="/ace/settings/academic/timetable">
               Build subject timetable
             </Link>
           </Button>
+        ) : null}
+      </div>
+      <div className="grid min-w-0 gap-4 2xl:grid-cols-2">
+        <div className="min-w-0">
+          <AcademicCalendarForm
+            key={siteRevision}
+            isLoading={isLoading}
+            academicYears={calendar?.academicYears ?? []}
+            isSaving={isSaving}
+            error={error}
+            success={success}
+            canManage={canManage}
+            timezone={calendar?.timezone ?? null}
+            onSave={save}
+          />
         </div>
-      ) : null}
-      <SubjectSettings canManage={canManage} />
-      <PacePolicySettings canManage={canManage} />
+        <div className="min-w-0 space-y-4">
+          <SubjectSettings canManage={canManage} />
+          <PacePolicySettings canManage={canManage} />
+        </div>
+      </div>
     </div>
   );
 }
