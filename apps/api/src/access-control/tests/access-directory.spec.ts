@@ -15,6 +15,7 @@ describe("access directory", () => {
           email: "a@example.com",
           isActive: true,
           superUser: false,
+          hasFamilyAccess: false,
         },
         role: "STAFF",
       },
@@ -27,14 +28,19 @@ describe("access directory", () => {
           email: "b@example.com",
           isActive: true,
           superUser: false,
+          hasFamilyAccess: false,
         },
         role: "STAFF",
       },
     ]);
+    const findAssignments = jest
+      .fn()
+      .mockResolvedValue([{ userId: "a", roleDefinitionId: "role-1" }]);
     const transaction: RolesTransactionBoundary = {
       run: async (_actor, operation) =>
         operation({
           orgMembership: { findMany },
+          userRoleAssignment: { findMany: findAssignments },
         } as unknown as Prisma.TransactionClient),
     };
     const effective = {} as EffectivePermissionsService;
@@ -50,7 +56,9 @@ describe("access directory", () => {
       { limit: 1 },
     );
     expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.roleDefinitionIds).toEqual(["role-1"]);
     expect(result.nextCursor).toBe("a");
     expect(findMany).toHaveBeenCalledWith(expect.objectContaining({ take: 2 }));
+    expect(findAssignments).toHaveBeenCalledTimes(1);
   });
 });

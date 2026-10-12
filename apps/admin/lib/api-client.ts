@@ -7306,7 +7306,7 @@ export type AdminAccessAuditEvent = {
   createdAt: string;
   tenantId: string | null;
   actorUserId: string;
-  entityType: "ORG_ROLE" | "ROLE_ASSIGNMENT";
+  entityType: "ORG_ROLE" | "ROLE_ASSIGNMENT" | "ACCESS_TAG_GRANT";
   entityId: string | null;
   action: string;
   metadata: unknown;
@@ -7452,7 +7452,7 @@ export async function fetchAccessSummary(
 export async function fetchAccessAuditEvents(params?: {
   cursor?: string;
   limit?: number;
-  entityType?: "ORG_ROLE" | "ROLE_ASSIGNMENT";
+  entityType?: "ORG_ROLE" | "ROLE_ASSIGNMENT" | "ACCESS_TAG_GRANT";
 }): Promise<{ items: AdminAccessAuditEvent[]; nextCursor: string | null }> {
   const query = new URLSearchParams();
   if (params?.cursor) query.set("cursor", params.cursor);

@@ -4,16 +4,14 @@ import { Badge, Card, DataTable, type ColumnDef } from "@pathway/ui";
 import {
   fetchAccessAuditEvents,
   type AdminAccessAuditEvent,
-  type PersonRow,
 } from "@/lib/api-client";
 import { formatAuditTimestamp } from "@/lib/roles";
 import { useCursorPage } from "./use-cursor-page";
 
-export type AuditLogPanelProps = {
-  people: PersonRow[];
-};
+type AuditPerson = { id: string; name: string | null };
+export type AuditLogPanelProps = { people: AuditPerson[] };
 
-function actorLabel(people: PersonRow[], actorUserId: string): string {
+function actorLabel(people: AuditPerson[], actorUserId: string): string {
   return people.find((p) => p.id === actorUserId)?.name ?? actorUserId;
 }
 
@@ -23,6 +21,19 @@ function actionLabel(action: string): string {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function changeDetail(metadata: unknown): string {
+  if (!metadata || typeof metadata !== "object") return "—";
+  const values = [
+    "tagKey" in metadata ? metadata.tagKey : null,
+    "state" in metadata ? metadata.state : null,
+    "scope" in metadata ? metadata.scope : null,
+  ];
+  const parts = values.flatMap((value) =>
+    typeof value === "string" ? [value.replaceAll("-", " ")] : [],
+  );
+  return parts.join(" · ") || "—";
 }
 
 export function AuditLogPanel({ people }: AuditLogPanelProps) {
@@ -56,7 +67,11 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
       header: "Type",
       cell: (row) => (
         <Badge variant={row.entityType === "ORG_ROLE" ? "accent" : "default"}>
-          {row.entityType === "ORG_ROLE" ? "Role" : "Assignment"}
+          {row.entityType === "ORG_ROLE"
+            ? "Role"
+            : row.entityType === "ACCESS_TAG_GRANT"
+              ? "Badge"
+              : "Assignment"}
         </Badge>
       ),
       width: "110px",
@@ -71,6 +86,16 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
         </span>
       ),
       width: "160px",
+      priority: "secondary",
+    },
+    {
+      id: "detail",
+      header: "Change",
+      cell: (row) => (
+        <span className="text-xs text-text-muted">
+          {changeDetail(row.metadata)}
+        </span>
+      ),
       priority: "secondary",
     },
   ];

@@ -16,6 +16,7 @@ export type ColumnDef<TRow> = {
   width?: string;
   align?: "left" | "center" | "right";
   priority?: "primary" | "secondary";
+  showInDetails?: boolean;
   sortValue?: (row: TRow) => SortValue;
 };
 
@@ -125,7 +126,8 @@ export function DataTable<TRow>({
       ? orderedRows.slice(page * pageSize, (page + 1) * pageSize)
       : orderedRows;
   const secondaryColumns = columns.filter(
-    (column) => column.priority === "secondary",
+    (column) =>
+      column.priority === "secondary" && column.showInDetails !== false,
   );
   const columnCount =
     columns.length +

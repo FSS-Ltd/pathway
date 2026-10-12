@@ -153,13 +153,44 @@ export class AccessUsersService {
               email: true,
               isActive: true,
               superUser: true,
+              hasFamilyAccess: true,
             },
           },
         },
       });
-      const items = rows
-        .slice(0, limit)
-        .map(({ user, role }) => ({ ...user, orgRole: role }));
+      const visibleRows = rows.slice(0, limit);
+      const assignments = visibleRows.length
+        ? await tx.userRoleAssignment.findMany({
+            where: {
+              orgId: actor.orgId,
+              userId: { in: visibleRows.map(({ userId }) => userId) },
+              revokedAt: null,
+              startsAt: { lte: now },
+              AND: [
+                { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+                {
+                  OR: [
+                    { tenantId: null },
+                    ...(actor.tenantId ? [{ tenantId: actor.tenantId }] : []),
+                  ],
+                },
+              ],
+              roleDefinition: { isActive: true },
+            },
+            select: { userId: true, roleDefinitionId: true },
+          })
+        : [];
+      const roleIdsByUser = new Map<string, string[]>();
+      for (const assignment of assignments) {
+        const ids = roleIdsByUser.get(assignment.userId) ?? [];
+        ids.push(assignment.roleDefinitionId);
+        roleIdsByUser.set(assignment.userId, ids);
+      }
+      const items = visibleRows.map(({ user, role }) => ({
+        ...user,
+        orgRole: role,
+        roleDefinitionIds: roleIdsByUser.get(user.id) ?? [],
+      }));
       return {
         items,
         nextCursor:
