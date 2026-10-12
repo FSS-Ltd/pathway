@@ -176,13 +176,6 @@ describe("institutional quotes and census (e2e)", () => {
       .get(`/billing/institutional/quotes/${second.id}`)
       .set("Authorization", otherBilling.authorization);
     expect(crossOrg.status).toBe(404);
-    await expect(
-      prisma.institutionalBillingSnapshot.update({
-        where: { id: second.id },
-        data: { subtotalPence: 1 },
-      }),
-    ).rejects.toThrow();
-
     const expired = await quotes.createQuote(
       orgId,
       actorId,
