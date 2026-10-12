@@ -26,7 +26,7 @@ export function StaffMessagingWorkspace({
   const selectedChannel = familyMessagingEnabled ? channel : "staff";
 
   return (
-    <main className="mx-auto flex min-w-0 max-w-7xl flex-col gap-5">
+    <main className="flex min-w-0 flex-col gap-5">
       <header className="space-y-1">
         <p className="text-sm font-medium text-accent-strong">
           ACE / Community

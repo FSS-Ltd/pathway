@@ -18,7 +18,7 @@ export function AceOverview({
   onRetry,
 }: AceOverviewProps) {
   return (
-    <main className="mx-auto flex min-w-0 max-w-6xl flex-col gap-4">
+    <main className="flex min-w-0 flex-col gap-4">
       <header className="min-w-0">
         <h1 className="font-heading text-2xl font-semibold text-text-primary">
           ACE overview

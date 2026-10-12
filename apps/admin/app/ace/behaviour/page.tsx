@@ -128,7 +128,7 @@ export default function BehaviourPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[90rem] space-y-5 pb-8">
+    <div className="min-w-0 space-y-5 pb-8">
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border-subtle pb-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">

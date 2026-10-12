@@ -173,7 +173,7 @@ function HeadTimetableWorkspaceView() {
   const selectedChild = roster?.items.find((child) => child.id === childId);
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6">
+    <main className="min-w-0 space-y-6">
       <header className="space-y-2">
         <p className="text-sm font-semibold text-text-muted">
           ACE / Academic setup

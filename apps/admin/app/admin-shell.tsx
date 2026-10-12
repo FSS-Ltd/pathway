@@ -331,13 +331,8 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
             }
             rightSlot={<TopBarActions />}
           />
-          <main className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
-            <div
-              className={cn(
-                "mx-auto w-full space-y-4",
-                pathname === "/sessions" ? "max-w-[90rem]" : "max-w-5xl",
-              )}
-            >
+          <main className="min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
+            <div className="mx-auto w-full max-w-[100rem] min-w-0 space-y-4">
               {showMockBanner && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
                   Running in mock API mode - some data is sample only.

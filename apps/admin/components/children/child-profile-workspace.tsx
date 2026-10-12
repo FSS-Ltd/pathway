@@ -40,7 +40,7 @@ export function ChildProfileWorkspace({ childId }: { childId: string }) {
     : "details";
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 pb-10">
+    <div className="flex w-full min-w-0 flex-col gap-5 pb-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="secondary" size="sm">
           <Link
