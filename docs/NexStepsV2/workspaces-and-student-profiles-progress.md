@@ -23,9 +23,10 @@ of authenticated views is blocked by Clerk's external sign-in handshake in
 this isolated checkout; no live sign-in was attempted.
 
 The user identified the Academic setup page's remaining `max-w-4xl` wrapper
-after step 1 merged. A focused follow-up from the merged `master` removes that
-constraint and arranges its settings in a responsive grid. Its PR and merge
-evidence will be recorded here before step 2 begins.
+after step 1 merged. [Follow-up PR #602](https://github.com/FSS-Ltd/pathway/pull/602)
+starts from the merged `master`, removes that constraint, and arranges its
+settings in a responsive grid. CI, authenticated visual review, and merge
+remain pending before step 2 begins.
 
 Behaviour, merits, demerits, discipline and PACE remain ACE-only. Academic
 results appear only from supported data sources. Finance and merit-wallet
