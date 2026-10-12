@@ -21,9 +21,10 @@ describe("Learning capability guard chain (e2e)", () => {
   const orgId = process.env.E2E_ORG_ID as string;
   const tenantId = process.env.E2E_TENANT_ID as string;
   const activeUserId = randomUUID();
-  const inactiveUserId = randomUUID();
+  const coreUserId = randomUUID();
   const noOrgUserId = randomUUID();
   const activeSubject = `learning-capability-${randomUUID()}`;
+  const coreSubject = `learning-core-${randomUUID()}`;
   let app: INestApplication | undefined;
   let originalLearningModule: Awaited<
     ReturnType<typeof prisma.orgModule.findUnique>
@@ -33,7 +34,7 @@ describe("Learning capability guard chain (e2e)", () => {
     if (!requireDatabase()) return;
 
     await withTenantRlsContext(tenantId, orgId, async (tx) => {
-      for (const userId of [activeUserId, inactiveUserId]) {
+      for (const userId of [activeUserId, coreUserId]) {
         await tx.user.create({
           data: {
             id: userId,
@@ -83,15 +84,17 @@ describe("Learning capability guard chain (e2e)", () => {
   afterAll(async () => {
     if (requireDatabase()) {
       await withTenantRlsContext(tenantId, orgId, async (tx) => {
-        await tx.subject.deleteMany({ where: { name: activeSubject } });
+        await tx.subject.deleteMany({
+          where: { name: { in: [activeSubject, coreSubject] } },
+        });
         await tx.userIdentity.deleteMany({
-          where: { userId: { in: [activeUserId, inactiveUserId, noOrgUserId] } },
+          where: { userId: { in: [activeUserId, coreUserId, noOrgUserId] } },
         });
         await tx.siteMembership.deleteMany({
-          where: { userId: { in: [activeUserId, inactiveUserId] } },
+          where: { userId: { in: [activeUserId, coreUserId] } },
         });
         await tx.user.deleteMany({
-          where: { id: { in: [activeUserId, inactiveUserId, noOrgUserId] } },
+          where: { id: { in: [activeUserId, coreUserId, noOrgUserId] } },
         });
       }).catch(() => undefined);
       if (originalLearningModule) {
@@ -125,7 +128,7 @@ describe("Learning capability guard chain (e2e)", () => {
     expect(response.body).toMatchObject({ name: activeSubject, tenantId });
   });
 
-  it("rejects the same route when Learning is inactive", async () => {
+  it("keeps Learning available without an optional module grant", async () => {
     if (!app) return;
     await prisma.orgModule.update({
       where: { orgId_module: { orgId, module: Module.LEARNING } },
@@ -134,11 +137,11 @@ describe("Learning capability guard chain (e2e)", () => {
 
     const response = await request(app.getHttpServer())
       .post("/learning/subjects")
-      .set("Authorization", await bearer(inactiveUserId))
-      .send({ name: "Blocked subject" });
+      .set("Authorization", await bearer(coreUserId))
+      .send({ name: coreSubject });
 
-    expect(response.status).toBe(403);
-    expect(response.body.message).toBe("Missing capability: learning.log.write");
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({ name: coreSubject, tenantId });
   });
 
   it("rejects a request with no active organisation", async () => {
