@@ -116,6 +116,22 @@ enum PendingOrderStatus {
   CANCELLED
 }
 
+enum InstitutionalSnapshotKind {
+  QUOTE
+  CENSUS
+}
+
+enum InstitutionalSnapshotStatus {
+  PRICED
+  CONTACT_SALES
+  REVIEW_REQUIRED
+}
+
+enum InstitutionalCountSource {
+  DECLARED
+  VERIFIED
+}
+
 enum AuditAction {
   CREATED
   UPDATED
@@ -144,6 +160,8 @@ enum AuditEntityType {
   ACE_RECORD
   ENROLMENT
   ENROLMENT_ROLL
+  BILLING_QUOTE
+  BILLING_CENSUS
 }
 
 enum OutboxStatus {
@@ -942,6 +960,9 @@ model Org {
   moduleChanges       ModuleChange[]
   childIdentities     OrgChildIdentity[]
   rollConfirmations   EnrolmentRollConfirmation[]
+  institutionalBillingPolicy InstitutionalBillingPolicy?
+  institutionalBillingSnapshots InstitutionalBillingSnapshot[]
+  institutionalQuoteAcceptances InstitutionalQuoteAcceptance[]
   roleDefinitions     OrgRoleDefinition[]
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
@@ -1176,6 +1197,8 @@ model User {
   auditEvents                       AuditEvent[]                @relation("AuditActor")
   enrolmentRevisions                EnrolmentRevision[]         @relation("EnrolmentRevisionActor")
   rollConfirmations                 EnrolmentRollConfirmation[] @relation("EnrolmentRollConfirmer")
+  institutionalDeclarations        InstitutionalBillingPolicy[] @relation("InstitutionalDeclarationActor")
+  institutionalQuoteAcceptances    InstitutionalQuoteAcceptance[] @relation("InstitutionalQuoteAcceptanceActor")
   swapRequestsFrom                  SwapRequest[]               @relation("SwapFromUser")
   swapRequestsTo                    SwapRequest[]               @relation("SwapToUser")
   orgRoles                          UserOrgRole[]
@@ -1761,7 +1784,9 @@ model EnrolmentRollConfirmation {
   confirmedAt     DateTime @default(now())
   org             Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
   confirmer       User     @relation("EnrolmentRollConfirmer", fields: [confirmerUserId], references: [id], onDelete: Restrict)
+  billingSnapshots InstitutionalBillingSnapshot[]
 
+  @@unique([id, orgId])
   @@index([orgId, confirmedAt])
   @@index([orgId, effectiveOn])
 }
@@ -3891,10 +3916,16 @@ model Subscription {
   cancelAtPeriodEnd Boolean            @default(false)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+  currentInstitutionalSnapshotId String?
+  nextInstitutionalSnapshotId String?
+  currentInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalCurrentSubscription", fields: [currentInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  nextInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalNextSubscription", fields: [nextInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  institutionalSnapshots InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSubscription")
 
   @@index([orgId])
   @@index([status])
   @@index([planCode])
+  @@unique([id, orgId])
 }
 
 model OrgEntitlementSnapshot {
@@ -3966,6 +3997,8 @@ model PendingOrder {
   createdAt              DateTime           @default(now())
   completedAt            DateTime?
   updatedAt              DateTime           @updatedAt
+  institutionalSnapshotId String?
+  institutionalSnapshot InstitutionalBillingSnapshot? @relation(fields: [institutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
 
   // For public checkout: store org/user details until payment confirmed.
   // Encrypted as a whole (may carry a plaintext password transiently) — see
@@ -3974,6 +4007,83 @@ model PendingOrder {
 
   @@index([tenantId, orgId, provider, providerCheckoutId])
   @@index([provider, providerSubscriptionId])
+}
+
+model InstitutionalBillingPolicy {
+  id                String   @id @default(uuid())
+  orgId             String   @unique
+  pricingVersion    String
+  timezone          String
+  declaredChildren  Int?
+  declaredAt        DateTime?
+  declaredByUserId  String?
+  reviewReason      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  org               Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  declarationActor  User?    @relation("InstitutionalDeclarationActor", fields: [declaredByUserId], references: [id], onDelete: Restrict)
+  snapshots         InstitutionalBillingSnapshot[]
+
+  @@unique([id, orgId])
+  @@index([reviewReason])
+}
+
+model InstitutionalBillingSnapshot {
+  id                    String   @id @default(uuid())
+  orgId                 String
+  policyId              String
+  subscriptionId        String?
+  kind                  InstitutionalSnapshotKind
+  status                InstitutionalSnapshotStatus
+  planCode              String
+  pricingVersion        String
+  countSource           InstitutionalCountSource?
+  enrolledChildren      Int?
+  includedChildren      Int?
+  includedModules       Module[] @default([])
+  paidModules           Module[] @default([])
+  lines                 Json?
+  subtotalPence         Int?
+  sourceConfirmationId  String?
+  sourceRevisionCutoff  DateTime?
+  censusCutoffAt        DateTime?
+  effectiveAt           DateTime?
+  expiresAt             DateTime?
+  supersedesId          String?
+  createdAt             DateTime @default(now())
+  org                   Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  policy                InstitutionalBillingPolicy @relation(fields: [policyId, orgId], references: [id, orgId], onDelete: Restrict)
+  subscription          Subscription? @relation("InstitutionalSnapshotSubscription", fields: [subscriptionId, orgId], references: [id, orgId], onDelete: Restrict)
+  sourceConfirmation    EnrolmentRollConfirmation? @relation(fields: [sourceConfirmationId, orgId], references: [id, orgId], onDelete: Restrict)
+  supersedes            InstitutionalBillingSnapshot? @relation("InstitutionalSnapshotSupersession", fields: [supersedesId, orgId], references: [id, orgId], onDelete: Restrict)
+  supersededBy          InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSupersession")
+  acceptance            InstitutionalQuoteAcceptance?
+  pendingOrders         PendingOrder[]
+  currentSubscriptions  Subscription[] @relation("InstitutionalCurrentSubscription")
+  nextSubscriptions     Subscription[] @relation("InstitutionalNextSubscription")
+
+  @@index([orgId, kind, createdAt])
+  @@index([orgId, effectiveAt])
+  @@index([policyId, createdAt])
+  @@index([subscriptionId, kind, createdAt])
+  @@unique([subscriptionId, kind, effectiveAt], map: "InstitutionalCensus_subscription_kind_effective_key")
+  @@unique([id, orgId])
+}
+
+model InstitutionalQuoteAcceptance {
+  id             String   @id @default(uuid())
+  orgId          String
+  snapshotId     String   @unique
+  actorUserId    String
+  idempotencyKey String
+  acceptedAt     DateTime @default(now())
+  org            Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  snapshot       InstitutionalBillingSnapshot @relation(fields: [snapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  actor          User     @relation("InstitutionalQuoteAcceptanceActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([orgId, idempotencyKey])
+  @@unique([snapshotId, orgId])
+  @@index([orgId, acceptedAt])
 }
 
 model OrgRetentionPolicy {
