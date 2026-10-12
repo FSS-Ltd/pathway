@@ -25,6 +25,12 @@ enum AssignmentStatus {
   DECLINED
 }
 
+enum SessionRotaKind {
+  STANDARD
+  COVER
+  MEETING
+}
+
 enum PermissionSlipChangeClassification {
   INITIAL
   MATERIAL
@@ -90,6 +96,12 @@ enum BillingProvider {
   GOCARDLESS
 }
 
+enum BillingEventProcessingStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 enum SubscriptionStatus {
   TRIALING
   ACTIVE
@@ -102,6 +114,36 @@ enum PendingOrderStatus {
   PENDING
   COMPLETED
   CANCELLED
+}
+
+enum InstitutionalSnapshotKind {
+  QUOTE
+  CENSUS
+}
+
+enum InstitutionalSnapshotStatus {
+  PRICED
+  CONTACT_SALES
+  REVIEW_REQUIRED
+}
+
+enum InstitutionalCountSource {
+  DECLARED
+  VERIFIED
+}
+
+enum InstitutionalBillingOperationKind {
+  CENSUS_FREEZE
+  RENEWAL_RECONCILE
+  PROVIDER_SCHEDULE
+}
+
+enum InstitutionalBillingOperationStatus {
+  PENDING
+  CLAIMED
+  RETRY
+  COMPLETED
+  REVIEW_REQUIRED
 }
 
 enum AuditAction {
@@ -130,6 +172,10 @@ enum AuditEntityType {
   ACE_MESSAGE
   ACE_NOTICE
   ACE_RECORD
+  ENROLMENT
+  ENROLMENT_ROLL
+  BILLING_QUOTE
+  BILLING_CENSUS
 }
 
 enum OutboxStatus {
@@ -192,6 +238,20 @@ enum ModuleStatus {
   CANCELLED
 }
 
+enum ModuleGrantSource {
+  PLAN
+  PAID_ADDON
+  MANUAL
+}
+
+enum ModuleChangeStatus {
+  PREVIEW
+  ACCEPTED
+  SCHEDULED
+  APPLIED
+  REVIEW_REQUIRED
+}
+
 enum AccessTagKey {
   SHOPKEEPER                  @map("shopkeeper")
   SHOPADMIN                   @map("shopadmin")
@@ -202,6 +262,7 @@ enum AccessTagKey {
   AUDIT_VIEWER                @map("audit-viewer")
   SENSITIVE_NOTE_VIEWER       @map("sensitive-note-viewer")
   BEHAVIOUR_VIEWER            @map("behaviour-viewer")
+  BEHAVIOUR_CORRECTOR         @map("behaviour-corrector")
   STUDENT_DRILLTHROUGH_VIEWER @map("student-drillthrough-viewer")
   PACE_FULL_ACCESS            @map("pace-full-access")
   SUPERVISOR_ALL_STUDENTS     @map("supervisor-all-students")
@@ -323,6 +384,36 @@ enum AcademicYearStatus {
 enum AcademicPeriodStatus {
   ACTIVE
   ARCHIVED
+}
+
+enum AceTeachingDateKind {
+  TEACHING
+  EXCEPTIONAL_OPEN
+  HOLIDAY
+  CLOSED
+}
+
+enum AceTimetableDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum AceTimetableSlotKind {
+  LESSON
+  BREAK
+}
+
+enum AceDailyAbsenceReason {
+  SICK
+  HOLIDAY
+  NOT_SCHEDULED
+  EXCUSED
+  UNEXCUSED
 }
 
 enum StudentSubjectEnrollmentStatus {
@@ -614,6 +705,27 @@ model AccessTagGrant {
   @@index([orgId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
+model AccessTagExclusion {
+  id           String       @id @default(uuid())
+  orgId        String
+  tenantId     String?
+  userId       String
+  tagKey       AccessTagKey
+  excludedById String
+  revokedAt    DateTime?
+  revokedById  String?
+  createdAt    DateTime     @default(now())
+
+  org        Org     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant     Tenant? @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  user       User    @relation("AccessTagExclusionAssignee", fields: [userId], references: [id], onDelete: Restrict)
+  excludedBy User    @relation("AccessTagExcluder", fields: [excludedById], references: [id], onDelete: Restrict)
+  revokedBy  User?   @relation("AccessTagExclusionRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([orgId, userId, revokedAt])
+  @@index([tenantId, userId, revokedAt])
+}
+
 model OutboxEvent {
   id             String   @id @default(uuid())
   orgId          String   @default(dbgenerated("app.current_org_id()"))
@@ -662,6 +774,49 @@ model OrgModule {
 
   @@unique([orgId, module])
   @@index([orgId])
+}
+
+// Billing grants are independent; OrgModule remains the effective capability view.
+model ModuleGrant {
+  id          String            @id @default(uuid())
+  orgId       String
+  org         Org               @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  module      Module
+  source      ModuleGrantSource
+  sourceId    String
+  status      ModuleStatus      @default(ACTIVE)
+  expiresAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([orgId, module, source, sourceId])
+  @@index([orgId, module, status])
+}
+
+// Accepted changes are durable desired state, separate from the current paid period.
+model ModuleChange {
+  id                 String             @id @default(uuid())
+  orgId              String
+  org                Org                @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  providerSubId      String
+  planCode           String
+  includedModules    Module[]           @default([])
+  paidModules        Module[]           @default([])
+  providerItems      Json
+  subtotalPence      Int
+  effectiveAt        DateTime
+  expiresAt          DateTime
+  acceptedAt         DateTime?
+  idempotencyKey     String?
+  providerScheduleId String?
+  status             ModuleChangeStatus @default(PREVIEW)
+  errorCategory      String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([orgId, idempotencyKey])
+  @@index([status, effectiveAt])
+  @@index([orgId, providerSubId, effectiveAt])
 }
 
 // --- Blog (platform-wide, not tenant-scoped) ---
@@ -815,10 +970,19 @@ model Org {
   deletedUsers        OrgDeletedUser[]
   orgVertical         OrgVertical?
   orgModules          OrgModule[]
+  moduleGrants        ModuleGrant[]
+  moduleChanges       ModuleChange[]
+  childIdentities     OrgChildIdentity[]
+  rollConfirmations   EnrolmentRollConfirmation[]
+  institutionalBillingPolicy InstitutionalBillingPolicy?
+  institutionalBillingSnapshots InstitutionalBillingSnapshot[]
+  institutionalQuoteAcceptances InstitutionalQuoteAcceptance[]
+  institutionalBillingOperations InstitutionalBillingOperation[]
   roleDefinitions     OrgRoleDefinition[]
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
   accessTagGrants     AccessTagGrant[]
+  accessTagExclusions AccessTagExclusion[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -840,6 +1004,7 @@ model Tenant {
   users           User[]
   groups          Group[]
   children        Child[]
+  enrolmentLinks  OrgChildSiteLink[]
   roles           UserTenantRole[]
   sessions        Session[]
   lessons         Lesson[]
@@ -850,6 +1015,7 @@ model Tenant {
   pendingOrders   PendingOrder[]
   siteMemberships        SiteMembership[]
   accessTagGrants        AccessTagGrant[]
+  accessTagExclusions    AccessTagExclusion[]
   lastActiveUsers        User[]                  @relation("UserLastActiveTenant")
   staffUnavailableDates  StaffUnavailableDate[]
   staffPreferredGroups   StaffPreferredGroup[]
@@ -870,6 +1036,19 @@ model Tenant {
   calendarItems          CalendarItem[]
   academicYears          AcademicYear[]
   academicPeriods        AcademicPeriod[]
+  aceYearBands           AceYearBand[]
+  aceStaffYearBandAssignments AceStaffYearBandAssignment[]
+  aceSchoolEnrollments   AceSchoolEnrollment[]
+  aceTeachingDates       AceTeachingDate[]
+  aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
+  aceTimetableSchedules  AceTimetableSchedule[]
+  aceTimetableSlots      AceTimetableSlot[]
+  aceStudentTimetableDrafts AceStudentTimetableDraft[]
+  aceStudentTimetableEntries AceStudentTimetableEntry[]
+  aceStudentTimetablePublications AceStudentTimetablePublication[]
+  aceStudentTimetablePublicationEntries AceStudentTimetablePublicationEntry[]
+  aceDailyAttendance     AceDailyAttendance[]
+  aceDailyCorrections    AceDailyAttendanceCorrectionEvent[]
   subjectEnrollments     StudentSubjectEnrollment[]
   paceAssessments        PaceAssessment[]
   paceProgress           PaceProgress[]
@@ -881,9 +1060,11 @@ model Tenant {
   pacePolicies           PacePolicy[]
   pacePolicyOverrides    PacePolicyOverride[]
   behaviourEntries       BehaviourEntry[]
+  behaviourRetractions    BehaviourEntryRetraction[]
   behaviourCategories    BehaviourCategory[]
   demeritPolicies        DemeritPolicy[]
   demeritStageOverrides  DemeritStageOverride[]
+  behaviourReviewRequests BehaviourReviewRequest[]
   studentPortalPolicy    StudentPortalPolicy?
   guardianIdentities     GuardianIdentity[]
   studentIdentities      StudentIdentity[]
@@ -963,6 +1144,7 @@ model Tenant {
 
   @@unique([id, orgId])
   @@index([orgId])
+  childRegistrationSubmissions ChildRegistrationSubmission[]
 }
 
 model UserTenantRole {
@@ -1028,6 +1210,10 @@ model User {
   notes                             ChildNote[]                 @relation("ChildNoteAuthor")
   approvedNotes                     ChildNote[]                 @relation("ChildNoteApprovedBy")
   auditEvents                       AuditEvent[]                @relation("AuditActor")
+  enrolmentRevisions                EnrolmentRevision[]         @relation("EnrolmentRevisionActor")
+  rollConfirmations                 EnrolmentRollConfirmation[] @relation("EnrolmentRollConfirmer")
+  institutionalDeclarations        InstitutionalBillingPolicy[] @relation("InstitutionalDeclarationActor")
+  institutionalQuoteAcceptances    InstitutionalQuoteAcceptance[] @relation("InstitutionalQuoteAcceptanceActor")
   swapRequestsFrom                  SwapRequest[]               @relation("SwapFromUser")
   swapRequestsTo                    SwapRequest[]               @relation("SwapToUser")
   orgRoles                          UserOrgRole[]
@@ -1037,6 +1223,7 @@ model User {
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
+  aceSchoolVolunteerCancellations AceSchoolVolunteerReservation[] @relation("AceVolunteerCancelledBy")
   familyIdentityInvites FamilyIdentityInvite[] @relation("FamilyIdentityInviteUser")
   familyIdentityInvitesCreated FamilyIdentityInvite[] @relation("FamilyIdentityInviteCreatedBy")
   familyIdentityInvitesRevoked FamilyIdentityInvite[] @relation("FamilyIdentityInviteRevokedBy")
@@ -1071,11 +1258,19 @@ model User {
   createdCorrespondence   Correspondence[]        @relation("CorrespondenceCreatedBy")
   recordedSubjectEnrollments StudentSubjectEnrollment[] @relation("StudentSubjectEnrollmentRecordedBy")
   recordedPaceAssessments    PaceAssessment[]            @relation("PaceAssessmentRecordedBy")
+  aceYearBandAssignments     AceStaffYearBandAssignment[]
+  aceTimetableSchedulesUpdated AceTimetableSchedule[] @relation("AceTimetableScheduleUpdatedBy")
+  aceStudentTimetableDraftsUpdated AceStudentTimetableDraft[] @relation("AceStudentTimetableDraftUpdatedBy")
+  aceStudentTimetablePublicationsIssued AceStudentTimetablePublication[] @relation("AceStudentTimetablePublishedBy")
+  aceStudentTimetablePublicationsWithdrawn AceStudentTimetablePublication[] @relation("AceStudentTimetableWithdrawnBy")
   createdPacePolicies        PacePolicy[]                @relation("PacePolicyCreatedBy")
   authorisedPaceOverrides    PacePolicyOverride[]        @relation("PacePolicyOverrideAuthorisedBy")
   recordedBehaviourEntries  BehaviourEntry[]            @relation("BehaviourEntryRecordedBy")
+  retractedBehaviourEntries BehaviourEntryRetraction[]  @relation("BehaviourEntryRetractionRecordedBy")
   correctedAttendance       Attendance[]                 @relation("AttendanceCorrectedBy")
   attendanceCorrectionEvents AttendanceCorrectionEvent[] @relation("AttendanceCorrectionEventRecordedBy")
+  aceDailyAttendanceRecorded AceDailyAttendance[] @relation("AceDailyAttendanceRecordedBy")
+  aceDailyCorrectionsRecorded AceDailyAttendanceCorrectionEvent[] @relation("AceDailyCorrectionRecordedBy")
   createdBehaviourCategories BehaviourCategory[]         @relation("BehaviourCategoryCreatedBy")
   createdDemeritPolicies     DemeritPolicy[]             @relation("DemeritPolicyCreatedBy")
   authorisedDemeritOverrides DemeritStageOverride[]      @relation("DemeritStageOverrideAuthorisedBy")
@@ -1103,6 +1298,7 @@ model User {
   createdMessageConversations       MessageConversation[]          @relation("MessageConversationCreatedBy")
   messageParticipants               MessageParticipant[]           @relation("MessageParticipantUser")
   createdAceNotices                 AceNotice[]                    @relation("AceNoticeCreatedBy")
+  scheduledAceNotices               AceNotice[]                    @relation("AceNoticeScheduledBy")
   aceNoticeAudienceMemberships      AceNoticeAudienceMember[]      @relation("AceNoticeAudienceRecipient")
   roleAssignments         UserRoleAssignment[]    @relation("UserRoleAssignmentAssignee")
   roleAssignmentsGranted  UserRoleAssignment[]    @relation("UserRoleAssignmentAssignedBy")
@@ -1110,6 +1306,9 @@ model User {
   accessTagGrants         AccessTagGrant[]        @relation("AccessTagGrantAssignee")
   accessTagGrantsIssued   AccessTagGrant[]        @relation("AccessTagGrantor")
   accessTagGrantsRevoked  AccessTagGrant[]        @relation("AccessTagGrantRevoker")
+  accessTagExclusions        AccessTagExclusion[] @relation("AccessTagExclusionAssignee")
+  accessTagExclusionsIssued  AccessTagExclusion[] @relation("AccessTagExcluder")
+  accessTagExclusionsRevoked AccessTagExclusion[] @relation("AccessTagExclusionRevoker")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.
@@ -1145,6 +1344,7 @@ model GuardianIdentity {
   messageConversations     MessageConversation[]
   messageParticipants      MessageParticipant[]
   aceNoticeAudienceMembers AceNoticeAudienceMember[]
+  aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, userId])
@@ -1242,6 +1442,7 @@ model FamilyIdentityInvite {
   id                         String               @id @default(uuid())
   tenantId                   String
   invitedUserId              String
+  invitedEmail               String?
   target                     FamilyIdentityTarget
   childId                    String?
   createdByUserId            String
@@ -1442,6 +1643,22 @@ model ChildGuardianContact {
   @@index([tenantId, contactType])
 }
 
+// Immutable snapshot of the submitted public registration. payload is encrypted at rest.
+// A child may have multiple submissions if a later registration replaces an earlier one.
+model ChildRegistrationSubmission {
+  id          String   @id @default(uuid())
+  tenantId    String
+  childId     String
+  formVersion String
+  payload     Json
+  submittedAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  child  Child  @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@index([tenantId, childId, submittedAt])
+}
+
 // allergies/additionalNeedsNotes/gpName/gpPhone/specialNeedsOther/notes are encrypted
 // at rest — see packages/db/src/pii-encryption.ts. dateOfBirth is NOT yet encrypted
 // (would require a DateTime -> String column change; tracked as a follow-up).
@@ -1467,16 +1684,22 @@ model Child {
   notes                      String?
   tenantId                   String
   tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
+  enrolmentLink              OrgChildSiteLink?
   guardians                  User[]                      @relation("ParentChildren")
   guardianContacts           ChildGuardianContact[]
+  registrationSubmissions    ChildRegistrationSubmission[]
   groupId                    String?
   group                      Group?                      @relation(fields: [groupId], references: [id])
   disabilities               String[]                    @default([])
   concerns                   Concern[]
   attendance                 Attendance[]
   attendanceCorrectionEvents AttendanceCorrectionEvent[]
+  aceDailyAttendance         AceDailyAttendance[]
   childNotes                 ChildNote[]
   learningLogs               LearningLog[]
+  aceSchoolEnrollments       AceSchoolEnrollment[]
+  aceStudentTimetableDrafts  AceStudentTimetableDraft[]
+  aceStudentTimetablePublications AceStudentTimetablePublication[]
   subjectEnrollments         StudentSubjectEnrollment[]
   paceAssessments            PaceAssessment[]
   paceProgress               PaceProgress[]
@@ -1486,6 +1709,7 @@ model Child {
   pacePolicyOverrides        PacePolicyOverride[]
   behaviourEntries           BehaviourEntry[]
   demeritStageOverrides      DemeritStageOverride[]
+  behaviourReviewRequests   BehaviourReviewRequest[]
   studentIdentityLinks       StudentIdentityLink[]
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites      FamilyIdentityInvite[]
@@ -1511,6 +1735,75 @@ model Child {
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([isGuest, guestExpiresAt])
+}
+
+// An organisation-local identity may link child profiles at multiple permitted
+// sites. Existing profiles are only candidates until an administrator links one.
+model OrgChildIdentity {
+  id             String   @id @default(uuid())
+  orgId          String
+  localReference String
+  createdAt      DateTime @default(now())
+  org            Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  siteLinks      OrgChildSiteLink[]
+  revisions      EnrolmentRevision[]
+
+  @@unique([id, orgId])
+  @@unique([orgId, localReference])
+  @@index([orgId])
+}
+
+model OrgChildSiteLink {
+  id         String   @id @default(uuid())
+  orgId      String
+  identityId String
+  tenantId   String
+  childId    String
+  linkedAt   DateTime @default(now())
+  identity   OrgChildIdentity @relation(fields: [identityId, orgId], references: [id, orgId], onDelete: Restrict)
+  tenant     Tenant   @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  child      Child    @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([childId, tenantId])
+  @@index([orgId, identityId])
+  @@index([tenantId])
+}
+
+// Each revision is an immutable, complete set of admission/leaving periods.
+// recordedAt allows a delayed census to replay only knowledge held at cutoff.
+model EnrolmentRevision {
+  id          String   @id @default(uuid())
+  orgId       String
+  identityId  String
+  version     Int
+  periods     Json
+  reason      String
+  actorUserId String
+  recordedAt  DateTime @default(now())
+  identity    OrgChildIdentity @relation(fields: [identityId, orgId], references: [id, orgId], onDelete: Restrict)
+  actor       User     @relation("EnrolmentRevisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([identityId, version])
+  @@index([orgId, recordedAt])
+  @@index([identityId, recordedAt])
+}
+
+model EnrolmentRollConfirmation {
+  id              String   @id @default(uuid())
+  orgId           String
+  effectiveOn     DateTime @db.Date
+  revisionCutoff  DateTime
+  identityIds     Json
+  enrolledCount   Int
+  confirmerUserId String
+  confirmedAt     DateTime @default(now())
+  org             Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  confirmer       User     @relation("EnrolmentRollConfirmer", fields: [confirmerUserId], references: [id], onDelete: Restrict)
+  billingSnapshots InstitutionalBillingSnapshot[]
+
+  @@unique([id, orgId])
+  @@index([orgId, confirmedAt])
+  @@index([orgId, effectiveOn])
 }
 
 model Group {
@@ -1864,23 +2157,38 @@ model MessageAttachment {
 }
 
 model AceNotice {
-  id              String            @id @default(uuid())
-  tenantId        String
-  createdByUserId String
-  title           String
-  body            String            @db.Text
-  audience        AceNoticeAudience
-  publishedAt     DateTime?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                      String            @id @default(uuid())
+  tenantId                String
+  createdByUserId         String?
+  title                   String
+  body                    String            @db.Text
+  audience                AceNoticeAudience
+  audienceScope           String            @default("SITE")
+  audienceTargetId        String?
+  requiresAcknowledgement Boolean           @default(false)
+  publishedAt             DateTime?
+  scheduledAt             DateTime?
+  scheduledByUserId       String?
+  scheduledAudienceVersion String?
+  scheduleFailedAt        DateTime?
+  scheduleFailureReason   String?
+  expiresAt               DateTime?
+  withdrawnAt             DateTime?
+  legacyImportedAt        DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
 
   tenant          Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  createdBy       User                      @relation("AceNoticeCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdBy       User?                     @relation("AceNoticeCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  scheduledBy     User?                     @relation("AceNoticeScheduledBy", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
   audienceMembers AceNoticeAudienceMember[]
   attachments     AceNoticeAttachment[]
 
   @@unique([id, tenantId])
   @@index([tenantId, publishedAt])
+  @@index([tenantId, scheduledAt])
+  @@index([tenantId, audienceScope, audienceTargetId])
+  @@index([tenantId, withdrawnAt, publishedAt(sort: Desc)])
 }
 
 model AceNoticeAudienceMember {
@@ -1890,6 +2198,7 @@ model AceNoticeAudienceMember {
   recipientUserId    String
   recipientKind      AceNoticeAudienceMemberKind
   guardianIdentityId String?
+  targetedChildIds   String[]                    @default([])
   createdAt          DateTime                    @default(now())
 
   tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Restrict)
@@ -1909,6 +2218,7 @@ model AceNoticeReceipt {
   audienceMemberId String
   deliveredAt      DateTime?
   readAt           DateTime?
+  acknowledgedAt   DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -2266,6 +2576,8 @@ model Session {
   startsAt               DateTime
   endsAt                 DateTime
   title                  String?
+  rotaKind               SessionRotaKind          @default(STANDARD)
+  familyPublishedAt      DateTime?
   assignments            Assignment[]
   attendances            Attendance[]
   lessons                Lesson[] // lessons linked to this session
@@ -2275,6 +2587,7 @@ model Session {
 
   @@index([tenantId])
   @@index([startsAt])
+  @@index([tenantId, familyPublishedAt, startsAt])
 }
 
 model Assignment {
@@ -2331,17 +2644,20 @@ model VolunteerPreference {
 }
 
 model StaffUnavailableDate {
-  id        String   @id @default(uuid())
-  userId    String
-  tenantId  String
-  date      DateTime @db.Date
-  reason    String?
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String
+  tenantId    String
+  date        DateTime @db.Date
+  startMinute Int      @default(0)
+  endMinute   Int      @default(1440)
+  reason      String?
+  createdAt   DateTime @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, tenantId, date])
+  @@unique([userId, tenantId, date, startMinute, endMinute], map: "StaffUnavailableDate_window_key")
+  @@index([tenantId, date])
   @@index([tenantId])
   @@index([userId])
 }
@@ -2412,6 +2728,7 @@ model Subject {
   sortOrder           Int?
   learningLogs        LearningLog[]
   subjectEnrollments  StudentSubjectEnrollment[]
+  aceStudentTimetableEntries AceStudentTimetableEntry[]
   paceAssessments     PaceAssessment[]
   paceProgress        PaceProgress[]
   paceDiagnosticResults PaceDiagnosticResult[]
@@ -2435,6 +2752,8 @@ model AcademicYear {
   endsOn    DateTime           @db.Date
   status    AcademicYearStatus @default(ACTIVE)
   periods   AcademicPeriod[]
+  schoolEnrollments AceSchoolEnrollment[]
+  teachingDates AceTeachingDate[]
   createdAt DateTime           @default(now())
   updatedAt DateTime           @default(now()) @updatedAt
 
@@ -2454,12 +2773,282 @@ model AcademicPeriod {
   endsOn         DateTime             @db.Date
   status         AcademicPeriodStatus @default(ACTIVE)
   aceTermReports AceTermReport[]
+  aceTimetableSchedules AceTimetableSchedule[]
+  aceStudentTimetableDrafts AceStudentTimetableDraft[]
+  aceStudentTimetablePublications AceStudentTimetablePublication[]
+  aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @default(now()) @updatedAt
 
   @@unique([id, tenantId])
   @@unique([tenantId, academicYearId, name])
   @@index([tenantId, status, startsOn])
+}
+
+model AceYearBand {
+  id               String                       @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  name             String
+  sortOrder        Int                          @default(0)
+  isActive         Boolean                      @default(true)
+  staffAssignments AceStaffYearBandAssignment[]
+  schoolEnrollments AceSchoolEnrollment[]
+  aceTimetableSchedules AceTimetableSchedule[]
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive, sortOrder])
+}
+
+model AceStaffYearBandAssignment {
+  id         String      @id @default(uuid())
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  yearBandId String
+  yearBand   AceYearBand @relation(fields: [yearBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  startsOn   DateTime    @db.Date
+  endsOn     DateTime?   @db.Date
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, userId, yearBandId, startsOn])
+  @@index([tenantId, userId, startsOn, endsOn])
+  @@index([tenantId, yearBandId, startsOn, endsOn])
+}
+
+model AceSchoolEnrollment {
+  id             String       @id @default(uuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId        String
+  child          Child        @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  yearBandId     String
+  yearBand       AceYearBand  @relation(fields: [yearBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  startsOn       DateTime     @db.Date
+  endsOn         DateTime?    @db.Date
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, childId, startsOn])
+  @@index([tenantId, yearBandId, startsOn, endsOn])
+  @@index([tenantId, childId, startsOn, endsOn])
+}
+
+model AceTeachingDate {
+  id             String              @id @default(uuid())
+  tenantId       String
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYearId String
+  academicYear   AcademicYear        @relation(fields: [academicYearId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  date           DateTime            @db.Date
+  kind           AceTeachingDateKind
+  reason         String?             @db.VarChar(240)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, date])
+  @@index([tenantId, academicYearId, date])
+}
+
+model AceSchoolVolunteerReservation {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  guardianIdentityId String
+  guardianIdentity   GuardianIdentity @relation(fields: [guardianIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  academicPeriodId   String
+  academicPeriod     AcademicPeriod @relation(fields: [academicPeriodId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  date               DateTime  @db.Date
+  slot               Int
+  cancelledAt        DateTime?
+  cancelledByUserId  String?
+  cancelledBy        User?     @relation("AceVolunteerCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: Restrict)
+  cancellationReason String?   @db.VarChar(240)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, academicPeriodId, date])
+  @@index([tenantId, guardianIdentityId, date])
+}
+
+model AceTimetableSchedule {
+  id               String           @id @default(uuid())
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicPeriodId String
+  academicPeriod   AcademicPeriod   @relation(fields: [academicPeriodId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  yearBandId       String
+  yearBand         AceYearBand      @relation(fields: [yearBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  teachingDays     AceTimetableDay[] @default([])
+  updatedByUserId  String
+  updatedBy        User             @relation("AceTimetableScheduleUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  slots            AceTimetableSlot[]
+  drafts           AceStudentTimetableDraft[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([id, tenantId, academicPeriodId])
+  @@unique([tenantId, academicPeriodId, yearBandId])
+  @@index([tenantId, academicPeriodId])
+}
+
+model AceTimetableSlot {
+  id           String               @id @default(uuid())
+  tenantId     String
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  scheduleId   String
+  schedule     AceTimetableSchedule @relation(fields: [scheduleId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  position     Int
+  kind         AceTimetableSlotKind
+  label        String               @db.VarChar(50)
+  startMinutes Int
+  endMinutes   Int
+  entries      AceStudentTimetableEntry[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@unique([id, tenantId, scheduleId])
+  @@unique([tenantId, scheduleId, position])
+}
+
+model AceStudentTimetableDraft {
+  id               String                        @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId          String
+  child            Child                         @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  academicPeriodId String
+  academicPeriod   AcademicPeriod                @relation(fields: [academicPeriodId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  scheduleId       String
+  schedule         AceTimetableSchedule          @relation(fields: [scheduleId, tenantId, academicPeriodId], references: [id, tenantId, academicPeriodId], onDelete: Restrict)
+  updatedByUserId  String
+  updatedBy        User                          @relation("AceStudentTimetableDraftUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  version          Int                           @default(1)
+  entries          AceStudentTimetableEntry[]
+  publications     AceStudentTimetablePublication[]
+  createdAt        DateTime                      @default(now())
+  updatedAt        DateTime                      @updatedAt
+
+  @@unique([id, tenantId, scheduleId])
+  @@unique([id, tenantId, childId, academicPeriodId])
+  @@unique([tenantId, childId, academicPeriodId])
+  @@index([tenantId, scheduleId])
+}
+
+model AceStudentTimetableEntry {
+  id         String                   @id @default(uuid())
+  tenantId   String
+  tenant     Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  draftId    String
+  scheduleId String
+  draft      AceStudentTimetableDraft @relation(fields: [draftId, tenantId, scheduleId], references: [id, tenantId, scheduleId], onDelete: Restrict)
+  day        AceTimetableDay
+  slotId     String
+  slot       AceTimetableSlot         @relation(fields: [slotId, tenantId, scheduleId], references: [id, tenantId, scheduleId], onDelete: Restrict)
+  subjectId  String
+  subject    Subject                  @relation(fields: [subjectId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  @@unique([tenantId, draftId, day, slotId])
+  @@index([tenantId, subjectId])
+}
+
+model AceStudentTimetablePublication {
+  id               String                               @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  draftId          String
+  draftVersion     Int                                  @default(1)
+  childId          String
+  academicPeriodId String
+  draft            AceStudentTimetableDraft             @relation(fields: [draftId, tenantId, childId, academicPeriodId], references: [id, tenantId, childId, academicPeriodId], onDelete: Restrict)
+  child            Child                                @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  academicPeriod   AcademicPeriod                       @relation(fields: [academicPeriodId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  periodName       String
+  periodStartsOn   DateTime                             @db.Date
+  periodEndsOn     DateTime                             @db.Date
+  yearBandName     String
+  publishedByUserId String
+  publishedBy      User                                 @relation("AceStudentTimetablePublishedBy", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  publishedAt      DateTime?
+  withdrawnAt      DateTime?
+  withdrawnByUserId String?
+  withdrawnBy      User?                                @relation("AceStudentTimetableWithdrawnBy", fields: [withdrawnByUserId], references: [id], onDelete: Restrict)
+  withdrawalReason String?                              @db.VarChar(240)
+  entries          AceStudentTimetablePublicationEntry[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId, childId, academicPeriodId, publishedAt])
+}
+
+model AceStudentTimetablePublicationEntry {
+  id            String                         @id @default(uuid())
+  tenantId      String
+  tenant        Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  publicationId String
+  publication   AceStudentTimetablePublication @relation(fields: [publicationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  day           AceTimetableDay
+  slotPosition  Int
+  slotKind      AceTimetableSlotKind
+  slotLabel     String                         @db.VarChar(50)
+  startMinutes  Int
+  endMinutes    Int
+  subjectId     String?
+  subjectName   String?
+  subjectColor  String?
+
+  @@unique([tenantId, publicationId, day, slotPosition])
+}
+
+model AceDailyAttendance {
+  id               String                         @id @default(uuid())
+  tenantId         String
+  tenant           Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId          String
+  child            Child                          @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  date             DateTime                       @db.Date
+  status           AttendanceStatus
+  absenceReason    AceDailyAbsenceReason?
+  recordedByUserId String
+  recordedBy       User                           @relation("AceDailyAttendanceRecordedBy", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  recordedAt       DateTime                       @default(now())
+  updatedAt        DateTime                       @updatedAt
+  corrections      AceDailyAttendanceCorrectionEvent[]
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, childId, date])
+  @@index([tenantId, date, status])
+}
+
+model AceDailyAttendanceCorrectionEvent {
+  id                 String                 @id @default(uuid())
+  tenantId           String
+  tenant             Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  dailyAttendanceId  String
+  dailyAttendance    AceDailyAttendance     @relation(fields: [dailyAttendanceId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "AceDailyCorrection_fact_fkey")
+  previousStatus     AttendanceStatus
+  newStatus          AttendanceStatus
+  previousReason     AceDailyAbsenceReason?
+  newReason          AceDailyAbsenceReason?
+  correctionReason   String                 @db.Text
+  correctedByUserId  String
+  correctedBy        User                   @relation("AceDailyCorrectionRecordedBy", fields: [correctedByUserId], references: [id], onDelete: Restrict)
+  correctedAt        DateTime               @default(now())
+
+  @@index([tenantId, dailyAttendanceId, correctedAt, id], map: "AceDailyCorrection_history_idx")
 }
 
 model AceTermReport {
@@ -2987,12 +3576,15 @@ model BehaviourEntry {
   recordedByUserId         String
   recordedBy               User                @relation("BehaviourEntryRecordedBy", fields: [recordedByUserId], references: [id])
   reason                   String              @db.Text
+  correctionReason         String?             @db.Text
   note                     String?             @db.Text
   correctsBehaviourEntryId String?
   clientCommandKeyHash     String?
   commandFingerprint       String?
   correctsBehaviourEntry   BehaviourEntry?     @relation("BehaviourEntryCorrections", fields: [correctsBehaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict, map: "BehaviourEntry_correction_target_fkey")
   correction               BehaviourEntry?     @relation("BehaviourEntryCorrections")
+  retraction               BehaviourEntryRetraction?
+  reviewRequests           BehaviourReviewRequest[]
   createdAt                DateTime            @default(now())
 
   @@unique([id, tenantId])
@@ -3002,6 +3594,26 @@ model BehaviourEntry {
   @@index([tenantId, childId, occurredAt])
   @@index([tenantId, type, occurredAt])
   @@index([tenantId, correctsBehaviourEntryId])
+}
+
+model BehaviourEntryRetraction {
+  id                 String         @id @default(uuid())
+  tenantId           String
+  tenant             Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  childId            String
+  entryId            String
+  entry              BehaviourEntry @relation(fields: [entryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict)
+  reason             String         @db.Text
+  retractedByUserId  String
+  retractedBy        User           @relation("BehaviourEntryRetractionRecordedBy", fields: [retractedByUserId], references: [id], onDelete: Restrict)
+  clientCommandKeyHash String
+  commandFingerprint String
+  retractedAt        DateTime       @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([entryId, tenantId, childId])
+  @@unique([tenantId, clientCommandKeyHash])
+  @@index([tenantId, retractedAt, id])
 }
 
 model DemeritPolicy {
@@ -3039,11 +3651,37 @@ model DemeritStageOverride {
   authorisedByUserId String
   authorisedBy       User          @relation("DemeritStageOverrideAuthorisedBy", fields: [authorisedByUserId], references: [id])
   reason             String        @db.Text
+  clientCommandKeyHash String?
+  commandFingerprint String?
   expiresAt          DateTime // PostgreSQL also rejects non-finite timestamps.
   createdAt          DateTime      @default(now())
+  reviewRequests     BehaviourReviewRequest[]
 
   @@unique([id, tenantId])
+  @@unique([tenantId, clientCommandKeyHash])
+  @@unique([id, tenantId, childId])
   @@index([tenantId, childId, expiresAt])
+}
+
+model BehaviourReviewRequest {
+  id                     String               @id @default(uuid())
+  tenantId               String
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id])
+  childId                String
+  child                  Child                @relation(fields: [childId, tenantId], references: [id, tenantId])
+  behaviourEntryId       String?
+  behaviourEntry         BehaviourEntry?      @relation(fields: [behaviourEntryId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict)
+  demeritStageOverrideId String?
+  demeritStageOverride   DemeritStageOverride? @relation(fields: [demeritStageOverrideId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict, onUpdate: Restrict)
+  kind                   String
+  stage                  Int
+  policyVersion          Int
+  requestedAt            DateTime             @default(now())
+
+  @@unique([behaviourEntryId, stage, kind])
+  @@unique([demeritStageOverrideId, stage, kind])
+  @@index([tenantId, requestedAt(sort: Desc), id(sort: Desc)])
+  @@index([tenantId, childId, requestedAt(sort: Desc)])
 }
 
 model LearningLog {
@@ -3293,10 +3931,17 @@ model Subscription {
   cancelAtPeriodEnd Boolean            @default(false)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+  currentInstitutionalSnapshotId String?
+  nextInstitutionalSnapshotId String?
+  currentInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalCurrentSubscription", fields: [currentInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  nextInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalNextSubscription", fields: [nextInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  institutionalSnapshots InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSubscription")
+  institutionalOperations InstitutionalBillingOperation[]
 
   @@index([orgId])
   @@index([status])
   @@index([planCode])
+  @@unique([id, orgId])
 }
 
 model OrgEntitlementSnapshot {
@@ -3332,10 +3977,16 @@ model BillingEvent {
   orgId       String?
   org         Org?            @relation(fields: [orgId], references: [id])
   provider    BillingProvider
+  providerEventId String?
   type        String
+  processingStatus BillingEventProcessingStatus @default(COMPLETED)
+  processingStartedAt DateTime?
+  processedAt DateTime?
+  lastError String?
   payloadJson Json
   createdAt   DateTime        @default(now())
 
+  @@unique([provider, providerEventId])
   @@index([orgId, createdAt])
 }
 
@@ -3362,6 +4013,9 @@ model PendingOrder {
   createdAt              DateTime           @default(now())
   completedAt            DateTime?
   updatedAt              DateTime           @updatedAt
+  institutionalSnapshotId String?
+  institutionalCheckoutKey String?
+  institutionalSnapshot InstitutionalBillingSnapshot? @relation(fields: [institutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
 
   // For public checkout: store org/user details until payment confirmed.
   // Encrypted as a whole (may carry a plaintext password transiently) — see
@@ -3370,6 +4024,114 @@ model PendingOrder {
 
   @@index([tenantId, orgId, provider, providerCheckoutId])
   @@index([provider, providerSubscriptionId])
+  @@unique([orgId, institutionalCheckoutKey])
+}
+
+model InstitutionalBillingPolicy {
+  id                String   @id @default(uuid())
+  orgId             String   @unique
+  pricingVersion    String
+  timezone          String
+  declaredChildren  Int?
+  declaredAt        DateTime?
+  declaredByUserId  String?
+  reviewReason      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  org               Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  declarationActor  User?    @relation("InstitutionalDeclarationActor", fields: [declaredByUserId], references: [id], onDelete: Restrict)
+  snapshots         InstitutionalBillingSnapshot[]
+
+  @@unique([id, orgId])
+  @@index([reviewReason])
+}
+
+model InstitutionalBillingSnapshot {
+  id                    String   @id @default(uuid())
+  orgId                 String
+  policyId              String
+  subscriptionId        String?
+  kind                  InstitutionalSnapshotKind
+  status                InstitutionalSnapshotStatus
+  planCode              String
+  pricingVersion        String
+  countSource           InstitutionalCountSource?
+  enrolledChildren      Int?
+  includedChildren      Int?
+  includedModules       Module[] @default([])
+  paidModules           Module[] @default([])
+  lines                 Json?
+  subtotalPence         Int?
+  sourceConfirmationId  String?
+  sourceRevisionCutoff  DateTime?
+  censusCutoffAt        DateTime?
+  effectiveAt           DateTime?
+  expiresAt             DateTime?
+  supersedesId          String?
+  createdAt             DateTime @default(now())
+  org                   Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  policy                InstitutionalBillingPolicy @relation(fields: [policyId, orgId], references: [id, orgId], onDelete: Restrict)
+  subscription          Subscription? @relation("InstitutionalSnapshotSubscription", fields: [subscriptionId, orgId], references: [id, orgId], onDelete: Restrict)
+  sourceConfirmation    EnrolmentRollConfirmation? @relation(fields: [sourceConfirmationId, orgId], references: [id, orgId], onDelete: Restrict)
+  supersedes            InstitutionalBillingSnapshot? @relation("InstitutionalSnapshotSupersession", fields: [supersedesId, orgId], references: [id, orgId], onDelete: Restrict)
+  supersededBy          InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSupersession")
+  acceptance            InstitutionalQuoteAcceptance?
+  pendingOrders         PendingOrder[]
+  operations            InstitutionalBillingOperation[]
+  currentSubscriptions  Subscription[] @relation("InstitutionalCurrentSubscription")
+  nextSubscriptions     Subscription[] @relation("InstitutionalNextSubscription")
+
+  @@index([orgId, kind, createdAt])
+  @@index([orgId, effectiveAt])
+  @@index([policyId, createdAt])
+  @@index([subscriptionId, kind, createdAt])
+  @@unique([subscriptionId, kind, effectiveAt], map: "InstitutionalCensus_subscription_kind_effective_key")
+  @@unique([id, orgId])
+}
+
+model InstitutionalQuoteAcceptance {
+  id             String   @id @default(uuid())
+  orgId          String
+  snapshotId     String   @unique
+  actorUserId    String
+  idempotencyKey String
+  acceptedAt     DateTime @default(now())
+  org            Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  snapshot       InstitutionalBillingSnapshot @relation(fields: [snapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  actor          User     @relation("InstitutionalQuoteAcceptanceActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([orgId, idempotencyKey])
+  @@unique([snapshotId, orgId])
+  @@index([orgId, acceptedAt])
+}
+
+model InstitutionalBillingOperation {
+  id                     String   @id @default(uuid())
+  orgId                  String
+  subscriptionId         String?
+  snapshotId             String?
+  kind                   InstitutionalBillingOperationKind
+  status                 InstitutionalBillingOperationStatus @default(PENDING)
+  idempotencyKey         String
+  dueAt                  DateTime
+  attempts               Int      @default(0)
+  claimToken             String?
+  claimedUntil           DateTime?
+  providerIdempotencyKey String?
+  providerReference      String?
+  lastError              String?
+  completedAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  org                    Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  subscription           Subscription? @relation(fields: [subscriptionId, orgId], references: [id, orgId], onDelete: Restrict)
+  snapshot               InstitutionalBillingSnapshot? @relation(fields: [snapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([orgId, idempotencyKey])
+  @@index([status, dueAt])
+  @@index([status, claimedUntil])
+  @@index([orgId, subscriptionId, kind])
+  @@unique([id, orgId])
 }
 
 model OrgRetentionPolicy {

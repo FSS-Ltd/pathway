@@ -297,7 +297,8 @@ export class BuyNowService {
     const base = name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
+      .replace(/^-/, "")
+      .replace(/-$/, "")
       .substring(0, 50);
 
     // Add random suffix to avoid collisions

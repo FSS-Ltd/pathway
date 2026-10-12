@@ -140,7 +140,11 @@ export class InvitesService {
         invitedByName,
       });
     } catch (error) {
-      console.error(`[INVITE] ❌ Failed to send email to ${normalizedEmail}:`, error);
+      console.error(
+        "[INVITE] ❌ Failed to send email to:",
+        normalizedEmail,
+        error,
+      );
       // Don't fail the invite creation if email fails
     }
 
@@ -180,7 +184,8 @@ export class InvitesService {
     } catch (error) {
       // Don't fail invite creation if user creation fails
       console.error(
-        `[INVITE] ❌ Error ensuring user exists for invite ${email}:`,
+        "[INVITE] ❌ Error ensuring user exists for invite:",
+        email,
         error,
       );
     }
