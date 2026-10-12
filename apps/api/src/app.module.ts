@@ -16,6 +16,7 @@ import { TenantsModule } from "./tenants/tenants.module"; // TODO: rename file
 import { UsersModule } from "./users/users.module";
 import { GroupsModule } from "./groups/groups.module";
 import { ChildrenModule } from "./children/children.module";
+import { EnrolmentsModule } from "./enrolments/enrolments.module";
 import { FamilyInvitesModule } from "./identity/family-invites.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { LessonsModule } from "./lessons/lessons.module";
@@ -63,6 +64,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     UsersModule,
     GroupsModule,
     ChildrenModule,
+    EnrolmentsModule,
     FamilyInvitesModule,
     AttendanceModule,
     LessonsModule,

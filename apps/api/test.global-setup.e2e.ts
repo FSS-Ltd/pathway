@@ -106,6 +106,7 @@ function roleProvisioningStatements(
     `GRANT SELECT ON TABLE "SiteMembership" TO ${rlsRole};`,
     `GRANT SELECT ON TABLE "OrgVertical" TO ${rlsRole};`,
     `GRANT SELECT ON TABLE "OrgModule" TO ${rlsRole};`,
+    `GRANT SELECT ON TABLE "OrgChildIdentity", "OrgChildSiteLink", "EnrolmentRevision", "EnrolmentRollConfirmation" TO ${rlsRole};`,
     `GRANT ${rlsRole} TO ${bootstrapRole};`,
   ];
 }
