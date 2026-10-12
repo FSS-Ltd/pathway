@@ -82,12 +82,22 @@ export class EnrolmentIdentitiesService {
       throw new BadRequestException("Invalid local reference.");
     try {
       return await withTenantRlsContext(tenantId, orgId, async (tx) => {
-        const child = await tx.child.findFirst({
-          where: { id: childId, tenantId, tenant: { orgId }, isGuest: false },
-          select: { id: true },
-        });
+        const [child, existingIdentity] = await Promise.all([
+          tx.child.findFirst({
+            where: { id: childId, tenantId, tenant: { orgId }, isGuest: false },
+            select: { id: true },
+          }),
+          tx.orgChildIdentity.findUnique({
+            where: {
+              orgId_localReference: { orgId, localReference: reference },
+            },
+            select: { id: true },
+          }),
+        ]);
         if (!child)
           throw new NotFoundException("Child profile not found at this site.");
+        if (existingIdentity)
+          throw new ConflictException("Identity or profile already linked.");
         return tx.orgChildIdentity.create({
           data: {
             orgId,
