@@ -5,7 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
-import { Badge, Button, Card, DataTable, Input, Label, type ColumnDef } from "@pathway/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  DataTable,
+  Input,
+  Label,
+  type ColumnDef,
+} from "@pathway/ui";
 import {
   AdminAttendanceRow,
   exportAttendanceCsv,
@@ -74,7 +82,9 @@ export default function AttendancePage() {
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | AdminAttendanceRow["status"]
   >("all");
-  const [exportFrom, setExportFrom] = React.useState(() => defaultExportRange().from);
+  const [exportFrom, setExportFrom] = React.useState(
+    () => defaultExportRange().from,
+  );
   const [exportTo, setExportTo] = React.useState(() => defaultExportRange().to);
   const [exporting, setExporting] = React.useState<string | null>(null);
   const [exportError, setExportError] = React.useState<string | null>(null);
@@ -136,6 +146,7 @@ export default function AttendancePage() {
       },
       {
         id: "room",
+        priority: "secondary",
         header: "Room",
         cell: (row) => (
           <span className="text-sm text-text-muted">
@@ -146,6 +157,7 @@ export default function AttendancePage() {
       },
       {
         id: "attendance",
+        priority: "secondary",
         header: "Attendance",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -159,7 +171,9 @@ export default function AttendancePage() {
         id: "status",
         header: "Status",
         cell: (row) => (
-          <Badge variant={statusTone[row.status]}>{statusCopy[row.status]}</Badge>
+          <Badge variant={statusTone[row.status]}>
+            {statusCopy[row.status]}
+          </Badge>
         ),
         align: "center",
         width: "140px",
@@ -304,6 +318,12 @@ export default function AttendancePage() {
         ) : (
           <DataTable
             data={filteredData}
+            caption="Attendance sessions"
+            rowKey={(row) => row.sessionId}
+            pagination={{
+              mode: "client",
+              resetKey: `${weekAnchor.toISOString()}:${search}:${statusFilter}`,
+            }}
             columns={columns}
             isLoading={isLoading}
             emptyMessage="No sessions in this week. Try another week or add sessions."
@@ -313,7 +333,10 @@ export default function AttendancePage() {
       </Card>
 
       {isAdmin && !isLoadingAccess && (
-        <Card title="Export attendance" description="Download CSV reports for date range.">
+        <Card
+          title="Export attendance"
+          description="Download CSV reports for date range."
+        >
           {exportError && (
             <div className="mb-4 rounded-md bg-status-danger/5 px-3 py-2 text-sm text-status-danger">
               {exportError}
@@ -356,7 +379,9 @@ export default function AttendancePage() {
                       type: "children",
                     });
                   } catch (err) {
-                    setExportError(err instanceof Error ? err.message : "Export failed");
+                    setExportError(
+                      err instanceof Error ? err.message : "Export failed",
+                    );
                   } finally {
                     setExporting(null);
                   }
@@ -380,7 +405,9 @@ export default function AttendancePage() {
                       type: "staff",
                     });
                   } catch (err) {
-                    setExportError(err instanceof Error ? err.message : "Export failed");
+                    setExportError(
+                      err instanceof Error ? err.message : "Export failed",
+                    );
                   } finally {
                     setExporting(null);
                   }
@@ -404,7 +431,9 @@ export default function AttendancePage() {
                       type: "all",
                     });
                   } catch (err) {
-                    setExportError(err instanceof Error ? err.message : "Export failed");
+                    setExportError(
+                      err instanceof Error ? err.message : "Export failed",
+                    );
                   } finally {
                     setExporting(null);
                   }

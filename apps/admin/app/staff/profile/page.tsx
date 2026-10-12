@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useSession } from "@/lib/use-session-compat";
 import { Card, Button, Input, Label } from "@pathway/ui";
-import { Plus, Trash2, Check, X, ClipboardList } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { getSafeDisplayName } from "@/lib/names";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import {
@@ -20,6 +20,7 @@ import {
 import { toLocalDateKey } from "@/lib/date";
 import { ProfileHeaderCard } from "@/components/profile-header-card";
 import { UnavailableWindowEditor } from "@/components/staff/unavailable-window-editor";
+import { StaffActivityTable } from "./staff-activity-table";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -41,19 +42,6 @@ function getTierLabel(role: {
   if (role.isOrgAdmin || role.isOrgOwner) return "Admin";
   if (role.isSiteAdmin) return "Team Lead";
   return "Staff Member";
-}
-
-function formatSessionDate(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = d.getTime() - now.getTime();
-  const diffDays = Math.round(diffMs / (24 * 60 * 60 * 1000));
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Tomorrow";
-  if (diffDays === -1) return "Yesterday";
-  if (diffDays > 0 && diffDays <= 7) return `In ${diffDays}d`;
-  if (diffDays < 0 && diffDays >= -7) return `${-diffDays}d ago`;
-  return d.toLocaleDateString();
 }
 
 type AvailabilityRange = { day: string; startTime: string; endTime: string };
@@ -88,7 +76,6 @@ export default function StaffProfilePage() {
   const [validationErrors, setValidationErrors] = React.useState<
     Record<string, string>
   >({});
-  const [activityPage, setActivityPage] = React.useState(1);
   const [actionLoadingId, setActionLoadingId] = React.useState<string | null>(
     null,
   );
@@ -100,8 +87,6 @@ export default function StaffProfilePage() {
     d.setMonth(d.getMonth() + 3);
     return toLocalDateKey(d);
   });
-
-  const ACTIVITY_PAGE_SIZE = 5;
 
   const filteredAssignments = React.useMemo(() => {
     const list = profile?.assignments ?? [];
@@ -119,12 +104,6 @@ export default function StaffProfilePage() {
         return aStart.localeCompare(bStart);
       });
   }, [profile?.assignments, activityDateFrom, activityDateTo]);
-
-  React.useEffect(() => {
-    const total = filteredAssignments.length;
-    const totalPages = Math.max(1, Math.ceil(total / ACTIVITY_PAGE_SIZE));
-    setActivityPage((p) => Math.min(p, totalPages));
-  }, [filteredAssignments.length]);
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -620,220 +599,20 @@ export default function StaffProfilePage() {
               const to = toLocalDateKey(d);
               setActivityDateFrom(from);
               setActivityDateTo(to);
-              setActivityPage(1);
             }}
           >
             Reset to today
           </Button>
         </div>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                <th className="pb-3 pr-4">Session</th>
-                <th className="w-[120px] pb-3 pr-4">Date</th>
-                <th className="w-[100px] pb-3 text-center">Status</th>
-                <th className="w-[180px] pb-3 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!profile?.assignments?.length ? (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-text-muted">
-                    No sessions assigned yet
-                  </td>
-                </tr>
-              ) : !filteredAssignments.length ? (
-                <tr>
-                  <td colSpan={4} className="py-8 text-center text-text-muted">
-                    No sessions in this date range. Adjust the filter to see
-                    older or future dates.
-                  </td>
-                </tr>
-              ) : (
-                (() => {
-                  const assignments = filteredAssignments;
-                  const totalPages = Math.max(
-                    1,
-                    Math.ceil(assignments.length / ACTIVITY_PAGE_SIZE),
-                  );
-                  const page = Math.min(activityPage, totalPages);
-                  const paginated = assignments.slice(
-                    (page - 1) * ACTIVITY_PAGE_SIZE,
-                    page * ACTIVITY_PAGE_SIZE,
-                  );
-                  return (
-                    <>
-                      {paginated.map((a, i) => {
-                        const isPending = a.status === "PENDING";
-                        const isConfirmedOrDeclined =
-                          a.status === "CONFIRMED" || a.status === "DECLINED";
-                        const marked = a.session.attendanceMarked ?? 0;
-                        const total = a.session.attendanceTotal ?? 0;
-                        const attendanceComplete = total > 0 && marked >= total;
-                        const isBusy = actionLoadingId === a.id;
-
-                        return (
-                          <tr
-                            key={a.id}
-                            className={
-                              i < paginated.length - 1
-                                ? "border-b border-dashed border-border-subtle"
-                                : ""
-                            }
-                          >
-                            <td className="py-4 pr-4">
-                              <div>
-                                <div className="font-semibold text-text-primary">
-                                  {a.session.title}
-                                </div>
-                                {a.session.groups?.length > 0 && (
-                                  <div className="text-xs text-text-muted">
-                                    {a.session.groups
-                                      .map((g) => g.name)
-                                      .join(", ")}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-4 pr-4 text-text-muted">
-                              {formatSessionDate(a.session.startsAt)}
-                            </td>
-                            <td className="py-4 text-center">
-                              <span
-                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                                  a.status === "PENDING"
-                                    ? "bg-amber-100 text-amber-800"
-                                    : a.status === "CONFIRMED"
-                                      ? "bg-green-100 text-green-800"
-                                      : "bg-muted text-text-muted"
-                                }`}
-                              >
-                                {a.status === "PENDING" ? "Pending" : a.status}
-                              </span>
-                            </td>
-                            <td className="py-4">
-                              <div className="flex items-center justify-center gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() => handleAcceptAssignment(a.id)}
-                                  disabled={!isPending || isBusy}
-                                  className={
-                                    isConfirmedOrDeclined
-                                      ? "opacity-50 cursor-not-allowed"
-                                      : "h-8 w-8 p-0"
-                                  }
-                                  title={
-                                    isPending
-                                      ? "Accept serve request"
-                                      : "Already responded"
-                                  }
-                                  aria-label={
-                                    isPending
-                                      ? "Accept serve request"
-                                      : "Already responded"
-                                  }
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => handleDeclineAssignment(a.id)}
-                                  disabled={!isPending || isBusy}
-                                  className={
-                                    isConfirmedOrDeclined
-                                      ? "opacity-50 cursor-not-allowed"
-                                      : "h-8 w-8 p-0"
-                                  }
-                                  title={
-                                    isPending
-                                      ? "Decline serve request"
-                                      : "Already responded"
-                                  }
-                                  aria-label={
-                                    isPending
-                                      ? "Decline serve request"
-                                      : "Already responded"
-                                  }
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  asChild
-                                  className={
-                                    attendanceComplete
-                                      ? "opacity-50 h-8 w-8 p-0"
-                                      : "h-8 w-8 p-0"
-                                  }
-                                  title={
-                                    attendanceComplete
-                                      ? "Attendance already submitted"
-                                      : "Take attendance"
-                                  }
-                                  aria-label={
-                                    attendanceComplete
-                                      ? "Attendance already submitted"
-                                      : "Take attendance"
-                                  }
-                                >
-                                  <Link
-                                    href={`/attendance/${a.session.id}`}
-                                    className="inline-flex items-center justify-center"
-                                  >
-                                    <ClipboardList className="h-4 w-4" />
-                                  </Link>
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {totalPages > 1 && (
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className="border-t border-dashed border-border-subtle py-3"
-                          >
-                            <div className="flex items-center justify-center gap-2">
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() =>
-                                  setActivityPage((p) => Math.max(1, p - 1))
-                                }
-                                disabled={page <= 1}
-                              >
-                                Previous
-                              </Button>
-                              <span className="text-sm text-text-muted">
-                                Page {page} of {totalPages}
-                              </span>
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() =>
-                                  setActivityPage((p) =>
-                                    Math.min(totalPages, p + 1),
-                                  )
-                                }
-                                disabled={page >= totalPages}
-                              >
-                                Next
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </>
-                  );
-                })()
-              )}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <StaffActivityTable
+            assignments={filteredAssignments}
+            hasAssignments={Boolean(profile?.assignments?.length)}
+            busyId={actionLoadingId}
+            filterKey={`${activityDateFrom}:${activityDateTo}`}
+            onAccept={(id) => void handleAcceptAssignment(id)}
+            onDecline={(id) => void handleDeclineAssignment(id)}
+          />
         </div>
       </Card>
 

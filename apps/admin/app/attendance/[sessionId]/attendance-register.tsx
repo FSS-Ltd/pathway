@@ -516,6 +516,12 @@ export function AttendanceRegister({
         <DataTable
           columns={columns}
           data={filteredRows}
+          caption="Attendance register"
+          rowKey={(row) => row.childId}
+          pagination={{
+            mode: "client",
+            resetKey: `${childSearch}:${statusFilter}`,
+          }}
           emptyMessage={
             authoritative.rows.length === 0
               ? "No children in this session."

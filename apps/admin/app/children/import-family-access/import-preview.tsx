@@ -1,4 +1,11 @@
-import { Button, Card, Input, Label } from "@pathway/ui";
+import {
+  Button,
+  Card,
+  DataTable,
+  Input,
+  Label,
+  type ColumnDef,
+} from "@pathway/ui";
 import type { ParsedFamilyImportRow } from "@/lib/family-identity-import";
 
 type Props = {
@@ -29,6 +36,21 @@ export function ImportPreview({
   const guardianCount = rows.filter(
     ({ row }) => row.target === "GUARDIAN",
   ).length;
+  const columns: ColumnDef<ParsedFamilyImportRow>[] = [
+    { id: "row", header: "CSV row", cell: ({ csvRow }) => csvRow },
+    {
+      id: "child",
+      header: "Child",
+      cell: ({ row }) => childNames.get(row.childId) ?? row.childId,
+    },
+    { id: "account", header: "Account", cell: ({ row }) => row.email },
+    {
+      id: "target",
+      header: "Target",
+      cell: ({ row }) => (row.target === "GUARDIAN" ? "Guardian" : "Student"),
+      priority: "secondary",
+    },
+  ];
   return (
     <Card
       title="2. Check invitations"
@@ -71,49 +93,13 @@ export function ImportPreview({
               {rows.length} invitations ready: {guardianCount} guardians,{" "}
               {rows.length - guardianCount} students.
             </p>
-            <div className="overflow-x-auto rounded-lg border border-border-subtle">
-              <table className="min-w-full text-left text-sm">
-                <caption className="sr-only">
-                  First ten family invitations in the CSV file
-                </caption>
-                <thead className="bg-muted text-text-muted">
-                  <tr>
-                    <th scope="col" className="px-3 py-2">
-                      CSV row
-                    </th>
-                    <th scope="col" className="px-3 py-2">
-                      Child
-                    </th>
-                    <th scope="col" className="px-3 py-2">
-                      Account
-                    </th>
-                    <th scope="col" className="px-3 py-2">
-                      Target
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 10).map(({ csvRow, row }) => (
-                    <tr key={csvRow} className="border-t border-border-subtle">
-                      <td className="px-3 py-2">{csvRow}</td>
-                      <td className="px-3 py-2">
-                        {childNames.get(row.childId)}
-                      </td>
-                      <td className="px-3 py-2 break-all">{row.email}</td>
-                      <td className="px-3 py-2">
-                        {row.target === "GUARDIAN" ? "Guardian" : "Student"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {rows.length > 10 ? (
-              <p className="text-xs text-text-muted">
-                Showing the first 10 rows. All {rows.length} rows will be
-                processed.
-              </p>
-            ) : null}
+            <DataTable
+              data={rows}
+              columns={columns}
+              caption="Family invitations in the CSV file"
+              rowKey={({ csvRow }) => csvRow}
+              pagination={{ mode: "client", resetKey: fileName }}
+            />
             <label className="flex items-start gap-2 text-sm text-text-primary">
               <input
                 type="checkbox"

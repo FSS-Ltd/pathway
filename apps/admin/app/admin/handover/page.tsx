@@ -26,14 +26,12 @@ const statusLabel: Record<HandoverLogStatus, string> = {
   APPROVED: "Approved",
 };
 
-const statusTone: Record<
-  HandoverLogStatus,
-  "default" | "warning" | "success"
-> = {
-  DRAFT: "default",
-  PENDING_APPROVAL: "warning",
-  APPROVED: "success",
-};
+const statusTone: Record<HandoverLogStatus, "default" | "warning" | "success"> =
+  {
+    DRAFT: "default",
+    PENDING_APPROVAL: "warning",
+    APPROVED: "success",
+  };
 
 export default function AdminHandoverPage() {
   const router = useRouter();
@@ -137,6 +135,7 @@ export default function AdminHandoverPage() {
       },
       {
         id: "group",
+        priority: "secondary",
         header: "Group / Class",
         cell: (row) => {
           const name = groupNameMap.get(row.groupId) ?? "Unknown group";
@@ -151,16 +150,20 @@ export default function AdminHandoverPage() {
         id: "status",
         header: "Status",
         cell: (row) => (
-          <Badge variant={statusTone[row.status]}>{statusLabel[row.status]}</Badge>
+          <Badge variant={statusTone[row.status]}>
+            {statusLabel[row.status]}
+          </Badge>
         ),
         align: "center",
         width: "140px",
       },
       {
         id: "approvedAt",
+        priority: "secondary",
         header: "Approved at",
         cell: (row) => {
-          if (!row.approvedAt) return <span className="text-sm text-text-muted">—</span>;
+          if (!row.approvedAt)
+            return <span className="text-sm text-text-muted">—</span>;
           const d = new Date(row.approvedAt);
           const label = Number.isNaN(d.getTime())
             ? row.approvedAt
@@ -170,11 +173,7 @@ export default function AdminHandoverPage() {
                 hour: "2-digit",
                 minute: "2-digit",
               });
-          return (
-            <span className="text-sm text-text-muted">
-              {label}
-            </span>
-          );
+          return <span className="text-sm text-text-muted">{label}</span>;
         },
         width: "180px",
       },
@@ -328,6 +327,12 @@ export default function AdminHandoverPage() {
 
         <DataTable
           data={logs}
+          caption="Handover logs"
+          rowKey={(row) => row.id}
+          pagination={{
+            mode: "client",
+            resetKey: `${dateFilter}:${statusFilter}:${groupFilter}`,
+          }}
           columns={columns}
           isLoading={isLoading}
           emptyMessage="No handover logs found for the selected filters."
@@ -337,4 +342,3 @@ export default function AdminHandoverPage() {
     </div>
   );
 }
-
