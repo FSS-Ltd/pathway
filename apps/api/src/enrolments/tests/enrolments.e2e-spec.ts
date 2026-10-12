@@ -121,6 +121,12 @@ describe("continuing enrolment (e2e)", () => {
     expect(created.status).toBe(201);
     expect(created.body.localReference).toBe(`ROLL-${nonce}`);
     const identityId = created.body.id as string;
+    expect(
+      await prisma.orgChildIdentity.findUnique({
+        where: { id: identityId },
+        select: { orgId: true, localReference: true },
+      }),
+    ).toEqual({ orgId, localReference: `ROLL-${nonce}` });
     await expect(
       identities.createIdentity(
         orgId,
