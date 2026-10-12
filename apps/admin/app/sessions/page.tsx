@@ -138,8 +138,6 @@ export default function SessionsPage() {
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | "not_started" | "in_progress" | "completed"
   >("all");
-  const [sessionPage, setSessionPage] = React.useState(0);
-  const sessionPageSize = 10;
 
   const [weekStart, setWeekStart] = React.useState<Date>(() =>
     startOfWeek(new Date()),
@@ -243,6 +241,7 @@ export default function SessionsPage() {
       },
       {
         id: "attendance",
+        priority: "secondary",
         header: "Attendance",
         cell: (row) =>
           row.rotaKind === "STANDARD" ? (
@@ -268,23 +267,6 @@ export default function SessionsPage() {
       return matchesQuery && matchesStatus;
     });
   }, [sessions, sessionSearch, statusFilter]);
-
-  const totalSessionPages = Math.max(
-    1,
-    Math.ceil(filteredSessions.length / sessionPageSize),
-  );
-  const paginatedSessions = React.useMemo(
-    () =>
-      filteredSessions.slice(
-        sessionPage * sessionPageSize,
-        (sessionPage + 1) * sessionPageSize,
-      ),
-    [filteredSessions, sessionPage, sessionPageSize],
-  );
-
-  React.useEffect(() => {
-    if (sessionPage >= totalSessionPages) setSessionPage(0);
-  }, [sessionPage, totalSessionPages]);
 
   const weekDates = React.useMemo(
     () => Array.from({ length: 7 }, (_, idx) => addDays(weekStart, idx)),
@@ -388,7 +370,12 @@ export default function SessionsPage() {
             </div>
           </div>
           <DataTable
-            data={paginatedSessions}
+            data={filteredSessions}
+            caption="Scheduled sessions"
+            pagination={{
+              mode: "client",
+              resetKey: `${sessionSearch}:${statusFilter}`,
+            }}
             columns={columns}
             isLoading={isLoadingSessions}
             emptyMessage="No sessions have been scheduled yet."
@@ -397,45 +384,6 @@ export default function SessionsPage() {
               router.push(`/sessions/${row.id}`);
             }}
           />
-          {filteredSessions.length > sessionPageSize ? (
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3">
-              <p className="text-sm text-text-muted">
-                Showing {sessionPage * sessionPageSize + 1}–
-                {Math.min(
-                  (sessionPage + 1) * sessionPageSize,
-                  filteredSessions.length,
-                )}{" "}
-                of {filteredSessions.length}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={sessionPage === 0}
-                  onClick={() => setSessionPage((p) => Math.max(0, p - 1))}
-                  aria-label="Previous page"
-                >
-                  Previous
-                </Button>
-                <span className="text-sm text-text-muted">
-                  Page {sessionPage + 1} of {totalSessionPages}
-                </span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={sessionPage >= totalSessionPages - 1}
-                  onClick={() =>
-                    setSessionPage((p) =>
-                      Math.min(totalSessionPages - 1, p + 1),
-                    )
-                  }
-                  aria-label="Next page"
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          ) : null}
         </>
       )}
     </Card>

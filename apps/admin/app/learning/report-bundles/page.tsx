@@ -107,6 +107,7 @@ export default function LearningReportBundlesPage() {
       },
       {
         id: "scope",
+        priority: "secondary",
         header: "Scope",
         cell: (row) => (row.childId ? "One child" : "All children"),
       },
@@ -225,6 +226,9 @@ export default function LearningReportBundlesPage() {
         ) : null}
         <DataTable
           data={bundles}
+          caption="Report bundles"
+          rowKey={(row) => row.id}
+          pagination={{ mode: "client" }}
           columns={columns}
           isLoading={isLoading}
           emptyMessage="No report bundles have been requested yet."

@@ -88,6 +88,7 @@ export default function ChildrenPage() {
       },
       {
         id: "ageGroup",
+        priority: "secondary",
         header: "Age group",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -98,6 +99,7 @@ export default function ChildrenPage() {
       },
       {
         id: "primaryGroup",
+        priority: "secondary",
         header: "Primary group/class",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -108,6 +110,7 @@ export default function ChildrenPage() {
       },
       {
         id: "flags",
+        priority: "secondary",
         header: "Flags",
         cell: (row) => (
           <div className="flex flex-wrap gap-2">
@@ -207,6 +210,12 @@ export default function ChildrenPage() {
             </div>
             <DataTable
               data={filteredData}
+              caption="Children"
+              rowKey={(row) => row.id}
+              pagination={{
+                mode: "client",
+                resetKey: `${searchQuery}:${ageFilter}`,
+              }}
               columns={columns}
               isLoading={isLoading}
               emptyMessage="No children are registered for this organisation yet."

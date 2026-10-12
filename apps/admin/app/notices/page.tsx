@@ -115,6 +115,7 @@ function ManageNoticesPage() {
       },
       {
         id: "created",
+        priority: "secondary",
         header: "Created",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -126,6 +127,7 @@ function ManageNoticesPage() {
       },
       {
         id: "scheduled",
+        priority: "secondary",
         header: "Scheduled",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -213,6 +215,12 @@ function ManageNoticesPage() {
             </div>
             <DataTable
               data={filteredData}
+              caption="Announcements"
+              rowKey={(row) => row.id}
+              pagination={{
+                mode: "client",
+                resetKey: `${searchQuery}:${statusFilter}:${audienceFilter}`,
+              }}
               columns={columns}
               isLoading={isLoading}
               emptyMessage="No announcements have been created for this organisation yet."

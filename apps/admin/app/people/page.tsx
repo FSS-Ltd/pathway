@@ -214,12 +214,14 @@ export default function PeoplePage() {
       },
       {
         id: "orgRole",
+        priority: "secondary",
         header: "Org role",
         cell: (row) => <Badge variant="default">{row.orgRole}</Badge>,
         width: "140px",
       },
       {
         id: "siteAccess",
+        priority: "secondary",
         header: "Site access",
         cell: (row) => (
           <span className="text-sm text-text-secondary">
@@ -290,6 +292,7 @@ export default function PeoplePage() {
       },
       {
         id: "role",
+        priority: "secondary",
         header: "Roles",
         cell: (row) => (
           <div className="flex flex-col gap-1">
@@ -301,6 +304,7 @@ export default function PeoplePage() {
       },
       {
         id: "expires",
+        priority: "secondary",
         header: "Expires",
         cell: (row) => (
           <span className="text-sm text-text-secondary">
@@ -358,6 +362,7 @@ export default function PeoplePage() {
       },
       {
         id: "priorOrgRole",
+        priority: "secondary",
         header: "Previous role",
         cell: (row) => (
           <Badge variant="default">{row.priorOrgRole ?? "ORG_MEMBER"}</Badge>
@@ -366,6 +371,7 @@ export default function PeoplePage() {
       },
       {
         id: "priorSiteCount",
+        priority: "secondary",
         header: "Site access",
         cell: (row) => (
           <span className="text-sm text-text-secondary">
@@ -376,6 +382,7 @@ export default function PeoplePage() {
       },
       {
         id: "deletedAt",
+        priority: "secondary",
         header: "Deleted",
         cell: (row) => (
           <span className="text-sm text-text-secondary">
@@ -523,18 +530,27 @@ export default function PeoplePage() {
           <DataTable
             columns={peopleColumns}
             data={filteredPeople}
+            caption="People"
+            rowKey={(row) => row.id}
+            pagination={{ mode: "client", resetKey: searchQuery }}
             emptyMessage="No people found. Invite someone to get started."
           />
         ) : activeTab === "invites" ? (
           <DataTable
             columns={inviteColumns}
             data={filteredInvites}
+            caption="Pending invitations"
+            rowKey={(row) => row.id}
+            pagination={{ mode: "client", resetKey: searchQuery }}
             emptyMessage="No pending invites."
           />
         ) : (
           <DataTable
             columns={deletedPeopleColumns}
             data={filteredDeletedPeople}
+            caption="Deleted people"
+            rowKey={(row) => row.id}
+            pagination={{ mode: "client", resetKey: searchQuery }}
             emptyMessage="No deleted users."
           />
         )}

@@ -5,10 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAdminContext } from "@/lib/admin-context";
 import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
-import {
-  fetchClasses,
-  type ClassRow,
-} from "../../lib/api-client";
+import { fetchClasses, type ClassRow } from "../../lib/api-client";
 import { useOrgLabel } from "@/lib/use-org-ui";
 
 function formatAgeRange(min: number | null, max: number | null): string {
@@ -25,7 +22,8 @@ export default function ClassesPage() {
   const [data, setData] = React.useState<ClassRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const tenantId = adminState.status === "ready" ? adminState.snapshot.activeSiteId : null;
+  const tenantId =
+    adminState.status === "ready" ? adminState.snapshot.activeSiteId : null;
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -74,6 +72,7 @@ export default function ClassesPage() {
       },
       {
         id: "ageRange",
+        priority: "secondary",
         header: "Age range",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -97,6 +96,7 @@ export default function ClassesPage() {
       },
       {
         id: "sessions",
+        priority: "secondary",
         header: "Sessions",
         cell: (row) => (
           <span className="text-sm text-text-muted">
@@ -165,6 +165,9 @@ export default function ClassesPage() {
         ) : (
           <DataTable
             data={sortedData}
+            caption="Classes"
+            rowKey={(row) => row.id}
+            pagination={{ mode: "client" }}
             columns={columns}
             isLoading={isLoading}
             emptyMessage="No classes yet. Create one to get started."

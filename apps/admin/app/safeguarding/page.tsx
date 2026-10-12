@@ -117,6 +117,7 @@ export default function SafeguardingPage() {
       },
       {
         id: "category",
+        priority: "secondary",
         header: "Category",
         cell: (row) => (
           <span className="text-sm text-text-muted">{row.category ?? "-"}</span>
@@ -125,6 +126,7 @@ export default function SafeguardingPage() {
       },
       {
         id: "reportedBy",
+        priority: "secondary",
         header: "Reported by",
         cell: (row) => (
           <span className="text-sm text-text-muted">
@@ -200,6 +202,9 @@ export default function SafeguardingPage() {
     return (
       <DataTable
         data={concerns}
+        caption="Safeguarding concerns"
+        rowKey={(row) => row.id}
+        pagination={{ mode: "client" }}
         columns={columns}
         isLoading={false}
         emptyMessage="No open concerns."

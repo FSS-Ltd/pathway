@@ -188,6 +188,8 @@ export default function LearningPage() {
       >
         <DataTable
           data={logs.slice(0, 10)}
+          caption="Recent learning activity"
+          rowKey={(row) => row.id}
           columns={logColumns}
           isLoading={isLoading}
           emptyMessage="No learning activity has been recorded yet."
@@ -199,6 +201,8 @@ export default function LearningPage() {
       >
         <DataTable
           data={bundles.slice(0, 10)}
+          caption="Recent report bundles"
+          rowKey={(row) => row.id}
           columns={bundleColumns}
           isLoading={isLoading}
           emptyMessage="No report bundles have been requested yet."
