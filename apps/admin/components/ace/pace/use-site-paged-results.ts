@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
-import { requestFailure } from "@/lib/request-error";
 
 export type PagedSiteQuery = { cursor?: string; signal?: AbortSignal };
 
@@ -66,12 +65,9 @@ export function useSitePagedResults<T>(
         items: page.items,
         nextCursor: page.nextCursor,
       });
-    } catch (cause) {
+    } catch {
       if (requestGeneration !== generation.current) return;
-      setState({
-        ...emptyState<T>(),
-        error: requestFailure(cause, errorMessage).message,
-      });
+      setState({ ...emptyState<T>(), error: errorMessage });
     } finally {
       if (requestGeneration === generation.current) controller.current = null;
     }
@@ -100,12 +96,12 @@ export function useSitePagedResults<T>(
         nextCursor: page.nextCursor,
         isLoadingMore: false,
       }));
-    } catch (cause) {
+    } catch {
       if (requestGeneration !== generation.current) return;
       setState((current) => ({
         ...current,
         isLoadingMore: false,
-        loadMoreError: requestFailure(cause, errorMessage).message,
+        loadMoreError: errorMessage,
       }));
     } finally {
       if (requestGeneration === generation.current) controller.current = null;

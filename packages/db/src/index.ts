@@ -1,21 +1,17 @@
 // Canonical Prisma bootstrap (ESM/CJS/Jest-safe)
 import { PrismaClient, Prisma } from "@prisma/client";
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   withPiiEncryption,
   withPiiEncryptionTransaction,
 } from "./pii-encryption";
-import {
-  activeTransaction,
-  assertCompatibleScope,
-  runWithTransaction,
-  type TransactionScope,
-} from "./transaction-context";
 
 export * from "./permission-definition-sync";
 export * from "./seed-system-roles";
 
 // Keep a single PrismaClient instance across hot-reloads in dev/test
 const globalForPrisma = globalThis as unknown as { __prisma?: PrismaClient };
+const prismaContext = new AsyncLocalStorage<Prisma.TransactionClient>();
 
 export const transactionOptions = {
   maxWait: 10_000,
@@ -32,7 +28,7 @@ const basePrismaClient: PrismaClient = withPiiEncryption(rawPrismaClient);
 
 const prismaProxy = new Proxy(basePrismaClient, {
   get(target, prop, receiver) {
-    const activeClient = activeTransaction()?.client;
+    const activeClient = prismaContext.getStore();
     const resolved = activeClient ?? target;
     const value = Reflect.get(resolved, prop, receiver);
     if (typeof value === "function") {
@@ -71,13 +67,7 @@ export async function resetDatabase() {
         "OrgRoleDefinition",
         "PermissionDefinition",
         "BillingEvent",
-        "ModuleChange",
-        "ModuleGrant",
         "PendingOrder",
-        "InstitutionalBillingOperation",
-        "InstitutionalQuoteAcceptance",
-        "InstitutionalBillingSnapshot",
-        "InstitutionalBillingPolicy",
         "UsageCounters",
         "StaffActivity",
         "ReportBundle",
@@ -92,21 +82,10 @@ export async function resetDatabase() {
         "SwapRequest",
         "Assignment",
         "AttendanceCorrectionEvent",
-        "AceDailyAttendanceCorrectionEvent",
-        "AceDailyAttendance",
         "Attendance",
-        "AceStaffYearBandAssignment",
-        "AceSchoolEnrollment",
-        "AceTeachingDate",
-        "AceYearBand",
         "Session",
         "ChildNote",
         "Concern",
-        "ChildRegistrationSubmission",
-        "EnrolmentRollConfirmation",
-        "EnrolmentRevision",
-        "OrgChildSiteLink",
-        "OrgChildIdentity",
         "ChildGuardianContact",
         "Child",
         "Group",
@@ -143,10 +122,6 @@ export async function resetDatabase() {
         "LearningLog",
         "Subject",
         "PendingOrder",
-        "InstitutionalBillingOperation",
-        "InstitutionalQuoteAcceptance",
-        "InstitutionalBillingSnapshot",
-        "InstitutionalBillingPolicy",
         "Subscription",
         "Announcement",
         "Lesson",
@@ -154,17 +129,10 @@ export async function resetDatabase() {
         "SwapRequest",
         "Assignment",
         "AttendanceCorrectionEvent",
-        "AceDailyAttendanceCorrectionEvent",
-        "AceDailyAttendance",
         "Attendance",
-        "AceStaffYearBandAssignment",
-        "AceSchoolEnrollment",
-        "AceTeachingDate",
-        "AceYearBand",
         "Session",
         "ChildNote",
         "Concern",
-        "ChildRegistrationSubmission",
         "ChildGuardianContact",
         "Child",
         "Group",
@@ -191,25 +159,15 @@ export type { PrismaClient as PrismaClientType } from "@prisma/client";
 export {
   PrismaClient,
   AssignmentStatus,
-  SessionRotaKind,
   Role,
   Weekday,
   SwapStatus,
   SubscriptionStatus,
   BillingProvider,
-  BillingEventProcessingStatus,
-  AuditAction,
-  AuditEntityType,
   PendingOrderStatus,
-  InstitutionalSnapshotKind,
-  InstitutionalSnapshotStatus,
-  InstitutionalCountSource,
-  InstitutionalBillingOperationKind,
-  InstitutionalBillingOperationStatus,
   OrgRole,
   SiteRole,
   AttendanceStatus,
-  AceDailyAbsenceReason,
   AttendanceCorrectionOrigin,
   StaffAttendanceStatus,
   ChildGuardianContactType,
@@ -217,8 +175,6 @@ export {
   Vertical,
   Module,
   ModuleStatus,
-  ModuleGrantSource,
-  ModuleChangeStatus,
   ReportBundleStatus,
   RoleScope,
 } from "@prisma/client";
@@ -234,20 +190,6 @@ export async function applyTenantContext(
   tenantId: string,
   orgId?: string | null,
 ) {
-  const active = activeTransaction();
-  if (active) {
-    if (active.client !== tx) {
-      throw new Error("Cannot set RLS on a second active database transaction");
-    }
-    const requested: TransactionScope = tenantId
-      ? { kind: "tenant", tenantId, orgId: orgId ?? null, readOnly: false }
-      : {
-          kind: "org",
-          orgId: orgId ?? "",
-          readOnly: active.scope.readOnly,
-        };
-    assertCompatibleScope(active, requested);
-  }
   await tx.$executeRawUnsafe(
     `SELECT set_config('app.tenant_id', $1, true)`,
     tenantId,
@@ -261,19 +203,12 @@ export async function applyTenantContext(
 }
 
 /**
- * Join the active writable request transaction, or create one when none exists.
- * A nested callback participates in the outer transaction's rollback boundary.
+ * Run an interactive transaction using the base Prisma client.
+ * Use this when prisma.$transaction fails (e.g. with the Proxy in some environments).
  */
 export async function runTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  const active = activeTransaction();
-  if (active) {
-    if (active.scope.readOnly) {
-      throw new Error("Cannot write inside a read-only database transaction");
-    }
-    return fn(active.client);
-  }
   return basePrismaClient.$transaction((tx) =>
     fn(withPiiEncryptionTransaction(tx)),
   );
@@ -283,30 +218,17 @@ export async function runTransaction<T>(
 export function withPrismaTransactionContext<T>(
   tx: Prisma.TransactionClient,
   operation: () => Promise<T>,
-  scope: TransactionScope = { kind: "unscoped", readOnly: false },
 ): Promise<T> {
-  return runWithTransaction({ client: tx, scope }, operation);
+  return prismaContext.run(tx, operation);
 }
 
 export async function runReadOnlyTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
-  const active = activeTransaction();
-  if (active) {
-    if (!active.scope.readOnly) {
-      throw new Error(
-        "Cannot start a read-only transaction inside a write transaction",
-      );
-    }
-    return fn(active.client);
-  }
   return basePrismaClient.$transaction(async (tx) => {
     const encryptedTx = withPiiEncryptionTransaction(tx);
     await encryptedTx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
-    return runWithTransaction(
-      { client: encryptedTx, scope: { kind: "unscoped", readOnly: true } },
-      () => fn(encryptedTx),
-    );
+    return fn(encryptedTx);
   });
 }
 
@@ -319,24 +241,10 @@ export async function withTenantRlsContext<T>(
     throw new Error("withTenantRlsContext requires a tenantId");
   }
 
-  const scope: TransactionScope = {
-    kind: "tenant",
-    tenantId,
-    orgId,
-    readOnly: false,
-  };
-  const active = activeTransaction();
-  if (active) {
-    assertCompatibleScope(active, scope);
-    return callback(active.client);
-  }
-
   return basePrismaClient.$transaction(async (tx) => {
     const encryptedTx = withPiiEncryptionTransaction(tx);
     await applyTenantContext(encryptedTx, tenantId, orgId);
-    return runWithTransaction({ client: encryptedTx, scope }, () =>
-      callback(encryptedTx),
-    );
+    return prismaContext.run(encryptedTx, () => callback(encryptedTx));
   });
 }
 
@@ -348,19 +256,10 @@ export async function withOrgRlsContext<T>(
     throw new Error("withOrgRlsContext requires an orgId");
   }
 
-  const scope: TransactionScope = { kind: "org", orgId, readOnly: true };
-  const active = activeTransaction();
-  if (active) {
-    assertCompatibleScope(active, scope);
-    return callback(active.client);
-  }
-
   return basePrismaClient.$transaction(async (tx) => {
     const encryptedTx = withPiiEncryptionTransaction(tx);
     await encryptedTx.$executeRawUnsafe("SET TRANSACTION READ ONLY");
     await applyTenantContext(encryptedTx, "", orgId);
-    return runWithTransaction({ client: encryptedTx, scope }, () =>
-      callback(encryptedTx),
-    );
+    return prismaContext.run(encryptedTx, () => callback(encryptedTx));
   });
 }

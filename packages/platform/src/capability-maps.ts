@@ -41,7 +41,6 @@ export const VERTICAL_CAPABILITIES = {
   ],
   ACE_SCHOOL: [
     ...PLATFORM_CORE_CAPABILITIES,
-    "ace.attendance.export",
     "students.manage",
     "classes.manage",
     "pace.manage",
@@ -60,7 +59,6 @@ export const VERTICAL_CAPABILITIES = {
     "ace.pace.diagnostics.manage",
     "ace.behaviour.read",
     "ace.behaviour.record",
-    "ace.behaviour.correct",
     "ace.behaviour.sensitive.read",
     "ace.behaviour.policy.manage",
     "ace.reports.read",
@@ -68,7 +66,6 @@ export const VERTICAL_CAPABILITIES = {
     "ace.reports.review",
     "ace.reports.publish",
     "ace.parent.progress.read",
-    "ace.parent.notices.read",
     "ace.student.self.read",
     "ace.faith.read",
     "ace.faith.manage",

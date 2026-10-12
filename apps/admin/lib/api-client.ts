@@ -5,9 +5,7 @@
 // rely on implicit mock fallbacks.
 import { toLocalDateKey } from "./date";
 import { notifyActiveSiteChanged } from "./active-site-events";
-import { notifyAccessChanged } from "./access-change-events";
 import { AdminAttendanceSaveError } from "./attendance-save-error";
-import { apiErrorFromResponse, createApiFetch } from "./api-transport";
 
 export { AdminAttendanceSaveError } from "./attendance-save-error";
 export type { AdminAttendanceSaveOutcome } from "./attendance-save-error";
@@ -26,10 +24,6 @@ if (!publicApiUrl && !useMockApiExplicit) {
 }
 
 export const API_BASE_URL = publicApiUrl ?? "http://localhost:3333";
-
-// Existing API functions share one request-time authentication transport.
-export const apiFetch = createApiFetch(API_BASE_URL);
-const fetch = apiFetch;
 
 export const isUsingMockApi = (): boolean => {
   return useMockApiExplicit;
@@ -50,8 +44,6 @@ export type AdminRelatedConcernMeta = {
 
 export type AdminSessionRow = {
   id: string;
-  rotaKind?: AdminSessionRotaKind;
-  familyPublishedAt?: string | null;
   title: string;
   startsAt: string;
   endsAt: string;
@@ -92,7 +84,6 @@ export type AdminAssignmentRow = {
   roleLabel: "Lead" | "Support" | string;
   status: "pending" | "confirmed" | "declined";
   sessionTitle?: string;
-  rotaKind?: AdminSessionRotaKind;
   sessionGroupName?: string;
   /** Hex color for the primary group (for rota/schedule card styling) */
   sessionGroupColor?: string | null;
@@ -117,13 +108,10 @@ export type AdminSessionDetail = AdminSessionRow & {
 };
 
 // SESSION FORMS (CreateSessionDto / UpdateSessionDto subset)
-export type AdminSessionRotaKind = "STANDARD" | "COVER" | "MEETING";
-
 export type AdminSessionFormValues = {
   title: string;
   startsAt: string;
   endsAt: string;
-  rotaKind?: AdminSessionRotaKind;
   /** @deprecated use groupIds */
   groupId?: string;
   groupIds?: string[];
@@ -208,10 +196,6 @@ export type AdminAnnouncementDetail = {
   createdAt: string | null;
   scheduledAt: string | null;
   publishedAt: string | null;
-  withdrawnAt: string | null;
-  legacyImportedAt: string | null;
-  scheduleFailedAt: string | null;
-  scheduleFailureReason: string | null;
   channels?: string[] | null;
   targetsSummary?: string | null;
 };
@@ -236,6 +220,18 @@ export type MyNextHandoverResponse =
   | MyNextHandoverAvailable;
 
 export type HandoverLogStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
+
+
+// ANNOUNCEMENTS FORMS (CreateAnnouncementDto / UpdateAnnouncementDto subset)
+export type AdminAnnouncementFormValues = {
+  title: string;
+  body: string;
+  audience: "ALL" | "PARENTS" | "STAFF";
+  sendMode: "draft" | "now" | "schedule";
+  scheduledAt?: string;
+  channels?: string[];
+  tenantId?: string;
+};
 
 export type AdminAttendanceRow = {
   id: string; // sessionId
@@ -448,7 +444,6 @@ export type AdminBuyNowPurchaseRequest = {
   extraLeaderSeats?: number | null;
   extraSites?: number | null;
   selectedModules?: AdminModule[];
-  selectedIncludedModules?: AdminModule[];
   successUrl?: string | null;
   cancelUrl?: string | null;
 };
@@ -510,10 +505,6 @@ export type AdminOrgModule = {
   activatedAt: string | null;
   expiresAt: string | null;
   billingSource: string | null;
-  grantSources?: Array<{
-    source: "PLAN" | "PAID_ADDON" | "MANUAL";
-    sourceId: string;
-  }>;
 };
 
 export type AdminOrgOverview = {
@@ -633,8 +624,8 @@ export type AdminReportBundleInput = {
   periodEnd: string;
 };
 
-// Legacy header builder for call sites that pass a token explicitly.
-// createApiFetch replaces it with a current Clerk token at request time.
+// Auth header builder with support for runtime token injection.
+// Token comes from Clerk via setApiClientToken() (see lib/use-session-compat.tsx).
 let accessTokenOverride: string | null = null;
 export function setApiClientToken(token?: string | null) {
   accessTokenOverride = token ?? null;
@@ -740,10 +731,7 @@ export async function fetchAceDashboard(
     signal: input.signal,
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to load the ACE overview.",
-    );
+    throw new Error("Unable to load the ACE overview.");
   }
   return response.json() as Promise<AceDashboardResponse>;
 }
@@ -834,9 +822,7 @@ export async function createAcademicYear(
   input: CreateAdminAcademicYearInput,
 ): Promise<AdminAcademicYear> {
   if (isUsingMockApi()) {
-    throw new Error(
-      "Academic calendar updates are not available in mock mode.",
-    );
+    throw new Error("Academic calendar updates are not available in mock mode.");
   }
   const response = await fetch(`${API_BASE_URL}/ace/academic-years`, {
     method: "POST",
@@ -849,26 +835,22 @@ export async function createAcademicYear(
   return response.json() as Promise<AdminAcademicYear>;
 }
 
-async function academicCalendarRequestError(
-  response: Response,
-): Promise<Error> {
+async function academicCalendarRequestError(response: Response): Promise<Error> {
   const fallback = `Academic calendar request failed: ${response.status}`;
-  const body = (await response.json().catch(() => null)) as unknown;
+  const body = await response.json().catch(() => null) as unknown;
   if (typeof body === "object" && body !== null && "message" in body) {
     const message = body.message;
-    if (typeof message === "string" && message.trim())
-      return new Error(message);
+    if (typeof message === "string" && message.trim()) return new Error(message);
   }
   return new Error(fallback);
 }
 
 async function studentSubjectsRequestError(response: Response): Promise<Error> {
   const fallback = `Subject placement request failed: ${response.status}`;
-  const body = (await response.json().catch(() => null)) as unknown;
+  const body = await response.json().catch(() => null) as unknown;
   if (typeof body === "object" && body !== null && "message" in body) {
     const { message } = body;
-    if (typeof message === "string" && message.trim())
-      return new Error(message);
+    if (typeof message === "string" && message.trim()) return new Error(message);
   }
   return new Error(fallback);
 }
@@ -1209,22 +1191,6 @@ export type AdminBehaviourCommandInput = {
   note?: string;
 };
 
-export type AdminBehaviourCorrectionInput = AdminBehaviourCommandInput & {
-  correctionReason: string;
-};
-
-export type AdminBehaviourRetractionInput = {
-  idempotencyKey: string;
-  reason: string;
-};
-
-export type AdminBehaviourRetractionResponse = {
-  id: string;
-  entryId: string;
-  retractedAt: string;
-  duplicate: boolean;
-};
-
 export type AdminBehaviourCommandResponse = {
   entry: AdminBehaviourEntry;
   duplicate: boolean;
@@ -1232,8 +1198,6 @@ export type AdminBehaviourCommandResponse = {
 
 export type AdminBehaviourHistoryResponse = {
   items: AdminBehaviourEntry[];
-  nextCursor: string | null;
-  canVoid?: boolean;
 };
 
 export type AdminBehaviourHistoryQuery = {
@@ -1241,95 +1205,7 @@ export type AdminBehaviourHistoryQuery = {
   type?: AdminBehaviourType;
   occurredFrom?: string;
   occurredTo?: string;
-  visibility?: AdminBehaviourVisibility | "ALL";
   limit?: number;
-  cursor?: string;
-};
-
-export type AdminBehaviourBatchInput = {
-  idempotencyKey: string;
-  childIds: string[];
-  occurredAt: string;
-  entries: Array<{
-    category: string;
-    type: AdminBehaviourType;
-    visibility: AdminBehaviourVisibility;
-    pointsDelta: number;
-    reason: string;
-    note?: string;
-    quantity: number;
-  }>;
-};
-
-export type AdminBehaviourBatchResponse = {
-  entries: AdminBehaviourEntry[];
-  duplicate: boolean;
-};
-
-export type AdminBehaviourTrendsQuery = {
-  from: string;
-  to: string;
-  bucket: "daily" | "weekly" | "monthly";
-  visibility: AdminBehaviourVisibility | "ALL";
-};
-
-export type AdminBehaviourTrendCounts = {
-  totalCount: number;
-  meritCount: number;
-  demeritCount: number;
-  generalCount: number;
-  meritPoints: number;
-  demeritPoints: number;
-  netPoints: number;
-};
-
-export type AdminBehaviourTrendsResponse = AdminBehaviourTrendsQuery & {
-  items: Array<AdminBehaviourTrendCounts & { bucketStart: string }>;
-  totals: AdminBehaviourTrendCounts;
-};
-
-export type AdminDemeritStatus = {
-  childId: string;
-  date: string;
-  policyVersion: number;
-  stage: number;
-  stageLabel: string;
-  action: "none" | "review" | "notify" | "head-review";
-  requiresNote: boolean;
-  headReview: boolean;
-  manualStage: number | null;
-  manualExpiresAt: string | null;
-};
-
-export type AdminDemeritOverrideInput = {
-  childId: string;
-  stage: number;
-  expectedPolicyVersion: number;
-  reason: string;
-  idempotencyKey: string;
-};
-
-export type AdminDemeritOverrideResponse = {
-  id: string;
-  stage: number;
-  expiresAt: string;
-  duplicate: boolean;
-};
-
-export type AdminBehaviourReviewRequest = {
-  id: string;
-  childId: string;
-  behaviourEntryId: string | null;
-  demeritStageOverrideId: string | null;
-  kind: "SITE" | "HEAD";
-  stage: number;
-  policyVersion: number;
-  requestedAt: string;
-};
-
-export type AdminBehaviourReviewResponse = {
-  items: AdminBehaviourReviewRequest[];
-  nextCursor: string | null;
 };
 
 export class AdminBehaviourApiError extends Error {
@@ -1355,89 +1231,9 @@ export async function fetchBehaviourPolicy(): Promise<AdminBehaviourPolicyRespon
 export async function fetchBehaviourHistory(
   query: AdminBehaviourHistoryQuery = {},
 ): Promise<AdminBehaviourHistoryResponse> {
-  if (isUsingMockApi()) return { items: [], nextCursor: null };
+  if (isUsingMockApi()) return { items: [] };
   return behaviourRequest<AdminBehaviourHistoryResponse>(
     `/ace/behaviour${behaviourQueryString(query)}`,
-  );
-}
-
-export function recordBehaviourBatch(
-  input: AdminBehaviourBatchInput,
-): Promise<AdminBehaviourBatchResponse> {
-  if (isUsingMockApi()) {
-    throw new Error("Behaviour batches are not available in mock mode.");
-  }
-  return behaviourRequest<AdminBehaviourBatchResponse>("/ace/behaviour/batch", {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export function fetchBehaviourTrends(
-  query: AdminBehaviourTrendsQuery,
-): Promise<AdminBehaviourTrendsResponse> {
-  if (isUsingMockApi()) {
-    return Promise.resolve({
-      ...query,
-      items: [],
-      totals: {
-        totalCount: 0,
-        meritCount: 0,
-        demeritCount: 0,
-        generalCount: 0,
-        meritPoints: 0,
-        demeritPoints: 0,
-        netPoints: 0,
-      },
-    });
-  }
-  return behaviourRequest<AdminBehaviourTrendsResponse>(
-    `/ace/behaviour/trends?${new URLSearchParams(query).toString()}`,
-  );
-}
-
-export function fetchDemeritStatus(
-  childId: string,
-  date: string,
-): Promise<AdminDemeritStatus | null> {
-  if (isUsingMockApi()) return Promise.resolve(null);
-  return behaviourRequest<AdminDemeritStatus | null>(
-    `/ace/behaviour/children/${encodeURIComponent(childId)}/demerit-status?date=${encodeURIComponent(date)}`,
-  );
-}
-
-export function createDemeritOverride(
-  input: AdminDemeritOverrideInput,
-): Promise<AdminDemeritOverrideResponse> {
-  if (isUsingMockApi()) {
-    throw new Error("Demerit overrides are not available in mock mode.");
-  }
-  return behaviourRequest<AdminDemeritOverrideResponse>(
-    "/ace/behaviour/demerit-overrides",
-    { method: "POST", body: JSON.stringify(input) },
-  );
-}
-
-export function fetchBehaviourReviewRequests(
-  childId: string,
-  cursor?: string,
-): Promise<AdminBehaviourReviewResponse> {
-  if (isUsingMockApi()) return Promise.resolve({ items: [], nextCursor: null });
-  const params = new URLSearchParams({ childId, limit: "10" });
-  if (cursor) params.set("cursor", cursor);
-  return behaviourRequest<AdminBehaviourReviewResponse>(
-    `/ace/behaviour/review-requests?${params.toString()}`,
-  );
-}
-
-export function fetchBehaviourReviewFact(
-  requestId: string,
-): Promise<{ entry: AdminBehaviourEntry }> {
-  if (isUsingMockApi()) {
-    throw new Error("Behaviour review facts are not available in mock mode.");
-  }
-  return behaviourRequest<{ entry: AdminBehaviourEntry }>(
-    `/ace/behaviour/review-requests/${encodeURIComponent(requestId)}/fact`,
   );
 }
 
@@ -1449,24 +1245,11 @@ export function recordBehaviour(
 
 export function correctBehaviour(
   entryId: string,
-  input: AdminBehaviourCorrectionInput,
+  input: AdminBehaviourCommandInput,
 ): Promise<AdminBehaviourCommandResponse> {
   return behaviourCommandRequest(
     `/ace/behaviour/${encodeURIComponent(entryId)}/corrections`,
     input,
-  );
-}
-
-export function retractBehaviour(
-  entryId: string,
-  input: AdminBehaviourRetractionInput,
-): Promise<AdminBehaviourRetractionResponse> {
-  if (isUsingMockApi()) {
-    throw new Error("Behaviour retractions are not available in mock mode.");
-  }
-  return behaviourRequest<AdminBehaviourRetractionResponse>(
-    `/ace/behaviour/${encodeURIComponent(entryId)}/retractions`,
-    { method: "POST", body: JSON.stringify(input) },
   );
 }
 
@@ -1503,9 +1286,7 @@ function behaviourQueryString(query: AdminBehaviourHistoryQuery): string {
   if (query.type) params.set("type", query.type);
   if (query.occurredFrom) params.set("occurredFrom", query.occurredFrom);
   if (query.occurredTo) params.set("occurredTo", query.occurredTo);
-  if (query.visibility) params.set("visibility", query.visibility);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
-  if (query.cursor) params.set("cursor", query.cursor);
   const encoded = params.toString();
   return encoded ? `?${encoded}` : "";
 }
@@ -1524,22 +1305,28 @@ async function behaviourRequestError(
       : "";
   const code =
     "code" in body && typeof body.code === "string" ? body.code : undefined;
-  return new AdminBehaviourApiError(message || fallback, response.status, code);
+  return new AdminBehaviourApiError(
+    message || fallback,
+    response.status,
+    code,
+  );
 }
 
 /** Get current user id from API (when session.user.id is missing). */
 export async function fetchMe(): Promise<{ userId: string }> {
   if (isUsingMockApi()) {
-    return { userId: "mock-user" };
+    return { userId: "" };
   }
   const res = await fetch(`${API_BASE_URL}/auth/me`, {
     method: "GET",
     headers: buildAuthHeaders(),
     cache: "no-store",
-    credentials: "include",
   });
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to resolve your account.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to get current user (${res.status}): ${body || res.statusText}`,
+    );
   }
   return res.json() as Promise<{ userId: string }>;
 }
@@ -1570,10 +1357,7 @@ export async function fetchActiveSiteState(): Promise<ActiveSiteState> {
     credentials: "include",
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to load available sites.",
-    );
+    throw new Error(`Failed to fetch active site: ${response.status}`);
   }
   return (await response.json()) as ActiveSiteState;
 }
@@ -1620,7 +1404,7 @@ export async function fetchUserRoles(
     credentials: "include",
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(response, "Unable to load your roles.");
+    throw new Error(`Failed to fetch user roles: ${response.status}`);
   }
   return (await response.json()) as UserRolesResponse;
 }
@@ -1637,9 +1421,9 @@ export async function fetchOrgCapabilities(
     cache: "no-store",
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to load enabled features.",
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch capabilities: ${response.status} ${body}`,
     );
   }
   const json = (await response.json()) as { capabilities: string[] };
@@ -1658,9 +1442,9 @@ export async function fetchMyPermissions(
     cache: "no-store",
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to load your permissions.",
+    const body = await response.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch effective permissions: ${response.status} ${body}`,
     );
   }
   const json = (await response.json()) as { permissions: string[] };
@@ -1684,14 +1468,11 @@ export async function fetchAuthDebugContext(): Promise<{
   dbSiteMemberships: Array<{ tenantId: string; role: string }>;
   dbOrgMemberships: Array<{ orgId: string; role: string }>;
 }> {
-  const response = await fetch(
-    `${API_BASE_URL}/auth/active-site/debug-context`,
-    {
-      method: "GET",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-    },
-  );
+  const response = await fetch(`${API_BASE_URL}/auth/active-site/debug-context`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch debug context: ${response.status}`);
   }
@@ -1714,7 +1495,7 @@ export async function setActiveSite(siteId: string): Promise<ActiveSiteState> {
     body: JSON.stringify({ siteId }),
   });
   if (!response.ok) {
-    throw await apiErrorFromResponse(response, "Unable to switch sites.");
+    throw new Error(`Failed to set active site: ${response.status}`);
   }
   const state = (await response.json()) as ActiveSiteState;
   notifyActiveSiteChanged();
@@ -1733,21 +1514,23 @@ export type AdminPublicSignupLink = {
  */
 export async function fetchPublicSignupLinkForCurrentSite(): Promise<AdminPublicSignupLink> {
   if (isUsingMockApi()) {
-    throw new Error(
-      "Parent signup QR requires the real API; disable mock API to use this feature.",
-    );
+    throw new Error("Parent signup QR requires the real API; disable mock API to use this feature.");
   }
-  const res = await fetch(
-    `${API_BASE_URL}/tenants/current/public-signup-link`,
-    {
-      method: "GET",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
+  const res = await fetch(`${API_BASE_URL}/tenants/current/public-signup-link`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to load signup link.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      res.status === 403
+        ? "You don’t have permission to manage the parent signup link for this site."
+        : res.status === 400
+          ? "Active site context required. Select a site first."
+          : `Failed to load signup link: ${res.status}${body ? ` ${body}` : ""}`,
+    );
   }
   return (await res.json()) as AdminPublicSignupLink;
 }
@@ -1757,21 +1540,23 @@ export async function fetchPublicSignupLinkForCurrentSite(): Promise<AdminPublic
  */
 export async function rotatePublicSignupLinkForCurrentSite(): Promise<AdminPublicSignupLink> {
   if (isUsingMockApi()) {
-    throw new Error(
-      "Parent signup QR requires the real API; disable mock API to use this feature.",
-    );
+    throw new Error("Parent signup QR requires the real API; disable mock API to use this feature.");
   }
-  const res = await fetch(
-    `${API_BASE_URL}/tenants/current/public-signup-link/rotate`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
+  const res = await fetch(`${API_BASE_URL}/tenants/current/public-signup-link/rotate`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to regenerate link.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      res.status === 403
+        ? "You don’t have permission to manage the parent signup link for this site."
+        : res.status === 400
+          ? "Active site context required. Select a site first."
+          : `Failed to rotate signup link: ${res.status}${body ? ` ${body}` : ""}`,
+    );
   }
   return (await res.json()) as AdminPublicSignupLink;
 }
@@ -1805,9 +1590,7 @@ export async function createGuestPassForCurrentSite(input: {
   consentConfirmed: boolean;
 }): Promise<GuestPassResult> {
   if (isUsingMockApi()) {
-    throw new Error(
-      "Guest pass requires the real API; disable mock API to use this feature.",
-    );
+    throw new Error("Guest pass requires the real API; disable mock API to use this feature.");
   }
   const res = await fetch(`${API_BASE_URL}/guest-pass/current`, {
     method: "POST",
@@ -1883,7 +1666,6 @@ type ApiAssignment = {
   status?: string | null;
   session?: {
     id: string;
-    rotaKind?: AdminSessionRotaKind;
     title?: string | null;
     startsAt?: string | null;
     endsAt?: string | null;
@@ -1926,7 +1708,6 @@ export const mapApiAssignmentToAdminRow = (
       string,
       {
         title?: string | null;
-        rotaKind?: AdminSessionRotaKind;
         startsAt?: string | null;
         endsAt?: string | null;
       }
@@ -1948,7 +1729,8 @@ export const mapApiAssignmentToAdminRow = (
     ? assignment.session.groups.map((g) => g.name).join(", ")
     : ((assignment.session as { group?: { name: string } })?.group?.name ??
       undefined);
-  const sessionGroupColor = assignment.session?.groups?.[0]?.color ?? undefined;
+  const sessionGroupColor =
+    assignment.session?.groups?.[0]?.color ?? undefined;
 
   return {
     id: assignment.id,
@@ -1960,7 +1742,6 @@ export const mapApiAssignmentToAdminRow = (
     roleLabel: normalizeRoleLabel(assignment.role),
     status: normalizeAssignmentStatus(assignment.status),
     sessionTitle: sessionMeta?.title ?? undefined,
-    rotaKind: sessionMeta?.rotaKind ?? assignment.session?.rotaKind,
     sessionGroupName: sessionGroupName ?? undefined,
     sessionGroupColor: sessionGroupColor ?? undefined,
     startsAt,
@@ -2074,8 +1855,6 @@ export async function fetchSessionsMock(): Promise<AdminSessionRow[]> {
 
 type ApiSessionDetail = {
   id: string;
-  rotaKind?: AdminSessionRotaKind;
-  familyPublishedAt?: string | null;
   title: string | null;
   startsAt: string;
   endsAt: string;
@@ -2122,8 +1901,6 @@ const mapApiSessionDetailToAdmin = (
   s: ApiSessionDetail,
 ): AdminSessionDetail & { groupId?: string | null; groupIds?: string[] } => ({
   id: s.id,
-  rotaKind: s.rotaKind ?? "STANDARD",
-  familyPublishedAt: s.familyPublishedAt ?? null,
   title: s.title ?? "Session",
   startsAt: s.startsAt,
   endsAt: s.endsAt,
@@ -2306,9 +2083,7 @@ export type ExportAttendanceParams = {
 };
 
 /** Triggers a CSV download for attendance export. Uses fetch + blob. */
-export async function exportAttendanceCsv(
-  params: ExportAttendanceParams,
-): Promise<void> {
+export async function exportAttendanceCsv(params: ExportAttendanceParams): Promise<void> {
   if (isUsingMockApi()) {
     throw new Error(
       "Cannot export attendance: API base URL is not set. Set NEXT_PUBLIC_API_URL.",
@@ -2332,9 +2107,7 @@ export async function exportAttendanceCsv(
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to export attendance: ${res.status} ${body || res.statusText}`,
-    );
+    throw new Error(`Failed to export attendance: ${res.status} ${body || res.statusText}`);
   }
   const blob = await res.blob();
   const disposition = res.headers.get("Content-Disposition");
@@ -2359,12 +2132,14 @@ export async function fetchSessions(): Promise<AdminSessionRow[]> {
   });
 
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to load sessions.");
+    const body = await res.text();
+    throw new Error(
+      `Failed to load sessions (${res.status}): ${body || res.statusText}`,
+    );
   }
 
   type ApiSession = {
     id: string;
-    rotaKind?: AdminSessionRotaKind;
     title: string | null;
     startsAt: string;
     endsAt: string;
@@ -2388,7 +2163,6 @@ export async function fetchSessions(): Promise<AdminSessionRow[]> {
 
   return json.map((s) => ({
     id: s.id,
-    rotaKind: s.rotaKind ?? "STANDARD",
     title: s.title ?? "Session",
     startsAt: s.startsAt,
     endsAt: s.endsAt,
@@ -2422,7 +2196,7 @@ export async function fetchSessions(): Promise<AdminSessionRow[]> {
   }));
 }
 
-// CreateSessionDto: tenantId, groupIds?, startsAt, endsAt, title?, rotaKind?
+// CreateSessionDto: tenantId, groupIds?, startsAt, endsAt, title?
 export async function createSession(
   input: AdminSessionFormValues,
 ): Promise<AdminSessionDetail> {
@@ -2439,7 +2213,6 @@ export async function createSession(
     startsAt: input.startsAt,
     endsAt: input.endsAt,
     title: input.title?.trim() || undefined,
-    rotaKind: input.rotaKind ?? "STANDARD",
   };
 
   const res = await fetch(`${API_BASE_URL}/sessions`, {
@@ -2461,7 +2234,7 @@ export async function createSession(
   return mapApiSessionDetailToAdmin(json);
 }
 
-// UpdateSessionDto: tenantId?, groupIds?, startsAt?, endsAt?, title?, rotaKind?
+// UpdateSessionDto: tenantId?, groupIds?, startsAt?, endsAt?, title?
 export async function updateSession(
   id: string,
   input: Partial<AdminSessionFormValues>,
@@ -2476,7 +2249,6 @@ export async function updateSession(
         : undefined;
   const payload = {
     ...(input.title ? { title: input.title.trim() } : {}),
-    ...(input.rotaKind ? { rotaKind: input.rotaKind } : {}),
     ...(input.startsAt ? { startsAt: input.startsAt } : {}),
     ...(input.endsAt ? { endsAt: input.endsAt } : {}),
     ...(groupIds !== undefined ? { groupIds } : {}),
@@ -2678,7 +2450,6 @@ export async function fetchAssignmentsForOrg(
       type ApiSessionForLookup = {
         id: string;
         title?: string | null;
-        rotaKind?: AdminSessionRotaKind;
         startsAt?: string | null;
         endsAt?: string | null;
       };
@@ -2688,7 +2459,6 @@ export async function fetchAssignmentsForOrg(
           string,
           {
             title?: string | null;
-            rotaKind?: AdminSessionRotaKind;
             startsAt?: string | null;
             endsAt?: string | null;
           }
@@ -2696,16 +2466,17 @@ export async function fetchAssignmentsForOrg(
       >((acc, s) => {
         acc[s.id] = {
           title: s.title ?? undefined,
-          rotaKind: s.rotaKind,
           startsAt: s.startsAt ?? undefined,
           endsAt: s.endsAt ?? undefined,
         };
         return acc;
       }, {});
     } else {
-      throw await apiErrorFromResponse(
-        sessionsRes,
-        "Unable to load the schedule window.",
+      const body = await sessionsRes.text().catch(() => "");
+      console.warn(
+        "Failed to prefetch sessions for rota window",
+        sessionsRes.status,
+        body,
       );
     }
   }
@@ -2752,8 +2523,12 @@ export async function fetchAssignmentsForOrg(
     },
   );
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load assignments.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to load assignments (${res.status}): ${body || res.statusText}`,
+    );
+  }
 
   const json = (await res.json()) as ApiAssignment[];
   const filtered = json.filter((assignment) => {
@@ -2901,7 +2676,10 @@ export async function updateAssignment(
   });
 
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to update the assignment.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to update assignment (${res.status}): ${body || res.statusText}`,
+    );
   }
 
   const json = (await res.json()) as ApiAssignment;
@@ -2946,59 +2724,11 @@ export async function fetchMyAssignments(params: {
     dateFrom: params.dateFrom,
     dateTo: params.dateTo,
     status: params.status,
-    userLookup: {},
   });
 }
 
-export type AdminTeamAssignment = {
-  assignmentId: string;
-  sessionId: string;
-  sessionTitle: string;
-  rotaKind?: AdminSessionRotaKind;
-  startsAt: string;
-  endsAt: string;
-  groups: { id: string; name: string }[];
-  staffId: string;
-  staffName: string;
-  role: string;
-  status: "PENDING" | "CONFIRMED";
-};
-
-export async function fetchTeamSchedule(
-  dateFrom: string,
-  dateTo: string,
-  signal?: AbortSignal,
-): Promise<AdminTeamAssignment[]> {
-  if (isUsingMockApi()) return [];
-  const query = new URLSearchParams({ dateFrom, dateTo });
-  const response = await fetch(
-    `${API_BASE_URL}/assignments/team-schedule?${query.toString()}`,
-    { headers: buildAuthHeaders(), cache: "no-store", signal },
-  );
-  if (!response.ok) {
-    throw await apiErrorFromResponse(response, "Unable to load team rota.");
-  }
-  return response.json() as Promise<AdminTeamAssignment[]>;
-}
-
-export type SwapCandidate = { id: string; fullName: string };
-
-export async function fetchSwapCandidates(
-  assignmentId: string,
-  signal?: AbortSignal,
-): Promise<SwapCandidate[]> {
-  const res = await fetch(
-    `${API_BASE_URL}/swaps/candidates?assignmentId=${encodeURIComponent(assignmentId)}`,
-    { headers: buildAuthHeaders(), cache: "no-store", signal },
-  );
-  if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to load swap candidates.");
-  }
-  return res.json() as Promise<SwapCandidate[]>;
-}
-
-/** Command responses contain only the persisted swap request. */
-export type AdminSwapRequest = {
+/** Minimal swap request shape for My Schedule / swap UI */
+export type AdminSwapRequestRow = {
   id: string;
   assignmentId: string;
   fromUserId: string;
@@ -3007,20 +2737,11 @@ export type AdminSwapRequest = {
   createdAt: string;
 };
 
-/** List responses add the session and participant context used by the rota UI. */
-export type AdminSwapRequestRow = AdminSwapRequest & {
-  assignment: {
-    session: { title: string | null; startsAt: string; endsAt: string };
-  };
-  fromUser: { name: string | null };
-  toUser: { name: string | null } | null;
-};
-
 export async function createSwapRequest(params: {
   fromUserId: string;
   assignmentId: string;
   toUserId: string;
-}): Promise<AdminSwapRequest> {
+}): Promise<AdminSwapRequestRow> {
   const res = await fetch(`${API_BASE_URL}/swaps`, {
     method: "POST",
     headers: buildAuthHeaders(),
@@ -3032,9 +2753,12 @@ export async function createSwapRequest(params: {
     }),
   });
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to create the swap request.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to create swap request (${res.status}): ${body || res.statusText}`,
+    );
   }
-  return res.json() as Promise<AdminSwapRequest>;
+  return res.json() as Promise<AdminSwapRequestRow>;
 }
 
 /** Fetch swap requests where the current user is from or to. */
@@ -3051,10 +2775,12 @@ export async function fetchMySwapRequests(
       cache: "no-store",
     }),
   ]);
-  if (!fromRes.ok)
-    throw await apiErrorFromResponse(fromRes, "Unable to load swap requests.");
-  if (!toRes.ok)
-    throw await apiErrorFromResponse(toRes, "Unable to load swap requests.");
+  if (!fromRes.ok || !toRes.ok) {
+    const body =
+      (await fromRes.text().catch(() => "")) ||
+      (await toRes.text().catch(() => ""));
+    throw new Error(`Failed to load swap requests: ${body || "unknown"}`);
+  }
   const fromList = (await fromRes.json()) as AdminSwapRequestRow[];
   const toList = (await toRes.json()) as AdminSwapRequestRow[];
   const seen = new Set<string>();
@@ -3071,7 +2797,9 @@ export async function fetchMySwapRequests(
   return merged;
 }
 
-export async function acceptSwapRequest(id: string): Promise<AdminSwapRequest> {
+export async function acceptSwapRequest(
+  id: string,
+): Promise<AdminSwapRequestRow> {
   const res = await fetch(`${API_BASE_URL}/swaps/${id}`, {
     method: "PATCH",
     headers: buildAuthHeaders(),
@@ -3079,14 +2807,17 @@ export async function acceptSwapRequest(id: string): Promise<AdminSwapRequest> {
     body: JSON.stringify({ status: "ACCEPTED" }),
   });
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to accept the swap.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to accept swap (${res.status}): ${body || res.statusText}`,
+    );
   }
-  return res.json() as Promise<AdminSwapRequest>;
+  return res.json() as Promise<AdminSwapRequestRow>;
 }
 
 export async function declineSwapRequest(
   id: string,
-): Promise<AdminSwapRequest> {
+): Promise<AdminSwapRequestRow> {
   const res = await fetch(`${API_BASE_URL}/swaps/${id}`, {
     method: "PATCH",
     headers: buildAuthHeaders(),
@@ -3094,9 +2825,12 @@ export async function declineSwapRequest(
     body: JSON.stringify({ status: "DECLINED" }),
   });
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to decline the swap.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to decline swap (${res.status}): ${body || res.statusText}`,
+    );
   }
-  return res.json() as Promise<AdminSwapRequest>;
+  return res.json() as Promise<AdminSwapRequestRow>;
 }
 
 // TODO: replace with real API call using tenant-scoped endpoint and auth headers
@@ -3178,7 +2912,11 @@ const mapApiChildToAdmin = (c: ApiChild): AdminChildRow => ({
   preferredName: c.preferredName ?? null,
   ageGroup: c.ageGroupLabel ?? c.ageGroup ?? c.yearGroup ?? "-",
   primaryGroup:
-    c.group?.name ?? c.primaryGroupLabel ?? c.primaryGroup ?? c.groupId ?? "-",
+    c.group?.name ??
+    c.primaryGroupLabel ??
+    c.primaryGroup ??
+    c.groupId ??
+    "-",
   primaryGroupId: c.groupId ?? null,
   hasPhotoConsent: Boolean(c.hasPhotoConsent ?? c.photoConsent),
   hasAllergies: Array.isArray(c.allergies) && c.allergies.length > 0,
@@ -3194,7 +2932,11 @@ const mapApiChildDetailToAdmin = (c: ApiChildDetail): AdminChildDetail => ({
   preferredName: c.preferredName ?? null,
   ageGroupLabel: c.ageGroupLabel ?? c.ageGroup ?? c.yearGroup ?? null,
   primaryGroupLabel:
-    c.group?.name ?? c.primaryGroupLabel ?? c.primaryGroup ?? c.groupId ?? null,
+    c.group?.name ??
+    c.primaryGroupLabel ??
+    c.primaryGroup ??
+    c.groupId ??
+    null,
   hasPhotoConsent: Boolean(c.hasPhotoConsent ?? c.photoConsent),
   hasAllergies: Array.isArray(c.allergies) && c.allergies.length > 0,
   hasAdditionalNeeds:
@@ -3210,79 +2952,6 @@ const mapApiChildDetailToAdmin = (c: ApiChildDetail): AdminChildDetail => ({
     contactType: contact.contactType ?? "PRIMARY_GUARDIAN",
   })),
 });
-
-export type AdminChildRegistration = {
-  id: string;
-  formVersion: string;
-  submittedAt: string;
-  snapshot: {
-    household: { homeAddress: string | null };
-    guardian: {
-      name: string;
-      email: string;
-      phone: string;
-      relationship: string | null;
-    };
-    emergencyContacts: Array<{
-      name: string;
-      phone: string;
-      relationship: string | null;
-      secondaryPhone?: string | null;
-      email?: string | null;
-      canPickUp?: boolean;
-      identificationNote?: string | null;
-    }>;
-    pickupContacts: Array<{
-      name: string;
-      phone: string;
-      relationship: string | null;
-      secondaryPhone?: string | null;
-      email?: string | null;
-      canPickUp?: boolean;
-      identificationNote?: string | null;
-    }>;
-    care: {
-      homeLanguage: string | null;
-      medicalConditions: string | null;
-      medicationAtCentre: string | null;
-      dietaryRestrictions: string | null;
-      learningSupport: string | null;
-      interestsStrengths: string | null;
-      settlingComfortNotes: string | null;
-      allergies: string | null;
-      additionalNeedsNotes: string | null;
-      gpName: string | null;
-      gpPhone: string | null;
-      schoolName: string | null;
-      yearGroup: string | null;
-      specialNeedsType: string | null;
-      specialNeedsOther: string | null;
-      pickupPermissions: string | null;
-      photoConsent: boolean;
-    };
-    registrationLevel: string | null;
-    consents: Record<
-      string,
-      { wording: string; granted: boolean; initials: string }
-    >;
-  };
-};
-
-export async function fetchChildRegistration(
-  childId: string,
-): Promise<AdminChildRegistration | null> {
-  if (isUsingMockApi()) return null;
-  const response = await fetch(
-    `${API_BASE_URL}/children/${encodeURIComponent(childId)}/registration`,
-    {
-      headers: buildAuthHeaders(),
-      cache: "no-store",
-    },
-  );
-  if (!response.ok)
-    throw new Error(`Unable to load registration (${response.status}).`);
-  return (await response.json()) as AdminChildRegistration | null;
-}
 
 export async function fetchChildById(
   id: string,
@@ -3520,147 +3189,59 @@ export async function updateChild(
   return mapApiChildDetailToAdmin(json);
 }
 
-export type GuardianInvite = {
-  id: string;
-  email: string;
-  expiresAt: string;
-  acceptedAt: string | null;
-  revokedAt: string | null;
-};
-
-export type GuardianInviteReviewBasis = "SCHOOL_RECORDS" | "LEGAL_DOCUMENT";
-
-export async function listGuardianInvites(
-  childId: string,
-): Promise<GuardianInvite[]> {
-  if (isUsingMockApi()) return [];
-  const response = await fetch(
-    `${API_BASE_URL}/family-invites/guardian/children/${childId}`,
-    {
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
-  if (!response.ok)
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to load guardian invitations.",
-    );
-  return response.json() as Promise<GuardianInvite[]>;
-}
-
-export async function createGuardianInvite(
+/** Link an existing parent to a child by email. Caller must be a linked parent. */
+export async function linkParentToChild(
   childId: string,
   email: string,
-  reviewBasis: GuardianInviteReviewBasis,
-): Promise<GuardianInvite> {
-  if (isUsingMockApi()) throw new Error("Invitations require the API.");
-  const response = await fetch(
-    `${API_BASE_URL}/family-invites/guardian/children/${childId}`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      body: JSON.stringify({
-        email: email.trim(),
-        reviewBasis,
-        confirmedLegalAccess: true,
-      }),
-    },
-  );
-  if (!response.ok)
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to send guardian invitation.",
-    );
-  return response.json() as Promise<GuardianInvite>;
+): Promise<{ linked: true; parentId: string } | { userNotFound: true }> {
+  if (isUsingMockApi()) {
+    return { userNotFound: true };
+  }
+  const res = await fetch(`${API_BASE_URL}/children/${childId}/link-parent`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({ email: email.trim() }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to link parent: ${res.status} ${body}`);
+  }
+  return res.json() as Promise<
+    { linked: true; parentId: string } | { userNotFound: true }
+  >;
 }
 
-export async function resendGuardianInvite(
-  inviteId: string,
-  reviewBasis: GuardianInviteReviewBasis,
-): Promise<GuardianInvite> {
-  if (isUsingMockApi()) throw new Error("Invitations require the API.");
-  const response = await fetch(
-    `${API_BASE_URL}/family-invites/guardian/${inviteId}/resend`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      body: JSON.stringify({ reviewBasis, confirmedLegalAccess: true }),
-    },
-  );
-  if (!response.ok)
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to resend guardian invitation.",
-    );
-  return response.json() as Promise<GuardianInvite>;
-}
-
-export async function revokeGuardianInvite(inviteId: string): Promise<void> {
-  if (isUsingMockApi()) throw new Error("Invitations require the API.");
-  const response = await fetch(
-    `${API_BASE_URL}/family-invites/guardian/${inviteId}/revoke`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-    },
-  );
-  if (!response.ok)
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to revoke guardian invitation.",
-    );
-}
-
-export type GuardianInviteForRecipient = {
-  id: string;
-  siteName: string;
-  expiresAt: string;
-  acceptedAt: string | null;
-  revokedAt: string | null;
-};
-
-export async function getGuardianInviteForRecipient(
-  siteId: string,
-  inviteId: string,
-): Promise<GuardianInviteForRecipient> {
-  const response = await fetch(
-    `${API_BASE_URL}/family-invites/sites/${siteId}/${inviteId}`,
-    {
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
-  if (!response.ok)
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to load this invitation.",
-    );
-  return response.json() as Promise<GuardianInviteForRecipient>;
-}
-
-export async function acceptGuardianInvite(
-  siteId: string,
-  inviteId: string,
-): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/family-invites/sites/${siteId}/${inviteId}/accept`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-    },
-  );
-  if (!response.ok)
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to accept this invitation.",
-    );
+/** Invite a parent to a child. ORG_ADMIN or linked parent only. Links if user exists, creates+invites if not. */
+export async function inviteParentToChild(
+  childId: string,
+  email: string,
+  name?: string,
+): Promise<
+  | { linked: true; parentId: string }
+  | { invited: true; parentId: string }
+  | { userNotFound: true }
+> {
+  if (isUsingMockApi()) {
+    return { userNotFound: true };
+  }
+  const res = await fetch(`${API_BASE_URL}/children/${childId}/invite-parent`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({ email: email.trim(), name: name?.trim() || undefined }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to invite parent: ${res.status} ${body}`);
+  }
+  return res.json() as Promise<
+    | { linked: true; parentId: string }
+    | { invited: true; parentId: string }
+    | { userNotFound: true }
+  >;
 }
 
 /** Upload internal child profile photo. Only admin or linked parent can upload. */
@@ -3872,19 +3453,16 @@ export async function linkChildrenExistingUser(
     return { success: true, linkedCount: childrenToCreate.length };
   }
 
-  const res = await fetch(
-    `${API_BASE_URL}/parents/link-children-existing-user`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-      body: JSON.stringify({
-        inviteToken,
-        childrenToCreate,
-      }),
-    },
-  );
+  const res = await fetch(`${API_BASE_URL}/parents/link-children-existing-user`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify({
+      inviteToken,
+      childrenToCreate,
+    }),
+  });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -3950,10 +3528,6 @@ type ApiAnnouncement = {
   audience?: string | null;
   createdAt: string;
   scheduledAt?: string | null;
-  legacyImportedAt?: string | null;
-  withdrawnAt?: string | null;
-  scheduleFailedAt?: string | null;
-  scheduleFailureReason?: string | null;
 };
 
 const statusLabelMap: Record<string, string> = {
@@ -3967,14 +3541,6 @@ const audienceLabelMap: Record<string, string> = {
   parents: "Parents",
   staff: "Staff",
   parents_staff: "Parents & staff",
-  parents_and_staff: "Parents & staff",
-};
-
-const audienceLabel = (audience?: string | null): string | null => {
-  if (!audience) return null;
-  const normalized =
-    audience === "ALL" ? "parents_staff" : audience.toLowerCase();
-  return audienceLabelMap[normalized] ?? audience;
 };
 
 const mapApiAnnouncementToAdminRow = (
@@ -3982,7 +3548,8 @@ const mapApiAnnouncementToAdminRow = (
 ): AdminAnnouncementRow => ({
   id: api.id,
   title: api.title,
-  audienceLabel: audienceLabel(api.audience) ?? "-",
+  audienceLabel:
+    (api.audience && audienceLabelMap[api.audience]) || api.audience || "-",
   statusLabel: statusLabelMap[api.status] ?? api.status ?? "Unknown",
   createdAt: api.createdAt,
   scheduledAt: api.scheduledAt ?? null,
@@ -3994,7 +3561,8 @@ const mapApiAnnouncementToAdminDetail = (
   id: api.id,
   title: api.title,
   body: (api as { body?: string | null }).body ?? null,
-  audienceLabel: audienceLabel(api.audience),
+  audienceLabel:
+    (api.audience && audienceLabelMap[api.audience]) || api.audience || null,
   status:
     api.status === "draft" ||
     api.status === "scheduled" ||
@@ -4005,10 +3573,6 @@ const mapApiAnnouncementToAdminDetail = (
   createdAt: api.createdAt ?? null,
   scheduledAt: api.scheduledAt ?? null,
   publishedAt: (api as { publishedAt?: string | null }).publishedAt ?? null,
-  withdrawnAt: api.withdrawnAt ?? null,
-  legacyImportedAt: api.legacyImportedAt ?? null,
-  scheduleFailedAt: api.scheduleFailedAt ?? null,
-  scheduleFailureReason: api.scheduleFailureReason ?? null,
   channels:
     ((api as { channels?: string[] | null }).channels ??
     (api as { channel?: string | null }).channel)
@@ -4047,7 +3611,10 @@ export async function fetchAnnouncements(): Promise<AdminAnnouncementRow[]> {
   });
 
   if (!res.ok) {
-    throw await apiErrorFromResponse(res, "Unable to load announcements.");
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch announcements: ${res.status} ${body || res.statusText}`,
+    );
   }
 
   const json = (await res.json()) as ApiAnnouncement[];
@@ -4057,37 +3624,14 @@ export async function fetchAnnouncements(): Promise<AdminAnnouncementRow[]> {
 export async function fetchRecentAnnouncements(
   limit = 4,
 ): Promise<AdminAnnouncementRow[]> {
-  if (isUsingMockApi()) return (await fetchAnnouncements()).slice(0, limit);
-  const query = new URLSearchParams({
-    limit: String(Math.min(50, Math.max(1, limit))),
-  });
-  const response = await fetch(`${API_BASE_URL}/ace/notices?${query}`, {
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-  });
-  if (!response.ok) {
-    throw await apiErrorFromResponse(
-      response,
-      "Unable to load recent notices.",
-    );
-  }
-  const page = (await response.json()) as {
-    items: Array<{
-      id: string;
-      title: string;
-      audience: "STAFF" | "PARENTS_AND_STAFF";
-      publishedAt: string;
-    }>;
-  };
-  return page.items.map((notice) => ({
-    id: notice.id,
-    title: notice.title,
-    audienceLabel: audienceLabel(notice.audience) ?? "Staff",
-    statusLabel: "Sent",
-    createdAt: notice.publishedAt,
-    scheduledAt: null,
-  }));
+  const all = await fetchAnnouncements();
+  return all
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
+    .slice(0, limit);
 }
 
 // NOTICES: detail view is read-only; do not surface provider payloads or internal delivery logs here.
@@ -4110,10 +3654,6 @@ export async function fetchAnnouncementById(
           createdAt: row.createdAt,
           scheduledAt: row.scheduledAt ?? null,
           publishedAt: row.scheduledAt ?? null,
-          withdrawnAt: null,
-          legacyImportedAt: null,
-          scheduleFailedAt: null,
-          scheduleFailureReason: null,
           channels: ["in-app"],
           targetsSummary: row.audienceLabel,
         }
@@ -4130,6 +3670,86 @@ export async function fetchAnnouncementById(
     const body = await res.text().catch(() => "");
     throw new Error(
       `Failed to fetch announcement: ${res.status} ${body || res.statusText}`,
+    );
+  }
+
+  const json = (await res.json()) as ApiAnnouncement;
+  return mapApiAnnouncementToAdminDetail(json);
+}
+
+// CreateAnnouncementDto fields: tenantId, title, body, audience, publishedAt?
+export async function createAnnouncement(
+  input: AdminAnnouncementFormValues,
+): Promise<AdminAnnouncementDetail> {
+  const publishedAt =
+    input.sendMode === "now"
+      ? new Date().toISOString()
+      : input.sendMode === "schedule"
+        ? input.scheduledAt
+        : undefined;
+
+  const payload = {
+    tenantId: input.tenantId ?? getDefaultTenantId(),
+    title: input.title?.trim(),
+    body: input.body?.trim(),
+    audience: input.audience,
+    ...(publishedAt ? { publishedAt } : {}),
+  };
+
+  const res = await fetch(`${API_BASE_URL}/announcements`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to create announcement (${res.status}): ${
+        body || res.statusText
+      }`,
+    );
+  }
+
+  const json = (await res.json()) as ApiAnnouncement;
+  return mapApiAnnouncementToAdminDetail(json);
+}
+
+// UpdateAnnouncementDto fields: title?, body?, audience?, publishedAt?
+export async function updateAnnouncement(
+  id: string,
+  input: Partial<AdminAnnouncementFormValues>,
+): Promise<AdminAnnouncementDetail> {
+  const publishedAt =
+    input.sendMode === "now"
+      ? new Date().toISOString()
+      : input.sendMode === "schedule"
+        ? input.scheduledAt
+        : input.sendMode === "draft"
+          ? null
+          : undefined;
+
+  const payload = {
+    ...(input.title ? { title: input.title.trim() } : {}),
+    ...(input.body ? { body: input.body.trim() } : {}),
+    ...(input.audience ? { audience: input.audience } : {}),
+    ...(typeof publishedAt !== "undefined" ? { publishedAt } : {}),
+  };
+
+  const res = await fetch(`${API_BASE_URL}/announcements/${id}`, {
+    method: "PATCH",
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to update announcement (${res.status}): ${
+        body || res.statusText
+      }`,
     );
   }
 
@@ -4451,9 +4071,7 @@ type ApiReportBundle = {
   completedAt?: string | null;
 };
 
-const mapApiLearningSubjectToAdmin = (
-  subject: ApiLearningSubject,
-): AdminLearningSubject => ({
+const mapApiLearningSubjectToAdmin = (subject: ApiLearningSubject): AdminLearningSubject => ({
   id: subject.id,
   name: subject.name,
   category: subject.category ?? null,
@@ -4462,9 +4080,7 @@ const mapApiLearningSubjectToAdmin = (
   sortOrder: subject.sortOrder ?? null,
 });
 
-const mapApiLearningLogToAdmin = (
-  log: ApiLearningLog,
-): AdminLearningLogRow => ({
+const mapApiLearningLogToAdmin = (log: ApiLearningLog): AdminLearningLogRow => ({
   id: log.id,
   childId: log.childId,
   subjectId: log.subjectId ?? null,
@@ -4475,9 +4091,7 @@ const mapApiLearningLogToAdmin = (
   createdAt: log.createdAt,
 });
 
-const mapApiReportBundleToAdmin = (
-  bundle: ApiReportBundle,
-): AdminReportBundleRow => ({
+const mapApiReportBundleToAdmin = (bundle: ApiReportBundle): AdminReportBundleRow => ({
   id: bundle.id,
   childId: bundle.childId ?? null,
   periodStart: bundle.periodStart,
@@ -4489,10 +4103,7 @@ const mapApiReportBundleToAdmin = (
   completedAt: bundle.completedAt ?? null,
 });
 
-async function learningRequest<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T> {
+async function learningRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}/learning/${path}`, {
     ...init,
     headers: buildAuthHeaders(),
@@ -4500,9 +4111,7 @@ async function learningRequest<T>(
   });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(
-      `Learning request failed (${response.status}): ${body || response.statusText}`,
-    );
+    throw new Error(`Learning request failed (${response.status}): ${body || response.statusText}`);
   }
   return response.json() as Promise<T>;
 }
@@ -4514,13 +4123,7 @@ export async function fetchLearningSubjects(): Promise<AdminLearningSubject[]> {
 }
 
 export async function createLearningSubject(
-  input: Pick<AdminLearningSubject, "name"> &
-    Partial<
-      Pick<
-        AdminLearningSubject,
-        "category" | "color" | "isActive" | "sortOrder"
-      >
-    >,
+  input: Pick<AdminLearningSubject, "name"> & Partial<Pick<AdminLearningSubject, "category" | "color" | "isActive" | "sortOrder">>,
 ): Promise<AdminLearningSubject> {
   const subject = await learningRequest<ApiLearningSubject>("subjects", {
     method: "POST",
@@ -4541,9 +4144,7 @@ export async function fetchLearningLogs(): Promise<AdminLearningLogRow[]> {
   return logs.map(mapApiLearningLogToAdmin);
 }
 
-export async function createLearningLog(
-  input: AdminLearningLogInput,
-): Promise<AdminLearningLogRow> {
+export async function createLearningLog(input: AdminLearningLogInput): Promise<AdminLearningLogRow> {
   const log = await learningRequest<ApiLearningLog>("logs", {
     method: "POST",
     body: JSON.stringify({
@@ -4564,9 +4165,7 @@ export async function fetchReportBundles(): Promise<AdminReportBundleRow[]> {
   return bundles.map(mapApiReportBundleToAdmin);
 }
 
-export async function createReportBundle(
-  input: AdminReportBundleInput,
-): Promise<AdminReportBundleRow> {
+export async function createReportBundle(input: AdminReportBundleInput): Promise<AdminReportBundleRow> {
   const bundle = await learningRequest<ApiReportBundle>("report-bundles", {
     method: "POST",
     body: JSON.stringify({
@@ -4579,18 +4178,13 @@ export async function createReportBundle(
 }
 
 export async function downloadReportBundle(bundleId: string): Promise<void> {
-  const response = await fetch(
-    `${API_BASE_URL}/learning/report-bundles/${encodeURIComponent(bundleId)}/download`,
-    {
-      headers: buildAuthHeaders(),
-      cache: "no-store",
-    },
-  );
+  const response = await fetch(`${API_BASE_URL}/learning/report-bundles/${encodeURIComponent(bundleId)}/download`, {
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
-    throw new Error(
-      `Failed to download report bundle (${response.status}): ${body || response.statusText}`,
-    );
+    throw new Error(`Failed to download report bundle (${response.status}): ${body || response.statusText}`);
   }
   const url = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
@@ -4751,18 +4345,8 @@ export async function fetchAttendanceDetailBySessionId(
       roomLabel: "Room 12",
       ageGroupLabel: "Year 3",
       rows: [
-        {
-          attendanceId: "a1",
-          childId: "c1",
-          childName: "Amara Patel",
-          status: "present",
-        },
-        {
-          attendanceId: "a2",
-          childId: "c2",
-          childName: "Leo Williams",
-          status: "absent",
-        },
+        { attendanceId: "a1", childId: "c1", childName: "Amara Patel", status: "present" },
+        { attendanceId: "a2", childId: "c2", childName: "Leo Williams", status: "absent" },
       ],
       summary: { present: 1, absent: 1, late: 0, unknown: 0 },
       status: "in_progress",
@@ -4939,8 +4523,12 @@ export async function fetchOpenConcerns(): Promise<AdminConcernRow[]> {
     cache: "no-store",
   });
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load concerns.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch concerns: ${res.status} ${body || res.statusText}`,
+    );
+  }
 
   const json = (await res.json()) as ApiConcern[];
 
@@ -5067,8 +4655,12 @@ export async function fetchNotesSummary(): Promise<AdminNotesSummary> {
     cache: "no-store",
   });
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load notes summary.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to fetch notes: ${res.status} ${body || res.statusText}`,
+    );
+  }
 
   const notes = (await res.json()) as ApiNote[];
   const totalNotes = notes.length;
@@ -5486,7 +5078,6 @@ export async function createBuyNowPurchase(
       extraSmsMessages: input.extraSmsMessages ?? 0,
       extraLeaderSeats: input.extraLeaderSeats ?? 0,
       selectedModules: input.selectedModules,
-      selectedIncludedModules: input.selectedIncludedModules,
     }),
   });
 
@@ -5543,50 +5134,6 @@ export async function createBuyNowPurchase(
   };
 }
 
-export type AdminModuleChangePreview = {
-  id: string;
-  planCode: string;
-  includedModules: AdminModule[];
-  paidModules: AdminModule[];
-  subtotalPence: number;
-  effectiveAt: string;
-  expiresAt: string;
-  status: "PREVIEW" | "ACCEPTED" | "SCHEDULED" | "APPLIED" | "REVIEW_REQUIRED";
-};
-
-export async function previewModuleChange(input: {
-  planCode: string;
-  includedModules: AdminModule[];
-  paidModules: AdminModule[];
-}): Promise<AdminModuleChangePreview> {
-  const res = await fetch(`${API_BASE_URL}/billing/module-changes/preview`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-    body: JSON.stringify(input),
-  });
-  if (!res.ok)
-    throw new Error(`Unable to preview renewal change: ${await res.text()}`);
-  return res.json() as Promise<AdminModuleChangePreview>;
-}
-
-export async function acceptModuleChange(
-  changeId: string,
-  idempotencyKey: string,
-): Promise<AdminModuleChangePreview> {
-  const res = await fetch(`${API_BASE_URL}/billing/module-changes/accept`, {
-    method: "POST",
-    headers: buildAuthHeaders(),
-    credentials: "include",
-    cache: "no-store",
-    body: JSON.stringify({ changeId, idempotencyKey }),
-  });
-  if (!res.ok)
-    throw new Error(`Unable to schedule renewal change: ${await res.text()}`);
-  return res.json() as Promise<AdminModuleChangePreview>;
-}
-
 type ApiOrg = {
   id: string;
   name: string;
@@ -5633,7 +5180,6 @@ export async function fetchOrgOverview(): Promise<AdminOrgOverview> {
   const res = await fetch(`${API_BASE_URL}/orgs`, {
     headers: buildAuthHeaders(),
     cache: "no-store",
-    credentials: "include",
   });
 
   if (!res.ok) {
@@ -6043,18 +5589,14 @@ export async function fetchStaff(): Promise<AdminStaffRow[]> {
     cache: "no-store",
   });
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load staff.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch users: ${res.status} ${body}`);
+  }
 
   const json = (await res.json()) as ApiUser[];
   return json.map(mapUserToStaffRow);
 }
-
-export type StaffUnavailableWindow = {
-  date: string;
-  startMinute: number;
-  endMinute: number;
-  reason?: string | null;
-};
 
 export type StaffEditDetail = {
   id: string;
@@ -6073,7 +5615,7 @@ export type StaffEditDetail = {
     startTime: string;
     endTime: string;
   }[];
-  unavailableDates: StaffUnavailableWindow[];
+  unavailableDates: { date: string; reason: string | null }[];
   preferredGroups: { id: string; name: string }[];
   canEditAvailability: boolean;
   hasServeAccess?: boolean;
@@ -6123,7 +5665,7 @@ export type StaffProfileUpdatePayload = {
     startTime: string;
     endTime: string;
   }[];
-  unavailableDates?: StaffUnavailableWindow[];
+  unavailableDates?: { date: string; reason?: string }[];
   preferredGroupIds?: string[];
 };
 
@@ -6139,7 +5681,7 @@ export type StaffEditUpdatePayload = {
     startTime: string;
     endTime: string;
   }[];
-  unavailableDates?: StaffUnavailableWindow[];
+  unavailableDates?: { date: string; reason?: string }[];
   preferredGroupIds?: string[];
 };
 
@@ -6234,13 +5776,7 @@ export async function fetchStaffProfile(): Promise<StaffProfileDetail> {
         },
       ],
       children: [
-        {
-          id: "c1",
-          firstName: "Sam",
-          lastName: "Morgan",
-          preferredName: "Sammy",
-          group: { name: "Year 3" },
-        },
+        { id: "c1", firstName: "Sam", lastName: "Morgan", preferredName: "Sammy", group: { name: "Year 3" } },
       ],
     };
   }
@@ -6421,9 +5957,7 @@ export async function fetchHandoverForSession(
   );
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(
-      `Failed to fetch handover for session: ${res.status} ${body}`,
-    );
+    throw new Error(`Failed to fetch handover for session: ${res.status} ${body}`);
   }
   return (await res.json()) as HandoverForSessionResponse;
 }
@@ -6444,13 +5978,10 @@ export async function fetchHandoverById(
   if (isUsingMockApi()) {
     throw new Error("Handover detail requires real API.");
   }
-  const res = await fetch(
-    `${API_BASE_URL}/handover/${encodeURIComponent(id)}`,
-    {
-      headers: buildAuthHeaders(),
-      cache: "no-store",
-    },
-  );
+  const res = await fetch(`${API_BASE_URL}/handover/${encodeURIComponent(id)}`, {
+    headers: buildAuthHeaders(),
+    cache: "no-store",
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to fetch handover: ${res.status} ${body}`);
@@ -6544,15 +6075,12 @@ export async function fetchAdminHandoverDetail(
     throw new Error("Handover admin detail requires real API.");
   }
 
-  const res = await fetch(
-    `${API_BASE_URL}/admin/handover/${encodeURIComponent(id)}`,
-    {
-      method: "GET",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
+  const res = await fetch(`${API_BASE_URL}/admin/handover/${encodeURIComponent(id)}`, {
+    method: "GET",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -6622,7 +6150,9 @@ export async function approveAdminHandover(
     throw new Error(
       res.status === 403
         ? "You don’t have permission to approve this handover. (403)"
-        : `Failed to approve handover: ${res.status}${body ? ` ${body}` : ""}`,
+        : `Failed to approve handover: ${res.status}${
+            body ? ` ${body}` : ""
+          }`,
     );
   }
 
@@ -6655,7 +6185,9 @@ export async function rejectAdminHandover(
     throw new Error(
       res.status === 403
         ? "You don’t have permission to reject this handover. (403)"
-        : `Failed to reject handover: ${res.status}${body ? ` ${body}` : ""}`,
+        : `Failed to reject handover: ${res.status}${
+            body ? ` ${body}` : ""
+          }`,
     );
   }
 
@@ -6704,14 +6236,11 @@ export async function updateHandover(
   if (isUsingMockApi()) {
     return { id, status: payload.status ?? "DRAFT" };
   }
-  const res = await fetch(
-    `${API_BASE_URL}/handover/${encodeURIComponent(id)}`,
-    {
-      method: "PATCH",
-      headers: buildAuthHeaders(),
-      body: JSON.stringify(payload),
-    },
-  );
+  const res = await fetch(`${API_BASE_URL}/handover/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: buildAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Failed to update handover: ${res.status} ${body}`);
@@ -6993,7 +6522,11 @@ export async function fetchPeopleForOrg(orgId: string): Promise<PersonRow[]> {
     cache: "no-store",
   });
 
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load people.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("[api-client] fetchPeopleForOrg error:", res.status, body);
+    throw new Error(`Failed to fetch people: ${res.status} ${body}`);
+  }
 
   return (await res.json()) as PersonRow[];
 }
@@ -7009,8 +6542,10 @@ export async function fetchDeletedPeopleForOrg(
     cache: "no-store",
   });
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load deleted people.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch deleted people: ${res.status} ${body}`);
+  }
 
   return (await res.json()) as DeletedPersonRow[];
 }
@@ -7028,8 +6563,10 @@ export async function deletePersonFromOrg(
     cache: "no-store",
   });
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to remove this person.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to delete person: ${res.status} ${body}`);
+  }
 
   return (await res.json()) as DeletedPersonRow;
 }
@@ -7051,8 +6588,10 @@ export async function fetchInvitesForOrg(
     cache: "no-store",
   });
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load invitations.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch invites: ${res.status} ${body}`);
+  }
 
   return (await res.json()) as InviteRow[];
 }
@@ -7093,8 +6632,10 @@ export async function resendInvite(
     },
   );
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to resend invitation.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to resend invite: ${res.status} ${body}`);
+  }
 
   return (await res.json()) as InviteRow;
 }
@@ -7114,8 +6655,10 @@ export async function revokeInvite(
     },
   );
 
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to revoke invitation.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to revoke invite: ${res.status} ${body}`);
+  }
 
   return (await res.json()) as InviteRow;
 }
@@ -7209,9 +6752,7 @@ export async function fetchBlogPostsAdmin(
   return res.json();
 }
 
-export async function fetchBlogPostAdmin(
-  id: string,
-): Promise<AdminBlogPost | null> {
+export async function fetchBlogPostAdmin(id: string): Promise<AdminBlogPost | null> {
   if (isUsingMockApi()) return null;
   const res = await fetch(`${API_BASE_URL}/admin/blog/posts/${id}`, {
     headers: buildAuthHeaders(),
@@ -7384,8 +6925,6 @@ export type AdminRoleAssignment = {
 export type AdminEffectivePermission = {
   permissionKey: string;
   sourceRoleIds: string[];
-  sourceTagGrantIds?: string[];
-  sourceSuperUser?: true;
 };
 
 export type AdminAccessAuditEvent = {
@@ -7393,7 +6932,7 @@ export type AdminAccessAuditEvent = {
   createdAt: string;
   tenantId: string | null;
   actorUserId: string;
-  entityType: "ORG_ROLE" | "ROLE_ASSIGNMENT" | "ACCESS_TAG_GRANT";
+  entityType: "ORG_ROLE" | "ROLE_ASSIGNMENT";
   entityId: string | null;
   action: string;
   metadata: unknown;
@@ -7420,16 +6959,9 @@ export type AdminAccessSummary = {
 };
 
 /** Throws `Error("${code}:${message}")` when the API returns a coded error body. */
-async function throwCodedRoleApiError(
-  res: Response,
-  fallback: string,
-): Promise<never> {
+async function throwCodedRoleApiError(res: Response, fallback: string): Promise<never> {
   const body = await res.json().catch(() => null);
-  if (
-    body &&
-    typeof body.code === "string" &&
-    typeof body.message === "string"
-  ) {
+  if (body && typeof body.code === "string" && typeof body.message === "string") {
     throw new Error(`${body.code}:${body.message}`);
   }
   const text = await res.text().catch(() => "");
@@ -7442,7 +6974,10 @@ export async function fetchRoles(): Promise<AdminRoleDefinition[]> {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok) throw await apiErrorFromResponse(res, "Unable to load roles.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch roles: ${res.status} ${body}`);
+  }
   return res.json();
 }
 
@@ -7459,8 +6994,10 @@ export async function fetchRoleAssignments(params?: {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load role assignments.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch role assignments: ${res.status} ${body}`);
+  }
   return res.json();
 }
 
@@ -7477,24 +7014,18 @@ export async function assignRole(input: {
     body: JSON.stringify(input),
   });
   if (!res.ok) return throwCodedRoleApiError(res, "Failed to assign role");
-  notifyAccessChanged();
   return res.json();
 }
 
 export async function revokeRoleAssignment(
   assignmentId: string,
 ): Promise<AdminRoleAssignment> {
-  const res = await fetch(
-    `${API_BASE_URL}/access/assignments/${assignmentId}`,
-    {
-      method: "DELETE",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-    },
-  );
-  if (!res.ok)
-    return throwCodedRoleApiError(res, "Failed to revoke role assignment");
-  notifyAccessChanged();
+  const res = await fetch(`${API_BASE_URL}/access/assignments/${assignmentId}`, {
+    method: "DELETE",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+  });
+  if (!res.ok) return throwCodedRoleApiError(res, "Failed to revoke role assignment");
   return res.json();
 }
 
@@ -7512,34 +7043,32 @@ export async function fetchEffectivePermissions(userId: string): Promise<{
       cache: "no-store",
     },
   );
-  if (!res.ok)
-    throw await apiErrorFromResponse(
-      res,
-      "Unable to load effective permissions.",
-    );
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch effective permissions: ${res.status} ${body}`);
+  }
   return res.json();
 }
 
 export async function fetchAccessSummary(
   userId: string,
 ): Promise<AdminAccessSummary> {
-  const res = await fetch(
-    `${API_BASE_URL}/access/users/${userId}/access-summary`,
-    {
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-    },
-  );
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load access summary.");
+  const res = await fetch(`${API_BASE_URL}/access/users/${userId}/access-summary`, {
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch access summary: ${res.status} ${body}`);
+  }
   return res.json();
 }
 
 export async function fetchAccessAuditEvents(params?: {
   cursor?: string;
   limit?: number;
-  entityType?: "ORG_ROLE" | "ROLE_ASSIGNMENT" | "ACCESS_TAG_GRANT";
+  entityType?: "ORG_ROLE" | "ROLE_ASSIGNMENT";
 }): Promise<{ items: AdminAccessAuditEvent[]; nextCursor: string | null }> {
   const query = new URLSearchParams();
   if (params?.cursor) query.set("cursor", params.cursor);
@@ -7551,7 +7080,9 @@ export async function fetchAccessAuditEvents(params?: {
     credentials: "include",
     cache: "no-store",
   });
-  if (!res.ok)
-    throw await apiErrorFromResponse(res, "Unable to load audit events.");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Failed to fetch audit events: ${res.status} ${body}`);
+  }
   return res.json();
 }

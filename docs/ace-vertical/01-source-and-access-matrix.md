@@ -30,14 +30,6 @@ APIs are merged; the role-write retirement and assignment migration remain
 separate delivery steps. The original R01-R14 rows below are historical where
 they describe customer role mutations.
 
-The ACE-only `ace.attendance.export` capability is site-scoped, sensitive,
-delegable, and part of ACE core. Fixed Organisation Head and Site Lead roles
-hold it; other fixed roles do not. The `attendance-exporter` tag maps only to
-that key and cannot be granted outside an active ACE organisation by an actor
-who holds and may delegate it. The daily export route is outside the original
-68-route contract; its site, dated enrolment, year-band, row
-limit, tenant RLS, and audit checks are required in addition to the key.
-
 Step 1.2c adds these routes outside the original 68-route ACE contract. Each
 uses the authenticated request's organisation and selected site. Grant and
 revoke require an active fixed Organisation Head assignment; a legacy role
@@ -158,7 +150,7 @@ Edge cases follow the action and data, not the URL prefix. Report drafting and a
 | R26 | GET | `/ace/pace/exceptions` | `ace.pace.read` | `ace.pace.read` | organisation-head, site-lead | active selected-site context | active-site exception domain | staff-only | `none` | `sensitive` | trusted organisation/site context; tenant-scoped RLS |
 | R27 | GET | `/ace/behaviour` | `ace.behaviour.read` | `ace.behaviour.read` | organisation-head, site-lead, staff, safeguarding-lead | active selected-site context | active-site behaviour domain; sensitive fields require `ace.behaviour.sensitive.read` | staff-only field-visibility policy | `none` | `sensitive` | trusted tenant and child scope; tenantId/childId RLS |
 | R28 | POST | `/ace/behaviour` | `ace.behaviour.record` | `ace.behaviour.record` | site-lead, staff | active selected-site context | child enrolled at active site | staff-only field-visibility policy | `none` | `sensitive` | trusted tenant and child scope; tenantId/childId RLS |
-| R29 | POST | `/ace/behaviour/:id/corrections` | `ace.behaviour.correct` | `ace.behaviour.correct` | organisation-head, site-lead, scoped behaviour-corrector tag holder | active selected-site context | behaviour fact belongs to child and active site | staff-only field-visibility policy | `none` | `sensitive` | trusted tenant, child, and fact scope; tenantId RLS |
+| R29 | POST | `/ace/behaviour/:id/corrections` | `ace.behaviour.record` | `ace.behaviour.record` | organisation-head, site-lead | active selected-site context | behaviour fact belongs to child and active site | staff-only field-visibility policy | `none` | `sensitive` | trusted tenant, child, and fact scope; tenantId RLS |
 | R30 | GET | `/ace/behaviour/policy` | `ace.behaviour.read` | `ace.behaviour.read` | organisation-head, site-lead, staff | active selected-site context | active-site-domain | active-policy-version | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 | R31 | PUT | `/ace/behaviour/policy` | `ace.behaviour.policy.manage` | `ace.behaviour.policy.manage` | organisation-head, site-lead | active selected-site context | active-site-domain | active-policy-version | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
 | R32 | GET | `/ace/reports` | `ace.reports.read` | `ace.reports.read` | organisation-head, site-lead, staff | active selected-site context | active-site report domain | staff-only workflow visibility | `none` | `sensitive` | trusted tenant and child scope; tenantId/childId RLS |
@@ -213,32 +205,6 @@ Added by ACE-F14 to give the admin nav a source for the caller's own effective p
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | R70 | GET | `/ace/dashboard` | `ace.dashboard.read` | `ace.dashboard.read` | organisation-head, site-lead | active selected-site context | active-site aggregate domain | staff-only | none | standard | trusted organisation/site context; tenant-scoped RLS |
 
-## ACE core subject catalogue routes
-
-Subject setup is part of ACE core. These routes do not require the paid Learning
-module, and they do not grant access to Learning logs or evidence.
-
-| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| R71 | GET | `/ace/subjects` | `ace.settings.read` | `ace.settings.read` | organisation-head, site-lead, staff | active selected-site context | active-site subject domain | staff-only | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-| R72 | POST | `/ace/subjects` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | active-site subject domain | audited subject creation | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-| R73 | PATCH | `/ace/subjects/:id` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | subject belongs to active site | audited subject rename | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-| R74 | POST | `/ace/subjects/:id/deactivate` | `ace.settings.manage` | `ace.settings.manage` | organisation-head, site-lead | active selected-site context | subject belongs to active site | audited deactivation; existing placements retained | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-
-## ACE site notice draft routes
-
-Draft management is ACE core and does not publish a notice or grant reader access.
-Every route also checks the ACE vertical, current site membership, and absence
-of a student identity in the selected site.
-
-| ID | Method | Path | capability | permission | persona | membership | relationship | releasePolicy | featureToggle | sensitivity | tenantRls |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| R75 | POST | `/ace/notices/drafts` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | active ACE site | audited draft creation; no publication | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-| R76 | GET | `/ace/notices/drafts` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | active ACE site | bounded draft list | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-| R77 | GET | `/ace/notices/drafts/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | draft belongs to selected site | draft detail only | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-| R78 | PUT | `/ace/notices/drafts/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead, scoped delegate | current selected-site membership | draft belongs to selected site | audited edit with optimistic revision | `none` | `standard` | trusted organisation/site context; tenant-scoped RLS |
-| R79 | POST | `/ace/behaviour/:id/retractions` | `ace.behaviour.policy.manage` | `ace.behaviour.policy.manage` | fixed organisation-head or site-lead only | active selected-site context and fixed reviewer role | current behaviour fact belongs to active site | sensitive visibility requires `ace.behaviour.sensitive.read`; append-only audited void | `none` | `protected` | tenant-scoped RLS, fact and child binding, fixed-role service check |
-
 ## NexSteps legacy surface (Batch A)
 
 Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cutover, using `platform.access.*`-family keys already active in `PLATFORM_CORE_CAPABILITIES` for every vertical. Not part of the 68 exact ACE routes; recorded separately so that count stays accurate. Migration is bounded to the two controllers that authorised from no role check at all (announcements, attendance) - see the ACE-F14 build plan for the controllers still blocked on a missing permission key or a commercial-entitlement decision (children, classes, parents, lessons, orgs, staff, session assignments, learning).
@@ -253,10 +219,6 @@ Pre-ACE NexSteps routes migrated to typed permissions alongside the ACE-F14 cuto
 | N04 | PATCH | `/announcements/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | announcement belongs to active tenant | AV30 hard-cap enforcement on publish | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
 | N05 | DELETE | `/announcements/:id` | `notices.manage` | `notices.manage` | organisation-head, site-lead | active site membership | announcement belongs to active tenant | `none` | `none` | `standard` | trusted tenant context; tenant-scoped RLS |
 | N06 | GET | `/attendance` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
-| N06a | GET | `/attendance/daily` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active organisation membership; current site membership for site-lead and staff | selected site, dated school enrolment, and staff year-band assignment unless active fixed leader role grants full-site scope | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
-| N06b | PUT | `/attendance/daily/:date/children/:childId` | `attendance.manage` | `attendance.manage` | organisation-head, site-lead, staff | active organisation membership; current site membership for site-lead and staff | selected site, open teaching date, dated school enrolment, and staff year-band assignment unless active fixed leader role grants full-site scope | `none` | daily correction event and audit | `sensitive` | trusted tenant context; tenant-scoped RLS; serialised child/date writes |
-| N06c | GET | `/attendance/daily/:id/history` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active organisation membership; current site membership for site-lead and staff | selected-site daily fact and dated school enrolment; staff year-band assignment unless active fixed leader role grants full-site scope | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS; bounded signed cursor scoped to site and fact |
-| N06d | GET | `/attendance/daily/export` | `ace.attendance.export` | `ace.attendance.export` | organisation-head, site-lead, tagged staff | active organisation membership; current site membership for site-lead and staff | selected site, dated school enrolment and staff year-band assignment unless active fixed leader role grants full-site scope | ACE core; 31-day and 5,000-row cap | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS; successful CSV exports audited |
 | N07 | GET | `/attendance/session-summaries` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | `none` | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
 | N08 | GET | `/attendance/session/:sessionId` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | session belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
 | N09 | GET | `/attendance/:id` | `attendance.read` | `attendance.read` | organisation-head, site-lead, staff | active site membership | record belongs to active tenant | `none` | `none` | `sensitive` | trusted tenant context; tenant-scoped RLS |
@@ -309,7 +271,7 @@ its accountable owner records approval.
 | --- | --- | --- | --- |
 | Detailed capability/permission matrix approved | Approved for `ACE-F02` through `ACE-F14` | Jean-Fidele Ntagengwa (Product & Engineering) | consumed by `ACE-F02` through `ACE-F14` |
 | Access-control/delegation ADR approved | Approved for `ACE-F02` through `ACE-F14` | Jean-Fidele Ntagengwa (Product & Engineering) | governs `ACE-F02` through `ACE-F14`, especially `ACE-F12` and `ACE-F14` |
-| Student identity ADR / invitation policy | Approved on 11 October 2026: school approval per student governs all ACE student identities; the school owns age, consent, and safeguarding approval; no platform-wide minimum age | Jean-Fidele Ntagengwa (Product & Engineering) | The policy decision is closed. `ACE-M15` through `ACE-M20` and identity-dependent pilot gates still require their implementation and release evidence; mobile work remains paused. |
+| Student identity ADR approved | Open | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F17`, `ACE-M15` through `ACE-M20`, then identity-dependent pilot gates |
 | PACE correction model approved | Open | Jean-Fidele Ntagengwa (Product & Engineering) | `ACE-F16`, `ACE-O02`, `ACE-O03`, and `ACE-O09` through `ACE-O13` |
 | RLS launch blockers assigned | Open | Technical Agent | `ACE-F03`, `ACE-F15` through `ACE-F22`, every add-on schema PR, `ACE-L05`, and `ACE-L09` |
 | UK-only versus EU residency confirmed | Open | Jean-Fidele Ntagengwa (Product & Engineering), with Legal/Commercial review | child-data onboarding; `ACE-L04`, `ACE-L05`, and `ACE-L09` |

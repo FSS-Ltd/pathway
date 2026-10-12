@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
 import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
@@ -69,7 +70,6 @@ export default function LessonsPage() {
       },
       {
         id: "ageGroup",
-        priority: "secondary",
         header: "Age group",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -80,7 +80,6 @@ export default function LessonsPage() {
       },
       {
         id: "group",
-        priority: "secondary",
         header: "Group/Class",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -102,7 +101,6 @@ export default function LessonsPage() {
       },
       {
         id: "updated",
-        priority: "secondary",
         header: "Updated",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -154,9 +152,6 @@ export default function LessonsPage() {
         ) : (
           <DataTable
             data={data}
-            caption="Lessons"
-            rowKey={(row) => row.id}
-            pagination={{ mode: "client" }}
             columns={columns}
             isLoading={isLoading}
             emptyMessage="No lessons have been created for this organisation yet."
@@ -167,3 +162,4 @@ export default function LessonsPage() {
     </div>
   );
 }
+

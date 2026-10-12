@@ -1,9 +1,4 @@
-import {
-  API_BASE_URL,
-  apiFetch,
-  buildAuthHeaders,
-  isUsingMockApi,
-} from "./api-client";
+import { API_BASE_URL, buildAuthHeaders, isUsingMockApi } from "./api-client";
 
 export type AttendanceCorrection = {
   previousStatus: "PRESENT" | "ABSENT" | "LATE" | null;
@@ -27,7 +22,7 @@ export async function fetchAttendanceHistory(
 
   const params = new URLSearchParams({ limit: "25" });
   if (cursor) params.set("cursor", cursor);
-  const response = await apiFetch(
+  const response = await fetch(
     `${API_BASE_URL}/attendance/${encodeURIComponent(attendanceId)}/history?${params}`,
     {
       headers: buildAuthHeaders(),

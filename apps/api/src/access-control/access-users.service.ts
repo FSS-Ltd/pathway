@@ -1,7 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { getOrgCapabilities } from "@pathway/platform";
-import { Prisma } from "@pathway/db";
-import { roleApiError } from "./role-api-error";
 import { fromStoredAccessTagKey } from "./access-tag-keys";
 import {
   EffectivePermissionsService,
@@ -49,13 +47,6 @@ export interface AccessSummaryResult {
   organisationCapabilities: string[];
 }
 
-export interface AccessDirectoryQuery {
-  limit?: number;
-  cursor?: string;
-  search?: string;
-  roleDefinitionId?: string;
-}
-
 @Injectable()
 export class AccessUsersService {
   constructor(
@@ -64,140 +55,6 @@ export class AccessUsersService {
     @Inject(EffectivePermissionsService)
     private readonly effectivePermissions: EffectivePermissionsService,
   ) {}
-
-  async listDirectory(
-    actor: RoleActorContext,
-    query: AccessDirectoryQuery = {},
-  ) {
-    const limit = query.limit ?? 10;
-    if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
-      throw roleApiError(
-        400,
-        "INVALID_EFFECTIVE_ACCESS_REQUEST",
-        actor.requestId,
-      );
-    }
-    const now = new Date();
-    const search = query.search?.trim();
-    return this.transaction.run(actor, async (tx) => {
-      const filters: Prisma.OrgMembershipWhereInput[] = [
-        { orgId: actor.orgId },
-        ...(query.cursor ? [{ userId: { gt: query.cursor } }] : []),
-        ...(search
-          ? [
-              {
-                user: {
-                  OR: [
-                    {
-                      name: {
-                        contains: search,
-                        mode: Prisma.QueryMode.insensitive,
-                      },
-                    },
-                    {
-                      displayName: {
-                        contains: search,
-                        mode: Prisma.QueryMode.insensitive,
-                      },
-                    },
-                    {
-                      email: {
-                        contains: search,
-                        mode: Prisma.QueryMode.insensitive,
-                      },
-                    },
-                  ],
-                },
-              },
-            ]
-          : []),
-        ...(query.roleDefinitionId
-          ? [
-              {
-                user: {
-                  roleAssignments: {
-                    some: {
-                      orgId: actor.orgId,
-                      roleDefinitionId: query.roleDefinitionId,
-                      revokedAt: null,
-                      startsAt: { lte: now },
-                      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-                      roleDefinition: {
-                        isActive: true,
-                        OR: [
-                          { tenantId: null },
-                          ...(actor.tenantId
-                            ? [{ tenantId: actor.tenantId }]
-                            : []),
-                        ],
-                      },
-                    },
-                  },
-                },
-              },
-            ]
-          : []),
-      ];
-      const rows = await tx.orgMembership.findMany({
-        where: { AND: filters },
-        orderBy: { userId: "asc" },
-        take: limit + 1,
-        select: {
-          userId: true,
-          role: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              displayName: true,
-              email: true,
-              isActive: true,
-              superUser: true,
-              hasFamilyAccess: true,
-            },
-          },
-        },
-      });
-      const visibleRows = rows.slice(0, limit);
-      const assignments = visibleRows.length
-        ? await tx.userRoleAssignment.findMany({
-            where: {
-              orgId: actor.orgId,
-              userId: { in: visibleRows.map(({ userId }) => userId) },
-              revokedAt: null,
-              startsAt: { lte: now },
-              AND: [
-                { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
-                {
-                  OR: [
-                    { tenantId: null },
-                    ...(actor.tenantId ? [{ tenantId: actor.tenantId }] : []),
-                  ],
-                },
-              ],
-              roleDefinition: { isActive: true },
-            },
-            select: { userId: true, roleDefinitionId: true },
-          })
-        : [];
-      const roleIdsByUser = new Map<string, string[]>();
-      for (const assignment of assignments) {
-        const ids = roleIdsByUser.get(assignment.userId) ?? [];
-        ids.push(assignment.roleDefinitionId);
-        roleIdsByUser.set(assignment.userId, ids);
-      }
-      const items = visibleRows.map(({ user, role }) => ({
-        ...user,
-        orgRole: role,
-        roleDefinitionIds: roleIdsByUser.get(user.id) ?? [],
-      }));
-      return {
-        items,
-        nextCursor:
-          rows.length > limit ? (rows[limit - 1]?.userId ?? null) : null,
-      };
-    });
-  }
 
   async getEffectivePermissions(
     targetUserId: string,
@@ -226,51 +83,50 @@ export class AccessUsersService {
     actor: RoleActorContext,
   ): Promise<AccessSummaryResult> {
     return this.transaction.run(actor, async (tx) => {
-      const [membership, assignments, tagGrants, capabilities] =
-        await Promise.all([
-          tx.orgMembership.findUnique({
-            where: {
-              orgId_userId: { orgId: actor.orgId, userId: targetUserId },
-            },
-            select: { role: true },
-          }),
-          tx.userRoleAssignment.findMany({
-            where: {
-              orgId: actor.orgId,
-              userId: targetUserId,
-              revokedAt: null,
-            },
-            select: {
-              id: true,
-              tenantId: true,
-              startsAt: true,
-              expiresAt: true,
-              roleDefinition: { select: { id: true, name: true, scope: true } },
-            },
-            orderBy: { startsAt: "desc" },
-          }),
-          tx.accessTagGrant.findMany({
-            where: {
-              orgId: actor.orgId,
-              userId: targetUserId,
-              revokedAt: null,
-              OR: [
-                { tenantId: null },
-                ...(actor.tenantId ? [{ tenantId: actor.tenantId }] : []),
-              ],
-            },
-            select: {
-              id: true,
-              tagKey: true,
-              tenantId: true,
-              grantedById: true,
-              startsAt: true,
-              expiresAt: true,
-            },
-            orderBy: { startsAt: "desc" },
-          }),
-          getOrgCapabilities(actor.orgId, tx),
-        ]);
+      const [membership, assignments, tagGrants, capabilities] = await Promise.all([
+        tx.orgMembership.findUnique({
+          where: {
+            orgId_userId: { orgId: actor.orgId, userId: targetUserId },
+          },
+          select: { role: true },
+        }),
+        tx.userRoleAssignment.findMany({
+          where: {
+            orgId: actor.orgId,
+            userId: targetUserId,
+            revokedAt: null,
+          },
+          select: {
+            id: true,
+            tenantId: true,
+            startsAt: true,
+            expiresAt: true,
+            roleDefinition: { select: { id: true, name: true, scope: true } },
+          },
+          orderBy: { startsAt: "desc" },
+        }),
+        tx.accessTagGrant.findMany({
+          where: {
+            orgId: actor.orgId,
+            userId: targetUserId,
+            revokedAt: null,
+            OR: [
+              { tenantId: null },
+              ...(actor.tenantId ? [{ tenantId: actor.tenantId }] : []),
+            ],
+          },
+          select: {
+            id: true,
+            tagKey: true,
+            tenantId: true,
+            grantedById: true,
+            startsAt: true,
+            expiresAt: true,
+          },
+          orderBy: { startsAt: "desc" },
+        }),
+        getOrgCapabilities(actor.orgId, tx),
+      ]);
 
       const now = new Date();
       return {

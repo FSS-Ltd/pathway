@@ -10,6 +10,7 @@ import {
   UseGuards,
   Req,
   Inject,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { z } from "zod";
 import { OrgsService } from "./orgs.service";
@@ -18,9 +19,9 @@ import { registerOrgDto } from "./dto/register-org.dto";
 import { uploadLogoDto } from "./dto/upload-logo.dto";
 import { CurrentOrg } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
+import { OrgRole, prisma } from "@pathway/db";
 import { isSector, isVertical } from "@pathway/types";
 import type { Request } from "express";
-import { assertOrgAdminAccess } from "./org-admin-access";
 
 interface AuthenticatedRequest extends Request {
   authUserId?: string;
@@ -291,6 +292,30 @@ export class OrgsController {
     req: AuthenticatedRequest,
     orgId: string,
   ): Promise<void> {
-    await assertOrgAdminAccess(req.authUserId, orgId, "perform this action");
+    const userId = req.authUserId as string;
+    if (!userId) {
+      throw new UnauthorizedException("User ID not found in request");
+    }
+    const membership = await prisma.orgMembership.findFirst({
+      where: {
+        userId,
+        orgId,
+        role: { in: [OrgRole.ORG_ADMIN] },
+      },
+    });
+    const orgRole = membership
+      ? null
+      : await prisma.userOrgRole.findFirst({
+          where: {
+            userId,
+            orgId,
+            role: { in: [OrgRole.ORG_ADMIN] },
+          },
+        });
+    if (!membership && !orgRole) {
+      throw new UnauthorizedException(
+        "You must be an Organisation admin to perform this action",
+      );
+    }
   }
 }

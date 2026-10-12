@@ -10,16 +10,11 @@ import {
   seedE2eTypedRole,
 } from "../../../test-helpers.e2e";
 import type { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
-import { withSystemRoleFixtureWrites } from "../../access-control/tests/system-role-fixture";
 import { OutboxService } from "../../common/outbox/outbox.service";
 import type { MailerService } from "../../mailer/mailer.service";
 import { BehaviourCommandService } from "../behaviour-command.service";
-import { BehaviourBatchService } from "../behaviour-batch.service";
-import { behaviourBatchFactKeyHash } from "../behaviour-entry.support";
 import { BehaviourQueryService } from "../behaviour-query.service";
-import { BehaviourRetractionService } from "../behaviour-retraction.service";
 import { DemeritEscalationService } from "../demerit-escalation.service";
-import { findActiveReviewers } from "../behaviour-review-access";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 
@@ -49,13 +44,6 @@ function commandService(allowed = true): BehaviourCommandService {
   return behaviourRuntime(allowed).command;
 }
 
-function batchService(allowed = true): BehaviourBatchService {
-  return new BehaviourBatchService(
-    commandService(allowed),
-    permissions(allowed),
-  );
-}
-
 function behaviourRuntime(
   allowed = true,
   mailer: MailerService = {
@@ -80,11 +68,9 @@ function behaviourRuntime(
 describe("ACE behaviour command database boundary", () => {
   let fixture: Fixture | undefined;
   let orgRecorderRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
-  const previousSigningKey = process.env.INTERNAL_AUTH_SECRET;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
-    process.env.INTERNAL_AUTH_SECRET = "behaviour-command-e2e-signing-key";
     fixture = {
       orgId: randomUUID(),
       tenantAId: randomUUID(),
@@ -157,9 +143,6 @@ describe("ACE behaviour command database boundary", () => {
   });
 
   afterAll(async () => {
-    if (previousSigningKey === undefined)
-      delete process.env.INTERNAL_AUTH_SECRET;
-    else process.env.INTERNAL_AUTH_SECRET = previousSigningKey;
     if (!isDatabaseAvailable() || !fixture) return;
     await prisma.outboxEvent.deleteMany({ where: { orgId: fixture.orgId } });
     await prisma.auditEvent.deleteMany({
@@ -170,8 +153,6 @@ describe("ACE behaviour command database boundary", () => {
         await tx.$executeRawUnsafe(
           "SET LOCAL session_replication_role = replica",
         );
-        await tx.behaviourReviewRequest.deleteMany({ where: { tenantId } });
-        await tx.behaviourEntryRetraction.deleteMany({ where: { tenantId } });
         await tx.behaviourEntry.deleteMany({ where: { tenantId } });
         await tx.behaviourCategory.deleteMany({ where: { tenantId } });
         await tx.demeritPolicy.deleteMany({ where: { tenantId } });
@@ -206,85 +187,6 @@ describe("ACE behaviour command database boundary", () => {
     });
     await prisma.tenant.deleteMany({ where: { orgId: fixture.orgId } });
     await prisma.org.deleteMany({ where: { id: fixture.orgId } });
-  });
-
-  it("finds an active organisation Head with no legacy site id and respects revocation", async () => {
-    if (!isDatabaseAvailable() || !fixture) return;
-    const roleId = randomUUID();
-    const assignmentId = randomUUID();
-    const now = new Date();
-    await withSystemRoleFixtureWrites((tx) =>
-      tx.orgRoleDefinition.create({
-        data: {
-          id: roleId,
-          orgId: fixture!.orgId,
-          tenantId: null,
-          name: "Organisation Head",
-          scope: "organisation",
-          isSystem: true,
-          createdById: fixture!.actorAId,
-          updatedById: fixture!.actorAId,
-        },
-      }),
-    );
-    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
-      tx.userRoleAssignment.create({
-        data: {
-          id: assignmentId,
-          orgId: fixture!.orgId,
-          tenantId: null,
-          userId: fixture!.orgRecorderId,
-          roleDefinitionId: roleId,
-          assignedById: fixture!.actorAId,
-          startsAt: new Date(now.getTime() - 1_000),
-        },
-      }),
-    );
-    try {
-      const legacySiteId = await prisma.user.findUniqueOrThrow({
-        where: { id: fixture.orgRecorderId },
-        select: { tenantId: true },
-      });
-      expect(legacySiteId.tenantId).toBeNull();
-      const headIds = await withTenantRlsContext(
-        fixture.tenantAId,
-        fixture.orgId,
-        (tx) =>
-          findActiveReviewers(
-            tx,
-            { tenantId: fixture!.tenantAId, orgId: fixture!.orgId },
-            "HEAD",
-            now,
-          ),
-      );
-      expect(headIds).toContain(fixture.orgRecorderId);
-
-      await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
-        tx.userRoleAssignment.update({
-          where: { id: assignmentId },
-          data: { revokedAt: now, revokedById: fixture!.actorAId },
-        }),
-      );
-      const revokedIds = await withTenantRlsContext(
-        fixture.tenantAId,
-        fixture.orgId,
-        (tx) =>
-          findActiveReviewers(
-            tx,
-            { tenantId: fixture!.tenantAId, orgId: fixture!.orgId },
-            "HEAD",
-            new Date(now.getTime() + 1_000),
-          ),
-      );
-      expect(revokedIds).not.toContain(fixture.orgRecorderId);
-    } finally {
-      await prisma.userRoleAssignment.deleteMany({
-        where: { id: assignmentId },
-      });
-      await withSystemRoleFixtureWrites((tx) =>
-        tx.orgRoleDefinition.deleteMany({ where: { id: roleId } }),
-      );
-    }
   });
 
   it("commits one fact, audit, and merit intent for concurrent command replay", async () => {
@@ -371,277 +273,6 @@ describe("ACE behaviour command database boundary", () => {
       pointsDelta: -3,
       correctsBehaviourEntryId: results[0]!.entry.id,
     });
-  });
-
-  it("records an atomic multi-learner batch with quantities and replays it once", async () => {
-    if (!isDatabaseAvailable() || !fixture) return;
-    const secondChildId = randomUUID();
-    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
-      tx.child.create({
-        data: {
-          id: secondChildId,
-          tenantId: fixture!.tenantAId,
-          firstName: "Second",
-          lastName: "Learner",
-        },
-      }),
-    );
-    const actor = {
-      tenantId: fixture.tenantAId,
-      orgId: fixture.orgId,
-      userId: fixture.actorAId,
-    };
-    const batch = {
-      idempotencyKey: randomUUID(),
-      childIds: [fixture.childAId, secondChildId],
-      occurredAt: "2026-08-12T09:30:00.000Z",
-      entries: [
-        {
-          category: "service",
-          type: "MERIT" as const,
-          visibility: "GENERAL" as const,
-          pointsDelta: 2,
-          reason: "Helped a peer",
-          quantity: 2,
-        },
-        {
-          category: "pastoral",
-          type: "GENERAL" as const,
-          visibility: "SENSITIVE" as const,
-          pointsDelta: 0,
-          reason: "Pastoral check in",
-          quantity: 1,
-        },
-      ],
-    };
-    const service = batchService();
-    const results = await Promise.all([
-      service.record(batch, actor),
-      service.record(batch, actor),
-    ]);
-    const created = results.find((result) => !result.duplicate);
-    const replay = results.find((result) => result.duplicate);
-    expect(created).toBeDefined();
-    expect(replay).toBeDefined();
-    if (!created || !replay) throw new Error("Expected one batch replay");
-    expect(created.duplicate).toBe(false);
-    expect(created.entries).toHaveLength(6);
-    expect(created.entries.map((entry) => entry.childId)).toEqual([
-      fixture.childAId,
-      fixture.childAId,
-      fixture.childAId,
-      secondChildId,
-      secondChildId,
-      secondChildId,
-    ]);
-    expect(replay).toEqual({ entries: created.entries, duplicate: true });
-    const counts = await withTenantRlsContext(
-      fixture.tenantAId,
-      fixture.orgId,
-      async (tx) => ({
-        facts: await tx.behaviourEntry.count({
-          where: {
-            tenantId: fixture!.tenantAId,
-            clientCommandKeyHash: {
-              in: created.entries.map((_, index) =>
-                behaviourBatchFactKeyHash(
-                  fixture!.tenantAId,
-                  batch.idempotencyKey,
-                  index,
-                ),
-              ),
-            },
-          },
-        }),
-        audits: await tx.auditEvent.count({
-          where: { entityId: { in: created.entries.map((entry) => entry.id) } },
-        }),
-        merits: await tx.outboxEvent.count({
-          where: {
-            aggregateId: { in: created.entries.map((entry) => entry.id) },
-            eventType: "behaviour.merit-awarded",
-          },
-        }),
-      }),
-    );
-    expect(counts).toEqual({ facts: 6, audits: 6, merits: 4 });
-    await expect(
-      service.record(
-        { ...batch, entries: [{ ...batch.entries[0]!, quantity: 1 }] },
-        actor,
-      ),
-    ).rejects.toHaveProperty("status", 409);
-  });
-
-  it("rolls back the whole batch on a bad row or cross-site learner", async () => {
-    if (!isDatabaseAvailable() || !fixture) return;
-    const actor = {
-      tenantId: fixture.tenantAId,
-      orgId: fixture.orgId,
-      userId: fixture.actorAId,
-    };
-    const batch = {
-      idempotencyKey: randomUUID(),
-      childIds: [fixture.childAId],
-      occurredAt: "2026-08-12T09:30:00.000Z",
-      entries: [
-        {
-          category: "service",
-          type: "MERIT" as const,
-          visibility: "GENERAL" as const,
-          pointsDelta: 2,
-          reason: "Helped a peer",
-          quantity: 1,
-        },
-        {
-          category: "missing-category",
-          type: "MERIT" as const,
-          visibility: "GENERAL" as const,
-          pointsDelta: 2,
-          reason: "Invalid row",
-          quantity: 1,
-        },
-      ],
-    };
-    const service = batchService();
-    await expect(service.record(batch, actor)).rejects.toHaveProperty(
-      "status",
-      404,
-    );
-    const firstKey = behaviourBatchFactKeyHash(
-      fixture.tenantAId,
-      batch.idempotencyKey,
-      0,
-    );
-    expect(
-      await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
-        tx.behaviourEntry.count({
-          where: {
-            tenantId: fixture!.tenantAId,
-            clientCommandKeyHash: firstKey,
-          },
-        }),
-      ),
-    ).toBe(0);
-    await expect(
-      service.record(
-        { ...batch, childIds: [fixture.childAId, fixture.childBId] },
-        actor,
-      ),
-    ).rejects.toHaveProperty("status", 404);
-    const corrected = await service.record(
-      { ...batch, entries: [batch.entries[0]!] },
-      actor,
-    );
-    expect(corrected.entries).toHaveLength(1);
-  });
-
-  it("requires sensitive access for creation and replay of a sensitive batch", async () => {
-    if (!isDatabaseAvailable() || !fixture) return;
-    const actor = {
-      tenantId: fixture.tenantAId,
-      orgId: fixture.orgId,
-      userId: fixture.actorAId,
-    };
-    const batch = {
-      idempotencyKey: randomUUID(),
-      childIds: [fixture.childAId],
-      occurredAt: "2026-08-12T09:30:00.000Z",
-      entries: [
-        {
-          category: "pastoral",
-          type: "GENERAL" as const,
-          visibility: "SENSITIVE" as const,
-          pointsDelta: 0,
-          reason: "Pastoral check in",
-          quantity: 1,
-        },
-      ],
-    };
-    await expect(
-      batchService(false).record(batch, actor),
-    ).rejects.toHaveProperty("status", 403);
-    const created = await batchService(true).record(batch, actor);
-    expect(created.entries).toHaveLength(1);
-    await expect(
-      batchService(false).record(batch, actor),
-    ).rejects.toHaveProperty("status", 403);
-  });
-
-  it("accepts the 50-fact boundary in one transaction", async () => {
-    if (!isDatabaseAvailable() || !fixture) return;
-    const result = await batchService().record(
-      {
-        idempotencyKey: randomUUID(),
-        childIds: [fixture.childAId],
-        occurredAt: "2026-08-12T09:30:00.000Z",
-        entries: [
-          {
-            category: "service",
-            type: "MERIT",
-            visibility: "GENERAL",
-            pointsDelta: 1,
-            reason: "Supported classmates",
-            quantity: 50,
-          },
-        ],
-      },
-      {
-        tenantId: fixture.tenantAId,
-        orgId: fixture.orgId,
-        userId: fixture.actorAId,
-      },
-    );
-    expect(result.entries).toHaveLength(50);
-    expect(new Set(result.entries.map((entry) => entry.id)).size).toBe(50);
-  });
-
-  it("applies demerit escalation across repeated rows in a batch", async () => {
-    if (!isDatabaseAvailable() || !fixture) return;
-    const childId = randomUUID();
-    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
-      tx.child.create({
-        data: {
-          id: childId,
-          tenantId: fixture!.tenantAId,
-          firstName: "Demerit",
-          lastName: "Learner",
-        },
-      }),
-    );
-    const created = await batchService().record(
-      {
-        idempotencyKey: randomUUID(),
-        childIds: [childId],
-        occurredAt: "2026-08-12T09:30:00.000Z",
-        entries: [
-          {
-            category: "routine",
-            type: "DEMERIT",
-            visibility: "GENERAL",
-            pointsDelta: -1,
-            reason: "Repeated disruption",
-            note: "Three separate incidents in the lesson",
-            quantity: 3,
-          },
-        ],
-      },
-      {
-        tenantId: fixture.tenantAId,
-        orgId: fixture.orgId,
-        userId: fixture.actorAId,
-      },
-    );
-    expect(created.entries).toHaveLength(3);
-    const reviewCount = await withTenantRlsContext(
-      fixture.tenantAId,
-      fixture.orgId,
-      (tx) =>
-        tx.behaviourReviewRequest.count({
-          where: { tenantId: fixture!.tenantAId, childId },
-        }),
-    );
-    expect(reviewCount).toBe(1);
   });
 
   it("keeps the committed fact and pending intent when notification delivery fails", async () => {
@@ -776,14 +407,11 @@ describe("ACE behaviour command database boundary", () => {
     );
     await expect(
       allowedQuery.list(actor, { childId: fixture.childAId }),
-    ).resolves.toEqual(
-      expect.objectContaining({
-        canVoid: false,
-        items: expect.arrayContaining([
-          expect.objectContaining({ id: created.entry.id, note: plaintext }),
-        ]),
-      }),
-    );
+    ).resolves.toEqual({
+      items: expect.arrayContaining([
+        expect.objectContaining({ id: created.entry.id, note: plaintext }),
+      ]),
+    });
   });
 
   it("allows one concurrent immutable correction and returns only terminal facts", async () => {
@@ -859,125 +487,6 @@ describe("ACE behaviour command database boundary", () => {
     ]);
   });
 
-  it("voids a merit once, keeps its audit trail, and hides it across tenant boundaries", async () => {
-    if (!isDatabaseAvailable() || !fixture) return;
-    const actor = {
-      tenantId: fixture.tenantAId,
-      orgId: fixture.orgId,
-      userId: fixture.actorAId,
-    };
-    const roleId = randomUUID();
-    const assignmentId = randomUUID();
-    await prisma.orgMembership.create({
-      data: { orgId: actor.orgId, userId: actor.userId, role: "ORG_MEMBER" },
-    });
-    await withSystemRoleFixtureWrites((tx) =>
-      tx.orgRoleDefinition.create({
-        data: {
-          id: roleId,
-          orgId: fixture!.orgId,
-          tenantId: fixture!.tenantAId,
-          name: "Site Lead",
-          scope: "site",
-          isSystem: true,
-          createdById: actor.userId,
-          updatedById: actor.userId,
-        },
-      }),
-    );
-    await withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
-      tx.userRoleAssignment.create({
-        data: {
-          id: assignmentId,
-          orgId: actor.orgId,
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-          roleDefinitionId: roleId,
-          assignedById: actor.userId,
-          startsAt: new Date(Date.now() - 1_000),
-        },
-      }),
-    );
-    try {
-      const created = await commandService().record(
-        {
-          idempotencyKey: randomUUID(),
-          childId: fixture.childAId,
-          category: "service",
-          type: "MERIT",
-          visibility: "GENERAL",
-          pointsDelta: 2,
-          occurredAt: "2026-08-12T13:00:00.000Z",
-          reason: "Merit to void",
-        },
-        actor,
-      );
-      const service = new BehaviourRetractionService(
-        permissions(true),
-        new OutboxService(),
-      );
-      const command = {
-        idempotencyKey: randomUUID(),
-        reason: "Recorded against the wrong event",
-      };
-      const first = await service.retract(created.entry.id, command, actor);
-      const replay = await service.retract(created.entry.id, command, actor);
-      expect(first.duplicate).toBe(false);
-      expect(replay).toMatchObject({ id: first.id, duplicate: true });
-
-      const evidence = await withTenantRlsContext(
-        actor.tenantId,
-        actor.orgId,
-        async (tx) => ({
-          retraction: await tx.behaviourEntryRetraction.findUniqueOrThrow({
-            where: { id: first.id },
-          }),
-          auditCount: await tx.auditEvent.count({
-            where: {
-              tenantId: actor.tenantId,
-              entityId: created.entry.id,
-            },
-          }),
-          adjustments: await tx.outboxEvent.findMany({
-            where: { aggregateId: first.id },
-            select: { payload: true },
-          }),
-        }),
-      );
-      expect(evidence.retraction.reason).toBe(command.reason);
-      expect(evidence.auditCount).toBe(2);
-      expect(evidence.adjustments).toEqual([
-        { payload: expect.objectContaining({ pointsDelta: -2 }) },
-      ]);
-      const history = await new BehaviourQueryService(permissions(true)).list(
-        actor,
-        { childId: fixture.childAId },
-      );
-      expect(history.items.some((item) => item.id === created.entry.id)).toBe(
-        false,
-      );
-      const crossTenantCount = await withBehaviourRlsContext(
-        fixture.tenantBId,
-        fixture.orgId,
-        (tx) =>
-          tx.behaviourEntryRetraction.count({
-            where: { tenantId: fixture!.tenantAId },
-          }),
-      );
-      expect(crossTenantCount).toBe(0);
-    } finally {
-      await prisma.userRoleAssignment.deleteMany({
-        where: { id: assignmentId },
-      });
-      await withSystemRoleFixtureWrites((tx) =>
-        tx.orgRoleDefinition.deleteMany({ where: { id: roleId } }),
-      );
-      await prisma.orgMembership.deleteMany({
-        where: { orgId: actor.orgId, userId: actor.userId },
-      });
-    }
-  });
-
   it("accepts an organisation-scoped behaviour recorder and keeps tenant scope forced", async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     const service = commandService();
@@ -1044,7 +553,9 @@ async function withBehaviourRlsContext<T>(
   callback: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   return withTenantRlsContext(tenantId, orgId, async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL ROLE "${TENANT_RLS_ROLE}"`);
+    if (process.env.E2E_USE_GLOBAL_SETUP === "true") {
+      await tx.$executeRawUnsafe(`SET LOCAL ROLE "${TENANT_RLS_ROLE}"`);
+    }
 
     return callback(tx);
   });

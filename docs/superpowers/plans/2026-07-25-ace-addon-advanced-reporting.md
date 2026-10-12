@@ -6,7 +6,7 @@
 
 **Architecture:** Advanced Reporting consumes documented ACE operational facts and projections through a governed aggregate layer. It does not bypass domain services or query unrestricted child rows from the browser. Small-group suppression, tenant scope, permission, entitlement, freshness, and export purpose are enforced server-side.
 
-**Price and packaging:** £10/month or £100/year, **Proposed**. Eligible for customer-selected Growth and Professional inclusion slots, Operations, and All Included.
+**Price and packaging:** £10/month or £100/year, **Proposed**. Included in Growth and Professional. Eligible for Operations and All Included.
 
 ## Global Constraints
 
@@ -24,7 +24,6 @@
 **Branch:** `feat/ace-advanced-reporting-entitlement`
 
 **Files:**
-
 - Modify: `packages/platform/src/capability-maps.ts`
 - Modify: `apps/api/src/billing/addon-catalog.ts`
 - Test: `apps/api/src/billing/addon-catalog.spec.ts`
@@ -44,7 +43,6 @@
 **Branch:** `feat/ace-advanced-metric-contracts`
 
 **Files:**
-
 - Create: `packages/ace-domain/src/advanced-metrics.ts`
 - Create: `packages/platform/src/reporting/privacy-policy.ts`
 - Test: `packages/ace-domain/src/advanced-metrics.spec.ts`
@@ -74,7 +72,6 @@ export interface MetricDefinition {
 **Branch:** `feat/ace-advanced-reporting-projections`
 
 **Files:**
-
 - Create: `apps/workers/src/reporting/refresh-ace-analytics.job.ts`
 - Create: `apps/api/src/advanced-reporting/analytics-projection.repository.ts`
 - Modify: `packages/db/prisma/schema.prisma`
@@ -95,7 +92,6 @@ export interface MetricDefinition {
 **Branch:** `feat/ace-advanced-reporting-api`
 
 **Files:**
-
 - Create: `apps/api/src/advanced-reporting/advanced-reporting.controller.ts`
 - Create: `apps/api/src/advanced-reporting/advanced-reporting.service.ts`
 - Create: `apps/api/src/advanced-reporting/advanced-reporting-export.service.ts`
@@ -115,7 +111,6 @@ export interface MetricDefinition {
 **Branch:** `feat/ace-advanced-reporting-ui`
 
 **Files:**
-
 - Create: `apps/admin/app/advanced-reporting/page.tsx`
 - Create: `apps/admin/app/advanced-reporting/advanced-reporting-dashboard.tsx`
 - Create: `apps/admin/app/advanced-reporting/metric-definition-panel.tsx`
@@ -135,7 +130,6 @@ export interface MetricDefinition {
 **Branch:** `perf/ace-advanced-reporting`
 
 **Files:**
-
 - Create: `apps/api/src/advanced-reporting/analytics-cache.service.ts`
 - Create: `apps/api/src/advanced-reporting/tests/advanced-reporting-performance.e2e.spec.ts`
 - Create: `docs/adr/ace-reporting-scale-boundary.md`
@@ -154,7 +148,6 @@ export interface MetricDefinition {
 **Branch:** `feat/ace-advanced-reporting-billing`
 
 **Files:**
-
 - Modify: `apps/api/src/billing/addon-catalog.ts`
 - Modify: `apps/api/src/billing/stripe-webhook.service.ts`
 - Test: `apps/api/src/advanced-reporting/tests/advanced-reporting-billing.e2e.spec.ts`
@@ -173,7 +166,6 @@ export interface MetricDefinition {
 **Branch:** `security/ace-advanced-reporting-release`
 
 **Files:**
-
 - Create: `apps/api/src/advanced-reporting/tests/advanced-reporting-access-matrix.e2e.spec.ts`
 - Create: `apps/api/src/advanced-reporting/tests/advanced-reporting-privacy.e2e.spec.ts`
 - Create: `docs/runbooks/advanced-reporting-addon.md`

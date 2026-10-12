@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Inject,
-  Param,
-  Query,
-  Req,
-  UseGuards,
-} from "@nestjs/common";
+import { Controller, Get, Inject, Param, Req, UseGuards } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
@@ -15,41 +7,21 @@ import { PermissionGuard } from "./permission.guard";
 import { RequirePermission } from "./require-permission.decorator";
 import { roleApiError } from "./role-api-error";
 import type { RoleActorContext } from "./roles.service";
-import { getOrCreateRequestId, type RequestWithRequestId } from "./request-id";
+import {
+  getOrCreateRequestId,
+  type RequestWithRequestId,
+} from "./request-id";
 
 const targetUserParam = z.object({ userId: z.string().uuid() }).strict();
-const directoryQuery = z
-  .object({
-    limit: z.enum(["10", "25", "50"]).transform(Number).optional(),
-    cursor: z.string().uuid().optional(),
-    search: z.string().trim().max(80).optional(),
-    roleDefinitionId: z.string().uuid().optional(),
-  })
-  .strict();
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @Controller("access/users")
 export class AccessUsersController {
   constructor(
-    @Inject(AccessUsersService)
-    private readonly accessUsers: AccessUsersService,
+    @Inject(AccessUsersService) private readonly accessUsers: AccessUsersService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
-
-  @Get()
-  @RequirePermission("platform.access.users.read")
-  listDirectory(@Query() query: unknown, @Req() request: RequestWithRequestId) {
-    const requestId = getOrCreateRequestId(request);
-    const parsed = directoryQuery.safeParse(query);
-    if (!parsed.success) {
-      throw roleApiError(400, "INVALID_EFFECTIVE_ACCESS_REQUEST", requestId);
-    }
-    return this.accessUsers.listDirectory(
-      this.actor(request, requestId),
-      parsed.data,
-    );
-  }
 
   @Get("me/permissions")
   async getMyPermissions(@Req() request: RequestWithRequestId) {

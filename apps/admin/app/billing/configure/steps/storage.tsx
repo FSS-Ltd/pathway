@@ -14,7 +14,6 @@ type StorageStepProps = {
   frequency: "monthly" | "yearly";
   prices: OptionPriceLookup;
   onSelect: (storageChoice: StorageChoice) => void;
-  isExistingSubscription?: boolean;
 };
 
 const STORAGE_OPTIONS: {
@@ -49,21 +48,7 @@ export function StorageStep({
   frequency,
   prices,
   onSelect,
-  isExistingSubscription = false,
 }: StorageStepProps) {
-  if (isExistingSubscription) {
-    return (
-      <section aria-labelledby="configurator-step-title" className="space-y-3">
-        <h2 id="configurator-step-title" className="font-heading text-2xl font-bold text-text-primary">
-          Existing storage
-        </h2>
-        <p className="rounded-xl border border-border-subtle bg-surface p-5 text-sm text-text-muted">
-          Your current storage allocation and any storage add-ons will stay in place.
-          You can review your plan and module changes on the next step.
-        </p>
-      </section>
-    );
-  }
   return (
     <section aria-labelledby="configurator-step-title" className="space-y-5">
       <div className="space-y-2">

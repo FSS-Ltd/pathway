@@ -56,9 +56,6 @@ function createHarness() {
       update: jest.fn().mockResolvedValue(grant),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
-    accessTagExclusion: {
-      findMany: jest.fn().mockResolvedValue([]),
-    },
     permissionDefinition: {
       findMany: jest.fn().mockResolvedValue([
         {

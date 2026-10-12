@@ -3,7 +3,6 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
-import { useAdminContext } from "@/lib/admin-context";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import {
   Button,
@@ -18,6 +17,7 @@ import {
 import {
   AdminLessonFormValues,
   createLesson,
+  fetchActiveSiteState,
   fetchGroups,
   fetchSessions,
   setApiClientToken,
@@ -70,14 +70,34 @@ export default function NewLessonPage() {
   } | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const fileInputId = React.useId();
-  const { state: adminState } = useAdminContext();
-  const tenantId = adminState.status === "ready" ? adminState.snapshot.activeSiteId : null;
+  const [tenantId, setTenantId] = React.useState<string | null>(null);
   const { data: session, status: sessionStatus } = useSession();
+
+  const resolveTenantId = (
+    activeSiteId: string | null,
+    sites: Array<{ id: string }>,
+  ) => {
+    const activeSite = sites.find((s) => s.id === activeSiteId) ?? sites[0];
+    return activeSite?.id ?? null;
+  };
 
   React.useEffect(() => {
     const token = (session as { accessToken?: string })?.accessToken ?? null;
     setApiClientToken(token);
   }, [session]);
+
+  React.useEffect(() => {
+    if (sessionStatus !== "authenticated") return;
+    const load = async () => {
+      try {
+        const state = await fetchActiveSiteState();
+        setTenantId(resolveTenantId(state.activeSiteId, state.sites));
+      } catch {
+        setTenantId(null);
+      }
+    };
+    void load();
+  }, [sessionStatus]);
 
   React.useEffect(() => {
     if (sessionStatus !== "authenticated") {
@@ -175,7 +195,7 @@ export default function NewLessonPage() {
           : {}),
       });
       router.push(created?.id ? `/lessons/${created.id}` : "/lessons");
-    } catch {
+    } catch (err) {
       setError("We couldn’t save this lesson. Try again.");
     } finally {
       setSubmitting(false);
@@ -473,3 +493,4 @@ export default function NewLessonPage() {
     </div>
   );
 }
+

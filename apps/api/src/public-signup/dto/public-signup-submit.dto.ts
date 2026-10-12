@@ -1,7 +1,6 @@
 import {
   IsArray,
   IsBoolean,
-  IsDefined,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -95,28 +94,6 @@ export class ParentGuardianContactOnlyDto {
   relationshipToChild?: string;
 }
 
-export class PickupContactDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
-  name!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  phone!: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  relationship?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  identificationNote?: string;
-}
-
 export class EmergencyContactDto {
   @IsString()
   @IsNotEmpty()
@@ -132,19 +109,6 @@ export class EmergencyContactDto {
   @IsString()
   @MaxLength(100)
   relationship?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  secondaryPhone?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  canPickUp?: boolean;
 }
 
 export class ChildSignupDto {
@@ -240,86 +204,6 @@ export class ChildSignupDto {
   @IsString()
   @MaxLength(200)
   pickupPermissions?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  homeLanguage?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  medicalConditions?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  medicationAtCentre?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  dietaryRestrictions?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  learningSupport?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  interestsStrengths?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  settlingComfortNotes?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsIn(["ABC", "Primary", "Secondary"])
-  registrationLevel?: string;
-}
-
-export class ConsentDecisionDto {
-  @IsBoolean()
-  granted!: boolean;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(12)
-  initials!: string;
-}
-
-export class RegistrationDecisionsDto {
-  @ValidateNested()
-  @Type(() => ConsentDecisionDto)
-  contact!: ConsentDecisionDto;
-
-  @ValidateNested()
-  @Type(() => ConsentDecisionDto)
-  emergencyMedical!: ConsentDecisionDto;
-
-  @ValidateNested()
-  @Type(() => ConsentDecisionDto)
-  localActivities!: ConsentDecisionDto;
-
-  @ValidateNested()
-  @Type(() => ConsentDecisionDto)
-  photoVideo!: ConsentDecisionDto;
-
-  @ValidateNested()
-  @Type(() => ConsentDecisionDto)
-  accuracy!: ConsentDecisionDto;
-
-  @ValidateNested()
-  @Type(() => ConsentDecisionDto)
-  dataProcessing!: ConsentDecisionDto;
-
-  @ValidateNested()
-  @Type(() => ConsentDecisionDto)
-  firstAid!: ConsentDecisionDto;
 }
 
 export class ConsentsDto {
@@ -329,11 +213,6 @@ export class ConsentsDto {
   @IsOptional()
   @IsBoolean()
   firstAidConsent?: boolean;
-
-  @IsDefined()
-  @ValidateNested()
-  @Type(() => RegistrationDecisionsDto)
-  registration!: RegistrationDecisionsDto;
 }
 
 export class PublicSignupSubmitDto {
@@ -343,7 +222,6 @@ export class PublicSignupSubmitDto {
   @MaxLength(128)
   token!: string;
 
-  @IsDefined()
   @ValidateNested()
   @Type(() => ParentGuardianDto)
   parent!: ParentGuardianDto;
@@ -358,22 +236,6 @@ export class PublicSignupSubmitDto {
   @Type(() => ChildSignupDto)
   children!: ChildSignupDto[];
 
-  @IsString()
-  @IsIn(["2.0"])
-  formVersion!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  homeAddress!: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PickupContactDto)
-  pickupContacts?: PickupContactDto[];
-
-  @IsDefined()
   @ValidateNested()
   @Type(() => ConsentsDto)
   consents!: ConsentsDto;
@@ -387,7 +249,6 @@ export class SubmitExistingUserDto {
   @MaxLength(128)
   token!: string;
 
-  @IsDefined()
   @ValidateNested()
   @Type(() => ParentGuardianExistingUserDto)
   parent!: ParentGuardianExistingUserDto;
@@ -402,22 +263,6 @@ export class SubmitExistingUserDto {
   @Type(() => ChildSignupDto)
   children!: ChildSignupDto[];
 
-  @IsString()
-  @IsIn(["2.0"])
-  formVersion!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  homeAddress!: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PickupContactDto)
-  pickupContacts?: PickupContactDto[];
-
-  @IsDefined()
   @ValidateNested()
   @Type(() => ConsentsDto)
   consents!: ConsentsDto;
@@ -430,7 +275,6 @@ export class PublicSignupContactOnlySubmitDto {
   @MaxLength(128)
   token!: string;
 
-  @IsDefined()
   @ValidateNested()
   @Type(() => ParentGuardianContactOnlyDto)
   parent!: ParentGuardianContactOnlyDto;
@@ -445,22 +289,6 @@ export class PublicSignupContactOnlySubmitDto {
   @Type(() => ChildSignupDto)
   children!: ChildSignupDto[];
 
-  @IsString()
-  @IsIn(["2.0"])
-  formVersion!: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  homeAddress!: string;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PickupContactDto)
-  pickupContacts?: PickupContactDto[];
-
-  @IsDefined()
   @ValidateNested()
   @Type(() => ConsentsDto)
   consents!: ConsentsDto;

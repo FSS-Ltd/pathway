@@ -1,9 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from "@nestjs/common";
+import { BadRequestException } from "@nestjs/common";
 import { SessionsController } from "../sessions.controller";
 import { SessionsService } from "../sessions.service";
 import { StaffAttendanceService } from "../staff-attendance.service";
@@ -11,9 +7,6 @@ import { CreateSessionDto } from "../dto/create-session.dto";
 import { UpdateSessionDto } from "../dto/update-session.dto";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../../billing/entitlements-enforcement.service";
-import { RotaAccessService } from "../rota-access.service";
-import { FamilyTimetableService } from "../family-timetable.service";
-import { SessionRotaKind } from "@pathway/db";
 
 // Minimal shape used in tests (avoid importing Prisma types here)
 type LessonShape = {
@@ -30,8 +23,6 @@ interface SessionShape {
   startsAt: Date;
   endsAt: Date;
   title: string | null;
-  rotaKind: SessionRotaKind;
-  familyPublishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   groups: { id: string; name: string }[];
@@ -45,18 +36,12 @@ describe("SessionsController", () => {
 
   const tenantId = "t1";
   const orgId = "org-123";
-  const managerRequest = { authUserId: "manager-1" } as Parameters<
-    SessionsController["list"]
-  >[3];
-  const staffRequest = { authUserId: "staff-1" } as typeof managerRequest;
   const baseSession: SessionShape = {
     id: "sess-1",
     tenantId,
     startsAt: new Date("2025-01-01T09:00:00Z"),
     endsAt: new Date("2025-01-01T10:00:00Z"),
     title: "Kids service",
-    rotaKind: SessionRotaKind.STANDARD,
-    familyPublishedAt: null,
     createdAt: new Date("2024-12-31T00:00:00Z"),
     updatedAt: new Date("2024-12-31T00:00:00Z"),
     groups: [{ id: "g1", name: "Kids" }],
@@ -91,9 +76,7 @@ describe("SessionsController", () => {
       Promise<SessionShape>,
       [string, UpdateSessionDto, string]
     >(),
-  } as jest.Mocked<
-    Pick<SessionsService, "list" | "getById" | "create" | "update">
-  >;
+  } as jest.Mocked<Pick<SessionsService, "list" | "getById" | "create" | "update">>;
 
   type SessionListFilters = Parameters<SessionsService["list"]>[0];
 
@@ -114,30 +97,16 @@ describe("SessionsController", () => {
     assertWithinHardCap: jest.fn(),
   };
 
-  const rotaAccess = {
-    canManage: jest.fn<Promise<boolean>, []>().mockResolvedValue(true),
-    assertManager: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
-    assertSessionVisible: jest
-      .fn<Promise<void>, []>()
-      .mockResolvedValue(undefined),
-  };
-  const familyTimetable = { setPublication: jest.fn() };
-
   beforeEach(async () => {
     jest.resetAllMocks();
     staffAttendanceMock.getRoster.mockResolvedValue(staffAttendanceRoster);
     staffAttendanceMock.upsert.mockResolvedValue(staffAttendanceRoster);
-    rotaAccess.canManage.mockResolvedValue(true);
-    rotaAccess.assertManager.mockResolvedValue(undefined);
-    rotaAccess.assertSessionVisible.mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SessionsController],
       providers: [
         { provide: SessionsService, useValue: serviceMock },
         { provide: StaffAttendanceService, useValue: staffAttendanceMock },
-        { provide: RotaAccessService, useValue: rotaAccess },
-        { provide: FamilyTimetableService, useValue: familyTimetable },
         {
           provide: EntitlementsEnforcementService,
           useValue: enforcementMock,
@@ -157,26 +126,18 @@ describe("SessionsController", () => {
 
   it("list should return array", async () => {
     serviceMock.list.mockResolvedValueOnce([baseSession]);
-    const res = await controller.list({}, tenantId, orgId, managerRequest);
+    const res = await controller.list({} as { groupId?: string }, tenantId);
     expect(Array.isArray(res)).toBe(true);
     expect(res[0].id).toBe(baseSession.id);
     expect(serviceMock.list).toHaveBeenCalledWith({
       tenantId,
-      staffUserId: undefined,
       groupId: undefined,
-      from: undefined,
-      to: undefined,
     });
   });
 
   it("byId should return a session", async () => {
     serviceMock.getById.mockResolvedValueOnce(baseSession);
-    const res = await controller.getById(
-      baseSession.id,
-      tenantId,
-      orgId,
-      managerRequest,
-    );
+    const res = await controller.getById(baseSession.id, tenantId);
     expect(res).toMatchObject({ id: baseSession.id });
     expect(serviceMock.getById).toHaveBeenCalledWith(baseSession.id, tenantId);
   });
@@ -190,7 +151,7 @@ describe("SessionsController", () => {
       title: "Kids service",
     };
     serviceMock.create.mockResolvedValueOnce(baseSession);
-    const res = await controller.create(dto, tenantId, orgId, managerRequest);
+    const res = await controller.create(dto, tenantId, orgId);
     expect(res).toEqual(baseSession);
     expect(serviceMock.create).toHaveBeenCalledWith(dto, tenantId);
   });
@@ -204,9 +165,9 @@ describe("SessionsController", () => {
       title: "Bad times",
     };
 
-    await expect(
-      controller.create(bad, tenantId, orgId, managerRequest),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.create(bad, tenantId, orgId)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(serviceMock.create).not.toHaveBeenCalled();
   });
 
@@ -223,9 +184,9 @@ describe("SessionsController", () => {
       title: "Kids service",
     };
 
-    await expect(
-      controller.create(dto, tenantId, orgId, managerRequest),
-    ).rejects.toThrow("HARD_CAP");
+    await expect(controller.create(dto, tenantId, orgId)).rejects.toThrow(
+      "HARD_CAP",
+    );
     expect(serviceMock.create).not.toHaveBeenCalled();
   });
 
@@ -239,13 +200,7 @@ describe("SessionsController", () => {
     const updated: SessionShape = { ...baseSession, title: "Updated" };
     serviceMock.update.mockResolvedValueOnce(updated);
 
-    const res = await controller.update(
-      baseSession.id,
-      dto,
-      tenantId,
-      orgId,
-      managerRequest,
-    );
+    const res = await controller.update(baseSession.id, dto, tenantId);
     expect(res).toEqual(updated);
     expect(serviceMock.update).toHaveBeenCalledWith(
       baseSession.id,
@@ -260,7 +215,7 @@ describe("SessionsController", () => {
       endsAt: new Date("2025-01-01T10:00:00Z"),
     };
     await expect(
-      controller.update("sess-1", bad, tenantId, orgId, managerRequest),
+      controller.update("sess-1", bad, tenantId),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(serviceMock.update).not.toHaveBeenCalled();
   });
@@ -269,8 +224,6 @@ describe("SessionsController", () => {
     const res = await controller.getStaffAttendance(
       baseSession.id,
       tenantId,
-      orgId,
-      managerRequest,
     );
     expect(res).toEqual(staffAttendanceRoster);
     expect(staffAttendanceMock.getRoster).toHaveBeenCalledWith(
@@ -286,107 +239,16 @@ describe("SessionsController", () => {
     >[2];
     const res = await controller.patchStaffAttendance(
       baseSession.id,
-      {
-        staffUserId: "22222222-2222-2222-2222-222222222222",
-        status: "PRESENT",
-      },
+      { staffUserId: "22222222-2222-2222-2222-222222222222", status: "PRESENT" },
       req,
       tenantId,
-      orgId,
     );
     expect(res).toEqual(staffAttendanceRoster);
     expect(staffAttendanceMock.upsert).toHaveBeenCalledWith(
       baseSession.id,
       tenantId,
       markerUserId,
-      {
-        staffUserId: "22222222-2222-2222-2222-222222222222",
-        status: "PRESENT",
-      },
+      { staffUserId: "22222222-2222-2222-2222-222222222222", status: "PRESENT" },
     );
-  });
-
-  it("limits a staff member's session list to their assignments", async () => {
-    rotaAccess.canManage.mockResolvedValue(false);
-    serviceMock.list.mockResolvedValueOnce([]);
-
-    await controller.list({}, tenantId, orgId, staffRequest);
-
-    expect(serviceMock.list).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId, staffUserId: "staff-1" }),
-    );
-  });
-
-  it("hides unrelated session details and rosters", async () => {
-    rotaAccess.assertSessionVisible.mockRejectedValue(
-      new NotFoundException("Session not found"),
-    );
-
-    await expect(
-      controller.getById(baseSession.id, tenantId, orgId, staffRequest),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      controller.getStaffAttendance(
-        baseSession.id,
-        tenantId,
-        orgId,
-        staffRequest,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      controller.patchStaffAttendance(
-        baseSession.id,
-        { staffUserId, status: "PRESENT" },
-        staffRequest,
-        tenantId,
-        orgId,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    expect(serviceMock.getById).not.toHaveBeenCalled();
-    expect(staffAttendanceMock.getRoster).not.toHaveBeenCalled();
-    expect(staffAttendanceMock.upsert).not.toHaveBeenCalled();
-  });
-
-  it("rejects staff session writes before reaching the service", async () => {
-    rotaAccess.assertManager.mockRejectedValue(
-      new ForbiddenException("Rota management is not available"),
-    );
-    const dto: CreateSessionDto = {
-      tenantId,
-      startsAt: new Date("2025-01-01T09:00:00Z"),
-      endsAt: new Date("2025-01-01T10:00:00Z"),
-    };
-
-    await expect(
-      controller.create(dto, tenantId, orgId, staffRequest),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.bulkCreate({}, tenantId, orgId, staffRequest),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.update(baseSession.id, {}, tenantId, orgId, staffRequest),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.delete(baseSession.id, tenantId, orgId, staffRequest),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.publishForFamily(
-        baseSession.id,
-        tenantId,
-        orgId,
-        staffRequest,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.unpublishForFamily(
-        baseSession.id,
-        tenantId,
-        orgId,
-        staffRequest,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(serviceMock.create).not.toHaveBeenCalled();
-    expect(serviceMock.update).not.toHaveBeenCalled();
-    expect(familyTimetable.setPublication).not.toHaveBeenCalled();
   });
 });

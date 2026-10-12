@@ -76,14 +76,6 @@ assert.ok(
   "expected PACE navigation to require the ace.pace.read permission",
 );
 
-const academicSetupNavEntry = navigationSource.match(
-  /label:\s*"Academic setup"[\s\S]*?href:\s*"\/ace\/settings\/academic"[\s\S]*?permission:\s*"ace\.settings\.read"[\s\S]*?group:\s*"Teaching",?\s*\},/,
-);
-assert.ok(
-  academicSetupNavEntry,
-  "expected ACE academic setup navigation to require ace.settings.read",
-);
-
 const staffRole = {
   isOrgAdmin: false,
   isOrgOwner: false,
@@ -115,37 +107,6 @@ assert.match(
   /href="\/ace\/behaviour"[^>]*>[\s\S]*?Behaviour/,
   "Behaviour navigation renders after ace.behaviour.read is loaded",
 );
-const academicSetupNavigation = (permissions: string[]) =>
-  resolveAdminNavItems({
-    role: staffRole,
-    currentOrgIsMasterOrg: false,
-    capabilities: [],
-    permissions,
-    ui: { labels: {} },
-  }).some((item) => item.href === "/ace/settings/academic");
-assert.equal(academicSetupNavigation([]), false);
-assert.equal(academicSetupNavigation(["ace.settings.read"]), true);
-const messagingNavigation = (permissions: string[]) =>
-  resolveAdminNavItems({
-    role: staffRole,
-    currentOrgIsMasterOrg: false,
-    capabilities: [],
-    permissions,
-    ui: { labels: {} },
-  }).some((item) => item.href === "/ace/messages");
-assert.equal(
-  messagingNavigation(["messaging.conversations.read"]),
-  false,
-  "messages navigation needs both conversation and message read permissions",
-);
-assert.equal(
-  messagingNavigation([
-    "messaging.conversations.read",
-    "messaging.messages.read",
-  ]),
-  true,
-  "messages navigation appears for staff with both read permissions",
-);
 
 // ACE-F14: Roles & Access must be gated by the typed permission, not a role
 // display name - no `access:` string on this entry.
@@ -172,23 +133,8 @@ assert.ok(
   "expected Attendance navigation to require the attendance.read permission",
 );
 
-const dailyRegisterVisible = (capabilities: string[], permissions: string[]) =>
-  resolveAdminNavItems({
-    role: staffRole,
-    currentOrgIsMasterOrg: false,
-    capabilities,
-    permissions,
-    ui: { labels: {} },
-  }).some((item) => item.href === "/ace/attendance/daily");
-assert.equal(dailyRegisterVisible([], ["attendance.read"]), false);
-assert.equal(dailyRegisterVisible(["ace.dashboard.read"], []), false);
-assert.equal(
-  dailyRegisterVisible(["ace.dashboard.read"], ["attendance.read"]),
-  true,
-);
-
 const noticesNavEntry = navigationSource.match(
-  /defaultSidebarItems\[9\][\s\S]*?access:\s*"staff-or-admin"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication",?\s*\},/,
+  /defaultSidebarItems\[9\][\s\S]*?access:\s*"site-admin-or-higher"[\s\S]*?permission:\s*"notices\.read"[\s\S]*?group:\s*"Communication",?\s*\},/,
 );
 assert.ok(
   noticesNavEntry,

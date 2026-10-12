@@ -12,9 +12,9 @@ import {
   fetchRecentAnnouncements,
   fetchSessions,
   rotatePublicSignupLinkForCurrentSite,
+  setApiClientToken,
   type AdminPublicSignupLink,
 } from "../lib/api-client";
-import { requestFailure } from "../lib/request-error";
 import { QrCodeCard } from "../components/qr/QrCodeCard";
 
 type StatusTone = "default" | "accent" | "warning" | "success";
@@ -110,7 +110,9 @@ export default function DashboardPage() {
       const result = await fetchSessions();
       setSessions(result);
     } catch (err) {
-      setSessionError(requestFailure(err, "Unable to load sessions.").message);
+      setSessionError(
+        err instanceof Error ? err.message : "Failed to load sessions",
+      );
     } finally {
       setIsLoadingSessions(false);
     }
@@ -124,7 +126,7 @@ export default function DashboardPage() {
       setAnnouncements(result);
     } catch (err) {
       setAnnouncementError(
-        requestFailure(err, "Unable to load announcements.").message,
+        err instanceof Error ? err.message : "Failed to load announcements",
       );
     } finally {
       setIsLoadingAnnouncements(false);
@@ -151,7 +153,7 @@ export default function DashboardPage() {
       setSignupLink(link);
       setQrModalOpen(true);
     } catch (err) {
-      setSignupLinkError(requestFailure(err, "Unable to load signup link.").message);
+      setSignupLinkError(err instanceof Error ? err.message : "Failed to load signup link");
     } finally {
       setIsLoadingSignupLink(false);
     }
@@ -165,7 +167,7 @@ export default function DashboardPage() {
       const link = await rotatePublicSignupLinkForCurrentSite();
       setSignupLink(link);
     } catch (err) {
-      setSignupLinkError(requestFailure(err, "Unable to regenerate link.").message);
+      setSignupLinkError(err instanceof Error ? err.message : "Failed to regenerate link");
     } finally {
       setIsLoadingSignupLink(false);
     }
@@ -173,6 +175,8 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     if (sessionStatus !== "authenticated" || !session) return;
+    const token = (session as { accessToken?: string })?.accessToken ?? null;
+    setApiClientToken(token);
     void loadSessions();
     void loadAnnouncements();
     void loadOpenConcerns();
@@ -391,7 +395,7 @@ export default function DashboardPage() {
               </p>
             ) : (
               <p className="text-sm text-text-muted">
-                Open concerns count is currently unavailable.
+                Open concerns count not available for your role.
               </p>
             )}
           </div>

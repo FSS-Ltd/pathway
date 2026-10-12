@@ -43,9 +43,6 @@ import { AccessUsersController } from "./access-users.controller";
 import { AccessUsersService } from "./access-users.service";
 import { AccessTagsController } from "./access-tags.controller";
 import { AccessTagsService } from "./access-tags.service";
-import { BadgeStateController } from "./badge-state.controller";
-import { BadgeStateService } from "./badge-state.service";
-import { BadgeMatrixService } from "./badge-matrix.service";
 import { fromStoredAccessTagKey } from "./access-tag-keys";
 import { AssignmentsController } from "./assignments.controller";
 import { AssignmentsService } from "./assignments.service";
@@ -58,73 +55,12 @@ import {
 import { RoleSafetyService } from "./role-safety.service";
 
 const effectivePermissionsReader: EffectivePermissionsReader = {
-  async isActiveSuperUser(userId) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { superUser: true, isActive: true },
-    });
-    return Boolean(user?.superUser && user.isActive);
-  },
-
-  async getMembership(userId, orgId, tenantId, isSuperUser) {
+  async getOrganisationMembership(userId, orgId) {
     const membership = await prisma.orgMembership.findUnique({
       where: { orgId_userId: { orgId, userId } },
-      select: { role: true },
-    });
-    if (!membership) {
-      return { hasMembership: false, isSuperUser: false };
-    }
-    if (!isSuperUser) {
-      return { hasMembership: true, isSuperUser: false };
-    }
-    if (!tenantId) {
-      return { hasMembership: true, isSuperUser: true };
-    }
-
-    // The global flag never admits a user to a new site or organisation.
-    const tenant = await prisma.tenant.findFirst({
-      where: { id: tenantId, orgId },
       select: { id: true },
     });
-    if (!tenant) {
-      return { hasMembership: true, isSuperUser: false };
-    }
-    if (membership.role === "ORG_ADMIN") {
-      return { hasMembership: true, isSuperUser: true };
-    }
-    const siteMembership = await prisma.siteMembership.findUnique({
-      where: { tenantId_userId: { tenantId, userId } },
-      select: { id: true },
-    });
-    if (siteMembership) {
-      return { hasMembership: true, isSuperUser: true };
-    }
-    const [legacySiteRole, legacyOrgAdmin] = await Promise.all([
-      prisma.userTenantRole.findFirst({
-        where: { tenantId, userId },
-        select: { id: true },
-      }),
-      prisma.userOrgRole.findFirst({
-        where: { orgId, userId, role: "ORG_ADMIN" },
-        select: { id: true },
-      }),
-    ]);
-    return {
-      hasMembership: true,
-      isSuperUser: Boolean(siteMembership || legacySiteRole || legacyOrgAdmin),
-    };
-  },
-
-  async findActivePermissionKeys(keys) {
-    if (keys.length === 0) return [];
-    const disabledDefinitions = await prisma.permissionDefinition.findMany({
-      where: { key: { in: [...keys] }, isActive: false },
-      select: { key: true },
-    });
-    // The compile-time capability registry owns executable keys. A missing
-    // metadata row must not silently disable a capability during rollout.
-    const disabled = new Set(disabledDefinitions.map(({ key }) => key));
-    return keys.filter((key) => !disabled.has(key));
+    return membership !== null;
   },
 
   async findAssignments(userId, orgId, tenantId, now) {
@@ -241,26 +177,6 @@ const effectivePermissionsReader: EffectivePermissionsReader = {
       })),
     );
   },
-
-  async findExclusions(userId, orgId, tenantId) {
-    const exclusions = await prisma.accessTagExclusion.findMany({
-      where: {
-        orgId,
-        userId,
-        revokedAt: null,
-        OR: [{ tenantId: null }, ...(tenantId ? [{ tenantId }] : [])],
-      },
-      select: { tenantId: true, tagKey: true },
-    });
-    return exclusions.flatMap(({ tenantId: scopeTenantId, tagKey }) =>
-      accessTagPermissionKeys(fromStoredAccessTagKey(tagKey)).map(
-        (permissionKey) => ({
-          tenantId: scopeTenantId,
-          permissionKey,
-        }),
-      ),
-    );
-  },
 };
 
 const orgCapabilitiesReader: OrgCapabilitiesReader = {
@@ -284,16 +200,8 @@ const featureAvailabilityReader: FeatureAvailabilityReader = {
 const effectivePermissionsContext: EffectivePermissionsContext = {
   async run(orgId, tenantId, operation, transaction) {
     if (transaction) {
-      return withPrismaTransactionContext(
-        transaction,
-        async () => {
-          await applyTenantContext(transaction, tenantId ?? "", orgId);
-          return operation();
-        },
-        tenantId
-          ? { kind: "tenant", tenantId, orgId, readOnly: false }
-          : { kind: "org", orgId, readOnly: false },
-      );
+      await applyTenantContext(transaction, tenantId ?? "", orgId);
+      return withPrismaTransactionContext(transaction, operation);
     }
     return tenantId
       ? withTenantRlsContext(tenantId, orgId, () => operation())
@@ -308,7 +216,6 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
     RolesController,
     AccessUsersController,
     AccessTagsController,
-    BadgeStateController,
     AccessAuditController,
     AccessPermissionsController,
   ],
@@ -317,8 +224,6 @@ const effectivePermissionsContext: EffectivePermissionsContext = {
     RolesService,
     AccessUsersService,
     AccessTagsService,
-    BadgeStateService,
-    BadgeMatrixService,
     AccessAuditService,
     AccessPermissionsService,
     RoleSafetyService,

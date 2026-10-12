@@ -3,10 +3,22 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAdminContext } from "@/lib/admin-context";
+import { useSession } from "@/lib/use-session-compat";
 import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
-import { fetchClasses, type ClassRow } from "../../lib/api-client";
+import {
+  fetchActiveSiteState,
+  fetchClasses,
+  type ClassRow,
+} from "../../lib/api-client";
 import { useOrgLabel } from "@/lib/use-org-ui";
+
+const resolveTenantId = (
+  activeSiteId: string | null,
+  sites: Array<{ id: string }>,
+) => {
+  const activeSite = sites.find((s) => s.id === activeSiteId) ?? sites[0];
+  return activeSite?.id ?? null;
+};
 
 function formatAgeRange(min: number | null, max: number | null): string {
   if (min == null && max == null) return "—";
@@ -18,12 +30,11 @@ function formatAgeRange(min: number | null, max: number | null): string {
 export default function ClassesPage() {
   const title = useOrgLabel("/classes", "Classes");
   const router = useRouter();
-  const { state: adminState } = useAdminContext();
+  const { data: session, status: sessionStatus } = useSession();
   const [data, setData] = React.useState<ClassRow[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const tenantId =
-    adminState.status === "ready" ? adminState.snapshot.activeSiteId : null;
+  const [tenantId, setTenantId] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
@@ -37,6 +48,20 @@ export default function ClassesPage() {
       setIsLoading(false);
     }
   }, []);
+
+  React.useEffect(() => {
+    if (sessionStatus !== "authenticated" || !session) return;
+    const loadSite = async () => {
+      try {
+        const state = await fetchActiveSiteState();
+        const id = resolveTenantId(state.activeSiteId, state.sites);
+        setTenantId(id);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load active site");
+      }
+    };
+    void loadSite();
+  }, [sessionStatus, session]);
 
   React.useEffect(() => {
     if (tenantId) void load();
@@ -72,7 +97,6 @@ export default function ClassesPage() {
       },
       {
         id: "ageRange",
-        priority: "secondary",
         header: "Age range",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -96,7 +120,6 @@ export default function ClassesPage() {
       },
       {
         id: "sessions",
-        priority: "secondary",
         header: "Sessions",
         cell: (row) => (
           <span className="text-sm text-text-muted">
@@ -165,9 +188,6 @@ export default function ClassesPage() {
         ) : (
           <DataTable
             data={sortedData}
-            caption="Classes"
-            rowKey={(row) => row.id}
-            pagination={{ mode: "client" }}
             columns={columns}
             isLoading={isLoading}
             emptyMessage="No classes yet. Create one to get started."

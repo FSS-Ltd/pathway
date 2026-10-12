@@ -11,12 +11,6 @@ export interface EffectivePermissionWithSources {
   permissionKey: PermissionKey;
   sourceRoleIds: string[];
   sourceTagGrantIds?: string[];
-  sourceSuperUser?: true;
-}
-
-export interface EffectiveMembership {
-  hasMembership: boolean;
-  isSuperUser: boolean;
 }
 
 export interface EffectivePermissionGrant {
@@ -41,22 +35,8 @@ export interface EffectiveTagPermissionGrant {
   revokedAt: Date | null;
 }
 
-export interface EffectivePermissionExclusion {
-  tenantId: string | null;
-  permissionKey: PermissionKey;
-}
-
 export interface EffectivePermissionsReader {
-  isActiveSuperUser(userId: string): Promise<boolean>;
-  getMembership(
-    userId: string,
-    orgId: string,
-    tenantId: string | undefined,
-    isSuperUser: boolean,
-  ): Promise<EffectiveMembership>;
-  findActivePermissionKeys(
-    keys: readonly PermissionKey[],
-  ): Promise<readonly PermissionKey[]>;
+  getOrganisationMembership(userId: string, orgId: string): Promise<boolean>;
   findAssignments(
     userId: string,
     orgId: string,
@@ -69,12 +49,6 @@ export interface EffectivePermissionsReader {
     tenantId: string | undefined,
     now: Date,
   ): Promise<readonly EffectiveTagPermissionGrant[]>;
-  findExclusions(
-    userId: string,
-    orgId: string,
-    tenantId: string | undefined,
-    now: Date,
-  ): Promise<readonly EffectivePermissionExclusion[]>;
 }
 
 export interface OrgCapabilitiesReader {
@@ -121,9 +95,8 @@ export class EffectivePermissionsService {
   ) {}
 
   async resolve(request: EffectiveAccessRequest): Promise<AccessDecision> {
-    const isSuperUser = await this.reader.isActiveSuperUser(request.userId);
     return this.context.run(request.orgId, request.tenantId, () =>
-      this.resolveInContext(request, isSuperUser),
+      this.resolveInContext(request),
     );
   }
 
@@ -132,9 +105,8 @@ export class EffectivePermissionsService {
     orgId: string,
     tenantId?: string,
   ): Promise<PermissionKey[]> {
-    const isSuperUser = await this.reader.isActiveSuperUser(userId);
     return this.context.run(orgId, tenantId, () =>
-      this.listForUserInContext(userId, orgId, tenantId, isSuperUser),
+      this.listForUserInContext(userId, orgId, tenantId),
     );
   }
 
@@ -144,15 +116,8 @@ export class EffectivePermissionsService {
     tenantId?: string,
     now = new Date(),
   ): Promise<EffectivePermissionWithSources[]> {
-    const isSuperUser = await this.reader.isActiveSuperUser(userId);
     return this.context.run(orgId, tenantId, () =>
-      this.listForUserWithSourcesInContext(
-        userId,
-        orgId,
-        tenantId,
-        now,
-        isSuperUser,
-      ),
+      this.listForUserWithSourcesInContext(userId, orgId, tenantId, now),
     );
   }
 
@@ -163,11 +128,7 @@ export class EffectivePermissionsService {
     tenantId: string | undefined,
     now: Date,
     transaction: Prisma.TransactionClient,
-    knownOrdinaryUser?: true,
   ): Promise<EffectivePermissionWithSources[]> {
-    const isSuperUser = knownOrdinaryUser
-      ? false
-      : await this.reader.isActiveSuperUser(userId);
     return this.context.run(
       orgId,
       tenantId,
@@ -177,7 +138,6 @@ export class EffectivePermissionsService {
           orgId,
           tenantId,
           now,
-          isSuperUser,
           true,
         ),
       transaction,
@@ -186,14 +146,12 @@ export class EffectivePermissionsService {
 
   private async resolveInContext(
     request: EffectiveAccessRequest,
-    isSuperUser: boolean,
   ): Promise<AccessDecision> {
     const snapshot = await this.loadSnapshot(
       request.userId,
       request.orgId,
       request.tenantId,
       request.now,
-      isSuperUser,
     );
     if (!snapshot.hasMembership) {
       return denied("no-membership");
@@ -211,37 +169,6 @@ export class EffectivePermissionsService {
       ))
     ) {
       return denied("feature-disabled");
-    }
-
-    if (snapshot.isSuperUser) {
-      const active = await this.reader.findActivePermissionKeys([
-        request.permission,
-      ]);
-      return active.includes(request.permission)
-        ? {
-            allowed: true,
-            reason: "allowed",
-            sourceRoleIds: [],
-            sourceSuperUser: true,
-          }
-        : denied("feature-disabled");
-    }
-
-    const exclusions = await this.reader.findExclusions(
-      request.userId,
-      request.orgId,
-      request.tenantId,
-      request.now,
-    );
-    if (
-      exclusions.some(
-        (exclusion) =>
-          exclusion.permissionKey === request.permission &&
-          (exclusion.tenantId === null ||
-            exclusion.tenantId === request.tenantId),
-      )
-    ) {
-      return denied("permission-missing");
     }
 
     const tagGrants = await this.reader.findTagGrants(
@@ -299,17 +226,10 @@ export class EffectivePermissionsService {
   private async listForUserInContext(
     userId: string,
     orgId: string,
-    tenantId: string | undefined,
-    isSuperUser: boolean,
+    tenantId?: string,
   ): Promise<PermissionKey[]> {
     const now = new Date();
-    const snapshot = await this.loadSnapshot(
-      userId,
-      orgId,
-      tenantId,
-      now,
-      isSuperUser,
-    );
+    const snapshot = await this.loadSnapshot(userId, orgId, tenantId, now);
     if (!snapshot.hasMembership) {
       return [];
     }
@@ -321,22 +241,9 @@ export class EffectivePermissionsService {
       now,
     );
 
-    const excludedKeys = new Set(
-      (await this.reader.findExclusions(userId, orgId, tenantId, now))
-        .filter(
-          (exclusion) =>
-            exclusion.tenantId === null || exclusion.tenantId === tenantId,
-        )
-        .map((exclusion) => exclusion.permissionKey),
-    );
-
     const availableCapabilities = new Set(snapshot.capabilities);
-    const superUserKeys = snapshot.isSuperUser
-      ? await this.reader.findActivePermissionKeys(snapshot.capabilities)
-      : [];
     const permissionKeys = [
       ...new Set([
-        ...superUserKeys,
         ...snapshot.grants
           .filter(
             (grant) =>
@@ -370,10 +277,7 @@ export class EffectivePermissionsService {
     );
 
     return availability
-      .filter(
-        ({ available, permission }) =>
-          available && (snapshot.isSuperUser || !excludedKeys.has(permission)),
-      )
+      .filter(({ available }) => available)
       .map(({ permission }) => permission);
   }
 
@@ -382,7 +286,6 @@ export class EffectivePermissionsService {
     orgId: string,
     tenantId: string | undefined,
     now: Date,
-    isSuperUser: boolean,
     bypassCache = false,
   ): Promise<EffectivePermissionWithSources[]> {
     const snapshot = await this.loadSnapshot(
@@ -390,7 +293,6 @@ export class EffectivePermissionsService {
       orgId,
       tenantId,
       now,
-      isSuperUser,
       bypassCache,
     );
     if (!snapshot.hasMembership) {
@@ -404,19 +306,7 @@ export class EffectivePermissionsService {
       now,
     );
 
-    const excludedKeys = new Set(
-      (await this.reader.findExclusions(userId, orgId, tenantId, now))
-        .filter(
-          (exclusion) =>
-            exclusion.tenantId === null || exclusion.tenantId === tenantId,
-        )
-        .map((exclusion) => exclusion.permissionKey),
-    );
-
     const availableCapabilities = new Set(snapshot.capabilities);
-    const superUserKeys = snapshot.isSuperUser
-      ? await this.reader.findActivePermissionKeys(snapshot.capabilities)
-      : [];
     const roleIdsByKey = new Map<PermissionKey, Set<string>>();
     const tagIdsByKey = new Map<PermissionKey, Set<string>>();
     for (const grant of snapshot.grants) {
@@ -449,11 +339,7 @@ export class EffectivePermissionsService {
     }
 
     const permissionKeys = [
-      ...new Set([
-        ...superUserKeys,
-        ...roleIdsByKey.keys(),
-        ...tagIdsByKey.keys(),
-      ]),
+      ...new Set([...roleIdsByKey.keys(), ...tagIdsByKey.keys()]),
     ].sort();
     const availability = await Promise.all(
       permissionKeys.map(async (permission) => ({
@@ -466,16 +352,10 @@ export class EffectivePermissionsService {
     );
 
     return availability
-      .filter(
-        ({ available, permission }) =>
-          available && (snapshot.isSuperUser || !excludedKeys.has(permission)),
-      )
+      .filter(({ available }) => available)
       .map(({ permission }) => ({
         permissionKey: permission,
         sourceRoleIds: [...(roleIdsByKey.get(permission) ?? [])].sort(),
-        ...(snapshot.isSuperUser && superUserKeys.includes(permission)
-          ? { sourceSuperUser: true as const }
-          : {}),
         ...(tagIdsByKey.has(permission)
           ? {
               sourceTagGrantIds: [
@@ -491,17 +371,14 @@ export class EffectivePermissionsService {
     orgId: string,
     tenantId: string | undefined,
     now: Date,
-    isSuperUser: boolean,
     bypassCache = false,
   ): Promise<EffectiveAccessSnapshot> {
-    const membership = await this.reader.getMembership(
+    const hasMembership = await this.reader.getOrganisationMembership(
       userId,
       orgId,
-      tenantId,
-      isSuperUser,
     );
-    if (!membership.hasMembership) {
-      return { ...membership, capabilities: [], grants: [] };
+    if (!hasMembership) {
+      return { hasMembership, capabilities: [], grants: [] };
     }
     const [capabilities, grants] = await Promise.all([
       this.capabilityReader.get(orgId),
@@ -511,13 +388,12 @@ export class EffectivePermissionsService {
             this.reader.findAssignments(userId, orgId, tenantId, now),
           ),
     ]);
-    return { ...membership, capabilities, grants };
+    return { hasMembership, capabilities, grants };
   }
 }
 
 interface EffectiveAccessSnapshot {
   readonly hasMembership: boolean;
-  readonly isSuperUser: boolean;
   readonly capabilities: readonly PermissionKey[];
   readonly grants: readonly EffectivePermissionGrant[];
 }

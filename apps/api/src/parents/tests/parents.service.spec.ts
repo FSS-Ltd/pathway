@@ -1,19 +1,13 @@
 const findMany = jest.fn();
 const findFirst = jest.fn();
-const update = jest.fn();
-const findChildren = jest.fn();
 
 jest.mock("@pathway/db", () => ({
-  withTenantRlsContext: jest.fn(),
   prisma: {
-    user: { findMany, findFirst, update },
-    child: { findMany: findChildren },
+    user: { findMany, findFirst },
     $disconnect: jest.fn(),
   },
 }));
 
-import { ConflictException } from "@nestjs/common";
-import { withTenantRlsContext } from "@pathway/db";
 import { ParentsService } from "../parents.service";
 
 describe("ParentsService", () => {
@@ -23,7 +17,6 @@ describe("ParentsService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(withTenantRlsContext).mockResolvedValue(null);
     service = new ParentsService();
   });
 
@@ -101,63 +94,5 @@ describe("ParentsService", () => {
 
       expect(result).toBeNull();
     });
-  });
-
-  it("updates only the selected site's child links", async () => {
-    findFirst
-      .mockResolvedValueOnce({ id: "p1", children: [{ id: "old-site-child" }] })
-      .mockResolvedValueOnce({
-        id: "p1",
-        name: "Parent One",
-        email: null,
-        children: [
-          { id: "new-site-child", firstName: "Sam", lastName: "Child" },
-        ],
-      });
-    findChildren.mockResolvedValueOnce([{ id: "new-site-child" }]);
-    update.mockResolvedValueOnce({ id: "p1" });
-
-    await service.updateForTenant(tenantId, orgId, "p1", {
-      childIds: ["new-site-child"],
-    });
-
-    expect(findFirst).toHaveBeenNthCalledWith(
-      1,
-      expect.objectContaining({
-        select: {
-          id: true,
-          children: { where: { tenantId }, select: { id: true } },
-        },
-      }),
-    );
-    expect(update).toHaveBeenCalledWith({
-      where: { id: "p1" },
-      data: {
-        children: {
-          disconnect: [{ id: "old-site-child" }],
-          connect: [{ id: "new-site-child" }],
-        },
-      },
-    });
-    expect(withTenantRlsContext).toHaveBeenCalledWith(
-      tenantId,
-      orgId,
-      expect.any(Function),
-    );
-  });
-
-  it("blocks unlinking a child with current full guardian access", async () => {
-    findFirst.mockResolvedValueOnce({
-      id: "p1",
-      children: [{ id: "approved-child" }],
-    });
-    jest.mocked(withTenantRlsContext).mockResolvedValueOnce({
-      id: "relationship-a",
-    });
-
-    await expect(
-      service.updateForTenant(tenantId, orgId, "p1", { childIds: [] }),
-    ).rejects.toBeInstanceOf(ConflictException);
-    expect(update).not.toHaveBeenCalled();
   });
 });

@@ -8,8 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./capability-definitions": "./src/capability-definitions.ts",
-    "./capability-maps": "./src/capability-maps.ts",
-    "./access-tags": "./src/access-tags.ts"
+    "./capability-maps": "./src/capability-maps.ts"
   },
   "scripts": {
     "build": "echo platform-build",
@@ -22,8 +21,7 @@
     "backfill:org-vertical": "tsx scripts/backfill-org-vertical.ts"
   },
   "dependencies": {
-    "@pathway/db": "workspace:*",
-    "zod": "^3.23.8"
+    "@pathway/db": "workspace:*"
   },
   "devDependencies": {
     "@prisma/client": "^5.18.0",

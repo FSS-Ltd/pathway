@@ -3,12 +3,6 @@ import type { BuyNowCheckoutParams } from "../buy-now.provider";
 import type { BillingProviderConfig } from "../billing-provider.config";
 import { StripeBuyNowProvider } from "../providers/stripe-buy-now.provider";
 
-// Exercise price construction while optional-module launch readiness is closed.
-jest.mock("@pathway/pricing", () => ({
-  ...jest.requireActual("@pathway/pricing"),
-  isConfiguratorModuleReady: jest.fn(() => true),
-}));
-
 const params: BuyNowCheckoutParams = {
   plan: {
     planCode: "STARTER_MONTHLY",
@@ -63,11 +57,7 @@ describe("StripeBuyNowProvider", () => {
       id: "cs_123",
       url: "https://checkout.stripe.test/cs_123",
     });
-    (
-      provider as unknown as {
-        stripe: { checkout: { sessions: { create: jest.Mock } } };
-      }
-    ).stripe = {
+    (provider as unknown as { stripe: { checkout: { sessions: { create: jest.Mock } } } }).stripe = {
       checkout: { sessions: { create } },
     };
 
@@ -87,47 +77,6 @@ describe("StripeBuyNowProvider", () => {
     );
   });
 
-  it("does not add a Stripe line item for included modules, but charges paid extras", async () => {
-    const provider = new StripeBuyNowProvider(
-      createConfig({
-        GROWTH_99_MONTHLY: "price_growth",
-        MODULE_MEALS_MONTHLY: "price_meals",
-      }),
-    );
-    const create = jest.fn().mockResolvedValue({
-      id: "cs_included",
-      url: "https://checkout.stripe.test/cs_included",
-    });
-    (
-      provider as unknown as {
-        stripe: { checkout: { sessions: { create: jest.Mock } } };
-      }
-    ).stripe = {
-      checkout: { sessions: { create } },
-    };
-
-    await provider.createCheckoutSession(
-      {
-        ...params,
-        plan: {
-          planCode: "GROWTH_99_MONTHLY",
-          selectedIncludedModules: [Module.FINANCE, Module.EVENTS, Module.HR],
-          selectedModules: [Module.MEALS],
-        },
-      },
-      { tenantId: "tenant_1", orgId: "org_1" },
-    );
-
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        line_items: [
-          { price: "price_growth", quantity: 1 },
-          { price: "price_meals", quantity: 1 },
-        ],
-      }),
-    );
-  });
-
   it("rejects checkout rather than omitting a selected module without a price", async () => {
     const provider = new StripeBuyNowProvider(
       createConfig({ STARTER_MONTHLY: "price_starter" }),
@@ -138,34 +87,28 @@ describe("StripeBuyNowProvider", () => {
         tenantId: "tenant_1",
         orgId: "org_1",
       }),
-    ).rejects.toThrow(
-      "Missing Stripe price configuration for selected modules",
-    );
+    ).rejects.toThrow("Missing Stripe price configuration for selected modules");
   });
 
-  it("adds the Asset Management module price to checkout", async () => {
+  it("adds the Learning module price to checkout", async () => {
     const provider = new StripeBuyNowProvider(
       createConfig({
         STARTER_MONTHLY: "price_starter",
-        MODULE_ASSET_MANAGEMENT_MONTHLY: "price_asset_management",
+        MODULE_LEARNING_MONTHLY: "price_learning",
       }),
     );
     const create = jest.fn().mockResolvedValue({
       id: "cs_learning",
       url: "https://checkout.stripe.test/cs_learning",
     });
-    (
-      provider as unknown as {
-        stripe: { checkout: { sessions: { create: jest.Mock } } };
-      }
-    ).stripe = {
+    (provider as unknown as { stripe: { checkout: { sessions: { create: jest.Mock } } } }).stripe = {
       checkout: { sessions: { create } },
     };
 
     await provider.createCheckoutSession(
       {
         ...params,
-        plan: { ...params.plan, selectedModules: [Module.ASSET_MANAGEMENT] },
+        plan: { ...params.plan, selectedModules: [Module.LEARNING] },
       },
       { tenantId: "tenant_1", orgId: "org_1" },
     );
@@ -174,7 +117,7 @@ describe("StripeBuyNowProvider", () => {
       expect.objectContaining({
         line_items: [
           { price: "price_starter", quantity: 1 },
-          { price: "price_asset_management", quantity: 1 },
+          { price: "price_learning", quantity: 1 },
         ],
       }),
     );

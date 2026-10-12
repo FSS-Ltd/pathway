@@ -1,11 +1,10 @@
 # New Supabase project backup restore
 
-**Status (7 October 2026):** The restored London project has 107 finished
-Prisma migrations, 1,475 archived application rows, and all 32 Storage
-objects. The production API now uses this project after the successful manual
-[deployment run](https://github.com/FSS-Ltd/pathway/actions/runs/37645052412).
-See the [production release record](../production-release-status.md) for the
-deployed commit, smoke checks, and remaining verification limits.
+**Status:** DB-2b target restore on 7 October 2026. Database rows, Storage
+bytes, and four pending Prisma migrations are in the new project. Application
+traffic and production configuration have not moved.
+Follow the [production release and cutover conditions](../production-release-status.md)
+before treating the new project as production.
 
 ## Candidate snapshot and target
 
@@ -33,13 +32,6 @@ filename suggests 7 September in UK date notation, and the newest blog row
 was updated on 2 September. The owner confirmed these are the latest available
 backups. The source remains inaccessible, so later writes cannot be ruled out
 by an independent source comparison.
-
-On 7 October, the owner chose to use this database and Storage pair as the
-**final source snapshot** despite that gap. Cutover planning may proceed from
-these archives. Any writes after the snapshot are unverified and may be absent
-from the new project; this is an accepted data-recovery limitation, not a
-claim that the source and target are current or identical. Keep the inactive
-source intact, and compare it before cutover if access is restored.
 
 ## Local restore rehearsal
 
@@ -198,25 +190,19 @@ validated against the target Storage API: it listed exactly
 `pathway-private` (private) and `pathway-public` (public). The target project
 reports healthy in London and has no Edge Functions. A security advisor run
 found public API-role execution grants on the `public.rls_auto_enable()`
-`SECURITY DEFINER` event-trigger function. DB-2e2 removed those grants after
-its PR gate. After [PR #405](https://github.com/FSS-Ltd/pathway/pull/405)
-merged with all eight checks passing, DB-2h applied successfully through
-`prisma migrate deploy`. The four affected trigger functions have
-`search_path = ''`; all 11 learning membership triggers remain attached. The
-security advisor no longer reports the four mutable-search-path warnings. The
-target has 107 finished Prisma migration records, while `prisma migrate
-status` exits nonzero because the two missing historical migration files
-remain unresolved.
+`SECURITY DEFINER` event-trigger function. DB-2e2 removes those grants after
+its PR gate; the target rollback-only rehearsal passed. Four separate
+mutable-search-path function warnings remain for review.
 
-**Remaining verification work after cutover:** The three migration-history
-provenance exceptions, authenticated admin and staging journeys, billing
-callbacks, background workers, and external Data API consumers have not been
-fully verified. The owner accepted the backup as final despite the unverified
-post-snapshot write gap. No repository Data API table client was found. A
-read-only catalog audit found no remaining static function references to
-application relations missing from `app` but present in `public`. Retain the
-inactive source and both archives for reconciliation; do not assume later
-source writes were included.
+**Remaining release blockers:** Migration-history provenance, source freshness
+and final delta, and project-specific configuration and staging verification
+remain unresolved.
+No repository Data API table client was found, but external consumers require
+review before cutover. A read-only catalog audit found no remaining static
+function references to application relations missing from `app` but present
+in `public`. Project-specific Auth, encryption, webhook,
+deployment-secret, and production smoke checks remain. This target is **not
+ready for traffic**.
 
 ## Restored-data checkpoint — 7 October 2026
 
@@ -298,10 +284,8 @@ exceptions and staging/cutover checks above remain open.
    Verify relevant functions, workers, billing callbacks, and uploads in
    staging before changing any deployment secret or production traffic.
 
-**Cutover evidence and gaps:** The owner accepted the 7 September archives as
-final because the inactive source could not be compared. Target row counts,
-32/32 Storage object checks, strict RLS, and the production migration job
-passed. The 7 October cutover was authorised and the three app deployment jobs
-passed, but the migration-history exceptions and complete staging and
-authenticated production journeys remain open. See the release record for
-specific smoke checks and follow-up risks.
+**Exit evidence for cutover:** independent source freshness or an agreed write
+freeze and final delta; resolved migration history and schema/RLS blockers;
+configuration inventory; staging journeys; and a separately authorised cutover
+plan. The target row-count comparison and 32/32 object checks are complete.
+Leave traffic on the old configuration until every release blocker is resolved.

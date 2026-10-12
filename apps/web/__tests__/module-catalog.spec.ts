@@ -136,7 +136,6 @@ describe("module catalogue", () => {
         planCode: "GROWTH_99_MONTHLY",
         frequency: "monthly",
         selectedModules: ["LEARNING"],
-        selectedIncludedModules: ["FINANCE", "EVENTS", "HR"],
       },
       { modulePrices },
     );
@@ -144,57 +143,8 @@ describe("module catalogue", () => {
     expect(total.totalMajor).toBe(128);
     expect(total.lines).toEqual([
       { label: "£99 / month", amountMajor: 99 },
-      { label: "Finance · included", amountMajor: 0 },
-      { label: "Events · included", amountMajor: 0 },
-      { label: "HR · included", amountMajor: 0 },
       { label: "Learning module", amountMajor: 29 },
     ]);
-  });
-
-  it("labels customer-selected included modules separately and charges remaining choices", () => {
-    const totals = calculateConfiguratorCartTotals(
-      {
-        planCode: "GROWTH_99_MONTHLY",
-        frequency: "monthly",
-        selectedIncludedModules: ["FINANCE", "EVENTS", "HR"],
-        selectedModules: ["FINANCE", "EVENTS", "HR", "LEARNING"],
-      },
-      {
-        modulePrices: {
-          MODULE_LEARNING_MONTHLY: {
-            amountMajor: 29,
-            label: "Learning module",
-          },
-        },
-      },
-    );
-
-    expect(totals.totalMajor).toBe(128);
-    expect(totals.lines).toEqual([
-      { label: "£99 / month", amountMajor: 99 },
-      { label: "Finance · included", amountMajor: 0 },
-      { label: "Events · included", amountMajor: 0 },
-      { label: "HR · included", amountMajor: 0 },
-      { label: "Learning module", amountMajor: 29 },
-    ]);
-  });
-
-  it("does not accept a plan-ineligible included selection as free", () => {
-    const totals = calculateCartTotals(
-      {
-        planCode: "STARTER_49_MONTHLY",
-        frequency: "monthly",
-        selectedIncludedModules: ["FINANCE"],
-        selectedModules: ["FINANCE"],
-      },
-      {
-        modulePrices: {
-          MODULE_FINANCE_MONTHLY: { amountMajor: 19, label: "Finance" },
-        },
-      },
-    );
-
-    expect(totals.totalMajor).toBe(68);
   });
 
   it("does not use published module fallbacks in configurator totals", () => {

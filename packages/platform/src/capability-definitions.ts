@@ -66,14 +66,6 @@ export const CAPABILITY_DEFINITIONS = {
     "site",
     "standard",
   ),
-  "ace.attendance.export": defineCapability(
-    "Export ACE attendance",
-    "Export daily attendance records within the active site and assigned scope",
-    "site",
-    "sensitive",
-    true,
-    aceRequirement,
-  ),
   "volunteers.manage": defineCapability(
     "Manage volunteers",
     "Manage volunteer records for the active site",
@@ -549,15 +541,7 @@ export const CAPABILITY_DEFINITIONS = {
   ),
   "ace.behaviour.record": defineCapability(
     "Record behaviour",
-    "Create behaviour facts",
-    "site",
-    "sensitive",
-    true,
-    aceRequirement,
-  ),
-  "ace.behaviour.correct": defineCapability(
-    "Correct behaviour",
-    "Create linked corrections for behaviour facts",
+    "Create and correct behaviour facts",
     "site",
     "sensitive",
     true,
@@ -617,14 +601,6 @@ export const CAPABILITY_DEFINITIONS = {
     "relationship",
     "sensitive",
     true,
-    aceRequirement,
-  ),
-  "ace.parent.notices.read": defineCapability(
-    "View family ACE notices",
-    "View notices addressed to a linked guardian at the active ACE site",
-    "relationship",
-    "sensitive",
-    false,
     aceRequirement,
   ),
   "ace.student.self.read": defineCapability(

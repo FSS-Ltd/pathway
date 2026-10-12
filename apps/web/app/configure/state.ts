@@ -23,7 +23,6 @@ export type ConfiguratorState = {
   orgType: OrgType | null;
   vertical: Vertical | null;
   selectedOptionalModules: WebModule[];
-  selectedIncludedModules: WebModule[];
   planCode: PlanCode | null;
   frequency: "monthly" | "yearly";
   storageChoice: "none" | "100" | "200" | "1000";
@@ -57,7 +56,6 @@ export const INITIAL_CONFIGURATOR_STATE: ConfiguratorState = {
   orgType: null,
   vertical: null,
   selectedOptionalModules: [],
-  selectedIncludedModules: [],
   planCode: null,
   frequency: "monthly",
   storageChoice: "none",
@@ -78,13 +76,9 @@ export function progressStepsForOrgType(
 }
 
 export function includedModulesForState(state: ConfiguratorState): WebModule[] {
-  return state.selectedIncludedModules;
-}
-
-export function includedModuleLimitForState(state: ConfiguratorState): number {
   return state.planCode
-    ? (getConfiguratorPlanPolicy(state.planCode)?.includedModuleLimit ?? 0)
-    : 0;
+    ? [...(getConfiguratorPlanPolicy(state.planCode)?.includedModules ?? [])]
+    : [];
 }
 
 export function configuredModulesForState(
@@ -92,35 +86,27 @@ export function configuredModulesForState(
 ): WebModule[] {
   return [
     ...new Set([
-      ...state.selectedIncludedModules,
+      ...includedModulesForState(state),
       ...state.selectedOptionalModules,
     ]),
   ];
 }
 
-function reconcileModules(
+function reconcileOptionalModules(
   modules: readonly WebModule[],
   planCode: PlanCode | null,
   frequency: ConfiguratorState["frequency"],
   prices: OptionPriceLookup,
-): { included: WebModule[]; optional: WebModule[] } {
+): WebModule[] {
   const policy = planCode ? getConfiguratorPlanPolicy(planCode) : undefined;
-  if (!policy || policy.outcome !== "checkout") {
-    return { included: [], optional: [] };
-  }
-  const selectedModules = [...new Set(modules)].filter((module) =>
-    policy.eligibleOptionalModules.includes(module),
+  if (!policy || policy.outcome !== "checkout") return [];
+
+  return [...new Set(modules)].filter(
+    (module) =>
+      policy.eligibleOptionalModules.includes(module) &&
+      optionDelta({ kind: "module", module }, frequency, prices).status ===
+        "priced",
   );
-  return {
-    included: selectedModules.slice(0, policy.includedModuleLimit),
-    optional: selectedModules
-      .slice(policy.includedModuleLimit)
-      .filter(
-        (module) =>
-          optionDelta({ kind: "module", module }, frequency, prices).status ===
-          "priced",
-      ),
-  };
 }
 
 export function firstIncompleteStep(
@@ -216,46 +202,16 @@ export function toggleModule(
   if (
     !policy ||
     policy.outcome !== "checkout" ||
-    !policy.eligibleOptionalModules.includes(module)
-  ) {
-    return state;
-  }
-
-  const selectedIncluded = state.selectedIncludedModules.includes(module);
-  const selectedOptional = state.selectedOptionalModules.includes(module);
-  const selectedModules = [
-    ...state.selectedIncludedModules,
-    ...state.selectedOptionalModules,
-  ];
-  if (selectedIncluded || selectedOptional) {
-    const reconciled = reconcileModules(
-      selectedModules.filter((selected) => selected !== module),
-      state.planCode,
-      state.frequency,
-      prices,
-    );
-    return {
-      ...state,
-      selectedIncludedModules: reconciled.included,
-      selectedOptionalModules: reconciled.optional,
-    };
-  }
-  if (state.selectedIncludedModules.length < policy.includedModuleLimit) {
-    return {
-      ...state,
-      selectedIncludedModules: [...state.selectedIncludedModules, module],
-    };
-  }
-  if (
+    !policy.eligibleOptionalModules.includes(module) ||
     optionDelta({ kind: "module", module }, state.frequency, prices).status !==
-    "priced"
-  ) {
+      "priced"
+  )
     return state;
-  }
-  return {
-    ...state,
-    selectedOptionalModules: [...state.selectedOptionalModules, module],
-  };
+
+  const selectedOptionalModules = state.selectedOptionalModules.includes(module)
+    ? state.selectedOptionalModules.filter((selected) => selected !== module)
+    : [...state.selectedOptionalModules, module];
+  return { ...state, selectedOptionalModules };
 }
 
 export function selectPlan(
@@ -263,22 +219,18 @@ export function selectPlan(
   planCode: PlanCode,
   prices: OptionPriceLookup,
 ): ConfiguratorState {
-  const selectedModules = [
-    ...state.selectedIncludedModules,
-    ...state.selectedOptionalModules,
-  ];
-  const reconciled = reconcileModules(
-    selectedModules,
-    planCode,
-    state.frequency,
-    prices,
-  );
-
+  const previouslyIncluded = new Set(includedModulesForState(state));
   return {
     ...state,
     planCode,
-    selectedIncludedModules: reconciled.included,
-    selectedOptionalModules: reconciled.optional,
+    selectedOptionalModules: reconcileOptionalModules(
+      state.selectedOptionalModules.filter(
+        (module) => !previouslyIncluded.has(module),
+      ),
+      planCode,
+      state.frequency,
+      prices,
+    ),
   };
 }
 
@@ -290,19 +242,16 @@ export function selectFrequency(
   const planCode = state.planCode
     ? remapPlanFrequency(state.planCode, frequency)
     : null;
-  const reconciled = reconcileModules(
-    [...state.selectedIncludedModules, ...state.selectedOptionalModules],
-    planCode,
-    frequency,
-    prices,
-  );
-
   return {
     ...state,
     frequency,
     planCode,
-    selectedIncludedModules: reconciled.included,
-    selectedOptionalModules: reconciled.optional,
+    selectedOptionalModules: reconcileOptionalModules(
+      state.selectedOptionalModules,
+      planCode,
+      frequency,
+      prices,
+    ),
   };
 }
 

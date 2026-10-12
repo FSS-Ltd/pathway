@@ -96,7 +96,6 @@ function roleProvisioningStatements(
     `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO ${rlsRole};`,
     `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO ${rlsRole};`,
     `GRANT SELECT, INSERT, UPDATE ON TABLE "AccessTagGrant" TO ${rlsRole};`,
-    `GRANT SELECT, INSERT, UPDATE ON TABLE "AccessTagExclusion" TO ${rlsRole};`,
     `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleRevision" TO ${rlsRole};`,
     `GRANT ${auditPrivileges} ON TABLE "AuditEvent" TO ${rlsRole};`,
     `GRANT ${outboxPrivileges} ON TABLE "OutboxEvent" TO ${rlsRole};`,
@@ -106,8 +105,6 @@ function roleProvisioningStatements(
     `GRANT SELECT ON TABLE "SiteMembership" TO ${rlsRole};`,
     `GRANT SELECT ON TABLE "OrgVertical" TO ${rlsRole};`,
     `GRANT SELECT ON TABLE "OrgModule" TO ${rlsRole};`,
-    `GRANT SELECT ON TABLE "OrgChildIdentity", "OrgChildSiteLink", "EnrolmentRevision", "EnrolmentRollConfirmation" TO ${rlsRole};`,
-    `GRANT SELECT ON TABLE "InstitutionalBillingPolicy", "InstitutionalBillingSnapshot", "InstitutionalQuoteAcceptance" TO ${rlsRole};`,
     `GRANT ${rlsRole} TO ${bootstrapRole};`,
   ];
 }

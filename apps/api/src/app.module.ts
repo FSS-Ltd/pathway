@@ -3,13 +3,11 @@ import { CommonModule } from "./common/common.module";
 import { OrgsModule } from "./orgs/orgs.module";
 import { PlatformModule } from "./platform/platform.module";
 import { BillingModule } from "./billing/billing.module";
-import { InstitutionalBillingModule } from "./billing/institutional/institutional-billing.module";
 import { AceSettingsModule } from "./ace-settings/ace-settings.module";
 import { PaceModule } from "./pace/pace.module";
 import { BehaviourModule } from "./behaviour/behaviour.module";
 import { AceDashboardModule } from "./ace-dashboard/ace-dashboard.module";
 import { MessagingModule } from "./messaging/messaging.module";
-import { AceNoticesModule } from "./ace-notices/ace-notices.module";
 
 // Core modules
 import { HealthModule } from "./health/health.module";
@@ -17,14 +15,10 @@ import { TenantsModule } from "./tenants/tenants.module"; // TODO: rename file
 import { UsersModule } from "./users/users.module";
 import { GroupsModule } from "./groups/groups.module";
 import { ChildrenModule } from "./children/children.module";
-import { EnrolmentsModule } from "./enrolments/enrolments.module";
-import { FamilyInvitesModule } from "./identity/family-invites.module";
 import { AttendanceModule } from "./attendance/attendance.module";
 import { LessonsModule } from "./lessons/lessons.module";
 import { LearningModule } from "./learning/learning.module";
 import { FamilyPlannerModule } from "./family-planner/family-planner.module";
-import { FamilyModule } from "./family/family.module";
-import { StudentSelfModule } from "./student-self/student-self.module";
 
 // // Scheduling / Rota
 import { SessionsModule } from "./sessions/sessions.module";
@@ -65,14 +59,10 @@ import { AccessControlModule } from "./access-control/access-control.module";
     UsersModule,
     GroupsModule,
     ChildrenModule,
-    EnrolmentsModule,
-    FamilyInvitesModule,
     AttendanceModule,
     LessonsModule,
     LearningModule,
     FamilyPlannerModule,
-    FamilyModule,
-    StudentSelfModule,
     SessionsModule,
     AssignmentsModule,
     PreferencesModule,
@@ -87,13 +77,11 @@ import { AccessControlModule } from "./access-control/access-control.module";
     PlatformModule,
     AccessControlModule,
     BillingModule,
-    InstitutionalBillingModule,
     AceSettingsModule,
     PaceModule,
     BehaviourModule,
     AceDashboardModule,
     MessagingModule,
-    AceNoticesModule,
     LeadsModule,
     StaffModule,
     PublicSignupModule,

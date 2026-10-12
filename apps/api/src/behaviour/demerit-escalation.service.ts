@@ -4,12 +4,11 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { SYSTEM_ROLE_TEMPLATES } from "@pathway/auth";
 import { evaluateDemeritStage } from "@pathway/ace-domain";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { MailerService } from "../mailer/mailer.service";
-import { findActiveReviewers } from "./behaviour-review-access";
-import { findActiveDemeritPolicy } from "./demerit-policy.repository";
 import {
   guardianNotificationIntentSchema,
   isIanaTimezone,
@@ -19,6 +18,7 @@ import {
   uniqueRecipients,
   uniqueSorted,
   type CreateDemeritIntentsInput,
+  type EscalationActor,
   type EscalationPredecessor,
   type DemeritEscalationResult,
   type DemeritPolicyRecord,
@@ -65,7 +65,6 @@ export class DemeritEscalationService {
         childId: input.entry.childId,
         type: "DEMERIT",
         correction: { is: null },
-        retraction: { is: null },
         id: { not: input.entry.id },
         occurredAt: { gte: window.start, lt: window.end },
       },
@@ -135,42 +134,6 @@ export class DemeritEscalationService {
       policyVersion: policy.version,
       createdIntentCount,
     };
-  }
-
-  async enqueueOverrideGuardianNotice(
-    tx: Prisma.TransactionClient,
-    input: {
-      actor: { tenantId: string; orgId: string };
-      childId: string;
-      overrideId: string;
-      policyVersion: number;
-      occurredOn: string;
-      now: Date;
-    },
-  ): Promise<void> {
-    const recipientUserIds = await this.findGuardianUserIds(
-      tx,
-      input.actor.tenantId,
-      input.childId,
-      input.now,
-    );
-    if (recipientUserIds.length === 0) return;
-    await this.outbox.enqueue(tx, {
-      aggregateType: "DEMERIT_STAGE_OVERRIDE",
-      aggregateId: input.overrideId,
-      eventType: "behaviour.guardian-notification.requested",
-      payload: {
-        demeritStageOverrideId: input.overrideId,
-        childId: input.childId,
-        tenantId: input.actor.tenantId,
-        orgId: input.actor.orgId,
-        stage: 2,
-        demeritPolicyVersion: input.policyVersion,
-        occurredOn: input.occurredOn,
-        recipientUserIds,
-      },
-      idempotencyKey: `behaviour-guardian-notification-override:${input.overrideId}:2`,
-    });
   }
 
   async deliverGuardianNotification(
@@ -276,7 +239,23 @@ export class DemeritEscalationService {
     tenantId: string,
     now: Date,
   ): Promise<DemeritPolicyRecord> {
-    const policy = await findActiveDemeritPolicy(tx, tenantId, now);
+    const policy = await tx.demeritPolicy.findFirst({
+      where: {
+        tenantId,
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gt: now } }],
+      },
+      orderBy: [{ effectiveFrom: "desc" }, { version: "desc" }],
+      select: {
+        id: true,
+        version: true,
+        windowDays: true,
+        stageOneThreshold: true,
+        stageTwoThreshold: true,
+        stageThreeThreshold: true,
+        seriousMisconductStage: true,
+      },
+    });
     if (!policy) throw new NotFoundException("Active demerit policy not found");
     return policy;
   }
@@ -307,12 +286,7 @@ export class DemeritEscalationService {
   ): Promise<number> {
     if (input.action === "none") return 0;
     if (input.action === "notify") {
-      const recipientUserIds = await this.findGuardianUserIds(
-        tx,
-        input.actor.tenantId,
-        input.entry.childId,
-        input.now,
-      );
+      const recipientUserIds = await this.findGuardianUserIds(tx, input);
       if (recipientUserIds.length === 0) return 0;
       await this.outbox.enqueue(tx, {
         aggregateType: "BEHAVIOUR_ENTRY",
@@ -325,7 +299,7 @@ export class DemeritEscalationService {
     }
 
     const reviewKind = input.action === "head-review" ? "HEAD" : "SITE";
-    const recipientUserIds = await findActiveReviewers(
+    const recipientUserIds = await this.findReviewerUserIds(
       tx,
       input.actor,
       reviewKind,
@@ -340,20 +314,6 @@ export class DemeritEscalationService {
         reviewKind,
       },
       idempotencyKey: `behaviour-review:${input.entry.id}:${input.stage}:${reviewKind.toLowerCase()}`,
-    });
-    await tx.behaviourReviewRequest.createMany({
-      data: [
-        {
-          tenantId: input.actor.tenantId,
-          childId: input.entry.childId,
-          behaviourEntryId: input.entry.id,
-          kind: reviewKind,
-          stage: input.stage,
-          policyVersion: input.policyVersion,
-          requestedAt: input.now,
-        },
-      ],
-      skipDuplicates: true,
     });
     return 1;
   }
@@ -380,18 +340,16 @@ export class DemeritEscalationService {
 
   private async findGuardianUserIds(
     tx: Prisma.TransactionClient,
-    tenantId: string,
-    childId: string,
-    now: Date,
+    input: CreateDemeritIntentsInput,
   ): Promise<string[]> {
     const relationships = await tx.guardianChildRelationship.findMany({
       where: {
-        tenantId,
-        childId,
+        tenantId: input.actor.tenantId,
+        childId: input.entry.childId,
         legalAccess: { not: "NONE" },
-        startsAt: { lte: now },
+        startsAt: { lte: input.now },
         revokedAt: null,
-        OR: [{ endedAt: null }, { endedAt: { gt: now } }],
+        OR: [{ endedAt: null }, { endedAt: { gt: input.now } }],
         guardianIdentity: { user: { isActive: true, email: { not: null } } },
       },
       select: { guardianIdentity: { select: { userId: true } } },
@@ -399,5 +357,38 @@ export class DemeritEscalationService {
     return uniqueSorted(
       relationships.map(({ guardianIdentity }) => guardianIdentity.userId),
     );
+  }
+
+  private async findReviewerUserIds(
+    tx: Prisma.TransactionClient,
+    actor: EscalationActor,
+    reviewKind: "SITE" | "HEAD",
+    now: Date,
+  ): Promise<string[]> {
+    const isHeadReview = reviewKind === "HEAD";
+    const role = isHeadReview
+      ? SYSTEM_ROLE_TEMPLATES.organisationHead
+      : SYSTEM_ROLE_TEMPLATES.siteLead;
+    const assignments = await tx.userRoleAssignment.findMany({
+      where: {
+        orgId: actor.orgId,
+        tenantId: isHeadReview ? null : actor.tenantId,
+        revokedAt: null,
+        startsAt: { lte: now },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        user: { isActive: true },
+        roleDefinition: {
+          orgId: actor.orgId,
+          tenantId: isHeadReview ? null : actor.tenantId,
+          scope: role.scope,
+          isSystem: true,
+          isActive: true,
+          name: role.name,
+        },
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    return uniqueSorted(assignments.map(({ userId }) => userId));
   }
 }

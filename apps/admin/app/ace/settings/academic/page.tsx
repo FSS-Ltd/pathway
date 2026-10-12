@@ -1,10 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { Button } from "@pathway/ui";
 import { NoAccessCard } from "@/components/no-access-card";
-import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import {
   createAcademicYear,
   fetchAcademicCalendar,
@@ -15,8 +12,6 @@ import { hasPermission } from "@/lib/access";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { useSession } from "@/lib/use-session-compat";
 import { AcademicCalendarForm } from "./academic-calendar-form";
-import { PacePolicySettings } from "./pace-policy-settings";
-import { SubjectSettings } from "./subject-settings";
 
 export default function AcademicCalendarPage() {
   const { data: session, status: sessionStatus } = useSession();
@@ -30,39 +25,20 @@ export default function AcademicCalendarPage() {
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
-  const [siteRevision, setSiteRevision] = React.useState(0);
-  const siteGeneration = React.useRef(0);
 
-  React.useEffect(
-    () =>
-      subscribeToActiveSiteChanges(() => {
-        siteGeneration.current += 1;
-        setSiteRevision((current) => current + 1);
-        setCalendar(null);
-        setError(null);
-        setSuccess(null);
-        setIsLoading(true);
-        setIsSaving(false);
-      }),
-    [],
-  );
-
-  const load = React.useCallback(async (generation: number) => {
+  const load = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const loaded = await fetchAcademicCalendar();
-      if (generation === siteGeneration.current) setCalendar(loaded);
+      setCalendar(await fetchAcademicCalendar());
     } catch (cause) {
-      if (generation === siteGeneration.current) {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Unable to load the academic calendar.",
-        );
-      }
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to load the academic calendar.",
+      );
     } finally {
-      if (generation === siteGeneration.current) setIsLoading(false);
+      setIsLoading(false);
     }
   }, []);
 
@@ -74,21 +50,15 @@ export default function AcademicCalendarPage() {
       !canRead
     )
       return;
-    const generation = siteGeneration.current;
-    void load(generation);
-    return () => {
-      siteGeneration.current += 1;
-    };
-  }, [canRead, isLoadingAccess, load, session, sessionStatus, siteRevision]);
+    void load();
+  }, [canRead, isLoadingAccess, load, session, sessionStatus]);
 
   const save = async (input: CreateAdminAcademicYearInput) => {
-    const generation = siteGeneration.current;
     setIsSaving(true);
     setError(null);
     setSuccess(null);
     try {
       const created = await createAcademicYear(input);
-      if (generation !== siteGeneration.current) return;
       setCalendar((current) =>
         current
           ? { ...current, academicYears: [created, ...current.academicYears] }
@@ -96,15 +66,13 @@ export default function AcademicCalendarPage() {
       );
       setSuccess("Academic year saved.");
     } catch (cause) {
-      if (generation === siteGeneration.current) {
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Unable to save the academic year.",
-        );
-      }
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to save the academic year.",
+      );
     } finally {
-      if (generation === siteGeneration.current) setIsSaving(false);
+      setIsSaving(false);
     }
   };
 
@@ -112,7 +80,7 @@ export default function AcademicCalendarPage() {
   if (!canRead) {
     return (
       <NoAccessCard
-        title="Academic setup"
+        title="Academic calendar"
         message="You do not have permission to view ACE settings."
       />
     );
@@ -122,15 +90,13 @@ export default function AcademicCalendarPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-4">
       <div>
         <h1 className="font-heading text-2xl font-semibold text-text-primary">
-          Academic setup
+          Academic calendar
         </h1>
         <p className="text-sm text-text-muted">
-          Set the academic year, subjects, and PACE assessment rules for the
-          active site.
+          Set the academic year before placing students in subjects.
         </p>
       </div>
       <AcademicCalendarForm
-        key={siteRevision}
         isLoading={isLoading}
         academicYears={calendar?.academicYears ?? []}
         isSaving={isSaving}
@@ -140,17 +106,6 @@ export default function AcademicCalendarPage() {
         timezone={calendar?.timezone ?? null}
         onSave={save}
       />
-      {canManage ? (
-        <div>
-          <Button asChild variant="outline" className="min-h-11">
-            <Link href="/ace/settings/academic/timetable">
-              Build subject timetable
-            </Link>
-          </Button>
-        </div>
-      ) : null}
-      <SubjectSettings canManage={canManage} />
-      <PacePolicySettings canManage={canManage} />
     </div>
   );
 }

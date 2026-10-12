@@ -14,8 +14,6 @@ const describeIfSeedProof =
 const REPOSITORY_ROOT = path.resolve(__dirname, "../../../..");
 const APPROVED_GRANTS = {
   "Organisation Head": [
-    "ace.attendance.export",
-    "ace.behaviour.correct",
     "ace.behaviour.policy.manage",
     "ace.behaviour.read",
     "ace.behaviour.record",
@@ -69,8 +67,6 @@ const APPROVED_GRANTS = {
     "students.manage",
   ],
   "Site Lead": [
-    "ace.attendance.export",
-    "ace.behaviour.correct",
     "ace.behaviour.policy.manage",
     "ace.behaviour.read",
     "ace.behaviour.record",
@@ -154,7 +150,6 @@ const APPROVED_GRANTS = {
   Parent: [
     "ace.faith.read",
     "ace.faith.reflect",
-    "ace.parent.notices.read",
     "ace.parent.progress.read",
     "messaging.conversations.create",
     "messaging.conversations.read",

@@ -26,7 +26,6 @@ type BehaviourFormProps = {
   canSensitive: boolean;
   siteTimeZone: string;
   disabled?: boolean;
-  compact?: boolean;
   initialDraft?: BehaviourDraft;
   onSave: (
     input: AdminBehaviourCommandInput,
@@ -43,7 +42,6 @@ export function BehaviourForm({
   canSensitive,
   siteTimeZone,
   disabled = false,
-  compact = false,
   initialDraft,
   onSave,
   onSuccess,
@@ -195,26 +193,20 @@ export function BehaviourForm({
   const formDisabled = disabled || isSaving;
 
   return (
-    <section
-      className={
-        compact ? "mt-4" : "rounded-lg border border-border bg-surface p-5"
-      }
-    >
-      {!compact ? (
-        <div>
-          <h2 className="font-heading text-lg font-semibold text-text-primary">
-            Record behaviour
-          </h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Choose a learner and one active site category. Policy and escalation
-            are confirmed by the server.
-          </p>
-        </div>
-      ) : null}
+    <section className="rounded-lg border border-border bg-surface p-5">
+      <div>
+        <h2 className="font-heading text-lg font-semibold text-text-primary">
+          Record behaviour
+        </h2>
+        <p className="mt-1 text-sm text-text-muted">
+          Choose a learner and one active site category. Policy and escalation
+          are confirmed by the server.
+        </p>
+      </div>
 
       <form
         aria-label="Record behaviour"
-        className={compact ? "space-y-3" : "mt-5 space-y-5"}
+        className="mt-5 space-y-5"
         onSubmit={submit}
       >
         <Field id="behaviour-child" label="Learner" error={validation.childId}>
@@ -304,7 +296,7 @@ export function BehaviourForm({
           <legend className="text-sm font-medium text-text-primary">
             Category
           </legend>
-          <div className="mt-2 grid max-h-40 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
             {availableCategories.map((category) => (
               <label
                 key={category.code}
@@ -404,7 +396,7 @@ export function BehaviourForm({
         <Field id="behaviour-note" label="Note (optional)">
           <textarea
             id="behaviour-note"
-            className={`${controlClassName} min-h-16`}
+            className={`${controlClassName} min-h-24`}
             value={draft.note}
             disabled={formDisabled}
             maxLength={4000}

@@ -84,7 +84,6 @@ export default function ParentsPage() {
       },
       {
         id: "email",
-        priority: "secondary",
         header: "Email",
         cell: (row) =>
           row.email ? (
@@ -100,7 +99,6 @@ export default function ParentsPage() {
       },
       {
         id: "children",
-        priority: "secondary",
         header: "Children",
         cell: (row) => (
           <span className="text-sm text-text-primary">
@@ -198,12 +196,6 @@ export default function ParentsPage() {
             </div>
             <DataTable
               data={filteredData}
-              caption="Parents and guardians"
-              rowKey={(row) => row.id}
-              pagination={{
-                mode: "client",
-                resetKey: `${searchQuery}:${childrenFilter}`,
-              }}
               columns={columns}
               isLoading={isLoading}
               emptyMessage="No parents or guardians found for this organisation yet."

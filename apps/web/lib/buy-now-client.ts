@@ -60,7 +60,6 @@ export type BuyNowCheckoutPayload = {
   storageAddon1Tb?: number;
   smsBundles1000?: number;
   selectedModules?: WebModule[];
-  selectedIncludedModules?: WebModule[];
   orgName: string;
   contactName: string;
   contactEmail: string;
@@ -138,7 +137,6 @@ export async function createCheckoutSession(
         (payload.storageAddon1Tb ?? 0) * 1000,
       extraSmsMessages: (payload.smsBundles1000 ?? 0) * 1000,
       selectedModules: payload.selectedModules,
-      selectedIncludedModules: payload.selectedIncludedModules,
     },
     org: {
       orgName: payload.orgName,

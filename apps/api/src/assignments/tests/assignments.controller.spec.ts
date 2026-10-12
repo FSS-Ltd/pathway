@@ -1,21 +1,11 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { AssignmentsController } from "../assignments.controller";
-import {
-  AssignmentsService,
-  type TeamScheduleRow,
-} from "../assignments.service";
+import { AssignmentsService } from "../assignments.service";
 import { Role, AssignmentStatus } from "@pathway/db";
 import { CreateAssignmentDto } from "../dto/create-assignment.dto";
 import { UpdateAssignmentDto } from "../dto/update-assignment.dto";
-import type { TeamScheduleQueryDto } from "../dto/team-schedule-query.dto";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { EntitlementsEnforcementService } from "../../billing/entitlements-enforcement.service";
-import { RotaAccessService } from "../../sessions/rota-access.service";
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from "@nestjs/common";
 
 type AssignmentShape = {
   id: string;
@@ -54,10 +44,6 @@ describe("AssignmentsController", () => {
       [CreateAssignmentDto, string, string]
     >;
     findAll: jest.Mock<Promise<readonly AssignmentShape[]>, [FindAllQuery]>;
-    findTeamSchedule: jest.Mock<
-      Promise<TeamScheduleRow[]>,
-      [string, TeamScheduleQueryDto]
-    >;
     findOne: jest.Mock<Promise<AssignmentShape>, [string, string]>;
     update: jest.Mock<
       Promise<AssignmentShape>,
@@ -76,19 +62,10 @@ describe("AssignmentsController", () => {
       "checkAv30ForOrg" | "assertWithinHardCap"
     >
   >;
-  const actorRequest = { authUserId: assignment.userId } as Parameters<
-    AssignmentsController["create"]
-  >[3];
-  const rotaAccess = {
-    canManage: jest.fn<Promise<boolean>, []>().mockResolvedValue(true),
-    assertManager: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
-    assertTeamViewer: jest.fn<Promise<void>, []>().mockResolvedValue(undefined),
-  };
 
   const createMockService = (): ServiceMock => ({
     create: jest.fn(),
     findAll: jest.fn(),
-    findTeamSchedule: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
@@ -112,7 +89,6 @@ describe("AssignmentsController", () => {
       providers: [
         { provide: AssignmentsService, useValue: mock },
         { provide: EntitlementsEnforcementService, useValue: enforcementMock },
-        { provide: RotaAccessService, useValue: rotaAccess },
       ],
     })
       .overrideGuard(AuthUserGuard)
@@ -124,9 +100,6 @@ describe("AssignmentsController", () => {
     enforcement = module.get(
       EntitlementsEnforcementService,
     ) as unknown as typeof enforcementMock;
-    rotaAccess.canManage.mockResolvedValue(true);
-    rotaAccess.assertManager.mockResolvedValue(undefined);
-    rotaAccess.assertTeamViewer.mockResolvedValue(undefined);
   });
 
   describe("create", () => {
@@ -139,12 +112,7 @@ describe("AssignmentsController", () => {
         status: AssignmentStatus.CONFIRMED,
       };
 
-      const result = await controller.create(
-        dto,
-        "tenant-1",
-        "org-123",
-        actorRequest,
-      );
+      const result = await controller.create(dto, "tenant-1", "org-123");
       expect(service.create).toHaveBeenCalledWith(dto, "tenant-1", "org-123");
       expect(result).toEqual(assignment);
     });
@@ -160,7 +128,7 @@ describe("AssignmentsController", () => {
       };
 
       await expect(
-        controller.create(dto, "tenant-1", "org-123", actorRequest),
+        controller.create(dto, "tenant-1", "org-123"),
       ).rejects.toThrow("HARD_CAP");
       expect(service.create).not.toHaveBeenCalled();
     });
@@ -177,8 +145,6 @@ describe("AssignmentsController", () => {
           status: assignment.status,
         },
         "tenant-1",
-        "org-123",
-        actorRequest,
       );
       expect(service.findAll).toHaveBeenCalledWith({
         tenantId: "tenant-1",
@@ -191,61 +157,10 @@ describe("AssignmentsController", () => {
     });
   });
 
-  describe("findTeamSchedule", () => {
-    const query = { dateFrom: "2026-10-05", dateTo: "2026-10-11" };
-
-    it("returns only the selected site's team schedule after access check", async () => {
-      service.findTeamSchedule.mockResolvedValue([]);
-      await expect(
-        controller.findTeamSchedule(query, "site-1", "org-123", actorRequest),
-      ).resolves.toEqual([]);
-      expect(rotaAccess.assertTeamViewer).toHaveBeenCalledWith({
-        userId: assignment.userId,
-        tenantId: "site-1",
-        orgId: "org-123",
-        isSuperUser: false,
-      });
-      expect(service.findTeamSchedule).toHaveBeenCalledWith("site-1", query);
-    });
-
-    it("rejects invalid or excessive date windows before reading", async () => {
-      for (const invalid of [
-        { dateFrom: "2026-02-30", dateTo: "2026-03-02" },
-        { dateFrom: "2026-10-05", dateTo: "2026-10-12" },
-        { dateFrom: "2026-10-11", dateTo: "2026-10-05" },
-      ]) {
-        await expect(
-          controller.findTeamSchedule(
-            invalid,
-            "site-1",
-            "org-123",
-            actorRequest,
-          ),
-        ).rejects.toBeInstanceOf(BadRequestException);
-      }
-      expect(service.findTeamSchedule).not.toHaveBeenCalled();
-    });
-
-    it("does not read team data when the actor is denied", async () => {
-      rotaAccess.assertTeamViewer.mockRejectedValueOnce(
-        new ForbiddenException(),
-      );
-      await expect(
-        controller.findTeamSchedule(query, "site-1", "org-123", actorRequest),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(service.findTeamSchedule).not.toHaveBeenCalled();
-    });
-  });
-
   describe("findOne", () => {
     it("should return a single assignment", async () => {
       service.findOne.mockResolvedValue(assignment);
-      const result = await controller.findOne(
-        assignment.id,
-        "tenant-1",
-        "org-123",
-        actorRequest,
-      );
+      const result = await controller.findOne(assignment.id, "tenant-1");
       expect(service.findOne).toHaveBeenCalledWith(assignment.id, "tenant-1");
       expect(result).toEqual(assignment);
     });
@@ -260,19 +175,23 @@ describe("AssignmentsController", () => {
       };
       service.update.mockResolvedValue(updated);
       const dto: UpdateAssignmentDto = { status: AssignmentStatus.DECLINED };
+      const req = { authUserId: "user-1" } as Parameters<
+        AssignmentsController["update"]
+      >[4];
+
       const result = await controller.update(
         assignment.id,
         dto,
         "tenant-1",
         "org-123",
-        actorRequest,
+        req,
       );
       expect(service.update).toHaveBeenCalledWith(
         assignment.id,
         dto,
         "tenant-1",
         "org-123",
-        undefined,
+        "user-1",
       );
       expect(result).toEqual(updated);
     });
@@ -283,53 +202,9 @@ describe("AssignmentsController", () => {
       const deletionResult = { deleted: true, id: assignment.id };
       service.remove.mockResolvedValue(deletionResult);
 
-      const result = await controller.remove(
-        assignment.id,
-        "tenant-1",
-        "org-123",
-        actorRequest,
-      );
+      const result = await controller.remove(assignment.id, "tenant-1");
       expect(service.remove).toHaveBeenCalledWith(assignment.id, "tenant-1");
       expect(result).toEqual(deletionResult);
     });
-  });
-
-  it("binds staff list requests to the signed-in user", async () => {
-    rotaAccess.canManage.mockResolvedValue(false);
-    service.findAll.mockResolvedValue([assignment]);
-
-    await controller.findAll({}, "tenant-1", "org-123", actorRequest);
-    expect(service.findAll).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: assignment.userId }),
-    );
-    await expect(
-      controller.findAll(
-        { userId: "33333333-3333-4333-9333-333333333333" },
-        "tenant-1",
-        "org-123",
-        actorRequest,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-  });
-
-  it("hides another staff member's assignment and denies a status change", async () => {
-    rotaAccess.canManage.mockResolvedValue(false);
-    service.findOne.mockResolvedValue({
-      ...assignment,
-      userId: "33333333-3333-4333-9333-333333333333",
-    });
-    await expect(
-      controller.findOne(assignment.id, "tenant-1", "org-123", actorRequest),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    await expect(
-      controller.update(
-        assignment.id,
-        { status: AssignmentStatus.DECLINED },
-        "tenant-1",
-        "org-123",
-        actorRequest,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    expect(service.update).not.toHaveBeenCalled();
   });
 });

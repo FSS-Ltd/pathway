@@ -6,7 +6,6 @@ import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Input, Label } from "@pathway/ui";
 import { DropdownMultiSelect } from "../../../../components/dropdown-multi-select";
-import { SessionRotaKindField } from "../../../../components/session-rota-kind";
 import {
   AdminSessionFormValues,
   AdminAssignmentRow,
@@ -40,14 +39,11 @@ export default function EditSessionPage() {
   const [groups, setGroups] = React.useState<GroupOption[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = React.useState<
-    Partial<Record<keyof AdminSessionFormValues, string>>
-  >({});
+  const [fieldErrors, setFieldErrors] =
+    React.useState<Partial<Record<keyof AdminSessionFormValues, string>>>({});
   const [submitting, setSubmitting] = React.useState(false);
 
-  const [assignments, setAssignments] = React.useState<AdminAssignmentRow[]>(
-    [],
-  );
+  const [assignments, setAssignments] = React.useState<AdminAssignmentRow[]>([]);
   const [assignmentsLoading, setAssignmentsLoading] = React.useState(false);
   const [assignmentError, setAssignmentError] = React.useState<string | null>(
     null,
@@ -86,7 +82,6 @@ export default function EditSessionPage() {
           };
           setForm({
             title: result.title,
-            rotaKind: result.rotaKind ?? "STANDARD",
             startsAt: result.startsAt.slice(0, 16),
             endsAt: result.endsAt.slice(0, 16),
             groupIds:
@@ -95,9 +90,7 @@ export default function EditSessionPage() {
           });
         }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to load session.",
-        );
+        setError(err instanceof Error ? err.message : "Failed to load session.");
         setForm(null);
       } finally {
         setLoading(false);
@@ -112,7 +105,6 @@ export default function EditSessionPage() {
         ? {
             [sessionId]: {
               title: form.title,
-              rotaKind: form.rotaKind,
               startsAt: form.startsAt,
               endsAt: form.endsAt,
             },
@@ -209,7 +201,7 @@ export default function EditSessionPage() {
         groupIds: form.groupIds?.filter(Boolean) ?? [],
       });
       router.push(`/sessions/${sessionId}`);
-    } catch {
+    } catch (err) {
       setError("We couldn’t save this session. Try again.");
     } finally {
       setSubmitting(false);
@@ -229,7 +221,10 @@ export default function EditSessionPage() {
         </Button>
       </div>
 
-      <Card title="Edit session" description="Update details for this session.">
+      <Card
+        title="Edit session"
+        description="Update details for this session."
+      >
         {error ? (
           <div className="mb-4 rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-sm text-status-danger">
             {error}
@@ -244,11 +239,6 @@ export default function EditSessionPage() {
           </div>
         ) : (
           <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-            <SessionRotaKindField
-              value={form.rotaKind ?? "STANDARD"}
-              onChange={(value) => handleChange("rotaKind", value)}
-              disabled
-            />
             <div className="flex flex-col gap-2">
               <Label htmlFor="title">Title</Label>
               <Input
@@ -258,9 +248,7 @@ export default function EditSessionPage() {
                 required
               />
               {fieldErrors.title ? (
-                <p className="text-xs text-status-danger">
-                  {fieldErrors.title}
-                </p>
+                <p className="text-xs text-status-danger">{fieldErrors.title}</p>
               ) : null}
             </div>
 
@@ -304,7 +292,7 @@ export default function EditSessionPage() {
               value={form.groupIds ?? []}
               onChange={(ids) => handleChange("groupIds", ids)}
               placeholder="Select classes…"
-              helperText="Optional for cover and meetings. Assign teaching sessions to classes from the Classes page."
+              helperText="Assign this session to one or more classes. Manage classes from the Classes page."
             />
 
             <div className="flex items-center justify-end gap-2 pt-2">
@@ -474,3 +462,4 @@ export default function EditSessionPage() {
     </div>
   );
 }
+

@@ -1,5 +1,5 @@
 import { HttpException } from "@nestjs/common";
-import { AccessTagKey, Vertical, type Prisma } from "@prisma/client";
+import { Vertical, type Prisma } from "@prisma/client";
 import { assertCanGrantAccessTag } from "../access-tags.delegation";
 import type { RoleActorContext } from "../roles.service";
 
@@ -21,8 +21,6 @@ interface FixtureOptions {
   permissionActive?: boolean;
   moduleActive?: boolean;
   permissionScope?: "organisation" | "site";
-  vertical?: Vertical;
-  excludedTag?: "attendance-recorder";
 }
 
 function fixture(options: FixtureOptions = {}) {
@@ -35,8 +33,6 @@ function fixture(options: FixtureOptions = {}) {
     permissionActive = true,
     moduleActive = false,
     permissionScope = "site",
-    vertical = Vertical.ACE_SCHOOL,
-    excludedTag,
   } = options;
   const knownKeys = permissionKeys ?? [heldKey ?? "attendance.manage"];
   const actorKeys = permissionKeys ?? (heldKey ? [heldKey] : []);
@@ -81,7 +77,9 @@ function fixture(options: FixtureOptions = {}) {
       ),
     },
     orgVertical: {
-      findUnique: jest.fn().mockResolvedValue({ vertical }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({ vertical: Vertical.ACE_SCHOOL }),
     },
     orgModule: {
       findMany: jest
@@ -91,13 +89,6 @@ function fixture(options: FixtureOptions = {}) {
         ),
     },
     accessTagGrant: { findMany: jest.fn().mockResolvedValue([]) },
-    accessTagExclusion: {
-      findMany: jest
-        .fn()
-        .mockResolvedValue(
-          excludedTag ? [{ tagKey: AccessTagKey.ATTENDANCE_RECORDER }] : [],
-        ),
-    },
   };
   return { tx: tx as unknown as Prisma.TransactionClient, roleFindMany };
 }
@@ -122,19 +113,6 @@ async function deniedCode(operation: Promise<unknown>): Promise<string> {
 }
 
 describe("access-tag delegation", () => {
-  it("does not let an excluded permission satisfy the head's delegation ceiling", async () => {
-    const { tx } = fixture({ excludedTag: "attendance-recorder" });
-    await expect(
-      deniedCode(
-        assertCanGrantAccessTag(
-          tx,
-          ACTOR,
-          { userId: "staff-1", tagKey: "attendance-recorder", scope: "site" },
-          NOW,
-        ),
-      ),
-    ).resolves.toBe("ACCESS_TAG_CANNOT_DELEGATE");
-  });
   it("allows an organisation head to grant a held platform capability", async () => {
     const { tx, roleFindMany } = fixture();
 
@@ -209,39 +187,6 @@ describe("access-tag delegation", () => {
         ),
       ),
     ).resolves.toBe("ACCESS_TAG_ASSIGNEE_NOT_IN_SITE");
-  });
-
-  it("requires the ACE export permission for the attendance-exporter tag", async () => {
-    const allowed = fixture({ heldKey: "ace.attendance.export" });
-    await expect(
-      assertCanGrantAccessTag(
-        allowed.tx,
-        ACTOR,
-        { userId: "staff-1", tagKey: "attendance-exporter", scope: "site" },
-        NOW,
-      ),
-    ).resolves.toBe("site-1");
-
-    for (const options of [
-      { heldKey: "attendance.manage" },
-      { heldKey: "ace.attendance.export", vertical: Vertical.CHURCH },
-    ]) {
-      const denied = fixture(options);
-      await expect(
-        deniedCode(
-          assertCanGrantAccessTag(
-            denied.tx,
-            ACTOR,
-            {
-              userId: "staff-1",
-              tagKey: "attendance-exporter",
-              scope: "site",
-            },
-            NOW,
-          ),
-        ),
-      ).resolves.toBe("ACCESS_TAG_CANNOT_DELEGATE");
-    }
   });
 
   it("denies inactive, unheld, or incompatible permissions", async () => {

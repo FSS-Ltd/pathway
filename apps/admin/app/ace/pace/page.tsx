@@ -17,7 +17,6 @@ import {
 } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { useSession } from "@/lib/use-session-compat";
-import { requestFailure, type RequestFailure } from "@/lib/request-error";
 import { PaceCorrectionDialog } from "@/components/ace/pace/pace-correction-dialog";
 import { PaceEntryDialog } from "@/components/ace/pace/pace-entry-dialog";
 import {
@@ -31,9 +30,13 @@ type CorrectionTarget = {
 };
 
 export default function PacePage() {
-  const { update: refreshSession } = useSession();
+  const {
+    data: session,
+    status: sessionStatus,
+    update: refreshSession,
+  } = useSession();
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
-  const canRead = permissions?.includes("ace.pace.read") === true;
+  const canRead = hasPermission(permissions, "ace.pace.read");
   const canRecord = hasPermission(permissions, "ace.pace.record");
   const canCorrect = hasPermission(permissions, "ace.pace.correct");
   const canReadDiagnostics =
@@ -44,7 +47,7 @@ export default function PacePage() {
     [],
   );
   const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<RequestFailure | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
   const [entryTarget, setEntryTarget] =
     React.useState<AdminPaceRosterItem | null>(null);
   const [correctionTarget, setCorrectionTarget] =
@@ -61,16 +64,27 @@ export default function PacePage() {
       setRoster(nextRoster);
       setExceptions(nextExceptions);
     } catch (cause) {
-      setError(requestFailure(cause, "Unable to load the PACE workflow."));
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to load the PACE workflow.",
+      );
     } finally {
       setIsLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
-    if (isLoadingAccess || !canRead) return;
+    if (
+      sessionStatus !== "authenticated" ||
+      !session ||
+      isLoadingAccess ||
+      !canRead
+    ) {
+      return;
+    }
     void load();
-  }, [canRead, isLoadingAccess, load]);
+  }, [canRead, isLoadingAccess, load, session, sessionStatus]);
 
   const afterCommand = async () => {
     await load();
@@ -84,9 +98,6 @@ export default function PacePage() {
         message="You do not have permission to view ACE PACE progress."
       />
     );
-  }
-  if (error?.kind === "denied") {
-    return <NoAccessCard title="PACE workflow" message={error.message} />;
   }
 
   return (
@@ -104,7 +115,7 @@ export default function PacePage() {
         isLoading={isLoading}
         items={roster}
         exceptions={exceptions}
-        error={error?.message ?? null}
+        error={error}
         canRecord={canRecord}
         canCorrect={canCorrect}
         canReadDiagnostics={canReadDiagnostics}

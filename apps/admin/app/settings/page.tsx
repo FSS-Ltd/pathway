@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import { useSession } from "@/lib/use-session-compat";
-import { useAdminContext } from "@/lib/admin-context";
 import { Badge, Button, Card, Input, Label } from "@pathway/ui";
 import {
   AdminBillingOverview,
@@ -15,8 +14,10 @@ import {
   type AdminVertical,
   deactivateOrganisation,
   deleteOrgLogo,
+  fetchActiveSiteState,
   fetchBillingOverview,
   fetchOrgModules,
+  fetchOrgOverview,
   fetchRetentionOverview,
   fetchVerticalCapabilities,
   requestExportOrganisationData,
@@ -52,15 +53,6 @@ function getRoleLabel(role: AdminRoleInfo): string {
 }
 
 export default function SettingsPage() {
-  const { state: adminState, refreshAccess } = useAdminContext();
-  const snapshot = adminState.status === "ready" ? adminState.snapshot : null;
-  const contextOrg = snapshot?.org ?? null;
-  const contextSiteState: ActiveSiteState | null = React.useMemo(
-    () => snapshot
-      ? { activeSiteId: snapshot.activeSiteId, sites: snapshot.sites }
-      : null,
-    [snapshot?.activeSiteId, snapshot?.sites],
-  );
   const { data: session, status: sessionStatus } = useSession();
   const {
     role,
@@ -135,19 +127,21 @@ export default function SettingsPage() {
   }, []);
 
   const load = React.useCallback(async () => {
-    if (!contextOrg || !contextSiteState) return;
     setIsLoading(true);
     setError(null);
     try {
-      const [retentionData, billingData] = await Promise.all([
-        fetchRetentionOverview(),
-        fetchBillingOverview(),
-        loadModules(),
-      ]);
-      setOrg(contextOrg);
+      const [orgData, retentionData, billingData, activeSiteData] =
+        await Promise.all([
+          fetchOrgOverview(),
+          fetchRetentionOverview(),
+          fetchBillingOverview(),
+          fetchActiveSiteState(),
+          loadModules(),
+        ]);
+      setOrg(orgData);
       setRetention(retentionData);
       setBilling(billingData);
-      setSiteState(contextSiteState);
+      setSiteState(activeSiteData);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to load settings overview",
@@ -159,7 +153,7 @@ export default function SettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [contextOrg, contextSiteState, loadModules]);
+  }, [loadModules]);
 
   React.useEffect(() => {
     if (
@@ -196,7 +190,6 @@ export default function SettingsPage() {
     try {
       const updated = await updateOrgProfile({ name: editOrgName });
       setOrg(updated);
-      await refreshAccess();
       setEditingOrg(false);
     } catch (e) {
       setOrgSaveError(e instanceof Error ? e.message : "Failed to save");
@@ -218,7 +211,6 @@ export default function SettingsPage() {
       try {
         const { logoUrl } = await uploadOrgLogo(base64, file.type);
         setOrg((prev) => (prev ? { ...prev, logoUrl } : prev));
-        await refreshAccess();
       } catch (err) {
         setLogoError(err instanceof Error ? err.message : "Failed to upload logo");
       } finally {
@@ -235,7 +227,6 @@ export default function SettingsPage() {
     try {
       const { logoUrl } = await deleteOrgLogo();
       setOrg((prev) => (prev ? { ...prev, logoUrl } : prev));
-      await refreshAccess();
     } catch (err) {
       setLogoError(err instanceof Error ? err.message : "Failed to remove logo");
     } finally {
@@ -252,7 +243,6 @@ export default function SettingsPage() {
         parentPortalEnabled: enabled,
       });
       setOrg(updated);
-      await refreshAccess();
     } catch (e) {
       setParentPortalSaveError(
         e instanceof Error ? e.message : "Failed to save setting",
@@ -290,7 +280,9 @@ export default function SettingsPage() {
       verticalPreviewRequest.current += 1;
       setOrg(updated);
       setVerticalPreview(null);
-      await refreshAccess();
+      // Nav/title vocabulary lives in OrgUiProvider, which only fetches once per
+      // session; reload so the sidebar picks up the new vertical immediately.
+      window.location.reload();
     } catch (e) {
       setVerticalSaveError(
         e instanceof Error ? e.message : "Failed to save vertical",
@@ -307,7 +299,6 @@ export default function SettingsPage() {
     try {
       const updated = await updateOrgSector(sector);
       setOrg(updated);
-      await refreshAccess();
     } catch (e) {
       setSectorSaveError(
         e instanceof Error ? e.message : "Failed to save sector",
@@ -324,7 +315,6 @@ export default function SettingsPage() {
     try {
       await toggleOrgModule(module, active);
       setModules(await fetchOrgModules());
-      await refreshAccess();
     } catch (e) {
       setModulesError(e instanceof Error ? e.message : "Failed to save module");
     } finally {
@@ -368,7 +358,6 @@ export default function SettingsPage() {
           : prev,
       );
       setEditingSite(false);
-      await refreshAccess();
     } catch (e) {
       setSiteSaveError(e instanceof Error ? e.message : "Failed to save");
     } finally {
@@ -543,6 +532,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-4">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-md border border-border-subtle bg-surface">
                   {org?.logoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={org.logoUrl}
                       alt="Organisation logo"

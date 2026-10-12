@@ -11,25 +11,18 @@ import {
   PLAN_PRICES,
   type PlanCode,
 } from "../../../lib/configurator-pricing";
-import {
-  MODULE_CATALOG,
-  type OptionPriceLookup,
-  type WebModule,
-} from "../../../lib/module-catalog";
+import type { OptionPriceLookup, WebModule } from "../../../lib/module-catalog";
 import {
   configuratorStepVariants,
   reducedStepVariants,
   type StepDirection,
 } from "../../../lib/motion";
 import {
-  acceptModuleChange,
   createBuyNowPurchase,
   fetchBillingOverview,
   fetchBillingPrices,
   fetchOrgModules,
-  previewModuleChange,
   type AdminBillingOverview,
-  type AdminModuleChangePreview,
 } from "../../../lib/api-client";
 import { getPlanDisplayName } from "../../../lib/plan-info";
 import { useAdminAccess } from "../../../lib/use-admin-access";
@@ -46,7 +39,6 @@ import { StorageStep } from "./steps/storage";
 import { SummaryStep } from "./steps/summary";
 import {
   firstIncompleteStep,
-  includedModuleLimitForState,
   includedModulesForState,
   initialStateFromSubscription,
   isConfiguratorPlanCode,
@@ -65,12 +57,7 @@ import {
 type ConfiguratorAction =
   | { type: "next" }
   | { type: "back" }
-  | {
-      type: "seed";
-      planCode: PlanCode;
-      included: WebModule[];
-      paid: WebModule[];
-    }
+  | { type: "seed"; planCode: PlanCode }
   | { type: "plan"; planCode: PlanCode; prices: OptionPriceLookup }
   | {
       type: "frequency";
@@ -97,7 +84,7 @@ function configuratorReducer(
     case "back":
       return prevStep(state);
     case "seed":
-      return initialStateFromSubscription(action.planCode, action);
+      return initialStateFromSubscription(action.planCode);
     case "plan":
       return selectPlan(state, action.planCode, action.prices);
     case "frequency":
@@ -113,9 +100,7 @@ function isContinueDisabled(
   state: ConfiguratorState,
   currentStep: ConfiguratorStep,
 ): boolean {
-  return (
-    currentStep === "summary" || (currentStep === "plan" && !state.planCode)
-  );
+  return currentStep === "summary" || (currentStep === "plan" && !state.planCode);
 }
 
 function storageGb(storageChoice: ConfiguratorState["storageChoice"]): number {
@@ -140,25 +125,14 @@ export default function ConfigurePlanPage() {
     configuratorReducer,
     INITIAL_CONFIGURATOR_STATE,
   );
-  const [billingPrices, setBillingPrices] = useState(() =>
-    mergeBillingPrices([]),
-  );
+  const [billingPrices, setBillingPrices] = useState(() => mergeBillingPrices([]));
   const [overview, setOverview] = useState<AdminBillingOverview | null>(null);
   const [ownedModules, setOwnedModules] = useState<WebModule[]>([]);
-  const [currentModules, setCurrentModules] = useState<{
-    included: WebModule[];
-    paid: WebModule[];
-  }>({ included: [], paid: [] });
-  const [moduleChangePreview, setModuleChangePreview] =
-    useState<AdminModuleChangePreview | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [isCheckoutPending, setIsCheckoutPending] = useState(false);
   const [stepDirection, setStepDirection] = useState<StepDirection>("forward");
   const checkoutInFlightRef = useRef(false);
-  const acceptanceKeyRef = useRef<{ changeId: string; key: string } | null>(
-    null,
-  );
   const seededRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
 
@@ -188,33 +162,9 @@ export default function ConfigurePlanPage() {
       }
       if (overviewResult) {
         setOverview(overviewResult);
-        if (
-          !seededRef.current &&
-          isConfiguratorPlanCode(overviewResult.planCode)
-        ) {
+        if (!seededRef.current && isConfiguratorPlanCode(overviewResult.planCode)) {
           seededRef.current = true;
-          const active = modulesResult.filter(
-            (module) => module.status === "ACTIVE",
-          );
-          const included = active
-            .filter((module) =>
-              module.grantSources?.some((grant) => grant.source === "PLAN"),
-            )
-            .map((module) => module.module as WebModule);
-          const paid = active
-            .filter((module) =>
-              module.grantSources?.some(
-                (grant) => grant.source === "PAID_ADDON",
-              ),
-            )
-            .map((module) => module.module as WebModule);
-          setCurrentModules({ included, paid });
-          dispatch({
-            type: "seed",
-            planCode: overviewResult.planCode,
-            included,
-            paid,
-          });
+          dispatch({ type: "seed", planCode: overviewResult.planCode });
         }
       }
       setOwnedModules(
@@ -249,85 +199,26 @@ export default function ConfigurePlanPage() {
     ? overview!.planCode
     : null;
   const includedModules = includedModulesForState(state);
-  const includedModuleLimit = includedModuleLimitForState(state);
   const eligibleOptionalModules = state.planCode
-    ? [
-        ...(getConfiguratorPlanPolicy(state.planCode)
-          ?.eligibleOptionalModules ?? []),
-      ]
+    ? [...(getConfiguratorPlanPolicy(state.planCode)?.eligibleOptionalModules ?? [])]
     : [];
-  const progressSteps: ConfiguratorProgressStep[] = PROGRESS_STEPS.map(
-    (step) => ({
-      id: step,
-      label: STEP_LABELS[step],
-    }),
-  );
+  const progressSteps: ConfiguratorProgressStep[] = PROGRESS_STEPS.map((step) => ({
+    id: step,
+    label: STEP_LABELS[step],
+  }));
   const stepVariants = prefersReducedMotion
     ? reducedStepVariants
     : configuratorStepVariants;
 
-  const isExistingSubscription = Boolean(
-    currentPlanCode && overview?.subscriptionStatus === "ACTIVE",
+  const hasAddons =
+    state.storageChoice !== "none" || state.selectedOptionalModules.length > 0;
+  const isSamePlan = Boolean(
+    state.planCode && currentPlanCode && state.planCode === currentPlanCode,
   );
-  const sameModules = (
-    left: readonly WebModule[],
-    right: readonly WebModule[],
-  ) =>
-    left.length === right.length &&
-    left.every((module) => right.includes(module));
   const disabledReason =
-    isExistingSubscription &&
-    state.planCode === currentPlanCode &&
-    sameModules(state.selectedIncludedModules, currentModules.included) &&
-    sameModules(state.selectedOptionalModules, currentModules.paid)
-      ? "No plan or module changes selected."
+    isSamePlan && !hasAddons
+      ? "This is your current plan. Add an add-on or choose a different plan to continue."
       : null;
-
-  useEffect(() => {
-    setModuleChangePreview(null);
-    acceptanceKeyRef.current = null;
-  }, [
-    state.planCode,
-    state.selectedIncludedModules,
-    state.selectedOptionalModules,
-  ]);
-
-  const handleModuleChange = async (accept: boolean) => {
-    if (checkoutInFlightRef.current || !state.planCode) return;
-    checkoutInFlightRef.current = true;
-    setCheckoutError(null);
-    setIsCheckoutPending(true);
-    try {
-      if (accept && moduleChangePreview) {
-        const previous = acceptanceKeyRef.current;
-        const key =
-          previous?.changeId === moduleChangePreview.id
-            ? previous.key
-            : crypto.randomUUID();
-        acceptanceKeyRef.current = { changeId: moduleChangePreview.id, key };
-        setModuleChangePreview(
-          await acceptModuleChange(moduleChangePreview.id, key),
-        );
-      } else {
-        setModuleChangePreview(
-          await previewModuleChange({
-            planCode: state.planCode,
-            includedModules: state.selectedIncludedModules,
-            paidModules: state.selectedOptionalModules,
-          }),
-        );
-      }
-    } catch (error) {
-      setCheckoutError(
-        error instanceof Error
-          ? error.message
-          : "Unable to schedule this change. Please try again.",
-      );
-    } finally {
-      setIsCheckoutPending(false);
-      checkoutInFlightRef.current = false;
-    }
-  };
 
   const handleCheckout = async () => {
     if (checkoutInFlightRef.current || !state.planCode) return;
@@ -338,9 +229,7 @@ export default function ConfigurePlanPage() {
       const successUrl = buildRedirectUrl("/billing/configure?status=success");
       const cancelUrl = buildRedirectUrl("/billing/configure?status=cancel");
       if (!successUrl || !cancelUrl) {
-        setCheckoutError(
-          "Unable to determine redirect URLs in this environment.",
-        );
+        setCheckoutError("Unable to determine redirect URLs in this environment.");
         return;
       }
       const response = await createBuyNowPurchase({
@@ -348,8 +237,9 @@ export default function ConfigurePlanPage() {
         extraSites: 0,
         extraStorageGb: storageGb(state.storageChoice),
         extraLeaderSeats: 0,
-        selectedModules: state.selectedOptionalModules,
-        selectedIncludedModules: state.selectedIncludedModules,
+        selectedModules: state.selectedOptionalModules.length
+          ? state.selectedOptionalModules
+          : undefined,
         successUrl,
         cancelUrl,
       });
@@ -397,12 +287,11 @@ export default function ConfigurePlanPage() {
               ← Back to billing
             </button>
             <h1 className="font-heading text-2xl font-bold text-text-primary sm:text-3xl">
-              Change your plan and modules
+              Upgrade your plan
             </h1>
             <p className="text-sm text-text-muted">
-              {isExistingSubscription
-                ? "Choose the plan and modules for your next renewal. No changes are charged today."
-                : "Choose a plan, modules and storage before secure checkout."}
+              Change your plan or add optional modules and storage. You only pay
+              the difference, confirmed at secure checkout.
             </p>
           </header>
           {notice ? (
@@ -433,23 +322,10 @@ export default function ConfigurePlanPage() {
               overview={overview}
               newPlanCode={state.planCode}
               storageChoice={state.storageChoice}
-              currentModules={[
-                ...new Set([
-                  ...currentModules.included,
-                  ...currentModules.paid,
-                ]),
-              ]}
-              selectedOptionalModules={[
-                ...state.selectedIncludedModules,
-                ...state.selectedOptionalModules,
-              ]}
+              selectedOptionalModules={state.selectedOptionalModules}
             />
           </div>
-          <AnimatePresence
-            mode="wait"
-            initial={!prefersReducedMotion}
-            custom={stepDirection}
-          >
+          <AnimatePresence mode="wait" initial={!prefersReducedMotion} custom={stepDirection}>
             <motion.div
               key={currentStep}
               custom={stepDirection}
@@ -466,18 +342,10 @@ export default function ConfigurePlanPage() {
                   planPrices={mergedPlanPrices}
                   onSelectPlan={(planCode) => {
                     setNotice(null);
-                    dispatch({
-                      type: "plan",
-                      planCode,
-                      prices: billingPrices.modulePrices,
-                    });
+                    dispatch({ type: "plan", planCode, prices: billingPrices.modulePrices });
                   }}
                   onSelectFrequency={(frequency) =>
-                    dispatch({
-                      type: "frequency",
-                      frequency,
-                      prices: billingPrices.modulePrices,
-                    })
+                    dispatch({ type: "frequency", frequency, prices: billingPrices.modulePrices })
                   }
                   onSelectEnterprise={() =>
                     setNotice(
@@ -488,59 +356,42 @@ export default function ConfigurePlanPage() {
               ) : null}
               {currentStep === "modules" ? (
                 <ModulesStep
+                  includedModules={includedModules}
                   ownedModules={ownedModules}
                   selectedOptionalModules={state.selectedOptionalModules}
-                  selectedIncludedModules={state.selectedIncludedModules}
-                  includedModuleLimit={includedModuleLimit}
                   eligibleOptionalModules={eligibleOptionalModules}
                   frequency={state.frequency}
                   prices={billingPrices.modulePrices}
                   planLabel={
-                    state.planCode
-                      ? PLANS[state.planCode].displayName
-                      : "your plan"
+                    state.planCode ? PLANS[state.planCode].displayName : "your plan"
                   }
                   onToggle={(module) =>
-                    dispatch({
-                      type: "module",
-                      module,
-                      prices: billingPrices.modulePrices,
-                    })
+                    dispatch({ type: "module", module, prices: billingPrices.modulePrices })
                   }
                 />
               ) : null}
               {currentStep === "storage" ? (
                 <StorageStep
                   storageChoice={state.storageChoice}
-                  isExistingSubscription={isExistingSubscription}
                   frequency={state.frequency}
                   prices={storagePrices}
-                  onSelect={(storageChoice) =>
-                    dispatch({ type: "storage", storageChoice })
-                  }
+                  onSelect={(storageChoice) => dispatch({ type: "storage", storageChoice })}
                 />
               ) : null}
               {currentStep === "summary" && state.planCode ? (
                 <SummaryStep
                   planLabel={PLANS[state.planCode].displayName}
                   currentPlanLabel={
-                    overview?.planCode
-                      ? getPlanDisplayName(overview.planCode)
-                      : null
+                    overview?.planCode ? getPlanDisplayName(overview.planCode) : null
                   }
                   frequency={state.frequency}
                   includedModules={includedModules}
                   selectedOptionalModules={state.selectedOptionalModules}
-                  includedModuleLimit={includedModuleLimit}
                   storageChoice={state.storageChoice}
                   onCheckout={handleCheckout}
                   isCheckoutPending={isCheckoutPending}
                   checkoutError={checkoutError}
                   disabledReason={disabledReason}
-                  isExistingSubscription={isExistingSubscription}
-                  moduleChangePreview={moduleChangePreview}
-                  onPreviewChange={() => void handleModuleChange(false)}
-                  onAcceptChange={() => void handleModuleChange(true)}
                 />
               ) : null}
             </motion.div>
@@ -552,28 +403,17 @@ export default function ConfigurePlanPage() {
               overview={overview}
               newPlanCode={state.planCode}
               storageChoice={state.storageChoice}
-              currentModules={[
-                ...new Set([
-                  ...currentModules.included,
-                  ...currentModules.paid,
-                ]),
-              ]}
-              selectedOptionalModules={[
-                ...state.selectedIncludedModules,
-                ...state.selectedOptionalModules,
-              ]}
+              selectedOptionalModules={state.selectedOptionalModules}
             />
           </div>
-          {!isExistingSubscription ? (
-            <div className="rounded-2xl border border-border-subtle bg-surface p-5 shadow-card">
-              <RunningTotal
-                state={state}
-                planPrices={mergedPlanPrices}
-                addonPrices={mergedAddonPrices}
-                modulePrices={billingPrices.modulePrices}
-              />
-            </div>
-          ) : null}
+          <div className="rounded-2xl border border-border-subtle bg-surface p-5 shadow-card">
+            <RunningTotal
+              state={state}
+              planPrices={mergedPlanPrices}
+              addonPrices={mergedAddonPrices}
+              modulePrices={billingPrices.modulePrices}
+            />
+          </div>
         </aside>
       </div>
     </main>
@@ -584,7 +424,6 @@ type PlanComparisonProps = {
   overview: AdminBillingOverview | null;
   newPlanCode: PlanCode | null;
   storageChoice: ConfiguratorState["storageChoice"];
-  currentModules: WebModule[];
   selectedOptionalModules: WebModule[];
 };
 
@@ -592,7 +431,6 @@ function PlanComparison({
   overview,
   newPlanCode,
   storageChoice,
-  currentModules,
   selectedOptionalModules,
 }: PlanComparisonProps) {
   const newPlan = newPlanCode ? PLANS[newPlanCode] : null;
@@ -611,13 +449,11 @@ function PlanComparison({
       <dl className="grid grid-cols-[1fr,auto,1fr] items-center gap-x-3 gap-y-2 text-sm">
         <Row
           label="Plan"
-          current={
-            overview?.planCode ? getPlanDisplayName(overview.planCode) : "None"
-          }
+          current={overview?.planCode ? getPlanDisplayName(overview.planCode) : "None"}
           next={newPlan?.displayName ?? "—"}
         />
         <Row
-          label="Active staff and volunteers"
+          label="Active People"
           current={fmt(overview?.av30Cap)}
           next={fmt(newPlan?.av30Included)}
         />
@@ -627,34 +463,11 @@ function PlanComparison({
           next={fmt(newPlan?.maxSitesIncluded)}
         />
       </dl>
-      {overview?.subscriptionStatus === "ACTIVE" ? (
-        <div className="space-y-1 border-t border-border-subtle pt-3 text-sm">
-          <p>
-            <span className="text-text-muted">Active modules:</span>{" "}
-            {currentModules.length
-              ? currentModules
-                  .map((module) => MODULE_CATALOG[module].label)
-                  .join(", ")
-              : "None"}
-          </p>
-          <p>
-            <span className="text-text-muted">Chosen for renewal:</span>{" "}
-            {selectedOptionalModules.length
-              ? selectedOptionalModules
-                  .map((module) => MODULE_CATALOG[module].label)
-                  .join(", ")
-              : "None"}
-          </p>
-        </div>
-      ) : null}
       {storageChip || selectedOptionalModules.length ? (
         <div className="flex flex-wrap gap-1.5 border-t border-border-subtle pt-3">
           {storageChip ? <Chip label={storageChip} /> : null}
           {selectedOptionalModules.map((module) => (
-            <Chip
-              key={module}
-              label={module.replace(/_/g, " ").toLowerCase()}
-            />
+            <Chip key={module} label={module.replace(/_/g, " ").toLowerCase()} />
           ))}
         </div>
       ) : null}

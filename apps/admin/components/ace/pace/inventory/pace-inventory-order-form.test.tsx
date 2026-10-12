@@ -146,14 +146,10 @@ async function run(): Promise<void> {
     assert.equal(requests.length, 1);
     assert.equal(requests[0].url, "http://api.test/ace/pace/inventory/orders");
     assert.equal(requests[0].init.method, "POST");
-    assert.equal(
-      new Headers(requests[0].init.headers).get("Content-Type"),
-      "application/json",
-    );
-    assert.equal(
-      new Headers(requests[0].init.headers).get("Authorization"),
-      "Bearer test-token",
-    );
+    assert.deepEqual(requests[0].init.headers, {
+      "Content-Type": "application/json",
+      Authorization: "Bearer test-token",
+    });
     assert.deepEqual(JSON.parse(String(requests[0].init.body)), {
       childId: "child-1",
       subjectId: "subject-1",

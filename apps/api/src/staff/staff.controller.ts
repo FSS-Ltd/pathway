@@ -22,23 +22,16 @@ import { updateStaffDto } from "./dto/update-staff.dto";
 import { updateProfileDto } from "./dto/update-profile.dto";
 import { uploadAvatarDto } from "./dto/upload-avatar.dto";
 
-const forSessionAssignmentQuery = z
-  .object({
-    groupId: z.string().uuid().optional(),
-    startsAt: z.string().datetime({ offset: true }),
-    endsAt: z.string().datetime({ offset: true }),
-  })
-  .refine((value) => new Date(value.endsAt) > new Date(value.startsAt), {
-    message: "End time must be after start time",
-    path: ["endsAt"],
-  });
+const forSessionAssignmentQuery = z.object({
+  groupId: z.string().uuid().optional(),
+  startsAt: z.string().min(1),
+  endsAt: z.string().min(1),
+});
 
 @UseGuards(AuthUserGuard)
 @Controller("staff")
 export class StaffController {
-  constructor(
-    @Inject(StaffService) private readonly staffService: StaffService,
-  ) {}
+  constructor(@Inject(StaffService) private readonly staffService: StaffService) {}
 
   @Get("profile")
   async getProfile(
@@ -74,12 +67,7 @@ export class StaffController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.errors);
     }
-    return this.staffService.updateProfile(
-      userId,
-      tenantId,
-      orgId,
-      parsed.data,
-    );
+    return this.staffService.updateProfile(userId, tenantId, orgId, parsed.data);
   }
 
   @Get("profile/avatar")
@@ -128,22 +116,12 @@ export class StaffController {
 
   @Get("for-session-assignment")
   async getForSessionAssignment(
-    @Req() req: Request & { authUserId?: string },
     @Query() query: unknown,
     @CurrentTenant("tenantId") tenantId: string,
-    @CurrentOrg("orgId") orgId: string,
   ) {
-    if (!tenantId || !orgId) {
+    if (!tenantId) {
       throw new BadRequestException("Active site context required");
     }
-    if (!req.authUserId) {
-      throw new BadRequestException("Not authenticated");
-    }
-    await this.staffService.assertStaffManagerAccess(
-      req.authUserId,
-      tenantId,
-      orgId,
-    );
     const parsed = forSessionAssignmentQuery.safeParse(query);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.flatten());
@@ -159,23 +137,18 @@ export class StaffController {
   @Get(":userId")
   async getById(
     @Param("userId") userId: string,
-    @Req() req: Request & { authUserId?: string },
     @CurrentTenant("tenantId") tenantId: string,
     @CurrentOrg("orgId") orgId: string,
   ) {
     if (!tenantId || !orgId) {
       throw new BadRequestException("Active site context required");
     }
-    const callerUserId = req.authUserId;
-    if (!callerUserId) {
-      throw new BadRequestException("Not authenticated");
+    try {
+      return await this.staffService.getById(userId, tenantId, orgId);
+    } catch (e) {
+      if (e instanceof NotFoundException) throw e;
+      throw e;
     }
-    return this.staffService.getByIdForAdmin(
-      userId,
-      tenantId,
-      orgId,
-      callerUserId,
-    );
   }
 
   @Patch(":userId")

@@ -30,14 +30,6 @@
 - Controllers stay thin. Deterministic ACE, finance, and merit rules stay outside controllers and React components.
 - No production deployment is authorised by these plans.
 
-## Roles & Access delivery amendment (RA-1 to RA-4)
-
-Deliver the approved Roles & Access workspace sequentially from verified `FSS-Ltd/pathway` `master`, one branch and PR per step. RA-1 provides the badge matrix, scoped individual exclusions, read/mutation APIs, and permission enforcement; RA-2 extends the existing shared `DataTable`; RA-3 adds the people-first workspace; RA-4 migrates suitable admin lists. The next step starts only after the current PR passes current-revision CI and required review and the host confirms its merge. Oasis is a read-only interaction reference.
-
-RA-1 keeps the platform-owned access-tag catalogue and fixed role definitions. Exclusions are additive, audited, forced-RLS rows; they subtract mapped permissions from ordinary role and badge grants in their scope, persist across role changes, and never override the platform-superuser boundary. Badge changes require an explicit scope and revision and preserve entitlement, relationship, feature-toggle, last-head, and self-lockout boundaries. Rollback after exclusions become active must retain exclusion enforcement; reverting to an API that ignores them is unsafe.
-
-Delivery evidence: RA-1 [PR #580](https://github.com/FSS-Ltd/pathway/pull/580), checked head `9df9ad1dcfedf2da9300c1bc76521110bdfb8dac`, eight CI checks passed, merged as `409cbe89ef726b4ca492ac8b704965b8688d4295`; RA-2 [PR #583](https://github.com/FSS-Ltd/pathway/pull/583), checked head `42cd07dfbddbb9420460e534c3587c590b4e7d56`, eight checks passed, merged as `d45167b477b2cd248ed6890320f392ef16d97282`; RA-3 [PR #588](https://github.com/FSS-Ltd/pathway/pull/588), checked head `f4bcd086b51d5c8c05f588741a50c83e4dd9d663`, eight checks passed, merged as `67fa3eec5f727c32e13f84c1bfbf80f3bd6d6487`. RA-4 [PR #590](https://github.com/FSS-Ltd/pathway/pull/590) passed all eight current-revision checks at `6ac762ca503cf9554f56c34925ed0d5658bd5498` and merged as `4fd1c1993c33bb1e635a4dc560005190780e174f`. The four-step implementation is complete in code; production deployment and verification remain separate. Keep client-side list pagination at 10 rows by default with 10/25/50 sizes, preserve full-dataset filtering and editing state, and leave specialised timetable editors as tables.
-
 ---
 
 ## 1. Source precedence

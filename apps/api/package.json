@@ -22,7 +22,6 @@
     "access:retire": "tsx scripts/retire-custom-role-assignments.ts",
     "stripe:provision:phase0": "tsx scripts/stripe-provision-phase0-plans.ts",
     "stripe:provision:learning": "tsx scripts/stripe-provision-learning-module.ts",
-    "stripe:provision:institutional": "tsx --tsconfig tsconfig.json scripts/stripe-provision-institutional-prices.ts",
     "db:generate": "pnpm --filter @pathway/db run prisma:generate",
     "db:migrate": "pnpm --filter @pathway/db run prisma:migrate:dev",
     "db:deploy": "pnpm --filter @pathway/db run prisma:migrate:deploy",

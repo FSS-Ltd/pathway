@@ -179,7 +179,6 @@ async function deleteIdentityRowsIfPresent(
 
   await client.$executeRawUnsafe(`
     TRUNCATE TABLE
-      "AceSchoolVolunteerReservation",
       "AceNoticeReceipt",
       "AceNoticeAttachment",
       "AceNoticeAudienceMember",

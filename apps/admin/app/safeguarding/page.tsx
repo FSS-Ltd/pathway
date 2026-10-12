@@ -7,6 +7,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSession } from "@/lib/use-session-compat";
 import { Plus } from "lucide-react";
 import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
 import {
@@ -14,12 +15,11 @@ import {
   AdminNotesSummary,
   fetchNotesSummary,
   fetchOpenConcerns,
+  setApiClientToken,
 } from "../../lib/api-client";
 import { useAdminAccess } from "../../lib/use-admin-access";
 import { canAccessSafeguardingAdmin } from "../../lib/access";
 import { NoAccessCard } from "../../components/no-access-card";
-import { SafeguardingMetrics } from "../../components/safeguarding/safeguarding-metrics";
-import { requestFailure, type RequestFailure } from "../../lib/request-error";
 
 const statusTone: Record<
   AdminConcernRow["status"],
@@ -33,19 +33,15 @@ const statusTone: Record<
 
 export default function SafeguardingPage() {
   const router = useRouter();
+  const { data: session, status: sessionStatus } = useSession();
   const { role, isLoading: isLoadingAccess } = useAdminAccess();
-  const canView = canAccessSafeguardingAdmin(role);
   const [concerns, setConcerns] = React.useState<AdminConcernRow[]>([]);
   const [notesSummary, setNotesSummary] =
     React.useState<AdminNotesSummary | null>(null);
   const [isLoadingConcerns, setIsLoadingConcerns] = React.useState(true);
   const [isLoadingNotes, setIsLoadingNotes] = React.useState(true);
-  const [concernError, setConcernError] = React.useState<RequestFailure | null>(
-    null,
-  );
-  const [notesError, setNotesError] = React.useState<RequestFailure | null>(
-    null,
-  );
+  const [concernError, setConcernError] = React.useState<string | null>(null);
+  const [notesError, setNotesError] = React.useState<string | null>(null);
 
   // All hooks must be called before any conditional returns
   const loadConcerns = React.useCallback(async () => {
@@ -55,8 +51,9 @@ export default function SafeguardingPage() {
       const result = await fetchOpenConcerns();
       setConcerns(result);
     } catch (err) {
-      setConcerns([]);
-      setConcernError(requestFailure(err, "Unable to load concerns."));
+      setConcernError(
+        err instanceof Error ? err.message : "Failed to load concerns",
+      );
     } finally {
       setIsLoadingConcerns(false);
     }
@@ -69,18 +66,28 @@ export default function SafeguardingPage() {
       const result = await fetchNotesSummary();
       setNotesSummary(result);
     } catch (err) {
-      setNotesSummary(null);
-      setNotesError(requestFailure(err, "Unable to load notes summary."));
+      setNotesError(
+        err instanceof Error ? err.message : "Failed to load notes summary",
+      );
     } finally {
       setIsLoadingNotes(false);
     }
   }, []);
 
   React.useEffect(() => {
-    if (isLoadingAccess || !canView) return;
+    if (
+      sessionStatus !== "authenticated" ||
+      !session ||
+      isLoadingAccess ||
+      !canAccessSafeguardingAdmin(role)
+    ) {
+      return;
+    }
+    const token = (session as { accessToken?: string })?.accessToken ?? null;
+    setApiClientToken(token);
     void loadConcerns();
     void loadNotes();
-  }, [isLoadingAccess, canView, loadConcerns, loadNotes]);
+  }, [sessionStatus, session, isLoadingAccess, role, loadConcerns, loadNotes]);
 
   const columns = React.useMemo<ColumnDef<AdminConcernRow>[]>(
     () => [
@@ -117,16 +124,16 @@ export default function SafeguardingPage() {
       },
       {
         id: "category",
-        priority: "secondary",
         header: "Category",
         cell: (row) => (
-          <span className="text-sm text-text-muted">{row.category ?? "-"}</span>
+          <span className="text-sm text-text-muted">
+            {row.category ?? "-"}
+          </span>
         ),
         width: "140px",
       },
       {
         id: "reportedBy",
-        priority: "secondary",
         header: "Reported by",
         cell: (row) => (
           <span className="text-sm text-text-muted">
@@ -149,7 +156,7 @@ export default function SafeguardingPage() {
     );
   }
 
-  if (!canView) {
+  if (!canAccessSafeguardingAdmin(role)) {
     return (
       <NoAccessCard
         title="Safeguarding admin is not accessible"
@@ -188,7 +195,7 @@ export default function SafeguardingPage() {
               Retry
             </Button>
           </div>
-          <p className="text-xs text-text-muted">{concernError.message}</p>
+          <p className="text-xs text-text-muted">{concernError}</p>
         </div>
       );
     }
@@ -202,9 +209,6 @@ export default function SafeguardingPage() {
     return (
       <DataTable
         data={concerns}
-        caption="Safeguarding concerns"
-        rowKey={(row) => row.id}
-        pagination={{ mode: "client" }}
         columns={columns}
         isLoading={false}
         emptyMessage="No open concerns."
@@ -231,15 +235,15 @@ export default function SafeguardingPage() {
               Retry
             </Button>
           </div>
-          <p className="text-xs text-text-muted">{notesError.message}</p>
+          <p className="text-xs text-text-muted">{notesError}</p>
         </div>
       );
     }
     if (!notesSummary) {
       return (
         <p className="text-sm text-text-muted">
-          Positive notes and wellbeing records will be summarised here in a
-          future update.
+              Positive notes and wellbeing records will be summarised here in a future
+          update.
         </p>
       );
     }
@@ -267,6 +271,8 @@ export default function SafeguardingPage() {
     );
   };
 
+  const openCount = concerns.length;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -280,30 +286,14 @@ export default function SafeguardingPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            asChild
-            variant="destructive"
-            size="sm"
-            className="min-w-[11.5rem]"
-          >
-            <Link
-              href="/safeguarding/concerns/new"
-              className="inline-flex items-center justify-center gap-2 w-full"
-            >
+          <Button asChild variant="destructive" size="sm" className="min-w-[11.5rem]">
+            <Link href="/safeguarding/concerns/new" className="inline-flex items-center justify-center gap-2 w-full">
               <Plus className="h-4 w-4" />
               Create concern
             </Link>
           </Button>
-          <Button
-            asChild
-            variant="success"
-            size="sm"
-            className="min-w-[11.5rem]"
-          >
-            <Link
-              href="/safeguarding/notes/new"
-              className="inline-flex items-center justify-center gap-2 w-full"
-            >
+          <Button asChild variant="success" size="sm" className="min-w-[11.5rem]">
+            <Link href="/safeguarding/notes/new" className="inline-flex items-center justify-center gap-2 w-full">
               <Plus className="h-4 w-4" />
               Create positive note
             </Link>
@@ -311,16 +301,22 @@ export default function SafeguardingPage() {
         </div>
       </div>
 
-      <SafeguardingMetrics
-        openConcerns={
-          isLoadingConcerns || concernError ? null : concerns.length
-        }
-        totalNotes={
-          isLoadingNotes || notesError
-            ? null
-            : (notesSummary?.totalNotes ?? null)
-        }
-      />
+      <div className="grid gap-3 sm:grid-cols-1 md:grid-cols-2">
+        <div className="rounded-md border border-border-subtle bg-surface px-3 py-2">
+          <p className="text-xs text-text-muted">Open concerns</p>
+          <p className="text-lg font-semibold text-text-primary">
+            {isLoadingConcerns ? "—" : openCount}
+          </p>
+        </div>
+        {notesSummary != null && (
+          <div className="rounded-md border border-border-subtle bg-surface px-3 py-2">
+            <p className="text-xs text-text-muted">Positive notes (total)</p>
+            <p className="text-lg font-semibold text-text-primary">
+              {notesSummary.totalNotes}
+            </p>
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Open Concerns">

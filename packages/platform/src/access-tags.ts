@@ -33,9 +33,8 @@ export const ACCESS_TAG_DEFINITIONS = {
   },
   "attendance-exporter": {
     label: "Attendance exporter",
-    description:
-      "Export ACE attendance within existing site and student scope.",
-    permissionKeys: ["ace.attendance.export"],
+    description: "Reserved until attendance export has its own permission.",
+    permissionKeys: [],
   },
   "attendance-recorder": {
     label: "Attendance recorder",
@@ -57,12 +56,6 @@ export const ACCESS_TAG_DEFINITIONS = {
     label: "Behaviour viewer",
     description: "View behaviour records within existing site and child scope.",
     permissionKeys: ["ace.behaviour.read"],
-  },
-  "behaviour-corrector": {
-    label: "Behaviour corrector",
-    description:
-      "Correct behaviour records within existing site and child scope.",
-    permissionKeys: ["ace.behaviour.correct"],
   },
   "student-drillthrough-viewer": {
     label: "Student drillthrough viewer",
@@ -128,6 +121,7 @@ const UNAVAILABLE_ACCESS_TAGS = new Set<AccessTagKey>([
   "shopkeeper",
   "shopadmin",
   "leaderboard-admin",
+  "attendance-exporter",
   "audit-viewer",
   "sensitive-note-viewer",
   "student-drillthrough-viewer",

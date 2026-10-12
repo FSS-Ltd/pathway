@@ -1,5 +1,4 @@
 import { PriceChip } from "../../../components/configurator/price-chip";
-import { isConfiguratorModuleReady } from "@pathway/pricing";
 import {
   SelectionCard,
   SelectionCardGroup,
@@ -12,9 +11,8 @@ import {
 } from "../../../lib/module-catalog";
 
 type ModulesStepProps = {
+  includedModules: WebModule[];
   selectedOptionalModules: WebModule[];
-  selectedIncludedModules: WebModule[];
-  includedModuleLimit: number;
   eligibleOptionalModules: WebModule[];
   frequency: "monthly" | "yearly";
   prices: OptionPriceLookup;
@@ -23,17 +21,18 @@ type ModulesStepProps = {
 };
 
 export function ModulesStep({
+  includedModules,
   selectedOptionalModules,
-  selectedIncludedModules,
-  includedModuleLimit,
   eligibleOptionalModules,
   frequency,
   prices,
   planLabel,
   onToggle,
 }: ModulesStepProps) {
-  const selectedIncludedSet = new Set(selectedIncludedModules);
-  const selectedOptionalSet = new Set(selectedOptionalModules);
+  const included = includedModules.map((module) => ({
+    module,
+    entry: MODULE_CATALOG[module],
+  }));
   const optionalModules = (
     Object.entries(MODULE_CATALOG) as [
       WebModule,
@@ -52,11 +51,6 @@ export function ModulesStep({
         Number(b.delta.status === "coming-soon"),
     );
 
-  const availableIncludedSlots = Math.max(
-    0,
-    includedModuleLimit - selectedIncludedModules.length,
-  );
-
   return (
     <section aria-labelledby="configurator-step-title" className="space-y-5">
       <div className="space-y-2">
@@ -67,23 +61,38 @@ export function ModulesStep({
           Add optional modules
         </h2>
         <p className="text-text-muted">
-          {planLabel} includes up to {includedModuleLimit} optional modules when
-          they become available. Module selection is currently closed.
+          Choose the extra capabilities your team needs now. You can change
+          these later.
         </p>
       </div>
       <SelectionCardGroup className="grid gap-3">
+        {included.map(({ module, entry }) => (
+          <SelectionCard
+            key={module}
+            isSelected
+            isDisabled={true}
+            onClick={() => undefined}
+          >
+            <span className="flex items-start justify-between gap-3">
+              <span>
+                <span className="block font-semibold text-text-primary">
+                  {entry.label}
+                </span>
+                <span className="mt-1 block text-sm text-text-muted">
+                  Included in {planLabel}
+                </span>
+              </span>
+              <span className="text-sm font-semibold text-text-muted">
+                Included
+              </span>
+            </span>
+          </SelectionCard>
+        ))}
         {optionalModules.map(({ module, entry, delta }) => (
           <SelectionCard
             key={module}
-            isSelected={
-              selectedIncludedSet.has(module) || selectedOptionalSet.has(module)
-            }
-            isDisabled={
-              !isConfiguratorModuleReady(module) ||
-              (delta.status === "coming-soon" &&
-                availableIncludedSlots === 0 &&
-                !selectedIncludedSet.has(module))
-            }
+            isSelected={selectedOptionalModules.includes(module)}
+            isDisabled={delta.status === "coming-soon"}
             onClick={() => onToggle(module)}
           >
             <span className="flex items-start justify-between gap-3">
@@ -95,25 +104,7 @@ export function ModulesStep({
                   {entry.description}
                 </span>
               </span>
-              <span className="flex flex-col items-end gap-1">
-                {!isConfiguratorModuleReady(module) ? (
-                  <span className="whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-text-muted">
-                    Coming soon
-                  </span>
-                ) : selectedIncludedSet.has(module) ? (
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-text-primary">
-                    Included in {planLabel}
-                  </span>
-                ) : selectedOptionalSet.has(module) ? (
-                  <PriceChip delta={delta} frequency={frequency} />
-                ) : availableIncludedSlots > 0 ? (
-                  <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-semibold text-text-primary">
-                    Included choice ({availableIncludedSlots} left)
-                  </span>
-                ) : (
-                  <PriceChip delta={delta} frequency={frequency} />
-                )}
-              </span>
+              <PriceChip delta={delta} frequency={frequency} />
             </span>
           </SelectionCard>
         ))}

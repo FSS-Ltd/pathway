@@ -4,13 +4,10 @@
  */
 
 import {
-  canAccessAdminSection,
-  canAccessSafeguardingAdmin,
   getAdminRoleInfoFromApiResponse,
   hasCapability,
   hasPermission,
   meetsAccessRequirement,
-  isStaffOnly,
 } from "./access";
 
 function runTests() {
@@ -29,22 +26,10 @@ function runTests() {
 
   console.log("getAdminRoleInfoFromApiResponse");
   const unknownRole = getAdminRoleInfoFromApiResponse(null);
-  assert(
-    !unknownRole.isStaff,
-    "missing role payload does not grant staff access",
-  );
-  assert(
-    !unknownRole.isOrgAdmin,
-    "missing role payload does not grant org admin",
-  );
-  assert(
-    !unknownRole.isSiteAdmin,
-    "missing role payload does not grant site admin",
-  );
-  assert(
-    !unknownRole.isSuperUser,
-    "missing role payload does not grant superuser",
-  );
+  assert(!unknownRole.isStaff, "missing role payload does not grant staff access");
+  assert(!unknownRole.isOrgAdmin, "missing role payload does not grant org admin");
+  assert(!unknownRole.isSiteAdmin, "missing role payload does not grant site admin");
+  assert(!unknownRole.isSuperUser, "missing role payload does not grant superuser");
 
   const superUserRole = getAdminRoleInfoFromApiResponse({
     userId: "user-super",
@@ -65,73 +50,9 @@ function runTests() {
     ],
   });
 
-  assert(
-    superUserRole.isSuperUser,
-    "superuser payload grants superuser access",
-  );
+  assert(superUserRole.isSuperUser, "superuser payload grants superuser access");
   assert(superUserRole.isOrgAdmin, "org admin membership grants org admin");
   assert(superUserRole.isSiteAdmin, "site admin membership grants site admin");
-
-  const viewerRole = getAdminRoleInfoFromApiResponse({
-    userId: "user-viewer",
-    orgRoles: [],
-    orgMemberships: [],
-    siteRoles: [],
-    siteMemberships: [
-      {
-        tenantId: "tenant-1",
-        tenantName: "Site",
-        orgId: "org-1",
-        role: "VIEWER",
-      },
-    ],
-  });
-  assert(
-    viewerRole.isRegistrationStaff === false,
-    "viewer cannot see submitted registration",
-  );
-  const staffRole = getAdminRoleInfoFromApiResponse({
-    userId: "user-staff",
-    orgRoles: [],
-    orgMemberships: [],
-    siteRoles: [],
-    siteMemberships: [
-      {
-        tenantId: "tenant-1",
-        tenantName: "Site",
-        orgId: "org-1",
-        role: "STAFF",
-      },
-    ],
-  });
-  assert(
-    staffRole.isRegistrationStaff === true,
-    "site staff can see submitted registration",
-  );
-
-  const superUserWithoutAdminRole = getAdminRoleInfoFromApiResponse({
-    userId: "user-super",
-    superUser: true,
-    currentOrgIsMasterOrg: false,
-    orgRoles: [],
-    siteRoles: [],
-    orgMemberships: [
-      { orgId: "org-1", orgName: "Victorious Kids", role: "ORG_MEMBER" },
-    ],
-    siteMemberships: [],
-  });
-  assert(
-    !isStaffOnly(superUserWithoutAdminRole),
-    "superuser is not classified as staff-only",
-  );
-  assert(
-    canAccessAdminSection(superUserWithoutAdminRole),
-    "superuser can enter admin sections",
-  );
-  assert(
-    canAccessSafeguardingAdmin(superUserWithoutAdminRole),
-    "superuser can enter safeguarding administration",
-  );
 
   console.log("hasCapability");
   assert(
@@ -178,10 +99,7 @@ function runTests() {
   return failed === 0;
 }
 
-if (
-  typeof process !== "undefined" &&
-  process.argv[1]?.includes("access.test")
-) {
+if (typeof process !== "undefined" && process.argv[1]?.includes("access.test")) {
   const ok = runTests();
   process.exit(ok ? 0 : 1);
 }

@@ -12,8 +12,6 @@ const REQUIRED_QUALIFIER_BY_TABLE = {
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
   AccessTagGrant:
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
-  AccessTagExclusion:
-    '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()) AND (("tenantId" IS NULL) OR ("tenantId" = current_tenant_id())))',
   OutboxEvent:
     '((current_org_id() IS NOT NULL) AND ("orgId" = current_org_id()))',
 };
@@ -72,31 +70,6 @@ const REVIEWED_ROLE_POLICIES = [
     "AccessTagGrant",
     "AccessTagGrant_rls_update",
     "AccessTagGrant",
-    undefined,
-    { command: "w" },
-  ),
-  reviewedPolicy(
-    "AccessTagExclusion",
-    "AccessTagExclusion_rls_select",
-    "AccessTagExclusion",
-    undefined,
-    { command: "r", check_qualifier: null },
-  ),
-  reviewedPolicy(
-    "AccessTagExclusion",
-    "AccessTagExclusion_rls_insert",
-    undefined,
-    null,
-    {
-      command: "a",
-      using_qualifier: null,
-      check_qualifier: REQUIRED_QUALIFIER_BY_TABLE.AccessTagExclusion,
-    },
-  ),
-  reviewedPolicy(
-    "AccessTagExclusion",
-    "AccessTagExclusion_rls_update",
-    "AccessTagExclusion",
     undefined,
     { command: "w" },
   ),

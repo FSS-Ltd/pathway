@@ -1,17 +1,19 @@
 "use client";
 
-import { Badge, Card, DataTable, type ColumnDef } from "@pathway/ui";
+import React from "react";
+import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
 import {
   fetchAccessAuditEvents,
   type AdminAccessAuditEvent,
+  type PersonRow,
 } from "@/lib/api-client";
 import { formatAuditTimestamp } from "@/lib/roles";
-import { useCursorPage } from "./use-cursor-page";
 
-type AuditPerson = { id: string; name: string | null };
-export type AuditLogPanelProps = { people: AuditPerson[] };
+export type AuditLogPanelProps = {
+  people: PersonRow[];
+};
 
-function actorLabel(people: AuditPerson[], actorUserId: string): string {
+function actorLabel(people: PersonRow[], actorUserId: string): string {
   return people.find((p) => p.id === actorUserId)?.name ?? actorUserId;
 }
 
@@ -23,103 +25,98 @@ function actionLabel(action: string): string {
     .join(" ");
 }
 
-function changeDetail(metadata: unknown): string {
-  if (!metadata || typeof metadata !== "object") return "—";
-  const values = [
-    "tagKey" in metadata ? metadata.tagKey : null,
-    "state" in metadata ? metadata.state : null,
-    "scope" in metadata ? metadata.scope : null,
-  ];
-  const parts = values.flatMap((value) =>
-    typeof value === "string" ? [value.replaceAll("-", " ")] : [],
-  );
-  return parts.join(" · ") || "—";
-}
-
 export function AuditLogPanel({ people }: AuditLogPanelProps) {
-  const auditPage = useCursorPage(
-    fetchAccessAuditEvents,
-    "Unable to load the audit log.",
-  );
+  const [events, setEvents] = React.useState<AdminAccessAuditEvent[]>([]);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const load = React.useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await fetchAccessAuditEvents();
+      setEvents(result.items);
+      setNextCursor(result.nextCursor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load the audit log");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleLoadMore = async () => {
+    if (!nextCursor) return;
+    setIsLoadingMore(true);
+    try {
+      const result = await fetchAccessAuditEvents({ cursor: nextCursor });
+      setEvents((prev) => [...prev, ...result.items]);
+      setNextCursor(result.nextCursor);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load more audit events");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
 
   const columns: ColumnDef<AdminAccessAuditEvent>[] = [
     {
       id: "when",
       header: "When",
       cell: (row) => (
-        <span className="text-sm text-text-secondary">
-          {formatAuditTimestamp(row.createdAt)}
-        </span>
+        <span className="text-sm text-text-secondary">{formatAuditTimestamp(row.createdAt)}</span>
       ),
       width: "160px",
     },
     {
       id: "actor",
       header: "Actor",
-      cell: (row) => (
-        <span className="text-sm text-text-primary">
-          {actorLabel(people, row.actorUserId)}
-        </span>
-      ),
+      cell: (row) => <span className="text-sm text-text-primary">{actorLabel(people, row.actorUserId)}</span>,
     },
     {
       id: "entityType",
       header: "Type",
       cell: (row) => (
         <Badge variant={row.entityType === "ORG_ROLE" ? "accent" : "default"}>
-          {row.entityType === "ORG_ROLE"
-            ? "Role"
-            : row.entityType === "ACCESS_TAG_GRANT"
-              ? "Badge"
-              : "Assignment"}
+          {row.entityType === "ORG_ROLE" ? "Role" : "Assignment"}
         </Badge>
       ),
       width: "110px",
-      priority: "secondary",
     },
     {
       id: "action",
       header: "Action",
-      cell: (row) => (
-        <span className="text-sm text-text-secondary">
-          {actionLabel(row.action)}
-        </span>
-      ),
+      cell: (row) => <span className="text-sm text-text-secondary">{actionLabel(row.action)}</span>,
       width: "160px",
-      priority: "secondary",
-    },
-    {
-      id: "detail",
-      header: "Change",
-      cell: (row) => (
-        <span className="text-xs text-text-muted">
-          {changeDetail(row.metadata)}
-        </span>
-      ),
-      priority: "secondary",
     },
   ];
 
   return (
     <Card title="Audit log" description="Recent role and assignment changes">
-      <DataTable
-        columns={columns}
-        data={auditPage.items}
-        caption="Access audit log"
-        rowKey={(event) => event.id}
-        isLoading={auditPage.isLoading}
-        errorMessage={auditPage.error}
-        onRetry={auditPage.refresh}
-        emptyMessage="No audit events yet."
-        pagination={{
-          mode: "server",
-          pageIndex: auditPage.pageIndex,
-          pageSize: auditPage.pageSize,
-          hasNextPage: auditPage.hasNextPage,
-          onPageChange: auditPage.changePage,
-          onPageSizeChange: auditPage.changePageSize,
-        }}
-      />
+      {error && (
+        <div className="mb-3 rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-sm text-status-danger">
+          {error}
+        </div>
+      )}
+      {isLoading ? (
+        <div className="py-8 text-center text-sm text-text-muted">Loading...</div>
+      ) : (
+        <>
+          <DataTable columns={columns} data={events} emptyMessage="No audit events yet." />
+          {nextCursor && (
+            <div className="mt-3 flex justify-center">
+              <Button variant="secondary" size="sm" onClick={handleLoadMore} disabled={isLoadingMore}>
+                {isLoadingMore ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
     </Card>
   );
 }

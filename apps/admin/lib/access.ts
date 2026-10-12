@@ -1,6 +1,6 @@
 /**
  * Admin access control helpers
- *
+ * 
  * Defines role-based permissions for the admin app.
  * Queries UserOrgRole, UserTenantRole, OrgMembership, and SiteMembership tables via API.
  */
@@ -13,14 +13,13 @@ export type AdminRoleInfo = {
   isOrgOwner: boolean;
   isSiteAdmin: boolean;
   isStaff: boolean;
-  isRegistrationStaff?: boolean;
   isSafeguardingStaff: boolean;
   isSuperUser: boolean;
 };
 
 /**
  * Extract role information from API response
- *
+ * 
  * Queries the database via /auth/active-site/roles endpoint which checks:
  * - UserOrgRole table (org-level roles)
  * - UserTenantRole table (site-level roles)
@@ -35,7 +34,6 @@ export function getAdminRoleInfoFromApiResponse(
     isOrgOwner: false,
     isSiteAdmin: false,
     isStaff: false,
-    isRegistrationStaff: false,
     isSafeguardingStaff: false,
     isSuperUser: false,
   };
@@ -60,30 +58,20 @@ export function getAdminRoleInfoFromApiResponse(
   const isSiteAdmin = siteRoles.has("SITE_ADMIN");
   const isSafeguardingLead =
     orgRoles.has("SAFEGUARDING_LEAD") || siteRoles.has("SAFEGUARDING_LEAD");
-  const isSuperUser = rolesResponse.superUser === true;
   const isStaff =
     siteRoles.has("STAFF") ||
     siteRoles.has("TEACHER") ||
     siteRoles.has("VIEWER") ||
-    (!isOrgAdmin && !isSiteAdmin && !isSuperUser);
+    (!isOrgAdmin && !isSiteAdmin);
 
-  const isRegistrationStaff = [
-    "STAFF",
-    "SITE_ADMIN",
-    "ADMIN",
-    "COORDINATOR",
-    "TEACHER",
-    "LEAD",
-    "SUPPORT",
-  ].some((siteRole) => siteRoles.has(siteRole));
   const isSafeguardingStaff = isSafeguardingLead;
+  const isSuperUser = rolesResponse.superUser === true;
 
   return {
     isOrgAdmin,
     isOrgOwner,
     isSiteAdmin,
     isStaff,
-    isRegistrationStaff,
     isSafeguardingStaff,
     isSuperUser,
   };
@@ -94,9 +82,7 @@ export function getAdminRoleInfoFromApiResponse(
  * (Reports, Settings, People management, etc.)
  */
 export function canAccessAdminSection(role: AdminRoleInfo): boolean {
-  return (
-    role.isSuperUser || role.isOrgAdmin || role.isOrgOwner || role.isSiteAdmin
-  );
+  return role.isOrgAdmin || role.isOrgOwner || role.isSiteAdmin;
 }
 
 /**
@@ -104,14 +90,14 @@ export function canAccessAdminSection(role: AdminRoleInfo): boolean {
  * Sees Profile instead of People; no Classes, Announcements, or Safeguarding dashboard.
  */
 export function isStaffOnly(role: AdminRoleInfo): boolean {
-  return role.isStaff && !canAccessAdminSection(role);
+  return role.isStaff && !role.isSiteAdmin && !role.isOrgAdmin && !role.isOrgOwner;
 }
 
 /**
  * Site admin or org admin. Can access People, Classes, Announcements, full Safeguarding.
  */
 export function isSiteAdminOrHigher(role: AdminRoleInfo): boolean {
-  return canAccessAdminSection(role);
+  return role.isSiteAdmin || role.isOrgAdmin || role.isOrgOwner;
 }
 
 /**
@@ -131,8 +117,7 @@ export function canAccessSafeguardingAdmin(role: AdminRoleInfo): boolean {
     role.isOrgAdmin ||
     role.isOrgOwner ||
     role.isSiteAdmin ||
-    role.isSafeguardingStaff ||
-    role.isSuperUser
+    role.isSafeguardingStaff
   );
 }
 
@@ -191,11 +176,7 @@ export function meetsAccessRequirement(
   requirement: AccessRequirement | undefined,
   context?: AccessContext,
 ): boolean {
-  if (
-    !requirement ||
-    requirement === "none" ||
-    requirement === "staff-or-admin"
-  ) {
+  if (!requirement || requirement === "none" || requirement === "staff-or-admin") {
     return true;
   }
 

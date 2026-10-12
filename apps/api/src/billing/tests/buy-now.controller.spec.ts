@@ -36,11 +36,7 @@ describe("BuyNowController", () => {
 
     app = moduleRef.createNestApplication();
     app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        transform: true,
-        forbidUnknownValues: true,
-      }),
+      new ValidationPipe({ whitelist: true, transform: true, forbidUnknownValues: true }),
     );
     await app.init();
     serviceMock.checkout.mockReset();
@@ -92,47 +88,6 @@ describe("BuyNowController", () => {
       .expect(400);
 
     expect(serviceMock.checkout).not.toHaveBeenCalled();
-  });
-
-  it("accepts separate valid included and paid module selections", async () => {
-    serviceMock.checkout.mockResolvedValue({
-      preview: {
-        planCode: "GROWTH_99_MONTHLY",
-        planTier: "growth",
-        billingPeriod: "monthly",
-        av30Cap: 75,
-        maxChildren: null,
-        maxSites: 2,
-        storageGbCap: null,
-        smsMessagesCap: null,
-        leaderSeatsIncluded: null,
-        source: "plan_catalogue",
-      },
-      provider: "fake",
-      sessionId: "included_123",
-      sessionUrl: "https://example.test/checkout/included_123",
-    });
-
-    await request(app.getHttpServer())
-      .post("/billing/buy-now/checkout")
-      .send({
-        ...baseBody,
-        plan: {
-          planCode: "GROWTH_99_MONTHLY",
-          selectedIncludedModules: ["FINANCE", "EVENTS", "HR"],
-          selectedModules: ["MEALS"],
-        },
-      })
-      .expect(201);
-
-    expect(serviceMock.checkout).toHaveBeenCalledWith(
-      expect.objectContaining({
-        plan: expect.objectContaining({
-          selectedIncludedModules: ["FINANCE", "EVENTS", "HR"],
-          selectedModules: ["MEALS"],
-        }),
-      }),
-    );
   });
 
   it("rejects duplicate or unknown module selections with 400", async () => {

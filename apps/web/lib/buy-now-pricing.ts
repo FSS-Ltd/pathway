@@ -5,7 +5,6 @@
  * so keep these codes consistent with `apps/api/src/billing/billing-plans.ts`.
  */
 
-import { getConfiguratorPlanPolicy } from "@pathway/pricing";
 import {
   MODULE_CATALOG,
   type ModuleCatalogEntry,
@@ -166,7 +165,6 @@ export type BuyNowSelection = {
   storageAddon1Tb?: number;
   learningModule?: boolean;
   selectedModules?: WebModule[];
-  selectedIncludedModules?: WebModule[];
 };
 
 export type CartTotals = {
@@ -248,37 +246,12 @@ function calculateTotals(
     addonPrices[`STORAGE_1TB_${intervalKey}` as AddonCode],
     selection.storageAddon1Tb,
   );
-  const selectedModules = new Set([
-    ...(selection.selectedModules ?? []),
-    ...(selection.learningModule ? (["LEARNING"] as const) : []),
-  ]);
-  const planPolicy = getConfiguratorPlanPolicy(selection.planCode);
-  const includedModules = new Set<WebModule>();
-  if (planPolicy) {
-    const includedSelection = selection.selectedIncludedModules ?? [];
-    for (const module of includedSelection) {
-      if (
-        includedModules.size >= planPolicy.includedModuleLimit ||
-        !planPolicy.eligibleOptionalModules.includes(module)
-      ) {
-        continue;
-      }
-      includedModules.add(module);
-    }
+  const selectedModules = new Set(selection.selectedModules ?? []);
+  if (selection.learningModule) {
+    selectedModules.add("LEARNING");
   }
 
-  const paidModules = new Set(
-    [...selectedModules].filter((module) => !includedModules.has(module)),
-  );
-  const modulesToDisplay = new Set([...includedModules, ...paidModules]);
-  for (const module of modulesToDisplay) {
-    if (includedModules.has(module)) {
-      lines.push({
-        label: `${MODULE_CATALOG[module].label} · included`,
-        amountMajor: 0,
-      });
-      continue;
-    }
+  for (const module of selectedModules) {
     const priceCode = MODULE_CATALOG[module].priceCodes[selection.frequency];
     const modulePrice =
       opts?.modulePrices?.[priceCode] ??

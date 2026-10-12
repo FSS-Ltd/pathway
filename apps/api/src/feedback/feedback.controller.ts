@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Inject,
-  Post,
-  UseGuards,
-} from "@nestjs/common";
+import { BadRequestException, Body, Controller, Post, UseGuards } from "@nestjs/common";
 import { CurrentOrg, CurrentTenant, CurrentUser } from "@pathway/auth";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
@@ -30,9 +23,7 @@ const parseOrBadRequest = async <T>(
 @UseGuards(AuthUserGuard)
 @Controller("feedback")
 export class FeedbackController {
-  constructor(
-    @Inject(FeedbackService) private readonly service: FeedbackService,
-  ) {}
+  constructor(private readonly service: FeedbackService) {}
 
   @Post()
   async create(

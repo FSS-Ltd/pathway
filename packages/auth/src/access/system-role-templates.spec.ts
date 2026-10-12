@@ -43,7 +43,6 @@ describe("ACE system role templates", () => {
           "platform.access.audit.read",
           "attendance.read",
           "attendance.manage",
-          "ace.attendance.export",
           "messaging.conversations.read",
           "messaging.conversations.create",
           "messaging.messages.read",
@@ -75,7 +74,6 @@ describe("ACE system role templates", () => {
           "ace.pace.diagnostics.manage",
           "ace.behaviour.read",
           "ace.behaviour.record",
-          "ace.behaviour.correct",
           "ace.behaviour.policy.manage",
           "ace.reports.read",
           "ace.reports.review",
@@ -101,7 +99,6 @@ describe("ACE system role templates", () => {
         permissions: [
           "attendance.read",
           "attendance.manage",
-          "ace.attendance.export",
           "messaging.conversations.read",
           "messaging.conversations.create",
           "messaging.messages.read",
@@ -132,7 +129,6 @@ describe("ACE system role templates", () => {
           "ace.pace.diagnostics.manage",
           "ace.behaviour.read",
           "ace.behaviour.record",
-          "ace.behaviour.correct",
           "ace.behaviour.policy.manage",
           "ace.reports.read",
           "ace.reports.compile",
@@ -221,7 +217,6 @@ describe("ACE system role templates", () => {
           "messaging.messages.send",
           "finance.family_invoices.read",
           "ace.parent.progress.read",
-          "ace.parent.notices.read",
           "ace.faith.read",
           "ace.faith.reflect",
           "school.permission_slips.read",
@@ -259,37 +254,6 @@ describe("ACE system role templates", () => {
     );
   });
 
-  it("reserves ACE attendance export for leaders or an explicit access tag", () => {
-    expect(SYSTEM_ROLE_TEMPLATES.organisationHead.permissions).toContain(
-      "ace.attendance.export",
-    );
-    expect(SYSTEM_ROLE_TEMPLATES.siteLead.permissions).toContain(
-      "ace.attendance.export",
-    );
-    for (const key of [
-      "staff",
-      "safeguardingLead",
-      "parent",
-      "student",
-    ] as const) {
-      expect(SYSTEM_ROLE_TEMPLATES[key].permissions).not.toContain(
-        "ace.attendance.export",
-      );
-    }
-  });
-
-  it("keeps parent notice reading on the relationship role without site notice access", () => {
-    expect(SYSTEM_ROLE_TEMPLATES.parent.permissions).toContain(
-      "ace.parent.notices.read",
-    );
-    expect(SYSTEM_ROLE_TEMPLATES.parent.permissions).not.toContain(
-      "notices.read",
-    );
-    expect(SYSTEM_ROLE_TEMPLATES.student.permissions).not.toContain(
-      "ace.parent.notices.read",
-    );
-  });
-
   it("gives every template except financeOperator at least one core (vertical-independent) permission", () => {
     const coreSet = new Set(CORE_PERMISSIONS);
     for (const [key, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
@@ -310,7 +274,6 @@ describe("ACE system role templates", () => {
     const siteOrOrgOnlyCore = [
       "attendance.read",
       "attendance.manage",
-      "ace.attendance.export",
       "notices.read",
       "notices.manage",
       "notices.publish",

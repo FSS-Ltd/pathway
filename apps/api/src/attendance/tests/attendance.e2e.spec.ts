@@ -304,36 +304,6 @@ describe("Attendance (e2e)", () => {
     });
   });
 
-  it("returns only this child's recent attendance and rejects another tenant", async () => {
-    if (!app) return;
-    const response = await request(app.getHttpServer())
-      .get(`/attendance/child/${ids.child}`)
-      .set("Authorization", authHeader);
-    expect(response.status).toBe(200);
-    expect(response.body.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: createdId,
-          status: "PRESENT",
-          sessionTitle: `Attendance ${nonce}`,
-        }),
-      ]),
-    );
-    expect(
-      response.body.items.every((row: { id: string }) => row.id === createdId),
-    ).toBe(true);
-
-    const missing = await request(app.getHttpServer())
-      .get(`/attendance/child/${randomUUID()}`)
-      .set("Authorization", authHeader);
-    expect(missing.status).toBe(404);
-    const otherTenantId = TENANT_B_ID;
-    if (!otherTenantId) throw new Error("Second test tenant is unavailable");
-    await expect(
-      directAttendanceService().service.listForChild(otherTenantId, ids.child),
-    ).rejects.toThrow("Child not found");
-  });
-
   it("POST /attendance creates and reads Late without losing legacy meaning", async () => {
     if (!app) return;
     const created = await request(app.getHttpServer())

@@ -24,10 +24,6 @@ export {
   type DataTableProps,
   type ColumnDef,
 } from "./components/ui/data-table";
-export {
-  type DataTablePagination,
-  type DataTablePageSize,
-} from "./components/ui/data-table-pagination";
 export { Input, type InputProps } from "./components/ui/input";
 export { Label, type LabelProps } from "./components/ui/label";
 export { Textarea, type TextareaProps } from "./components/ui/textarea";

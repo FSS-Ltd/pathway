@@ -4,12 +4,6 @@ import crypto from "node:crypto";
 import path from "node:path";
 import process from "node:process";
 import { getArgValue, parseEnvFile, resolveEnvFile } from "./lib/env-file.mjs";
-import {
-  buildSupabasePoolerUrl,
-  inspectSupabaseSettings,
-  isDirectSupabaseDatabaseUrl,
-  isSharedPoolerWithPort,
-} from "./lib/supabase-production-url.mjs";
 
 const destination = path.resolve(
   process.cwd(),
@@ -18,10 +12,12 @@ const destination = path.resolve(
 const overwrite = new Set(process.argv.slice(2)).has("--overwrite");
 const NON_SECRET_DEFAULTS = {
   VERCEL_ORG_ID: "team_qvufVWPpOoZtQcAtRv8KQenE",
+  SUPABASE_URL: "https://fkajodqkxysfcnfhizwn.supabase.co",
   SUPABASE_STORAGE_PRIVATE_BUCKET: "pathway-private",
   SUPABASE_STORAGE_PUBLIC_BUCKET: "pathway-public",
 };
 const GENERATED_INTERNAL_SECRET_KEYS = ["REVALIDATE_SECRET"];
+const SUPABASE_POOLER_HOST = "aws-0-eu-west-1.pooler.supabase.com";
 
 await main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
@@ -54,7 +50,6 @@ async function main() {
     return;
   }
 
-  inspectSupabaseSettings(fs.readFileSync(source, "utf8"));
   fs.copyFileSync(source, destination);
   fs.chmodSync(destination, 0o600);
   console.log(
@@ -67,19 +62,17 @@ async function main() {
 }
 
 function prepareEnvFile(filePath) {
-  const settings = inspectSupabaseSettings(fs.readFileSync(filePath, "utf8"));
-  appendMissingNonSecretDefaults(filePath, settings.projectUrl);
+  appendMissingNonSecretDefaults(filePath);
   appendMissingGeneratedSecrets(filePath);
-  prepareSupabaseDatabaseUrls(filePath, settings.poolerHost);
+  prepareSupabaseDatabaseUrls(filePath);
 }
 
-function appendMissingNonSecretDefaults(filePath, projectUrl) {
+function appendMissingNonSecretDefaults(filePath) {
   const contents = fs.readFileSync(filePath, "utf8");
   const parsed = parseEnvFile(contents);
-  const missing = Object.entries({
-    ...NON_SECRET_DEFAULTS,
-    SUPABASE_URL: projectUrl,
-  }).filter(([key]) => parsed[key] === undefined);
+  const missing = Object.entries(NON_SECRET_DEFAULTS).filter(
+    ([key]) => parsed[key] === undefined,
+  );
 
   if (missing.length === 0) {
     console.log("[production-env] Known non-secret defaults are already set.");
@@ -132,39 +125,25 @@ function generateSecret() {
   return crypto.randomBytes(32).toString("base64url");
 }
 
-function prepareSupabaseDatabaseUrls(filePath, poolerHost) {
+function prepareSupabaseDatabaseUrls(filePath) {
   const contents = fs.readFileSync(filePath, "utf8");
   const parsed = parseEnvFile(contents);
   const updates = {};
 
-  if (
-    isDirectSupabaseDatabaseUrl(parsed.DATABASE_URL) ||
-    isSharedPoolerWithPort(parsed.DATABASE_URL, "5432")
-  ) {
+  if (isDirectSupabaseDatabaseUrl(parsed.DATABASE_URL)) {
     updates.DATABASE_URL = buildSupabasePoolerUrl(
       parsed.DATABASE_URL,
       "transaction",
-      poolerHost,
     );
   }
 
-  if (parsed.DIRECT_URL === undefined) {
-    updates.DIRECT_URL = buildSupabasePoolerUrl(
-      parsed.DATABASE_URL,
-      "session",
-      poolerHost,
-    );
-  } else if (
-    isDirectSupabaseDatabaseUrl(parsed.DIRECT_URL) ||
-    isSharedPoolerWithPort(parsed.DIRECT_URL, "6543") ||
-    (isSharedPoolerWithPort(parsed.DIRECT_URL, "5432") &&
-      hasTransactionPoolerOptions(parsed.DIRECT_URL))
+  if (
+    parsed.DIRECT_URL === undefined &&
+    isDirectSupabaseDatabaseUrl(parsed.DATABASE_URL)
   ) {
-    updates.DIRECT_URL = buildSupabasePoolerUrl(
-      parsed.DIRECT_URL,
-      "session",
-      poolerHost,
-    );
+    updates.DIRECT_URL = buildSupabasePoolerUrl(parsed.DATABASE_URL, "session");
+  } else if (isDirectSupabaseDatabaseUrl(parsed.DIRECT_URL)) {
+    updates.DIRECT_URL = buildSupabasePoolerUrl(parsed.DIRECT_URL, "session");
   }
 
   if (Object.keys(updates).length === 0) {
@@ -182,9 +161,21 @@ function prepareSupabaseDatabaseUrls(filePath, poolerHost) {
   );
 }
 
-function hasTransactionPoolerOptions(value) {
-  const parameters = new URL(value).searchParams;
-  return parameters.has("pgbouncer") || parameters.has("connection_limit");
+function buildSupabasePoolerUrl(value, mode) {
+  const url = new URL(value);
+  const ref = url.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/i)?.[1];
+  if (!ref) {
+    throw new Error("Cannot derive Supabase project ref from database URL.");
+  }
+
+  url.username = `${url.username}.${ref}`;
+  url.hostname = SUPABASE_POOLER_HOST;
+  url.port = mode === "transaction" ? "6543" : "5432";
+  if (mode === "transaction") {
+    url.searchParams.set("pgbouncer", "true");
+    url.searchParams.set("connection_limit", "1");
+  }
+  return url.toString();
 }
 
 function upsertEnvValues(filePath, updates, sectionTitle) {
@@ -207,4 +198,15 @@ ${keys.map((key) => `${key}=${updates[key]}`).join("\n")}
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isDirectSupabaseDatabaseUrl(value) {
+  if (!value) return false;
+  try {
+    return (
+      new URL(value).host.startsWith("db.") && value.includes(".supabase.co")
+    );
+  } catch {
+    return false;
+  }
 }

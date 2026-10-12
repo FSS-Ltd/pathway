@@ -1,12 +1,7 @@
 import { BillingProvider } from "@pathway/db";
 import { type PlanCode } from "./billing-plans";
-import type { InstitutionalStripePriceCode } from "./institutional/institutional-stripe-prices";
 
-export type ActiveBillingProvider =
-  | "FAKE"
-  | "STRIPE"
-  | "STRIPE_TEST"
-  | "GOCARDLESS";
+export type ActiveBillingProvider = "FAKE" | "STRIPE" | "STRIPE_TEST" | "GOCARDLESS";
 
 export type AddonPriceCode =
   | "STORAGE_100GB_MONTHLY"
@@ -36,11 +31,7 @@ export type ModulePriceCode =
   | "MODULE_LEARNING_MONTHLY"
   | "MODULE_LEARNING_YEARLY";
 
-export type PriceCode =
-  | PlanCode
-  | AddonPriceCode
-  | ModulePriceCode
-  | InstitutionalStripePriceCode;
+export type PriceCode = PlanCode | AddonPriceCode | ModulePriceCode;
 
 export type StripePriceMap = Partial<Record<PriceCode, string>>;
 
@@ -96,11 +87,6 @@ const ALLOWED_PRICE_CODES: Set<PriceCode> = new Set([
   "GROWTH_99_YEARLY",
   "PROFESSIONAL_149_MONTHLY",
   "PROFESSIONAL_149_YEARLY",
-  "INSTITUTIONAL_STARTER_MONTHLY",
-  "INSTITUTIONAL_GROWTH_MONTHLY",
-  "INSTITUTIONAL_PROFESSIONAL_MONTHLY",
-  "INSTITUTIONAL_CHILD_UP_TO_100_MONTHLY",
-  "INSTITUTIONAL_CHILD_101_TO_250_MONTHLY",
   // Phase 3 PR 3.1: module add-on price codes.
   "MODULE_FINANCE_MONTHLY",
   "MODULE_FINANCE_YEARLY",
@@ -179,9 +165,7 @@ const parsePriceMap = (raw?: string): ParsePriceMapResult => {
 
   if (!trimmed) {
     if (process.env.NODE_ENV === "production") {
-      console.warn(
-        "[billing] STRIPE_PRICE_MAP unset or empty; pricing unavailable.",
-      );
+      console.warn("[billing] STRIPE_PRICE_MAP unset or empty; pricing unavailable.");
     }
     return { diagnostics: emptyDiagnostics };
   }
@@ -246,15 +230,11 @@ const parsePriceMap = (raw?: string): ParsePriceMapResult => {
 
 export function loadBillingProviderConfig(): BillingProviderConfig {
   // Treat empty/whitespace as unset; strip surrounding quotes (e.g. GitHub Secrets "STRIPE")
-  const raw = process.env.BILLING_PROVIDER?.trim()
-    .replace(/^["']|["']$/g, "")
-    ?.trim();
+  const raw = process.env.BILLING_PROVIDER?.trim().replace(/^["']|["']$/g, "")?.trim();
   const active = (raw?.toUpperCase() ?? "FAKE") as ActiveBillingProvider;
-  const fallbackSuccess =
-    process.env.BILLING_SUCCESS_URL_DEFAULT ??
+  const fallbackSuccess = process.env.BILLING_SUCCESS_URL_DEFAULT ??
     "http://localhost:3000/billing/checkout/success";
-  const fallbackCancel =
-    process.env.BILLING_CANCEL_URL_DEFAULT ??
+  const fallbackCancel = process.env.BILLING_CANCEL_URL_DEFAULT ??
     "http://localhost:3000/billing/checkout/cancel";
 
   // Use test keys and webhook secret when in STRIPE_TEST mode
@@ -299,10 +279,9 @@ export function loadBillingProviderConfig(): BillingProviderConfig {
   const isProd = process.env.NODE_ENV === "production";
   if ((active === "STRIPE" || active === "STRIPE_TEST") && isProd) {
     if (!stripeConfig.secretKey || !stripeConfig.webhookSecretSnapshot) {
-      const secretName =
-        active === "STRIPE_TEST"
-          ? "STRIPE_WEBHOOK_SECRET_TEST"
-          : "STRIPE_WEBHOOK_SECRET_SNAPSHOT";
+      const secretName = active === "STRIPE_TEST" 
+        ? "STRIPE_WEBHOOK_SECRET_TEST" 
+        : "STRIPE_WEBHOOK_SECRET_SNAPSHOT";
       throw new Error(
         `Stripe billing provider requires STRIPE_SECRET_KEY and ${secretName} in production`,
       );
@@ -318,8 +297,8 @@ export function loadBillingProviderConfig(): BillingProviderConfig {
   }
 
   const safeActive: ActiveBillingProvider =
-    active === "STRIPE" || active === "STRIPE_TEST" || active === "GOCARDLESS"
-      ? active
+    active === "STRIPE" || active === "STRIPE_TEST" || active === "GOCARDLESS" 
+      ? active 
       : "FAKE";
 
   // When provider would be FAKE but Stripe keys are present, use STRIPE so that

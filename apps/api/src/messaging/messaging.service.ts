@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   Injectable,
@@ -19,8 +20,6 @@ import {
   STAFF_CONVERSATION_KINDS,
   type MessagingActor,
 } from "./messaging-access";
-import { advanceMessageReadCursor } from "./messaging-read-cursor";
-import { unreadCountsForConversations } from "./messaging-unread-count";
 
 const DEFAULT_LIMIT = 20;
 
@@ -91,12 +90,6 @@ export class MessagingService {
       });
       const page = rows.slice(0, limit);
       const last = page.at(-1);
-      const unreadByConversation = await unreadCountsForConversations(
-        tx,
-        actor.tenantId,
-        actor.userId,
-        page.map((row) => row.id),
-      );
       return {
         items: page.map((row) => {
           const other = row.participants.find(
@@ -122,7 +115,6 @@ export class MessagingService {
                 }
               : null,
             updatedAt: row.updatedAt.toISOString(),
-            unreadCount: unreadByConversation.get(row.id) ?? 0,
           };
         }),
         nextCursor:
@@ -156,7 +148,7 @@ export class MessagingService {
             },
           },
         },
-        select: { id: true, kind: true },
+        select: { id: true },
       });
       if (!conversation) throw new NotFoundException("Conversation not found");
 
@@ -182,40 +174,6 @@ export class MessagingService {
         take: limit + 1,
       });
       const page = rows.slice(0, limit);
-      const recipient =
-        conversation.kind === "STAFF_DIRECT" &&
-        page.some((row) => row.sender.userId === actor.userId)
-          ? await tx.messageParticipant.findFirst({
-              where: {
-                tenantId: actor.tenantId,
-                conversationId,
-                userId: { not: actor.userId },
-                kind: "STAFF",
-                removedAt: null,
-                user: {
-                  isActive: true,
-                  siteMemberships: {
-                    some: {
-                      tenantId: actor.tenantId,
-                      role: { in: ["SITE_ADMIN", "STAFF"] },
-                    },
-                  },
-                  studentIdentities: {
-                    none: { tenantId: actor.tenantId },
-                  },
-                },
-              },
-              select: {
-                readCursors: {
-                  where: { tenantId: actor.tenantId, conversationId },
-                  select: { lastReadSequence: true },
-                  take: 1,
-                },
-              },
-            })
-          : null;
-      const recipientReadSequence =
-        recipient?.readCursors[0]?.lastReadSequence ?? 0;
       return {
         items: page.map((row) => ({
           id: row.id,
@@ -229,10 +187,6 @@ export class MessagingService {
               row.sender.user.name?.trim() ||
               "Staff member",
           },
-          recipientRead:
-            recipient && row.sender.userId === actor.userId
-              ? row.sequence <= recipientReadSequence
-              : null,
         })),
         nextBefore:
           rows.length > limit ? (page.at(-1)?.sequence ?? null) : null,
@@ -270,13 +224,23 @@ export class MessagingService {
       });
       if (!message) throw new BadRequestException("Message sequence not found");
 
-      return advanceMessageReadCursor(
-        tx,
-        actor.tenantId,
-        conversationId,
-        participant.id,
-        input.sequence,
-      );
+      const rows = await tx.$queryRaw<Array<{ lastReadSequence: number }>>`
+        INSERT INTO "MessageParticipantReadCursor" (
+          "id", "tenantId", "conversationId", "participantId", "lastReadSequence"
+        ) VALUES (
+          ${randomUUID()}, ${actor.tenantId}, ${conversationId},
+          ${participant.id}, ${input.sequence}
+        )
+        ON CONFLICT ("tenantId", "conversationId", "participantId")
+        DO UPDATE SET
+          "lastReadSequence" = GREATEST(
+            "MessageParticipantReadCursor"."lastReadSequence",
+            EXCLUDED."lastReadSequence"
+          ),
+          "updatedAt" = CURRENT_TIMESTAMP
+        RETURNING "lastReadSequence"
+      `;
+      return { lastReadSequence: rows[0].lastReadSequence };
     });
   }
 }

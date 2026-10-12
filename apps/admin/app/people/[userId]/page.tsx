@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Mail, Plus, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Input, Label, Select } from "@pathway/ui";
 import { Checkbox } from "../../../components/ui/checkbox";
 import { ProfileHeaderCard } from "../../../components/profile-header-card";
@@ -16,9 +16,7 @@ import {
   updateStaff,
   type StaffEditDetail,
   type StaffEditUpdatePayload,
-  type StaffUnavailableWindow,
 } from "../../../lib/api-client";
-import { UnavailableWindowEditor } from "../../../components/staff/unavailable-window-editor";
 import { toLocalDateKey } from "../../../lib/date";
 import { toast } from "sonner";
 
@@ -52,9 +50,7 @@ export default function StaffDetailPage() {
   const userId = params.userId;
 
   const [staff, setStaff] = React.useState<StaffEditDetail | null>(null);
-  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>(
-    [],
-  );
+  const [groups, setGroups] = React.useState<{ id: string; name: string }[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -79,16 +75,17 @@ export default function StaffDetailPage() {
     AvailabilityRange[]
   >([]);
   const [unavailableDates, setUnavailableDates] = React.useState<
-    StaffUnavailableWindow[]
+    { date: string; reason?: string }[]
   >([]);
   const [preferredGroupIds, setPreferredGroupIds] = React.useState<string[]>(
     [],
   );
+  const [newUnavailableDate, setNewUnavailableDate] = React.useState("");
   const [validationErrors, setValidationErrors] = React.useState<
     Record<string, string>
   >({});
 
-  const { role: userRole } = useAdminAccess();
+  const { role: userRole, isLoading: isLoadingAccess } = useAdminAccess();
   const isAdmin = canAccessAdminSection(userRole);
 
   const load = React.useCallback(async () => {
@@ -121,8 +118,6 @@ export default function StaffDetailPage() {
         setUnavailableDates(
           staffData.unavailableDates.map((u) => ({
             date: u.date,
-            startMinute: u.startMinute ?? 0,
-            endMinute: u.endMinute ?? 1440,
             reason: u.reason ?? undefined,
           })),
         );
@@ -130,7 +125,9 @@ export default function StaffDetailPage() {
       }
       setGroups(groupsData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load profile");
+      setError(
+        err instanceof Error ? err.message : "Failed to load profile",
+      );
       setStaff(null);
     } finally {
       setIsLoading(false);
@@ -160,6 +157,18 @@ export default function StaffDetailPage() {
 
   const removeAvailabilityRange = (index: number) => {
     setWeeklyAvailability((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addUnavailableDate = () => {
+    const date = newUnavailableDate.trim();
+    if (!date) return;
+    if (unavailableDates.some((u) => u.date === date)) return;
+    setUnavailableDates((prev) => [...prev, { date }]);
+    setNewUnavailableDate("");
+  };
+
+  const removeUnavailableDate = (date: string) => {
+    setUnavailableDates((prev) => prev.filter((u) => u.date !== date));
   };
 
   const togglePreferredGroup = (groupId: string) => {
@@ -213,10 +222,8 @@ export default function StaffDetailPage() {
         lastName: lastName.trim() || undefined,
         dateOfBirth: dateOfBirth.trim() || null,
         hasServeAccess: userRole.isOrgAdmin ? hasServeAccess : undefined,
-        role: userRole.isOrgAdmin
-          ? (role as "SITE_ADMIN" | "STAFF" | "VIEWER")
-          : undefined,
-        isActive: userRole.isSuperUser ? isActive : undefined,
+        role: role as "SITE_ADMIN" | "STAFF" | "VIEWER",
+        isActive,
       };
       if (staff.canEditAvailability) {
         payload.weeklyAvailability = weeklyAvailability.map((r) => ({
@@ -231,7 +238,9 @@ export default function StaffDetailPage() {
       setStaff(updated);
       toast.success("Profile saved successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save changes");
+      setError(
+        err instanceof Error ? err.message : "Failed to save changes",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -310,10 +319,7 @@ export default function StaffDetailPage() {
             </div>
           )}
 
-          <div
-            className="border-t border-dashed border-border-subtle"
-            aria-hidden
-          />
+          <div className="border-t border-dashed border-border-subtle" aria-hidden />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <ProfileHeaderCard
@@ -332,7 +338,9 @@ export default function StaffDetailPage() {
               }
               avatarSrc={undefined}
               badges={
-                <Badge variant={statusTone[isActive ? "active" : "inactive"]}>
+                <Badge
+                  variant={statusTone[isActive ? "active" : "inactive"]}
+                >
                   {isActive ? "Active" : "Inactive"}
                 </Badge>
               }
@@ -388,48 +396,29 @@ export default function StaffDetailPage() {
                     <Label htmlFor="hasServeAccess">Has serve access</Label>
                   </div>
                 )}
-                {userRole.isOrgAdmin ? (
-                  <div>
-                    <Label htmlFor="role">Role</Label>
-                    <Select
-                      id="role"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className="mt-1"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-muted">
-                    Role is managed by an organisation admin.
-                  </p>
-                )}
-                {userRole.isSuperUser ? (
-                  <div className="sm:col-span-2">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="isActive"
-                        checked={isActive}
-                        onChange={(e) => setIsActive(e.target.checked)}
-                      />
-                      <Label htmlFor="isActive">Account active</Label>
-                    </div>
-                    <p className="mt-1 text-sm text-text-muted">
-                      Disabling this account blocks access to every
-                      organisation.
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-text-muted sm:col-span-2">
-                    Global account status is managed by a platform
-                    administrator.
-                  </p>
-                )}
+                <div>
+                  <Label htmlFor="role">Role</Label>
+                  <Select
+                    id="role"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="mt-1"
+                  >
+                    {ROLES.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="isActive"
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
+                  />
+                  <Label htmlFor="isActive">Active</Label>
+                </div>
                 {staff.email && (
                   <div className="sm:col-span-2">
                     <Label>Email</Label>
@@ -476,11 +465,7 @@ export default function StaffDetailPage() {
                           type="time"
                           value={r.startTime}
                           onChange={(e) =>
-                            updateAvailabilityRange(
-                              i,
-                              "startTime",
-                              e.target.value,
-                            )
+                            updateAvailabilityRange(i, "startTime", e.target.value)
                           }
                           className="mt-1"
                         />
@@ -491,11 +476,7 @@ export default function StaffDetailPage() {
                           type="time"
                           value={r.endTime}
                           onChange={(e) =>
-                            updateAvailabilityRange(
-                              i,
-                              "endTime",
-                              e.target.value,
-                            )
+                            updateAvailabilityRange(i, "endTime", e.target.value)
                           }
                           className="mt-1"
                         />
@@ -532,13 +513,49 @@ export default function StaffDetailPage() {
 
               <Card
                 title="Date exceptions"
-                description="Whole days or specific hours when this staff member is unavailable"
+                description="Specific dates when this staff member is unavailable"
               >
-                <UnavailableWindowEditor
-                  value={unavailableDates}
-                  onChange={setUnavailableDates}
-                  disabled={isSaving}
-                />
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={newUnavailableDate}
+                      onChange={(e) => setNewUnavailableDate(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={addUnavailableDate}
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <ul className="space-y-1">
+                    {unavailableDates.map((u) => (
+                      <li
+                        key={u.date}
+                        className="flex items-center justify-between rounded border border-border-subtle px-3 py-2 text-sm"
+                      >
+                        <span>{u.date}</span>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => removeUnavailableDate(u.date)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  {unavailableDates.length === 0 && (
+                    <p className="text-sm text-text-muted">
+                      No blocked dates. Add a date above to mark unavailability.
+                    </p>
+                  )}
+                </div>
               </Card>
             </>
           )}

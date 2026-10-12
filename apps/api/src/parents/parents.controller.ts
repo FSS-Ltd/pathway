@@ -28,7 +28,9 @@ import {
   updateParentSchema,
   type UpdateParentDto,
 } from "./dto/update-parent.dto";
-import { LinkChildrenExistingUserDto } from "./dto/link-children-existing-user.dto";
+import {
+  LinkChildrenExistingUserDto,
+} from "./dto/link-children-existing-user.dto";
 
 interface AuthRequest extends Request {
   authUserId?: string;
@@ -39,10 +41,8 @@ interface AuthRequest extends Request {
 export class ParentsController {
   constructor(
     @Inject(ParentsService) private readonly parentsService: ParentsService,
-    @Inject(PublicSignupService)
-    private readonly publicSignupService: PublicSignupService,
-    @Inject(PathwayRequestContext)
-    private readonly requestContext: PathwayRequestContext,
+    @Inject(PublicSignupService) private readonly publicSignupService: PublicSignupService,
+    @Inject(PathwayRequestContext) private readonly requestContext: PathwayRequestContext,
   ) {}
 
   @Get()
@@ -72,7 +72,6 @@ export class ParentsController {
       tenantId,
       orgId,
       id,
-      isOwnProfile && !isOrgAdmin,
     );
     if (!parent) {
       throw new NotFoundException("Parent not found");
@@ -118,17 +117,11 @@ export class ParentsController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.format());
     }
-    if (parsed.data.childIds !== undefined && !isOrgAdmin) {
-      throw new ForbiddenException(
-        "Only an organisation admin may change child links",
-      );
-    }
     return this.parentsService.updateForTenant(
       tenantId,
       orgId,
       id,
       parsed.data as UpdateParentDto,
-      isOwnProfile && !isOrgAdmin,
     );
   }
 

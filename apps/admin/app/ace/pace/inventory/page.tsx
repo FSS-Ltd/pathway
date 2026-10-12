@@ -6,6 +6,7 @@ import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import { PaceInventoryWorkspace } from "@/components/ace/pace/inventory/pace-inventory-workspace";
 import { usePaceInventoryPage } from "@/components/ace/pace/inventory/use-pace-inventory-page";
 import { useAdminAccess } from "@/lib/use-admin-access";
+import { useSession } from "@/lib/use-session-compat";
 import {
   fetchPaceInventoryAttention,
   fetchPaceInventoryOrders,
@@ -17,6 +18,7 @@ import {
 import type { PagedInventory } from "@/components/ace/pace/inventory/use-pace-inventory-page";
 
 export default function PaceInventoryPage() {
+  const { data: session, status: sessionStatus } = useSession();
   const { permissions, isLoading: isLoadingAccess } = useAdminAccess();
   const [stockView, setStockView] = React.useState<"attention" | "all">(
     "attention",
@@ -26,7 +28,11 @@ export default function PaceInventoryPage() {
   );
   const canRead = permissions?.includes("ace.pace.inventory.read") === true;
   const canManage = permissions?.includes("ace.pace.inventory.manage") === true;
-  const enabled = !isLoadingAccess && canRead;
+  const enabled =
+    sessionStatus === "authenticated" &&
+    session !== null &&
+    !isLoadingAccess &&
+    canRead;
   const orders = usePaceInventoryPage(
     fetchPaceInventoryOrders,
     enabled,
@@ -37,7 +43,7 @@ export default function PaceInventoryPage() {
     [],
   );
 
-  if (isLoadingAccess) {
+  if (isLoadingAccess || sessionStatus === "loading") {
     return <p role="status">Loading inventory access…</p>;
   }
   if (!enabled) {

@@ -154,11 +154,7 @@ async function run(): Promise<void> {
         onRetry={() => undefined}
       />,
     );
-    assert.doesNotMatch(
-      container.textContent ?? "",
-      /No active PACE placements/,
-    );
-    assert.doesNotMatch(container.textContent ?? "", /No PACE exceptions/);
+    assert.match(container.textContent ?? "", /No active PACE placements/);
     assert.ok(
       container.querySelector('button[type="button"]'),
       "offers a retry after a recoverable roster failure",

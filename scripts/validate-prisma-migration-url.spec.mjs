@@ -6,26 +6,18 @@ const projectRef = "testproject123";
 const supabaseUrl = `https://${projectRef}.supabase.co`;
 
 test("accepts the configured project's direct migration endpoint", () => {
-  const url = `postgresql://postgres:secret@db.${projectRef}.supabase.co:5432/postgres?schema=app`;
+  const url = `postgresql://postgres:secret@db.${projectRef}.supabase.co:5432/postgres`;
   assert.equal(validatePrismaMigrationUrl(url, supabaseUrl), "direct");
 });
 
 test("accepts the configured project's shared session pooler", () => {
-  const url = `postgresql://postgres.${projectRef}:secret@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?schema=app`;
-  assert.equal(validatePrismaMigrationUrl(url, supabaseUrl), "session-pooler");
-});
-
-test("rejects migration URLs that do not select the app schema", () => {
   const url = `postgresql://postgres.${projectRef}:secret@aws-0-eu-west-1.pooler.supabase.com:5432/postgres`;
-  assert.throws(
-    () => validatePrismaMigrationUrl(url, supabaseUrl),
-    /schema=app/,
-  );
+  assert.equal(validatePrismaMigrationUrl(url, supabaseUrl), "session-pooler");
 });
 
 test("rejects a connection to a different Supabase project", () => {
   const url =
-    "postgresql://postgres:secret@db.otherproject.supabase.co:5432/postgres?schema=app";
+    "postgresql://postgres:secret@db.otherproject.supabase.co:5432/postgres";
   assert.throws(
     () => validatePrismaMigrationUrl(url, supabaseUrl),
     /different Supabase projects/,
@@ -42,7 +34,7 @@ test("rejects transaction-pooler URLs", () => {
 
 test("rejects a session-pooler user for a different project", () => {
   const url =
-    "postgresql://postgres.otherproject:secret@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?schema=app";
+    "postgresql://postgres.otherproject:secret@aws-0-eu-west-1.pooler.supabase.com:5432/postgres";
   assert.throws(
     () => validatePrismaMigrationUrl(url, supabaseUrl),
     /different Supabase projects/,
@@ -58,7 +50,7 @@ test("rejects a missing migration password", () => {
 });
 
 test("rejects a direct URL using a different database role", () => {
-  const url = `postgresql://app_user:secret@db.${projectRef}.supabase.co:5432/postgres?schema=app`;
+  const url = `postgresql://app_user:secret@db.${projectRef}.supabase.co:5432/postgres`;
   assert.throws(
     () => validatePrismaMigrationUrl(url, supabaseUrl),
     /postgres database role/,

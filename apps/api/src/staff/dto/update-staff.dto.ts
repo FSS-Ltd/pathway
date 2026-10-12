@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { Weekday } from "@pathway/db";
-import { unavailableWindowSchema } from "./unavailable-window.dto";
 
 const weekdaySchema = z.nativeEnum(Weekday);
 const timeSchema = z
@@ -25,19 +24,20 @@ const weeklyAvailabilityItemSchema = z
     path: ["endTime"],
   });
 
+const unavailableDateSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  reason: z.string().max(500).optional(),
+});
+
 export const updateStaffDto = z.object({
   firstName: z.string().min(1).max(100).optional(),
   lastName: z.string().min(1).max(100).optional(),
-  dateOfBirth: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
-    .optional()
-    .nullable(),
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD").optional().nullable(),
   hasServeAccess: z.boolean().optional(),
   role: z.enum(["SITE_ADMIN", "STAFF", "VIEWER"]).optional(),
   isActive: z.boolean().optional(),
   weeklyAvailability: z.array(weeklyAvailabilityItemSchema).optional(),
-  unavailableDates: z.array(unavailableWindowSchema).max(5000).optional(),
+  unavailableDates: z.array(unavailableDateSchema).optional(),
   preferredGroupIds: z.array(z.string().uuid()).optional(),
 });
 

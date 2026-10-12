@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { AccessTagKey } from "@prisma/client";
 import { Test, type TestingModule } from "@nestjs/testing";
 import {
   applyTenantContext,
@@ -95,7 +94,6 @@ describe("effective permission RLS resolution", () => {
     orgB: randomUUID(),
     allowedUser: randomUUID(),
     crossOrgUser: randomUUID(),
-    superUser: randomUUID(),
     orgARole: randomUUID(),
     orgBRole: randomUUID(),
     siteA: randomUUID(),
@@ -136,11 +134,6 @@ describe("effective permission RLS resolution", () => {
           id: fixture.crossOrgUser,
           email: `${fixture.crossOrgUser}@example.test`,
         },
-        {
-          id: fixture.superUser,
-          email: `${fixture.superUser}@example.test`,
-          superUser: true,
-        },
       ],
     });
     await prisma.tenant.createMany({
@@ -164,14 +157,10 @@ describe("effective permission RLS resolution", () => {
         { orgId: fixture.orgA, userId: fixture.allowedUser },
         { orgId: fixture.orgA, userId: fixture.crossOrgUser },
         { orgId: fixture.orgB, userId: fixture.crossOrgUser },
-        { orgId: fixture.orgA, userId: fixture.superUser },
       ],
     });
     await prisma.siteMembership.create({
       data: { tenantId: fixture.siteA, userId: fixture.allowedUser },
-    });
-    await prisma.siteMembership.create({
-      data: { tenantId: fixture.siteA, userId: fixture.superUser },
     });
     await prisma.orgVertical.createMany({
       data: [
@@ -274,9 +263,6 @@ describe("effective permission RLS resolution", () => {
 
   afterAll(async () => {
     if (isDatabaseAvailable()) {
-      await prisma.accessTagExclusion.deleteMany({
-        where: { orgId: fixture.orgA },
-      });
       await prisma.userRoleAssignment.deleteMany({
         where: {
           roleDefinitionId: {
@@ -303,21 +289,13 @@ describe("effective permission RLS resolution", () => {
         where: { tenantId: { in: [fixture.siteA, fixture.siteB] } },
       });
       await prisma.orgMembership.deleteMany({
-        where: {
-          userId: {
-            in: [fixture.allowedUser, fixture.crossOrgUser, fixture.superUser],
-          },
-        },
+        where: { userId: { in: [fixture.allowedUser, fixture.crossOrgUser] } },
       });
       await prisma.tenant.deleteMany({
         where: { id: { in: [fixture.siteA, fixture.siteB] } },
       });
       await prisma.user.deleteMany({
-        where: {
-          id: {
-            in: [fixture.allowedUser, fixture.crossOrgUser, fixture.superUser],
-          },
-        },
+        where: { id: { in: [fixture.allowedUser, fixture.crossOrgUser] } },
       });
       await prisma.org.deleteMany({
         where: { id: { in: [fixture.orgA, fixture.orgB] } },
@@ -375,40 +353,6 @@ describe("effective permission RLS resolution", () => {
     });
   });
 
-  it("subtracts an organisation exclusion from a role under RLS", async () => {
-    if (!service) return;
-    const exclusion = await prisma.accessTagExclusion.create({
-      data: {
-        id: randomUUID(),
-        orgId: fixture.orgA,
-        userId: fixture.allowedUser,
-        tagKey: AccessTagKey.PACE_FULL_ACCESS,
-        excludedById: fixture.allowedUser,
-      },
-    });
-    try {
-      await expect(
-        service.resolve({
-          userId: fixture.allowedUser,
-          orgId: fixture.orgA,
-          permission: "ace.pace.read",
-          now: NOW,
-        }),
-      ).resolves.toEqual({
-        allowed: false,
-        reason: "permission-missing",
-        sourceRoleIds: [],
-      });
-      await expect(
-        withRoleRlsOrgContext(fixture.orgB, (tx) =>
-          tx.accessTagExclusion.findMany({ where: { orgId: fixture.orgA } }),
-        ),
-      ).resolves.toEqual([]);
-    } finally {
-      await prisma.accessTagExclusion.delete({ where: { id: exclusion.id } });
-    }
-  });
-
   it("reads uncommitted retirement changes instead of a cached assignment", async () => {
     const cutoverService = transactionalService;
     if (!cutoverService) return;
@@ -439,7 +383,6 @@ describe("effective permission RLS resolution", () => {
           undefined,
           NOW,
           tx,
-          true,
         );
         expect(before).toHaveLength(1);
 
@@ -458,7 +401,6 @@ describe("effective permission RLS resolution", () => {
           undefined,
           NOW,
           tx,
-          true,
         );
         expect(after).toEqual([]);
         throw rollback;
@@ -494,7 +436,6 @@ describe("effective permission RLS resolution", () => {
         fixture.siteA,
         NOW,
         tx,
-        true,
       );
       const siteB = await cutoverService.listForUserWithSourcesInTransaction(
         fixture.allowedUser,
@@ -502,7 +443,6 @@ describe("effective permission RLS resolution", () => {
         fixture.siteB,
         NOW,
         tx,
-        true,
       );
       expect(siteA.map(({ permissionKey }) => permissionKey)).toEqual([
         "ace.pace.read",
@@ -528,38 +468,6 @@ describe("effective permission RLS resolution", () => {
       allowed: false,
       reason: "permission-missing",
       sourceRoleIds: [],
-    });
-  });
-
-  it("grants an admitted superuser without an assignment but rejects other scopes", async () => {
-    if (!service) return;
-    const request = {
-      userId: fixture.superUser,
-      orgId: fixture.orgA,
-      tenantId: fixture.siteA,
-      permission: "ace.pace.read" as const,
-      now: NOW,
-    };
-
-    await expect(service.resolve(request)).resolves.toEqual({
-      allowed: true,
-      reason: "allowed",
-      sourceRoleIds: [],
-      sourceSuperUser: true,
-    });
-    await expect(
-      service.resolve({ ...request, tenantId: undefined }),
-    ).resolves.toMatchObject({ allowed: true, sourceSuperUser: true });
-    await expect(
-      service.resolve({ ...request, tenantId: fixture.siteB }),
-    ).resolves.toMatchObject({
-      allowed: false,
-    });
-    await expect(
-      service.resolve({ ...request, orgId: fixture.orgB }),
-    ).resolves.toMatchObject({
-      allowed: false,
-      reason: "no-membership",
     });
   });
 

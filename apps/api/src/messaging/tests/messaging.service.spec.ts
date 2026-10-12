@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
-import { Prisma, withTenantRlsContext } from "@pathway/db";
+import { withTenantRlsContext } from "@pathway/db";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
 import { MessagingController } from "../messaging.controller";
 import {
@@ -15,16 +15,7 @@ import {
 import { encodeConversationCursor } from "../messaging-cursor";
 import { MessagingService } from "../messaging.service";
 
-jest.mock("@pathway/db", () => ({
-  withTenantRlsContext: jest.fn(),
-  Prisma: {
-    sql: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
-      strings: [...strings],
-      values,
-    })),
-    join: jest.fn((values: unknown[]) => values),
-  },
-}));
+jest.mock("@pathway/db", () => ({ withTenantRlsContext: jest.fn() }));
 
 const actor = { tenantId: "tenant-a", orgId: "org-a", userId: "staff-a" };
 const time = new Date("2026-10-07T09:00:00.000Z");
@@ -100,9 +91,6 @@ describe("staff messaging service", () => {
 
   it("lists only the selected site's active staff conversations", async () => {
     const { tx, service } = setup();
-    tx.$queryRaw.mockResolvedValue([
-      { conversationId: "conversation-a", unreadCount: 2n },
-    ]);
     tx.messageConversation.findMany.mockResolvedValue([
       {
         id: "conversation-a",
@@ -129,7 +117,6 @@ describe("staff messaging service", () => {
           createdAt: time.toISOString(),
         },
         updatedAt: time.toISOString(),
-        unreadCount: 2,
       },
     ]);
     expect(result.nextCursor).toEqual(expect.any(String));
@@ -155,18 +142,6 @@ describe("staff messaging service", () => {
       actor.orgId,
       expect.any(Function),
     );
-    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
-    expect(Prisma.join).toHaveBeenCalledWith(["conversation-a"]);
-  });
-
-  it("does not query unread messages when the page is empty", async () => {
-    const { tx, service } = setup();
-
-    await expect(service.listStaffConversations(actor, {})).resolves.toEqual({
-      items: [],
-      nextCursor: null,
-    });
-    expect(tx.$queryRaw).not.toHaveBeenCalled();
   });
 
   it("denies staff reads after membership ends or for a student identity", async () => {
@@ -281,7 +256,6 @@ describe("staff messaging service", () => {
         body: "Reply",
         createdAt: time.toISOString(),
         sender: { id: "staff-b", displayName: "Bob" },
-        recipientRead: null,
       },
     ]);
     expect(result.nextBefore).toBe(2);
@@ -295,77 +269,6 @@ describe("staff messaging service", () => {
         take: 2,
       }),
     );
-  });
-
-  it("shows a direct recipient's read state only for the caller's messages", async () => {
-    const { tx, service } = setup();
-    tx.messageConversation.findFirst.mockResolvedValue({
-      id: "conversation-a",
-      kind: "STAFF_DIRECT",
-    });
-    tx.messageParticipant.findFirst.mockResolvedValue({
-      readCursors: [{ lastReadSequence: 2 }],
-    });
-    tx.message.findMany.mockResolvedValue(
-      [
-        { id: "new", sequence: 3, senderId: "staff-a" },
-        { id: "read", sequence: 2, senderId: "staff-a" },
-        { id: "incoming", sequence: 1, senderId: "staff-b" },
-      ].map(({ id, sequence, senderId }) => ({
-        id,
-        sequence,
-        bodyEncrypted: id,
-        createdAt: time,
-        sender: {
-          userId: senderId,
-          user: { displayName: senderId, name: null },
-        },
-      })),
-    );
-
-    const result = await service.listStaffMessages(actor, "conversation-a", {});
-
-    expect(result.items.map((item) => item.recipientRead)).toEqual([
-      false,
-      true,
-      null,
-    ]);
-    expect(tx.messageParticipant.findFirst).toHaveBeenCalledWith({
-      where: {
-        tenantId: actor.tenantId,
-        conversationId: "conversation-a",
-        userId: { not: actor.userId },
-        kind: "STAFF",
-        removedAt: null,
-        user: {
-          isActive: true,
-          siteMemberships: {
-            some: {
-              tenantId: actor.tenantId,
-              role: { in: ["SITE_ADMIN", "STAFF"] },
-            },
-          },
-          studentIdentities: { none: { tenantId: actor.tenantId } },
-        },
-      },
-      select: {
-        readCursors: {
-          where: {
-            tenantId: actor.tenantId,
-            conversationId: "conversation-a",
-          },
-          select: { lastReadSequence: true },
-          take: 1,
-        },
-      },
-    });
-
-    tx.messageParticipant.findFirst.mockResolvedValue(null);
-    expect(
-      (await service.listStaffMessages(actor, "conversation-a", {})).items.map(
-        (item) => item.recipientRead,
-      ),
-    ).toEqual([null, null, null]);
   });
 
   it("rejects a missing participant or sequence before writing a read cursor", async () => {

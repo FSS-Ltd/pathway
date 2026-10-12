@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Body,
   Controller,
-  Inject,
   Param,
   Patch,
   Post,
@@ -13,7 +12,6 @@ import { z } from "zod";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
 import { advancePaceInventoryOrderSchema } from "./dto/advance-pace-inventory-order.dto";
 import {
   paceInventoryBulkSchema,
@@ -24,17 +22,12 @@ import { PaceInventoryOrderStatusService } from "./pace-inventory-order-status.s
 import { PaceInventoryStockCommandService } from "./pace-inventory-stock-command.service";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
-@IndependentTransaction()
 @Controller("ace/pace/inventory")
 export class PaceInventoryCommandsController {
   constructor(
-    @Inject(PaceInventoryOrderCommandService)
     private readonly orderService: PaceInventoryOrderCommandService,
-    @Inject(PaceInventoryOrderStatusService)
     private readonly statusService: PaceInventoryOrderStatusService,
-    @Inject(PaceInventoryStockCommandService)
     private readonly stockService: PaceInventoryStockCommandService,
-    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

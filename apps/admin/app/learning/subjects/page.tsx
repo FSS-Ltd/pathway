@@ -78,7 +78,6 @@ export default function LearningSubjectsPage() {
       },
       {
         id: "category",
-        priority: "secondary",
         header: "Category",
         cell: (row) => row.category ?? "-",
       },
@@ -161,9 +160,6 @@ export default function LearningSubjectsPage() {
         ) : null}
         <DataTable
           data={subjects}
-          caption="Learning subjects"
-          rowKey={(row) => row.id}
-          pagination={{ mode: "client" }}
           columns={columns}
           isLoading={isLoading}
           emptyMessage="No subjects have been added yet."

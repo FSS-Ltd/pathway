@@ -6,19 +6,9 @@ import {
   Inject,
   Optional,
 } from "@nestjs/common";
-import {
-  prisma,
-  runTransaction,
-  Weekday,
-  OrgRole,
-  SiteRole,
-  Role,
-  type Prisma,
-} from "@pathway/db";
+import { prisma, Weekday, OrgRole } from "@pathway/db";
 import type { UpdateStaffDto } from "./dto/update-staff.dto";
 import type { UpdateProfileDto } from "./dto/update-profile.dto";
-import { recordAuditEventInTransaction } from "../audit/audit.service";
-import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { staffAvatarKey } from "../common/storage/storage-key.util";
 
@@ -41,49 +31,6 @@ function timeFromMinute(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}`;
-}
-
-type UnavailableWindow = NonNullable<
-  UpdateProfileDto["unavailableDates"]
->[number];
-
-async function replaceUnavailableWindows(
-  userId: string,
-  tenantId: string,
-  windows: UnavailableWindow[],
-): Promise<void> {
-  const sorted = [...windows].sort(
-    (a, b) => a.date.localeCompare(b.date) || a.startMinute - b.startMinute,
-  );
-  for (let index = 1; index < sorted.length; index++) {
-    const previous = sorted[index - 1];
-    const current = sorted[index];
-    if (
-      previous.date === current.date &&
-      current.startMinute < previous.endMinute
-    ) {
-      throw new BadRequestException(
-        `Overlapping unavailable times on ${current.date}`,
-      );
-    }
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
-    await tx.staffUnavailableDate.deleteMany({ where: { userId, tenantId } });
-    if (sorted.length > 0) {
-      await tx.staffUnavailableDate.createMany({
-        data: sorted.map((window) => ({
-          userId,
-          tenantId,
-          date: new Date(`${window.date}T00:00:00.000Z`),
-          startMinute: window.startMinute,
-          endMinute: window.endMinute,
-          reason: window.reason ?? null,
-        })),
-      });
-    }
-  });
 }
 
 export type StaffForAssignmentRow = {
@@ -139,13 +86,8 @@ export class StaffService {
     },
   ): Promise<StaffForAssignmentRow[]> {
     const sessionDate = new Date(params.startsAt);
-    const firstDate = new Date(
-      `${sessionDate.toISOString().slice(0, 10)}T00:00:00.000Z`,
-    );
-    const lastDate = new Date(
-      `${params.endsAt.toISOString().slice(0, 10)}T00:00:00.000Z`,
-    );
-    const dayOfWeek = sessionDate.getUTCDay();
+    const dateStr = sessionDate.toISOString().slice(0, 10);
+    const dayOfWeek = sessionDate.getDay();
     const weekday = WEEKDAY_ORDER[dayOfWeek];
     const startMin = Math.floor(params.startsAt.getTime() / 60000) % (24 * 60);
     const endMin = Math.floor(params.endsAt.getTime() / 60000) % (24 * 60);
@@ -184,14 +126,9 @@ export class StaffService {
           where: {
             userId: { in: userIds },
             tenantId,
-            date: { gte: firstDate, lte: lastDate },
+            date: new Date(dateStr),
           },
-          select: {
-            userId: true,
-            date: true,
-            startMinute: true,
-            endMinute: true,
-          },
+          select: { userId: true },
         }),
         prisma.volunteerPreference.findMany({
           where: {
@@ -213,17 +150,7 @@ export class StaffService {
           : Promise.resolve([]),
       ]);
 
-    const blockedSet = new Set(
-      unavailableDates
-        .filter((window) => {
-          const date = window.date.getTime();
-          return (
-            params.startsAt.getTime() < date + window.endMinute * 60000 &&
-            params.endsAt.getTime() > date + window.startMinute * 60000
-          );
-        })
-        .map((window) => window.userId),
-    );
+    const blockedSet = new Set(unavailableDates.map((u) => u.userId));
     const preferredSet = new Set(preferredGroups.map((p) => p.userId));
     const availableByUser = new Map<string, boolean>();
     for (const p of preferences) {
@@ -287,12 +214,7 @@ export class StaffService {
     role: string;
     isActive: boolean;
     weeklyAvailability: { day: Weekday; startTime: string; endTime: string }[];
-    unavailableDates: {
-      date: string;
-      startMinute: number;
-      endMinute: number;
-      reason: string | null;
-    }[];
+    unavailableDates: { date: string; reason: string | null }[];
     preferredGroups: { id: string; name: string }[];
     canEditAvailability: boolean;
     hasServeAccess: boolean;
@@ -338,7 +260,7 @@ export class StaffService {
       }),
       prisma.staffUnavailableDate.findMany({
         where: { userId, tenantId },
-        orderBy: [{ date: "asc" }, { startMinute: "asc" }],
+        orderBy: { date: "asc" },
       }),
       prisma.staffPreferredGroup.findMany({
         where: { userId, tenantId },
@@ -349,7 +271,6 @@ export class StaffService {
         where: { id: userId },
         select: {
           children: {
-            where: { tenantId },
             select: {
               id: true,
               firstName: true,
@@ -400,8 +321,6 @@ export class StaffService {
       weeklyAvailability,
       unavailableDates: unavailableDates.map((u) => ({
         date: u.date.toISOString().slice(0, 10),
-        startMinute: u.startMinute,
-        endMinute: u.endMinute,
         reason: u.reason,
       })),
       preferredGroups: preferredGroups.map((pg) => ({
@@ -419,16 +338,6 @@ export class StaffService {
           group: c.group,
         })) ?? [],
     };
-  }
-
-  async getByIdForAdmin(
-    userId: string,
-    tenantId: string,
-    orgId: string,
-    callerUserId: string,
-  ): ReturnType<StaffService["getById"]> {
-    await this.assertStaffManagerAccess(callerUserId, tenantId, orgId);
-    return this.getById(userId, tenantId, orgId);
   }
 
   /**
@@ -489,7 +398,6 @@ export class StaffService {
         where: { id: currentUserId },
         select: {
           children: {
-            where: { tenantId },
             select: {
               id: true,
               firstName: true,
@@ -726,11 +634,25 @@ export class StaffService {
         }
       }
       if (dto.unavailableDates !== undefined) {
-        await replaceUnavailableWindows(
-          currentUserId,
-          tenantId,
-          dto.unavailableDates,
-        );
+        const seen = new Set<string>();
+        const toCreate = dto.unavailableDates.filter((u) => {
+          if (seen.has(u.date)) return false;
+          seen.add(u.date);
+          return true;
+        });
+        await prisma.staffUnavailableDate.deleteMany({
+          where: { userId: currentUserId, tenantId },
+        });
+        for (const u of toCreate) {
+          await prisma.staffUnavailableDate.create({
+            data: {
+              userId: currentUserId,
+              tenantId,
+              date: new Date(u.date),
+              reason: u.reason ?? null,
+            },
+          });
+        }
       }
       if (dto.preferredGroupIds !== undefined) {
         const groups = await prisma.group.findMany({
@@ -785,34 +707,6 @@ export class StaffService {
     return membership !== null || orgRole !== null;
   }
 
-  async assertStaffManagerAccess(
-    callerUserId: string,
-    tenantId: string,
-    orgId: string,
-  ): Promise<boolean> {
-    const [caller, isOrgAdmin, siteAdmin, legacySiteAdmin] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: callerUserId },
-        select: { isActive: true },
-      }),
-      this.isOrgAdmin(callerUserId, orgId),
-      prisma.siteMembership.findFirst({
-        where: { userId: callerUserId, tenantId, role: SiteRole.SITE_ADMIN },
-        select: { id: true },
-      }),
-      prisma.userTenantRole.findFirst({
-        where: { userId: callerUserId, tenantId, role: Role.ADMIN },
-        select: { id: true },
-      }),
-    ]);
-    if (!caller?.isActive || (!isOrgAdmin && !siteAdmin && !legacySiteAdmin)) {
-      throw new ForbiddenException(
-        "Staff administration requires a current leader role",
-      );
-    }
-    return isOrgAdmin;
-  }
-
   private async resolvePlanTier(orgId: string): Promise<boolean> {
     const org = await prisma.org.findUnique({
       where: { id: orgId },
@@ -829,33 +723,10 @@ export class StaffService {
     dto: UpdateStaffDto,
     callerUserId: string,
   ): Promise<ReturnType<StaffService["getById"]>> {
-    const isCallerOrgAdmin = await this.assertStaffManagerAccess(
-      callerUserId,
-      tenantId,
-      orgId,
-    );
-    if (
-      !isCallerOrgAdmin &&
-      (dto.role !== undefined || dto.hasServeAccess !== undefined)
-    ) {
-      throw new ForbiddenException(
-        "Only an Organisation admin can change staff roles or serve access",
-      );
-    }
-    if (dto.isActive !== undefined) {
-      const caller = await prisma.user.findUnique({
-        where: { id: callerUserId },
-        select: { superUser: true },
-      });
-      if (!caller?.superUser) {
-        throw new ForbiddenException(
-          "Only a platform administrator can change global account status",
-        );
-      }
-    }
     await assertStaffInTenant(userId, tenantId);
 
     const canEditAvailability = await this.resolvePlanTier(orgId);
+    const isCallerOrgAdmin = await this.isOrgAdmin(callerUserId, orgId);
     if (!canEditAvailability) {
       const availabilityFields: (keyof UpdateStaffDto)[] = [
         "weeklyAvailability",
@@ -872,39 +743,29 @@ export class StaffService {
       }
     }
 
-    const userData: Prisma.UserUpdateInput = {};
+    const userData: Record<string, unknown> = {};
     if (dto.firstName !== undefined) userData.firstName = dto.firstName;
     if (dto.lastName !== undefined) userData.lastName = dto.lastName;
     if (dto.dateOfBirth !== undefined) {
       userData.dateOfBirth = dto.dateOfBirth ? new Date(dto.dateOfBirth) : null;
     }
     if (dto.isActive !== undefined) userData.isActive = dto.isActive;
-    if (dto.hasServeAccess !== undefined) {
+    if (dto.hasServeAccess !== undefined && isCallerOrgAdmin) {
       userData.hasServeAccess = dto.hasServeAccess;
     }
     if (Object.keys(userData).length > 0) {
-      if (dto.isActive === undefined) {
-        await prisma.user.update({ where: { id: userId }, data: userData });
-      } else {
-        await runTransaction(async (tx) => {
-          await tx.user.update({ where: { id: userId }, data: userData });
-          await recordAuditEventInTransaction(tx, {
-            actorUserId: callerUserId,
-            tenantId,
-            orgId,
-            entityType: AuditEntityType.ACE_RECORD,
-            entityId: userId,
-            action: AuditAction.UPDATED,
-            metadata: {
-              kind: "STAFF_ACCOUNT_STATUS",
-              action: dto.isActive ? "enable" : "disable",
-            },
-          });
-        });
-      }
+      await prisma.user.update({
+        where: { id: userId },
+        data: userData as never,
+      });
     }
 
     if (dto.role !== undefined) {
+      if (!isCallerOrgAdmin) {
+        throw new ForbiddenException(
+          "Only an Organisation admin can change a staff member's site role",
+        );
+      }
       await prisma.siteMembership.upsert({
         where: { tenantId_userId: { tenantId, userId } },
         create: { tenantId, userId, role: dto.role },
@@ -952,7 +813,25 @@ export class StaffService {
     }
 
     if (canEditAvailability && dto.unavailableDates !== undefined) {
-      await replaceUnavailableWindows(userId, tenantId, dto.unavailableDates);
+      const seen = new Set<string>();
+      const toCreate = dto.unavailableDates.filter((u) => {
+        if (seen.has(u.date)) return false;
+        seen.add(u.date);
+        return true;
+      });
+      await prisma.staffUnavailableDate.deleteMany({
+        where: { userId, tenantId },
+      });
+      for (const u of toCreate) {
+        await prisma.staffUnavailableDate.create({
+          data: {
+            userId,
+            tenantId,
+            date: new Date(u.date),
+            reason: u.reason ?? null,
+          },
+        });
+      }
     }
 
     if (canEditAvailability && dto.preferredGroupIds !== undefined) {

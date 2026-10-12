@@ -1,16 +1,8 @@
 # ACE daily attendance register contract
 
-**Status:** C06 contract in the
-[Oasis parity matrix](02-oasis-web-journey-parity.md). Steps 1.3g1–1.3g4
-established the schema. Step 1.3g5 adds the scoped staff roster read API.
-Step 1.3g6 adds atomic daily mark and correction writes. Step 1.3g7 adds the
-bounded staff correction-history read. Step 1.3g8 adds the staff web register
-for marking, correction and history. Step 1.3g9 adds a student-only daily mark
-history API. Step 1.3g10 adds a linked-parent daily mark history API. Step
-1.3g11 adds parent and student web views for explicit site and child links.
-Step 1.3g12 adds authenticated family site and child discovery. Step 1.3g13
-adds a family landing page for choosing those contexts. Exports and production
-migration remain open.
+**Status:** Step 1.3d5 design contract for C06 in the
+[Oasis parity matrix](02-oasis-web-journey-parity.md). No daily-register schema,
+API, web journey, migration, or production release is claimed by this document.
 
 ## Source behaviour and current gap
 
@@ -32,104 +24,6 @@ assignment, or teaching-day calendar. `AcademicYear` and `AcademicPeriod` do
 not establish that each date is an operating day.
 
 ## Decision and data boundaries
-
-Step 1.3g1 establishes the site year-band catalogue and dated staff-band
-assignments first. It adds no daily marks or roster endpoint. The assignment
-write guard requires an active site member; later reads must recheck current
-membership, typed permission, and the assignment's date range.
-Step 1.3g1a makes that guard resolve membership and user rows in the
-assignment table's schema or the restored `public` schema.
-Step 1.3g2 adds dated school enrolment with composite site references,
-academic-year bounds, a guest-child write guard, and non-overlapping child
-date ranges. It does not infer enrolment from legacy `Child.yearGroup` text.
-Step 1.3g3 adds one explicit teaching-date decision per site/date within an
-academic year. Holidays, closures, and exceptional openings require a reason;
-an unconfigured date remains closed to future daily-mark writes.
-Step 1.3g4 adds the separate daily fact and append-only correction-event
-tables with site, child, academic-year, teaching-date, recorder, and reason
-constraints. The original recorder and time stay on the fact, while each
-correction event stores its own actor and server time. The service must write
-a changed mark, its correction event, and the audit entry in one locked
-transaction; this schema step does not expose a daily-register API.
-Step 1.3g5 exposes only the bounded staff roster read. It reads existing marks
-without changing the session-attendance model or accepting daily writes.
-Step 1.3g6 exposes one child/date mark write. It serialises initial marks and
-corrections per site/child/date, rechecks the actor's manage permission and
-dated band scope, and records a changed fact, correction event, and audit in
-one transaction. An identical save leaves the history unchanged.
-Step 1.3g7 reads the append-only daily correction events only after resolving
-the selected-site fact and the actor's dated band scope. Pages are newest
-first, bounded to 50, and use a signed cursor bound to the site and fact. A
-corrected teaching calendar does not hide a previously issued fact's history.
-Step 1.3g9 gives an authenticated student a bounded view of their own issued
-daily marks through an explicit site route. The service checks the site's
-student portal policy and exactly one active self-link on each read. It rejects
-future dates in the site's timezone, missing timezones, revoked/ended links,
-and other sites with the same not-found response. Only date, status and absence
-reason leave this route; staff identities and correction notes stay private.
-The site portal policy is the current release switch for issued daily marks;
-there is no per-mark publication state. This endpoint does not expose an
-attendance-rate denominator or a parent view.
-Step 1.3g10 gives an authenticated parent a bounded view of one explicitly
-selected child at one explicit site. Every read requires an active guardian
-identity and a current `FULL` legal-access relationship to that non-guest
-child. `LIMITED` and `NONE` relationships do not receive absence reasons or
-marks because the model has no finer-grained attendance disclosure rule. The
-organisation's parent portal switch must also be enabled on each read. A
-disabled switch returns the same not-found response as an inaccessible child.
-The student portal policy applies to student links only; it is not a parent
-release switch. Issued daily facts are available immediately to a full-access
-guardian. Missing, future-starting, ended, revoked and cross-site links use
-the same not-found response. The shared bounded date and response contract
-omits staff identities and correction notes.
-
-Step 1.3g11 presents those scoped records in dedicated family web pages. The
-family shell does not mount staff navigation, role lookup or organisation UI
-requests. The student page takes a site ID and the parent page takes a site and
-child ID from an explicit link; both call the existing guarded API and show
-recorded-day counts without implying an attendance rate. These pages do not
-yet discover a signed-in person's linked sites or children. Navigation from an
-invitation or family landing page remains a separate step.
-
-Step 1.3g12 adds `GET /ace/family/contexts` for a signed-in person. A narrow
-forced-RLS read policy lets the API discover only that person's guardian and
-student identity site IDs without a selected site. Each candidate site is then
-rechecked in a tenant-scoped transaction. A parent context requires the
-organisation's parent portal switch, an active `FULL` guardian relationship,
-and a non-guest child. A student context requires the site's student portal
-policy, exactly one active self-link, and a non-guest child. The response
-contains only context kind, site ID/name and child ID/name. It does not grant
-attendance access: the daily-history routes still recheck their own boundaries
-on every request. The discovery policy adds no table grant to browser database
-roles and no write permission. The read is limited to 100 identity sites per
-kind; an excess fails rather than silently omitting links. The migration must
-be applied before the endpoint can discover contexts in production.
-
-Step 1.3g13 presents the discovered contexts at `/ace/family` in the separate
-family shell. It groups parent and student access, links only to the existing
-guarded attendance pages, and provides sign-in, loading, empty, denied, and
-retry states. Its family-shell navigation never requests staff roles or
-organisation UI. It does not imply that the wider parent and student portal
-journeys are complete.
-
-Step 1.3g14a establishes `ace.attendance.export` as a separate ACE core
-permission before any daily CSV route exists. Organisation heads and site leads
-receive it through their fixed-role templates after the controlled permission
-and role seed; ordinary staff do not. The approved Oasis
-`attendance-exporter` access tag maps only to this key and can be granted only
-when the actor may delegate it. The future export route must still enforce
-current site membership, dated year-band scope for non-leaders, bounded dates
-and rows, tenant RLS, and an audit record. A tag alone cannot widen student or
-site scope. No existing session export route gains this new permission.
-
-Step 1.3g14b adds a daily attendance CSV route using that permission. A
-validated inclusive date range spans at most 31 days and returns at most 5,000
-marked facts; a larger result fails without a partial CSV. Each row requires a
-site-matched, non-guest child enrolled in an academic year and year band on
-that mark date. Tagged staff also need a dated assignment to that year band.
-The route emits a successful export audit event with dates, optional child ID,
-and row count, and guards spreadsheet formula cells. Empty exports retain the
-headers and an audit event. Session attendance exports remain separate.
 
 1. Add a distinct ACE daily attendance fact with `tenantId`, `childId`, a
    site-local `DATE`, status, nullable absence reason, recorder, and server

@@ -20,7 +20,6 @@ const navItemsWithAccess: (SidebarNavItem & {
   access?: AccessRequirement;
   capability?: Capability;
   permission?: PermissionKey;
-  additionalPermission?: PermissionKey;
 })[] = [
   { ...defaultSidebarItems[0], access: "staff-or-admin" }, // Dashboard
   {
@@ -54,7 +53,6 @@ const navItemsWithAccess: (SidebarNavItem & {
   {
     label: "ACE overview",
     href: "/ace",
-    matchMode: "exact",
     iconIndex: 24,
     access: "staff-or-admin",
     permission: "ace.dashboard.read",
@@ -66,14 +64,6 @@ const navItemsWithAccess: (SidebarNavItem & {
     iconIndex: 22,
     access: "staff-or-admin",
     permission: "ace.pace.read",
-    group: "Teaching",
-  },
-  {
-    label: "Academic setup",
-    href: "/ace/settings/academic",
-    iconIndex: 27,
-    access: "staff-or-admin",
-    permission: "ace.settings.read",
     group: "Teaching",
   },
   {
@@ -101,29 +91,11 @@ const navItemsWithAccess: (SidebarNavItem & {
     group: "Schedule",
   }, // Attendance
   {
-    label: "Daily register",
-    href: "/ace/attendance/daily",
-    iconIndex: 28,
-    access: "staff-or-admin",
-    capability: "ace.dashboard.read",
-    permission: "attendance.read",
-    group: "Schedule",
-  },
-  {
     ...defaultSidebarItems[9],
-    access: "staff-or-admin",
+    access: "site-admin-or-higher",
     permission: "notices.read",
     group: "Communication",
-  }, // Shared site notices
-  {
-    label: "Messages",
-    href: "/ace/messages",
-    iconIndex: 26,
-    access: "staff-or-admin",
-    permission: "messaging.conversations.read",
-    additionalPermission: "messaging.messages.read",
-    group: "Communication",
-  },
+  }, // Notices & Announcements (admins only)
   {
     label: "Guest pass",
     href: "/guest-pass",
@@ -197,8 +169,7 @@ export function resolveAdminNavItems({
           currentOrgIsMasterOrg,
         }) &&
         hasCapability(capabilities, item.capability) &&
-        hasPermission(permissions, item.permission) &&
-        hasPermission(permissions, item.additionalPermission),
+        hasPermission(permissions, item.permission),
     )
     .map((item) => ({ ...item, label: orgLabel(ui, item.href, item.label) }));
 }

@@ -26,12 +26,12 @@ ACE core includes PACE, behaviour, homework/evidence, Faith Corner, site reporti
 
 Finance, Clubs, Child Merit Market, and Advanced Reporting remain separate entitlements:
 
-| Product            | Price                  | Status   | Packaging                                                                                          |
-| ------------------ | ---------------------- | -------- | -------------------------------------------------------------------------------------------------- |
-| Clubs              | £12/month or £120/year | Proposed | Global; included for `Vertical.CLUB`; Operations and All Included eligible                         |
-| Child Merit Market | £19/month or £190/year | Proposed | ACE-only; All Included applies only to ACE organisations; licensing gate remains                   |
-| Finance            | £15/month or £150/year | Proposed | Eligible for customer-selected Growth/Professional inclusion; Operations and All Included eligible |
-| Advanced Reporting | £10/month or £100/year | Proposed | Eligible for customer-selected Growth/Professional inclusion; Operations and All Included eligible |
+| Product | Price | Status | Packaging |
+| --- | --- | --- | --- |
+| Clubs | £12/month or £120/year | Proposed | Global; included for `Vertical.CLUB`; Operations and All Included eligible |
+| Child Merit Market | £19/month or £190/year | Proposed | ACE-only; All Included applies only to ACE organisations; licensing gate remains |
+| Finance | £15/month or £150/year | Proposed | Included in Growth and Professional; Operations and All Included eligible |
+| Advanced Reporting | £10/month or £100/year | Proposed | Included in Growth and Professional; Operations and All Included eligible |
 
 No Stripe Product or Price may be created from a Proposed row. Included modules must never be charged again.
 
@@ -52,16 +52,16 @@ AND tenant/RLS policy
 
 The layers have separate inputs and denial reasons:
 
-| Layer                          | Source                                                                                                             | Must not become                               |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| Authentication                 | Auth0/session and trusted request identity                                                                         | a role, entitlement, or tenant selector       |
-| Active membership              | active organisation/site context                                                                                   | proof of a record relationship                |
-| Commercial capability          | `OrgVertical` plus active `OrgModule` records                                                                      | a role label or feature toggle                |
-| Typed permission               | compile-time registry plus fixed-role assignments and active scoped access-tag grants                              | a customer-created executable string          |
-| Included feature               | `OrgFeatureSetting` for included optional features                                                                 | a paid entitlement                            |
-| Relationship/domain assignment | guardian-child, StudentIdentity, active-site record scope, derived Community membership, or scoped lead assignment | a broad role permission                       |
-| Release/visibility             | published/frozen, audience, revocation, field-visibility, and moderation policy                                    | a UI-only check                               |
-| Tenant/RLS                     | trusted org/site context, scoped queries, forced RLS, and strict assertions                                        | a route parameter or application filter alone |
+| Layer | Source | Must not become |
+| --- | --- | --- |
+| Authentication | Auth0/session and trusted request identity | a role, entitlement, or tenant selector |
+| Active membership | active organisation/site context | proof of a record relationship |
+| Commercial capability | `OrgVertical` plus active `OrgModule` records | a role label or feature toggle |
+| Typed permission | compile-time registry plus fixed-role assignments and active scoped access-tag grants | a customer-created executable string |
+| Included feature | `OrgFeatureSetting` for included optional features | a paid entitlement |
+| Relationship/domain assignment | guardian-child, StudentIdentity, active-site record scope, derived Community membership, or scoped lead assignment | a broad role permission |
+| Release/visibility | published/frozen, audience, revocation, field-visibility, and moderation policy | a UI-only check |
+| Tenant/RLS | trusted org/site context, scoped queries, forced RLS, and strict assertions | a route parameter or application filter alone |
 
 Each denial is safe and avoids exposing capability, permission, record, child, or tenant details.
 

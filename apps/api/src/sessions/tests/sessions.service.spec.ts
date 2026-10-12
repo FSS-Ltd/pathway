@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { SessionsService } from "../sessions.service";
-import { prisma as realPrisma, SessionRotaKind } from "@pathway/db";
+import { prisma as realPrisma } from "@pathway/db";
 import type { Prisma } from "@pathway/db";
 
 // Narrow the Prisma shape we use here for strong typing in mocks
@@ -11,18 +11,10 @@ type SessionRow = {
   startsAt: Date;
   endsAt: Date;
   title: string | null;
-  rotaKind: SessionRotaKind;
-  familyPublishedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   groups?: { id: string; name: string }[];
-  lessons?: {
-    id: string;
-    title: string;
-    description: string | null;
-    resourceFileName: string | null;
-    fileKey: string | null;
-  }[];
+  lessons?: { id: string; title: string; description: string | null; resourceFileName: string | null; fileKey: string | null }[];
 };
 
 describe("SessionsService", () => {
@@ -72,8 +64,6 @@ describe("SessionsService", () => {
     startsAt: now,
     endsAt: later,
     title: "Sunday 11am",
-    rotaKind: SessionRotaKind.STANDARD,
-    familyPublishedAt: null,
     createdAt: now,
     updatedAt: now,
     groups: [{ id: ids.group, name: "Kids" }],
@@ -151,22 +141,6 @@ describe("SessionsService", () => {
         },
       });
     });
-
-    it("filters a staff schedule in the database", async () => {
-      sFindMany.mockResolvedValue([]);
-      aGroupBy.mockResolvedValue([]);
-
-      await svc.list({ tenantId: ids.tenant, staffUserId: "staff-1" });
-
-      expect(sFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            tenantId: ids.tenant,
-            assignments: { some: { userId: "staff-1" } },
-          },
-        }),
-      );
-    });
   });
 
   describe("getById", () => {
@@ -222,7 +196,6 @@ describe("SessionsService", () => {
           startsAt: now,
           endsAt: later,
           title: "Sunday 11am",
-          rotaKind: SessionRotaKind.STANDARD,
         },
         ids.tenant,
       );
@@ -235,49 +208,9 @@ describe("SessionsService", () => {
           startsAt: now,
           endsAt: later,
           title: "Sunday 11am",
-          rotaKind: SessionRotaKind.STANDARD,
         },
         include: { groups: { select: { id: true, name: true } } },
       });
-    });
-
-    it("creates a titled cover shift without a class group", async () => {
-      tFindUnique.mockResolvedValue({ id: ids.tenant });
-      sCreate.mockResolvedValue({ ...base, rotaKind: SessionRotaKind.COVER });
-
-      await svc.create(
-        {
-          tenantId: ids.tenant,
-          startsAt: now,
-          endsAt: later,
-          title: "Year 4 cover",
-          rotaKind: SessionRotaKind.COVER,
-        },
-        ids.tenant,
-      );
-      expect(sCreate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            rotaKind: SessionRotaKind.COVER,
-            title: "Year 4 cover",
-          }),
-        }),
-      );
-    });
-
-    it("rejects an untitled meeting shift before writing", async () => {
-      await expect(
-        svc.create(
-          {
-            tenantId: ids.tenant,
-            startsAt: now,
-            endsAt: later,
-            rotaKind: SessionRotaKind.MEETING,
-          },
-          ids.tenant,
-        ),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(sCreate).not.toHaveBeenCalled();
     });
 
     it("rejects when startsAt >= endsAt", async () => {
@@ -321,23 +254,6 @@ describe("SessionsService", () => {
   });
 
   describe("update", () => {
-    it("rejects reclassifying a teaching session as cover", async () => {
-      sFindFirst.mockResolvedValue(base);
-      await expect(
-        svc.update(base.id, { rotaKind: SessionRotaKind.COVER }, ids.tenant),
-      ).rejects.toThrow("Session purpose cannot change after creation");
-      expect(sUpdate).not.toHaveBeenCalled();
-    });
-    it("rejects clearing the title of a cover shift", async () => {
-      sFindFirst.mockResolvedValue({
-        ...base,
-        rotaKind: SessionRotaKind.COVER,
-      });
-      await expect(
-        svc.update(base.id, { title: " " }, ids.tenant),
-      ).rejects.toBeInstanceOf(BadRequestException);
-      expect(sUpdate).not.toHaveBeenCalled();
-    });
     it("updates fields and validates times and group tenant", async () => {
       sFindFirst.mockResolvedValue({
         ...base,
@@ -382,7 +298,11 @@ describe("SessionsService", () => {
       });
       gFindMany.mockResolvedValue([]);
       await expect(
-        svc.update(base.id, { groupIds: [crossTenantGroupId] }, ids.tenant),
+        svc.update(
+          base.id,
+          { groupIds: [crossTenantGroupId] },
+          ids.tenant,
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

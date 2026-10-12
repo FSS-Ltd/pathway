@@ -55,16 +55,6 @@ export class AttendanceController {
     return this.attendanceService.list(tenantId, sessionId);
   }
 
-  @Get("child/:childId")
-  @RequirePermission("attendance.read")
-  async listForChild(
-    @Param("childId") childId: string,
-    @CurrentTenant("tenantId") tenantId: string,
-    @Query("cursor") cursor?: string,
-  ) {
-    return this.attendanceService.listForChild(tenantId, childId, cursor);
-  }
-
   @Get("session-summaries")
   @RequirePermission("attendance.read")
   async getSessionSummaries(

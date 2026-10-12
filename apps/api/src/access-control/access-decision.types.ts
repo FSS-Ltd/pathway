@@ -21,5 +21,4 @@ export interface AccessDecision {
     | "tenant-denied";
   sourceRoleIds: string[];
   sourceTagGrantIds?: string[];
-  sourceSuperUser?: true;
 }

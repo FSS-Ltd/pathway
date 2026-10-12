@@ -40,7 +40,6 @@ import { SummaryStep, type AccountDetails } from "./steps/summary";
 import { VerticalStep } from "./steps/vertical";
 import {
   firstIncompleteStep,
-  includedModuleLimitForState,
   includedModulesForState,
   INITIAL_CONFIGURATOR_STATE,
   nextStep,
@@ -192,7 +191,6 @@ export default function ConfigurePage() {
           ?.eligibleOptionalModules ?? []),
       ]
     : [];
-  const includedModuleLimit = includedModuleLimitForState(state);
   const progressSteps: ConfiguratorProgressStep[] = progressStepsForOrgType(
     state.orgType,
   ).map((step) => ({ id: step, label: STEP_LABELS[step] }));
@@ -264,11 +262,11 @@ export default function ConfigurePage() {
               How pricing works
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-text-muted">
-              Each plan includes a site limit and an allowance for active staff
-              and volunteers. The allowance counts unique staff and volunteers
-              with qualifying activity during the previous 30 days; parent
-              accounts do not count. Storage is the optional usage add-on.
-              Monthly and annual totals are shown before checkout.
+              Each plan includes a site limit and an Active People allowance.
+              Active People are unique staff or volunteers who have qualifying
+              activity during the previous 30 days; parent accounts do not
+              count. Storage is the optional usage add-on. Monthly and annual
+              totals are shown before checkout.
             </p>
           </section>
           {pricingWarning ? (
@@ -368,9 +366,8 @@ export default function ConfigurePage() {
               ) : null}
               {currentStep === "modules" ? (
                 <ModulesStep
+                  includedModules={includedModules}
                   selectedOptionalModules={state.selectedOptionalModules}
-                  selectedIncludedModules={state.selectedIncludedModules}
-                  includedModuleLimit={includedModuleLimit}
                   eligibleOptionalModules={eligibleOptionalModules}
                   frequency={state.frequency}
                   prices={billingPrices.modulePrices}
@@ -403,7 +400,6 @@ export default function ConfigurePage() {
                   vertical={state.vertical}
                   includedModules={includedModules}
                   selectedOptionalModules={state.selectedOptionalModules}
-                  includedModuleLimit={includedModuleLimit}
                   planCode={state.planCode}
                   frequency={state.frequency}
                   storageChoice={state.storageChoice}

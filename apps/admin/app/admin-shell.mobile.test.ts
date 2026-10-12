@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const source = readFileSync(
-  new URL("./admin-shell.tsx", import.meta.url),
-  "utf8",
-);
+const source = readFileSync(new URL("./admin-shell.tsx", import.meta.url), "utf8");
 
 assert.match(
   source,
@@ -45,11 +42,6 @@ assert.match(
   source,
   /setIsMobileNavOpen\(false\)/,
   "mobile navigation can close after route changes or dismissal",
-);
-assert.equal(
-  source.match(/renderLink=\{renderAdminNavLink\}/g)?.length,
-  2,
-  "desktop and mobile sidebars both use client-side links",
 );
 
 console.log("admin-shell mobile navigation checks passed");

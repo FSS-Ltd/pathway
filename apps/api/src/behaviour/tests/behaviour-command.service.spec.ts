@@ -20,7 +20,6 @@ import { BehaviourController } from "../behaviour.controller";
 import {
   behaviourCorrectionSchema,
   behaviourListQuerySchema,
-  createBehaviourBatchSchema,
   createBehaviourEntrySchema,
   type BehaviourCorrectionDto,
   type CreateBehaviourEntryDto,
@@ -96,11 +95,6 @@ function entry(overrides: Partial<Record<string, unknown>> = {}) {
 function transaction() {
   return {
     $executeRaw: jest.fn().mockResolvedValue(0),
-    $queryRaw: jest
-      .fn()
-      .mockResolvedValue([
-        { snapshotAt: new Date("2026-08-12T10:00:00.000Z") },
-      ]),
     tenant: { findFirst: jest.fn() },
     child: { findFirst: jest.fn() },
     behaviourCategory: { aggregate: jest.fn(), findFirst: jest.fn() },
@@ -180,7 +174,7 @@ function arrange(options: { sensitive?: boolean } = {}) {
 describe("behaviour entry boundary", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("uses distinct permissions for recording, correcting, and voiding", () => {
+  it("uses the registered read and record permissions on create, list, and correction routes", () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSION,
@@ -196,27 +190,9 @@ describe("behaviour entry boundary", () => {
     expect(
       Reflect.getMetadata(
         REQUIRED_PERMISSION,
-        BehaviourController.prototype.retractEntry,
-      ),
-    ).toBe("ace.behaviour.policy.manage");
-    expect(
-      Reflect.getMetadata(
-        REQUIRED_PERMISSION,
         BehaviourController.prototype.correctEntry,
       ),
-    ).toBe("ace.behaviour.correct");
-    expect(
-      Reflect.getMetadata(
-        REQUIRED_PERMISSION,
-        BehaviourController.prototype.recordBatch,
-      ),
     ).toBe("ace.behaviour.record");
-    expect(
-      Reflect.getMetadata(
-        REQUIRED_PERMISSION,
-        BehaviourController.prototype.trends,
-      ),
-    ).toBe("ace.behaviour.read");
   });
 
   it("strictly validates bounded commands, queries, and type/delta consistency", () => {
@@ -240,43 +216,6 @@ describe("behaviour entry boundary", () => {
     ]) {
       expect(createBehaviourEntrySchema.safeParse(invalid).success).toBe(false);
     }
-  });
-
-  it("limits batches to 50 resulting facts and distinct learners", () => {
-    const batch = {
-      idempotencyKey: "batch-1",
-      childIds: [childId],
-      occurredAt,
-      entries: [
-        {
-          category: "service",
-          type: "MERIT",
-          visibility: "GENERAL",
-          pointsDelta: 3,
-          reason: "Helped a peer",
-          quantity: 50,
-        },
-      ],
-    };
-    expect(createBehaviourBatchSchema.safeParse(batch).success).toBe(true);
-    expect(
-      createBehaviourBatchSchema.safeParse({
-        ...batch,
-        childIds: [childId, childId],
-      }).success,
-    ).toBe(false);
-    expect(
-      createBehaviourBatchSchema.safeParse({
-        ...batch,
-        entries: [{ ...batch.entries[0], quantity: 51 }],
-      }).success,
-    ).toBe(false);
-    expect(
-      createBehaviourBatchSchema.safeParse({
-        ...batch,
-        childIds: [childId, originalId],
-      }).success,
-    ).toBe(false);
   });
 });
 
@@ -595,7 +534,6 @@ describe("BehaviourCommandService", () => {
         occurredAt: true,
         categoryIsSerious: true,
         correction: { select: { id: true } },
-        retraction: { select: { id: true } },
       },
     });
     expect(tx.behaviourEntry.create).toHaveBeenCalledWith({
@@ -606,45 +544,6 @@ describe("BehaviourCommandService", () => {
       }),
       select: expect.any(Object),
     });
-  });
-
-  it("stores the replacement fact reason separately from the audited correction reason", async () => {
-    const { commandService, tx } = arrange();
-    tx.behaviourEntry.findFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce(
-        entry({ id: originalId, correction: null, retraction: null }),
-      );
-    tx.behaviourEntry.create.mockResolvedValue(
-      entry({ id: "correction-2", correctsBehaviourEntryId: originalId }),
-    );
-
-    await commandService.correct(
-      originalId,
-      correction({
-        reason: "Helped another learner",
-        correctionReason: "The original points were entered incorrectly",
-      }),
-      actor,
-    );
-
-    expect(tx.behaviourEntry.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        reason: "Helped another learner",
-        correctionReason: "The original points were entered incorrectly",
-      }),
-      select: expect.any(Object),
-    });
-    expect(tx.auditEvent.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          metadata: expect.objectContaining({
-            operation: "BEHAVIOUR_ENTRY_CORRECTED",
-            correctsBehaviourEntryId: originalId,
-          }),
-        }),
-      }),
-    );
   });
 
   it("requires sensitive permission when the correction predecessor is sensitive", async () => {
@@ -770,15 +669,6 @@ describe("BehaviourCommandService", () => {
 });
 
 describe("BehaviourQueryService", () => {
-  const previousSigningKey = process.env.INTERNAL_AUTH_SECRET;
-  beforeAll(() => {
-    process.env.INTERNAL_AUTH_SECRET = "behaviour-query-unit-test-key";
-  });
-  afterAll(() => {
-    if (previousSigningKey === undefined)
-      delete process.env.INTERNAL_AUTH_SECRET;
-    else process.env.INTERNAL_AUTH_SECRET = previousSigningKey;
-  });
   beforeEach(() => jest.clearAllMocks());
 
   it("returns only terminal tenant facts through an explicit field allow-list", async () => {
@@ -791,8 +681,6 @@ describe("BehaviourQueryService", () => {
       queryService.list(actor, { childId, limit: 25 }),
     ).resolves.toEqual({
       items: [expect.objectContaining({ id: "entry-1" })],
-      nextCursor: null,
-      canVoid: false,
     });
     expect(tx.behaviourEntry.findMany).toHaveBeenCalledWith({
       where: {
@@ -800,11 +688,9 @@ describe("BehaviourQueryService", () => {
         childId,
         visibility: "GENERAL",
         correction: { is: null },
-        retraction: { is: null },
-        createdAt: { lte: new Date("2026-08-12T10:00:00.000Z") },
       },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
-      take: 26,
+      take: 25,
       select: expect.objectContaining({
         id: true,
         tenantId: false,
@@ -831,8 +717,6 @@ describe("BehaviourQueryService", () => {
         where: {
           tenantId: actor.tenantId,
           correction: { is: null },
-          retraction: { is: null },
-          createdAt: { lte: new Date("2026-08-12T10:00:00.000Z") },
         },
       }),
     );

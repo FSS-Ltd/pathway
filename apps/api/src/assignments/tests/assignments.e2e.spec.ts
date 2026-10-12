@@ -1,5 +1,4 @@
 import request from "supertest";
-import { randomUUID } from "node:crypto";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../../app.module";
@@ -31,7 +30,6 @@ describe("Assignments (e2e)", () => {
     tenant: tenantId as string | undefined,
     group: undefined as undefined | string,
     session: undefined as undefined | string,
-    sessionDate: undefined as undefined | string,
     user: undefined as undefined | string,
     assignment: undefined as undefined | string,
     otherTenant: otherTenantId as string | undefined,
@@ -76,7 +74,6 @@ describe("Assignments (e2e)", () => {
         },
       });
       ids.session = session.id;
-      ids.sessionDate = session.startsAt.toISOString().slice(0, 10);
 
       const user = await tx.user.create({
         data: {
@@ -238,60 +235,6 @@ describe("Assignments (e2e)", () => {
     );
   });
 
-  it("shows active-site staff the team rota without cross-site or child data", async () => {
-    if (!app || !ids.user || !ids.assignment || !ids.sessionDate) return;
-    const staff = await seedE2eAuthUser({
-      subject: `team-staff-${randomUUID()}`,
-      userId: ids.user,
-      tenantId,
-      siteRole: "STAFF",
-    });
-    const viewer = await seedE2eAuthUser({
-      subject: `team-viewer-${randomUUID()}`,
-      tenantId,
-      siteRole: "VIEWER",
-    });
-    const path = `/assignments/team-schedule?dateFrom=${ids.sessionDate}&dateTo=${ids.sessionDate}`;
-    try {
-      const response = await request(app.getHttpServer())
-        .get(path)
-        .set("Authorization", staff.authorization);
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            assignmentId: ids.assignment,
-            staffId: ids.user,
-            staffName: "Teacher Test",
-          }),
-        ]),
-      );
-      expect(
-        response.body.some(
-          (row: { assignmentId: string }) =>
-            row.assignmentId === ids.otherAssignment,
-        ),
-      ).toBe(false);
-      expect(JSON.stringify(response.body)).not.toMatch(
-        /child|attendance|email/i,
-      );
-
-      const denied = await request(app.getHttpServer())
-        .get(path)
-        .set("Authorization", viewer.authorization);
-      expect(denied.status).toBe(403);
-
-      const invalid = await request(app.getHttpServer())
-        .get("/assignments/team-schedule?dateFrom=2026-10-05&dateTo=2026-10-13")
-        .set("Authorization", staff.authorization);
-      expect(invalid.status).toBe(400);
-    } finally {
-      await clearE2eAuthAccess(staff.userId);
-      await clearE2eAuthAccess(viewer.userId);
-      await prisma.user.deleteMany({ where: { id: viewer.userId } });
-    }
-  });
-
   it("PATCH /assignments/:id should update status to DECLINED", async () => {
     if (!app) return;
     const res = await request(app.getHttpServer())
@@ -337,34 +280,5 @@ describe("Assignments (e2e)", () => {
       .set("Authorization", authHeader);
 
     expect(res.status).toBe(404);
-  });
-
-  it("limits a staff member to their own assignments", async () => {
-    if (!app || !ids.user || !ids.assignment) return;
-    const staff = await seedE2eAuthUser({
-      subject: `assignments-staff-${randomUUID()}`,
-      userId: ids.user,
-      tenantId,
-      siteRole: "STAFF",
-    });
-    try {
-      const own = await request(app.getHttpServer())
-        .get(`/assignments/${ids.assignment}`)
-        .set("Authorization", staff.authorization);
-      expect(own.status).toBe(200);
-
-      const other = await request(app.getHttpServer())
-        .get(`/assignments/${ids.otherAssignment}`)
-        .set("Authorization", staff.authorization);
-      expect(other.status).toBe(404);
-
-      const create = await request(app.getHttpServer())
-        .post("/assignments")
-        .set("Authorization", staff.authorization)
-        .send({ sessionId: ids.session, userId: ids.user, role: Role.TEACHER });
-      expect(create.status).toBe(403);
-    } finally {
-      await clearE2eAuthAccess(staff.userId);
-    }
   });
 });

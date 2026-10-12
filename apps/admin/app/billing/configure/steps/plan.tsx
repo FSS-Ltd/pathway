@@ -49,9 +49,6 @@ export function PlanStep({
         <p className="text-text-muted">
           Upgrade to the capacity your organisation needs today.
         </p>
-        <p className="text-sm text-text-muted">
-          The allowance counts unique staff and volunteers with qualifying activity during the previous 30 days. Parent accounts do not count.
-        </p>
       </div>
       <div
         role="group"
@@ -97,8 +94,8 @@ export function PlanStep({
                     ) : null}
                   </span>
                   <span className="mt-1 block text-sm text-text-muted">
-                    Up to {plan.av30Included?.toLocaleString("en-GB")} active
-                    staff and volunteers · {plan.maxSitesIncluded}{" "}
+                    Up to {plan.av30Included?.toLocaleString("en-GB")} Active
+                    People · {plan.maxSitesIncluded}{" "}
                     {plan.maxSitesIncluded === 1 ? "site" : "sites"}
                   </span>
                 </span>

@@ -63,24 +63,6 @@ function getBillingSource(metadata: unknown): string | null {
   return typeof billingSource === "string" ? billingSource : null;
 }
 
-function getGrantSources(metadata: unknown): Array<{ source: string; sourceId: string }> {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return [];
-  const record = metadata as Record<string, unknown>;
-  if (Array.isArray(record.grantSources)) {
-    return record.grantSources.filter((grant): grant is { source: string; sourceId: string } =>
-      !!grant && typeof grant === "object" &&
-      typeof grant.source === "string" && typeof grant.sourceId === "string",
-    );
-  }
-  if (typeof record.subscriptionId === "string") {
-    return [{
-      source: record.entitlementSource === "plan" ? "PLAN" : "PAID_ADDON",
-      sourceId: record.subscriptionId,
-    }];
-  }
-  return [];
-}
-
 @UseGuards(AuthUserGuard)
 @Controller("platform")
 export class PlatformController {
@@ -118,7 +100,6 @@ export class PlatformController {
       modules: modules.map(({ metadata, ...module }) => ({
         ...module,
         billingSource: getBillingSource(metadata),
-        grantSources: getGrantSources(metadata),
       })),
     };
   }

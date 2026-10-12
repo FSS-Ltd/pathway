@@ -11,10 +11,8 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { prisma, OrgRole, SiteRole } from "@pathway/db";
-import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
 import { AuthUserGuard } from "./auth-user.guard";
 import { UserRolesService } from "./user-roles.service";
-import { listStudentActiveSites } from "./student-active-sites";
 
 interface AuthenticatedRequest extends Request {
   authUserId?: string;
@@ -49,21 +47,17 @@ export class ActiveSiteController {
   ) {}
 
   @UseGuards(AuthUserGuard)
-  @IndependentTransaction()
   @Get()
-  async getActiveSite(
-    @Req() req: AuthenticatedRequest,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async getActiveSite(@Req() req: AuthenticatedRequest) {
     const userId = req.authUserId;
-
+    
     if (!userId) {
       throw new UnauthorizedException("Missing authenticated user");
     }
-
+    
     // Get user's accessible sites
     const sites = await this.listSitesForUser(userId);
-
+    
     // Get user's last active tenant
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -84,13 +78,8 @@ export class ActiveSiteController {
         });
       }
     }
-
-    const selectedSite = sites.find((site) => site.id === activeSiteId);
-    this.setActiveSiteCookies(res, {
-      siteId: selectedSite?.id ?? null,
-      orgId: selectedSite?.orgId ?? null,
-    });
-    return { activeSiteId: selectedSite?.id ?? null, sites };
+    
+    return { activeSiteId: activeSiteId ?? null, sites };
   }
 
   private async listSitesForUser(userId: string): Promise<SiteSummary[]> {
@@ -106,22 +95,6 @@ export class ActiveSiteController {
     const orgMemberships = await prisma.orgMembership.findMany({
       where: { userId, role: { in: ORG_ADMIN_ROLES } },
     });
-
-    const guardianRelationships =
-      await prisma.guardianChildRelationship.findMany({
-        where: {
-          guardianIdentity: { userId, user: { isActive: true } },
-          legalAccess: "FULL",
-          startsAt: { lte: new Date() },
-          endedAt: null,
-          revokedAt: null,
-          child: { isGuest: false },
-          tenant: { org: { parentPortalEnabled: true } },
-        },
-        select: { tenant: { include: { org: true } } },
-      });
-
-    const studentSites = await listStudentActiveSites(userId);
 
     const orgTenantIds =
       orgMemberships.length > 0
@@ -150,24 +123,6 @@ export class ActiveSiteController {
         role: SiteRole.SITE_ADMIN,
         timezone: tenant.timezone ?? null,
       })),
-      ...guardianRelationships.map<SiteSummary>(({ tenant }) => ({
-        id: tenant.id,
-        name: tenant.name,
-        orgId: tenant.orgId,
-        orgName: tenant.org.name,
-        orgSlug: tenant.org.slug,
-        role: null,
-        timezone: tenant.timezone ?? null,
-      })),
-      ...studentSites.map<SiteSummary>((site) => ({
-        id: site.id,
-        name: site.name,
-        orgId: site.orgId,
-        orgName: site.org.name,
-        orgSlug: site.org.slug,
-        role: null,
-        timezone: site.timezone ?? null,
-      })),
     ];
 
     // De-dupe by tenantId
@@ -178,15 +133,13 @@ export class ActiveSiteController {
       }
     });
 
-    return Array.from(seen.values()).sort(
-      (a, b) =>
-        (a.orgName ?? "").localeCompare(b.orgName ?? "") ||
-        a.name.localeCompare(b.name),
+    return Array.from(seen.values()).sort((a, b) =>
+      (a.orgName ?? "").localeCompare(b.orgName ?? "") ||
+      a.name.localeCompare(b.name),
     );
   }
 
   @UseGuards(AuthUserGuard)
-  @IndependentTransaction()
   @Post()
   async setActiveSite(
     @Req() req: AuthenticatedRequest,
@@ -215,7 +168,7 @@ export class ActiveSiteController {
 
     const result = { activeSiteId: body.siteId, sites };
     const selectedSite = sites.find((s) => s.id === body.siteId);
-
+    
     this.setActiveSiteCookies(res, {
       siteId: body.siteId,
       orgId: selectedSite?.orgId ?? null,

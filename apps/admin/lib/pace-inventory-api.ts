@@ -1,6 +1,5 @@
 import {
   API_BASE_URL,
-  apiFetch,
   buildAuthHeaders,
   isUsingMockApi,
   paceRequestError,
@@ -74,7 +73,7 @@ export async function advancePaceInventoryOrder(
       "Physical PACE inventory changes are not available in mock mode.",
     );
   }
-  const response = await apiFetch(
+  const response = await fetch(
     `${API_BASE_URL}/ace/pace/inventory/orders/${encodeURIComponent(orderId)}/status`,
     {
       method: "PATCH",
@@ -109,16 +108,13 @@ async function writeInventoryBatch<T>(
       "Physical PACE inventory changes are not available in mock mode.",
     );
   }
-  const response = await apiFetch(
-    `${API_BASE_URL}/ace/pace/inventory/${view}`,
-    {
-      method: "POST",
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-      body: JSON.stringify(input),
-    },
-  );
+  const response = await fetch(`${API_BASE_URL}/ace/pace/inventory/${view}`, {
+    method: "POST",
+    headers: buildAuthHeaders(),
+    credentials: "include",
+    cache: "no-store",
+    body: JSON.stringify(input),
+  });
   if (!response.ok) throw await paceRequestError(response);
   return response.json() as Promise<T>;
 }
@@ -166,7 +162,7 @@ async function requestInventoryPage<T>(
   const params = new URLSearchParams({ limit: "50" });
   if (query.attentionOnly) params.set("attentionOnly", query.attentionOnly);
   if (query.cursor) params.set("cursor", query.cursor);
-  const response = await apiFetch(
+  const response = await fetch(
     `${API_BASE_URL}/ace/pace/inventory/${view}?${params.toString()}`,
     {
       headers: buildAuthHeaders(),

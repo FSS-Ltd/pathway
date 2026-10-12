@@ -4,16 +4,17 @@ import React from "react";
 import ReactDOM from "react-dom";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "@/lib/use-session-compat";
 import { ArrowLeft, Plus, User } from "lucide-react";
 import { Badge, Button, Card, Input, Label, Select, Textarea } from "@pathway/ui";
 import { Checkbox } from "../../../components/ui/checkbox";
 import { ProfileHeaderCard } from "../../../components/profile-header-card";
-import { GuardianAccessReviewCard } from "../../../components/parents/guardian-access-review-card";
 import { canAccessSafeguardingAdmin } from "../../../lib/access";
 import { useAdminAccess } from "../../../lib/use-admin-access";
 import {
   AdminParentDetail,
   fetchParentById,
+  fetchChildren,
   updateParent,
   createChild,
   type UpdateParentPayload,
@@ -64,15 +65,21 @@ export default function ParentDetailPage() {
     photoContentType: "",
     pickupPermissions: "",
   });
+  const { data: session } = useSession();
   const { role, isLoading: isLoadingAccess } = useAdminAccess();
-  const canAddChildren = role.isOrgAdmin;
+  const currentUserId = (session?.user as { id?: string })?.id ?? null;
+  const isViewingSelf = !!currentUserId && currentUserId === parentId;
+  const canAddChildren = isViewingSelf || role.isOrgAdmin;
 
   const load = React.useCallback(async () => {
     setIsLoading(true);
     setError(null);
     setNotFound(false);
     try {
-      const parentResult = await fetchParentById(parentId);
+      const [parentResult, childrenRes] = await Promise.all([
+        fetchParentById(parentId),
+        fetchChildren().catch(() => []),
+      ]);
       setParent(parentResult);
       if (!parentResult) {
         setNotFound(true);
@@ -80,7 +87,12 @@ export default function ParentDetailPage() {
         setDisplayName(parentResult.fullName ?? "");
         setChildIds(parentResult.children?.map((c) => c.id) ?? []);
       }
-      setChildren(parentResult?.children ?? []);
+      setChildren(
+        (Array.isArray(childrenRes) ? childrenRes : []).map((c) => ({
+          id: c.id,
+          fullName: c.fullName || "Child",
+        })),
+      );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to load parent";
@@ -373,10 +385,6 @@ export default function ParentDetailPage() {
               Child links respect role and tenant access.
             </p>
           </Card>
-
-          {!isLoadingAccess && role.isOrgAdmin ? (
-            <GuardianAccessReviewCard key={parentId} parentId={parentId} />
-          ) : null}
 
           {addChildModalOpen &&
             typeof document !== "undefined" &&

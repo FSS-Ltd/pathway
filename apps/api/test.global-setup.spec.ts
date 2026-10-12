@@ -44,8 +44,17 @@ describe("configureCiRlsRole", () => {
       statements.push(statement.trim());
     });
 
-    expect(statements).toHaveLength(69);
+    expect(statements).toHaveLength(60);
     expect(statements[0]).toContain('CREATE ROLE "pathway_e2e_rls"');
+    expect(statements[18]).toContain(
+      'CREATE ROLE "pathway_e2e_outbox_denied"',
+    );
+    expect(statements[36]).toContain(
+      'CREATE ROLE "pathway_e2e_audit_denied"',
+    );
+    expect(statements[54]).toContain(
+      'CREATE ROLE "pathway_e2e_tenant_rls"',
+    );
     expect(statements).toEqual(
       expect.arrayContaining([
         'REVOKE ALL PRIVILEGES ON SCHEMA app FROM "pathway_e2e_rls";',
@@ -55,7 +64,6 @@ describe("configureCiRlsRole", () => {
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRolePermission" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "UserRoleAssignment" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE ON TABLE "AccessTagGrant" TO "pathway_e2e_rls";',
-        'GRANT SELECT, INSERT, UPDATE ON TABLE "AccessTagExclusion" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "OrgRoleRevision" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT ON TABLE "AuditEvent" TO "pathway_e2e_rls";',
         'GRANT SELECT, INSERT ON TABLE "OutboxEvent" TO "pathway_e2e_rls";',
@@ -65,13 +73,9 @@ describe("configureCiRlsRole", () => {
         'GRANT SELECT ON TABLE "SiteMembership" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgVertical" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgModule" TO "pathway_e2e_rls";',
-        'GRANT SELECT ON TABLE "OrgChildIdentity", "OrgChildSiteLink", "EnrolmentRevision", "EnrolmentRollConfirmation" TO "pathway_e2e_rls";',
-        'GRANT SELECT ON TABLE "InstitutionalBillingPolicy", "InstitutionalBillingSnapshot", "InstitutionalQuoteAcceptance" TO "pathway_e2e_rls";',
         'GRANT "pathway_e2e_rls" TO "pathway_test_user";',
-        expect.stringContaining('CREATE ROLE "pathway_e2e_outbox_denied"'),
         'GRANT SELECT ON TABLE "OutboxEvent" TO "pathway_e2e_outbox_denied";',
         'GRANT "pathway_e2e_outbox_denied" TO "pathway_test_user";',
-        expect.stringContaining('CREATE ROLE "pathway_e2e_audit_denied"'),
         'GRANT SELECT ON TABLE "AuditEvent" TO "pathway_e2e_audit_denied";',
         'GRANT SELECT, INSERT ON TABLE "OutboxEvent" TO "pathway_e2e_audit_denied";',
         'GRANT "pathway_e2e_audit_denied" TO "pathway_test_user";',

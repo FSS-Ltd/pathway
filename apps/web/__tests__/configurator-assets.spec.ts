@@ -197,7 +197,7 @@ describe("configurator imagery and motion contract", () => {
     );
 
     expect(stage).not.toContain("getImageProps");
-    expect(stage).not.toContain('rel = "preload"');
+    expect(stage).not.toContain("rel = \"preload\"");
     expect(stage).toContain('sizes="(min-width: 1024px) 19vw, 24vw"');
     expect(catalogue).toContain("CONFIGURATOR_BACKDROP_SIZES");
     expect(catalogue).toContain("CONFIGURATOR_OBJECT_SIZES");
@@ -366,7 +366,6 @@ describe("configurator imagery and motion contract", () => {
       orgType: "CHURCH",
       vertical: "CHURCH",
       planCode: "GROWTH_99_MONTHLY",
-      selectedIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
       selectedOptionalModules: ["LEARNING"],
       storageChoice: "200",
     });

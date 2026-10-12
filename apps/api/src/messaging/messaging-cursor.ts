@@ -5,17 +5,9 @@ interface ConversationCursor {
   id: string;
 }
 
-export type ConversationView =
-  | "staff-conversations"
-  | "school-team-conversations";
-
-function scopeFor(
-  tenantId: string,
-  userId: string,
-  view: ConversationView,
-): string {
+function scopeFor(tenantId: string, userId: string): string {
   return createHash("sha256")
-    .update(JSON.stringify({ tenantId, userId, view }))
+    .update(JSON.stringify({ tenantId, userId, view: "staff-conversations" }))
     .digest("base64url");
 }
 
@@ -23,13 +15,12 @@ export function encodeConversationCursor(
   cursor: ConversationCursor,
   tenantId: string,
   userId: string,
-  view: ConversationView = "staff-conversations",
 ): string {
   return Buffer.from(
     JSON.stringify({
       updatedAt: cursor.updatedAt.toISOString(),
       id: cursor.id,
-      scope: scopeFor(tenantId, userId, view),
+      scope: scopeFor(tenantId, userId),
     }),
   ).toString("base64url");
 }
@@ -38,7 +29,6 @@ export function decodeConversationCursor(
   encoded: string,
   tenantId: string,
   userId: string,
-  view: ConversationView = "staff-conversations",
 ): ConversationCursor {
   const value: unknown = JSON.parse(
     Buffer.from(encoded, "base64url").toString("utf8"),
@@ -57,7 +47,7 @@ export function decodeConversationCursor(
     !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
       value.id,
     ) ||
-    value.scope !== scopeFor(tenantId, userId, view)
+    value.scope !== scopeFor(tenantId, userId)
   ) {
     throw new Error("Invalid conversation cursor");
   }

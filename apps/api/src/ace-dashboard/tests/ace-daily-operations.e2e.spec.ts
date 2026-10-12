@@ -79,7 +79,6 @@ describe("ACE dashboard daily operations", () => {
         "ace.pace.correct",
         "ace.behaviour.policy.manage",
         "ace.behaviour.record",
-        "ace.behaviour.correct",
         "attendance.manage",
         "ace.dashboard.read",
       ],
@@ -173,9 +172,6 @@ describe("ACE dashboard daily operations", () => {
             where: { tenantId: fixture!.tenantId },
           });
           await tx.studentSubjectEnrollment.deleteMany({
-            where: { tenantId: fixture!.tenantId },
-          });
-          await tx.behaviourReviewRequest.deleteMany({
             where: { tenantId: fixture!.tenantId },
           });
           await tx.behaviourEntry.deleteMany({

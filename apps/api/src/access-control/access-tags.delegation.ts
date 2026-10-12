@@ -167,7 +167,7 @@ async function readActorPermissionKeys(
           { scope: "site" as const, tenantId: actor.tenantId },
         ]
       : [{ scope: "organisation" as const, tenantId: null }];
-  const [assignments, tags, exclusions] = await Promise.all([
+  const [assignments, tags] = await Promise.all([
     tx.userRoleAssignment.findMany({
       where: {
         orgId: actor.orgId,
@@ -200,15 +200,6 @@ async function readActorPermissionKeys(
       },
       select: { tagKey: true },
     }),
-    tx.accessTagExclusion.findMany({
-      where: {
-        orgId: actor.orgId,
-        userId: actor.userId,
-        revokedAt: null,
-        OR: allowedTagScopes,
-      },
-      select: { tagKey: true },
-    }),
   ]);
   const roleKeys = assignments.flatMap((assignment) =>
     assignment.roleDefinition.permissions
@@ -219,14 +210,7 @@ async function readActorPermissionKeys(
     const publicKey = fromStoredAccessTagKey(tagKey);
     return accessTagPermissionKeys(publicKey);
   });
-  const excludedKeys = new Set(
-    exclusions.flatMap(({ tagKey }) =>
-      accessTagPermissionKeys(fromStoredAccessTagKey(tagKey)),
-    ),
-  );
-  return [...new Set([...roleKeys, ...tagKeys])].filter(
-    (key) => !excludedKeys.has(key),
-  );
+  return [...new Set([...roleKeys, ...tagKeys])];
 }
 
 function isPermissionKey(key: string): key is PermissionKey {

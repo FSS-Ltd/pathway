@@ -8,9 +8,8 @@ import { useSession } from "@/lib/use-session-compat";
 import { Menu, X, LifeBuoy } from "lucide-react";
 import { APP_VERSION } from "@pathway/util/version";
 import { TopBarActions } from "@/components/topbar-actions";
-import { SidebarNav, TopBar, type SidebarNavProps } from "@pathway/ui";
+import { SidebarNav, TopBar } from "@pathway/ui";
 import { useAdminAccess } from "@/lib/use-admin-access";
-import { useAdminContext } from "@/lib/admin-context";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { useOrgUi } from "@/lib/use-org-ui";
 import { orgLabel } from "@/lib/org-ui";
@@ -20,7 +19,8 @@ import { resolveAdminNavItems } from "./admin-navigation";
 const getDevRuntimeState = () => {
   // Check if we have any API URL configured (supports both old and new env var names)
   const hasApiUrl = Boolean(
-    process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL,
+    process.env.NEXT_PUBLIC_API_URL || 
+    process.env.NEXT_PUBLIC_API_BASE_URL
   );
   const isMockApi = !hasApiUrl;
   return { isMockApi };
@@ -36,13 +36,8 @@ const titleMap: Record<string, string> = {
   "/parents": "Parents & Guardians",
   "/lessons": "Lessons",
   "/learning": "Learning",
-  "/ace": "ACE overview",
   "/ace/pace": "PACE workflow",
-  "/ace/pace/inventory": "PACE inventory",
   "/ace/behaviour": "Behaviour capture",
-  "/ace/messages": "Messages",
-  "/ace/settings/academic": "Academic setup",
-  "/ace/attendance/daily": "Daily register",
   "/classes": "Classes",
   "/sessions": "Sessions & Rota",
   "/my-schedule": "My schedule",
@@ -70,10 +65,6 @@ const resolveTitle = (path: string): string => {
   return titleMap[topSegment] ?? "Admin";
 };
 
-const renderAdminNavLink: NonNullable<SidebarNavProps["renderLink"]> = (
-  props,
-) => <Link {...props} />;
-
 type AdminBrandLinkProps = {
   isCollapsed?: boolean;
   onClick?: () => void;
@@ -83,13 +74,7 @@ type AdminBrandLinkProps = {
 
 // Plain <img> (not next/image): logoUrl is a per-org Supabase URL not known at build
 // time, and the admin app has no images.remotePatterns configured for it.
-const BrandMark = ({
-  logoUrl,
-  alt,
-}: {
-  logoUrl?: string | null;
-  alt: string;
-}) => {
+const BrandMark = ({ logoUrl, alt }: { logoUrl?: string | null; alt: string }) => {
   const [broken, setBroken] = React.useState(false);
   React.useEffect(() => setBroken(false), [logoUrl]);
 
@@ -124,10 +109,7 @@ type FeedbackNavLinkProps = {
 
 // Filled colored badge (vs. every other sidebar item's bare outline glyph) so this
 // support/feedback entry point reads as visually distinct at a glance.
-const FeedbackNavLink = ({
-  isCollapsed = false,
-  isActive,
-}: FeedbackNavLinkProps) => (
+const FeedbackNavLink = ({ isCollapsed = false, isActive }: FeedbackNavLinkProps) => (
   <Link
     href="/feedback"
     title={isCollapsed ? "Feedback" : undefined}
@@ -146,9 +128,7 @@ const FeedbackNavLink = ({
 
 const AppVersionTag = ({ isCollapsed = false }: { isCollapsed?: boolean }) =>
   isCollapsed ? null : (
-    <span className="block px-3 pt-2 text-xs text-text-muted">
-      v{APP_VERSION}
-    </span>
+    <span className="block px-3 pt-2 text-xs text-text-muted">v{APP_VERSION}</span>
   );
 
 const AdminBrandLink = ({
@@ -188,7 +168,6 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   const title = orgLabel(ui, pathname, resolveTitle(pathname));
   const { isMockApi } = getDevRuntimeState();
   const { data: session } = useSession();
-  const { state: adminState, retry: retryAdminContext } = useAdminContext();
 
   // Only show mock banner if truly in mock mode
   const showMockBanner = isMockApi;
@@ -199,10 +178,11 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
     currentOrgIsMasterOrg,
     capabilities,
     permissions,
+    error: accessError,
     warning: accessWarning,
   } = useAdminAccess();
 
-  // Org's white-label logo comes from the shared admin context.
+  // Org's white-label logo for the day-to-day brand swap, from OrgUiProvider.
   // Stays null pre-auth (login/accept-invite before sign-in), so those screens
   // keep the Nexsteps mark.
 
@@ -271,9 +251,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
   );
 
   if (isAuthRoute) {
-    return (
-      <div className="min-h-screen bg-shell text-text-primary">{children}</div>
-    );
+    return <div className="min-h-screen bg-shell text-text-primary">{children}</div>;
   }
 
   return (
@@ -292,21 +270,12 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
           className="hidden lg:flex"
           items={visibleNavItems}
           currentPath={pathname}
-          renderLink={renderAdminNavLink}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          header={
-            <AdminBrandLink
-              isCollapsed={isSidebarCollapsed}
-              logoUrl={orgLogoUrl}
-            />
-          }
+          header={<AdminBrandLink isCollapsed={isSidebarCollapsed} logoUrl={orgLogoUrl} />}
           footer={
             <>
-              <FeedbackNavLink
-                isCollapsed={isSidebarCollapsed}
-                isActive={isFeedbackActive}
-              />
+              <FeedbackNavLink isCollapsed={isSidebarCollapsed} isActive={isFeedbackActive} />
               <AppVersionTag isCollapsed={isSidebarCollapsed} />
             </>
           }
@@ -343,43 +312,17 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
                   Running in mock API mode - some data is sample only.
                 </div>
               )}
+              {accessError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-900">
+                  Role lookup failed: {accessError}
+                </div>
+              )}
               {accessWarning && (
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-                  {accessWarning}
+                  Role lookup warning: {accessWarning}
                 </div>
               )}
-              {adminState.status === "ready" ? (
-                <React.Fragment
-                  key={`${adminState.snapshot.userId}:${adminState.snapshot.activeSiteId}`}
-                >
-                  {children}
-                </React.Fragment>
-              ) : adminState.status === "error" ? (
-                <div
-                  role="alert"
-                  className="rounded-md border border-status-danger/30 bg-status-danger/10 p-4"
-                >
-                  <p>{adminState.message}</p>
-                  <button
-                    type="button"
-                    onClick={() => void retryAdminContext()}
-                    className="mt-2 underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : adminState.status === "no-active-site" ? (
-                <p>Select a site from the menu to continue.</p>
-              ) : adminState.status === "unauthenticated" ? (
-                <p>
-                  <Link href="/login" className="text-accent-strong underline">
-                    Sign in
-                  </Link>{" "}
-                  to continue.
-                </p>
-              ) : (
-                <p role="status">Loading your admin context…</p>
-              )}
+              {children}
             </div>
           </main>
         </div>
@@ -417,7 +360,6 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               className="!h-full !w-full border-r-0 shadow-none"
               items={visibleNavItems}
               currentPath={pathname}
-              renderLink={renderAdminNavLink}
               header={null}
               footer={
                 <>

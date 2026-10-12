@@ -16,7 +16,6 @@ interface AuthenticatedRequest extends Request {
   authUserId?: string;
   authEmail?: string;
   authDisplayName?: string;
-  authIsSuperUser?: boolean;
   [key: string]: unknown;
 }
 
@@ -76,7 +75,6 @@ export class AuthUserGuard implements CanActivate {
     req.authUserId = user.id;
     req.authEmail = user.email ?? principal.email ?? undefined;
     req.authDisplayName = user.displayName ?? user.name ?? undefined;
-    req.authIsSuperUser = user.superUser && user.isActive;
 
     // Determine active tenant from cookie or user's lastActiveTenantId
     const cookieTenantId = req.cookies?.pw_active_site_id;
@@ -217,7 +215,6 @@ export class AuthUserGuard implements CanActivate {
     const pathwayContext = {
       user: {
         userId: user.id,
-        isSuperUser: user.superUser && user.isActive,
         email: user.email ?? principal.email ?? undefined,
         givenName: user.displayName ?? user.name ?? undefined,
         familyName: undefined,

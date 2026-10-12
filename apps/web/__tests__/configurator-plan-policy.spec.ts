@@ -1,7 +1,6 @@
 import {
   CONFIGURATOR_MODULE_CODES,
   getConfiguratorPlanPolicy,
-  isConfiguratorModuleReady,
 } from "@pathway/pricing";
 
 const allModules = [
@@ -15,7 +14,6 @@ const allModules = [
   "ADVANCED_REPORTING",
   "LEARNING",
 ] as const;
-const optionalModules = allModules.filter((module) => module !== "LEARNING");
 
 describe("configurator plan policy", () => {
   it("publishes the complete eligible module catalogue as an immutable list", () => {
@@ -23,42 +21,41 @@ describe("configurator plan policy", () => {
     expect(Object.isFrozen(CONFIGURATOR_MODULE_CODES)).toBe(true);
   });
 
-  it("keeps all optional modules unavailable until launch readiness is approved", () => {
-    expect(optionalModules.every((module) => !isConfiguratorModuleReady(module))).toBe(true);
-    expect(isConfiguratorModuleReady("LEARNING")).toBe(false);
-  });
-
   it.each(["STARTER_49_MONTHLY", "STARTER_49_YEARLY"])(
-    "%s has no included allowance and exposes every module as optional",
+    "%s includes no modules and exposes every module as optional",
     (planCode) => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
-        includedModuleLimit: 0,
-        eligibleOptionalModules: optionalModules,
+        includedModules: [],
+        eligibleOptionalModules: allModules,
       });
     },
   );
 
   it.each(["GROWTH_99_MONTHLY", "GROWTH_99_YEARLY"])(
-    "%s allows three customer-chosen included modules and paid extras",
+    "%s includes the Growth module bundle",
     (planCode) => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
-        includedModuleLimit: 3,
-        eligibleOptionalModules: optionalModules,
-        legacyIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
+        includedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
+        eligibleOptionalModules: [
+          "TRANSPORT",
+          "MEALS",
+          "ASSET_MANAGEMENT",
+          "HR",
+          "AI_WORKSPACE",
+          "LEARNING",
+        ],
       });
     },
   );
 
   it.each(["PROFESSIONAL_149_MONTHLY", "PROFESSIONAL_149_YEARLY"])(
-    "%s allows six customer-chosen included modules and paid extras",
+    "%s includes the Professional module bundle",
     (planCode) => {
       expect(getConfiguratorPlanPolicy(planCode)).toMatchObject({
         outcome: "checkout",
-        includedModuleLimit: 6,
-        eligibleOptionalModules: optionalModules,
-        legacyIncludedModules: [
+        includedModules: [
           "FINANCE",
           "EVENTS",
           "ADVANCED_REPORTING",
@@ -66,6 +63,7 @@ describe("configurator plan policy", () => {
           "ASSET_MANAGEMENT",
           "AI_WORKSPACE",
         ],
+        eligibleOptionalModules: ["TRANSPORT", "MEALS", "LEARNING"],
       });
     },
   );
@@ -73,9 +71,8 @@ describe("configurator plan policy", () => {
   it("routes Enterprise plans to contact without modules", () => {
     expect(getConfiguratorPlanPolicy("ENTERPRISE_CONTACT")).toEqual({
       outcome: "contact",
-      includedModuleLimit: 0,
+      includedModules: [],
       eligibleOptionalModules: [],
-      legacyIncludedModules: [],
       contactPath: "/demo?plan=enterprise",
     });
   });
@@ -92,9 +89,8 @@ describe("configurator plan policy", () => {
   ])("preserves %s as a no-bundle legacy checkout plan", (planCode) => {
     expect(getConfiguratorPlanPolicy(planCode)).toEqual({
       outcome: "checkout",
-      includedModuleLimit: 0,
-      eligibleOptionalModules: optionalModules,
-      legacyIncludedModules: [],
+      includedModules: [],
+      eligibleOptionalModules: allModules,
     });
   });
 
@@ -111,12 +107,16 @@ describe("configurator plan policy", () => {
     "PROFESSIONAL_149_MONTHLY",
     "ENTERPRISE_CONTACT",
     "CORE_MONTHLY",
-  ])("keeps %s policy and eligible modules immutable", (planCode) => {
+  ])("keeps %s included and optional modules disjoint and immutable", (planCode) => {
     const policy = getConfiguratorPlanPolicy(planCode);
 
     expect(policy).toBeDefined();
-    expect(Object.isFrozen(policy)).toBe(true);
+    expect(Object.isFrozen(policy!.includedModules)).toBe(true);
     expect(Object.isFrozen(policy!.eligibleOptionalModules)).toBe(true);
-    expect(Object.isFrozen(policy!.legacyIncludedModules)).toBe(true);
+    expect(
+      policy!.includedModules.some((module) =>
+        policy!.eligibleOptionalModules.includes(module),
+      ),
+    ).toBe(false);
   });
 });

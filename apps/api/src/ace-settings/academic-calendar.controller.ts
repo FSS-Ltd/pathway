@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Get,
-  Inject,
   Post,
   UseGuards,
 } from "@nestjs/common";
@@ -19,9 +18,7 @@ import { createAcademicYearSchema } from "./dto/academic-calendar.dto";
 @Controller("ace")
 export class AcademicCalendarController {
   constructor(
-    @Inject(AcademicCalendarService)
     private readonly service: AcademicCalendarService,
-    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 

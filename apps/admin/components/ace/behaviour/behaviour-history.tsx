@@ -1,18 +1,12 @@
 "use client";
 
 import React from "react";
-import { Button } from "@pathway/ui";
+import { Button, Label } from "@pathway/ui";
 import type {
-  AdminBehaviourCategory,
-  AdminBehaviourCorrectionInput,
+  AdminBehaviourCommandInput,
   AdminBehaviourCommandResponse,
   AdminBehaviourEntry,
-  AdminBehaviourRetractionInput,
-  AdminBehaviourRetractionResponse,
-  AdminBehaviourVisibility,
 } from "@/lib/api-client";
-import { BehaviourCorrectionForm } from "./behaviour-correction-form";
-import { BehaviourRetractionForm } from "./behaviour-retraction-form";
 import { formatSiteDateTime } from "./behaviour-time";
 
 type BehaviourHistoryProps = {
@@ -20,28 +14,15 @@ type BehaviourHistoryProps = {
   error: string | null;
   items: AdminBehaviourEntry[];
   children: Array<{ id: string; fullName: string }>;
-  categories: AdminBehaviourCategory[];
   canCorrect: boolean;
-  canVoid: boolean;
   canSensitive: boolean;
   siteTimeZone: string;
-  selectedVisibility?: AdminBehaviourVisibility | "ALL";
-  pagination?: {
-    page: number;
-    hasNext: boolean;
-    onNext: () => void;
-    onPrevious: () => void;
-  };
   onRetry: () => void;
   onCorrect: (
     entryId: string,
-    input: AdminBehaviourCorrectionInput,
+    input: AdminBehaviourCommandInput,
   ) => Promise<AdminBehaviourCommandResponse>;
-  onRetract: (
-    entryId: string,
-    input: AdminBehaviourRetractionInput,
-  ) => Promise<AdminBehaviourRetractionResponse>;
-  onSuccess?: () => Promise<void> | void;
+  onSuccess?: (response: AdminBehaviourCommandResponse) => Promise<void> | void;
 };
 
 export function BehaviourHistory({
@@ -49,99 +30,46 @@ export function BehaviourHistory({
   error,
   items,
   children,
-  categories,
   canCorrect,
-  canVoid,
   canSensitive,
   siteTimeZone,
-  selectedVisibility: controlledVisibility,
-  pagination,
   onRetry,
   onCorrect,
-  onRetract,
   onSuccess,
 }: BehaviourHistoryProps) {
-  const [visibility, setVisibility] =
-    React.useState<AdminBehaviourVisibility>("GENERAL");
-  const selectedVisibility =
-    controlledVisibility ?? (canSensitive ? visibility : "GENERAL");
-  const visibleItems = controlledVisibility
-    ? items
-    : items.filter((item) => item.visibility === selectedVisibility);
+  const visibleItems = items.filter(
+    (item) => item.visibility === "GENERAL" || canSensitive,
+  );
   const childNames = new Map(
     children.map((child) => [child.id, child.fullName]),
   );
   const [correctionTarget, setCorrectionTarget] = React.useState<string | null>(
     null,
   );
-  const [retractionTarget, setRetractionTarget] = React.useState<string | null>(
-    null,
-  );
   const [success, setSuccess] = React.useState<string | null>(null);
   const successRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (canSensitive) return;
-    const correction = items.find((item) => item.id === correctionTarget);
-    const retraction = items.find((item) => item.id === retractionTarget);
-    if (correction?.visibility === "SENSITIVE") setCorrectionTarget(null);
-    if (retraction?.visibility === "SENSITIVE") setRetractionTarget(null);
-  }, [canSensitive, correctionTarget, retractionTarget, items]);
-
-  React.useEffect(() => {
-    if (!canSensitive) setVisibility("GENERAL");
-  }, [canSensitive]);
-
-  React.useEffect(() => {
-    if (!canCorrect) setCorrectionTarget(null);
-    if (!canVoid) setRetractionTarget(null);
-  }, [canCorrect, canVoid]);
+    if (canSensitive || !correctionTarget) return;
+    const target = items.find((item) => item.id === correctionTarget);
+    if (target?.visibility === "SENSITIVE") setCorrectionTarget(null);
+  }, [canSensitive, correctionTarget, items]);
 
   React.useEffect(() => {
     if (success) successRef.current?.focus();
   }, [success]);
 
   return (
-    <section className="rounded-xl border border-border-subtle bg-surface p-4 shadow-sm">
+    <section className="rounded-lg border border-border bg-surface p-5">
       <div>
         <h2 className="font-heading text-lg font-semibold text-text-primary">
           Behaviour history
         </h2>
         <p className="mt-1 text-sm text-text-muted">
-          Current records, newest first. Corrections and voids retain an audit
-          trail.
+          Current records are shown newest first. Corrections create a linked
+          replacement and keep the original audit trail.
         </p>
       </div>
-
-      {canSensitive && !controlledVisibility ? (
-        <fieldset className="mt-5">
-          <legend className="text-sm font-medium text-text-primary">
-            Record visibility
-          </legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {(["GENERAL", "SENSITIVE"] as const).map((option) => (
-              <label
-                key={option}
-                className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm text-text-primary"
-              >
-                <input
-                  type="radio"
-                  name="behaviour-history-visibility"
-                  value={option}
-                  checked={selectedVisibility === option}
-                  onChange={() => {
-                    setVisibility(option);
-                    setCorrectionTarget(null);
-                    setRetractionTarget(null);
-                    setSuccess(null);
-                  }}
-                />
-                {option === "GENERAL" ? "General records" : "Sensitive records"}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
 
       {success ? (
         <div
@@ -181,21 +109,14 @@ export function BehaviourHistory({
 
       {!isLoading && !error && visibleItems.length === 0 ? (
         <p className="mt-5 rounded-md bg-muted p-4 text-sm text-text-muted">
-          {selectedVisibility === "SENSITIVE"
-            ? "No sensitive records in the recently loaded history."
-            : controlledVisibility
-              ? "No behaviour records in the selected range."
-              : "No behaviour records yet."}
+          No behaviour records yet.
         </p>
       ) : null}
 
-      {!isLoading && !error && visibleItems.length > 0 ? (
-        <ol className="mt-4 max-h-[34rem] space-y-2 overflow-y-auto pr-1">
+      {!isLoading && visibleItems.length > 0 ? (
+        <ol className="mt-5 space-y-3">
           {visibleItems.map((item) => (
-            <li
-              key={item.id}
-              className="rounded-lg border border-border-subtle p-3"
-            >
+            <li key={item.id} className="rounded-md border border-border p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-text-primary">
@@ -217,47 +138,24 @@ export function BehaviourHistory({
                     </p>
                   ) : null}
                 </div>
-                {canCorrect || canVoid ? (
-                  <div className="flex flex-wrap gap-2">
-                    {canCorrect ? (
-                      <Button
-                        id={`behaviour-correct-${item.id}`}
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          setSuccess(null);
-                          setRetractionTarget(null);
-                          setCorrectionTarget(item.id);
-                        }}
-                      >
-                        Correct
-                      </Button>
-                    ) : null}
-                    {canVoid ? (
-                      <Button
-                        id={`behaviour-void-${item.id}`}
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => {
-                          setSuccess(null);
-                          setCorrectionTarget(null);
-                          setRetractionTarget(item.id);
-                        }}
-                      >
-                        Void
-                      </Button>
-                    ) : null}
-                  </div>
+                {canCorrect ? (
+                  <Button
+                    id={`behaviour-correct-${item.id}`}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setSuccess(null);
+                      setCorrectionTarget(item.id);
+                    }}
+                  >
+                    Correct
+                  </Button>
                 ) : null}
               </div>
               {correctionTarget === item.id ? (
-                <BehaviourCorrectionForm
+                <CorrectionForm
                   entry={item}
-                  categories={categories}
-                  canSensitive={canSensitive}
-                  siteTimeZone={siteTimeZone}
                   onCancel={() => setCorrectionTarget(null)}
                   onCorrect={onCorrect}
                   onSuccess={async (response) => {
@@ -267,23 +165,7 @@ export function BehaviourHistory({
                         ? "This correction was already recorded."
                         : "Correction recorded.",
                     );
-                    await onSuccess?.();
-                  }}
-                />
-              ) : null}
-              {retractionTarget === item.id ? (
-                <BehaviourRetractionForm
-                  entry={item}
-                  onCancel={() => setRetractionTarget(null)}
-                  onRetract={onRetract}
-                  onSuccess={async (response) => {
-                    setRetractionTarget(null);
-                    setSuccess(
-                      response.duplicate
-                        ? "This void was already recorded."
-                        : "Behaviour record voided.",
-                    );
-                    await onSuccess?.();
+                    await onSuccess?.(response);
                   }}
                 />
               ) : null}
@@ -291,35 +173,147 @@ export function BehaviourHistory({
           ))}
         </ol>
       ) : null}
-      {pagination && !isLoading && !error ? (
-        <nav
-          aria-label="Recent behaviour pages"
-          className="mt-4 flex items-center justify-between border-t border-border-subtle pt-3"
-        >
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={pagination.page === 1}
-            onClick={pagination.onPrevious}
-          >
-            Previous
-          </Button>
-          <span className="text-sm tabular-nums text-text-muted">
-            Page {pagination.page}
-          </span>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={!pagination.hasNext}
-            onClick={pagination.onNext}
-          >
-            Next
-          </Button>
-        </nav>
-      ) : null}
     </section>
+  );
+}
+
+function CorrectionForm({
+  entry,
+  onCancel,
+  onCorrect,
+  onSuccess,
+}: {
+  entry: AdminBehaviourEntry;
+  onCancel: () => void;
+  onCorrect: BehaviourHistoryProps["onCorrect"];
+  onSuccess: (response: AdminBehaviourCommandResponse) => Promise<void> | void;
+}) {
+  const [reason, setReason] = React.useState("");
+  const [note, setNote] = React.useState(entry.note ?? "");
+  const [idempotencyKey, setIdempotencyKey] = React.useState(createCommandKey);
+  const [reasonError, setReasonError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const submitting = React.useRef(false);
+  const commandAttempted = React.useRef(false);
+
+  const editCommand = (edit: () => void) => {
+    if (commandAttempted.current) {
+      commandAttempted.current = false;
+      setIdempotencyKey(createCommandKey());
+    }
+    edit();
+    setError(null);
+  };
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    if (!reason.trim()) {
+      setReasonError("Enter a reason for this correction.");
+      return;
+    }
+
+    submitting.current = true;
+    commandAttempted.current = true;
+    setIsSaving(true);
+    setError(null);
+    try {
+      const trimmedNote = note.trim();
+      const response = await onCorrect(entry.id, {
+        idempotencyKey,
+        childId: entry.childId,
+        category: entry.category,
+        type: entry.type,
+        visibility: entry.visibility,
+        pointsDelta: entry.pointsDelta,
+        occurredAt: entry.occurredAt,
+        reason: reason.trim(),
+        ...(trimmedNote ? { note: trimmedNote } : {}),
+      });
+      await onSuccess(response);
+    } catch (cause) {
+      setError(
+        cause instanceof Error && cause.message
+          ? cause.message
+          : "Unable to correct this behaviour record.",
+      );
+    } finally {
+      submitting.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <form
+      aria-label="Correct behaviour record"
+      className="mt-4 space-y-3 border-t border-border pt-4"
+      onSubmit={submit}
+    >
+      <div>
+        <Label htmlFor={`behaviour-correction-reason-${entry.id}`}>
+          Correction reason
+        </Label>
+        <input
+          id={`behaviour-correction-reason-${entry.id}`}
+          className={controlClassName}
+          value={reason}
+          maxLength={1000}
+          disabled={isSaving}
+          onChange={(event) => {
+            editCommand(() => setReason(event.target.value));
+            setReasonError(null);
+          }}
+          aria-invalid={Boolean(reasonError)}
+          aria-describedby={
+            reasonError
+              ? `behaviour-correction-reason-${entry.id}-error`
+              : undefined
+          }
+        />
+        {reasonError ? (
+          <p
+            id={`behaviour-correction-reason-${entry.id}-error`}
+            className="mt-1 text-sm text-red-700"
+            role="alert"
+          >
+            {reasonError}
+          </p>
+        ) : null}
+      </div>
+      <div>
+        <Label htmlFor={`behaviour-correction-note-${entry.id}`}>
+          Replacement note (optional)
+        </Label>
+        <textarea
+          id={`behaviour-correction-note-${entry.id}`}
+          className={`${controlClassName} min-h-20`}
+          value={note}
+          maxLength={4000}
+          disabled={isSaving}
+          onChange={(event) => editCommand(() => setNote(event.target.value))}
+        />
+      </div>
+      {error ? (
+        <p className="text-sm text-red-700" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" size="sm" disabled={isSaving}>
+          {isSaving ? "Saving correction…" : "Save correction"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={isSaving}
+          onClick={onCancel}
+        >
+          Cancel
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -342,3 +336,12 @@ function formatPoints(points: number): string {
   if (points < 0) return `${points} points`;
   return "No points";
 }
+
+function createCommandKey(): string {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return uuid;
+  return `behaviour-correction-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+const controlClassName =
+  "mt-1 w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60";

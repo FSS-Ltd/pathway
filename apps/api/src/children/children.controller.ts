@@ -6,7 +6,6 @@ import {
   Param,
   Body,
   BadRequestException,
-  ForbiddenException,
   NotFoundException,
   UseGuards,
   Inject,
@@ -15,7 +14,7 @@ import {
   Header,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
-import { CurrentOrg, CurrentTenant } from "@pathway/auth";
+import { CurrentTenant, PathwayRequestContext, UserOrgRole } from "@pathway/auth";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { ChildrenService } from "./children.service";
 import { createChildSchema, CreateChildDto } from "./dto/create-child.dto";
@@ -32,14 +31,11 @@ type AuthenticatedRequest = Request & {
 export class ChildrenController {
   constructor(
     @Inject(ChildrenService) private readonly childrenService: ChildrenService,
+    @Inject(PathwayRequestContext) private readonly requestContext: PathwayRequestContext,
   ) {}
 
   @Get()
-  async list(
-    @CurrentTenant("tenantId") tenantId: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    this.assertStaff(req);
+  async list(@CurrentTenant("tenantId") tenantId: string) {
     return this.childrenService.list(tenantId);
   }
 
@@ -48,15 +44,8 @@ export class ChildrenController {
   async getPhoto(
     @Param("id") id: string,
     @CurrentTenant("tenantId") tenantId: string,
-    @Req() req: AuthenticatedRequest,
     @Res() res: Response,
   ) {
-    await this.childrenService.assertCanViewChild(
-      id,
-      tenantId,
-      req.authUserId,
-      this.isStaff(req),
-    );
     const result = await this.childrenService.getPhoto(id, tenantId);
     if (!result) {
       throw new NotFoundException("Photo not found");
@@ -65,35 +54,11 @@ export class ChildrenController {
     res.send(result.buffer);
   }
 
-  @Get(":id/registration")
-  async getRegistration(
-    @Param("id") id: string,
-    @CurrentTenant("tenantId") tenantId: string,
-    @CurrentOrg("orgId") orgId: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    this.assertStaff(req);
-    if (!req.authUserId) throw new ForbiddenException("Staff access required");
-    return this.childrenService.getRegistration(
-      id,
-      tenantId,
-      orgId,
-      req.authUserId,
-    );
-  }
-
   @Get(":id")
   async getById(
     @Param("id") id: string,
     @CurrentTenant("tenantId") tenantId: string,
-    @Req() req: AuthenticatedRequest,
   ) {
-    await this.childrenService.assertCanViewChild(
-      id,
-      tenantId,
-      req.authUserId,
-      this.isStaff(req),
-    );
     return this.childrenService.getById(id, tenantId);
   }
 
@@ -101,9 +66,7 @@ export class ChildrenController {
   async create(
     @Body() body: unknown,
     @CurrentTenant("tenantId") tenantId: string,
-    @Req() req: AuthenticatedRequest,
   ) {
-    this.assertStaff(req);
     const parsed = createChildSchema.safeParse(body);
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.format());
@@ -123,7 +86,8 @@ export class ChildrenController {
       throw new BadRequestException(parsed.error.format());
     }
     const userId = req.authUserId;
-    const isSiteAdmin = req.__pathwayContext?.siteRole === "SITE_ADMIN";
+    const isSiteAdmin =
+      req.__pathwayContext?.siteRole === "SITE_ADMIN";
     return this.childrenService.update(
       id,
       parsed.data as UpdateChildDto,
@@ -148,7 +112,8 @@ export class ChildrenController {
     if (!parsed.success) {
       throw new BadRequestException(parsed.error.format());
     }
-    const isSiteAdmin = req.__pathwayContext?.siteRole === "SITE_ADMIN";
+    const isSiteAdmin =
+      req.__pathwayContext?.siteRole === "SITE_ADMIN";
     await this.childrenService.uploadPhoto(
       id,
       tenantId,
@@ -160,15 +125,59 @@ export class ChildrenController {
     return { ok: true };
   }
 
-  private isStaff(req: AuthenticatedRequest): boolean {
-    return (
-      req.__pathwayContext?.siteRole === "SITE_ADMIN" ||
-      req.__pathwayContext?.siteRole === "STAFF"
+  @Post(":id/link-parent")
+  async linkParent(
+    @Param("id") id: string,
+    @Body() body: { email?: string },
+    @CurrentTenant("tenantId") tenantId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.authUserId;
+    if (!userId) {
+      throw new BadRequestException("Authentication required");
+    }
+    const email = body?.email?.trim();
+    if (!email) {
+      throw new BadRequestException("Email is required");
+    }
+    return this.childrenService.linkParentByEmail(
+      id,
+      tenantId,
+      userId,
+      email,
     );
   }
 
-  private assertStaff(req: AuthenticatedRequest): void {
-    if (!this.isStaff(req))
-      throw new ForbiddenException("Staff access required");
+  /**
+   * Invite a parent to the child. Only ORG_ADMIN or a linked parent can invite.
+   * If user exists: link to child and grant family access.
+   * If user doesn't exist: create user, send invite email, link to child.
+   */
+  @Post(":id/invite-parent")
+  async inviteParent(
+    @Param("id") id: string,
+    @Body() body: { email?: string; name?: string },
+    @CurrentTenant("tenantId") tenantId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.authUserId;
+    if (!userId) {
+      throw new BadRequestException("Authentication required");
+    }
+    const email = body?.email?.trim();
+    if (!email) {
+      throw new BadRequestException("Email is required");
+    }
+    const isOrgAdmin = this.requestContext.roles.org.some(
+      (r) => r === UserOrgRole.ORG_ADMIN,
+    );
+    return this.childrenService.inviteParentToChild(
+      id,
+      tenantId,
+      userId,
+      isOrgAdmin,
+      email,
+      body?.name?.trim() || undefined,
+    );
   }
 }

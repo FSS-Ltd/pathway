@@ -42,7 +42,6 @@ const aUpdate = jest.spyOn(prisma.attendance, "update");
 const eventCreate = jest.spyOn(prisma.attendanceCorrectionEvent, "create");
 
 const cFindUnique = jest.spyOn(prisma.child, "findUnique");
-const cFindFirst = jest.spyOn(prisma.child, "findFirst");
 const cFindMany = jest.spyOn(prisma.child, "findMany");
 const gFindUnique = jest.spyOn(prisma.group, "findUnique");
 const sFindFirst = jest.spyOn(prisma.session, "findFirst");
@@ -151,7 +150,6 @@ describe("AttendanceService", () => {
       origin: "LIVE",
     });
     cFindUnique.mockReset();
-    cFindFirst.mockReset();
     cFindMany.mockReset();
     gFindUnique.mockReset();
     sFindFirst.mockReset();
@@ -204,87 +202,6 @@ describe("AttendanceService", () => {
         ]);
       },
     );
-  });
-
-  describe("listForChild", () => {
-    it("returns only the tenant-scoped child's recent marks", async () => {
-      cFindFirst.mockResolvedValueOnce(makeChild("tenant-123"));
-      aFindMany.mockResolvedValueOnce([
-        {
-          id: "attendance-1",
-          present: true,
-          status: null,
-          timestamp: new Date("2026-08-12T09:00:00.000Z"),
-          session: { title: "Morning session" },
-        },
-      ] as unknown as Awaited<ReturnType<typeof prisma.attendance.findMany>>);
-
-      await expect(svc.listForChild("tenant-123", "child-1")).resolves.toEqual({
-        items: [
-          {
-            id: "attendance-1",
-            status: "PRESENT",
-            timestamp: new Date("2026-08-12T09:00:00.000Z"),
-            sessionTitle: "Morning session",
-          },
-        ],
-        nextCursor: null,
-      });
-      expect(cFindFirst).toHaveBeenCalledWith({
-        where: { id: "child-1", tenantId: "tenant-123" },
-        select: { id: true },
-      });
-      expect(aFindMany).toHaveBeenCalledWith({
-        where: { childId: "child-1", child: { tenantId: "tenant-123" } },
-        select: { ...attendanceSelect, session: { select: { title: true } } },
-        orderBy: [{ timestamp: "desc" }, { id: "desc" }],
-        take: 51,
-      });
-    });
-
-    it("returns a cursor when older marks remain", async () => {
-      cFindFirst.mockResolvedValueOnce(makeChild("tenant-123"));
-      const rows = Array.from({ length: 51 }, (_, index) => ({
-        id: `mark-${index}`,
-        present: true,
-        status: "PRESENT",
-        timestamp: new Date("2026-08-12T09:00:00.000Z"),
-        session: null,
-      }));
-      aFindMany.mockResolvedValueOnce(
-        rows as unknown as Awaited<
-          ReturnType<typeof prisma.attendance.findMany>
-        >,
-      );
-      const page = await svc.listForChild("tenant-123", "child-1");
-      expect(page.items).toHaveLength(50);
-      expect(page.nextCursor).toBe("mark-49");
-    });
-
-    it("does not read attendance for a missing or foreign child", async () => {
-      cFindFirst.mockResolvedValueOnce(null);
-      await expect(
-        svc.listForChild("tenant-123", "foreign-child"),
-      ).rejects.toThrow(NotFoundException);
-      expect(aFindMany).not.toHaveBeenCalled();
-    });
-
-    it("rejects a cursor outside this child's tenant scope", async () => {
-      cFindFirst.mockResolvedValueOnce(makeChild("tenant-123"));
-      aFindFirst.mockResolvedValueOnce(null);
-      await expect(
-        svc.listForChild("tenant-123", "child-1", "foreign-cursor"),
-      ).rejects.toThrow(BadRequestException);
-      expect(aFindFirst).toHaveBeenCalledWith({
-        where: {
-          id: "foreign-cursor",
-          childId: "child-1",
-          child: { tenantId: "tenant-123" },
-        },
-        select: { id: true, timestamp: true },
-      });
-      expect(aFindMany).not.toHaveBeenCalled();
-    });
   });
 
   describe("DTO compatibility", () => {
@@ -811,23 +728,6 @@ describe("AttendanceService", () => {
   });
 
   describe("upsertSessionAttendance", () => {
-    it("requires a teaching session before child attendance writes", async () => {
-      sFindFirst.mockResolvedValueOnce(null);
-      await expect(
-        svc.upsertSessionAttendance("shift-1", "tenant-123", { rows: [] }),
-      ).rejects.toBeInstanceOf(NotFoundException);
-      expect(sFindFirst).toHaveBeenCalledWith({
-        where: {
-          id: "shift-1",
-          tenantId: "tenant-123",
-          rotaKind: "STANDARD",
-        },
-        select: { id: true, groups: { select: { id: true } } },
-      });
-      expect(aCreate).not.toHaveBeenCalled();
-      expect(aUpdate).not.toHaveBeenCalled();
-    });
-
     it("requires per-row correction provenance and writes Late coherently", async () => {
       sFindFirst.mockResolvedValueOnce({
         id: "session-1",

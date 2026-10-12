@@ -32,7 +32,6 @@ const ACE_LEARNING_KEYS = [
 ] as const;
 
 const ACE_CORE_KEYS = [
-  "ace.attendance.export",
   "ace.settings.read",
   "ace.settings.manage",
   "ace.pace.read",
@@ -45,7 +44,6 @@ const ACE_CORE_KEYS = [
   "ace.pace.diagnostics.manage",
   "ace.behaviour.read",
   "ace.behaviour.record",
-  "ace.behaviour.correct",
   "ace.behaviour.sensitive.read",
   "ace.behaviour.policy.manage",
   "ace.reports.read",
@@ -53,7 +51,6 @@ const ACE_CORE_KEYS = [
   "ace.reports.review",
   "ace.reports.publish",
   "ace.parent.progress.read",
-  "ace.parent.notices.read",
   "ace.student.self.read",
   "ace.faith.read",
   "ace.faith.manage",

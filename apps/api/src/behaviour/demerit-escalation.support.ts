@@ -57,51 +57,26 @@ export interface WindowedDemerit {
   categoryIsSerious: boolean | null;
 }
 
-const guardianNotificationFields = {
-  aggregateId: z.string().trim().min(1),
-  eventType: z.literal("behaviour.guardian-notification.requested"),
-  idempotencyKey: z.string().trim().min(1),
-};
-
-const guardianNotificationPayloadFields = {
-  childId: z.string().trim().min(1),
-  tenantId: z.string().trim().min(1),
-  orgId: z.string().trim().min(1),
-  stage: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  demeritPolicyVersion: z.number().int().positive(),
-  occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  recipientUserIds: z.array(z.string().trim().min(1)).min(1),
-};
-
-export const guardianNotificationIntentSchema = z.discriminatedUnion(
-  "aggregateType",
-  [
-    z
+export const guardianNotificationIntentSchema = z
+  .object({
+    aggregateType: z.literal("BEHAVIOUR_ENTRY"),
+    aggregateId: z.string().trim().min(1),
+    eventType: z.literal("behaviour.guardian-notification.requested"),
+    idempotencyKey: z.string().trim().min(1),
+    payload: z
       .object({
-        ...guardianNotificationFields,
-        aggregateType: z.literal("BEHAVIOUR_ENTRY"),
-        payload: z
-          .object({
-            ...guardianNotificationPayloadFields,
-            behaviourEntryId: z.string().trim().min(1),
-          })
-          .strict(),
+        behaviourEntryId: z.string().trim().min(1),
+        childId: z.string().trim().min(1),
+        tenantId: z.string().trim().min(1),
+        orgId: z.string().trim().min(1),
+        stage: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+        demeritPolicyVersion: z.number().int().positive(),
+        occurredOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+        recipientUserIds: z.array(z.string().trim().min(1)).min(1),
       })
       .strict(),
-    z
-      .object({
-        ...guardianNotificationFields,
-        aggregateType: z.literal("DEMERIT_STAGE_OVERRIDE"),
-        payload: z
-          .object({
-            ...guardianNotificationPayloadFields,
-            demeritStageOverrideId: z.string().trim().min(1),
-          })
-          .strict(),
-      })
-      .strict(),
-  ],
-);
+  })
+  .strict();
 
 export type GuardianNotificationIntent = z.infer<
   typeof guardianNotificationIntentSchema
@@ -126,23 +101,6 @@ export function localDateWindow(
     end: localMidnightToUtc(endOn, timezone),
     occurredOn,
   };
-}
-
-export function localDateWindowForDate(
-  localDate: string,
-  timezone: string,
-  windowDays: number,
-): LocalDateWindow {
-  const startOn = addCalendarDays(localDate, -(windowDays - 1));
-  return {
-    start: localMidnightToUtc(startOn, timezone),
-    end: localMidnightToUtc(addCalendarDays(localDate, 1), timezone),
-    occurredOn: localDate,
-  };
-}
-
-export function currentLocalDate(instant: Date, timezone: string): string {
-  return localDateAt(instant, timezone);
 }
 
 export function summariseDemerits(entries: readonly WindowedDemerit[]) {

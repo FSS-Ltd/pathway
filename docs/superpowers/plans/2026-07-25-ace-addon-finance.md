@@ -6,7 +6,7 @@
 
 **Architecture:** Finance uses a dedicated domain package and ledger-like immutable financial events. It is isolated from NexSteps SaaS subscription billing. NestJS applies tenancy, permissions, relationship/release, audit, and outbox rules; private object storage holds generated documents.
 
-**Price and packaging:** £15/month or £150/year, **Proposed**. Eligible for customer-selected Growth and Professional inclusion slots, Operations, and All Included. Never charge an organisation again when its plan or bundle already grants Finance.
+**Price and packaging:** £15/month or £150/year, **Proposed**. Included in Growth and Professional. Eligible for Operations and All Included. Never charge an organisation again when its plan or bundle already grants Finance.
 
 ## Global Constraints
 
@@ -24,7 +24,6 @@
 **Branch:** `feat/ace-finance-entitlement`
 
 **Files:**
-
 - Modify: `packages/platform/src/capability-maps.ts`
 - Modify: `apps/api/src/billing/addon-catalog.ts`
 - Test: `apps/api/src/billing/addon-catalog.spec.ts`
@@ -43,7 +42,6 @@
 **Branch:** `feat/ace-finance-schema`
 
 **Files:**
-
 - Modify: `packages/db/prisma/schema.prisma`
 - Create: `packages/db/prisma/migrations/<timestamp>_add_finance/migration.sql`
 - Create: `apps/api/src/finance/tests/finance-rls.e2e.spec.ts`
@@ -62,7 +60,6 @@
 **Branch:** `feat/ace-finance-domain`
 
 **Files:**
-
 - Create: `packages/finance-domain/package.json`
 - Create: `packages/finance-domain/src/invoice.ts`
 - Create: `packages/finance-domain/src/allocation.ts`
@@ -87,7 +84,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-drafts`
 
 **Files:**
-
 - Create: `apps/api/src/finance/finance.controller.ts`
 - Create: `apps/api/src/finance/invoice-draft.service.ts`
 - Create: `apps/api/src/finance/dto/create-invoice-draft.dto.ts`
@@ -106,7 +102,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-issue`
 
 **Files:**
-
 - Create: `apps/api/src/finance/invoice-command.service.ts`
 - Create: `apps/api/src/finance/dto/issue-invoice.dto.ts`
 - Create: `apps/api/src/finance/dto/credit-invoice.dto.ts`
@@ -126,7 +121,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-payments`
 
 **Files:**
-
 - Create: `apps/api/src/finance/payment.service.ts`
 - Create: `apps/api/src/finance/dto/record-payment.dto.ts`
 - Create: `apps/api/src/finance/dto/allocate-payment.dto.ts`
@@ -146,7 +140,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-documents`
 
 **Files:**
-
 - Create: `apps/workers/src/finance/render-finance-document.job.ts`
 - Create: `apps/workers/src/finance/finance-document.template.tsx`
 - Create: `apps/api/src/finance/finance-document.service.ts`
@@ -165,7 +158,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-admin-ui`
 
 **Files:**
-
 - Create: `apps/admin/app/finance/page.tsx`
 - Create: `apps/admin/app/finance/finance-workspace.tsx`
 - Create: `apps/admin/app/finance/invoice-editor.tsx`
@@ -185,7 +177,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-family-finance-ui`
 
 **Files:**
-
 - Create: `apps/mobile/app/(family)/(tabs)/finance/index.tsx`
 - Create: `apps/mobile/app/(family)/(tabs)/finance/[invoiceId].tsx`
 - Create: `apps/admin/app/family/finance/page.tsx`
@@ -205,7 +196,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-notifications`
 
 **Files:**
-
 - Create: `apps/workers/src/finance/finance-notification.job.ts`
 - Create: `apps/api/src/finance/finance-notification.policy.ts`
 - Test: `apps/workers/src/finance/finance-notification.job.spec.ts`
@@ -223,7 +213,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-reporting`
 
 **Files:**
-
 - Create: `apps/api/src/finance/finance-reporting.service.ts`
 - Create: `apps/api/src/finance/finance-export.service.ts`
 - Test: `apps/api/src/finance/tests/finance-reporting.e2e.spec.ts`
@@ -242,7 +231,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `feat/ace-finance-addon-billing`
 
 **Files:**
-
 - Modify: `apps/api/src/billing/addon-catalog.ts`
 - Modify: `apps/api/src/billing/stripe-webhook.service.ts`
 - Test: `apps/api/src/finance/tests/finance-addon-billing.e2e.spec.ts`
@@ -261,7 +249,6 @@ export function allocatePayment(input: AllocationInput): AllocationResult;
 **Branch:** `security/ace-finance-release-gate`
 
 **Files:**
-
 - Create: `apps/api/src/finance/tests/finance-access-matrix.e2e.spec.ts`
 - Create: `apps/api/src/finance/tests/finance-retention.e2e.spec.ts`
 - Create: `docs/runbooks/finance-addon.md`

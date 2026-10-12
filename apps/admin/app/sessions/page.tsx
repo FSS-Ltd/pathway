@@ -22,7 +22,6 @@ import {
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
 import { useOrgLabel } from "@/lib/use-org-ui";
-import { SessionRotaKindBadge } from "@/components/session-rota-kind";
 
 const statusCopy: Record<AdminSessionRow["status"], string> = {
   not_started: "Not started",
@@ -138,9 +137,11 @@ export default function SessionsPage() {
   const [statusFilter, setStatusFilter] = React.useState<
     "all" | "not_started" | "in_progress" | "completed"
   >("all");
+  const [sessionPage, setSessionPage] = React.useState(0);
+  const sessionPageSize = 10;
 
-  const [weekStart, setWeekStart] = React.useState<Date>(() =>
-    startOfWeek(new Date()),
+  const [weekStart, setWeekStart] = React.useState<Date>(
+    () => startOfWeek(new Date()),
   );
   const [rotaDays, setRotaDays] = React.useState<AdminRotaDay[]>([]);
   const [rotaLoading, setRotaLoading] = React.useState(false);
@@ -161,24 +162,29 @@ export default function SessionsPage() {
     }
   }, []);
 
-  const loadRota = React.useCallback(async (start: Date) => {
-    setRotaLoading(true);
-    setRotaError(null);
-    const dateFrom = toLocalDateKey(start);
-    const dateTo = toLocalDateKey(addDays(start, 6));
-    try {
-      const assignments = await fetchAssignmentsForOrg({
-        dateFrom,
-        dateTo,
-      });
-      const grouped = mapApiAssignmentsToRotaDays(assignments);
-      setRotaDays(grouped);
-    } catch (err) {
-      setRotaError(err instanceof Error ? err.message : "Failed to load rota");
-    } finally {
-      setRotaLoading(false);
-    }
-  }, []);
+  const loadRota = React.useCallback(
+    async (start: Date) => {
+      setRotaLoading(true);
+      setRotaError(null);
+      const dateFrom = toLocalDateKey(start);
+      const dateTo = toLocalDateKey(addDays(start, 6));
+      try {
+        const assignments = await fetchAssignmentsForOrg({
+          dateFrom,
+          dateTo,
+        });
+        const grouped = mapApiAssignmentsToRotaDays(assignments);
+        setRotaDays(grouped);
+      } catch (err) {
+        setRotaError(
+          err instanceof Error ? err.message : "Failed to load rota",
+        );
+      } finally {
+        setRotaLoading(false);
+      }
+    },
+    [],
+  );
 
   React.useEffect(() => {
     // Only load data when session is authenticated
@@ -217,7 +223,6 @@ export default function SessionsPage() {
             <span className="font-semibold text-text-primary">
               {normalizeSessionTitle(row.title)}
             </span>
-            <SessionRotaKindBadge kind={row.rotaKind} />
             {row.ageGroup !== "-" || row.room !== "-" ? (
               <span className="text-sm text-text-muted">
                 {row.ageGroup === row.room
@@ -241,16 +246,12 @@ export default function SessionsPage() {
       },
       {
         id: "attendance",
-        priority: "secondary",
         header: "Attendance",
-        cell: (row) =>
-          row.rotaKind === "STANDARD" ? (
-            <span className="text-sm font-medium text-text-primary">
-              {row.attendanceMarked} / {row.attendanceTotal} marked
-            </span>
-          ) : (
-            <span className="text-sm text-text-muted">—</span>
-          ),
+        cell: (row) => (
+          <span className="text-sm font-medium text-text-primary">
+            {row.attendanceMarked} / {row.attendanceTotal} marked
+          </span>
+        ),
         align: "right",
         width: "160px",
       },
@@ -261,12 +262,30 @@ export default function SessionsPage() {
   const filteredSessions = React.useMemo(() => {
     const query = sessionSearch.trim().toLowerCase();
     return sessions.filter((s) => {
-      const matchesQuery = query ? s.title.toLowerCase().includes(query) : true;
-      const matchesStatus =
-        statusFilter === "all" ? true : s.status === statusFilter;
+      const matchesQuery = query
+        ? s.title.toLowerCase().includes(query)
+        : true;
+      const matchesStatus = statusFilter === "all" ? true : s.status === statusFilter;
       return matchesQuery && matchesStatus;
     });
   }, [sessions, sessionSearch, statusFilter]);
+
+  const totalSessionPages = Math.max(
+    1,
+    Math.ceil(filteredSessions.length / sessionPageSize),
+  );
+  const paginatedSessions = React.useMemo(
+    () =>
+      filteredSessions.slice(
+        sessionPage * sessionPageSize,
+        (sessionPage + 1) * sessionPageSize,
+      ),
+    [filteredSessions, sessionPage, sessionPageSize],
+  );
+
+  React.useEffect(() => {
+    if (sessionPage >= totalSessionPages) setSessionPage(0);
+  }, [sessionPage, totalSessionPages]);
 
   const weekDates = React.useMemo(
     () => Array.from({ length: 7 }, (_, idx) => addDays(weekStart, idx)),
@@ -280,7 +299,10 @@ export default function SessionsPage() {
 
   // Staff-by-day grid: unique staff sorted by name, then for each (staffId, date) list of assignments
   const { rotaStaffOrder, rotaGrid } = React.useMemo(() => {
-    const staffById = new Map<string, { staffId: string; staffName: string }>();
+    const staffById = new Map<
+      string,
+      { staffId: string; staffName: string }
+    >();
     const grid = new Map<string, Map<string, AdminAssignmentRow[]>>();
 
     rotaDays.forEach((day) => {
@@ -303,9 +325,7 @@ export default function SessionsPage() {
     });
 
     const staffOrder = Array.from(staffById.values()).sort((a, b) =>
-      a.staffName.localeCompare(b.staffName, undefined, {
-        sensitivity: "base",
-      }),
+      a.staffName.localeCompare(b.staffName, undefined, { sensitivity: "base" }),
     );
 
     return { rotaStaffOrder: staffOrder, rotaGrid: grid };
@@ -370,12 +390,7 @@ export default function SessionsPage() {
             </div>
           </div>
           <DataTable
-            data={filteredSessions}
-            caption="Scheduled sessions"
-            pagination={{
-              mode: "client",
-              resetKey: `${sessionSearch}:${statusFilter}`,
-            }}
+            data={paginatedSessions}
             columns={columns}
             isLoading={isLoadingSessions}
             emptyMessage="No sessions have been scheduled yet."
@@ -384,6 +399,46 @@ export default function SessionsPage() {
               router.push(`/sessions/${row.id}`);
             }}
           />
+          {filteredSessions.length > sessionPageSize ? (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3">
+              <p className="text-sm text-text-muted">
+                Showing{" "}
+                {sessionPage * sessionPageSize + 1}–
+                {Math.min(
+                  (sessionPage + 1) * sessionPageSize,
+                  filteredSessions.length,
+                )}{" "}
+                of {filteredSessions.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={sessionPage === 0}
+                  onClick={() => setSessionPage((p) => Math.max(0, p - 1))}
+                  aria-label="Previous page"
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-text-muted">
+                  Page {sessionPage + 1} of {totalSessionPages}
+                </span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={sessionPage >= totalSessionPages - 1}
+                  onClick={() =>
+                    setSessionPage((p) =>
+                      Math.min(totalSessionPages - 1, p + 1),
+                    )
+                  }
+                  aria-label="Next page"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
     </Card>
@@ -432,11 +487,7 @@ export default function SessionsPage() {
               <span className="font-semibold">Unable to load rota</span>
               <span>{rotaError}</span>
               <div>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => loadRota(weekStart)}
-                >
+                <Button size="sm" variant="secondary" onClick={() => loadRota(weekStart)}>
                   Retry
                 </Button>
               </div>
@@ -478,10 +529,7 @@ export default function SessionsPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table
-                className="w-full border-collapse table-fixed"
-                style={{ minWidth: "max-content" }}
-              >
+              <table className="w-full border-collapse table-fixed" style={{ minWidth: "max-content" }}>
                 <thead>
                   <tr>
                     <th className="w-52 shrink-0 border-b border-border-subtle bg-surface-alt p-3 text-left text-sm font-medium text-text-muted">
@@ -544,9 +592,7 @@ export default function SessionsPage() {
                                   className="flex min-h-[56px] items-center justify-center rounded-md border border-dashed border-border-subtle bg-surface-alt/30"
                                   aria-hidden
                                 >
-                                  <span className="text-text-muted text-xl leading-none">
-                                    +
-                                  </span>
+                                  <span className="text-text-muted text-xl leading-none">+</span>
                                 </div>
                               ) : (
                                 <div className="flex flex-col gap-1.5">
@@ -563,13 +609,9 @@ export default function SessionsPage() {
                                         : tone === "warning"
                                           ? "bg-status-warning/10"
                                           : "bg-surface-alt";
-                                    const borderStyle =
-                                      assignment.sessionGroupColor
-                                        ? {
-                                            borderColor:
-                                              assignment.sessionGroupColor,
-                                          }
-                                        : undefined;
+                                    const borderStyle = assignment.sessionGroupColor
+                                      ? { borderColor: assignment.sessionGroupColor }
+                                      : undefined;
                                     const bgStyle = assignment.sessionGroupColor
                                       ? {
                                           backgroundColor: `${assignment.sessionGroupColor}20`,
@@ -599,29 +641,18 @@ export default function SessionsPage() {
                                         }
                                       >
                                         <span className="truncate font-bold text-text-primary">
-                                          {assignment.rotaKind &&
-                                          assignment.rotaKind !== "STANDARD"
-                                            ? (assignment.sessionTitle ??
-                                              "Staff shift")
-                                            : (assignment.sessionGroupName ??
-                                              assignment.sessionTitle ??
-                                              "Session")}
+                                          {assignment.sessionGroupName ??
+                                            assignment.sessionTitle ??
+                                            "Session"}
                                         </span>
-                                        <SessionRotaKindBadge
-                                          kind={assignment.rotaKind}
-                                        />
                                         <span className="text-xs text-text-muted">
                                           {range}
                                         </span>
                                         <span className="text-xs text-text-muted">
                                           {assignment.roleLabel}
-                                          {assignment.status !==
-                                            "confirmed" && (
+                                          {assignment.status !== "confirmed" && (
                                             <span className="ml-1">
-                                              ·{" "}
-                                              {assignment.status === "pending"
-                                                ? "Pending"
-                                                : "Declined"}
+                                              · {assignment.status === "pending" ? "Pending" : "Declined"}
                                             </span>
                                           )}
                                         </span>

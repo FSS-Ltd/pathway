@@ -13,7 +13,6 @@ import {
 import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
 import {
   assignmentListQueryDto,
   assignmentRequestDto,
@@ -36,7 +35,6 @@ const assignmentIdParam = z
   .strict();
 
 @UseGuards(AuthUserGuard, PermissionGuard)
-@IndependentTransaction()
 @Controller("access/assignments")
 export class AssignmentsController {
   constructor(

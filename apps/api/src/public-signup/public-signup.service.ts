@@ -6,12 +6,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { createHash } from "crypto";
-import {
-  ChildGuardianContactType,
-  prisma,
-  Role,
-  withTenantRlsContext,
-} from "@pathway/db";
+import { ChildGuardianContactType, prisma, Role } from "@pathway/db";
 import { MailerService } from "../mailer/mailer.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 import { ClerkManagementService } from "../auth/clerk-management.service";
@@ -20,15 +15,6 @@ import type { VerifiedPrincipal } from "../auth/token-verifier";
 import { getAuthProviderMode } from "../config/runtime-env";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { childPhotoKey } from "../common/storage/storage-key.util";
-import {
-  REGISTRATION_FORM_VERSION,
-  REGISTRATION_CONSENT_WORDING,
-  ACE_REGISTRATION_LEVELS,
-} from "./registration-form";
-import {
-  recordRegistrationSubmissions,
-  validateRegistrationSubmission,
-} from "./registration-submission";
 import type { PublicSignupConfigDto } from "./dto/public-signup-config.dto";
 import type {
   ChildSignupDto,
@@ -41,7 +27,11 @@ import type {
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // 5MB
 const ALLOWED_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-const REQUIRED_CONSENTS = ["data_processing", "emergency_contact"];
+const FORM_VERSION = "1.0";
+const REQUIRED_CONSENTS = [
+  "data_processing",
+  "emergency_contact",
+];
 
 type ResolvedLink = {
   id: string;
@@ -51,22 +41,12 @@ type ResolvedLink = {
   siteName: string;
   siteTimezone: string | null;
   parentPortalEnabled: boolean;
-  isAceSchool: boolean;
 };
 
 type CommonSignupPayload = {
   consents: { dataProcessingConsent: boolean; firstAidConsent?: boolean };
   emergencyContacts: EmergencyContactDto[];
   children: ChildSignupDto[];
-  formVersion?: string;
-  homeAddress?: string;
-  parent: {
-    fullName: string;
-    email: string;
-    phone?: string;
-    relationshipToChild?: string;
-  };
-  pickupContacts?: import("./dto/public-signup-submit.dto").PickupContactDto[];
 };
 
 @Injectable()
@@ -107,13 +87,7 @@ export class PublicSignupService {
       },
       include: {
         tenant: { select: { name: true, timezone: true } },
-        org: {
-          select: {
-            name: true,
-            parentPortalEnabled: true,
-            orgVertical: { select: { vertical: true } },
-          },
-        },
+        org: { select: { name: true, parentPortalEnabled: true } },
       },
     });
 
@@ -129,7 +103,6 @@ export class PublicSignupService {
       siteName: link.tenant.name,
       siteTimezone: link.tenant.timezone ?? null,
       parentPortalEnabled: link.org.parentPortalEnabled,
-      isAceSchool: link.org.orgVertical?.vertical === "ACE_SCHOOL",
     };
   }
 
@@ -141,11 +114,7 @@ export class PublicSignupService {
       siteTimezone: link.siteTimezone,
       parentPortalEnabled: link.parentPortalEnabled,
       requiredConsents: REQUIRED_CONSENTS,
-      formVersion: REGISTRATION_FORM_VERSION,
-      consentWording: REGISTRATION_CONSENT_WORDING,
-      ...(link.isAceSchool
-        ? { aceRegistrationLevels: ACE_REGISTRATION_LEVELS }
-        : {}),
+      formVersion: FORM_VERSION,
     };
   }
 
@@ -195,8 +164,9 @@ export class PublicSignupService {
   }
 
   /**
-   * Give an authenticated user family access to children created in this signup.
-   * A valid link cannot be used to claim an existing child's identity.
+   * Link children to an authenticated existing user (staff account gaining family access).
+   * Requires valid invite token. Sets hasFamilyAccess=true and upserts parent-child links (idempotent).
+   * When childrenToCreate is provided, creates those children first then links.
    */
   async linkChildrenExistingUser(
     userId: string,
@@ -215,12 +185,7 @@ export class PublicSignupService {
   ): Promise<{ success: true; linkedCount: number }> {
     const link = await this.resolveLink(inviteToken);
     this.assertParentPortalEnabled(link);
-    if (childIds.length > 0) {
-      throw new BadRequestException(
-        "Linking an existing child requires school approval.",
-      );
-    }
-    const idsToLink: string[] = [];
+    const idsToLink = [...childIds];
 
     if (childrenToCreate && childrenToCreate.length > 0) {
       for (const c of childrenToCreate) {
@@ -314,15 +279,6 @@ export class PublicSignupService {
       }
     });
 
-    if (idsToLink.length > 0) {
-      await this.createGuardianAccessForNewChildren(
-        link.tenantId,
-        link.orgId,
-        userId,
-        idsToLink,
-      );
-    }
-
     return { success: true, linkedCount: idsToLink.length };
   }
 
@@ -343,12 +299,10 @@ export class PublicSignupService {
     const link = await this.resolveLink(dto.token);
     this.assertParentPortalEnabled(link);
 
-    this.assertCommonSignupRequirements(dto, link.isAceSchool);
+    this.assertCommonSignupRequirements(dto);
 
     if (!principal.email || !principal.emailVerified) {
-      throw new BadRequestException(
-        "Please verify your email before continuing.",
-      );
+      throw new BadRequestException("Please verify your email before continuing.");
     }
     const email = principal.email.trim().toLowerCase();
 
@@ -387,9 +341,8 @@ export class PublicSignupService {
 
     const now = new Date();
 
-    const childIds: string[] = [];
     for (const c of dto.children) {
-      childIds.push(await this.createSignupChild(link, c, user.id));
+      await this.createSignupChild(link, c, user.id);
     }
 
     await prisma.emergencyContact.createMany({
@@ -413,20 +366,6 @@ export class PublicSignupService {
           dto.parent.relationshipToChild?.trim() || null,
       },
     });
-    await recordRegistrationSubmissions(
-      link.tenantId,
-      link.orgId,
-      childIds,
-      dto,
-      link.isAceSchool,
-      now,
-    );
-    await this.createGuardianAccessForNewChildren(
-      link.tenantId,
-      link.orgId,
-      user.id,
-      childIds,
-    );
 
     await prisma.publicSignupLink.update({
       where: { id: link.id },
@@ -459,55 +398,62 @@ export class PublicSignupService {
     const link = await this.resolveLink(dto.token);
     this.assertParentPortalEnabled(link);
 
-    this.assertCommonSignupRequirements(dto, link.isAceSchool);
+    this.assertCommonSignupRequirements(dto);
 
     const email = dto.parent.email.trim().toLowerCase();
     const fullName = dto.parent.fullName.trim();
     const safeName = fullName && !fullName.includes("@") ? fullName : null;
 
-    const existingUser = await prisma.user.findFirst({
+    let user = await prisma.user.findFirst({
       where: { email: { equals: email, mode: "insensitive" } },
     });
-    if (existingUser) {
-      throw new BadRequestException(
-        "Account already exists. Sign in to complete registration.",
-      );
-    }
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        name: safeName ?? fullName,
-        displayName: safeName ?? fullName,
-        tenantId: link.tenantId,
-        hasFamilyAccess: true,
-      },
-    });
-
-    const provider = getAuthProviderMode() === "auth0" ? "auth0" : "clerk";
-    const providerUserId =
-      provider === "auth0"
-        ? await this.auth0Management?.createUser({
-            email,
-            password: dto.parent.password,
-            name: safeName ?? fullName,
-            emailVerified: false,
-          })
-        : await this.clerkManagement?.createUser({
-            email,
-            password: dto.parent.password,
-            name: safeName ?? fullName,
-            externalId: user.id,
-          });
-
-    if (providerUserId) {
-      await prisma.userIdentity.create({
+    if (!user) {
+      user = await prisma.user.create({
         data: {
-          userId: user.id,
-          provider,
-          providerSubject: providerUserId,
           email,
+          name: safeName ?? fullName,
           displayName: safeName ?? fullName,
+          tenantId: link.tenantId,
+          hasFamilyAccess: true,
+        },
+      });
+
+      const provider = getAuthProviderMode() === "auth0" ? "auth0" : "clerk";
+      const providerUserId =
+        provider === "auth0"
+          ? await this.auth0Management?.createUser({
+              email,
+              password: dto.parent.password,
+              name: safeName ?? fullName,
+              emailVerified: false,
+            })
+          : await this.clerkManagement?.createUser({
+              email,
+              password: dto.parent.password,
+              name: safeName ?? fullName,
+              externalId: user.id,
+            });
+
+      if (providerUserId) {
+        await prisma.userIdentity.create({
+          data: {
+            userId: user.id,
+            provider,
+            providerSubject: providerUserId,
+            email,
+            displayName: safeName ?? fullName,
+          },
+        });
+      }
+    } else {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          name: safeName ?? user.name ?? fullName,
+          displayName: safeName ?? user.displayName ?? fullName,
+          tenantId: link.tenantId,
+          hasFamilyAccess: true,
         },
       });
     }
@@ -534,7 +480,7 @@ export class PublicSignupService {
 
     await prisma.emergencyContact.createMany({
       data: dto.emergencyContacts.map((ec: EmergencyContactDto) => ({
-        userId: user.id,
+        userId: user!.id,
         tenantId: link.tenantId,
         name: ec.name.trim(),
         phone: ec.phone.trim(),
@@ -553,20 +499,6 @@ export class PublicSignupService {
           dto.parent.relationshipToChild?.trim() || null,
       },
     });
-    await recordRegistrationSubmissions(
-      link.tenantId,
-      link.orgId,
-      childIds,
-      dto,
-      link.isAceSchool,
-      now,
-    );
-    await this.createGuardianAccessForNewChildren(
-      link.tenantId,
-      link.orgId,
-      user.id,
-      childIds,
-    );
 
     await prisma.publicSignupLink.update({
       where: { id: link.id },
@@ -602,7 +534,7 @@ export class PublicSignupService {
       );
     }
 
-    this.assertCommonSignupRequirements(dto, link.isAceSchool);
+    this.assertCommonSignupRequirements(dto);
 
     const now = new Date();
     const childIds: string[] = [];
@@ -643,15 +575,6 @@ export class PublicSignupService {
       data: contactRows,
     });
 
-    await recordRegistrationSubmissions(
-      link.tenantId,
-      link.orgId,
-      childIds,
-      dto,
-      link.isAceSchool,
-      now,
-    );
-
     await prisma.publicSignupLink.update({
       where: { id: link.id },
       data: { lastUsedAt: now },
@@ -671,35 +594,7 @@ export class PublicSignupService {
     }
   }
 
-  private async createGuardianAccessForNewChildren(
-    tenantId: string,
-    orgId: string,
-    userId: string,
-    childIds: string[],
-  ): Promise<void> {
-    await withTenantRlsContext(tenantId, orgId, async (tx) => {
-      const guardian = await tx.guardianIdentity.upsert({
-        where: { tenantId_userId: { tenantId, userId } },
-        create: { tenantId, userId },
-        update: {},
-        select: { id: true },
-      });
-      await tx.guardianChildRelationship.createMany({
-        data: childIds.map((childId) => ({
-          tenantId,
-          guardianIdentityId: guardian.id,
-          childId,
-          legalAccess: "FULL",
-        })),
-      });
-    });
-  }
-
-  private assertCommonSignupRequirements(
-    dto: CommonSignupPayload,
-    isAceSchool: boolean,
-  ): void {
-    validateRegistrationSubmission(dto, isAceSchool);
+  private assertCommonSignupRequirements(dto: CommonSignupPayload): void {
     if (!dto.consents.dataProcessingConsent) {
       throw new BadRequestException("Data processing consent is required");
     }

@@ -11,7 +11,6 @@ import { OutboxService } from "../../common/outbox/outbox.service";
 import { BehaviourOutboxController } from "../behaviour-outbox.controller";
 
 jest.mock("@pathway/db", () => ({
-  ...jest.requireActual("@pathway/db"),
   withTenantRlsContext: jest.fn(),
 }));
 
@@ -61,9 +60,6 @@ function transaction(
       findMany: jest.fn().mockResolvedValue(options.priorEntries ?? []),
     },
     demeritStageOverride: { findFirst: jest.fn().mockResolvedValue(null) },
-    behaviourReviewRequest: {
-      createMany: jest.fn().mockResolvedValue({ count: 1 }),
-    },
     guardianChildRelationship: {
       findMany: jest.fn().mockResolvedValue(
         (options.guardianUserIds ?? ["guardian-1"]).map((userId) => ({
@@ -71,11 +67,13 @@ function transaction(
         })),
       ),
     },
-    $queryRaw: jest.fn().mockResolvedValue(
-      (options.reviewerUserIds ?? ["reviewer-1"]).map((userId) => ({
-        userId,
-      })),
-    ),
+    userRoleAssignment: {
+      findMany: jest.fn().mockResolvedValue(
+        (options.reviewerUserIds ?? ["reviewer-1"]).map((userId) => ({
+          userId,
+        })),
+      ),
+    },
     outboxEvent: {
       createMany: jest
         .fn()
@@ -159,78 +157,6 @@ describe("DemeritEscalationService", () => {
     process.env.BEHAVIOUR_OUTBOX_SECRET = originalBehaviourOutboxSecret;
   });
 
-  it("delivers one guardian notice for a manual Stage 2 override", async () => {
-    const { tx, events } = transaction();
-    const mailerMock = mailer();
-    const { escalation } = service(mailerMock);
-    const input = {
-      actor,
-      childId: "child-1",
-      overrideId: "override-1",
-      policyVersion: 3,
-      occurredOn: "2026-08-12",
-      now,
-    };
-    await escalation.enqueueOverrideGuardianNotice(tx as never, input);
-    await escalation.enqueueOverrideGuardianNotice(tx as never, input);
-
-    expect(events.size).toBe(1);
-    const intent = [...events.values()][0];
-    expect(intent).toEqual(
-      expect.objectContaining({
-        aggregateType: "DEMERIT_STAGE_OVERRIDE",
-        aggregateId: input.overrideId,
-        eventType: "behaviour.guardian-notification.requested",
-        payload: expect.objectContaining({
-          demeritStageOverrideId: input.overrideId,
-          stage: 2,
-          recipientUserIds: ["guardian-1"],
-        }),
-      }),
-    );
-    jest
-      .mocked(withTenantRlsContext)
-      .mockImplementation(async (_tenantId, _orgId, callback) =>
-        callback({
-          tenant: {
-            findFirst: jest.fn().mockResolvedValue({ name: "ACE Site" }),
-          },
-          child: {
-            findFirst: jest.fn().mockResolvedValue({
-              firstName: "Learner",
-              lastName: "One",
-              preferredName: null,
-            }),
-          },
-          guardianChildRelationship: {
-            findMany: jest.fn().mockResolvedValue([
-              {
-                guardianIdentity: {
-                  user: {
-                    id: "guardian-1",
-                    email: "guardian@example.com",
-                    name: "Guardian One",
-                    displayName: null,
-                    firstName: null,
-                  },
-                },
-              },
-            ]),
-          },
-        } as never),
-      );
-    await expect(escalation.dispatch(intent)).resolves.toEqual({ sent: 1 });
-    expect(mailerMock.sendBehaviourNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: "guardian@example.com",
-        stage: 2,
-        occurredOn: input.occurredOn,
-        idempotencyKey:
-          "behaviour-guardian-notification-override:override-1:2:guardian-1",
-      }),
-    );
-  });
-
   it.each([
     {
       priorUnits: 2,
@@ -256,7 +182,7 @@ describe("DemeritEscalationService", () => {
   ])(
     "creates the $action intent only when the demerit total crosses stage $stage",
     async ({ priorUnits, stage, action, eventType, reviewKind }) => {
-      const { result, events, tx } = await createIntents({ priorUnits });
+      const { result, events } = await createIntents({ priorUnits });
 
       expect(result).toEqual({
         stage,
@@ -281,23 +207,6 @@ describe("DemeritEscalationService", () => {
           }),
         }),
       ]);
-      if (reviewKind) {
-        expect(tx.behaviourReviewRequest.createMany).toHaveBeenCalledWith({
-          data: [
-            expect.objectContaining({
-              tenantId: actor.tenantId,
-              childId: "child-1",
-              behaviourEntryId: "entry-1",
-              kind: reviewKind,
-              stage,
-              policyVersion: 3,
-            }),
-          ],
-          skipDuplicates: true,
-        });
-      } else {
-        expect(tx.behaviourReviewRequest.createMany).not.toHaveBeenCalled();
-      }
     },
   );
 
@@ -330,12 +239,17 @@ describe("DemeritEscalationService", () => {
       policyVersion: 3,
       createdIntentCount: 1,
     });
-    expect(tx.$queryRaw.mock.calls[0]?.[0].values).toEqual([
-      actor.tenantId,
-      actor.orgId,
-      "HEAD",
-      now,
-    ]);
+    expect(tx.userRoleAssignment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          orgId: actor.orgId,
+          tenantId: null,
+          roleDefinition: expect.objectContaining({
+            name: "Organisation Head",
+          }),
+        }),
+      }),
+    );
     expect([...events.values()][0]).toEqual(
       expect.objectContaining({
         payload: expect.objectContaining({
@@ -479,7 +393,6 @@ describe("DemeritEscalationService", () => {
         childId: "child-1",
         type: "DEMERIT",
         correction: { is: null },
-        retraction: { is: null },
         id: { not: "entry-1" },
         occurredAt: {
           gte: new Date("2026-07-13T23:00:00.000Z"),

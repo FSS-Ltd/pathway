@@ -1,5 +1,5 @@
 import { CAPABILITY_DEFINITIONS, VERTICAL_CAPABILITIES } from "@pathway/platform";
-import { applyTenantContext, type Prisma } from "@pathway/db";
+import type { Prisma } from "@pathway/db";
 import {
   createRolesTransactionBoundary,
   resolveDelegableCeiling,
@@ -298,9 +298,7 @@ describe("RolesService", () => {
       let permissionPresent = true;
       let roleIsActive = true;
       const reader = {
-        isActiveSuperUser: jest.fn().mockResolvedValue(false),
-        getMembership: jest.fn().mockResolvedValue({ hasMembership: true, isSuperUser: false }),
-        findActivePermissionKeys: jest.fn().mockResolvedValue([]),
+        getOrganisationMembership: jest.fn().mockResolvedValue(true),
         findAssignments: jest.fn().mockImplementation(async () => {
           if (!permissionPresent) return [];
           return [{
@@ -316,7 +314,6 @@ describe("RolesService", () => {
           }] satisfies EffectivePermissionGrant[];
         }),
         findTagGrants: jest.fn().mockResolvedValue([]),
-        findExclusions: jest.fn().mockResolvedValue([]),
       };
       const resolver = new EffectivePermissionsService(
         reader,
@@ -584,29 +581,5 @@ describe("roles transaction boundary", () => {
     const boundary = createRolesTransactionBoundary(async <T>(operation: (tx: Prisma.TransactionClient) => Promise<T>) => operation({} as never));
 
     expect(boundary).toEqual(expect.objectContaining({ run: expect.any(Function) }));
-  });
-
-  it("keeps ordinary role work in one scope while maintenance can switch explicitly", async () => {
-    const execute = jest.fn(async () => 1);
-    const tx = { $executeRawUnsafe: execute } as unknown as Prisma.TransactionClient;
-    const runner = async <T>(operation: (client: Prisma.TransactionClient) => Promise<T>) =>
-      operation(tx);
-    const actor: RoleActorContext = {
-      orgId: "org-1",
-      userId: "head-1",
-      legacyOrgRoles: ["org:admin"],
-      requestId: "request-1",
-    };
-
-    await expect(
-      createRolesTransactionBoundary(runner).run(actor, (client) =>
-        applyTenantContext(client, "site-2", actor.orgId),
-      ),
-    ).rejects.toThrow("Cannot change the scope");
-    await expect(
-      createRolesTransactionBoundary(runner, false).run(actor, (client) =>
-        applyTenantContext(client, "site-2", actor.orgId),
-      ),
-    ).resolves.toBeUndefined();
   });
 });

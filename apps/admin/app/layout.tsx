@@ -1,5 +1,6 @@
 import React from "react";
 import type { Metadata } from "next";
+import { AdminShell } from "./admin-shell";
 import { Providers } from "./providers";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
@@ -21,7 +22,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-shell">
-        <Providers>{children}</Providers>
+        <Providers>
+          <AdminShell>{children}</AdminShell>
+        </Providers>
         <Toaster />
       </body>
     </html>

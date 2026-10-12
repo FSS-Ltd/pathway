@@ -10,79 +10,74 @@ export const CONFIGURATOR_MODULE_CODES = Object.freeze([
   "LEARNING",
 ] as const);
 
-export type ConfiguratorModuleCode = (typeof CONFIGURATOR_MODULE_CODES)[number];
-
-// Learning is a core platform capability. Keep its historical code readable,
-// while excluding it from every optional-module allowance and new purchase.
-const OPTIONAL_MODULE_CODES = Object.freeze(
-  CONFIGURATOR_MODULE_CODES.filter((code) => code !== "LEARNING"),
-);
-
-// Product launch gate. Modules remain in the catalogue for display and legacy
-// order decoding, but none may be newly selected until their offering is ready.
-const READY_OPTIONAL_MODULES: ReadonlySet<ConfiguratorModuleCode> = new Set();
-
-export function isConfiguratorModuleReady(
-  module: ConfiguratorModuleCode,
-): boolean {
-  return READY_OPTIONAL_MODULES.has(module);
-}
+export type ConfiguratorModuleCode =
+  (typeof CONFIGURATOR_MODULE_CODES)[number];
 
 export interface ConfiguratorPlanPolicy {
   outcome: "checkout" | "contact";
-  includedModuleLimit: number;
+  includedModules: readonly ConfiguratorModuleCode[];
   eligibleOptionalModules: readonly ConfiguratorModuleCode[];
-  /** Modules bundled before customer-selected allowances were introduced. */
-  legacyIncludedModules: readonly ConfiguratorModuleCode[];
   contactPath?: string;
 }
 
 const NO_MODULES = Object.freeze([] as ConfiguratorModuleCode[]);
 
-function freezePolicy(policy: ConfiguratorPlanPolicy): ConfiguratorPlanPolicy {
-  return Object.freeze({
-    ...policy,
-    eligibleOptionalModules: Object.freeze([...policy.eligibleOptionalModules]),
-    legacyIncludedModules: Object.freeze([...policy.legacyIncludedModules]),
-  });
+const GROWTH_INCLUDED_MODULES = Object.freeze([
+  "FINANCE",
+  "EVENTS",
+  "ADVANCED_REPORTING",
+] as const);
+
+const PROFESSIONAL_INCLUDED_MODULES = Object.freeze([
+  "FINANCE",
+  "EVENTS",
+  "ADVANCED_REPORTING",
+  "HR",
+  "ASSET_MANAGEMENT",
+  "AI_WORKSPACE",
+] as const);
+
+function optionalModulesExcluding(
+  includedModules: readonly ConfiguratorModuleCode[],
+): readonly ConfiguratorModuleCode[] {
+  return Object.freeze(
+    CONFIGURATOR_MODULE_CODES.filter(
+      (moduleCode) => !includedModules.includes(moduleCode),
+    ),
+  );
 }
 
-const STARTER_POLICY = freezePolicy({
+const STARTER_POLICY: ConfiguratorPlanPolicy = {
   outcome: "checkout",
-  includedModuleLimit: 0,
-  eligibleOptionalModules: OPTIONAL_MODULE_CODES,
-  legacyIncludedModules: NO_MODULES,
-});
+  includedModules: NO_MODULES,
+  eligibleOptionalModules: CONFIGURATOR_MODULE_CODES,
+};
 
-const GROWTH_POLICY = freezePolicy({
+const GROWTH_POLICY: ConfiguratorPlanPolicy = {
   outcome: "checkout",
-  includedModuleLimit: 3,
-  eligibleOptionalModules: OPTIONAL_MODULE_CODES,
-  legacyIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
-});
+  includedModules: GROWTH_INCLUDED_MODULES,
+  eligibleOptionalModules: optionalModulesExcluding(GROWTH_INCLUDED_MODULES),
+};
 
-const PROFESSIONAL_POLICY = freezePolicy({
+const PROFESSIONAL_POLICY: ConfiguratorPlanPolicy = {
   outcome: "checkout",
-  includedModuleLimit: 6,
-  eligibleOptionalModules: OPTIONAL_MODULE_CODES,
-  legacyIncludedModules: [
-    "FINANCE",
-    "EVENTS",
-    "ADVANCED_REPORTING",
-    "HR",
-    "ASSET_MANAGEMENT",
-    "AI_WORKSPACE",
-  ],
-});
+  includedModules: PROFESSIONAL_INCLUDED_MODULES,
+  eligibleOptionalModules: optionalModulesExcluding(
+    PROFESSIONAL_INCLUDED_MODULES,
+  ),
+};
 
-const ENTERPRISE_POLICY = freezePolicy({
+const ENTERPRISE_POLICY: ConfiguratorPlanPolicy = {
   outcome: "contact",
-  includedModuleLimit: 0,
+  includedModules: NO_MODULES,
   eligibleOptionalModules: NO_MODULES,
-  legacyIncludedModules: NO_MODULES,
   contactPath: "/demo?plan=enterprise",
-});
+};
 
+// Two consumers rely on this list: it maps legacy codes to STARTER_POLICY
+// below, and apps/api/src/billing/buy-now.service.ts imports it to reject
+// these codes for brand-new signups. Editing it changes checkout behavior,
+// not just policy mapping.
 export const LEGACY_PLAN_CODES = [
   "CORE_MONTHLY",
   "CORE_YEARLY",
@@ -94,20 +89,19 @@ export const LEGACY_PLAN_CODES = [
   "GROWTH_YEARLY",
 ] as const;
 
-const CONFIGURATOR_PLAN_POLICIES: Readonly<
-  Record<string, ConfiguratorPlanPolicy>
-> = Object.freeze({
-  STARTER_49_MONTHLY: STARTER_POLICY,
-  STARTER_49_YEARLY: STARTER_POLICY,
-  GROWTH_99_MONTHLY: GROWTH_POLICY,
-  GROWTH_99_YEARLY: GROWTH_POLICY,
-  PROFESSIONAL_149_MONTHLY: PROFESSIONAL_POLICY,
-  PROFESSIONAL_149_YEARLY: PROFESSIONAL_POLICY,
-  ENTERPRISE_CONTACT: ENTERPRISE_POLICY,
-  ...Object.fromEntries(
-    LEGACY_PLAN_CODES.map((planCode) => [planCode, STARTER_POLICY]),
-  ),
-});
+const CONFIGURATOR_PLAN_POLICIES: Readonly<Record<string, ConfiguratorPlanPolicy>> =
+  Object.freeze({
+    STARTER_49_MONTHLY: STARTER_POLICY,
+    STARTER_49_YEARLY: STARTER_POLICY,
+    GROWTH_99_MONTHLY: GROWTH_POLICY,
+    GROWTH_99_YEARLY: GROWTH_POLICY,
+    PROFESSIONAL_149_MONTHLY: PROFESSIONAL_POLICY,
+    PROFESSIONAL_149_YEARLY: PROFESSIONAL_POLICY,
+    ENTERPRISE_CONTACT: ENTERPRISE_POLICY,
+    ...Object.fromEntries(
+      LEGACY_PLAN_CODES.map((planCode) => [planCode, STARTER_POLICY]),
+    ),
+  });
 
 export function getConfiguratorPlanPolicy(
   planCode: string,

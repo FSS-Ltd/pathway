@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { BadRequestException, ForbiddenException } from "@nestjs/common";
+import { BadRequestException } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { ChildrenController } from "../../children/children.controller";
@@ -15,7 +15,6 @@ const tenantId = "t1";
 
 const listMock: jest.Mock<Promise<unknown[]>, [string]> = jest.fn();
 const getByIdMock: jest.Mock<Promise<unknown>, [string, string]> = jest.fn();
-const getRegistrationMock = jest.fn();
 const createMock: jest.Mock<
   Promise<unknown>,
   [CreateChildDto, string]
@@ -24,20 +23,13 @@ const updateMock: jest.Mock<
   Promise<unknown>,
   [string, UpdateChildDto, string, string | undefined, boolean]
 > = jest.fn();
-const assertCanViewChildMock = jest.fn().mockResolvedValue(undefined);
-const staffRequest = {
-  authUserId: "staff-a",
-  __pathwayContext: { siteRole: "STAFF" },
-} as Parameters<ChildrenController["list"]>[1];
 
 const mockService: ChildrenService = {
   list: listMock as unknown as ChildrenService["list"],
   getById: getByIdMock as unknown as ChildrenService["getById"],
-  getRegistration: getRegistrationMock as ChildrenService["getRegistration"],
   create: createMock as unknown as ChildrenService["create"],
   update: updateMock as unknown as ChildrenService["update"],
-  assertCanViewChild: assertCanViewChildMock,
-} as unknown as ChildrenService;
+} as ChildrenService;
 
 describe("ChildrenController", () => {
   let controller: ChildrenController;
@@ -63,60 +55,19 @@ describe("ChildrenController", () => {
     const row = { id: "c1", firstName: "Jess", lastName: "Doe" };
     listMock.mockResolvedValueOnce([row]);
 
-    const res = await controller.list(tenantId, staffRequest);
+    const res = await controller.list(tenantId);
     expect(Array.isArray(res)).toBe(true);
     expect(res).toEqual([row]);
     expect(listMock).toHaveBeenCalledWith(tenantId);
-  });
-
-  it("does not expose the child list or create route to a guardian session", async () => {
-    const parentRequest = {
-      authUserId: "guardian-a",
-      __pathwayContext: { siteRole: "VIEWER" },
-    } as Parameters<ChildrenController["list"]>[1];
-    await expect(
-      controller.list(tenantId, parentRequest),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    await expect(
-      controller.create(
-        { firstName: "Sam", lastName: "Child" },
-        tenantId,
-        parentRequest,
-      ),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(listMock).not.toHaveBeenCalled();
-    expect(createMock).not.toHaveBeenCalled();
   });
 
   it("getById should return a child", async () => {
     const child = { id: "c1", firstName: "Jess", lastName: "Doe" };
     getByIdMock.mockResolvedValueOnce(child);
 
-    const res = await controller.getById("c1", tenantId, staffRequest);
+    const res = await controller.getById("c1", tenantId);
     expect(res).toBe(child);
     expect(getByIdMock).toHaveBeenCalledWith("c1", tenantId);
-  });
-
-  it("returns a submitted registration only for staff in the active tenant", async () => {
-    getRegistrationMock.mockResolvedValueOnce(null);
-    await expect(
-      controller.getRegistration("c1", tenantId, "org-1", staffRequest),
-    ).resolves.toBeNull();
-    expect(getRegistrationMock).toHaveBeenCalledWith(
-      "c1",
-      tenantId,
-      "org-1",
-      "staff-a",
-    );
-
-    const guardianRequest = {
-      authUserId: "guardian-a",
-      __pathwayContext: { siteRole: "VIEWER" },
-    } as Parameters<ChildrenController["getRegistration"]>[3];
-    await expect(
-      controller.getRegistration("c1", tenantId, "org-1", guardianRequest),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(getRegistrationMock).toHaveBeenCalledTimes(1);
   });
 
   it("create should validate and call service", async () => {
@@ -129,7 +80,7 @@ describe("ChildrenController", () => {
     const created = { id: "c1", ...dto };
     createMock.mockResolvedValueOnce(created);
 
-    const res = await controller.create(dto, tenantId, staffRequest);
+    const res = await controller.create(dto, tenantId);
     expect(res).toEqual(created);
     expect(createMock).toHaveBeenCalledWith(dto, tenantId);
   });
@@ -140,9 +91,9 @@ describe("ChildrenController", () => {
       allergies: "none",
     } as unknown as CreateChildDto;
 
-    await expect(
-      controller.create(bad, tenantId, staffRequest),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(controller.create(bad, tenantId)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(createMock).not.toHaveBeenCalled();
   });
 

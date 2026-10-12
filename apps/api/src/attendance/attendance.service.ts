@@ -6,12 +6,7 @@ import {
   Optional,
   UnauthorizedException,
 } from "@nestjs/common";
-import {
-  prisma,
-  SessionRotaKind,
-  withTenantRlsContext,
-  type Prisma,
-} from "@pathway/db";
+import { prisma, withTenantRlsContext, type Prisma } from "@pathway/db";
 import { PathwayRequestContext } from "@pathway/auth";
 import { Av30ActivityType } from "@pathway/types/av30";
 import { Av30ActivityService } from "../av30/av30-activity.service";
@@ -94,54 +89,6 @@ export class AttendanceService {
     return rows.map(toAttendanceResponse);
   }
 
-  /** Paginated session marks for one tenant-scoped child profile. */
-  async listForChild(tenantId: string, childId: string, cursor?: string) {
-    const child = await prisma.child.findFirst({
-      where: { id: childId, tenantId },
-      select: { id: true },
-    });
-    if (!child) throw new NotFoundException("Child not found");
-
-    const cursorRow = cursor
-      ? await prisma.attendance.findFirst({
-          where: { id: cursor, childId, child: { tenantId } },
-          select: { id: true, timestamp: true },
-        })
-      : null;
-    if (cursor && !cursorRow) {
-      throw new BadRequestException("Invalid attendance cursor");
-    }
-
-    const where: Prisma.AttendanceWhereInput = {
-      childId,
-      child: { tenantId },
-      ...(cursorRow
-        ? {
-            OR: [
-              { timestamp: { lt: cursorRow.timestamp } },
-              { timestamp: cursorRow.timestamp, id: { lt: cursorRow.id } },
-            ],
-          }
-        : {}),
-    };
-    const rows = await prisma.attendance.findMany({
-      where,
-      select: { ...SELECT, session: { select: { title: true } } },
-      orderBy: [{ timestamp: "desc" }, { id: "desc" }],
-      take: 51,
-    });
-    const page = rows.slice(0, 50);
-    return {
-      items: page.map(({ session, ...row }) => ({
-        id: row.id,
-        status: effectiveAttendanceStatus(row),
-        timestamp: row.timestamp,
-        sessionTitle: session?.title ?? null,
-      })),
-      nextCursor: rows.length > 50 ? (page[49]?.id ?? null) : null,
-    };
-  }
-
   /** Session summaries for list page: sessions in range with markedCount and totalChildCount. */
   async getSessionSummaries(
     tenantId: string,
@@ -163,7 +110,6 @@ export class AttendanceService {
     const sessions = await prisma.session.findMany({
       where: {
         tenantId,
-        rotaKind: SessionRotaKind.STANDARD,
         startsAt: { lte: to },
         endsAt: { gte: from },
       },
@@ -231,7 +177,7 @@ export class AttendanceService {
     tenantId: string,
   ) {
     const session = await tx.session.findFirst({
-      where: { id: sessionId, tenantId, rotaKind: SessionRotaKind.STANDARD },
+      where: { id: sessionId, tenantId },
       select: {
         id: true,
         title: true,
@@ -314,11 +260,7 @@ export class AttendanceService {
       this.requestContext.currentOrgId,
       async (tx) => {
         const session = await tx.session.findFirst({
-          where: {
-            id: sessionId,
-            tenantId,
-            rotaKind: SessionRotaKind.STANDARD,
-          },
+          where: { id: sessionId, tenantId },
           select: { id: true, groups: { select: { id: true } } },
         });
         if (!session) throw new NotFoundException("Session not found");
@@ -509,18 +451,9 @@ export class AttendanceService {
     if (input.sessionId) {
       const session = await prisma.session.findUnique({
         where: { id: input.sessionId },
-        select: {
-          id: true,
-          tenantId: true,
-          rotaKind: true,
-          groups: { select: { id: true } },
-        },
+        select: { id: true, tenantId: true, groups: { select: { id: true } } },
       });
-      if (
-        !session ||
-        session.tenantId !== tenantId ||
-        session.rotaKind !== SessionRotaKind.STANDARD
-      ) {
+      if (!session || session.tenantId !== tenantId) {
         throw new NotFoundException("Attendance not found");
       }
       if (
@@ -646,18 +579,9 @@ export class AttendanceService {
     if (input.sessionId) {
       const session = await tx.session.findUnique({
         where: { id: input.sessionId },
-        select: {
-          id: true,
-          tenantId: true,
-          rotaKind: true,
-          groups: { select: { id: true } },
-        },
+        select: { id: true, tenantId: true, groups: { select: { id: true } } },
       });
-      if (
-        !session ||
-        session.tenantId !== tenantId ||
-        session.rotaKind !== SessionRotaKind.STANDARD
-      ) {
+      if (!session || session.tenantId !== tenantId) {
         throw new NotFoundException("Attendance not found");
       }
       const effectiveGroupId = input.groupId ?? current.groupId ?? undefined;
