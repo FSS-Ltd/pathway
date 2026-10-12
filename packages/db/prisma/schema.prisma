@@ -142,6 +142,8 @@ enum AuditEntityType {
   ACE_MESSAGE
   ACE_NOTICE
   ACE_RECORD
+  ENROLMENT
+  ENROLMENT_ROLL
 }
 
 enum OutboxStatus {
@@ -938,6 +940,8 @@ model Org {
   orgModules          OrgModule[]
   moduleGrants        ModuleGrant[]
   moduleChanges       ModuleChange[]
+  childIdentities     OrgChildIdentity[]
+  rollConfirmations   EnrolmentRollConfirmation[]
   roleDefinitions     OrgRoleDefinition[]
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
@@ -964,6 +968,7 @@ model Tenant {
   users           User[]
   groups          Group[]
   children        Child[]
+  enrolmentLinks  OrgChildSiteLink[]
   roles           UserTenantRole[]
   sessions        Session[]
   lessons         Lesson[]
@@ -1169,6 +1174,8 @@ model User {
   notes                             ChildNote[]                 @relation("ChildNoteAuthor")
   approvedNotes                     ChildNote[]                 @relation("ChildNoteApprovedBy")
   auditEvents                       AuditEvent[]                @relation("AuditActor")
+  enrolmentRevisions                EnrolmentRevision[]         @relation("EnrolmentRevisionActor")
+  rollConfirmations                 EnrolmentRollConfirmation[] @relation("EnrolmentRollConfirmer")
   swapRequestsFrom                  SwapRequest[]               @relation("SwapFromUser")
   swapRequestsTo                    SwapRequest[]               @relation("SwapToUser")
   orgRoles                          UserOrgRole[]
@@ -1639,6 +1646,7 @@ model Child {
   notes                      String?
   tenantId                   String
   tenant                     Tenant                      @relation(fields: [tenantId], references: [id])
+  enrolmentLink              OrgChildSiteLink?
   guardians                  User[]                      @relation("ParentChildren")
   guardianContacts           ChildGuardianContact[]
   registrationSubmissions    ChildRegistrationSubmission[]
@@ -1689,6 +1697,73 @@ model Child {
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([isGuest, guestExpiresAt])
+}
+
+// An organisation-local identity may link child profiles at multiple permitted
+// sites. Existing profiles are only candidates until an administrator links one.
+model OrgChildIdentity {
+  id             String   @id @default(uuid())
+  orgId          String
+  localReference String
+  createdAt      DateTime @default(now())
+  org            Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  siteLinks      OrgChildSiteLink[]
+  revisions      EnrolmentRevision[]
+
+  @@unique([id, orgId])
+  @@unique([orgId, localReference])
+  @@index([orgId])
+}
+
+model OrgChildSiteLink {
+  id         String   @id @default(uuid())
+  orgId      String
+  identityId String
+  tenantId   String
+  childId    String
+  linkedAt   DateTime @default(now())
+  identity   OrgChildIdentity @relation(fields: [identityId, orgId], references: [id, orgId], onDelete: Restrict)
+  tenant     Tenant   @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  child      Child    @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+
+  @@unique([childId, tenantId])
+  @@index([orgId, identityId])
+  @@index([tenantId])
+}
+
+// Each revision is an immutable, complete set of admission/leaving periods.
+// recordedAt allows a delayed census to replay only knowledge held at cutoff.
+model EnrolmentRevision {
+  id          String   @id @default(uuid())
+  orgId       String
+  identityId  String
+  version     Int
+  periods     Json
+  reason      String
+  actorUserId String
+  recordedAt  DateTime @default(now())
+  identity    OrgChildIdentity @relation(fields: [identityId, orgId], references: [id, orgId], onDelete: Restrict)
+  actor       User     @relation("EnrolmentRevisionActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([identityId, version])
+  @@index([orgId, recordedAt])
+  @@index([identityId, recordedAt])
+}
+
+model EnrolmentRollConfirmation {
+  id              String   @id @default(uuid())
+  orgId           String
+  effectiveOn     DateTime @db.Date
+  revisionCutoff  DateTime
+  identityIds     Json
+  enrolledCount   Int
+  confirmerUserId String
+  confirmedAt     DateTime @default(now())
+  org             Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  confirmer       User     @relation("EnrolmentRollConfirmer", fields: [confirmerUserId], references: [id], onDelete: Restrict)
+
+  @@index([orgId, confirmedAt])
+  @@index([orgId, effectiveOn])
 }
 
 model Group {
