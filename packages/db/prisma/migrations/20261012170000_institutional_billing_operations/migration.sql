@@ -1,3 +1,27 @@
+-- Keep new tables with the physical Prisma core tables in either supported layout.
+DO $$
+DECLARE
+  core_schema text;
+BEGIN
+  SELECT n.nspname INTO STRICT core_schema
+  FROM pg_catalog.pg_class AS c
+  JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+  WHERE c.relname = 'Org'
+    AND c.relkind IN ('r', 'p')
+    AND n.nspname IN ('app', 'public');
+
+  PERFORM pg_catalog.set_config(
+    'search_path',
+    pg_catalog.format(
+      '%I, %I',
+      core_schema,
+      CASE core_schema WHEN 'app' THEN 'public' ELSE 'app' END
+    ),
+    false
+  );
+END;
+$$;
+
 CREATE TYPE "InstitutionalBillingOperationKind" AS ENUM ('CENSUS_FREEZE', 'RENEWAL_RECONCILE', 'PROVIDER_SCHEDULE');
 CREATE TYPE "InstitutionalBillingOperationStatus" AS ENUM ('PENDING', 'CLAIMED', 'RETRY', 'COMPLETED', 'REVIEW_REQUIRED');
 
@@ -66,27 +90,39 @@ DO $$ BEGIN
   END IF;
 END $$;
 
-CREATE FUNCTION app.list_due_institutional_billing_org_ids(at_time TIMESTAMPTZ)
-RETURNS TABLE ("orgId" TEXT)
-LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
-  SELECT DISTINCT operation."orgId"
-  FROM app."InstitutionalBillingOperation" AS operation
-  WHERE (operation."status" IN ('PENDING', 'RETRY') AND operation."dueAt" <= (at_time AT TIME ZONE 'UTC'))
-     OR (operation."status" = 'CLAIMED' AND operation."claimedUntil" <= (at_time AT TIME ZONE 'UTC'))
-  ORDER BY operation."orgId";
-$$;
+DO $migration$
+BEGIN
+  EXECUTE pg_catalog.format($definition$
+    CREATE FUNCTION app.list_due_institutional_billing_org_ids(at_time TIMESTAMPTZ)
+    RETURNS TABLE ("orgId" TEXT)
+    LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $body$
+      SELECT DISTINCT operation."orgId"
+      FROM %I."InstitutionalBillingOperation" AS operation
+      WHERE (operation."status" IN ('PENDING', 'RETRY') AND operation."dueAt" <= (at_time AT TIME ZONE 'UTC'))
+         OR (operation."status" = 'CLAIMED' AND operation."claimedUntil" <= (at_time AT TIME ZONE 'UTC'))
+      ORDER BY operation."orgId";
+    $body$;
+  $definition$, pg_catalog.current_schema());
+END;
+$migration$;
 REVOKE ALL ON FUNCTION app.list_due_institutional_billing_org_ids(TIMESTAMPTZ) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app.list_due_institutional_billing_org_ids(TIMESTAMPTZ) TO CURRENT_USER;
 
-CREATE FUNCTION app.institutional_billing_alert_counts(before_time TIMESTAMPTZ)
-RETURNS TABLE (overdue BIGINT, needs_review BIGINT)
-LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$
-  SELECT
-    count(*) FILTER (WHERE
-      ("status" IN ('PENDING', 'RETRY') AND "dueAt" < (before_time AT TIME ZONE 'UTC'))
-      OR ("status" = 'CLAIMED' AND "claimedUntil" < (before_time AT TIME ZONE 'UTC'))),
-    count(*) FILTER (WHERE "status" = 'REVIEW_REQUIRED')
-  FROM app."InstitutionalBillingOperation";
-$$;
+DO $migration$
+BEGIN
+  EXECUTE pg_catalog.format($definition$
+    CREATE FUNCTION app.institutional_billing_alert_counts(before_time TIMESTAMPTZ)
+    RETURNS TABLE (overdue BIGINT, needs_review BIGINT)
+    LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $body$
+      SELECT
+        count(*) FILTER (WHERE
+          ("status" IN ('PENDING', 'RETRY') AND "dueAt" < (before_time AT TIME ZONE 'UTC'))
+          OR ("status" = 'CLAIMED' AND "claimedUntil" < (before_time AT TIME ZONE 'UTC'))),
+        count(*) FILTER (WHERE "status" = 'REVIEW_REQUIRED')
+      FROM %I."InstitutionalBillingOperation";
+    $body$;
+  $definition$, pg_catalog.current_schema());
+END;
+$migration$;
 REVOKE ALL ON FUNCTION app.institutional_billing_alert_counts(TIMESTAMPTZ) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION app.institutional_billing_alert_counts(TIMESTAMPTZ) TO CURRENT_USER;

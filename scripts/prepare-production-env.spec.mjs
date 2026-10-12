@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
+import { URL, fileURLToPath } from "node:url";
 import { parseEnvFile } from "./lib/env-file.mjs";
 import { validatePrismaMigrationUrl } from "./validate-prisma-migration-url.mjs";
 
@@ -14,7 +14,7 @@ const script = fileURLToPath(
 const targetRef = "jzofykdzpuslpdyfovxp";
 const sourceRef = "fkajodqkxysfcnfhizwn";
 const targetPooler = "aws-0-eu-west-2.pooler.supabase.com";
-const directUrl = `postgresql://postgres:fixture-password@db.${targetRef}.supabase.co:5432/postgres?schema=app`;
+const directUrl = `postgresql://postgres:fixture-password@db.${targetRef}.supabase.co:5432/postgres?schema=public`;
 
 function fixture(t, lines) {
   const directory = fs.mkdtempSync(
@@ -74,7 +74,7 @@ test("uses the selected project's URL and explicit pooler host", (t) => {
 test("can use a matching existing session pooler URL for conversion", (t) => {
   const files = fixture(t, [
     `DATABASE_URL=${directUrl}`,
-    `DIRECT_URL=postgresql://postgres.${targetRef}:fixture-password@${targetPooler}:5432/postgres?schema=app`,
+    `DIRECT_URL=postgresql://postgres.${targetRef}:fixture-password@${targetPooler}:5432/postgres?schema=public`,
   ]);
 
   const result = prepare(files);
@@ -87,7 +87,7 @@ test("can use a matching existing session pooler URL for conversion", (t) => {
 
 test("derives runtime and migration URLs from a session pooler source", (t) => {
   const files = fixture(t, [
-    `DATABASE_URL=postgresql://postgres.${targetRef}:fixture-password@${targetPooler}:5432/postgres?schema=app&pgbouncer=true&connection_limit=1`,
+    `DATABASE_URL=postgresql://postgres.${targetRef}:fixture-password@${targetPooler}:5432/postgres?schema=public&pgbouncer=true&connection_limit=1`,
   ]);
 
   const result = prepare(files);
@@ -111,7 +111,7 @@ test("derives runtime and migration URLs from a session pooler source", (t) => {
 });
 
 test("removes transaction options from an existing session migration URL", (t) => {
-  const sessionUrl = `postgresql://postgres.${targetRef}:fixture-password@${targetPooler}:5432/postgres?schema=app&pgbouncer=true&connection_limit=1`;
+  const sessionUrl = `postgresql://postgres.${targetRef}:fixture-password@${targetPooler}:5432/postgres?schema=public&pgbouncer=true&connection_limit=1`;
   const files = fixture(t, [
     `DATABASE_URL=${sessionUrl}`,
     `DIRECT_URL=${sessionUrl}`,

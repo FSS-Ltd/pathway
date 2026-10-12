@@ -1,4 +1,27 @@
-SET search_path TO app, public;
+-- Keep Prisma models in the schema containing the physical core tables. Production
+-- uses public; fresh installations may use app. Views cannot be FK targets.
+DO $$
+DECLARE
+  core_schema text;
+BEGIN
+  SELECT n.nspname INTO STRICT core_schema
+  FROM pg_catalog.pg_class AS c
+  JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+  WHERE c.relname = 'Org'
+    AND c.relkind IN ('r', 'p')
+    AND n.nspname IN ('app', 'public');
+
+  PERFORM pg_catalog.set_config(
+    'search_path',
+    pg_catalog.format(
+      '%I, %I',
+      core_schema,
+      CASE core_schema WHEN 'app' THEN 'public' ELSE 'app' END
+    ),
+    false
+  );
+END;
+$$;
 
 ALTER TYPE "AuditEntityType" ADD VALUE 'ENROLMENT';
 ALTER TYPE "AuditEntityType" ADD VALUE 'ENROLMENT_ROLL';
