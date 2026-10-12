@@ -56,7 +56,7 @@ jobs:
           test -n "$VERCEL_PROJECT_ID"
           npx --yes vercel@54.13.0 curl / \
             --deployment "$ADMIN_DEPLOYMENT_URL" \
-            --non-interactive -- \
+            -- \
             --silent --show-error --max-time 20 \
             --dump-header /tmp/nexsteps-admin-headers.txt \
             --output /tmp/nexsteps-admin-response.txt
