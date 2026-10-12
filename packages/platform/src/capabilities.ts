@@ -22,6 +22,9 @@ export async function getOrgCapabilities(
   if (vertical) {
     for (const c of VERTICAL_CAPABILITIES[vertical]) caps.add(c);
   }
+  // Learning is part of the platform for every organisation, regardless of
+  // optional-module billing or an OrgModule grant.
+  for (const c of MODULE_CAPABILITIES.LEARNING) caps.add(c);
   for (const m of modules) {
     if (m.expiresAt && m.expiresAt.getTime() <= now) continue;
     for (const c of MODULE_CAPABILITIES[m.module]) caps.add(c);

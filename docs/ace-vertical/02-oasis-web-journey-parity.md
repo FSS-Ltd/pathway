@@ -77,10 +77,11 @@ parity.
 ## Paid add-ons and release boundaries
 
 These are tracked here so core journeys cannot quietly absorb paid features.
-Growth and Professional inclusions remain governed by the existing entitlement
-engine and approved pricing record. A subscription's active module is checked
-server-side for every paid read and write, including after expiry or a site
-switch.
+Growth and Professional each provide a fixed count of customer-selected included
+module slots, governed by the existing entitlement engine and approved pricing
+record. Existing subscriptions retain their prior fixed bundle selections. A
+subscription's active module is checked server-side for every paid read and
+write, including after expiry or a site switch.
 
 | ID                     | Oasis evidence                                                     | NexSteps state and target entitlement                                                                                  | Acceptance check                                                                                                                     |
 | ---------------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |

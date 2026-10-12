@@ -6,6 +6,12 @@ import { type BillingProviderConfig } from "../billing-provider.config";
 import type { PathwayRequestContext } from "@pathway/auth";
 import { Auth0ManagementService } from "../../auth/auth0-management.service";
 
+// Exercise the future purchase mechanics separately from the launch readiness gate.
+jest.mock("@pathway/pricing", () => ({
+  ...jest.requireActual("@pathway/pricing"),
+  isConfiguratorModuleReady: jest.fn(() => true),
+}));
+
 const prismaMock = {
   pendingOrder: { create: jest.fn(), update: jest.fn() },
   orgMembership: { findUnique: jest.fn() },
@@ -257,6 +263,12 @@ describe("BuyNowService", () => {
       },
     });
 
+    expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: expect.objectContaining({ selectedIncludedModules: [] }),
+      }),
+      expect.anything(),
+    );
     expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -274,7 +286,7 @@ describe("BuyNowService", () => {
     );
   });
 
-  it("strips included modules and deduplicates eligible paid modules for public checkout", async () => {
+  it("marks explicit empty public inclusion selections so webhook compatibility never adds legacy bundles", async () => {
     const service = new BuyNowService(
       previewService,
       providerMock,
@@ -287,26 +299,106 @@ describe("BuyNowService", () => {
       ...baseRequest,
       plan: {
         planCode: "GROWTH_99_MONTHLY",
-        selectedModules: [
-          Module.FINANCE,
-          Module.TRANSPORT,
-          Module.TRANSPORT,
-          Module.EVENTS,
-        ],
+        selectedIncludedModules: [],
+        selectedModules: [Module.MEALS],
       },
     });
 
     expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ selectedModules: [Module.TRANSPORT] }),
+        data: expect.objectContaining({
+          selectedModules: [Module.MEALS],
+          flags: { moduleSelection: { includedModules: [] } },
+        }),
+      }),
+    );
+  });
+
+  it("splits customer-selected included modules from paid Growth extras on public checkout", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await service.checkout({
+      ...baseRequest,
+      plan: {
+        planCode: "GROWTH_99_MONTHLY",
+        selectedIncludedModules: [
+          Module.FINANCE,
+          Module.TRANSPORT,
+          Module.EVENTS,
+        ],
+        selectedModules: [Module.MEALS, Module.ASSET_MANAGEMENT],
+      },
+    });
+
+    expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          selectedModules: [
+            Module.FINANCE,
+            Module.TRANSPORT,
+            Module.EVENTS,
+            Module.MEALS,
+            Module.ASSET_MANAGEMENT,
+          ],
+          flags: {
+            moduleSelection: {
+              includedModules: [
+                Module.FINANCE,
+                Module.TRANSPORT,
+                Module.EVENTS,
+              ],
+            },
+          },
+        }),
       }),
     );
     expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        plan: expect.objectContaining({ selectedModules: [Module.TRANSPORT] }),
+        plan: expect.objectContaining({
+          selectedIncludedModules: [
+            Module.FINANCE,
+            Module.TRANSPORT,
+            Module.EVENTS,
+          ],
+          selectedModules: [Module.MEALS, Module.ASSET_MANAGEMENT],
+        }),
       }),
       expect.anything(),
     );
+  });
+
+  it("rejects included modules outside the plan allowance before creating an order", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await expect(
+      service.checkout({
+        ...baseRequest,
+        plan: {
+          planCode: "GROWTH_99_MONTHLY",
+          selectedIncludedModules: [
+            Module.FINANCE,
+            Module.EVENTS,
+            Module.HR,
+            Module.TRANSPORT,
+          ],
+          selectedModules: [],
+        },
+      }),
+    ).rejects.toThrow("Selected included modules exceed the plan allowance");
+    expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
+    expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
   });
 
   it("normalizes CORE before resolving modules for public checkout", async () => {
@@ -338,6 +430,7 @@ describe("BuyNowService", () => {
       expect.objectContaining({
         plan: expect.objectContaining({
           planCode: "MINIMUM_MONTHLY",
+          selectedIncludedModules: [],
           selectedModules: [Module.FINANCE],
         }),
       }),
@@ -365,7 +458,7 @@ describe("BuyNowService", () => {
     expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
   });
 
-  it("permits a same-plan module-only purchase and persists its selection", async () => {
+  it("routes a same-plan module-only change away from Checkout", async () => {
     prismaMock.subscription.findFirst.mockResolvedValue({
       planCode: "STARTER_MONTHLY",
     });
@@ -384,13 +477,13 @@ describe("BuyNowService", () => {
       providerConfig,
     );
 
-    await service.purchaseForOrg(
+    await expect(service.purchaseForOrg(
       {
         planCode: "STARTER_MONTHLY",
         selectedModules: [Module.FINANCE],
       },
       { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
-    );
+    )).rejects.toThrow("Use the renewal change flow");
 
     expect(prismaMock.subscription.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -399,24 +492,41 @@ describe("BuyNowService", () => {
         }),
       }),
     );
+    expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
+    expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("marks explicit empty authenticated inclusion selections for webhook activation", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await service.purchaseForOrg(
+      {
+        planCode: "GROWTH_99_MONTHLY",
+        selectedIncludedModules: [],
+        selectedModules: [Module.MEALS],
+        successUrl: "https://example.com/success",
+        cancelUrl: "https://example.com/cancel",
+      },
+      { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+    );
+
     expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          selectedModules: [Module.FINANCE],
-          flags: { purchaseKind: "add-on" },
+          selectedModules: [Module.MEALS],
+          flags: { moduleSelection: { includedModules: [] } },
         }),
       }),
     );
-    expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        addonsOnly: true,
-        plan: expect.objectContaining({ selectedModules: [Module.FINANCE] }),
-      }),
-      expect.anything(),
-    );
   });
 
-  it("strips included modules and deduplicates eligible paid modules for authenticated checkout", async () => {
+  it("splits customer-selected included modules from paid Growth extras for authenticated checkout", async () => {
     prismaMock.org.findUnique
       .mockResolvedValueOnce({ isMasterOrg: false })
       .mockResolvedValueOnce({ name: "Test Org", stripeCustomerId: "cus_123" });
@@ -432,24 +542,48 @@ describe("BuyNowService", () => {
     await service.purchaseForOrg(
       {
         planCode: "GROWTH_99_MONTHLY",
-        selectedModules: [
+        selectedIncludedModules: [
           Module.FINANCE,
-          Module.TRANSPORT,
           Module.TRANSPORT,
           Module.EVENTS,
         ],
+        selectedModules: [Module.MEALS, Module.ASSET_MANAGEMENT],
       },
       { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
     );
 
     expect(prismaMock.pendingOrder.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ selectedModules: [Module.TRANSPORT] }),
+        data: expect.objectContaining({
+          selectedModules: [
+            Module.FINANCE,
+            Module.TRANSPORT,
+            Module.EVENTS,
+            Module.MEALS,
+            Module.ASSET_MANAGEMENT,
+          ],
+          flags: {
+            moduleSelection: {
+              includedModules: [
+                Module.FINANCE,
+                Module.TRANSPORT,
+                Module.EVENTS,
+              ],
+            },
+          },
+        }),
       }),
     );
     expect(providerMock.createCheckoutSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        plan: expect.objectContaining({ selectedModules: [Module.TRANSPORT] }),
+        plan: expect.objectContaining({
+          selectedIncludedModules: [
+            Module.FINANCE,
+            Module.TRANSPORT,
+            Module.EVENTS,
+          ],
+          selectedModules: [Module.MEALS, Module.ASSET_MANAGEMENT],
+        }),
       }),
       expect.anything(),
     );
@@ -485,6 +619,7 @@ describe("BuyNowService", () => {
       expect.objectContaining({
         plan: expect.objectContaining({
           planCode: "MINIMUM_MONTHLY",
+          selectedIncludedModules: [],
           selectedModules: [Module.FINANCE],
         }),
       }),
@@ -492,7 +627,7 @@ describe("BuyNowService", () => {
     );
   });
 
-  it("rejects an included-only same-plan purchase without creating a pending order", async () => {
+  it("routes an included-only same-plan change away from Checkout", async () => {
     prismaMock.subscription.findFirst.mockResolvedValue({
       planCode: "GROWTH_99_MONTHLY",
     });
@@ -513,8 +648,27 @@ describe("BuyNowService", () => {
         },
         { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
       ),
-    ).rejects.toThrow("already on this plan");
+    ).rejects.toThrow("Use the renewal change flow");
 
+    expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
+    expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("does not start an immediate Checkout for an existing plan change", async () => {
+    prismaMock.subscription.findFirst.mockResolvedValue({
+      planCode: "STARTER_49_MONTHLY",
+    });
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+    await expect(service.purchaseForOrg(
+      { planCode: "GROWTH_99_MONTHLY" },
+      { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+    )).rejects.toThrow("Use the renewal change flow");
     expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
     expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
   });
@@ -588,7 +742,7 @@ describe("BuyNowService", () => {
           ...baseRequest,
           plan: {
             planCode: "STARTER_MONTHLY",
-            selectedModules: [Module.LEARNING],
+            selectedModules: [Module.ASSET_MANAGEMENT],
           },
         }),
       ).rejects.toThrow(

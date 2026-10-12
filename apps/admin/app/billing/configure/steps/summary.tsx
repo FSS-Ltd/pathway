@@ -3,6 +3,7 @@ import {
   type StorageChoice,
   type WebModule,
 } from "../../../../lib/module-catalog";
+import type { AdminModuleChangePreview } from "../../../../lib/api-client";
 
 type SummaryStepProps = {
   planLabel: string;
@@ -10,11 +11,16 @@ type SummaryStepProps = {
   frequency: "monthly" | "yearly";
   includedModules: WebModule[];
   selectedOptionalModules: WebModule[];
+  includedModuleLimit: number;
   storageChoice: StorageChoice;
   onCheckout: () => void;
   isCheckoutPending: boolean;
   checkoutError: string | null;
   disabledReason: string | null;
+  isExistingSubscription: boolean;
+  moduleChangePreview: AdminModuleChangePreview | null;
+  onPreviewChange: () => void;
+  onAcceptChange: () => void;
 };
 
 function storageLabelFor(storageChoice: StorageChoice): string {
@@ -28,11 +34,16 @@ export function SummaryStep({
   frequency,
   includedModules,
   selectedOptionalModules,
+  includedModuleLimit,
   storageChoice,
   onCheckout,
   isCheckoutPending,
   checkoutError,
   disabledReason,
+  isExistingSubscription,
+  moduleChangePreview,
+  onPreviewChange,
+  onAcceptChange,
 }: SummaryStepProps) {
   const errorMessage = checkoutError;
 
@@ -43,13 +54,18 @@ export function SummaryStep({
           id="configurator-step-title"
           className="font-heading text-2xl font-bold text-text-primary"
         >
-          Review your upgrade
+          Review your changes
         </h2>
         <p className="text-text-muted">
-          Check your changes. You'll confirm the exact amount due today at secure
-          checkout.
+          {isExistingSubscription
+            ? "Review the next renewal before you schedule these changes."
+            : "Check your choices before secure checkout."}
         </p>
       </div>
+      <p className="text-sm text-text-muted">
+        Your plan includes up to {includedModuleLimit} chosen modules. Paid
+        module add-ons are listed separately.
+      </p>
       <dl className="grid gap-3 rounded-xl border border-border-subtle bg-surface p-5 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-text-muted">Current plan</dt>
@@ -83,18 +99,63 @@ export function SummaryStep({
               : "None selected"}
           </dd>
         </div>
-        <div>
-          <dt className="text-text-muted">Storage</dt>
-          <dd className="mt-1 font-semibold text-text-primary">
-            {storageLabelFor(storageChoice)}
-          </dd>
-        </div>
+        {!isExistingSubscription ? (
+          <div>
+            <dt className="text-text-muted">Storage</dt>
+            <dd className="mt-1 font-semibold text-text-primary">
+              {storageLabelFor(storageChoice)}
+            </dd>
+          </div>
+        ) : null}
       </dl>
       <div className="space-y-4 rounded-xl border border-border-subtle bg-surface p-5">
         <p className="text-sm text-text-muted">
-          Plan changes are handled securely via Stripe. You'll review the exact
-          amount due today, including any proration, before confirming payment.
+          {isExistingSubscription
+            ? "Changes take effect at your next renewal without a charge today. Existing unrelated subscription items remain in place."
+            : "You'll review the amount due at secure checkout."}
         </p>
+        {moduleChangePreview ? (
+          <div
+            className="rounded-lg border border-border-subtle bg-muted/30 p-4 text-sm"
+            role="status"
+          >
+            <p className="font-semibold text-text-primary">
+              {moduleChangePreview.status === "SCHEDULED"
+                ? "Change scheduled"
+                : "Renewal preview"}
+            </p>
+            <p className="mt-1 text-text-muted">
+              Effective{" "}
+              {new Date(moduleChangePreview.effectiveAt).toLocaleDateString(
+                "en-GB",
+                {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                },
+              )}
+              . Estimated recurring subtotal:{" "}
+              {new Intl.NumberFormat("en-GB", {
+                style: "currency",
+                currency: "GBP",
+              }).format(moduleChangePreview.subtotalPence / 100)}{" "}
+              before discounts and tax.
+            </p>
+            {moduleChangePreview.status === "PREVIEW" ? (
+              <p className="mt-1 text-text-muted">
+                Confirm before{" "}
+                {new Date(moduleChangePreview.expiresAt).toLocaleTimeString(
+                  "en-GB",
+                  {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  },
+                )}
+                .
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {disabledReason ? (
           <p className="rounded-md bg-status-warning/10 px-3 py-2 text-sm text-text-primary">
             {disabledReason}
@@ -110,14 +171,32 @@ export function SummaryStep({
         ) : null}
         <button
           type="button"
-          onClick={onCheckout}
-          disabled={isCheckoutPending || Boolean(disabledReason)}
+          onClick={
+            isExistingSubscription
+              ? moduleChangePreview
+                ? onAcceptChange
+                : onPreviewChange
+              : onCheckout
+          }
+          disabled={
+            isCheckoutPending ||
+            Boolean(disabledReason) ||
+            moduleChangePreview?.status === "SCHEDULED"
+          }
           aria-busy={isCheckoutPending}
           className="rounded-md bg-accent-primary px-5 py-3 text-sm font-semibold text-accent-foreground transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isCheckoutPending
-            ? "Starting checkout…"
-            : "Confirm & continue to secure checkout"}
+            ? isExistingSubscription
+              ? "Updating renewal…"
+              : "Starting checkout…"
+            : isExistingSubscription
+              ? moduleChangePreview?.status === "SCHEDULED"
+                ? "Scheduled for renewal"
+                : moduleChangePreview
+                  ? "Confirm renewal change"
+                  : "Review renewal change"
+              : "Continue to secure checkout"}
         </button>
       </div>
     </section>

@@ -26,6 +26,7 @@ const completeState = (
   orgType: "SCHOOL",
   vertical: "INDEPENDENT_SCHOOL",
   selectedOptionalModules: [],
+  selectedIncludedModules: [],
   planCode: "STARTER_49_MONTHLY",
   frequency: "monthly",
   storageChoice: "none",
@@ -50,6 +51,7 @@ describe("configurator checkout payload", () => {
       "maps Starter monthly with Learning and 100GB",
       completeState({
         selectedOptionalModules: ["LEARNING"],
+        selectedIncludedModules: [],
         storageChoice: "100",
       }),
       {
@@ -59,6 +61,7 @@ describe("configurator checkout payload", () => {
         storageAddon200Gb: 0,
         storageAddon1Tb: 0,
         selectedModules: ["LEARNING"],
+        selectedIncludedModules: [],
         orgName: "Grace Community",
         contactName: "Avery Jordan",
         contactEmail: "avery@example.com",
@@ -74,6 +77,7 @@ describe("configurator checkout payload", () => {
         vertical: "CHURCH",
         planCode: "PROFESSIONAL_149_YEARLY",
         frequency: "yearly",
+        selectedIncludedModules: [],
       }),
       {
         planCode: "PROFESSIONAL_149_YEARLY",
@@ -81,7 +85,8 @@ describe("configurator checkout payload", () => {
         storageAddon100Gb: 0,
         storageAddon200Gb: 0,
         storageAddon1Tb: 0,
-        selectedModules: undefined,
+        selectedModules: [],
+        selectedIncludedModules: [],
         orgName: "Grace Community",
         contactName: "Avery Jordan",
         contactEmail: "avery@example.com",
@@ -92,11 +97,36 @@ describe("configurator checkout payload", () => {
       },
     ],
     [
-      "maps Growth monthly with 1TB for a non-school vertical",
+      "preserves legacy Growth inclusions when no new selection exists",
+      completeState({
+        planCode: "GROWTH_99_MONTHLY",
+        selectedIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
+      }),
+      {
+        planCode: "GROWTH_99_MONTHLY",
+        billingPeriod: "monthly",
+        storageAddon100Gb: 0,
+        storageAddon200Gb: 0,
+        storageAddon1Tb: 0,
+        selectedModules: [],
+        selectedIncludedModules: ["FINANCE", "EVENTS", "ADVANCED_REPORTING"],
+        orgName: "Grace Community",
+        contactName: "Avery Jordan",
+        contactEmail: "avery@example.com",
+        password: "secure-passphrase",
+        sector: "SCHOOL",
+        successUrl: "https://example.com/buy/thanks",
+        cancelUrl: "https://example.com/buy/cancelled",
+      },
+    ],
+    [
+      "maps Growth monthly with selected included and paid modules and 1TB storage",
       completeState({
         vertical: "CHARITY",
         planCode: "GROWTH_99_MONTHLY",
         storageChoice: "1000",
+        selectedIncludedModules: ["FINANCE", "EVENTS", "HR"],
+        selectedOptionalModules: ["LEARNING"],
       }),
       {
         planCode: "GROWTH_99_MONTHLY",
@@ -104,7 +134,8 @@ describe("configurator checkout payload", () => {
         storageAddon100Gb: 0,
         storageAddon200Gb: 0,
         storageAddon1Tb: 1,
-        selectedModules: undefined,
+        selectedModules: ["LEARNING"],
+        selectedIncludedModules: ["FINANCE", "EVENTS", "HR"],
         orgName: "Grace Community",
         contactName: "Avery Jordan",
         contactEmail: "avery@example.com",
@@ -270,10 +301,13 @@ describe("configurator checkout and rollout source contracts", () => {
     expect(summary).toContain("disabled={disabled}");
   });
 
-  it("builds checkout payloads from paid optional modules only", () => {
+  it("builds checkout payloads with included and paid modules kept distinct", () => {
     const checkout = readSource("lib/configurator-checkout.ts");
 
-    expect(checkout).toContain("state.selectedOptionalModules");
-    expect(checkout).not.toContain("state.selectedModules");
+    expect(checkout).toContain(
+      "selectedModules: state.selectedOptionalModules",
+    );
+    expect(checkout).toContain("selectedIncludedModules:");
+    expect(checkout).toContain("state.selectedIncludedModules");
   });
 });

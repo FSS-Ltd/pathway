@@ -8,10 +8,12 @@ import {
   Optional,
   Post,
   Req,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
 import {
   prisma,
+  applyTenantContext,
   SubscriptionStatus,
   Prisma,
   PendingOrderStatus,
@@ -19,7 +21,7 @@ import {
   OrgRole,
   OrgSector,
   Module,
-  ModuleStatus,
+  ModuleChangeStatus,
 } from "@pathway/db";
 import {
   getConfiguratorPlanPolicy,
@@ -32,22 +34,35 @@ import {
   ParsedBillingWebhookEvent,
 } from "./billing-webhook.provider";
 import { getPlanDefinition } from "./billing-plans";
-import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
-import { LoggingService, StructuredLogger } from "../common/logging/logging.service";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+} from "./billing-provider.config";
+import {
+  LoggingService,
+  StructuredLogger,
+} from "../common/logging/logging.service";
 import { Auth0ManagementService } from "../auth/auth0-management.service";
 import { ClerkManagementService } from "../auth/clerk-management.service";
 import { getAuthProviderMode } from "../config/runtime-env";
 import Stripe from "stripe";
 import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
+import {
+  cancelPaidSourceGrants,
+  reconcileSubscriptionModuleGrants,
+  updateSubscriptionGrantPeriod,
+} from "./module-grants";
+import {
+  claimBillingEvent,
+  finishBillingEvent,
+} from "./billing-event-processing";
 
 type WebhookResult =
   | { status: "ok"; eventId: string }
   | { status: "ignored_duplicate"; eventId: string }
   | { status: "ignored_unknown"; eventId: string };
 
-type PendingOrderRecord = Prisma.PendingOrderGetPayload<
-  Record<string, never>
->;
+type PendingOrderRecord = Prisma.PendingOrderGetPayload<Record<string, never>>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -55,9 +70,42 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isAddOnOnlyOrder(pendingOrder: PendingOrderRecord): boolean {
   return (
-    isRecord(pendingOrder.flags) &&
-    pendingOrder.flags.purchaseKind === "add-on"
+    isRecord(pendingOrder.flags) && pendingOrder.flags.purchaseKind === "add-on"
   );
+}
+
+function includedModulesFromPendingOrder(
+  pendingOrder: PendingOrderRecord,
+  selectedModules: readonly Module[],
+): Module[] {
+  if (isAddOnOnlyOrder(pendingOrder)) return [];
+
+  const policy = getConfiguratorPlanPolicy(pendingOrder.planCode);
+  if (!policy || policy.outcome !== "checkout") return [];
+
+  const moduleSelection = isRecord(pendingOrder.flags)
+    ? pendingOrder.flags.moduleSelection
+    : undefined;
+  if (
+    isRecord(moduleSelection) &&
+    Array.isArray(moduleSelection.includedModules)
+  ) {
+    const includedSelection = moduleSelection.includedModules;
+    if (includedSelection.length > policy.includedModuleLimit) return [];
+    const selected = new Set(selectedModules);
+    const included = includedSelection.filter(
+      (module): module is Module =>
+        typeof module === "string" &&
+        selected.has(module as Module) &&
+        policy.eligibleOptionalModules.includes(
+          module as ConfiguratorModuleCode,
+        ),
+    );
+    return [...new Set(included)].slice(0, policy.includedModuleLimit);
+  }
+
+  // Legacy orders predate explicit included choices and module selections.
+  return [...policy.legacyIncludedModules] as Module[];
 }
 
 function subscriptionPlanCode(
@@ -69,21 +117,6 @@ function subscriptionPlanCode(
     ? addOnSubscriptionPlanCode(pendingOrder.planCode)
     : pendingOrder.planCode;
 }
-
-const PRISMA_MODULE_BY_CONFIGURATOR_CODE: Record<
-  ConfiguratorModuleCode,
-  Module
-> = {
-  FINANCE: Module.FINANCE,
-  EVENTS: Module.EVENTS,
-  TRANSPORT: Module.TRANSPORT,
-  MEALS: Module.MEALS,
-  ASSET_MANAGEMENT: Module.ASSET_MANAGEMENT,
-  HR: Module.HR,
-  AI_WORKSPACE: Module.AI_WORKSPACE,
-  ADVANCED_REPORTING: Module.ADVANCED_REPORTING,
-  LEARNING: Module.LEARNING,
-};
 
 export function isOrgSector(value: string | undefined): value is OrgSector {
   return !!value && (Object.values(OrgSector) as string[]).includes(value);
@@ -105,7 +138,8 @@ export class BillingWebhookController {
     @Inject(EntitlementsService)
     private readonly entitlements: EntitlementsService,
     @Inject(ModuleRef) private readonly moduleRef: ModuleRef,
-    @Inject(BILLING_PROVIDER_CONFIG) private readonly billingConfig: BillingProviderConfig,
+    @Inject(BILLING_PROVIDER_CONFIG)
+    private readonly billingConfig: BillingProviderConfig,
     @Optional()
     @Inject(LoggingService)
     logging?: LoggingService,
@@ -113,7 +147,7 @@ export class BillingWebhookController {
     this.logger = logging
       ? logging.createLogger(BillingWebhookController.name)
       : this.createFallbackLogger();
-    
+
     this.logger.info("BillingWebhookController initialized", {
       hasModuleRef: !!this.moduleRef,
       moduleRefType: typeof this.moduleRef,
@@ -126,7 +160,9 @@ export class BillingWebhookController {
   private getAuth0Service(): Auth0ManagementService | null {
     if (!this.auth0Management) {
       try {
-        this.auth0Management = this.moduleRef.get(Auth0ManagementService, { strict: false });
+        this.auth0Management = this.moduleRef.get(Auth0ManagementService, {
+          strict: false,
+        });
         this.logger.info("Auth0ManagementService lazy-loaded", {
           isReady: this.auth0Management?.isReady(),
         });
@@ -145,7 +181,9 @@ export class BillingWebhookController {
   private getClerkService(): ClerkManagementService | null {
     if (!this.clerkManagement) {
       try {
-        this.clerkManagement = this.moduleRef.get(ClerkManagementService, { strict: false });
+        this.clerkManagement = this.moduleRef.get(ClerkManagementService, {
+          strict: false,
+        });
         this.logger.info("ClerkManagementService lazy-loaded", {
           isReady: this.clerkManagement?.isReady(),
         });
@@ -178,16 +216,10 @@ export class BillingWebhookController {
   ): Promise<WebhookResult> {
     const sig = signature ?? stripeSignature;
     const rawBody = req?.rawBody;
-    let event = await this.provider.verifyAndParse(body, sig, rawBody);
+    const event = await this.provider.verifyAndParse(body, sig, rawBody);
 
-    const alreadyHandled = await prisma.billingEvent.findFirst({
-      where: {
-        provider: event.provider,
-        payloadJson: { path: ["eventId"], equals: event.eventId },
-      },
-      select: { id: true },
-    });
-    if (alreadyHandled) {
+    const claim = await claimBillingEvent(event);
+    if (claim.status === "duplicate") {
       this.logger.info("Duplicate webhook ignored", {
         provider: event.provider,
         eventId: event.eventId,
@@ -196,31 +228,33 @@ export class BillingWebhookController {
       return { status: "ignored_duplicate", eventId: event.eventId };
     }
 
-    // If orgId is "pending", resolve the actual orgId from the pending order
-    if (event.orgId === "pending" && event.providerCheckoutId) {
-      const pendingOrder = await prisma.pendingOrder.findFirst({
-        where: {
-          provider: event.provider,
-          providerCheckoutId: event.providerCheckoutId,
-        },
-      });
+    try {
+      return await this.processClaimedEvent(event, claim.id);
+    } catch (error) {
+      await finishBillingEvent(claim.id, event.orgId, false);
+      throw error;
+    }
+  }
 
-      if (pendingOrder?.pendingOrgDetails && !pendingOrder.orgId) {
+  private async processClaimedEvent(
+    event: ParsedBillingWebhookEvent,
+    claimId: string,
+  ): Promise<WebhookResult> {
+    // If orgId is "pending", resolve the actual orgId from the pending order
+    if (event.orgId === "pending" || !event.orgId) {
+      const pendingOrder = await this.findPendingOrder(event);
+
+      if (
+        pendingOrder?.pendingOrgDetails &&
+        !pendingOrder.orgId &&
+        event.kind === "invoice.paid"
+      ) {
         // Create org/tenant/user NOW before processing the event
-        const created = await this.createOrgFromPendingDetails(pendingOrder.pendingOrgDetails);
-        
-        // Update the pending order with the real orgId
-        await prisma.pendingOrder.update({
-          where: { id: pendingOrder.id },
-          data: {
-            orgId: created.orgId,
-            tenantId: created.tenantId,
-          },
-        });
+        const created = await this.createOrgFromPendingDetails(pendingOrder);
 
         // Update the event orgId for subsequent processing
         event = { ...event, orgId: created.orgId };
-        
+
         this.logger.info("Resolved pending orgId", {
           pendingOrderId: pendingOrder.id,
           orgId: created.orgId,
@@ -231,23 +265,18 @@ export class BillingWebhookController {
       }
     }
 
+    if (
+      event.kind === "invoice.paid" &&
+      (!event.orgId || event.orgId === "pending")
+    ) {
+      throw new ServiceUnavailableException(
+        "Billing organisation is not available for this payment event.",
+      );
+    }
+
     const applied = await this.applyEvent(event);
 
-    // Only create billing event if we have a valid orgId
-    if (event.orgId && event.orgId !== "pending") {
-      await prisma.billingEvent.create({
-        data: {
-          orgId: event.orgId,
-          provider: event.provider,
-          type: event.kind,
-          payloadJson: {
-            eventId: event.eventId,
-            subscriptionId: event.subscriptionId,
-            orgId: event.orgId,
-          },
-        },
-      });
-    }
+    await finishBillingEvent(claimId, event.orgId, true);
 
     if (applied) {
       // Warm the resolver; no enforcement here.
@@ -273,9 +302,7 @@ export class BillingWebhookController {
     return { status: "ignored_unknown", eventId: event.eventId };
   }
 
-  private async applyEvent(
-    event: ParsedBillingWebhookEvent,
-  ): Promise<boolean> {
+  private async applyEvent(event: ParsedBillingWebhookEvent): Promise<boolean> {
     switch (event.kind) {
       case "subscription.updated":
       case "subscription.created":
@@ -287,6 +314,7 @@ export class BillingWebhookController {
         return true;
       case "invoice.payment_failed":
         {
+          if (!event.orgId || event.orgId === "pending") return true;
           const pendingOrder = await this.findPendingOrder(event);
           await this.upsertSubscription(
             event,
@@ -319,14 +347,22 @@ export class BillingWebhookController {
     }
 
     const pendingOrder = await this.findPendingOrder(event);
+    const awaitingPayment =
+      pendingOrder !== null &&
+      pendingOrder.status !== PendingOrderStatus.COMPLETED &&
+      event.kind !== "invoice.paid";
+    const effectiveStatus = awaitingPayment
+      ? SubscriptionStatus.INCOMPLETE
+      : status;
     const shouldApplyPendingOrder =
       pendingOrder !== null &&
       pendingOrder.status !== PendingOrderStatus.COMPLETED &&
+      event.kind === "invoice.paid" &&
       status === SubscriptionStatus.ACTIVE;
     if (!shouldApplyPendingOrder) {
       await this.upsertSubscription(
         event,
-        status,
+        effectiveStatus,
         prisma,
         subscriptionPlanCode(event, pendingOrder),
       );
@@ -338,8 +374,12 @@ export class BillingWebhookController {
       );
     }
 
+    if (event.kind === "invoice.paid" && status === SubscriptionStatus.ACTIVE) {
+      await this.applyScheduledModuleChange(event);
+    }
+
     if (pendingOrder) {
-      if (status !== SubscriptionStatus.ACTIVE) return;
+      if (effectiveStatus !== SubscriptionStatus.ACTIVE) return;
 
       if (pendingOrder.status !== PendingOrderStatus.COMPLETED) {
         await this.applyPendingOrder(event, status, pendingOrder);
@@ -369,50 +409,153 @@ export class BillingWebhookController {
     pendingOrder: PendingOrderRecord,
     event: ParsedBillingWebhookEvent,
   ): Promise<void> {
-    const policy = getConfiguratorPlanPolicy(pendingOrder.planCode);
-    const includedModules =
-      !isAddOnOnlyOrder(pendingOrder) && policy?.outcome === "checkout"
-        ? policy.includedModules.map(
-            (moduleCode) => PRISMA_MODULE_BY_CONFIGURATOR_CODE[moduleCode],
-          )
-        : [];
-    const selectedModules = pendingOrder.selectedModules ?? [];
-    const entitlementSources = new Map<Module, "plan" | "add-on">();
+    const selectedModules = [...new Set(pendingOrder.selectedModules ?? [])];
+    const includedModules = includedModulesFromPendingOrder(
+      pendingOrder,
+      selectedModules,
+    );
+    const includedModuleSet = new Set(includedModules);
+    const paidModules = selectedModules.filter(
+      (module) => !includedModuleSet.has(module),
+    );
+    await reconcileSubscriptionModuleGrants(
+      tx,
+      orgId,
+      event.subscriptionId,
+      { included: includedModules, paid: paidModules },
+      event.periodEnd ?? null,
+    );
+  }
 
-    for (const module of includedModules) {
-      entitlementSources.set(module, "plan");
-    }
-    for (const module of selectedModules) {
-      if (!entitlementSources.has(module)) {
-        entitlementSources.set(module, "add-on");
-      }
-    }
-    if (entitlementSources.size === 0) return;
-
-    const now = new Date();
-    for (const [module, entitlementSource] of entitlementSources) {
-      const metadata = {
-        billingSource: "subscription",
-        subscriptionId: event.subscriptionId,
-        entitlementSource,
-      };
-      await tx.orgModule.upsert({
-        where: { orgId_module: { orgId, module } },
-        create: {
-          orgId,
-          module,
-          status: ModuleStatus.ACTIVE,
-          activatedAt: now,
-          expiresAt: event.periodEnd ?? null,
-          metadata,
+  private async applyScheduledModuleChange(
+    event: ParsedBillingWebhookEvent,
+  ): Promise<void> {
+    if (!event.periodStart || !event.orgId || !event.subscriptionId) return;
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, "", event.orgId);
+      const change = await tx.moduleChange.findFirst({
+        where: {
+          orgId: event.orgId,
+          providerSubId: event.subscriptionId,
+          status: ModuleChangeStatus.SCHEDULED,
+          effectiveAt: { lte: event.periodStart! },
         },
-        update: {
-          status: ModuleStatus.ACTIVE,
-          expiresAt: event.periodEnd ?? null,
-          metadata,
-        },
+        orderBy: { effectiveAt: "desc" },
       });
-    }
+      if (!change) return;
+      const claim = await tx.moduleChange.updateMany({
+        where: { id: change.id, status: ModuleChangeStatus.SCHEDULED },
+        data: { status: ModuleChangeStatus.APPLIED },
+      });
+      if (claim.count !== 1) return;
+      await reconcileSubscriptionModuleGrants(
+        tx,
+        event.orgId,
+        event.subscriptionId,
+        { included: change.includedModules, paid: change.paidModules },
+        event.periodEnd ?? null,
+      );
+      const providerItems = change.providerItems;
+      if (
+        isRecord(providerItems) &&
+        Array.isArray(providerItems.retiredSources)
+      ) {
+        for (const source of providerItems.retiredSources) {
+          if (
+            !isRecord(source) ||
+            typeof source.sourceId !== "string" ||
+            !Array.isArray(source.modules) ||
+            !source.modules.every(
+              (module) =>
+                typeof module === "string" &&
+                Object.values(Module).includes(module as Module),
+            )
+          ) {
+            throw new Error(
+              "Scheduled change has invalid retired grant sources",
+            );
+          }
+          await cancelPaidSourceGrants(
+            tx,
+            event.orgId,
+            source.sourceId,
+            source.modules as Module[],
+          );
+        }
+      }
+      const current = await tx.subscription.findUnique({
+        where: { providerSubId: event.subscriptionId },
+        select: { planCode: true },
+      });
+      if (current) {
+        const previous = await tx.orgEntitlementSnapshot.findFirst({
+          where: { orgId: event.orgId },
+          orderBy: { createdAt: "desc" },
+        });
+        const priorFlags = isRecord(previous?.flagsJson)
+          ? previous.flagsJson
+          : {};
+        // Subscription updates can arrive before the paid invoice. The latest
+        // entitlement snapshot, not the subscription row, records the paid tier.
+        const paidPlanCode =
+          typeof priorFlags.planCode === "string"
+            ? priorFlags.planCode
+            : current.planCode;
+        if (paidPlanCode !== change.planCode) {
+          const oldPlan = getPlanDefinition(paidPlanCode);
+          const nextPlan = getPlanDefinition(change.planCode);
+          if (!nextPlan)
+            throw new Error("Scheduled plan is no longer recognised");
+          const retainExtras = (
+            currentValue: number | null | undefined,
+            oldBase: number | null | undefined,
+            nextBase: number | null | undefined,
+          ): number =>
+            (nextBase ?? currentValue ?? 0) +
+            (oldBase === null ||
+            oldBase === undefined ||
+            currentValue === null ||
+            currentValue === undefined
+              ? 0
+              : Math.max(0, currentValue - oldBase));
+          await tx.orgEntitlementSnapshot.create({
+            data: {
+              orgId: event.orgId,
+              av30Included: retainExtras(
+                previous?.av30Included,
+                oldPlan?.av30Included,
+                nextPlan.av30Included,
+              ),
+              maxSites: retainExtras(
+                previous?.maxSites,
+                oldPlan?.maxSitesIncluded,
+                nextPlan.maxSitesIncluded,
+              ),
+              storageGbIncluded: retainExtras(
+                previous?.storageGbIncluded,
+                oldPlan?.storageGbIncluded,
+                nextPlan.storageGbIncluded,
+              ),
+              leaderSeatsIncluded: retainExtras(
+                previous?.leaderSeatsIncluded,
+                oldPlan?.leaderSeatsIncluded,
+                nextPlan.leaderSeatsIncluded,
+              ),
+              flagsJson: {
+                ...priorFlags,
+                planCode: change.planCode,
+                planTier: nextPlan.tier,
+              },
+              source: "module_change",
+            },
+          });
+        }
+        await tx.subscription.update({
+          where: { providerSubId: event.subscriptionId },
+          data: { planCode: change.planCode },
+        });
+      }
+    });
   }
 
   private async extendActiveModulesExpiry(
@@ -422,13 +565,9 @@ export class BillingWebhookController {
   ): Promise<void> {
     if (!periodEnd) return;
 
-    await prisma.orgModule.updateMany({
-      where: {
-        orgId,
-        status: ModuleStatus.ACTIVE,
-        metadata: { path: ["subscriptionId"], equals: subscriptionId },
-      },
-      data: { expiresAt: periodEnd },
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, "", orgId);
+      await updateSubscriptionGrantPeriod(tx, orgId, subscriptionId, periodEnd);
     });
   }
 
@@ -436,13 +575,9 @@ export class BillingWebhookController {
     orgId: string,
     subscriptionId: string,
   ): Promise<void> {
-    await prisma.orgModule.updateMany({
-      where: {
-        orgId,
-        status: ModuleStatus.ACTIVE,
-        metadata: { path: ["subscriptionId"], equals: subscriptionId },
-      },
-      data: { status: ModuleStatus.CANCELLED },
+    await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, "", orgId);
+      await updateSubscriptionGrantPeriod(tx, orgId, subscriptionId, null);
     });
   }
 
@@ -481,11 +616,11 @@ export class BillingWebhookController {
     pendingOrder: PendingOrderRecord,
   ) {
     const now = new Date();
-    
+
     // Use orgId from the event (which has been resolved in handleWebhook)
     const actualOrgId = event.orgId;
     const actualTenantId = pendingOrder.tenantId;
-    
+
     if (!actualOrgId || actualOrgId === "pending") {
       this.logger.error("Cannot apply pending order: orgId not resolved", {
         pendingOrderId: pendingOrder.id,
@@ -493,8 +628,9 @@ export class BillingWebhookController {
       });
       throw new Error("Cannot apply pending order without resolved orgId");
     }
-    
+
     await prisma.$transaction(async (tx) => {
+      await applyTenantContext(tx, actualTenantId ?? "", actualOrgId);
       await this.upsertSubscription(
         event,
         status,
@@ -521,7 +657,7 @@ export class BillingWebhookController {
           event,
         );
       }
-      
+
       // Store Stripe customer ID on org
       if (event.providerCustomerId && actualOrgId) {
         await tx.org.update({
@@ -529,7 +665,7 @@ export class BillingWebhookController {
           data: { stripeCustomerId: event.providerCustomerId },
         });
       }
-      
+
       await tx.pendingOrder.update({
         where: { id: pendingOrder.id },
         data: {
@@ -554,7 +690,10 @@ export class BillingWebhookController {
       event.subscriptionId &&
       !isAddOnOnlyOrder(pendingOrder)
     ) {
-      await this.cancelOtherActiveSubscriptionsForOrg(actualOrgId, event.subscriptionId);
+      await this.cancelOtherActiveSubscriptionsForOrg(
+        actualOrgId,
+        event.subscriptionId,
+      );
     }
   }
 
@@ -570,7 +709,9 @@ export class BillingWebhookController {
       where: {
         orgId,
         providerSubId: { not: currentProviderSubId },
-        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE] },
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.PAST_DUE],
+        },
       },
       select: { id: true, providerSubId: true, planCode: true },
     });
@@ -584,12 +725,20 @@ export class BillingWebhookController {
     for (const sub of others) {
       if (stripe && sub.providerSubId) {
         try {
-          await this.refundProratedAndCancelSubscription(stripe, orgId, sub.providerSubId, sub.planCode);
+          await this.refundProratedAndCancelSubscription(
+            stripe,
+            orgId,
+            sub.providerSubId,
+            sub.planCode,
+          );
         } catch (err) {
-          this.logger.warn("Failed to refund/cancel Stripe subscription; marking CANCELED in DB", {
-            providerSubId: sub.providerSubId,
-            error: err instanceof Error ? err.message : String(err),
-          });
+          this.logger.warn(
+            "Failed to refund/cancel Stripe subscription; marking CANCELED in DB",
+            {
+              providerSubId: sub.providerSubId,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          );
           await stripe.subscriptions.cancel(sub.providerSubId).catch(() => {});
         }
       }
@@ -629,7 +778,7 @@ export class BillingWebhookController {
     const chargeId =
       invoice?.charge && typeof invoice.charge === "string"
         ? invoice.charge
-        : (invoice?.charge as Stripe.Charge)?.id ?? null;
+        : ((invoice?.charge as Stripe.Charge)?.id ?? null);
     const amountPaidCents = invoice?.amount_paid ?? 0;
 
     if (chargeId && amountPaidCents > 0 && remainingSeconds > 0) {
@@ -657,10 +806,16 @@ export class BillingWebhookController {
             remainingDays: Math.round(remainingSeconds / 86400),
           });
         } catch (refundErr) {
-          this.logger.warn("Prorated refund failed; still canceling subscription", {
-            providerSubId,
-            error: refundErr instanceof Error ? refundErr.message : String(refundErr),
-          });
+          this.logger.warn(
+            "Prorated refund failed; still canceling subscription",
+            {
+              providerSubId,
+              error:
+                refundErr instanceof Error
+                  ? refundErr.message
+                  : String(refundErr),
+            },
+          );
         }
       }
     }
@@ -681,7 +836,10 @@ export class BillingWebhookController {
     if (planDefinition?.maxChildrenIncluded !== null) {
       flags.maxChildrenIncluded = planDefinition?.maxChildrenIncluded;
     }
-    if (pendingOrder.smsMessagesCap !== null && pendingOrder.smsMessagesCap !== undefined) {
+    if (
+      pendingOrder.smsMessagesCap !== null &&
+      pendingOrder.smsMessagesCap !== undefined
+    ) {
       flags.smsMessagesCap = pendingOrder.smsMessagesCap;
     }
     if (pendingOrder.flags) {
@@ -690,13 +848,15 @@ export class BillingWebhookController {
     if (pendingOrder.warnings) {
       flags.pendingOrderWarnings = pendingOrder.warnings;
     }
-    return Object.keys(flags).length ? (flags as Prisma.InputJsonValue) : undefined;
+    return Object.keys(flags).length
+      ? (flags as Prisma.InputJsonValue)
+      : undefined;
   }
 
   private async createOrgFromPendingDetails(
-    pendingDetails: Prisma.JsonValue,
-  ): Promise<{ orgId: string; tenantId: string; userId: string }> {
-    const details = pendingDetails as Record<string, string>;
+    pendingOrder: PendingOrderRecord,
+  ): Promise<{ orgId: string; tenantId: string }> {
+    const details = pendingOrder.pendingOrgDetails as Record<string, string>;
     const orgName = details.orgName;
     const slug = details.slug;
     const contactName = details.contactName;
@@ -716,6 +876,17 @@ export class BillingWebhookController {
 
     // Wrap all DB operations in a transaction
     return await prisma.$transaction(async (tx) => {
+      // Different provider events for one order can arrive together. Lock the
+      // order and persist its org link in this same transaction.
+      await tx.$queryRaw`SELECT id FROM "PendingOrder" WHERE id = ${pendingOrder.id} FOR UPDATE`;
+      const currentOrder = await tx.pendingOrder.findUnique({
+        where: { id: pendingOrder.id },
+      });
+      if (!currentOrder)
+        throw new Error("Pending order disappeared during provisioning");
+      if (currentOrder.orgId && currentOrder.tenantId) {
+        return { orgId: currentOrder.orgId, tenantId: currentOrder.tenantId };
+      }
       // Create org
       const org = await tx.org.create({
         data: {
@@ -751,7 +922,10 @@ export class BillingWebhookController {
             hasServeAccess: true, // Enable staff access by default
           },
         });
-        this.logger.info("Created new user", { userId: user.id, email: contactEmail });
+        this.logger.info("Created new user", {
+          userId: user.id,
+          email: contactEmail,
+        });
       } else {
         // Update existing user with tenantId if not set
         if (!user.tenantId) {
@@ -760,7 +934,10 @@ export class BillingWebhookController {
             data: { tenantId: tenant.id },
           });
         }
-        this.logger.info("User already exists", { userId: user.id, email: contactEmail });
+        this.logger.info("User already exists", {
+          userId: user.id,
+          email: contactEmail,
+        });
       }
 
       // Check if user already has an identity, on either provider
@@ -829,10 +1006,13 @@ export class BillingWebhookController {
               // Don't fail the whole transaction if Auth0 creation fails
             }
           } else {
-            this.logger.warn("Auth0ManagementService not ready (credentials missing or invalid)", {
-              userId: user.id,
-              email: contactEmail,
-            });
+            this.logger.warn(
+              "Auth0ManagementService not ready (credentials missing or invalid)",
+              {
+                userId: user.id,
+                email: contactEmail,
+              },
+            );
           }
         } else {
           // "dual" and "clerk": new org accounts land on Clerk.
@@ -890,10 +1070,13 @@ export class BillingWebhookController {
               // Don't fail the whole transaction if Clerk creation fails
             }
           } else {
-            this.logger.warn("ClerkManagementService not ready (secret key missing)", {
-              userId: user.id,
-              email: contactEmail,
-            });
+            this.logger.warn(
+              "ClerkManagementService not ready (secret key missing)",
+              {
+                userId: user.id,
+                email: contactEmail,
+              },
+            );
           }
         }
       } else if (existingIdentity) {
@@ -903,10 +1086,13 @@ export class BillingWebhookController {
           provider: existingIdentity.provider,
         });
       } else if (!password) {
-        this.logger.warn("No password provided, skipping identity provider user creation", {
-          userId: user.id,
-          email: contactEmail,
-        });
+        this.logger.warn(
+          "No password provided, skipping identity provider user creation",
+          {
+            userId: user.id,
+            email: contactEmail,
+          },
+        );
       }
 
       // Link user to tenant and org
@@ -984,16 +1170,22 @@ export class BillingWebhookController {
       });
       this.logger.info("✅ Created SiteMembership");
 
-      this.logger.info("Successfully created org/tenant/user and linked memberships", {
-        orgId: org.id,
-        tenantId: tenant.id,
-        userId: user.id,
-      });
+      this.logger.info(
+        "Successfully created org/tenant/user and linked memberships",
+        {
+          orgId: org.id,
+          tenantId: tenant.id,
+          userId: user.id,
+        },
+      );
 
+      await tx.pendingOrder.update({
+        where: { id: pendingOrder.id },
+        data: { orgId: org.id, tenantId: tenant.id },
+      });
       return {
         orgId: org.id,
         tenantId: tenant.id,
-        userId: user.id,
       };
     });
   }

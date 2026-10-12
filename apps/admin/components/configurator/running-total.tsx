@@ -41,6 +41,7 @@ function buildSelection(state: ConfiguratorState) {
     storageAddon200Gb: state.storageChoice === "200" ? 1 : 0,
     storageAddon1Tb: state.storageChoice === "1000" ? 1 : 0,
     selectedModules: state.selectedOptionalModules,
+    selectedIncludedModules: state.selectedIncludedModules,
   };
 }
 

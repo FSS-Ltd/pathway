@@ -96,6 +96,12 @@ enum BillingProvider {
   GOCARDLESS
 }
 
+enum BillingEventProcessingStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 enum SubscriptionStatus {
   TRIALING
   ACTIVE
@@ -196,6 +202,20 @@ enum ModuleStatus {
   ACTIVE
   EXPIRED
   CANCELLED
+}
+
+enum ModuleGrantSource {
+  PLAN
+  PAID_ADDON
+  MANUAL
+}
+
+enum ModuleChangeStatus {
+  PREVIEW
+  ACCEPTED
+  SCHEDULED
+  APPLIED
+  REVIEW_REQUIRED
 }
 
 enum AccessTagKey {
@@ -722,6 +742,49 @@ model OrgModule {
   @@index([orgId])
 }
 
+// Billing grants are independent; OrgModule remains the effective capability view.
+model ModuleGrant {
+  id          String            @id @default(uuid())
+  orgId       String
+  org         Org               @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  module      Module
+  source      ModuleGrantSource
+  sourceId    String
+  status      ModuleStatus      @default(ACTIVE)
+  expiresAt   DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([orgId, module, source, sourceId])
+  @@index([orgId, module, status])
+}
+
+// Accepted changes are durable desired state, separate from the current paid period.
+model ModuleChange {
+  id                 String             @id @default(uuid())
+  orgId              String
+  org                Org                @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  providerSubId      String
+  planCode           String
+  includedModules    Module[]           @default([])
+  paidModules        Module[]           @default([])
+  providerItems      Json
+  subtotalPence      Int
+  effectiveAt        DateTime
+  expiresAt          DateTime
+  acceptedAt         DateTime?
+  idempotencyKey     String?
+  providerScheduleId String?
+  status             ModuleChangeStatus @default(PREVIEW)
+  errorCategory      String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([orgId, idempotencyKey])
+  @@index([status, effectiveAt])
+  @@index([orgId, providerSubId, effectiveAt])
+}
+
 // --- Blog (platform-wide, not tenant-scoped) ---
 
 enum BlogPostStatus {
@@ -873,6 +936,8 @@ model Org {
   deletedUsers        OrgDeletedUser[]
   orgVertical         OrgVertical?
   orgModules          OrgModule[]
+  moduleGrants        ModuleGrant[]
+  moduleChanges       ModuleChange[]
   roleDefinitions     OrgRoleDefinition[]
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
@@ -3790,10 +3855,16 @@ model BillingEvent {
   orgId       String?
   org         Org?            @relation(fields: [orgId], references: [id])
   provider    BillingProvider
+  providerEventId String?
   type        String
+  processingStatus BillingEventProcessingStatus @default(COMPLETED)
+  processingStartedAt DateTime?
+  processedAt DateTime?
+  lastError String?
   payloadJson Json
   createdAt   DateTime        @default(now())
 
+  @@unique([provider, providerEventId])
   @@index([orgId, createdAt])
 }
 

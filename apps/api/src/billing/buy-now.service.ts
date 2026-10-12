@@ -17,8 +17,8 @@ import {
 } from "@pathway/db";
 import {
   getConfiguratorPlanPolicy,
+  isConfiguratorModuleReady,
   LEGACY_PLAN_CODES,
-  type ConfiguratorModuleCode,
 } from "@pathway/pricing";
 import { getPlanDefinition } from "./billing-plans";
 import type { PlanTier } from "./billing-plans";
@@ -91,10 +91,15 @@ export class BuyNowService {
     const planDefinition = getPlanDefinition(sanitisedPlan.planCode);
     const { selection: gatedPlan, warnings: gatingWarnings } =
       this.enforcePlanAddonPolicy(sanitisedPlan, planDefinition?.tier ?? null);
-    const selectedModules = this.resolvePaidSelectedModules(
+    const resolvedModules = this.resolveSelectedModules(
       sanitisedPlan.selectedModules,
       sanitisedPlan.planCode,
+      sanitisedPlan.selectedIncludedModules,
     );
+    const {
+      includedModules: selectedIncludedModules,
+      paidModules: selectedModules,
+    } = resolvedModules;
 
     const previewAddons: PlanPreviewAddons = {
       extraAv30Blocks: gatedPlan.av30AddonBlocks,
@@ -179,11 +184,23 @@ export class BuyNowService {
         leaderSeatsIncluded:
           previewResult.effectiveCaps.leaderSeatsIncluded ?? undefined,
         maxSites: previewResult.effectiveCaps.maxSites ?? undefined,
-        selectedModules,
+        selectedModules: [...selectedIncludedModules, ...selectedModules],
         flags:
-          previewResult.notes?.source === "plan_catalogue"
-            ? undefined
-            : { source: previewResult.notes?.source },
+          request.plan.selectedIncludedModules !== undefined ||
+          previewResult.notes?.source !== "plan_catalogue"
+            ? {
+                ...(previewResult.notes?.source === "plan_catalogue"
+                  ? {}
+                  : { source: previewResult.notes?.source }),
+                ...(request.plan.selectedIncludedModules !== undefined
+                  ? {
+                      moduleSelection: {
+                        includedModules: selectedIncludedModules,
+                      },
+                    }
+                  : {}),
+              }
+            : undefined,
         warnings: previewResult.notes?.warnings ?? [],
         provider: prismaProvider,
         status: PendingOrderStatus.PENDING,
@@ -192,7 +209,7 @@ export class BuyNowService {
     });
 
     const providerParams: BuyNowCheckoutParams = {
-      plan: { ...gatedPlan, selectedModules },
+      plan: { ...gatedPlan, selectedModules, selectedIncludedModules },
       org: request.org,
       preview,
       successUrl: request.successUrl,
@@ -233,10 +250,11 @@ export class BuyNowService {
     return value < 0 ? 0 : Math.trunc(value);
   }
 
-  private resolvePaidSelectedModules(
+  private resolveSelectedModules(
     selectedModules: readonly Module[] | undefined,
     planCode: string,
-  ): Module[] {
+    explicitlyIncludedModules?: readonly Module[],
+  ): { includedModules: Module[]; paidModules: Module[] } {
     const policy = getConfiguratorPlanPolicy(planCode);
     if (!policy) {
       throw new BadRequestException(`Invalid plan code: ${planCode}`);
@@ -247,16 +265,40 @@ export class BuyNowService {
       );
     }
 
-    const includedModules = new Set<ConfiguratorModuleCode>(
-      policy.includedModules,
-    );
-    const eligibleOptionalModules = new Set<ConfiguratorModuleCode>(
+    const eligibleOptionalModules = new Set<string>(
       policy.eligibleOptionalModules,
     );
-    const paidModules = [...new Set(selectedModules ?? [])].filter(
-      (module) => !includedModules.has(module),
+    const uniqueExplicitIncludedModules = [
+      ...new Set(explicitlyIncludedModules ?? []),
+    ];
+    const normalizedSelectedModules = [...new Set(selectedModules ?? [])];
+    if (
+      explicitlyIncludedModules !== undefined &&
+      uniqueExplicitIncludedModules.length <= policy.includedModuleLimit &&
+      uniqueExplicitIncludedModules.some((module) =>
+        normalizedSelectedModules.includes(module),
+      )
+    ) {
+      throw new BadRequestException(
+        "Included modules must not also be submitted as paid modules.",
+      );
+    }
+    const includedModules = uniqueExplicitIncludedModules;
+    const uniqueModules = [
+      ...new Set([...includedModules, ...normalizedSelectedModules]),
+    ];
+    const invalidIncludedModules = uniqueExplicitIncludedModules.filter(
+      (module) => !eligibleOptionalModules.has(module),
     );
-    const ineligibleModules = paidModules.filter(
+    if (
+      uniqueExplicitIncludedModules.length > policy.includedModuleLimit ||
+      invalidIncludedModules.length > 0
+    ) {
+      throw new BadRequestException(
+        "Selected included modules exceed the plan allowance or are not eligible.",
+      );
+    }
+    const ineligibleModules = uniqueModules.filter(
       (module) => !eligibleOptionalModules.has(module),
     );
     if (ineligibleModules.length > 0) {
@@ -264,11 +306,25 @@ export class BuyNowService {
         "Selected modules are not eligible for the selected plan.",
       );
     }
+    if (uniqueModules.some((module) =>
+      policy.eligibleOptionalModules.some((code) =>
+        code === module && !isConfiguratorModuleReady(code),
+      ))) {
+      throw new BadRequestException("Selected modules are not yet available.");
+    }
 
-    if (paidModules.length === 0) return paidModules;
+    const includedModuleSet = new Set(includedModules);
+    const paidModules = uniqueModules.filter(
+      (module) => !includedModuleSet.has(module),
+    );
+    if (paidModules.length === 0) {
+      return { includedModules, paidModules };
+    }
 
     const provider = this.providerConfig?.activeProvider ?? "FAKE";
-    if (provider === "FAKE") return paidModules;
+    if (provider === "FAKE") {
+      return { includedModules, paidModules };
+    }
     if (provider === "GOCARDLESS") {
       throw new BadRequestException(
         "Selected modules are not supported by the active billing provider.",
@@ -287,7 +343,7 @@ export class BuyNowService {
       );
     }
 
-    return paidModules;
+    return { includedModules, paidModules };
   }
 
   /**
@@ -340,12 +396,19 @@ export class BuyNowService {
     }
 
     const normalizedPlanCode = this.normalizePlanCode(request.planCode);
-    const selectedModules = this.resolvePaidSelectedModules(
+    const resolvedModules = this.resolveSelectedModules(
       request.selectedModules,
       normalizedPlanCode,
+      request.selectedIncludedModules,
     );
+    const {
+      includedModules: selectedIncludedModules,
+      paidModules: selectedModules,
+    } = resolvedModules;
 
-    // 2. If org has active subscription and selected plan is the same: allow checkout only for add-ons
+    // Existing subscription module changes are applied at renewal through
+    // ModuleChangeService; Checkout would charge immediately and lose the
+    // included selection.
     const activeSubscription = await prisma.subscription.findFirst({
       where: {
         orgId,
@@ -359,17 +422,23 @@ export class BuyNowService {
       select: { planCode: true },
     });
 
+    if (activeSubscription) {
+      throw new BadRequestException(
+        "Use the renewal change flow to update an existing subscription.",
+      );
+    }
+
     const addonsOnly =
       Boolean(activeSubscription) &&
       activeSubscription!.planCode === normalizedPlanCode;
 
     const hasAddons =
+      selectedModules.length > 0 ||
       (this.toNonNegativeInt(request.av30AddonBlocks) ?? 0) > 0 ||
       (this.toNonNegativeInt(request.extraStorageGb) ?? 0) > 0 ||
       (this.toNonNegativeInt(request.extraSmsMessages) ?? 0) > 0 ||
       (this.toNonNegativeInt(request.extraSites) ?? 0) > 0 ||
-      (this.toNonNegativeInt(request.extraLeaderSeats) ?? 0) > 0 ||
-      selectedModules.length > 0;
+      (this.toNonNegativeInt(request.extraLeaderSeats) ?? 0) > 0;
 
     if (addonsOnly && !hasAddons) {
       throw new BadRequestException(
@@ -486,8 +555,26 @@ export class BuyNowService {
         leaderSeatsIncluded:
           previewResult.effectiveCaps.leaderSeatsIncluded ?? undefined,
         maxSites: previewResult.effectiveCaps.maxSites ?? undefined,
-        selectedModules,
-        flags: addonsOnly ? { purchaseKind: "add-on" } : undefined,
+        selectedModules: addonsOnly
+          ? selectedModules
+          : [...selectedIncludedModules, ...selectedModules],
+        flags:
+          addonsOnly ||
+          request.selectedIncludedModules !== undefined ||
+          selectedIncludedModules.length > 0
+            ? {
+                ...(addonsOnly ? { purchaseKind: "add-on" } : {}),
+                ...(request.selectedIncludedModules !== undefined
+                  ? {
+                      moduleSelection: {
+                        includedModules: addonsOnly
+                          ? []
+                          : selectedIncludedModules,
+                      },
+                    }
+                  : {}),
+              }
+            : undefined,
         provider: prismaProvider,
         status: PendingOrderStatus.PENDING,
       },
@@ -503,6 +590,7 @@ export class BuyNowService {
         extraSmsMessages: gatedAddons.extraSmsMessages,
         extraLeaderSeats: gatedAddons.extraLeaderSeats,
         selectedModules,
+        selectedIncludedModules: addonsOnly ? [] : selectedIncludedModules,
       },
       org: {
         orgName: org.name,

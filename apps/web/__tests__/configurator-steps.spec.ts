@@ -13,8 +13,8 @@ import {
 const configureDirectory = join(process.cwd(), "app/configure");
 const stepsDirectory = join(configureDirectory, "steps");
 const PRICES = {
-  MODULE_LEARNING_MONTHLY: { amountMajor: 29 },
-  MODULE_LEARNING_YEARLY: { amountMajor: 290 },
+  MODULE_ASSET_MANAGEMENT_MONTHLY: { amountMajor: 29 },
+  MODULE_ASSET_MANAGEMENT_YEARLY: { amountMajor: 290 },
 };
 
 describe("configurator step contracts", () => {
@@ -25,12 +25,12 @@ describe("configurator step contracts", () => {
 
     const starter = selectPlan(school, "STARTER_49_MONTHLY", PRICES);
     expect(
-      toggleModule(starter, "LEARNING", PRICES).selectedOptionalModules,
-    ).toEqual(["LEARNING"]);
+      toggleModule(starter, "ASSET_MANAGEMENT", PRICES).selectedOptionalModules,
+    ).toEqual(["ASSET_MANAGEMENT"]);
     expect(selectStorage(starter, "200").storageChoice).toBe("200");
   });
 
-  it("remaps plans and removes modules without a live price in the new interval", () => {
+  it("remaps plans and keeps choices within the new plan allowance", () => {
     for (const [monthly, yearly] of [
       ["STARTER_49_MONTHLY", "STARTER_49_YEARLY"],
       ["GROWTH_99_MONTHLY", "GROWTH_99_YEARLY"],
@@ -38,14 +38,19 @@ describe("configurator step contracts", () => {
     ] as const) {
       const state = {
         ...selectPlan(INITIAL_CONFIGURATOR_STATE, monthly, PRICES),
-        selectedOptionalModules: ["LEARNING" as const],
+        selectedOptionalModules: ["ASSET_MANAGEMENT" as const],
       };
-      const yearlyState = selectFrequency(state, "yearly", PRICES);
+      const yearlyPrices = {
+        ...PRICES,
+        MODULE_ASSET_MANAGEMENT_YEARLY: { amountMajor: 290 },
+      };
+      const yearlyState = selectFrequency(state, "yearly", yearlyPrices);
 
       expect(yearlyState).toMatchObject({
         planCode: yearly,
         frequency: "yearly",
-        selectedOptionalModules: ["LEARNING"],
+        selectedOptionalModules: monthly.startsWith("STARTER") ? ["ASSET_MANAGEMENT"] : [],
+        selectedIncludedModules: monthly.startsWith("STARTER") ? [] : ["ASSET_MANAGEMENT"],
       });
       expect(selectFrequency(yearlyState, "monthly", PRICES).planCode).toBe(
         monthly,
@@ -101,7 +106,9 @@ describe("configurator step contracts", () => {
     expect(page).toContain(
       "selectedOptionalModules={state.selectedOptionalModules}",
     );
-    expect(page).toContain("includedModules={includedModules}");
+    expect(page).toContain(
+      "selectedIncludedModules={state.selectedIncludedModules}",
+    );
     expect(page).toContain("eligibleOptionalModules={eligibleOptionalModules}");
     expect(page.indexOf('{currentStep === "plan"')).toBeLessThan(
       page.indexOf('{currentStep === "org-type"'),
@@ -119,10 +126,10 @@ describe("configurator step contracts", () => {
   it("distinguishes included, eligible, and unavailable modules", () => {
     const modules = readFileSync(join(stepsDirectory, "modules.tsx"), "utf8");
 
-    expect(modules).toContain("includedModules");
+    expect(modules).toContain("selectedIncludedModules");
     expect(modules).toContain("eligibleOptionalModules");
     expect(modules).toContain("Included in {planLabel}");
-    expect(modules).toContain("isDisabled={true}");
+    expect(modules).toContain('delta.status === "coming-soon"');
     expect(modules).toContain("eligibleOptionalModules.includes(module)");
   });
 
