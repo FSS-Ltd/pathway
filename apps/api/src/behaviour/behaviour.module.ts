@@ -4,6 +4,7 @@ import { AuthModule } from "../auth/auth.module";
 import { CommonModule } from "../common/common.module";
 import { MailerModule } from "../mailer/mailer.module";
 import { BehaviourCommandService } from "./behaviour-command.service";
+import { BehaviourBatchService } from "./behaviour-batch.service";
 import { BehaviourPolicyService } from "./behaviour-policy.service";
 import { BehaviourQueryService } from "./behaviour-query.service";
 import { BehaviourReviewService } from "./behaviour-review.service";
@@ -19,6 +20,7 @@ import { BehaviourOutboxController } from "./behaviour-outbox.controller";
   providers: [
     BehaviourPolicyService,
     BehaviourCommandService,
+    BehaviourBatchService,
     BehaviourQueryService,
     BehaviourReviewService,
     BehaviourRetractionService,

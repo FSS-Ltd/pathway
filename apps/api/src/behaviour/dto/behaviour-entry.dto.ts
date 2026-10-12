@@ -50,6 +50,47 @@ export const createBehaviourEntrySchema = z
   .strict()
   .superRefine(enforceTypeDelta);
 
+const behaviourBatchRowSchema = z
+  .object({
+    category,
+    type,
+    visibility,
+    pointsDelta,
+    reason,
+    note,
+    quantity: z.number().int().min(1).max(50),
+  })
+  .strict()
+  .superRefine(enforceTypeDelta);
+
+export const createBehaviourBatchSchema = z
+  .object({
+    idempotencyKey,
+    childIds: z.array(childId).min(1).max(50),
+    occurredAt,
+    entries: z.array(behaviourBatchRowSchema).min(1).max(50),
+  })
+  .strict()
+  .superRefine((batch, context) => {
+    if (new Set(batch.childIds).size !== batch.childIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["childIds"],
+        message: "Learners must be unique",
+      });
+    }
+    const factCount =
+      batch.childIds.length *
+      batch.entries.reduce((total, entry) => total + entry.quantity, 0);
+    if (factCount > 50) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["entries"],
+        message: "A batch can create at most 50 behaviour facts",
+      });
+    }
+  });
+
 export const behaviourCorrectionSchema = z
   .object({
     ...behaviourEntryFields,
@@ -94,6 +135,9 @@ export const behaviourListQuerySchema = z
 
 export type CreateBehaviourEntryDto = z.infer<
   typeof createBehaviourEntrySchema
+>;
+export type CreateBehaviourBatchDto = z.infer<
+  typeof createBehaviourBatchSchema
 >;
 export type BehaviourCorrectionDto = z.infer<typeof behaviourCorrectionSchema>;
 export type BehaviourRetractionDto = z.infer<typeof behaviourRetractionSchema>;

@@ -3,6 +3,7 @@ import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@pathway/db";
 import type {
   BehaviourCorrectionDto,
+  CreateBehaviourBatchDto,
   CreateBehaviourEntryDto,
 } from "./dto/behaviour-entry.dto";
 
@@ -91,6 +92,42 @@ export function behaviourClientCommandKeyHash(
   return sha256(`ace-behaviour-command:${tenantId}:${clientKey.trim()}`);
 }
 
+export function behaviourBatchFactKeyHash(
+  tenantId: string,
+  batchKey: string,
+  index: number,
+): string {
+  // The first fact reserves the public key; later facts use an internal namespace.
+  return index === 0
+    ? behaviourClientCommandKeyHash(tenantId, batchKey)
+    : sha256(
+        `ace-behaviour-batch-fact:${tenantId}:${batchKey.trim()}:${index}`,
+      );
+}
+
+export function behaviourBatchFingerprint(
+  actorUserId: string,
+  batch: CreateBehaviourBatchDto,
+): string {
+  return sha256(
+    JSON.stringify({
+      operation: "batch",
+      actorUserId,
+      childIds: batch.childIds,
+      occurredAt: new Date(batch.occurredAt).toISOString(),
+      entries: batch.entries.map((entry) => ({
+        category: entry.category,
+        type: entry.type,
+        visibility: entry.visibility,
+        pointsDelta: entry.pointsDelta,
+        reason: entry.reason,
+        note: entry.note ?? null,
+        quantity: entry.quantity,
+      })),
+    }),
+  );
+}
+
 export function behaviourCommandFingerprint(
   operation: "record" | "correct",
   actorUserId: string,
@@ -130,6 +167,15 @@ export function behaviourIdempotencyConflict(): ConflictException {
     code: "BEHAVIOUR_IDEMPOTENCY_CONFLICT",
     message: "The idempotency key was already used for another command.",
   });
+}
+
+export function isBehaviourUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
 }
 
 export function toBehaviourEntryResponse(entry: BehaviourEntryResponseRecord) {

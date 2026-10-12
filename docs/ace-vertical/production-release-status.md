@@ -29,17 +29,27 @@ merge before starting the next step. Reconcile the count after each merge.
 
 ## ACE behaviour workspace upgrade (12 October 2026)
 
-Step ACE-B01, correction and void controls, is in
-[PR #581](https://github.com/FSS-Ltd/pathway/pull/581). The code revision
-`6f747ef925c339cb2aa3faecaf61f9e2773e4c52` passed the repository
-pre-commit lint, API unit, worker, and auth checks; rebased affected type,
-format, lint, admin interaction, API unit (90 tests), guarded PostgreSQL
-integration (7 tests), API build, and admin build checks also passed. The
-admin build used local public Clerk configuration and explicit mock API mode.
-Browser review blocked an external sign-in redirect for local visual
-inspection; the user chose to continue without it. Latest-head CI and merge
-evidence are pending. ACE-B02 batch recording cannot start until this PR has
-passing CI and is confirmed merged into `master`.
+Step ACE-B01, correction and void controls, merged in
+[PR #581](https://github.com/FSS-Ltd/pathway/pull/581) on 12 October 2026.
+The checked head `371bc3caf6d5d7465bcf1d2e5c40adfe7b33ba4a` passed all
+eight applicable checks: typecheck/lint/unit, both CodeQL analyses and their
+aggregate, integration, system-role seed database identity, permission
+definition database, and organisation-role RLS. GitHub confirms the squash
+merge commit `16e78a2ac6b7ef7fdb05ac3764315b7ef6085187`. Local checks
+included the repository pre-commit hook, affected type/lint/format checks,
+admin interaction tests, guarded PostgreSQL integration, and API/admin builds.
+The admin build used local public Clerk configuration and explicit mock API
+mode. Browser review blocked an external sign-in redirect; the user chose to
+continue without browser inspection.
+
+Step ACE-B02, atomic batch recording, starts from that merged commit on
+`feature/ace-behaviour-batch-recording`. The batch uses the existing immutable
+fact writer inside one tenant transaction, with at most 50 resulting facts and
+no schema change. Local API typecheck, lint, format, build, 1,337 API unit
+tests, and 12 guarded PostgreSQL behaviour integration tests passed. The
+database suite covers concurrent replay, full rollback and retry, cross-site
+and sensitive denial, merit intents, 50 facts, and demerit escalation. Its PR,
+checked revision, CI, and merge evidence remain pending.
 
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at

@@ -20,6 +20,7 @@ import { BehaviourController } from "../behaviour.controller";
 import {
   behaviourCorrectionSchema,
   behaviourListQuerySchema,
+  createBehaviourBatchSchema,
   createBehaviourEntrySchema,
   type BehaviourCorrectionDto,
   type CreateBehaviourEntryDto,
@@ -200,6 +201,12 @@ describe("behaviour entry boundary", () => {
         BehaviourController.prototype.correctEntry,
       ),
     ).toBe("ace.behaviour.correct");
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSION,
+        BehaviourController.prototype.recordBatch,
+      ),
+    ).toBe("ace.behaviour.record");
   });
 
   it("strictly validates bounded commands, queries, and type/delta consistency", () => {
@@ -223,6 +230,43 @@ describe("behaviour entry boundary", () => {
     ]) {
       expect(createBehaviourEntrySchema.safeParse(invalid).success).toBe(false);
     }
+  });
+
+  it("limits batches to 50 resulting facts and distinct learners", () => {
+    const batch = {
+      idempotencyKey: "batch-1",
+      childIds: [childId],
+      occurredAt,
+      entries: [
+        {
+          category: "service",
+          type: "MERIT",
+          visibility: "GENERAL",
+          pointsDelta: 3,
+          reason: "Helped a peer",
+          quantity: 50,
+        },
+      ],
+    };
+    expect(createBehaviourBatchSchema.safeParse(batch).success).toBe(true);
+    expect(
+      createBehaviourBatchSchema.safeParse({
+        ...batch,
+        childIds: [childId, childId],
+      }).success,
+    ).toBe(false);
+    expect(
+      createBehaviourBatchSchema.safeParse({
+        ...batch,
+        entries: [{ ...batch.entries[0], quantity: 51 }],
+      }).success,
+    ).toBe(false);
+    expect(
+      createBehaviourBatchSchema.safeParse({
+        ...batch,
+        childIds: [childId, originalId],
+      }).success,
+    ).toBe(false);
   });
 });
 
