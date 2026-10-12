@@ -142,7 +142,7 @@ export function NoticeInboxView({
 }) {
   const isParent = reader === "parent";
   return (
-    <main className="mx-auto flex min-w-0 max-w-6xl flex-col gap-5">
+    <main className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-accent-strong">
