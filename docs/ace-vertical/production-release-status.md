@@ -58,13 +58,15 @@ into `master` as `be406e1234fae574b2d46b16b73f338a149868be` on
 12 October 2026.
 
 Step ACE-B03, paginated behaviour history and site-local trends, starts from
-that merged commit on `feature/ace-behaviour-history-trends`. Local API
+that merged commit on `feature/ace-behaviour-history-trends` in
+[PR #587](https://github.com/FSS-Ltd/pathway/pull/587), implementation revision
+`c41e14fb`. Local API
 typecheck, lint, format, build, 1,366 API unit tests, and 17 guarded
 PostgreSQL behaviour integration tests passed. The database tests cover
 filter-bound cursor paging under backdated inserts, spring and autumn
 daylight-saving boundaries, current-fact aggregates, empty buckets, site
-scope, and sensitive-total denial. Its PR, checked revision, CI, and merge
-evidence remain pending.
+scope, and sensitive-total denial. Latest-head CI and merge evidence remain
+pending.
 
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
