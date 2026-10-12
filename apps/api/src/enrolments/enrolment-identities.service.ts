@@ -122,7 +122,7 @@ export class EnrolmentIdentitiesService {
   ) {
     try {
       return await withTenantRlsContext(tenantId, orgId, async (tx) => {
-        const [identity, child] = await Promise.all([
+        const [identity, child, existingLink] = await Promise.all([
           tx.orgChildIdentity.findFirst({
             where: { id: identityId, orgId },
             select: { id: true },
@@ -131,11 +131,17 @@ export class EnrolmentIdentitiesService {
             where: { id: childId, tenantId, tenant: { orgId }, isGuest: false },
             select: { id: true },
           }),
+          tx.orgChildSiteLink.findUnique({
+            where: { childId_tenantId: { childId, tenantId } },
+            select: { id: true },
+          }),
         ]);
         if (!identity || !child)
           throw new NotFoundException(
             "Identity or site child profile not found.",
           );
+        if (existingLink)
+          throw new ConflictException("Child profile already linked.");
         return tx.orgChildSiteLink.create({
           data: { orgId, identityId, tenantId, childId },
           select: { id: true, identityId: true, tenantId: true, childId: true },

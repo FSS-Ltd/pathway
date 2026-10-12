@@ -132,6 +132,14 @@ describe("continuing enrolment (e2e)", () => {
         where: { orgId, localReference: `ROLL-${nonce}` },
       }),
     ).toBe(1);
+    const uniqueIndexes = await prisma.$queryRaw<{ indexname: string }[]>`
+      SELECT indexname FROM pg_indexes
+      WHERE schemaname = 'app'
+        AND indexname IN ('OrgChildIdentity_orgId_localReference_key', 'OrgChildSiteLink_childId_tenantId_key')`;
+    expect(uniqueIndexes.map((index) => index.indexname).sort()).toEqual([
+      "OrgChildIdentity_orgId_localReference_key",
+      "OrgChildSiteLink_childId_tenantId_key",
+    ]);
     await expect(
       identities.createIdentity(
         orgId,
