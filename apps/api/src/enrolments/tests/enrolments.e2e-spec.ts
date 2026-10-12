@@ -127,6 +127,11 @@ describe("continuing enrolment (e2e)", () => {
         select: { orgId: true, localReference: true },
       }),
     ).toEqual({ orgId, localReference: `ROLL-${nonce}` });
+    expect(
+      await prisma.orgChildIdentity.count({
+        where: { orgId, localReference: `ROLL-${nonce}` },
+      }),
+    ).toBe(1);
     await expect(
       identities.createIdentity(
         orgId,
@@ -134,7 +139,7 @@ describe("continuing enrolment (e2e)", () => {
         `ROLL-${nonce}`,
         second.id,
       ),
-    ).rejects.toThrow();
+    ).rejects.toThrow("Identity or profile already linked.");
     const otherOrgId = randomUUID();
     const otherTenantId = randomUUID();
     await prisma.org.create({
