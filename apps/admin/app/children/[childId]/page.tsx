@@ -1,9 +1,9 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { ChildProfileWorkspace } from "../../../components/children/child-profile-workspace";
+import { ChildRecordWorkspace } from "../../../components/children/child-record-workspace";
 
-export default function ChildDetailPage() {
+export default function ChildRecordPage() {
   const { childId } = useParams<{ childId: string }>();
-  return <ChildProfileWorkspace childId={childId} />;
+  return <ChildRecordWorkspace childId={childId} />;
 }

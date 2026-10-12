@@ -1,21 +1,9 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useParams } from "next/navigation";
+import { ChildProfileWorkspace } from "../../../../components/children/child-profile-workspace";
 
-/**
- * Child edit is now inline on the profile page.
- * Redirect /children/[childId]/edit → /children/[childId]
- */
-export default function EditChildRedirectPage() {
-  const params = useParams<{ childId: string }>();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (params.childId) {
-      router.replace(`/children/${params.childId}`);
-    }
-  }, [params.childId, router]);
-
-  return null;
+export default function EditChildProfilePage() {
+  const { childId } = useParams<{ childId: string }>();
+  return <ChildProfileWorkspace childId={childId} />;
 }
