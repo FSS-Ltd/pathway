@@ -25,6 +25,13 @@ type BehaviourHistoryProps = {
   canVoid: boolean;
   canSensitive: boolean;
   siteTimeZone: string;
+  selectedVisibility?: AdminBehaviourVisibility | "ALL";
+  pagination?: {
+    page: number;
+    hasNext: boolean;
+    onNext: () => void;
+    onPrevious: () => void;
+  };
   onRetry: () => void;
   onCorrect: (
     entryId: string,
@@ -47,6 +54,8 @@ export function BehaviourHistory({
   canVoid,
   canSensitive,
   siteTimeZone,
+  selectedVisibility: controlledVisibility,
+  pagination,
   onRetry,
   onCorrect,
   onRetract,
@@ -54,10 +63,11 @@ export function BehaviourHistory({
 }: BehaviourHistoryProps) {
   const [visibility, setVisibility] =
     React.useState<AdminBehaviourVisibility>("GENERAL");
-  const selectedVisibility = canSensitive ? visibility : "GENERAL";
-  const visibleItems = items.filter(
-    (item) => item.visibility === selectedVisibility,
-  );
+  const selectedVisibility =
+    controlledVisibility ?? (canSensitive ? visibility : "GENERAL");
+  const visibleItems = controlledVisibility
+    ? items
+    : items.filter((item) => item.visibility === selectedVisibility);
   const childNames = new Map(
     children.map((child) => [child.id, child.fullName]),
   );
@@ -92,18 +102,18 @@ export function BehaviourHistory({
   }, [success]);
 
   return (
-    <section className="rounded-lg border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border-subtle bg-surface p-4 shadow-sm">
       <div>
         <h2 className="font-heading text-lg font-semibold text-text-primary">
           Behaviour history
         </h2>
         <p className="mt-1 text-sm text-text-muted">
-          Up to 50 current records are shown newest first. Corrections create a
-          linked replacement and keep the original audit trail.
+          Current records, newest first. Corrections and voids retain an audit
+          trail.
         </p>
       </div>
 
-      {canSensitive ? (
+      {canSensitive && !controlledVisibility ? (
         <fieldset className="mt-5">
           <legend className="text-sm font-medium text-text-primary">
             Record visibility
@@ -173,14 +183,19 @@ export function BehaviourHistory({
         <p className="mt-5 rounded-md bg-muted p-4 text-sm text-text-muted">
           {selectedVisibility === "SENSITIVE"
             ? "No sensitive records in the recently loaded history."
-            : "No behaviour records yet."}
+            : controlledVisibility
+              ? "No behaviour records in the selected range."
+              : "No behaviour records yet."}
         </p>
       ) : null}
 
       {!isLoading && !error && visibleItems.length > 0 ? (
-        <ol className="mt-5 space-y-3">
+        <ol className="mt-4 max-h-[34rem] space-y-2 overflow-y-auto pr-1">
           {visibleItems.map((item) => (
-            <li key={item.id} className="rounded-md border border-border p-4">
+            <li
+              key={item.id}
+              className="rounded-lg border border-border-subtle p-3"
+            >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-medium text-text-primary">
@@ -275,6 +290,34 @@ export function BehaviourHistory({
             </li>
           ))}
         </ol>
+      ) : null}
+      {pagination && !isLoading && !error ? (
+        <nav
+          aria-label="Recent behaviour pages"
+          className="mt-4 flex items-center justify-between border-t border-border-subtle pt-3"
+        >
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={pagination.page === 1}
+            onClick={pagination.onPrevious}
+          >
+            Previous
+          </Button>
+          <span className="text-sm tabular-nums text-text-muted">
+            Page {pagination.page}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={!pagination.hasNext}
+            onClick={pagination.onNext}
+          >
+            Next
+          </Button>
+        </nav>
       ) : null}
     </section>
   );

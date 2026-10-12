@@ -510,7 +510,10 @@ export type AdminOrgModule = {
   activatedAt: string | null;
   expiresAt: string | null;
   billingSource: string | null;
-  grantSources?: Array<{ source: "PLAN" | "PAID_ADDON" | "MANUAL"; sourceId: string }>;
+  grantSources?: Array<{
+    source: "PLAN" | "PAID_ADDON" | "MANUAL";
+    sourceId: string;
+  }>;
 };
 
 export type AdminOrgOverview = {
@@ -1229,6 +1232,7 @@ export type AdminBehaviourCommandResponse = {
 
 export type AdminBehaviourHistoryResponse = {
   items: AdminBehaviourEntry[];
+  nextCursor: string | null;
   canVoid?: boolean;
 };
 
@@ -1237,7 +1241,51 @@ export type AdminBehaviourHistoryQuery = {
   type?: AdminBehaviourType;
   occurredFrom?: string;
   occurredTo?: string;
+  visibility?: AdminBehaviourVisibility | "ALL";
   limit?: number;
+  cursor?: string;
+};
+
+export type AdminBehaviourBatchInput = {
+  idempotencyKey: string;
+  childIds: string[];
+  occurredAt: string;
+  entries: Array<{
+    category: string;
+    type: AdminBehaviourType;
+    visibility: AdminBehaviourVisibility;
+    pointsDelta: number;
+    reason: string;
+    note?: string;
+    quantity: number;
+  }>;
+};
+
+export type AdminBehaviourBatchResponse = {
+  entries: AdminBehaviourEntry[];
+  duplicate: boolean;
+};
+
+export type AdminBehaviourTrendsQuery = {
+  from: string;
+  to: string;
+  bucket: "daily" | "weekly" | "monthly";
+  visibility: AdminBehaviourVisibility | "ALL";
+};
+
+export type AdminBehaviourTrendCounts = {
+  totalCount: number;
+  meritCount: number;
+  demeritCount: number;
+  generalCount: number;
+  meritPoints: number;
+  demeritPoints: number;
+  netPoints: number;
+};
+
+export type AdminBehaviourTrendsResponse = AdminBehaviourTrendsQuery & {
+  items: Array<AdminBehaviourTrendCounts & { bucketStart: string }>;
+  totals: AdminBehaviourTrendCounts;
 };
 
 export type AdminDemeritStatus = {
@@ -1307,9 +1355,44 @@ export async function fetchBehaviourPolicy(): Promise<AdminBehaviourPolicyRespon
 export async function fetchBehaviourHistory(
   query: AdminBehaviourHistoryQuery = {},
 ): Promise<AdminBehaviourHistoryResponse> {
-  if (isUsingMockApi()) return { items: [] };
+  if (isUsingMockApi()) return { items: [], nextCursor: null };
   return behaviourRequest<AdminBehaviourHistoryResponse>(
     `/ace/behaviour${behaviourQueryString(query)}`,
+  );
+}
+
+export function recordBehaviourBatch(
+  input: AdminBehaviourBatchInput,
+): Promise<AdminBehaviourBatchResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("Behaviour batches are not available in mock mode.");
+  }
+  return behaviourRequest<AdminBehaviourBatchResponse>("/ace/behaviour/batch", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchBehaviourTrends(
+  query: AdminBehaviourTrendsQuery,
+): Promise<AdminBehaviourTrendsResponse> {
+  if (isUsingMockApi()) {
+    return Promise.resolve({
+      ...query,
+      items: [],
+      totals: {
+        totalCount: 0,
+        meritCount: 0,
+        demeritCount: 0,
+        generalCount: 0,
+        meritPoints: 0,
+        demeritPoints: 0,
+        netPoints: 0,
+      },
+    });
+  }
+  return behaviourRequest<AdminBehaviourTrendsResponse>(
+    `/ace/behaviour/trends?${new URLSearchParams(query).toString()}`,
   );
 }
 
@@ -1420,7 +1503,9 @@ function behaviourQueryString(query: AdminBehaviourHistoryQuery): string {
   if (query.type) params.set("type", query.type);
   if (query.occurredFrom) params.set("occurredFrom", query.occurredFrom);
   if (query.occurredTo) params.set("occurredTo", query.occurredTo);
+  if (query.visibility) params.set("visibility", query.visibility);
   if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.cursor) params.set("cursor", query.cursor);
   const encoded = params.toString();
   return encoded ? `?${encoded}` : "";
 }
@@ -5481,7 +5566,8 @@ export async function previewModuleChange(input: {
     cache: "no-store",
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(`Unable to preview renewal change: ${await res.text()}`);
+  if (!res.ok)
+    throw new Error(`Unable to preview renewal change: ${await res.text()}`);
   return res.json() as Promise<AdminModuleChangePreview>;
 }
 
@@ -5496,7 +5582,8 @@ export async function acceptModuleChange(
     cache: "no-store",
     body: JSON.stringify({ changeId, idempotencyKey }),
   });
-  if (!res.ok) throw new Error(`Unable to schedule renewal change: ${await res.text()}`);
+  if (!res.ok)
+    throw new Error(`Unable to schedule renewal change: ${await res.text()}`);
   return res.json() as Promise<AdminModuleChangePreview>;
 }
 
