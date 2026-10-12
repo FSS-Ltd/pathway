@@ -43,13 +43,16 @@ mode. Browser review blocked an external sign-in redirect; the user chose to
 continue without browser inspection.
 
 Step ACE-B02, atomic batch recording, starts from that merged commit on
-`feature/ace-behaviour-batch-recording`. The batch uses the existing immutable
+`feature/ace-behaviour-batch-recording` in
+[PR #585](https://github.com/FSS-Ltd/pathway/pull/585). The implementation
+revision `0e0c403252a9eab196d175d0d7d30dba3623fd44` uses the immutable
 fact writer inside one tenant transaction, with at most 50 resulting facts and
 no schema change. Local API typecheck, lint, format, build, 1,337 API unit
-tests, and 12 guarded PostgreSQL behaviour integration tests passed. The
+tests, 12 guarded PostgreSQL behaviour integration tests, and the repository
+pre-commit hook passed. The
 database suite covers concurrent replay, full rollback and retry, cross-site
-and sensitive denial, merit intents, 50 facts, and demerit escalation. Its PR,
-checked revision, CI, and merge evidence remain pending.
+and sensitive denial, merit intents, 50 facts, and demerit escalation.
+Latest-head CI and merge evidence remain pending.
 
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
