@@ -82,6 +82,14 @@ describe("institutional quotes and census (e2e)", () => {
     if (app) await app.close();
   });
 
+  it("rejects worker dispatch without the internal secret", async () => {
+    if (!app) return;
+    const response = await request(app.getHttpServer())
+      .post(`/billing/institutional/internal/operations/${randomUUID()}`)
+      .send();
+    expect(response.status).toBe(401);
+  });
+
   it("requires an accepted declaration, preserves zero as base-fee billing, and rejects stale quotes", async () => {
     if (!app) return;
     const missing = await request(app.getHttpServer())
@@ -140,6 +148,17 @@ describe("institutional quotes and census (e2e)", () => {
       `accepted-${orgId}`,
     );
     expect(accepted.snapshotId).toBe(second.id);
+    const disabledCheckout = await request(app.getHttpServer())
+      .post("/billing/institutional/checkout")
+      .set("Authorization", billingHeader)
+      .send({ snapshotId: second.id, idempotencyKey: `checkout-${orgId}` });
+    expect(disabledCheckout.status).toBe(503);
+    expect(disabledCheckout.body.code).toBe("INSTITUTIONAL_CHECKOUT_DISABLED");
+    expect(
+      await prisma.pendingOrder.count({
+        where: { orgId, institutionalSnapshotId: second.id },
+      }),
+    ).toBe(0);
     expect(
       (await quotes.acceptQuote(orgId, actorId, second.id, `accepted-${orgId}`))
         .id,

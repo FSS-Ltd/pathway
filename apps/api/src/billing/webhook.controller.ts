@@ -47,6 +47,7 @@ import { ClerkManagementService } from "../auth/clerk-management.service";
 import { getAuthProviderMode } from "../config/runtime-env";
 import Stripe from "stripe";
 import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
+import { InstitutionalWebhookService } from "./institutional/institutional-webhook.service";
 import {
   cancelPaidSourceGrants,
   reconcileSubscriptionModuleGrants,
@@ -140,6 +141,8 @@ export class BillingWebhookController {
     @Inject(ModuleRef) private readonly moduleRef: ModuleRef,
     @Inject(BILLING_PROVIDER_CONFIG)
     private readonly billingConfig: BillingProviderConfig,
+    @Inject(InstitutionalWebhookService)
+    private readonly institutionalWebhook: InstitutionalWebhookService,
     @Optional()
     @Inject(LoggingService)
     logging?: LoggingService,
@@ -263,6 +266,13 @@ export class BillingWebhookController {
         // Org was already created, use the existing orgId
         event = { ...event, orgId: pendingOrder.orgId };
       }
+      if ((!event.orgId || event.orgId === "pending") && event.subscriptionId) {
+        const subscription = await prisma.subscription.findUnique({
+          where: { providerSubId: event.subscriptionId },
+          select: { orgId: true },
+        });
+        if (subscription) event = { ...event, orgId: subscription.orgId };
+      }
     }
 
     if (
@@ -303,6 +313,7 @@ export class BillingWebhookController {
   }
 
   private async applyEvent(event: ParsedBillingWebhookEvent): Promise<boolean> {
+    if (await this.institutionalWebhook.handle(event)) return true;
     switch (event.kind) {
       case "subscription.updated":
       case "subscription.created":

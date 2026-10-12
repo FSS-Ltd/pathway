@@ -132,6 +132,20 @@ enum InstitutionalCountSource {
   VERIFIED
 }
 
+enum InstitutionalBillingOperationKind {
+  CENSUS_FREEZE
+  RENEWAL_RECONCILE
+  PROVIDER_SCHEDULE
+}
+
+enum InstitutionalBillingOperationStatus {
+  PENDING
+  CLAIMED
+  RETRY
+  COMPLETED
+  REVIEW_REQUIRED
+}
+
 enum AuditAction {
   CREATED
   UPDATED
@@ -963,6 +977,7 @@ model Org {
   institutionalBillingPolicy InstitutionalBillingPolicy?
   institutionalBillingSnapshots InstitutionalBillingSnapshot[]
   institutionalQuoteAcceptances InstitutionalQuoteAcceptance[]
+  institutionalBillingOperations InstitutionalBillingOperation[]
   roleDefinitions     OrgRoleDefinition[]
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
@@ -3921,6 +3936,7 @@ model Subscription {
   currentInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalCurrentSubscription", fields: [currentInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
   nextInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalNextSubscription", fields: [nextInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
   institutionalSnapshots InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSubscription")
+  institutionalOperations InstitutionalBillingOperation[]
 
   @@index([orgId])
   @@index([status])
@@ -3998,6 +4014,7 @@ model PendingOrder {
   completedAt            DateTime?
   updatedAt              DateTime           @updatedAt
   institutionalSnapshotId String?
+  institutionalCheckoutKey String?
   institutionalSnapshot InstitutionalBillingSnapshot? @relation(fields: [institutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
 
   // For public checkout: store org/user details until payment confirmed.
@@ -4007,6 +4024,7 @@ model PendingOrder {
 
   @@index([tenantId, orgId, provider, providerCheckoutId])
   @@index([provider, providerSubscriptionId])
+  @@unique([orgId, institutionalCheckoutKey])
 }
 
 model InstitutionalBillingPolicy {
@@ -4059,6 +4077,7 @@ model InstitutionalBillingSnapshot {
   supersededBy          InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSupersession")
   acceptance            InstitutionalQuoteAcceptance?
   pendingOrders         PendingOrder[]
+  operations            InstitutionalBillingOperation[]
   currentSubscriptions  Subscription[] @relation("InstitutionalCurrentSubscription")
   nextSubscriptions     Subscription[] @relation("InstitutionalNextSubscription")
 
@@ -4084,6 +4103,35 @@ model InstitutionalQuoteAcceptance {
   @@unique([orgId, idempotencyKey])
   @@unique([snapshotId, orgId])
   @@index([orgId, acceptedAt])
+}
+
+model InstitutionalBillingOperation {
+  id                     String   @id @default(uuid())
+  orgId                  String
+  subscriptionId         String?
+  snapshotId             String?
+  kind                   InstitutionalBillingOperationKind
+  status                 InstitutionalBillingOperationStatus @default(PENDING)
+  idempotencyKey         String
+  dueAt                  DateTime
+  attempts               Int      @default(0)
+  claimToken             String?
+  claimedUntil           DateTime?
+  providerIdempotencyKey String?
+  providerReference      String?
+  lastError              String?
+  completedAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  org                    Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  subscription           Subscription? @relation(fields: [subscriptionId, orgId], references: [id, orgId], onDelete: Restrict)
+  snapshot               InstitutionalBillingSnapshot? @relation(fields: [snapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([orgId, idempotencyKey])
+  @@index([status, dueAt])
+  @@index([status, claimedUntil])
+  @@index([orgId, subscriptionId, kind])
+  @@unique([id, orgId])
 }
 
 model OrgRetentionPolicy {

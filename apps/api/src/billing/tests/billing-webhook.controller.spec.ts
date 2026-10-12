@@ -1,5 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { BillingWebhookController } from "../webhook.controller";
+import { InstitutionalWebhookService } from "../institutional/institutional-webhook.service";
 import {
   BillingWebhookProvider,
   ParsedBillingWebhookEvent,
@@ -33,7 +34,14 @@ const prismaMock: {
     findMany: jest.Mock;
     findUnique: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
+  institutionalBillingSnapshot: { findFirst: jest.Mock };
+  institutionalBillingPolicy: { updateMany: jest.Mock; findUnique: jest.Mock };
+  enrolmentRollConfirmation: { findFirst: jest.Mock };
+  enrolmentRevision: { findFirst: jest.Mock };
+  institutionalBillingOperation: { updateMany: jest.Mock; upsert: jest.Mock };
+  org: { update: jest.Mock };
   orgEntitlementSnapshot: { create: jest.Mock; findFirst: jest.Mock };
   orgModule: {
     upsert: jest.Mock;
@@ -51,9 +59,12 @@ const prismaMock: {
     findUnique: jest.Mock;
     findFirst: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
   $transaction: jest.Mock;
   $executeRawUnsafe: jest.Mock;
+  $executeRaw: jest.Mock;
+  $queryRaw: jest.Mock;
 } = {
   billingEvent: { findFirst: jest.fn(), create: jest.fn() },
   subscription: {
@@ -61,7 +72,14 @@ const prismaMock: {
     findMany: jest.fn().mockResolvedValue([]),
     findUnique: jest.fn(),
     update: jest.fn().mockResolvedValue(undefined),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
+  institutionalBillingSnapshot: { findFirst: jest.fn() },
+  institutionalBillingPolicy: { updateMany: jest.fn(), findUnique: jest.fn() },
+  enrolmentRollConfirmation: { findFirst: jest.fn() },
+  enrolmentRevision: { findFirst: jest.fn() },
+  institutionalBillingOperation: { updateMany: jest.fn(), upsert: jest.fn() },
+  org: { update: jest.fn() },
   orgEntitlementSnapshot: { create: jest.fn(), findFirst: jest.fn() },
   orgModule: {
     upsert: jest.fn(),
@@ -79,11 +97,14 @@ const prismaMock: {
     findUnique: jest.fn(),
     findFirst: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
   $transaction: jest.fn((cb: (tx: typeof prismaMock) => unknown) =>
     Promise.resolve(cb(prismaMock)),
   ),
   $executeRawUnsafe: jest.fn(),
+  $executeRaw: jest.fn(),
+  $queryRaw: jest.fn(),
 };
 
 jest.mock("@pathway/db", () => {
@@ -119,6 +140,7 @@ describe("BillingWebhookController", () => {
   let controller: BillingWebhookController;
   let provider: BillingWebhookProvider;
   let entitlements: jest.Mocked<Pick<EntitlementsService, "resolve">>;
+  let billingConfig: BillingProviderConfig;
   const logging = new LoggingService();
 
   beforeEach(() => {
@@ -183,6 +205,10 @@ describe("BillingWebhookController", () => {
     });
     prismaMock.pendingOrder.findUnique.mockResolvedValue(null);
     prismaMock.pendingOrder.findFirst.mockResolvedValue(null);
+    prismaMock.institutionalBillingSnapshot.findFirst.mockResolvedValue(null);
+    prismaMock.subscription.upsert.mockResolvedValue({
+      id: "subscription_db_1",
+    });
 
     provider = {
       verifyAndParse: jest
@@ -203,7 +229,7 @@ describe("BillingWebhookController", () => {
       get: jest.fn().mockReturnValue(auth0Management),
     } as unknown as ModuleRef;
 
-    const billingConfig: BillingProviderConfig = {
+    billingConfig = {
       activeProvider: "STRIPE",
       stripe: {},
       goCardless: {},
@@ -214,6 +240,7 @@ describe("BillingWebhookController", () => {
       entitlements as unknown as EntitlementsService,
       moduleRef,
       billingConfig,
+      new InstitutionalWebhookService(provider, billingConfig),
       logging,
     );
   });
@@ -1073,5 +1100,379 @@ describe("BillingWebhookController", () => {
         source: "module_change",
       }),
     });
+  });
+
+  function setupInstitutionalPayment(
+    kind: "invoice.paid" | "invoice.draft" | "invoice.payment_failed",
+  ) {
+    const pending = {
+      id: "institutional_order_1",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      institutionalSnapshotId: "snapshot_1",
+      institutionalCheckoutKey: "checkout_1",
+      createdAt: new Date("2030-01-01T00:00:00Z"),
+      status: PendingOrderStatus.PENDING,
+    };
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
+    prismaMock.subscription.findUnique.mockResolvedValue(null);
+    const snapshot = {
+      id: "snapshot_1",
+      orgId: baseEvent.orgId,
+      kind: "QUOTE",
+      status: "PRICED",
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      pricingVersion: "ENROLLED_CHILDREN_V1",
+      countSource: "DECLARED",
+      enrolledChildren: 0,
+      subtotalPence: 4_900,
+      includedModules: [],
+      paidModules: [],
+      createdAt: new Date("2029-12-31T23:59:00Z"),
+      expiresAt: new Date("2030-01-01T00:14:00Z"),
+      acceptance: {
+        id: "acceptance_1",
+        acceptedAt: new Date("2029-12-31T23:59:30Z"),
+      },
+    };
+    prismaMock.institutionalBillingSnapshot.findFirst.mockImplementation(
+      async ({ where }) => (where.supersedesId ? null : snapshot),
+    );
+    prismaMock.institutionalBillingPolicy.findUnique.mockResolvedValue({
+      pricingVersion: "ENROLLED_CHILDREN_V1",
+      declaredChildren: 0,
+      declaredAt: new Date("2029-12-31T23:58:00Z"),
+    });
+    billingConfig.stripe.priceMap = {
+      INSTITUTIONAL_STARTER_MONTHLY: "price_starter123",
+    };
+    const event: ParsedBillingWebhookEvent = {
+      ...baseEvent,
+      kind,
+      pendingOrderId: pending.id,
+      planCode: pending.planCode,
+      occurredAt: new Date("2030-01-01T00:01:00Z"),
+      invoice: {
+        id: "in_1",
+        status: kind === "invoice.draft" ? "draft" : "paid",
+        currency: "gbp",
+        linesComplete: true,
+        lines: [
+          { priceId: "price_starter123", quantity: 1, amountPence: 4_900 },
+        ],
+      },
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue(event);
+    return event;
+  }
+
+  it("activates an accepted institutional snapshot only after its invoice is paid and matched", async () => {
+    const event = setupInstitutionalPayment("invoice.paid");
+    event.providerCustomerId = "cus_institutional";
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          currentInstitutionalSnapshotId: "snapshot_1",
+        }),
+      }),
+    );
+    expect(prismaMock.pendingOrder.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "institutional_order_1",
+        orgId: baseEvent.orgId,
+        status: { not: PendingOrderStatus.COMPLETED },
+      },
+      data: expect.objectContaining({ status: PendingOrderStatus.COMPLETED }),
+    });
+    expect(
+      prismaMock.institutionalBillingOperation.upsert,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ kind: "CENSUS_FREEZE" }),
+      }),
+    );
+    expect(prismaMock.org.update).toHaveBeenCalledWith({
+      where: { id: baseEvent.orgId },
+      data: { stripeCustomerId: "cus_institutional" },
+    });
+  });
+
+  it("activates a payment after quote expiry when Checkout began while it was valid", async () => {
+    const event = setupInstitutionalPayment("invoice.paid");
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...event,
+      occurredAt: new Date("2030-01-01T00:16:00Z"),
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).toHaveBeenCalled();
+    expect(prismaMock.pendingOrder.updateMany).toHaveBeenCalled();
+  });
+
+  it("honours a paid Checkout when a newer quote was created later", async () => {
+    setupInstitutionalPayment("invoice.paid");
+    const originalLookup =
+      prismaMock.institutionalBillingSnapshot.findFirst.getMockImplementation();
+    prismaMock.institutionalBillingSnapshot.findFirst.mockImplementation(
+      async (args) =>
+        args.where.supersedesId ? { id: "new_quote" } : originalLookup?.(args),
+    );
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).toHaveBeenCalled();
+  });
+
+  it("holds payment activation when Checkout began after quote expiry", async () => {
+    setupInstitutionalPayment("invoice.paid");
+    prismaMock.pendingOrder.findUnique.mockResolvedValue({
+      id: "institutional_order_1",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      institutionalSnapshotId: "snapshot_1",
+      institutionalCheckoutKey: "checkout_1",
+      createdAt: new Date("2030-01-01T00:16:00Z"),
+      status: PendingOrderStatus.PENDING,
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.pendingOrder.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("holds payment activation when acceptance postdates Checkout", async () => {
+    setupInstitutionalPayment("invoice.paid");
+    prismaMock.institutionalBillingSnapshot.findFirst.mockResolvedValue({
+      id: "snapshot_1",
+      orgId: baseEvent.orgId,
+      kind: "QUOTE",
+      status: "PRICED",
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      pricingVersion: "ENROLLED_CHILDREN_V1",
+      countSource: "DECLARED",
+      enrolledChildren: 0,
+      subtotalPence: 4_900,
+      includedModules: [],
+      paidModules: [],
+      expiresAt: new Date("2030-01-01T00:14:00Z"),
+      acceptance: {
+        id: "acceptance_1",
+        acceptedAt: new Date("2030-01-01T00:02:00Z"),
+      },
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+  });
+
+  it("holds a mismatched institutional draft and marks billing for review", async () => {
+    setupInstitutionalPayment("invoice.draft");
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      kind: "invoice.draft",
+      pendingOrderId: "institutional_order_1",
+      invoice: {
+        id: "in_1",
+        status: "draft",
+        currency: "gbp",
+        linesComplete: true,
+        lines: [
+          { priceId: "price_starter123", quantity: 1, amountPence: 5_000 },
+        ],
+      },
+    });
+    provider.holdDraftInvoice = jest.fn().mockResolvedValue(undefined);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(provider.holdDraftInvoice).toHaveBeenCalledWith("in_1");
+    expect(
+      prismaMock.institutionalBillingPolicy.updateMany,
+    ).toHaveBeenCalledWith({
+      where: { orgId: baseEvent.orgId },
+      data: { reviewReason: "INVOICE_MISMATCH" },
+    });
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+  });
+
+  it("does not acknowledge an unsafe draft hold", async () => {
+    setupInstitutionalPayment("invoice.draft");
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...baseEvent,
+      kind: "invoice.draft",
+      pendingOrderId: "institutional_order_1",
+      invoice: {
+        id: "in_1",
+        status: "draft",
+        currency: "gbp",
+        linesComplete: true,
+        lines: [
+          { priceId: "price_starter123", quantity: 1, amountPence: 5_000 },
+        ],
+      },
+    });
+
+    await expect(
+      controller.handleWebhook({ dummy: true }, "test-signature"),
+    ).rejects.toThrow("Institutional draft invoice could not be held");
+    expect(finishBillingEvent).toHaveBeenCalledWith(
+      "billing_event_1",
+      baseEvent.orgId,
+      false,
+    );
+  });
+
+  it("never activates an institutional snapshot for a mismatched paid or failed invoice", async () => {
+    const event = setupInstitutionalPayment("invoice.paid");
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...event,
+      invoice: {
+        ...event.invoice!,
+        lines: [
+          { priceId: "price_starter123", quantity: 1, amountPence: 5_000 },
+        ],
+      },
+    });
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.pendingOrder.updateMany).not.toHaveBeenCalled();
+
+    jest.clearAllMocks();
+    setupInstitutionalPayment("invoice.payment_failed");
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.pendingOrder.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("moves a matched frozen census into current paid state at renewal", async () => {
+    const event = setupInstitutionalPayment("invoice.paid");
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(null);
+    prismaMock.pendingOrder.findFirst.mockResolvedValue(null);
+    prismaMock.subscription.findUnique.mockResolvedValue({
+      id: "subscription_db_1",
+      orgId: baseEvent.orgId,
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      status: SubscriptionStatus.ACTIVE,
+      periodStart: new Date("2030-01-01T00:00:00Z"),
+      periodEnd: new Date("2030-02-01T00:00:00Z"),
+      currentInstitutionalSnapshotId: "snapshot_1",
+      nextInstitutionalSnapshotId: "census_2",
+    });
+    prismaMock.institutionalBillingSnapshot.findFirst.mockResolvedValue({
+      id: "census_2",
+      orgId: baseEvent.orgId,
+      kind: "CENSUS",
+      status: "PRICED",
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      pricingVersion: "ENROLLED_CHILDREN_V1",
+      enrolledChildren: 0,
+      subtotalPence: 4_900,
+      includedModules: [],
+      paidModules: [],
+      effectiveAt: new Date("2030-02-01T00:00:00Z"),
+      acceptance: null,
+    });
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...event,
+      pendingOrderId: null,
+      periodStart: new Date("2030-02-01T00:00:00Z"),
+      periodEnd: new Date("2030-03-01T00:00:00Z"),
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          currentInstitutionalSnapshotId: "census_2",
+          nextInstitutionalSnapshotId: null,
+        }),
+      }),
+    );
+    expect(prismaMock.orgEntitlementSnapshot.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        maxSites: 1,
+        source: "institutional_invoice",
+      }),
+    });
+  });
+
+  it("does not regress a newer paid period when an older invoice arrives late", async () => {
+    const event = setupInstitutionalPayment("invoice.paid");
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(null);
+    prismaMock.pendingOrder.findFirst.mockResolvedValue(null);
+    prismaMock.subscription.findUnique.mockResolvedValue({
+      id: "subscription_db_1",
+      orgId: baseEvent.orgId,
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      status: SubscriptionStatus.ACTIVE,
+      periodStart: new Date("2030-02-01T00:00:00Z"),
+      periodEnd: new Date("2030-03-01T00:00:00Z"),
+      currentInstitutionalSnapshotId: "snapshot_1",
+      nextInstitutionalSnapshotId: null,
+    });
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...event,
+      pendingOrderId: null,
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(
+      prismaMock.institutionalBillingPolicy.updateMany,
+    ).not.toHaveBeenCalled();
+  });
+
+  it("resolves a renewal invoice without organisation metadata from its stored subscription", async () => {
+    const event = setupInstitutionalPayment("invoice.paid");
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(null);
+    prismaMock.pendingOrder.findFirst.mockResolvedValue(null);
+    prismaMock.subscription.findUnique.mockResolvedValue({
+      id: "subscription_db_1",
+      orgId: baseEvent.orgId,
+      periodStart: new Date("2030-02-01T00:00:00Z"),
+      currentInstitutionalSnapshotId: "snapshot_1",
+    });
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue({
+      ...event,
+      pendingOrderId: null,
+      orgId: "",
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(finishBillingEvent).toHaveBeenCalledWith(
+      "billing_event_1",
+      baseEvent.orgId,
+      true,
+    );
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+  });
+
+  it("resolves a metadata-free institutional event when the service is called directly", async () => {
+    const event = setupInstitutionalPayment("invoice.paid");
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(null);
+    prismaMock.pendingOrder.findFirst.mockResolvedValue(null);
+    prismaMock.subscription.findUnique.mockResolvedValue({
+      id: "subscription_db_1",
+      orgId: baseEvent.orgId,
+      periodStart: new Date("2030-02-01T00:00:00Z"),
+      currentInstitutionalSnapshotId: "snapshot_1",
+    });
+
+    const service = new InstitutionalWebhookService(provider, billingConfig);
+    await expect(
+      service.handle({ ...event, pendingOrderId: null, orgId: "" }),
+    ).resolves.toBe(true);
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
   });
 });

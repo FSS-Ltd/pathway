@@ -16,6 +16,7 @@ import { z } from "zod";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { IndependentTransaction } from "../../common/database/independent-transaction.decorator";
 import { InstitutionalCensusService } from "./institutional-census.service";
+import { InstitutionalCheckoutService } from "./institutional-checkout.service";
 import { InstitutionalQuoteService } from "./institutional-quote.service";
 
 const planCodeSchema = z.enum([
@@ -34,6 +35,7 @@ const acceptSchema = z.object({
   snapshotId: z.string().uuid(),
   idempotencyKey: z.string().min(8).max(128),
 });
+const checkoutSchema = acceptSchema;
 
 function parseBody<TSchema extends z.ZodTypeAny>(
   schema: TSchema,
@@ -58,6 +60,8 @@ export class InstitutionalBillingController {
     private readonly quotes: InstitutionalQuoteService,
     @Inject(InstitutionalCensusService)
     private readonly census: InstitutionalCensusService,
+    @Inject(InstitutionalCheckoutService)
+    private readonly checkoutService: InstitutionalCheckoutService,
   ) {}
 
   private async authorize(
@@ -108,6 +112,21 @@ export class InstitutionalBillingController {
   ) {
     await this.authorize(orgId, req);
     return this.quotes.getQuote(orgId, id);
+  }
+
+  @Post("checkout")
+  async checkout(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Body() body: unknown,
+  ) {
+    await this.authorize(orgId, req);
+    const input = parseBody(checkoutSchema, body);
+    return this.checkoutService.checkout(
+      orgId,
+      input.snapshotId,
+      input.idempotencyKey,
+    );
   }
 
   @Get("summary")

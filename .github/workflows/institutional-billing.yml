@@ -1,0 +1,64 @@
+name: Institutional billing worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Independent of retention; execution remains disabled until launch approval.
+    - cron: "*/15 * * * *"
+
+jobs:
+  run:
+    name: Process institutional billing operations
+    if: vars.INSTITUTIONAL_BILLING_WORKER_ENABLED == 'true'
+    runs-on: ubuntu-22.04
+    environment: production
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      BILLING_WORKER_ENABLED: "true"
+      BILLING_INTERNAL_API_URL: ${{ secrets.BILLING_INTERNAL_API_URL }}
+      INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Verify required secrets
+        shell: bash
+        run: |
+          test -n "$DATABASE_URL" || { echo "DATABASE_URL is required." >&2; exit 1; }
+          test -n "$BILLING_INTERNAL_API_URL" || { echo "BILLING_INTERNAL_API_URL is required." >&2; exit 1; }
+          test -n "$INTERNAL_AUTH_SECRET" || { echo "INTERNAL_AUTH_SECRET is required." >&2; exit 1; }
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Process billing operations
+        run: pnpm --filter @pathway/workers billing:run

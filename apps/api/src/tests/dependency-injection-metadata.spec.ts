@@ -30,6 +30,7 @@ import { GoCardlessBuyNowProvider } from "../billing/providers/gocardless-buy-no
 import { StripeBillingWebhookProvider } from "../billing/providers/stripe-billing-webhook.provider";
 import { StripeBuyNowProvider } from "../billing/providers/stripe-buy-now.provider";
 import { BillingWebhookController } from "../billing/webhook.controller";
+import { InstitutionalWebhookService } from "../billing/institutional/institutional-webhook.service";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { LoggingService } from "../common/logging/logging.service";
@@ -222,7 +223,15 @@ describe("dependency injection metadata", () => {
         { index: 1, param: EntitlementsService },
         { index: 2, param: ModuleRef },
         { index: 3, param: BILLING_PROVIDER_CONFIG },
-        { index: 4, param: LoggingService },
+        { index: 4, param: InstitutionalWebhookService },
+        { index: 5, param: LoggingService },
+      ],
+    },
+    {
+      target: InstitutionalWebhookService,
+      dependencies: [
+        { index: 0, param: BILLING_WEBHOOK_PROVIDER },
+        { index: 1, param: BILLING_PROVIDER_CONFIG },
       ],
     },
     {
