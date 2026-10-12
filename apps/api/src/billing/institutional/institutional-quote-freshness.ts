@@ -1,73 +1,32 @@
 import {
-  InstitutionalCountSource,
   InstitutionalSnapshotKind,
-  Prisma,
-  prisma,
+  InstitutionalSnapshotStatus,
+  type Prisma,
 } from "@pathway/db";
-import { INSTITUTIONAL_PRICING_VERSION } from "@pathway/pricing";
-import type { ParsedBillingWebhookEvent } from "../billing-webhook.provider";
 
-export async function quoteStillAcceptable(
-  snapshot: Prisma.InstitutionalBillingSnapshotGetPayload<
-    Record<string, never>
-  >,
-  event: ParsedBillingWebhookEvent,
-  client: Prisma.TransactionClient | typeof prisma,
-): Promise<boolean> {
-  const paidAt = event.occurredAt ?? new Date();
-  if (
-    snapshot.kind !== InstitutionalSnapshotKind.QUOTE ||
-    snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION ||
-    !snapshot.expiresAt ||
-    snapshot.expiresAt <= paidAt
-  ) {
-    return false;
-  }
-  const [policy, supersedingQuote] = await Promise.all([
-    client.institutionalBillingPolicy.findUnique({
-      where: { orgId: snapshot.orgId },
-    }),
-    client.institutionalBillingSnapshot.findFirst({
-      where: { orgId: snapshot.orgId, supersedesId: snapshot.id },
-      select: { id: true },
-    }),
-  ]);
-  if (
-    !policy ||
-    supersedingQuote ||
-    policy.pricingVersion !== snapshot.pricingVersion
-  ) {
-    return false;
-  }
-  if (snapshot.countSource === InstitutionalCountSource.DECLARED) {
-    return (
-      policy.declaredChildren === snapshot.enrolledChildren &&
-      !!policy.declaredAt &&
-      policy.declaredAt <= snapshot.createdAt
-    );
-  }
-  if (
-    snapshot.countSource !== InstitutionalCountSource.VERIFIED ||
-    !snapshot.sourceConfirmationId ||
-    !snapshot.sourceRevisionCutoff
-  ) {
-    return false;
-  }
-  const [latestConfirmation, laterRevision] = await Promise.all([
-    client.enrolmentRollConfirmation.findFirst({
-      where: { orgId: snapshot.orgId },
-      orderBy: [{ revisionCutoff: "desc" }, { id: "desc" }],
-      select: { id: true },
-    }),
-    client.enrolmentRevision.findFirst({
-      where: {
-        orgId: snapshot.orgId,
-        recordedAt: { gt: snapshot.sourceRevisionCutoff },
-      },
-      select: { id: true },
-    }),
-  ]);
+type AcceptedQuote = Prisma.InstitutionalBillingSnapshotGetPayload<{
+  include: { acceptance: true };
+}>;
+
+type CheckoutOrder = Pick<
+  Prisma.PendingOrderGetPayload<Record<string, never>>,
+  "createdAt" | "institutionalSnapshotId" | "institutionalCheckoutKey" | "orgId"
+>;
+
+/** A valid checkout fixes the accepted price; payment may arrive after quote expiry. */
+export function quoteWasAcceptedForCheckout(
+  snapshot: AcceptedQuote,
+  order: CheckoutOrder,
+): boolean {
   return (
-    latestConfirmation?.id === snapshot.sourceConfirmationId && !laterRevision
+    snapshot.kind === InstitutionalSnapshotKind.QUOTE &&
+    snapshot.status === InstitutionalSnapshotStatus.PRICED &&
+    snapshot.orgId === order.orgId &&
+    snapshot.id === order.institutionalSnapshotId &&
+    !!order.institutionalCheckoutKey &&
+    !!snapshot.acceptance &&
+    snapshot.acceptance.acceptedAt <= order.createdAt &&
+    !!snapshot.expiresAt &&
+    order.createdAt < snapshot.expiresAt
   );
 }

@@ -1111,6 +1111,8 @@ describe("BillingWebhookController", () => {
       tenantId: "tenant_1",
       planCode: "INSTITUTIONAL_STARTER_MONTHLY",
       institutionalSnapshotId: "snapshot_1",
+      institutionalCheckoutKey: "checkout_1",
+      createdAt: new Date("2030-01-01T00:00:00Z"),
       status: PendingOrderStatus.PENDING,
     };
     prismaMock.pendingOrder.findUnique.mockResolvedValue(pending);
@@ -1129,7 +1131,10 @@ describe("BillingWebhookController", () => {
       paidModules: [],
       createdAt: new Date("2029-12-31T23:59:00Z"),
       expiresAt: new Date("2030-01-01T00:14:00Z"),
-      acceptance: { id: "acceptance_1" },
+      acceptance: {
+        id: "acceptance_1",
+        acceptedAt: new Date("2029-12-31T23:59:30Z"),
+      },
     };
     prismaMock.institutionalBillingSnapshot.findFirst.mockImplementation(
       async ({ where }) => (where.supersedesId ? null : snapshot),
@@ -1196,7 +1201,7 @@ describe("BillingWebhookController", () => {
     });
   });
 
-  it("holds payment activation when an accepted quote expired before the paid event", async () => {
+  it("activates a payment after quote expiry when Checkout began while it was valid", async () => {
     const event = setupInstitutionalPayment("invoice.paid");
     (provider.verifyAndParse as jest.Mock).mockResolvedValue({
       ...event,
@@ -1205,17 +1210,11 @@ describe("BillingWebhookController", () => {
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
-    expect(
-      prismaMock.institutionalBillingPolicy.updateMany,
-    ).toHaveBeenCalledWith({
-      where: { orgId: baseEvent.orgId },
-      data: { reviewReason: "INVOICE_MISMATCH" },
-    });
-    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
-    expect(prismaMock.pendingOrder.updateMany).not.toHaveBeenCalled();
+    expect(prismaMock.subscription.upsert).toHaveBeenCalled();
+    expect(prismaMock.pendingOrder.updateMany).toHaveBeenCalled();
   });
 
-  it("holds payment activation when a newer quote superseded the accepted one", async () => {
+  it("honours a paid Checkout when a newer quote was created later", async () => {
     setupInstitutionalPayment("invoice.paid");
     const originalLookup =
       prismaMock.institutionalBillingSnapshot.findFirst.getMockImplementation();
@@ -1223,6 +1222,51 @@ describe("BillingWebhookController", () => {
       async (args) =>
         args.where.supersedesId ? { id: "new_quote" } : originalLookup?.(args),
     );
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).toHaveBeenCalled();
+  });
+
+  it("holds payment activation when Checkout began after quote expiry", async () => {
+    setupInstitutionalPayment("invoice.paid");
+    prismaMock.pendingOrder.findUnique.mockResolvedValue({
+      id: "institutional_order_1",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      institutionalSnapshotId: "snapshot_1",
+      institutionalCheckoutKey: "checkout_1",
+      createdAt: new Date("2030-01-01T00:16:00Z"),
+      status: PendingOrderStatus.PENDING,
+    });
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.pendingOrder.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("holds payment activation when acceptance postdates Checkout", async () => {
+    setupInstitutionalPayment("invoice.paid");
+    prismaMock.institutionalBillingSnapshot.findFirst.mockResolvedValue({
+      id: "snapshot_1",
+      orgId: baseEvent.orgId,
+      kind: "QUOTE",
+      status: "PRICED",
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      pricingVersion: "ENROLLED_CHILDREN_V1",
+      countSource: "DECLARED",
+      enrolledChildren: 0,
+      subtotalPence: 4_900,
+      includedModules: [],
+      paidModules: [],
+      expiresAt: new Date("2030-01-01T00:14:00Z"),
+      acceptance: {
+        id: "acceptance_1",
+        acceptedAt: new Date("2030-01-01T00:02:00Z"),
+      },
+    });
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 

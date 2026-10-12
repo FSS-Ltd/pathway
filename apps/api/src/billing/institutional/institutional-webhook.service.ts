@@ -21,7 +21,7 @@ import {
 import { censusCutoffFor } from "./institutional-time";
 import { isInstitutionalPlanCode } from "./institutional-selection";
 import { invoiceMatchesSnapshot } from "./institutional-invoice-match";
-import { quoteStillAcceptable } from "./institutional-quote-freshness";
+import { quoteWasAcceptedForCheckout } from "./institutional-quote-freshness";
 
 @Injectable()
 export class InstitutionalWebhookService {
@@ -122,11 +122,11 @@ export class InstitutionalWebhookService {
       snapshot?.kind === InstitutionalSnapshotKind.CENSUS ||
       (snapshot?.kind === InstitutionalSnapshotKind.QUOTE &&
         !!snapshot.acceptance);
-    const quoteFresh =
+    const checkoutAccepted =
       snapshot &&
       pendingOrder &&
       pendingOrder.status !== PendingOrderStatus.COMPLETED
-        ? await quoteStillAcceptable(snapshot, event, prisma)
+        ? quoteWasAcceptedForCheckout(snapshot, pendingOrder)
         : true;
     const effectivePeriod =
       snapshot?.kind !== InstitutionalSnapshotKind.CENSUS ||
@@ -138,7 +138,7 @@ export class InstitutionalWebhookService {
     const matches =
       snapshot &&
       accepted &&
-      quoteFresh &&
+      checkoutAccepted &&
       effectivePeriod &&
       event.periodStart &&
       event.periodEnd &&
@@ -196,17 +196,6 @@ export class InstitutionalWebhookService {
       }
       if (!isInstitutionalPlanCode(snapshot.planCode)) {
         throw new Error("Institutional snapshot plan is invalid.");
-      }
-      if (
-        pendingOrder &&
-        pendingOrder.status !== PendingOrderStatus.COMPLETED &&
-        !(await quoteStillAcceptable(snapshot, event, tx))
-      ) {
-        await tx.institutionalBillingPolicy.updateMany({
-          where: { orgId: event.orgId },
-          data: { reviewReason: "INVOICE_MISMATCH" },
-        });
-        return;
       }
       const plan = INSTITUTIONAL_PLANS[snapshot.planCode];
       const paid = await tx.subscription.upsert({
