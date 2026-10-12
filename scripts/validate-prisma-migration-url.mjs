@@ -28,6 +28,9 @@ export function validatePrismaMigrationUrl(databaseUrl, supabaseUrl) {
   if (!connection.password) {
     throw new Error("DIRECT_URL must include the database password.");
   }
+  if (connection.searchParams.get("schema") !== "app") {
+    throw new Error("DIRECT_URL must include schema=app for migrations.");
+  }
 
   const projectRef = parseSupabaseProjectRef(supabaseUrl);
   const directProjectRef = connection.hostname.match(
