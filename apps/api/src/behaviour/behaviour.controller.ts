@@ -16,6 +16,7 @@ import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { BehaviourCommandService } from "./behaviour-command.service";
+import { BehaviourBatchService } from "./behaviour-batch.service";
 import { BehaviourPolicyService } from "./behaviour-policy.service";
 import { BehaviourQueryService } from "./behaviour-query.service";
 import { BehaviourReviewService } from "./behaviour-review.service";
@@ -25,6 +26,7 @@ import {
   behaviourCorrectionSchema,
   behaviourListQuerySchema,
   behaviourRetractionSchema,
+  createBehaviourBatchSchema,
   createBehaviourEntrySchema,
 } from "./dto/behaviour-entry.dto";
 import { updateBehaviourPolicySchema } from "./dto/behaviour-policy.dto";
@@ -42,6 +44,8 @@ export class BehaviourController {
     private readonly policyService: BehaviourPolicyService,
     @Inject(BehaviourCommandService)
     private readonly commandService: BehaviourCommandService,
+    @Inject(BehaviourBatchService)
+    private readonly batchService: BehaviourBatchService,
     @Inject(BehaviourQueryService)
     private readonly queryService: BehaviourQueryService,
     @Inject(DemeritStageService)
@@ -160,6 +164,22 @@ export class BehaviourController {
     try {
       return await this.commandService.record(
         await createBehaviourEntrySchema.parseAsync(body),
+        this.actor(),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(error.flatten());
+      }
+      throw error;
+    }
+  }
+
+  @Post("batch")
+  @RequirePermission("ace.behaviour.record")
+  async recordBatch(@Body() body: unknown) {
+    try {
+      return await this.batchService.record(
+        await createBehaviourBatchSchema.parseAsync(body),
         this.actor(),
       );
     } catch (error) {

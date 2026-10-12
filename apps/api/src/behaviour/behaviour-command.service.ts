@@ -19,6 +19,7 @@ import {
   behaviourEntryCommandSelect,
   behaviourEntryReplayMetadataSelect,
   behaviourIdempotencyConflict,
+  isBehaviourUniqueConstraintError,
   toBehaviourEntryResponse,
   type BehaviourEntryCommand,
   type BehaviourEntryRecord,
@@ -144,112 +145,16 @@ export class BehaviourCommandService {
               )
             : null;
 
-          await acquireAceSettingsReadLock(tx, actor.tenantId);
-          const category = await this.requireActiveCategory(
-            tx,
-            actor.tenantId,
-            command.category,
-          );
-          this.assertCategoryMatchesCommand(category, command);
-          this.requireSensitivePermission(
-            category.visibility,
-            canReadSensitive,
-          );
-          if (predecessor) {
-            this.requireSensitivePermission(
-              predecessor.visibility,
-              canReadSensitive,
-            );
-          }
-
-          const entry = (await tx.behaviourEntry.create({
-            data: {
-              tenantId: actor.tenantId,
-              childId: command.childId,
-              category: category.code,
-              categoryPolicyVersion: category.policyVersion,
-              categoryIsSerious: category.isSerious,
-              type: category.type,
-              visibility: category.visibility,
-              pointsDelta: command.pointsDelta,
-              occurredAt: new Date(command.occurredAt),
-              recordedByUserId: actor.userId,
-              reason: command.reason.trim(),
-              correctionReason:
-                operation === "correct"
-                  ? "correctionReason" in command && command.correctionReason
-                    ? command.correctionReason.trim()
-                    : command.reason.trim()
-                  : null,
-              note: command.note?.trim(),
-              correctsBehaviourEntryId: predecessor?.id,
-              clientCommandKeyHash,
-              commandFingerprint,
-            },
-            select: behaviourEntryCommandSelect,
-          })) as BehaviourEntryRecord;
-
-          const demeritEscalation = await this.demeritEscalation.createIntents(
-            tx,
-            {
-              actor,
-              entry,
-              predecessor,
-              timezone: site.timezone,
-              now: new Date(),
-            },
-          );
-
-          await recordAuditEventInTransaction(tx, {
-            actorUserId: actor.userId,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-            entityType: AuditEntityType.ACE_RECORD,
-            entityId: entry.id,
-            action: AuditAction.CREATED,
-            metadata: {
-              operation:
-                operation === "correct"
-                  ? "BEHAVIOUR_ENTRY_CORRECTED"
-                  : "BEHAVIOUR_ENTRY_RECORDED",
-              childId: entry.childId,
-              categoryPolicyVersion: entry.categoryPolicyVersion,
-              categoryIsSerious: entry.categoryIsSerious,
-              type: entry.type,
-              visibility: entry.visibility,
-              pointsDelta: entry.pointsDelta,
-              correctsBehaviourEntryId: entry.correctsBehaviourEntryId,
-              ...(demeritEscalation
-                ? {
-                    demeritStage: demeritEscalation.stage,
-                    demeritAction: demeritEscalation.action,
-                    demeritPolicyVersion: demeritEscalation.policyVersion,
-                    demeritIntentCount: demeritEscalation.createdIntentCount,
-                  }
-                : {}),
-            },
-          });
-
-          const meritPointsDelta = this.meritPointsAdjustment(
-            entry,
+          const entry = await this.writeEntryInTransaction(tx, {
+            operation,
+            command,
+            actor,
             predecessor,
-          );
-          if (entry.type === "MERIT" || predecessor?.type === "MERIT") {
-            await this.outbox.enqueue(tx, {
-              aggregateType: "BEHAVIOUR_ENTRY",
-              aggregateId: entry.id,
-              eventType: "behaviour.merit-awarded",
-              payload: {
-                behaviourEntryId: entry.id,
-                childId: entry.childId,
-                tenantId: actor.tenantId,
-                orgId: actor.orgId,
-                pointsDelta: meritPointsDelta,
-                correctsBehaviourEntryId: entry.correctsBehaviourEntryId,
-              },
-              idempotencyKey: `behaviour-merit-awarded:${entry.id}`,
-            });
-          }
+            timezone: site.timezone,
+            canReadSensitive,
+            clientCommandKeyHash,
+            commandFingerprint,
+          });
 
           return {
             entry: toBehaviourEntryResponse(entry),
@@ -258,13 +163,134 @@ export class BehaviourCommandService {
         },
       );
     } catch (error) {
-      if (isUniqueConstraintError(error)) {
+      if (isBehaviourUniqueConstraintError(error)) {
         throw new ConflictException(
           "Behaviour entry changed before this command completed",
         );
       }
       throw error;
     }
+  }
+
+  async writeEntryInTransaction(
+    tx: Prisma.TransactionClient,
+    input: {
+      operation: "record" | "correct";
+      command: BehaviourEntryCommand;
+      actor: BehaviourActor;
+      predecessor: BehaviourPredecessor | null;
+      timezone: string | null;
+      canReadSensitive: boolean;
+      clientCommandKeyHash: string;
+      commandFingerprint: string;
+    },
+  ): Promise<BehaviourEntryRecord> {
+    const {
+      operation,
+      command,
+      actor,
+      predecessor,
+      timezone,
+      canReadSensitive,
+      clientCommandKeyHash,
+      commandFingerprint,
+    } = input;
+    this.assertCommand(command);
+    await acquireAceSettingsReadLock(tx, actor.tenantId);
+    const category = await this.requireActiveCategory(
+      tx,
+      actor.tenantId,
+      command.category,
+    );
+    this.assertCategoryMatchesCommand(category, command);
+    this.requireSensitivePermission(category.visibility, canReadSensitive);
+    if (predecessor) {
+      this.requireSensitivePermission(predecessor.visibility, canReadSensitive);
+    }
+
+    const entry = (await tx.behaviourEntry.create({
+      data: {
+        tenantId: actor.tenantId,
+        childId: command.childId,
+        category: category.code,
+        categoryPolicyVersion: category.policyVersion,
+        categoryIsSerious: category.isSerious,
+        type: category.type,
+        visibility: category.visibility,
+        pointsDelta: command.pointsDelta,
+        occurredAt: new Date(command.occurredAt),
+        recordedByUserId: actor.userId,
+        reason: command.reason.trim(),
+        correctionReason:
+          operation === "correct"
+            ? "correctionReason" in command && command.correctionReason
+              ? command.correctionReason.trim()
+              : command.reason.trim()
+            : null,
+        note: command.note?.trim(),
+        correctsBehaviourEntryId: predecessor?.id,
+        clientCommandKeyHash,
+        commandFingerprint,
+      },
+      select: behaviourEntryCommandSelect,
+    })) as BehaviourEntryRecord;
+
+    const demeritEscalation = await this.demeritEscalation.createIntents(tx, {
+      actor,
+      entry,
+      predecessor,
+      timezone,
+      now: new Date(),
+    });
+
+    await recordAuditEventInTransaction(tx, {
+      actorUserId: actor.userId,
+      tenantId: actor.tenantId,
+      orgId: actor.orgId,
+      entityType: AuditEntityType.ACE_RECORD,
+      entityId: entry.id,
+      action: AuditAction.CREATED,
+      metadata: {
+        operation:
+          operation === "correct"
+            ? "BEHAVIOUR_ENTRY_CORRECTED"
+            : "BEHAVIOUR_ENTRY_RECORDED",
+        childId: entry.childId,
+        categoryPolicyVersion: entry.categoryPolicyVersion,
+        categoryIsSerious: entry.categoryIsSerious,
+        type: entry.type,
+        visibility: entry.visibility,
+        pointsDelta: entry.pointsDelta,
+        correctsBehaviourEntryId: entry.correctsBehaviourEntryId,
+        ...(demeritEscalation
+          ? {
+              demeritStage: demeritEscalation.stage,
+              demeritAction: demeritEscalation.action,
+              demeritPolicyVersion: demeritEscalation.policyVersion,
+              demeritIntentCount: demeritEscalation.createdIntentCount,
+            }
+          : {}),
+      },
+    });
+
+    const meritPointsDelta = this.meritPointsAdjustment(entry, predecessor);
+    if (entry.type === "MERIT" || predecessor?.type === "MERIT") {
+      await this.outbox.enqueue(tx, {
+        aggregateType: "BEHAVIOUR_ENTRY",
+        aggregateId: entry.id,
+        eventType: "behaviour.merit-awarded",
+        payload: {
+          behaviourEntryId: entry.id,
+          childId: entry.childId,
+          tenantId: actor.tenantId,
+          orgId: actor.orgId,
+          pointsDelta: meritPointsDelta,
+          correctsBehaviourEntryId: entry.correctsBehaviourEntryId,
+        },
+        idempotencyKey: `behaviour-merit-awarded:${entry.id}`,
+      });
+    }
+    return entry;
   }
 
   private async canReadSensitive(actor: BehaviourActor): Promise<boolean> {
@@ -454,12 +480,3 @@ const behaviourCategorySelect = {
   isActive: true,
   isSerious: true,
 } satisfies Prisma.BehaviourCategorySelect;
-
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "P2002"
-  );
-}

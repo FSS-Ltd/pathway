@@ -14,6 +14,8 @@ import { withSystemRoleFixtureWrites } from "../../access-control/tests/system-r
 import { OutboxService } from "../../common/outbox/outbox.service";
 import type { MailerService } from "../../mailer/mailer.service";
 import { BehaviourCommandService } from "../behaviour-command.service";
+import { BehaviourBatchService } from "../behaviour-batch.service";
+import { behaviourBatchFactKeyHash } from "../behaviour-entry.support";
 import { BehaviourQueryService } from "../behaviour-query.service";
 import { BehaviourRetractionService } from "../behaviour-retraction.service";
 import { DemeritEscalationService } from "../demerit-escalation.service";
@@ -45,6 +47,13 @@ function permissions(allowed: boolean): EffectivePermissionsService {
 
 function commandService(allowed = true): BehaviourCommandService {
   return behaviourRuntime(allowed).command;
+}
+
+function batchService(allowed = true): BehaviourBatchService {
+  return new BehaviourBatchService(
+    commandService(allowed),
+    permissions(allowed),
+  );
 }
 
 function behaviourRuntime(
@@ -357,6 +366,277 @@ describe("ACE behaviour command database boundary", () => {
       pointsDelta: -3,
       correctsBehaviourEntryId: results[0]!.entry.id,
     });
+  });
+
+  it("records an atomic multi-learner batch with quantities and replays it once", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const secondChildId = randomUUID();
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
+      tx.child.create({
+        data: {
+          id: secondChildId,
+          tenantId: fixture!.tenantAId,
+          firstName: "Second",
+          lastName: "Learner",
+        },
+      }),
+    );
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgId,
+      userId: fixture.actorAId,
+    };
+    const batch = {
+      idempotencyKey: randomUUID(),
+      childIds: [fixture.childAId, secondChildId],
+      occurredAt: "2026-08-12T09:30:00.000Z",
+      entries: [
+        {
+          category: "service",
+          type: "MERIT" as const,
+          visibility: "GENERAL" as const,
+          pointsDelta: 2,
+          reason: "Helped a peer",
+          quantity: 2,
+        },
+        {
+          category: "pastoral",
+          type: "GENERAL" as const,
+          visibility: "SENSITIVE" as const,
+          pointsDelta: 0,
+          reason: "Pastoral check in",
+          quantity: 1,
+        },
+      ],
+    };
+    const service = batchService();
+    const results = await Promise.all([
+      service.record(batch, actor),
+      service.record(batch, actor),
+    ]);
+    const created = results.find((result) => !result.duplicate);
+    const replay = results.find((result) => result.duplicate);
+    expect(created).toBeDefined();
+    expect(replay).toBeDefined();
+    if (!created || !replay) throw new Error("Expected one batch replay");
+    expect(created.duplicate).toBe(false);
+    expect(created.entries).toHaveLength(6);
+    expect(created.entries.map((entry) => entry.childId)).toEqual([
+      fixture.childAId,
+      fixture.childAId,
+      fixture.childAId,
+      secondChildId,
+      secondChildId,
+      secondChildId,
+    ]);
+    expect(replay).toEqual({ entries: created.entries, duplicate: true });
+    const counts = await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgId,
+      async (tx) => ({
+        facts: await tx.behaviourEntry.count({
+          where: {
+            tenantId: fixture!.tenantAId,
+            clientCommandKeyHash: {
+              in: created.entries.map((_, index) =>
+                behaviourBatchFactKeyHash(
+                  fixture!.tenantAId,
+                  batch.idempotencyKey,
+                  index,
+                ),
+              ),
+            },
+          },
+        }),
+        audits: await tx.auditEvent.count({
+          where: { entityId: { in: created.entries.map((entry) => entry.id) } },
+        }),
+        merits: await tx.outboxEvent.count({
+          where: {
+            aggregateId: { in: created.entries.map((entry) => entry.id) },
+            eventType: "behaviour.merit-awarded",
+          },
+        }),
+      }),
+    );
+    expect(counts).toEqual({ facts: 6, audits: 6, merits: 4 });
+    await expect(
+      service.record(
+        { ...batch, entries: [{ ...batch.entries[0]!, quantity: 1 }] },
+        actor,
+      ),
+    ).rejects.toHaveProperty("status", 409);
+  });
+
+  it("rolls back the whole batch on a bad row or cross-site learner", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgId,
+      userId: fixture.actorAId,
+    };
+    const batch = {
+      idempotencyKey: randomUUID(),
+      childIds: [fixture.childAId],
+      occurredAt: "2026-08-12T09:30:00.000Z",
+      entries: [
+        {
+          category: "service",
+          type: "MERIT" as const,
+          visibility: "GENERAL" as const,
+          pointsDelta: 2,
+          reason: "Helped a peer",
+          quantity: 1,
+        },
+        {
+          category: "missing-category",
+          type: "MERIT" as const,
+          visibility: "GENERAL" as const,
+          pointsDelta: 2,
+          reason: "Invalid row",
+          quantity: 1,
+        },
+      ],
+    };
+    const service = batchService();
+    await expect(service.record(batch, actor)).rejects.toHaveProperty(
+      "status",
+      404,
+    );
+    const firstKey = behaviourBatchFactKeyHash(
+      fixture.tenantAId,
+      batch.idempotencyKey,
+      0,
+    );
+    expect(
+      await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
+        tx.behaviourEntry.count({
+          where: {
+            tenantId: fixture!.tenantAId,
+            clientCommandKeyHash: firstKey,
+          },
+        }),
+      ),
+    ).toBe(0);
+    await expect(
+      service.record(
+        { ...batch, childIds: [fixture.childAId, fixture.childBId] },
+        actor,
+      ),
+    ).rejects.toHaveProperty("status", 404);
+    const corrected = await service.record(
+      { ...batch, entries: [batch.entries[0]!] },
+      actor,
+    );
+    expect(corrected.entries).toHaveLength(1);
+  });
+
+  it("requires sensitive access for creation and replay of a sensitive batch", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgId,
+      userId: fixture.actorAId,
+    };
+    const batch = {
+      idempotencyKey: randomUUID(),
+      childIds: [fixture.childAId],
+      occurredAt: "2026-08-12T09:30:00.000Z",
+      entries: [
+        {
+          category: "pastoral",
+          type: "GENERAL" as const,
+          visibility: "SENSITIVE" as const,
+          pointsDelta: 0,
+          reason: "Pastoral check in",
+          quantity: 1,
+        },
+      ],
+    };
+    await expect(
+      batchService(false).record(batch, actor),
+    ).rejects.toHaveProperty("status", 403);
+    const created = await batchService(true).record(batch, actor);
+    expect(created.entries).toHaveLength(1);
+    await expect(
+      batchService(false).record(batch, actor),
+    ).rejects.toHaveProperty("status", 403);
+  });
+
+  it("accepts the 50-fact boundary in one transaction", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const result = await batchService().record(
+      {
+        idempotencyKey: randomUUID(),
+        childIds: [fixture.childAId],
+        occurredAt: "2026-08-12T09:30:00.000Z",
+        entries: [
+          {
+            category: "service",
+            type: "MERIT",
+            visibility: "GENERAL",
+            pointsDelta: 1,
+            reason: "Supported classmates",
+            quantity: 50,
+          },
+        ],
+      },
+      {
+        tenantId: fixture.tenantAId,
+        orgId: fixture.orgId,
+        userId: fixture.actorAId,
+      },
+    );
+    expect(result.entries).toHaveLength(50);
+    expect(new Set(result.entries.map((entry) => entry.id)).size).toBe(50);
+  });
+
+  it("applies demerit escalation across repeated rows in a batch", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const childId = randomUUID();
+    await withTenantRlsContext(fixture.tenantAId, fixture.orgId, (tx) =>
+      tx.child.create({
+        data: {
+          id: childId,
+          tenantId: fixture!.tenantAId,
+          firstName: "Demerit",
+          lastName: "Learner",
+        },
+      }),
+    );
+    const created = await batchService().record(
+      {
+        idempotencyKey: randomUUID(),
+        childIds: [childId],
+        occurredAt: "2026-08-12T09:30:00.000Z",
+        entries: [
+          {
+            category: "routine",
+            type: "DEMERIT",
+            visibility: "GENERAL",
+            pointsDelta: -1,
+            reason: "Repeated disruption",
+            note: "Three separate incidents in the lesson",
+            quantity: 3,
+          },
+        ],
+      },
+      {
+        tenantId: fixture.tenantAId,
+        orgId: fixture.orgId,
+        userId: fixture.actorAId,
+      },
+    );
+    expect(created.entries).toHaveLength(3);
+    const reviewCount = await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgId,
+      (tx) =>
+        tx.behaviourReviewRequest.count({
+          where: { tenantId: fixture!.tenantAId, childId },
+        }),
+    );
+    expect(reviewCount).toBe(1);
   });
 
   it("keeps the committed fact and pending intent when notification delivery fails", async () => {
