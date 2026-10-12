@@ -6,12 +6,14 @@ export type BillingEventKind =
   | "subscription.created"
   | "subscription.canceled"
   | "invoice.paid"
+  | "invoice.draft"
   | "invoice.payment_failed"
   | "unknown";
 
 export type ParsedBillingWebhookEvent = {
   provider: BillingProvider;
   eventId: string;
+  occurredAt?: Date;
   kind: BillingEventKind;
   orgId: string;
   subscriptionId: string;
@@ -23,6 +25,17 @@ export type ParsedBillingWebhookEvent = {
   periodStart?: Date | null;
   periodEnd?: Date | null;
   cancelAtPeriodEnd?: boolean | null;
+  invoice?: {
+    id: string;
+    status: "draft" | "paid" | "other";
+    currency: string;
+    linesComplete: boolean;
+    lines: Array<{
+      priceId: string | null;
+      quantity: number | null;
+      amountPence: number;
+    }>;
+  };
   entitlements?: {
     maxSites?: number | null;
     av30Included?: number | null;
@@ -39,6 +52,7 @@ export interface BillingWebhookProvider {
     signature?: string,
     rawBody?: Buffer,
   ): Promise<ParsedBillingWebhookEvent>;
+  holdDraftInvoice?(invoiceId: string): Promise<void>;
 }
 
 export const BILLING_WEBHOOK_PROVIDER = Symbol("BILLING_WEBHOOK_PROVIDER");
@@ -124,14 +138,16 @@ const mapType = (type: string): BillingEventKind => {
       return "subscription.canceled";
     case "invoice.paid":
       return "invoice.paid";
+    case "invoice.created":
+      return "invoice.draft";
+    case "invoice.payment_failed":
+      return "invoice.payment_failed";
     default:
       return "unknown";
   }
 };
 
-const mapStatus = (
-  status: unknown,
-): SubscriptionStatus | null | undefined => {
+const mapStatus = (status: unknown): SubscriptionStatus | null | undefined => {
   if (typeof status !== "string") return null;
   if (
     status === SubscriptionStatus.ACTIVE ||

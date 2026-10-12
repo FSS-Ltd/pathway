@@ -34,6 +34,7 @@ const REQUIRED_RLS_TABLES = [
   "InstitutionalBillingPolicy",
   "InstitutionalBillingSnapshot",
   "InstitutionalQuoteAcceptance",
+  "InstitutionalBillingOperation",
   "EnrolmentRollConfirmation",
   "AcademicYear",
   "AcademicPeriod",

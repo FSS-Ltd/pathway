@@ -25,7 +25,9 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
     private readonly config: BillingProviderConfig,
   ) {
     if (!config.stripe.secretKey) {
-      throw new Error("Stripe secret key is required for Stripe webhook provider");
+      throw new Error(
+        "Stripe secret key is required for Stripe webhook provider",
+      );
     }
     this.stripe = new Stripe(config.stripe.secretKey ?? "", {
       apiVersion: "2023-10-16",
@@ -42,7 +44,9 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
     }
     const secret = this.config.stripe.webhookSecretSnapshot;
     if (!secret) {
-      throw new BadRequestException("Stripe snapshot webhook secret not configured");
+      throw new BadRequestException(
+        "Stripe snapshot webhook secret not configured",
+      );
     }
 
     let event: Stripe.Event;
@@ -65,21 +69,50 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       );
     }
 
-    return this.mapEvent(event);
+    return {
+      ...this.mapEvent(event),
+      occurredAt: new Date(event.created * 1000),
+    };
+  }
+
+  async holdDraftInvoice(invoiceId: string): Promise<void> {
+    if (
+      process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED !== "true" ||
+      !/^(?:rk|sk)_test_/.test(this.config.stripe.secretKey ?? "")
+    ) {
+      throw new Error("Institutional draft invoice hold is disabled.");
+    }
+    const invoice = await this.stripe.invoices.update(invoiceId, {
+      auto_advance: false,
+    });
+    if (invoice.status !== "draft" || invoice.auto_advance !== false) {
+      throw new Error("Institutional draft invoice could not be held.");
+    }
   }
 
   private mapEvent(event: Stripe.Event): ParsedBillingWebhookEvent {
     switch (event.type) {
       case "checkout.session.completed":
-        return this.mapCheckoutCompleted(event as Stripe.CheckoutSessionCompletedEvent);
+        return this.mapCheckoutCompleted(
+          event as Stripe.CheckoutSessionCompletedEvent,
+        );
       case "customer.subscription.updated":
-        return this.mapSubscription(event as Stripe.CustomerSubscriptionUpdatedEvent);
+        return this.mapSubscription(
+          event as Stripe.CustomerSubscriptionUpdatedEvent,
+        );
       case "customer.subscription.created":
-        return this.mapSubscription(event as Stripe.CustomerSubscriptionCreatedEvent);
+        return this.mapSubscription(
+          event as Stripe.CustomerSubscriptionCreatedEvent,
+        );
       case "customer.subscription.deleted":
-        return this.mapSubscription(event as Stripe.CustomerSubscriptionDeletedEvent, true);
+        return this.mapSubscription(
+          event as Stripe.CustomerSubscriptionDeletedEvent,
+          true,
+        );
       case "invoice.paid":
         return this.mapInvoicePaid(event as Stripe.InvoicePaidEvent);
+      case "invoice.created":
+        return this.mapInvoiceDraft(event as Stripe.InvoiceCreatedEvent);
       case "invoice.payment_failed":
         return this.mapInvoiceFailed(event as Stripe.InvoicePaymentFailedEvent);
       default:
@@ -102,11 +135,11 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
     const subscriptionId =
       typeof session.subscription === "string"
         ? session.subscription
-        : session.subscription?.id ?? "";
+        : (session.subscription?.id ?? "");
     const customerId =
       typeof session.customer === "string"
         ? session.customer
-        : session.customer?.id ?? null;
+        : (session.customer?.id ?? null);
     const planCode = session.metadata?.planCode ?? null;
 
     return {
@@ -139,7 +172,9 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
         ? sub.items.data[0].price.nickname
         : null);
     const customerId =
-      typeof sub.customer === "string" ? sub.customer : sub.customer?.id ?? null;
+      typeof sub.customer === "string"
+        ? sub.customer
+        : (sub.customer?.id ?? null);
     return {
       provider: BillingProvider.STRIPE,
       eventId: event.id,
@@ -149,7 +184,9 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       pendingOrderId,
       planCode,
       providerCustomerId: customerId,
-      status: isCancel ? SubscriptionStatus.CANCELED : mapStripeStatus(sub.status),
+      status: isCancel
+        ? SubscriptionStatus.CANCELED
+        : mapStripeStatus(sub.status),
       periodStart: sub.current_period_start
         ? new Date(sub.current_period_start * 1000)
         : null,
@@ -160,22 +197,22 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
     };
   }
 
-  private mapInvoicePaid(event: Stripe.InvoicePaidEvent): ParsedBillingWebhookEvent {
+  private mapInvoicePaid(
+    event: Stripe.InvoicePaidEvent,
+  ): ParsedBillingWebhookEvent {
     const invoice = event.data.object;
     const metadata = invoice.subscription_details?.metadata ?? invoice.metadata;
     const subId =
       typeof invoice.subscription === "string"
         ? invoice.subscription
-        : invoice.subscription?.id ?? "";
+        : (invoice.subscription?.id ?? "");
     const orgId = metadata?.orgId ?? "";
     const pendingOrderId = metadata?.pendingOrderId ?? null;
-    const subscriptionLine = invoice.lines.data.find((line) =>
-      (typeof line.subscription === "string" ? line.subscription : line.subscription?.id) === subId,
-    );
+    const subscriptionLine = this.subscriptionLine(invoice, subId);
     const customerId =
       typeof invoice.customer === "string"
         ? invoice.customer
-        : invoice.customer?.id ?? null;
+        : (invoice.customer?.id ?? null);
 
     return {
       provider: BillingProvider.STRIPE,
@@ -192,7 +229,68 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       periodEnd: subscriptionLine?.period?.end
         ? new Date(subscriptionLine.period.end * 1000)
         : null,
+      invoice: this.mapInvoiceDetails(invoice),
     };
+  }
+
+  private mapInvoiceDraft(
+    event: Stripe.InvoiceCreatedEvent,
+  ): ParsedBillingWebhookEvent {
+    const invoice = event.data.object;
+    const metadata = invoice.subscription_details?.metadata ?? invoice.metadata;
+    const subId =
+      typeof invoice.subscription === "string"
+        ? invoice.subscription
+        : (invoice.subscription?.id ?? "");
+    const subscriptionLine = this.subscriptionLine(invoice, subId);
+    return {
+      provider: BillingProvider.STRIPE,
+      eventId: event.id,
+      kind: "invoice.draft",
+      orgId: metadata?.orgId ?? "",
+      subscriptionId: subId,
+      pendingOrderId: metadata?.pendingOrderId ?? null,
+      periodStart: subscriptionLine?.period?.start
+        ? new Date(subscriptionLine.period.start * 1000)
+        : null,
+      periodEnd: subscriptionLine?.period?.end
+        ? new Date(subscriptionLine.period.end * 1000)
+        : null,
+      invoice: this.mapInvoiceDetails(invoice),
+    };
+  }
+
+  private mapInvoiceDetails(
+    invoice: Stripe.Invoice,
+  ): NonNullable<ParsedBillingWebhookEvent["invoice"]> {
+    return {
+      id: invoice.id,
+      status:
+        invoice.status === "draft" || invoice.status === "paid"
+          ? invoice.status
+          : "other",
+      currency: invoice.currency,
+      linesComplete: !invoice.lines.has_more,
+      lines: invoice.lines.data.map((line) => ({
+        priceId: line.price?.id ?? null,
+        quantity: line.quantity ?? null,
+        amountPence: line.amount,
+      })),
+    };
+  }
+
+  private subscriptionLine(
+    invoice: Stripe.Invoice,
+    subscriptionId: string,
+  ): Stripe.InvoiceLineItem | undefined {
+    return (
+      invoice.lines.data.find(
+        (line) =>
+          (typeof line.subscription === "string"
+            ? line.subscription
+            : line.subscription?.id) === subscriptionId,
+      ) ?? invoice.lines.data.find((line) => line.type === "subscription")
+    );
   }
 
   private mapInvoiceFailed(
@@ -202,13 +300,13 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
     const subId =
       typeof invoice.subscription === "string"
         ? invoice.subscription
-        : invoice.subscription?.id ?? "";
+        : (invoice.subscription?.id ?? "");
     const orgId = invoice.metadata?.orgId ?? "";
     const pendingOrderId = invoice.metadata?.pendingOrderId ?? null;
     const customerId =
       typeof invoice.customer === "string"
         ? invoice.customer
-        : invoice.customer?.id ?? null;
+        : (invoice.customer?.id ?? null);
 
     return {
       provider: BillingProvider.STRIPE,

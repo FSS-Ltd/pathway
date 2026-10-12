@@ -15,9 +15,7 @@ import { BillingPricingController } from "./pricing.controller";
 import { BillingPricingService } from "./pricing.service";
 import { ModuleChangeController } from "./module-change.controller";
 import { ModuleChangeService } from "./module-change.service";
-import {
-  BillingWebhookController,
-} from "./webhook.controller";
+import { BillingWebhookController } from "./webhook.controller";
 import {
   BILLING_PROVIDER_CONFIG,
   loadBillingProviderConfig,
@@ -28,6 +26,7 @@ import {
   createBuyNowProvider,
 } from "./providers/provider.factory";
 import { BILLING_WEBHOOK_PROVIDER } from "./billing-webhook.provider";
+import { InstitutionalWebhookService } from "./institutional/institutional-webhook.service";
 
 @Module({
   imports: [PathwayAuthModule, CommonModule, AuthModule],
@@ -47,6 +46,7 @@ import { BILLING_WEBHOOK_PROVIDER } from "./billing-webhook.provider";
     BuyNowService,
     BillingPricingService,
     ModuleChangeService,
+    InstitutionalWebhookService,
     {
       provide: BILLING_PROVIDER_CONFIG,
       useFactory: () => loadBillingProviderConfig(),
