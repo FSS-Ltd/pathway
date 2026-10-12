@@ -227,7 +227,7 @@ export class InstitutionalQuoteService {
             priced.kind === "priced" ? priced.includedChildren : null,
           includedModules: selection.includedModules,
           paidModules: selection.paidModules,
-          lines: priced.kind === "priced" ? priced.lines : Prisma.DbNull,
+          lines: priced.kind === "priced" ? priced.lines : [],
           subtotalPence: priced.kind === "priced" ? priced.subtotalPence : null,
           sourceConfirmationId: confirmation?.id,
           sourceRevisionCutoff,

@@ -176,6 +176,26 @@ describe("institutional quotes and census (e2e)", () => {
       .get(`/billing/institutional/quotes/${second.id}`)
       .set("Authorization", otherBilling.authorization);
     expect(crossOrg.status).toBe(404);
+    const unverifiedSubscription = await prisma.subscription.create({
+      data: {
+        orgId: otherOrgId,
+        provider: BillingProvider.STRIPE,
+        providerSubId: `sub_unverified_${randomUUID()}`,
+        planCode: starter,
+        status: SubscriptionStatus.ACTIVE,
+        periodStart: new Date(Date.now() - 29 * 24 * 60 * 60 * 1_000),
+        periodEnd: new Date(Date.now() + 24 * 60 * 60 * 1_000),
+      },
+    });
+    const review = await census.freezeNext(unverifiedSubscription.id);
+    expect(review.kind).toBe("frozen");
+    if (review.kind !== "frozen") throw new Error("Expected review snapshot");
+    expect(review.snapshot).toMatchObject({
+      status: InstitutionalSnapshotStatus.REVIEW_REQUIRED,
+      enrolledChildren: null,
+      subtotalPence: null,
+      lines: [],
+    });
     const expired = await quotes.createQuote(
       orgId,
       actorId,
@@ -195,6 +215,7 @@ describe("institutional quotes and census (e2e)", () => {
     });
     expect(tooMany.status).toBe(InstitutionalSnapshotStatus.CONTACT_SALES);
     expect(tooMany.subtotalPence).toBeNull();
+    expect(tooMany.lines).toEqual([]);
     await expect(
       quotes.acceptQuote(orgId, actorId, tooMany.id, `over250-${orgId}`),
     ).rejects.toMatchObject({ status: 409 });

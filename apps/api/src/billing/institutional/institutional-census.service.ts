@@ -8,7 +8,6 @@ import {
   InstitutionalCountSource,
   InstitutionalSnapshotKind,
   InstitutionalSnapshotStatus,
-  Prisma,
   prisma,
   SubscriptionStatus,
   withOrgRlsContext,
@@ -137,7 +136,7 @@ export class InstitutionalCensusService {
           includedModules:
             current.currentInstitutionalSnapshot?.includedModules ?? [],
           paidModules: current.currentInstitutionalSnapshot?.paidModules ?? [],
-          lines: priced?.kind === "priced" ? priced.lines : Prisma.DbNull,
+          lines: priced?.kind === "priced" ? priced.lines : [],
           subtotalPence:
             priced?.kind === "priced" ? priced.subtotalPence : null,
           sourceConfirmationId: confirmation?.id,
