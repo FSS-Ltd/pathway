@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
 import { Badge, Button, Card } from "@pathway/ui";
+import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
 import {
   AdminBillingOverview,
   AdminBillingPrices,
@@ -143,7 +144,12 @@ export default function BillingPage() {
   const planInfo = data
     ? (mergedByCode[data.planCode ?? ""] ?? getPlanInfo(data.planCode))
     : null;
-  const planDisplayName = planInfo?.displayName ?? getPlanDisplayName(data?.planCode);
+  const institutionalPlan = Object.values(INSTITUTIONAL_PLANS).find(
+    (plan) => plan.code === data?.planCode,
+  );
+  const planDisplayName = institutionalPlan
+    ? `Nexsteps ${institutionalPlan.tier}`
+    : planInfo?.displayName ?? getPlanDisplayName(data?.planCode);
   const priceDisplay = planInfo?.priceDisplay ?? getPlanPriceDisplay(data?.planCode);
 
   // Access control guard
@@ -160,7 +166,7 @@ export default function BillingPage() {
     return (
       <NoAccessCard
         title="You don't have access to billing"
-        message="Billing and subscription management is only available to organisation admins."
+        message="Billing and subscription management is available to organisation admins and billing users."
       />
     );
   }
@@ -254,7 +260,7 @@ export default function BillingPage() {
               </p>
             </div>
           )}
-          {planInfo && (
+          {planInfo && !institutionalPlan && (
             <p className="text-sm text-text-muted">
               Includes {planInfo.av30Included ?? "unlimited"} active staff and volunteers per rolling 30-day period
             </p>
@@ -265,8 +271,8 @@ export default function BillingPage() {
           <p className="text-sm text-text-muted">
             No active subscription found for this organisation.
           </p>
-          <Button size="sm" onClick={() => router.push("/billing/configure")}>
-            Get started with a plan
+          <Button size="sm" onClick={() => router.push("/billing/institutional")}>
+            Explore enrolled-child plans
           </Button>
         </div>
       ) : null}
@@ -420,27 +426,31 @@ export default function BillingPage() {
       {/* UI intentionally avoids showing any payment method PII; this is a usage/plan summary only. */}
       <div className="grid gap-4 md:grid-cols-2">
         {planCard}
-        {av30Card}
+        {!institutionalPlan && av30Card}
       </div>
       {limitsCard}
       {!isMasterOrg && (
         <Card title="Change your plan">
           <div className="flex flex-col gap-3">
             <p className="text-sm text-text-muted">
-              {data?.planCode
-                ? "Upgrade to a higher tier or adjust your plan settings."
-                : "Choose a plan that fits your school or organisation."}
+              {institutionalPlan
+                ? "Review a change against your confirmed continuing roll. It can take effect at an eligible renewal."
+                : data?.planCode
+                  ? "Upgrade to a higher tier or adjust your plan settings."
+                  : "Choose a plan that fits your school or organisation."}
             </p>
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" onClick={() => router.push("/billing/configure")}>
-                  {data?.planCode ? "Upgrade plan" : "Choose a plan"}
+                <Button size="sm" onClick={() => router.push("/billing/institutional")}>
+                  {data?.planCode ? "Review plan change" : "Explore enrolled-child plans"}
                 </Button>
                 <p className="text-xs text-text-muted">
-                  Plan changes are handled securely via Stripe. You'll review pricing before confirming.
+                  {institutionalPlan
+                    ? "No charge is made when you accept a renewal quote."
+                    : "Plan changes are handled securely via Stripe. You'll review pricing before confirming."}
                 </p>
               </div>
-              {data?.planCode && (
+              {data?.planCode && !institutionalPlan && (
                 <p className="text-xs text-text-muted">
                   Current plan: {planDisplayName} • {priceDisplay}
                 </p>

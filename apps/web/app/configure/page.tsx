@@ -1,422 +1,235 @@
 "use client";
 
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import { getConfiguratorPlanPolicy, PLANS } from "@pathway/pricing";
+import React from "react";
+import Link from "next/link";
 import {
-  ADDON_PRICES,
-  PLAN_PRICES,
-  mergeBillingPrices,
-  type PlanCode,
-} from "../../lib/buy-now-pricing";
-import {
-  createCheckoutSession,
-  fetchPublicBillingPrices,
-} from "../../lib/buy-now-client";
-import { buildCheckoutPayload } from "../../lib/configurator-checkout";
-import type {
-  OptionPriceLookup,
-  StorageChoice,
-  WebModule,
-} from "../../lib/module-catalog";
-import {
-  configuratorStepVariants,
-  reducedStepVariants,
-  type StepDirection,
-} from "../../lib/motion";
-import { RunningTotal } from "../../components/configurator/running-total";
-import { ConfiguratorStage } from "../../components/configurator/stage";
-import {
-  ConfiguratorStepper,
-  type ConfiguratorProgressStep,
-} from "../../components/configurator/stepper";
-import { IncludedStep } from "./steps/included";
-import { ModulesStep } from "./steps/modules";
-import { OrgTypeStep } from "./steps/org-type";
-import { PlanStep } from "./steps/plan";
-import { StorageStep } from "./steps/storage";
-import { SummaryStep, type AccountDetails } from "./steps/summary";
-import { VerticalStep } from "./steps/vertical";
-import {
-  firstIncompleteStep,
-  includedModuleLimitForState,
-  includedModulesForState,
-  INITIAL_CONFIGURATOR_STATE,
-  nextStep,
-  prevStep,
-  progressStepsForOrgType,
-  selectFrequency,
-  selectOrgType,
-  selectPlan,
-  selectStorage,
-  selectVertical,
-  toggleModule,
-  type ConfiguratorState,
-  type ConfiguratorStep,
-  type OrgType,
-} from "./state";
-import type { Vertical } from "@pathway/types";
+  INSTITUTIONAL_PLANS,
+  type InstitutionalPlanCode,
+  type InstitutionalQuoteResult,
+} from "@pathway/pricing";
+import { estimateInstitutionalPrice } from "../../lib/institutional-estimate-client";
 
-type ConfiguratorAction =
-  | { type: "next" }
-  | { type: "back" }
-  | { type: "org-type"; orgType: OrgType }
-  | { type: "vertical"; vertical: Vertical }
-  | { type: "module"; module: WebModule; prices: OptionPriceLookup }
-  | { type: "plan"; planCode: PlanCode; prices: OptionPriceLookup }
-  | {
-      type: "frequency";
-      frequency: "monthly" | "yearly";
-      prices: OptionPriceLookup;
-    }
-  | { type: "storage"; storageChoice: StorageChoice };
-
-const STEP_LABELS: Record<ConfiguratorStep, string> = {
-  "org-type": "Organisation",
-  vertical: "Setting",
-  included: "Included",
-  modules: "Modules",
-  plan: "Plan",
-  storage: "Storage",
-  summary: "Summary",
-};
-
-const EMPTY_ACCOUNT_DETAILS: AccountDetails = {
-  organisationName: "",
-  contactName: "",
-  workEmail: "",
-  password: "",
-};
-
-function buildRedirectUrl(path: string): string | null {
-  if (typeof window === "undefined" || !window.location) return null;
-
-  return new URL(path, window.location.href).toString();
-}
-
-function configuratorReducer(
-  state: ConfiguratorState,
-  action: ConfiguratorAction,
-): ConfiguratorState {
-  switch (action.type) {
-    case "next":
-      return nextStep(state);
-    case "back":
-      return prevStep(state);
-    case "org-type":
-      return selectOrgType(state, action.orgType);
-    case "vertical":
-      return selectVertical(state, action.vertical);
-    case "module":
-      return toggleModule(state, action.module, action.prices);
-    case "plan":
-      return selectPlan(state, action.planCode, action.prices);
-    case "frequency":
-      return selectFrequency(state, action.frequency, action.prices);
-    case "storage":
-      return selectStorage(state, action.storageChoice);
-  }
-}
-
-function isContinueDisabled(
-  state: ConfiguratorState,
-  currentStep: ConfiguratorStep,
-): boolean {
-  return (
-    currentStep === "summary" ||
-    (currentStep === "org-type" && !state.orgType) ||
-    (currentStep === "vertical" && !state.vertical) ||
-    (currentStep === "plan" && !state.planCode)
+const plans = Object.values(INSTITUTIONAL_PLANS);
+const money = (pence: number) =>
+  new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
+    pence / 100,
   );
-}
 
 export default function ConfigurePage() {
-  const router = useRouter();
-  const [state, dispatch] = useReducer(
-    configuratorReducer,
-    INITIAL_CONFIGURATOR_STATE,
+  const [planCode, setPlanCode] = React.useState<InstitutionalPlanCode>(
+    "INSTITUTIONAL_STARTER_MONTHLY",
   );
-  const [accountDetails, setAccountDetails] = useState<AccountDetails>(
-    EMPTY_ACCOUNT_DETAILS,
-  );
-  const [billingPrices, setBillingPrices] = useState(() =>
-    mergeBillingPrices([]),
-  );
-  const [pricingWarning, setPricingWarning] = useState<string | null>(null);
-  const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [isCheckoutPending, setIsCheckoutPending] = useState(false);
-  const checkoutInFlightRef = useRef(false);
-  const [stepDirection, setStepDirection] = useState<StepDirection>("forward");
-  const prefersReducedMotion = useReducedMotion();
-  const currentStep = firstIncompleteStep(state);
+  const [countInput, setCountInput] = React.useState("25");
+  const [estimate, setEstimate] =
+    React.useState<InstitutionalQuoteResult | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, setPending] = React.useState(false);
+  const count = Number(countInput);
+  const validCount =
+    countInput.trim() !== "" && Number.isSafeInteger(count) && count >= 0;
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const loadPrices = async () => {
-      try {
-        const response = await fetchPublicBillingPrices();
-        if (!controller.signal.aborted && response.prices.length) {
-          setBillingPrices(mergeBillingPrices(response.prices));
-        }
-      } catch {
-        if (!controller.signal.aborted)
-          setPricingWarning(
-            "Live pricing could not be loaded. Showing our current published prices.",
-          );
-      }
-    };
-    void loadPrices();
-    return () => controller.abort();
-  }, []);
-
-  const mergedPlanPrices = useMemo(
-    () => ({ ...PLAN_PRICES, ...billingPrices.planPrices }),
-    [billingPrices.planPrices],
-  );
-  const mergedAddonPrices = useMemo(
-    () => ({ ...ADDON_PRICES, ...billingPrices.addonPrices }),
-    [billingPrices.addonPrices],
-  );
-  const storagePrices = useMemo<OptionPriceLookup>(
-    () => ({
-      ...ADDON_PRICES,
-      ...billingPrices.addonPrices,
-    }),
-    [billingPrices.addonPrices],
-  );
-  const includedModules = includedModulesForState(state);
-  const eligibleOptionalModules = state.planCode
-    ? [
-        ...(getConfiguratorPlanPolicy(state.planCode)
-          ?.eligibleOptionalModules ?? []),
-      ]
-    : [];
-  const includedModuleLimit = includedModuleLimitForState(state);
-  const progressSteps: ConfiguratorProgressStep[] = progressStepsForOrgType(
-    state.orgType,
-  ).map((step) => ({ id: step, label: STEP_LABELS[step] }));
-  const stepVariants = prefersReducedMotion
-    ? reducedStepVariants
-    : configuratorStepVariants;
-  const handleCheckout = async () => {
-    if (checkoutInFlightRef.current) return;
-    checkoutInFlightRef.current = true;
-    setCheckoutError(null);
-    setIsCheckoutPending(true);
-
-    try {
-      const successUrl = buildRedirectUrl("/buy/thanks");
-      const cancelUrl = buildRedirectUrl("/buy/cancelled");
-      if (!successUrl || !cancelUrl) {
-        setCheckoutError(
-          "Unable to determine redirect URLs; please try again in the browser.",
-        );
-        return;
-      }
-
-      const { sessionUrl } = await createCheckoutSession(
-        buildCheckoutPayload(state, {
-          ...accountDetails,
-          successUrl,
-          cancelUrl,
-        }),
-      );
-      window.location.href = sessionUrl;
-    } catch (error) {
-      setCheckoutError(
-        error instanceof Error
-          ? error.message
-          : "We couldn’t start checkout. Please try again.",
-      );
-    } finally {
-      setIsCheckoutPending(false);
-      checkoutInFlightRef.current = false;
+  React.useEffect(() => {
+    if (!validCount) {
+      setEstimate(null);
+      setError("Enter a whole number of enrolled children, including zero.");
+      return;
     }
-  };
+    const controller = new AbortController();
+    setPending(true);
+    setError(null);
+    void estimateInstitutionalPrice(planCode, count, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setEstimate(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setEstimate(null);
+          setError("The estimate is unavailable. Please try again.");
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPending(false);
+      });
+    return () => controller.abort();
+  }, [planCode, count, validCount]);
+
+  const chosen = INSTITUTIONAL_PLANS[planCode];
+  const band = (component: "CHILDREN_UP_TO_100" | "CHILDREN_101_TO_250") =>
+    estimate?.kind === "priced"
+      ? (estimate.lines.find((line) => line.component === component)
+          ?.subtotalPence ?? 0)
+      : 0;
 
   return (
-    <div className="bg-shell py-10 sm:py-14">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr),minmax(400px,44%)] lg:px-8">
-        <section className="max-w-xl space-y-8">
-          <header className="space-y-3">
-            <p className="text-sm font-semibold text-accent-strong">
-              Configure Nexsteps
-            </p>
-            <h1 className="font-heading text-3xl font-bold text-text-primary sm:text-4xl">
-              Build the right workspace for your organisation.
-            </h1>
-            <p className="text-base leading-relaxed text-text-muted">
-              Compare the published plans, then choose your organisation type,
-              optional modules, billing period and storage. Your total updates
-              as you configure the workspace, with final pricing and tax
-              confirmed at checkout.
-            </p>
-          </header>
+    <div className="bg-shell px-4 py-8 text-text-primary sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-5xl space-y-6">
+        <header className="max-w-3xl space-y-3">
+          <p className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
+            Nexsteps for organisations
+          </p>
+          <h1 className="font-heading text-3xl font-bold sm:text-4xl">
+            Pricing for every child you serve.
+          </h1>
+          <p className="text-base leading-relaxed text-text-muted">
+            One monthly plan for churches, charities, clubs, schools and
+            nurseries. Count each enrolled child once across your organisation’s
+            permitted sites. Parents, staff, volunteers and adult participants
+            are not counted.
+          </p>
+        </header>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr),minmax(300px,0.7fr)]">
           <section
-            aria-labelledby="pricing-explained-title"
-            className="rounded-2xl border border-border-subtle bg-surface p-5 shadow-soft"
+            aria-labelledby="plan-title"
+            className="space-y-6 rounded-2xl border border-border-subtle bg-surface p-5 shadow-soft sm:p-7"
           >
-            <h2
-              id="pricing-explained-title"
-              className="font-heading text-xl font-bold text-text-primary"
-            >
-              How pricing works
-            </h2>
-            <p className="mt-2 text-sm leading-relaxed text-text-muted">
-              Each plan includes a site limit and an allowance for active staff
-              and volunteers. The allowance counts unique staff and volunteers
-              with qualifying activity during the previous 30 days; parent
-              accounts do not count. Storage is the optional usage add-on.
-              Monthly and annual totals are shown before checkout.
-            </p>
+            <div>
+              <h2 id="plan-title" className="font-heading text-xl font-bold">
+                Choose your plan
+              </h2>
+              <p className="mt-1 text-sm text-text-muted">
+                Your child count stays the same when you compare plans.
+              </p>
+            </div>
+            <fieldset className="grid gap-3 sm:grid-cols-3">
+              <legend className="sr-only">Monthly plan</legend>
+              {plans.map((plan) => (
+                <label
+                  key={plan.code}
+                  className={`cursor-pointer rounded-xl border p-4 transition-colors focus-within:ring-2 focus-within:ring-accent-primary ${planCode === plan.code ? "border-accent-primary bg-accent-primary/5" : "border-border-subtle hover:border-accent-primary"}`}
+                >
+                  <input
+                    type="radio"
+                    name="institutional-plan"
+                    value={plan.code}
+                    checked={planCode === plan.code}
+                    onChange={() => setPlanCode(plan.code)}
+                    className="sr-only"
+                  />
+                  <span className="block text-base font-semibold capitalize">
+                    {plan.tier}
+                  </span>
+                  <span className="mt-1 block text-xl font-bold">
+                    {money(plan.basePence)}
+                    <span className="text-sm font-normal text-text-muted">
+                      {" "}
+                      / month
+                    </span>
+                  </span>
+                  <span className="mt-2 block text-xs text-text-muted">
+                    Includes {plan.includedChildren} children ·{" "}
+                    {plan.includedSites}{" "}
+                    {plan.includedSites === 1 ? "site" : "sites"} ·{" "}
+                    {plan.includedModuleSlots} optional module{" "}
+                    {plan.includedModuleSlots === 1 ? "place" : "places"}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+            <div>
+              <label
+                htmlFor="enrolled-children"
+                className="block text-sm font-semibold"
+              >
+                Enrolled children
+              </label>
+              <p id="enrolled-help" className="mt-1 text-sm text-text-muted">
+                Count distinct children on your continuing roll, whether or not
+                they attended today.
+              </p>
+              <input
+                id="enrolled-children"
+                aria-describedby="enrolled-help"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                value={countInput}
+                onChange={(event) => setCountInput(event.target.value)}
+                className="mt-3 w-full max-w-48 rounded-lg border border-border-subtle bg-surface px-3 py-2 text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+              />
+            </div>
+            <div className="rounded-xl border border-border-subtle bg-muted/40 p-4">
+              <h3 className="text-sm font-semibold">Optional modules</h3>
+              <p className="mt-1 text-sm text-text-muted">
+                No optional modules are ready to offer yet. Your plan’s module
+                places will become available when modules are released. Learning
+                is part of the core platform.
+              </p>
+            </div>
           </section>
-          {pricingWarning ? (
-            <p
-              role="status"
-              className="rounded-lg bg-status-warn/10 px-4 py-3 text-sm text-text-primary"
-            >
-              {pricingWarning}
-            </p>
-          ) : null}
-          <ConfiguratorStepper
-            steps={progressSteps}
-            currentStep={currentStep}
-            onBack={() => {
-              if (isCheckoutPending || checkoutInFlightRef.current) return;
-              setStepDirection("back");
-              dispatch({ type: "back" });
-            }}
-            onContinue={() => {
-              setStepDirection("forward");
-              dispatch({ type: "next" });
-            }}
-            isBackDisabled={currentStep === "plan" || isCheckoutPending}
-            isContinueDisabled={isContinueDisabled(state, currentStep)}
-          />
-        </section>
-        <aside className="sticky top-2 z-10 grid h-fit grid-cols-[minmax(0,1.4fr),minmax(0,1fr)] gap-3 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:block lg:space-y-6">
-          <ConfiguratorStage state={state} />
-          <div className="rounded-2xl bg-muted p-4 shadow-card lg:p-6">
-            <RunningTotal
-              state={state}
-              planPrices={mergedPlanPrices}
-              addonPrices={mergedAddonPrices}
-              modulePrices={billingPrices.modulePrices}
-              showEntitlementPreview={currentStep === "summary"}
-              compact
-            />
-          </div>
-        </aside>
-        <section className="max-w-xl lg:col-start-1 lg:row-start-2">
-          <AnimatePresence
-            mode="wait"
-            initial={!prefersReducedMotion}
-            custom={stepDirection}
+          <aside
+            aria-labelledby="estimate-title"
+            className="h-fit rounded-2xl border border-border-subtle bg-surface p-5 shadow-card sm:p-7 lg:sticky lg:top-24"
           >
-            <motion.div
-              key={currentStep}
-              custom={stepDirection}
-              variants={stepVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
+            <h2 id="estimate-title" className="font-heading text-xl font-bold">
+              Monthly estimate
+            </h2>
+            <p className="mt-1 text-sm text-text-muted capitalize">
+              {chosen.tier} · enrolled children
+            </p>
+            <div
+              aria-live="polite"
+              aria-atomic="true"
+              className="mt-6 min-h-28"
             >
-              {currentStep === "plan" ? (
-                <PlanStep
-                  planCode={state.planCode}
-                  frequency={state.frequency}
-                  planPrices={mergedPlanPrices}
-                  onSelectPlan={(planCode) =>
-                    dispatch({
-                      type: "plan",
-                      planCode,
-                      prices: billingPrices.modulePrices,
-                    })
-                  }
-                  onSelectFrequency={(frequency) =>
-                    dispatch({
-                      type: "frequency",
-                      frequency,
-                      prices: billingPrices.modulePrices,
-                    })
-                  }
-                  onSelectEnterprise={() =>
-                    router.push("/demo?plan=enterprise")
-                  }
-                />
+              {error ? (
+                <p role="alert" className="text-sm text-status-danger">
+                  {error}
+                </p>
+              ) : pending ? (
+                <p className="text-sm text-text-muted">Updating estimate…</p>
+              ) : estimate?.kind === "contact_sales" ? (
+                <div className="space-y-3">
+                  <p className="text-lg font-semibold">Custom quote required</p>
+                  <p className="text-sm text-text-muted">
+                    For more than 250 children, we’ll agree a price with your
+                    organisation.
+                  </p>
+                </div>
+              ) : estimate ? (
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span>Base · includes {estimate.includedChildren}</span>
+                    <span>
+                      {money(
+                        estimate.lines.find((line) => line.component === "BASE")
+                          ?.subtotalPence ?? 0,
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span>Additional children to 100 · £1 each</span>
+                    <span>{money(band("CHILDREN_UP_TO_100"))}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span>Children 101–250 · 75p each</span>
+                    <span>{money(band("CHILDREN_101_TO_250"))}</span>
+                  </div>
+                  <div className="border-t border-border-subtle pt-3">
+                    <div className="flex justify-between gap-4 text-lg font-bold">
+                      <span>Estimated monthly total</span>
+                      <span>{money(estimate.subtotalPence)}</span>
+                    </div>
+                  </div>
+                </div>
               ) : null}
-              {currentStep === "org-type" ? (
-                <OrgTypeStep
-                  orgType={state.orgType}
-                  onSelect={(orgType) =>
-                    dispatch({ type: "org-type", orgType })
-                  }
-                />
-              ) : null}
-              {currentStep === "vertical" && state.orgType ? (
-                <VerticalStep
-                  orgType={state.orgType}
-                  vertical={state.vertical}
-                  onSelect={(vertical) =>
-                    dispatch({ type: "vertical", vertical })
-                  }
-                />
-              ) : null}
-              {currentStep === "included" && state.vertical ? (
-                <IncludedStep vertical={state.vertical} />
-              ) : null}
-              {currentStep === "modules" ? (
-                <ModulesStep
-                  selectedOptionalModules={state.selectedOptionalModules}
-                  selectedIncludedModules={state.selectedIncludedModules}
-                  includedModuleLimit={includedModuleLimit}
-                  eligibleOptionalModules={eligibleOptionalModules}
-                  frequency={state.frequency}
-                  prices={billingPrices.modulePrices}
-                  planLabel={
-                    state.planCode
-                      ? PLANS[state.planCode].displayName
-                      : "your plan"
-                  }
-                  onToggle={(module) =>
-                    dispatch({
-                      type: "module",
-                      module,
-                      prices: billingPrices.modulePrices,
-                    })
-                  }
-                />
-              ) : null}
-              {currentStep === "storage" ? (
-                <StorageStep
-                  storageChoice={state.storageChoice}
-                  frequency={state.frequency}
-                  prices={storagePrices}
-                  onSelect={(storageChoice) =>
-                    dispatch({ type: "storage", storageChoice })
-                  }
-                />
-              ) : null}
-              {currentStep === "summary" && state.vertical && state.planCode ? (
-                <SummaryStep
-                  vertical={state.vertical}
-                  includedModules={includedModules}
-                  selectedOptionalModules={state.selectedOptionalModules}
-                  includedModuleLimit={includedModuleLimit}
-                  planCode={state.planCode}
-                  frequency={state.frequency}
-                  storageChoice={state.storageChoice}
-                  accountDetails={accountDetails}
-                  onAccountDetailsChange={setAccountDetails}
-                  onCheckout={handleCheckout}
-                  isCheckoutPending={isCheckoutPending}
-                  checkoutError={checkoutError}
-                />
-              ) : null}
-            </motion.div>
-          </AnimatePresence>
-        </section>
+            </div>
+            <p className="mt-4 text-xs leading-relaxed text-text-muted">
+              The base fee applies even with zero children. This estimate is not
+              a quote or a charge. Final billing uses an accepted count and the
+              census before renewal.
+            </p>
+            <Link
+              href="/demo"
+              className="mt-6 inline-flex w-full justify-center rounded-lg bg-accent-primary px-4 py-3 text-sm font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2"
+            >
+              Talk to our team
+            </Link>
+            <p className="mt-3 text-center text-xs text-text-muted">
+              New-plan checkout is currently unavailable.
+            </p>
+          </aside>
+        </div>
       </div>
     </div>
   );

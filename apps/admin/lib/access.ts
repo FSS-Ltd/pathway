@@ -11,6 +11,7 @@ import type { UserRolesResponse } from "./api-client";
 export type AdminRoleInfo = {
   isOrgAdmin: boolean;
   isOrgOwner: boolean;
+  isOrgBilling?: boolean;
   isSiteAdmin: boolean;
   isStaff: boolean;
   isRegistrationStaff?: boolean;
@@ -33,6 +34,7 @@ export function getAdminRoleInfoFromApiResponse(
   const noAccessRole: AdminRoleInfo = {
     isOrgAdmin: false,
     isOrgOwner: false,
+    isOrgBilling: false,
     isSiteAdmin: false,
     isStaff: false,
     isRegistrationStaff: false,
@@ -57,6 +59,7 @@ export function getAdminRoleInfoFromApiResponse(
   // Determine permissions (org + site roles; SAFEGUARDING_LEAD can be org or site level)
   const isOrgAdmin = orgRoles.has("ORG_ADMIN");
   const isOrgOwner = orgRoles.has("ORG_OWNER"); // Note: ORG_OWNER not in current enum, but checking for future
+  const isOrgBilling = orgRoles.has("ORG_BILLING");
   const isSiteAdmin = siteRoles.has("SITE_ADMIN");
   const isSafeguardingLead =
     orgRoles.has("SAFEGUARDING_LEAD") || siteRoles.has("SAFEGUARDING_LEAD");
@@ -81,6 +84,7 @@ export function getAdminRoleInfoFromApiResponse(
   return {
     isOrgAdmin,
     isOrgOwner,
+    isOrgBilling,
     isSiteAdmin,
     isStaff,
     isRegistrationStaff,
@@ -119,7 +123,7 @@ export function isSiteAdminOrHigher(role: AdminRoleInfo): boolean {
  * Restricted to org admins and owners only
  */
 export function canAccessBilling(role: AdminRoleInfo): boolean {
-  return role.isOrgAdmin || role.isOrgOwner;
+  return role.isOrgAdmin || role.isOrgOwner || role.isOrgBilling === true;
 }
 
 /**

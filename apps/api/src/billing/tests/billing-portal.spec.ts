@@ -1,8 +1,10 @@
 const findUniqueOrThrow = jest.fn();
+const findSubscription = jest.fn();
 
 jest.mock("@pathway/db", () => ({
   prisma: {
     org: { findUniqueOrThrow },
+    subscription: { findFirst: findSubscription },
   },
 }));
 
@@ -13,7 +15,10 @@ import { BillingService } from "../billing.service";
 import { EntitlementsService } from "../entitlements.service";
 import { EntitlementsEnforcementService } from "../entitlements-enforcement.service";
 import { AuthUserGuard } from "../../auth/auth-user.guard";
-import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "../billing-provider.config";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+} from "../billing-provider.config";
 
 describe("POST /billing/portal", () => {
   let controller: BillingController;
@@ -30,6 +35,7 @@ describe("POST /billing/portal", () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    findSubscription.mockResolvedValue(null);
     delete process.env.NEXSTEPS_HOME_BILLING_RETURN_URL;
 
     const config: BillingProviderConfig = {
@@ -43,7 +49,10 @@ describe("POST /billing/portal", () => {
       providers: [
         BillingService,
         { provide: EntitlementsService, useValue: { resolve: jest.fn() } },
-        { provide: EntitlementsEnforcementService, useValue: { checkAv30ForOrg: jest.fn() } },
+        {
+          provide: EntitlementsEnforcementService,
+          useValue: { checkAv30ForOrg: jest.fn() },
+        },
         { provide: BILLING_PROVIDER_CONFIG, useValue: config },
       ],
     })
@@ -66,7 +75,9 @@ describe("POST /billing/portal", () => {
   });
 
   it("returns a portal session url for an org with a stripe customer, omitting return_url when unset", async () => {
-    stripeCreate.mockResolvedValue({ url: "https://billing.stripe.com/session/abc" });
+    stripeCreate.mockResolvedValue({
+      url: "https://billing.stripe.com/session/abc",
+    });
     findUniqueOrThrow.mockResolvedValue({ stripeCustomerId: "cus_123" });
 
     const result = await controller.createPortalSession("org1");
@@ -85,8 +96,11 @@ describe("POST /billing/portal", () => {
   });
 
   it("passes return_url when NEXSTEPS_HOME_BILLING_RETURN_URL is set", async () => {
-    process.env.NEXSTEPS_HOME_BILLING_RETURN_URL = "https://app.nexsteps.dev/family/membership";
-    stripeCreate.mockResolvedValue({ url: "https://billing.stripe.com/session/abc" });
+    process.env.NEXSTEPS_HOME_BILLING_RETURN_URL =
+      "https://app.nexsteps.dev/family/membership";
+    stripeCreate.mockResolvedValue({
+      url: "https://billing.stripe.com/session/abc",
+    });
     findUniqueOrThrow.mockResolvedValue({ stripeCustomerId: "cus_123" });
 
     await controller.createPortalSession("org1");
@@ -100,13 +114,26 @@ describe("POST /billing/portal", () => {
   it("throws NotFoundException when the org has no stripe customer", async () => {
     findUniqueOrThrow.mockResolvedValue({ stripeCustomerId: null });
 
-    await expect(controller.createPortalSession("org1")).rejects.toThrow(NotFoundException);
+    await expect(controller.createPortalSession("org1")).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+
+  it("does not open an unrestricted portal for enrolled-child subscriptions", async () => {
+    findSubscription.mockResolvedValue({ id: "sub_institutional" });
+
+    await expect(controller.createPortalSession("org1")).rejects.toMatchObject({
+      response: { code: "INSTITUTIONAL_PORTAL_UNAVAILABLE" },
+    });
+    expect(stripeCreate).not.toHaveBeenCalled();
   });
 
   it("rethrows (does not swallow) when Stripe rejects the session creation", async () => {
     findUniqueOrThrow.mockResolvedValue({ stripeCustomerId: "cus_123" });
     stripeCreate.mockRejectedValue(new Error("Stripe API error"));
 
-    await expect(controller.createPortalSession("org1")).rejects.toThrow("Stripe API error");
+    await expect(controller.createPortalSession("org1")).rejects.toThrow(
+      "Stripe API error",
+    );
   });
 });

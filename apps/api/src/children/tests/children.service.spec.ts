@@ -254,6 +254,22 @@ describe("ChildrenService", () => {
       });
       expect(create).not.toHaveBeenCalled();
     });
+
+    it("does not block a child profile on an enrolled-child subscription because of a historic cap", async () => {
+      tFindUnique.mockResolvedValueOnce({ id: tenantId, orgId: "org_1" });
+      snapshotFindFirst.mockResolvedValueOnce({
+        flagsJson: { maxChildrenIncluded: 50 },
+      });
+      subscriptionFindFirst.mockResolvedValueOnce({
+        planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      });
+      create.mockResolvedValueOnce({ id: "c_new", tenantId });
+
+      await expect(
+        svc.create({ ...baseDto }, tenantId),
+      ).resolves.toHaveProperty("id", "c_new");
+      expect(count).not.toHaveBeenCalled();
+    });
   });
 
   describe("update", () => {

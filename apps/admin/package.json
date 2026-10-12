@@ -25,6 +25,7 @@
   "dependencies": {
     "@clerk/nextjs": "6.39.6",
     "@pathway/platform": "workspace:*",
+    "@pathway/pricing": "workspace:*",
     "@pathway/util": "workspace:*",
     "@tiptap/extension-image": "^3.19.0",
     "@tiptap/extension-link": "^3.19.0",

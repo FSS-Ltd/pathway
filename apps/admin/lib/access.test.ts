@@ -4,6 +4,7 @@
  */
 
 import {
+  canAccessBilling,
   canAccessAdminSection,
   canAccessSafeguardingAdmin,
   getAdminRoleInfoFromApiResponse,
@@ -107,6 +108,21 @@ function runTests() {
   assert(
     staffRole.isRegistrationStaff === true,
     "site staff can see submitted registration",
+  );
+  const billingRole = getAdminRoleInfoFromApiResponse({
+    userId: "user-billing",
+    orgRoles: [{ orgId: "org-1", role: "ORG_BILLING" }],
+    orgMemberships: [],
+    siteRoles: [],
+    siteMemberships: [],
+  });
+  assert(
+    canAccessBilling(billingRole),
+    "billing role can view aggregate billing",
+  );
+  assert(
+    !canAccessAdminSection(billingRole),
+    "billing role does not gain admin access",
   );
 
   const superUserWithoutAdminRole = getAdminRoleInfoFromApiResponse({

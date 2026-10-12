@@ -58,7 +58,11 @@ export class InstitutionalCensusService {
           periodEnd: true,
           nextInstitutionalSnapshotId: true,
           currentInstitutionalSnapshot: {
-            select: { includedModules: true, paidModules: true },
+            select: {
+              createdAt: true,
+              includedModules: true,
+              paidModules: true,
+            },
           },
         },
       });
@@ -85,6 +89,21 @@ export class InstitutionalCensusService {
       if (existing) return { kind: "frozen" as const, snapshot: existing };
 
       const policy = await this.quotes.ensurePolicy(tx, current.orgId);
+      const acceptedChange = await tx.institutionalBillingSnapshot.findFirst({
+        where: {
+          orgId: current.orgId,
+          subscriptionId: current.id,
+          kind: InstitutionalSnapshotKind.QUOTE,
+          acceptance: { is: { acceptedAt: { lte: cutoffAt } } },
+          createdAt: {
+            gt: current.currentInstitutionalSnapshot?.createdAt ?? new Date(0),
+          },
+        },
+        orderBy: { acceptance: { acceptedAt: "desc" } },
+      });
+      const renewalPlanCode = acceptedChange
+        ? institutionalPlanCode(acceptedChange.planCode)
+        : planCode;
       const confirmation = await tx.enrolmentRollConfirmation.findFirst({
         where: { orgId: current.orgId, revisionCutoff: { lte: cutoffAt } },
         orderBy: [{ revisionCutoff: "desc" }, { id: "desc" }],
@@ -104,7 +123,7 @@ export class InstitutionalCensusService {
         count !== null &&
         policy.pricingVersion === INSTITUTIONAL_PRICING_VERSION
           ? calculateInstitutionalQuote({
-              planCode,
+              planCode: renewalPlanCode,
               enrolledChildren: count,
               pricingVersion: INSTITUTIONAL_PRICING_VERSION,
             })
@@ -127,15 +146,20 @@ export class InstitutionalCensusService {
           subscriptionId: current.id,
           kind: InstitutionalSnapshotKind.CENSUS,
           status,
-          planCode,
+          planCode: renewalPlanCode,
           pricingVersion: INSTITUTIONAL_PRICING_VERSION,
           countSource: confirmation ? InstitutionalCountSource.VERIFIED : null,
           enrolledChildren: count,
           includedChildren:
             priced?.kind === "priced" ? priced.includedChildren : null,
           includedModules:
-            current.currentInstitutionalSnapshot?.includedModules ?? [],
-          paidModules: current.currentInstitutionalSnapshot?.paidModules ?? [],
+            acceptedChange?.includedModules ??
+            current.currentInstitutionalSnapshot?.includedModules ??
+            [],
+          paidModules:
+            acceptedChange?.paidModules ??
+            current.currentInstitutionalSnapshot?.paidModules ??
+            [],
           lines: priced?.kind === "priced" ? priced.lines : [],
           subtotalPence:
             priced?.kind === "priced" ? priced.subtotalPence : null,
@@ -183,6 +207,23 @@ export class InstitutionalCensusService {
       const planCode = subscription
         ? institutionalPlanCode(subscription.planCode)
         : null;
+      const acceptedChange = subscription
+        ? await tx.institutionalBillingSnapshot.findFirst({
+            where: {
+              orgId,
+              subscriptionId: subscription.id,
+              kind: InstitutionalSnapshotKind.QUOTE,
+              acceptance: { isNot: null },
+              createdAt: {
+                gt:
+                  subscription.currentInstitutionalSnapshot?.createdAt ??
+                  new Date(0),
+              },
+            },
+            orderBy: { acceptance: { acceptedAt: "desc" } },
+            include: { acceptance: { select: { acceptedAt: true } } },
+          })
+        : null;
       const latestConfirmation = await tx.enrolmentRollConfirmation.findFirst({
         where: { orgId },
         orderBy: [{ revisionCutoff: "desc" }, { id: "desc" }],
@@ -214,6 +255,18 @@ export class InstitutionalCensusService {
               planCode,
               periodStart: subscription.periodStart,
               periodEnd: subscription.periodEnd,
+              enrolledChildren:
+                subscription.currentInstitutionalSnapshot?.enrolledChildren ??
+                null,
+              includedChildren:
+                subscription.currentInstitutionalSnapshot?.includedChildren ??
+                null,
+              includedModules:
+                subscription.currentInstitutionalSnapshot?.includedModules ??
+                [],
+              paidModules:
+                subscription.currentInstitutionalSnapshot?.paidModules ?? [],
+              lines: subscription.currentInstitutionalSnapshot?.lines ?? [],
               subtotalPence:
                 subscription.currentInstitutionalSnapshot?.subtotalPence ??
                 null,
@@ -223,13 +276,35 @@ export class InstitutionalCensusService {
         liveForecast: forecast,
         frozenRenewal: subscription?.nextInstitutionalSnapshot
           ? {
+              planCode: subscription.nextInstitutionalSnapshot.planCode,
               status: subscription.nextInstitutionalSnapshot.status,
               enrolledChildren:
                 subscription.nextInstitutionalSnapshot.enrolledChildren,
+              includedChildren:
+                subscription.nextInstitutionalSnapshot.includedChildren,
+              includedModules:
+                subscription.nextInstitutionalSnapshot.includedModules,
+              paidModules: subscription.nextInstitutionalSnapshot.paidModules,
+              lines: subscription.nextInstitutionalSnapshot.lines ?? [],
               subtotalPence:
                 subscription.nextInstitutionalSnapshot.subtotalPence,
               cutoffAt: subscription.nextInstitutionalSnapshot.censusCutoffAt,
               effectiveAt: subscription.nextInstitutionalSnapshot.effectiveAt,
+            }
+          : null,
+        scheduledChange: acceptedChange
+          ? {
+              planCode: acceptedChange.planCode,
+              includedModules: acceptedChange.includedModules,
+              paidModules: acceptedChange.paidModules,
+              acceptedAt: acceptedChange.acceptance?.acceptedAt ?? null,
+              effectiveAt:
+                subscription &&
+                acceptedChange.acceptance &&
+                acceptedChange.acceptance.acceptedAt <=
+                  censusCutoffFor(subscription.periodEnd)
+                  ? subscription.periodEnd
+                  : null,
             }
           : null,
         nextCutoffAt: subscription
