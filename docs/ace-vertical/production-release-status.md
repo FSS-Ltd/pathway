@@ -42,7 +42,7 @@ The admin build used local public Clerk configuration and explicit mock API
 mode. Browser review blocked an external sign-in redirect; the user chose to
 continue without browser inspection.
 
-Step ACE-B02, atomic batch recording, starts from that merged commit on
+Step ACE-B02, atomic batch recording, merged from
 `feature/ace-behaviour-batch-recording` in
 [PR #585](https://github.com/FSS-Ltd/pathway/pull/585). The implementation
 revision `0e0c403252a9eab196d175d0d7d30dba3623fd44` uses the immutable
@@ -51,8 +51,20 @@ no schema change. Local API typecheck, lint, format, build, 1,337 API unit
 tests, 12 guarded PostgreSQL behaviour integration tests, and the repository
 pre-commit hook passed. The
 database suite covers concurrent replay, full rollback and retry, cross-site
-and sensitive denial, merit intents, 50 facts, and demerit escalation.
-Latest-head CI and merge evidence remain pending.
+and sensitive denial, merit intents, 50 facts, and demerit escalation. All
+eight applicable CI checks passed on documented head
+`3e97fdc134cc702ac4d909a8accb576486436e7d`; GitHub confirms its merge
+into `master` as `be406e1234fae574b2d46b16b73f338a149868be` on
+12 October 2026.
+
+Step ACE-B03, paginated behaviour history and site-local trends, starts from
+that merged commit on `feature/ace-behaviour-history-trends`. Local API
+typecheck, lint, format, build, 1,366 API unit tests, and 17 guarded
+PostgreSQL behaviour integration tests passed. The database tests cover
+filter-bound cursor paging under backdated inserts, spring and autumn
+daylight-saving boundaries, current-fact aggregates, empty buckets, site
+scope, and sensitive-total denial. Its PR, checked revision, CI, and merge
+evidence remain pending.
 
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at

@@ -96,7 +96,11 @@ function entry(overrides: Partial<Record<string, unknown>> = {}) {
 function transaction() {
   return {
     $executeRaw: jest.fn().mockResolvedValue(0),
-    $queryRaw: jest.fn().mockResolvedValue([]),
+    $queryRaw: jest
+      .fn()
+      .mockResolvedValue([
+        { snapshotAt: new Date("2026-08-12T10:00:00.000Z") },
+      ]),
     tenant: { findFirst: jest.fn() },
     child: { findFirst: jest.fn() },
     behaviourCategory: { aggregate: jest.fn(), findFirst: jest.fn() },
@@ -207,6 +211,12 @@ describe("behaviour entry boundary", () => {
         BehaviourController.prototype.recordBatch,
       ),
     ).toBe("ace.behaviour.record");
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSION,
+        BehaviourController.prototype.trends,
+      ),
+    ).toBe("ace.behaviour.read");
   });
 
   it("strictly validates bounded commands, queries, and type/delta consistency", () => {
@@ -760,6 +770,15 @@ describe("BehaviourCommandService", () => {
 });
 
 describe("BehaviourQueryService", () => {
+  const previousSigningKey = process.env.INTERNAL_AUTH_SECRET;
+  beforeAll(() => {
+    process.env.INTERNAL_AUTH_SECRET = "behaviour-query-unit-test-key";
+  });
+  afterAll(() => {
+    if (previousSigningKey === undefined)
+      delete process.env.INTERNAL_AUTH_SECRET;
+    else process.env.INTERNAL_AUTH_SECRET = previousSigningKey;
+  });
   beforeEach(() => jest.clearAllMocks());
 
   it("returns only terminal tenant facts through an explicit field allow-list", async () => {
@@ -772,6 +791,7 @@ describe("BehaviourQueryService", () => {
       queryService.list(actor, { childId, limit: 25 }),
     ).resolves.toEqual({
       items: [expect.objectContaining({ id: "entry-1" })],
+      nextCursor: null,
       canVoid: false,
     });
     expect(tx.behaviourEntry.findMany).toHaveBeenCalledWith({
@@ -781,9 +801,10 @@ describe("BehaviourQueryService", () => {
         visibility: "GENERAL",
         correction: { is: null },
         retraction: { is: null },
+        createdAt: { lte: new Date("2026-08-12T10:00:00.000Z") },
       },
       orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
-      take: 25,
+      take: 26,
       select: expect.objectContaining({
         id: true,
         tenantId: false,
@@ -811,6 +832,7 @@ describe("BehaviourQueryService", () => {
           tenantId: actor.tenantId,
           correction: { is: null },
           retraction: { is: null },
+          createdAt: { lte: new Date("2026-08-12T10:00:00.000Z") },
         },
       }),
     );

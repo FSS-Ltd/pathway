@@ -80,9 +80,11 @@ function behaviourRuntime(
 describe("ACE behaviour command database boundary", () => {
   let fixture: Fixture | undefined;
   let orgRecorderRole: Awaited<ReturnType<typeof seedE2eTypedRole>> | undefined;
+  const previousSigningKey = process.env.INTERNAL_AUTH_SECRET;
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
+    process.env.INTERNAL_AUTH_SECRET = "behaviour-command-e2e-signing-key";
     fixture = {
       orgId: randomUUID(),
       tenantAId: randomUUID(),
@@ -155,6 +157,9 @@ describe("ACE behaviour command database boundary", () => {
   });
 
   afterAll(async () => {
+    if (previousSigningKey === undefined)
+      delete process.env.INTERNAL_AUTH_SECRET;
+    else process.env.INTERNAL_AUTH_SECRET = previousSigningKey;
     if (!isDatabaseAvailable() || !fixture) return;
     await prisma.outboxEvent.deleteMany({ where: { orgId: fixture.orgId } });
     await prisma.auditEvent.deleteMany({
@@ -771,12 +776,14 @@ describe("ACE behaviour command database boundary", () => {
     );
     await expect(
       allowedQuery.list(actor, { childId: fixture.childAId }),
-    ).resolves.toEqual({
-      canVoid: false,
-      items: expect.arrayContaining([
-        expect.objectContaining({ id: created.entry.id, note: plaintext }),
-      ]),
-    });
+    ).resolves.toEqual(
+      expect.objectContaining({
+        canVoid: false,
+        items: expect.arrayContaining([
+          expect.objectContaining({ id: created.entry.id, note: plaintext }),
+        ]),
+      }),
+    );
   });
 
   it("allows one concurrent immutable correction and returns only terminal facts", async () => {

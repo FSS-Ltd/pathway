@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isDateOnly } from "../../ace-settings/dto/academic-calendar.dto";
 
 const idempotencyKey = z.string().trim().min(1).max(128);
 const childId = z.string().uuid();
@@ -114,9 +115,14 @@ export const behaviourListQuerySchema = z
   .object({
     childId: childId.optional(),
     type: type.optional(),
+    visibility: z.enum(["GENERAL", "SENSITIVE", "ALL"]).optional(),
     occurredFrom: occurredAt.optional(),
     occurredTo: occurredAt.optional(),
     limit: listLimit,
+    cursor: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,512}$/)
+      .optional(),
   })
   .strict()
   .superRefine((query, context) => {
@@ -133,6 +139,29 @@ export const behaviourListQuerySchema = z
     }
   });
 
+export const behaviourTrendsQuerySchema = z
+  .object({
+    from: z
+      .string()
+      .refine(isDateOnly, "Use a valid date in YYYY-MM-DD format"),
+    to: z.string().refine(isDateOnly, "Use a valid date in YYYY-MM-DD format"),
+    bucket: z.enum(["daily", "weekly", "monthly"]),
+    visibility: z.enum(["GENERAL", "SENSITIVE", "ALL"]),
+  })
+  .strict()
+  .refine(({ from, to }) => from <= to, {
+    message: "from must be on or before to",
+    path: ["to"],
+  })
+  .refine(
+    ({ from, to }) =>
+      (Date.parse(`${to}T00:00:00.000Z`) -
+        Date.parse(`${from}T00:00:00.000Z`)) /
+        86_400_000 <
+      366,
+    { message: "Select at most 366 days", path: ["to"] },
+  );
+
 export type CreateBehaviourEntryDto = z.infer<
   typeof createBehaviourEntrySchema
 >;
@@ -142,3 +171,4 @@ export type CreateBehaviourBatchDto = z.infer<
 export type BehaviourCorrectionDto = z.infer<typeof behaviourCorrectionSchema>;
 export type BehaviourRetractionDto = z.infer<typeof behaviourRetractionSchema>;
 export type BehaviourListQuery = z.infer<typeof behaviourListQuerySchema>;
+export type BehaviourTrendsQuery = z.infer<typeof behaviourTrendsQuerySchema>;
