@@ -81,8 +81,12 @@ build with nonproduction public Clerk configuration and mock API mode. The new
 interaction tests cover keyboard tab focus, batch cap/retry, cursor paging,
 filter reset, a daylight-saving date window, and trends controls. Graphify's
 code graph was refreshed. Browser inspection was declined by the user after
-the local page redirected to the external sign-in domain. Latest-head CI and
-merge evidence remain pending.
+the local page redirected to the external sign-in domain. All eight applicable
+CI checks passed on latest head `f0c045c13ad8957a99f47b0b3f28384d60a58bde`:
+typecheck/lint/unit, both CodeQL analyses and their aggregate, integration,
+system-role seed database identity, permission definition database, and
+organisation-role RLS. GitHub confirms its merge into `master` as
+`876c5caec43252b2fb321a3fd34788c64dbd181d` on 12 October 2026.
 
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
