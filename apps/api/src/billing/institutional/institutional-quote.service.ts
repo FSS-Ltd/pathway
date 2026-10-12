@@ -22,6 +22,7 @@ import {
 } from "@pathway/db";
 import {
   calculateInstitutionalQuote,
+  INSTITUTIONAL_PLANS,
   INSTITUTIONAL_PRICING_VERSION,
   type InstitutionalPlanCode,
 } from "@pathway/pricing";
@@ -131,6 +132,29 @@ export class InstitutionalQuoteService {
       throw new BadRequestException({ code: "INVALID_COUNT" });
     }
     return withInstitutionalOrgLock(orgId, async (tx) => {
+      const currentSubscription = await tx.subscription.findFirst({
+        where: {
+          orgId,
+          planCode: { in: Object.keys(INSTITUTIONAL_PLANS) },
+          status: {
+            in: [
+              SubscriptionStatus.ACTIVE,
+              SubscriptionStatus.PAST_DUE,
+              SubscriptionStatus.TRIALING,
+            ],
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        include: { currentInstitutionalSnapshot: true },
+      });
+      const currentModules = currentSubscription?.currentInstitutionalSnapshot;
+      if (
+        currentModules &&
+        (currentModules.includedModules.length > 0 ||
+          currentModules.paidModules.length > 0)
+      ) {
+        throw new ConflictException({ code: "MODULE_CHANGE_REVIEW_REQUIRED" });
+      }
       let policy = await this.ensurePolicy(tx, orgId);
       const confirmation = await tx.enrolmentRollConfirmation.findFirst({
         where: { orgId },
@@ -214,6 +238,7 @@ export class InstitutionalQuoteService {
         data: {
           orgId,
           policyId: policy.id,
+          subscriptionId: currentSubscription?.id,
           kind: InstitutionalSnapshotKind.QUOTE,
           status:
             priced.kind === "priced"
@@ -358,7 +383,13 @@ export class InstitutionalQuoteService {
         }
       }
       const acceptance = await tx.institutionalQuoteAcceptance.create({
-        data: { orgId, snapshotId, actorUserId, idempotencyKey },
+        data: {
+          orgId,
+          snapshotId,
+          actorUserId,
+          idempotencyKey,
+          acceptedAt: now,
+        },
       });
       await tx.auditEvent.create({
         data: {

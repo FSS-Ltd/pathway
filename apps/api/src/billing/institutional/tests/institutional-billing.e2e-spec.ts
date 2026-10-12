@@ -90,6 +90,30 @@ describe("institutional quotes and census (e2e)", () => {
     expect(response.status).toBe(401);
   });
 
+  it("offers public monthly catalogue and child-count estimates without checkout", async () => {
+    if (!app) return;
+    const catalogue = await request(app.getHttpServer()).get(
+      "/billing/institutional/catalogue",
+    );
+    expect(catalogue.status).toBe(200);
+    expect(catalogue.body.plans).toHaveLength(3);
+    expect(
+      catalogue.body.plans.every(
+        (plan: { checkoutEnabled: boolean }) => !plan.checkoutEnabled,
+      ),
+    ).toBe(true);
+
+    const estimate = await request(app.getHttpServer())
+      .post("/billing/institutional/catalogue/estimate")
+      .send({ planCode: starter, enrolledChildren: 100 });
+    expect(estimate.status).toBe(201);
+    expect(estimate.body).toMatchObject({
+      kind: "priced",
+      enrolledChildren: 100,
+      subtotalPence: 12400,
+    });
+  });
+
   it("requires an accepted declaration, preserves zero as base-fee billing, and rejects stale quotes", async () => {
     if (!app) return;
     const missing = await request(app.getHttpServer())
@@ -352,6 +376,17 @@ describe("institutional quotes and census (e2e)", () => {
         currentInstitutionalSnapshotId: refreshed.id,
       },
     });
+    const planChange = await quotes.createQuote(orgId, actorId, {
+      planCode: "INSTITUTIONAL_GROWTH_MONTHLY",
+      includedModules: [],
+      paidModules: [],
+    });
+    await quotes.acceptQuote(
+      orgId,
+      actorId,
+      planChange.id,
+      `growth-change-${orgId}`,
+    );
     const cutoff = censusCutoffFor(periodEnd);
     expect(
       (await census.freezeNext(subscription.id, new Date(cutoff.getTime() - 1)))
@@ -396,7 +431,8 @@ describe("institutional quotes and census (e2e)", () => {
     expect(frozen.kind).toBe("frozen");
     if (frozen.kind !== "frozen") throw new Error("Expected frozen census");
     expect(frozen.snapshot.enrolledChildren).toBe(2);
-    expect(frozen.snapshot.subtotalPence).toBe(4900);
+    expect(frozen.snapshot.planCode).toBe("INSTITUTIONAL_GROWTH_MONTHLY");
+    expect(frozen.snapshot.subtotalPence).toBe(9900);
     expect(frozen.snapshot.censusCutoffAt?.toISOString()).toBe(
       cutoff.toISOString(),
     );
@@ -414,6 +450,57 @@ describe("institutional quotes and census (e2e)", () => {
     expect(summary.status).toBe(200);
     expect(summary.body.currentPaid.subtotalPence).toBe(4900);
     expect(summary.body.frozenRenewal.enrolledChildren).toBe(2);
+    expect(summary.body.frozenRenewal.planCode).toBe(
+      "INSTITUTIONAL_GROWTH_MONTHLY",
+    );
     expect(JSON.stringify(summary.body)).not.toContain("Private");
+
+    const lateAcceptedAt = new Date(cutoff.getTime() + 60 * 60_000);
+    const lateChange = await quotes.createQuote(
+      orgId,
+      actorId,
+      {
+        planCode: "INSTITUTIONAL_PROFESSIONAL_MONTHLY",
+        includedModules: [],
+        paidModules: [],
+      },
+      lateAcceptedAt,
+    );
+    await quotes.acceptQuote(
+      orgId,
+      actorId,
+      lateChange.id,
+      `late-change-${orgId}`,
+      lateAcceptedAt,
+    );
+    const unchanged = await census.freezeNext(
+      subscription.id,
+      new Date(cutoff.getTime() + 2 * 24 * 60 * 60_000),
+    );
+    expect(unchanged.kind).toBe("frozen");
+    if (unchanged.kind !== "frozen") throw new Error("Expected frozen census");
+    expect(unchanged.snapshot.planCode).toBe("INSTITUTIONAL_GROWTH_MONTHLY");
+
+    const followingEnd = new Date(periodEnd.getTime() + 30 * 24 * 60 * 60_000);
+    await prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        planCode: "INSTITUTIONAL_GROWTH_MONTHLY",
+        periodStart: periodEnd,
+        periodEnd: followingEnd,
+        currentInstitutionalSnapshotId: frozen.snapshot.id,
+        nextInstitutionalSnapshotId: null,
+      },
+    });
+    const following = await census.freezeNext(
+      subscription.id,
+      censusCutoffFor(followingEnd),
+    );
+    expect(following.kind).toBe("frozen");
+    if (following.kind !== "frozen")
+      throw new Error("Expected following census");
+    expect(following.snapshot.planCode).toBe(
+      "INSTITUTIONAL_PROFESSIONAL_MONTHLY",
+    );
   });
 });

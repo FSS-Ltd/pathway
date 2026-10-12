@@ -115,10 +115,6 @@ describe("configurator imagery and motion contract", () => {
       join(process.cwd(), "components/configurator/stage.tsx"),
       "utf8",
     );
-    const page = readFileSync(
-      join(process.cwd(), "app/configure/page.tsx"),
-      "utf8",
-    );
     const total = readFileSync(
       join(process.cwd(), "components/configurator/running-total.tsx"),
       "utf8",
@@ -136,8 +132,6 @@ describe("configurator imagery and motion contract", () => {
     expect(stage).toContain("sizes");
     expect(stage).not.toContain("CONFIGURATOR_IMAGE_PATHS");
     expect(stage).not.toContain("duration:");
-    expect(page).toContain("ConfiguratorStage");
-    expect(page).toContain("AnimatePresence");
     expect(total).toContain("totalTick");
     expect(card).toContain("aria-pressed");
     expect(card).toContain("focus-visible:ring-2");
@@ -165,10 +159,6 @@ describe("configurator imagery and motion contract", () => {
       join(process.cwd(), "components/configurator/stage.tsx"),
       "utf8",
     );
-    const page = readFileSync(
-      join(process.cwd(), "app/configure/page.tsx"),
-      "utf8",
-    );
     const motionSource = readFileSync(
       join(process.cwd(), "lib/motion.ts"),
       "utf8",
@@ -180,8 +170,6 @@ describe("configurator imagery and motion contract", () => {
       "animate={prefersReducedMotion ? { opacity: 1 } : stageControls}",
     );
     expect(motionSource).toContain("configuratorStepVariants");
-    expect(page).toContain("custom={stepDirection}");
-    expect(page).toContain("configuratorStepVariants");
     expect(configuratorStepVariants.exit("forward")).toMatchObject({ x: -24 });
     expect(configuratorStepVariants.exit("back")).toMatchObject({ x: 24 });
   });
@@ -212,21 +200,17 @@ describe("configurator imagery and motion contract", () => {
     }
   });
 
-  it("keeps the single compact stage between controls and active step on mobile", () => {
+  it("keeps the live estimate below the form on narrow layouts", () => {
     const page = readFileSync(
       join(process.cwd(), "app/configure/page.tsx"),
       "utf8",
     );
-    const stepperIndex = page.indexOf("<ConfiguratorStepper");
-    const stageIndex = page.indexOf("<ConfiguratorStage");
-    const activeStepIndex = page.lastIndexOf("<AnimatePresence");
-
-    expect(stepperIndex).toBeGreaterThan(-1);
-    expect(stageIndex).toBeGreaterThan(stepperIndex);
-    expect(activeStepIndex).toBeGreaterThan(stageIndex);
-    expect(page).toContain("sticky top-2");
-    expect(page).toContain("lg:col-start-2");
-    expect(page).toContain("lg:row-span-2");
+    expect(page.indexOf('aria-labelledby="plan-title"')).toBeLessThan(
+      page.indexOf('aria-labelledby="estimate-title"'),
+    );
+    expect(page).toContain("lg:grid-cols-");
+    expect(page).toContain("lg:sticky");
+    expect(page).toContain('aria-live="polite"');
   });
 
   it("uses stable bottom slots for compact and staggered foreground scenes", () => {

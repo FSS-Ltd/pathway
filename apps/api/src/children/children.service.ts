@@ -6,6 +6,7 @@ import {
   Optional,
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
+import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
 import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
 import { getPlanDefinition } from "../billing/billing-plans";
@@ -301,6 +302,12 @@ export class ChildrenService {
       }),
     ]);
 
+    if (
+      latestSubscription &&
+      Object.hasOwn(INSTITUTIONAL_PLANS, latestSubscription.planCode)
+    ) {
+      return null;
+    }
     const flags = toRecord(latestSnapshot?.flagsJson);
     const capFromSnapshot = numberOrNull(flags?.maxChildrenIncluded);
     if (capFromSnapshot !== null) return capFromSnapshot;

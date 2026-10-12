@@ -375,6 +375,15 @@ export default function BuyNowPage() {
         },
       )
     : { currency: "gbp", subtotalMajor: 0, totalMajor: 0, lines: [] };
+  if (snapshot?.org.sector) {
+    return (
+      <Card title="Enrolled-child billing">
+        <p className="text-sm text-text-muted">The previous staff-based checkout is closed for organisations. Review your current plan and confirmed continuing roll instead.</p>
+        <Link href="/billing/institutional" className="text-sm font-semibold text-accent-strong underline">View institutional billing</Link>
+      </Card>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">

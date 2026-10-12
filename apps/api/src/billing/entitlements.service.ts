@@ -1,8 +1,10 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { prisma, SubscriptionStatus, BillingProvider } from "@pathway/db";
+import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
 import { getPlanDefinition } from "./billing-plans";
 import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "./subscription-plan-code";
+import { isInstitutionalPlanCode } from "./institutional/institutional-selection";
 
 export type SubscriptionState = SubscriptionStatus | "NONE";
 
@@ -110,11 +112,17 @@ export class EntitlementsService {
       flagsFromSnapshot?.maxChildrenIncluded,
     );
 
-    const av30Cap =
-      snapshot?.av30Included ?? planDefinition?.av30Included ?? null;
-    const maxChildren =
-      maxChildrenFromSnapshot ??
-      (snapshot ? null : planDefinition?.maxChildrenIncluded ?? null);
+    const institutionalPlan =
+      subscription && isInstitutionalPlanCode(subscription.planCode)
+        ? INSTITUTIONAL_PLANS[subscription.planCode]
+        : null;
+    const av30Cap = institutionalPlan
+      ? null
+      : snapshot?.av30Included ?? planDefinition?.av30Included ?? null;
+    const maxChildren = institutionalPlan
+      ? null
+      : maxChildrenFromSnapshot ??
+        (snapshot ? null : planDefinition?.maxChildrenIncluded ?? null);
     const storageGbCap =
       snapshot?.storageGbIncluded ?? planDefinition?.storageGbIncluded ?? null;
     const smsMessagesCap =
@@ -124,7 +132,7 @@ export class EntitlementsService {
       snapshot?.leaderSeatsIncluded ??
       planDefinition?.leaderSeatsIncluded ??
       null;
-    const maxSites = snapshot?.maxSites ?? planDefinition?.maxSitesIncluded ?? null;
+    const maxSites = institutionalPlan?.includedSites ?? snapshot?.maxSites ?? planDefinition?.maxSitesIncluded ?? null;
 
     const flags = snapshot
       ? flagsFromSnapshot

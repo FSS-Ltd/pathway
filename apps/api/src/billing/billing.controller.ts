@@ -7,6 +7,7 @@ import {
   Inject,
   Logger,
   NotFoundException,
+  ForbiddenException,
   UseGuards,
   forwardRef,
 } from "@nestjs/common";
@@ -19,7 +20,11 @@ import { EntitlementsService } from "./entitlements.service";
 import { EntitlementsEnforcementService } from "./entitlements-enforcement.service";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { CurrentOrg } from "@pathway/auth";
-import { BILLING_PROVIDER_CONFIG, type BillingProviderConfig } from "./billing-provider.config";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+} from "./billing-provider.config";
+import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
 
 const parseOrBadRequest = async <T>(
   schema: z.ZodTypeAny,
@@ -50,9 +55,12 @@ export class BillingController {
 
   constructor(
     @Inject(BillingService) private readonly service: BillingService,
-    @Inject(forwardRef(() => EntitlementsService)) private readonly entitlements: EntitlementsService,
-    @Inject(forwardRef(() => EntitlementsEnforcementService)) private readonly enforcement: EntitlementsEnforcementService,
-    @Inject(BILLING_PROVIDER_CONFIG) private readonly billingConfig: BillingProviderConfig,
+    @Inject(forwardRef(() => EntitlementsService))
+    private readonly entitlements: EntitlementsService,
+    @Inject(forwardRef(() => EntitlementsEnforcementService))
+    private readonly enforcement: EntitlementsEnforcementService,
+    @Inject(BILLING_PROVIDER_CONFIG)
+    private readonly billingConfig: BillingProviderConfig,
   ) {
     // Same construction as StripeBuyNowProvider/BillingPricingService
     // (providers/stripe-buy-now.provider.ts, pricing.service.ts): pinned
@@ -60,7 +68,9 @@ export class BillingController {
     // left null (not thrown) when unset so FAKE-provider dev/test boots
     // still work - createPortalSession 404s instead.
     this.stripe = this.billingConfig.stripe.secretKey
-      ? new Stripe(this.billingConfig.stripe.secretKey, { apiVersion: "2023-10-16" })
+      ? new Stripe(this.billingConfig.stripe.secretKey, {
+          apiVersion: "2023-10-16",
+        })
       : null;
   }
 
@@ -83,13 +93,15 @@ export class BillingController {
       orgId: resolved.orgId,
       isMasterOrg: resolved.isMasterOrg,
       subscriptionStatus: resolved.subscriptionStatus,
-      subscription: resolved.subscription ? {
-        planCode: resolved.subscription.planCode,
-        status: resolved.subscription.status,
-        periodStart: resolved.subscription.periodStart.toISOString(),
-        periodEnd: resolved.subscription.periodEnd.toISOString(),
-        cancelAtPeriodEnd: resolved.subscription.cancelAtPeriodEnd,
-      } : null,
+      subscription: resolved.subscription
+        ? {
+            planCode: resolved.subscription.planCode,
+            status: resolved.subscription.status,
+            periodStart: resolved.subscription.periodStart.toISOString(),
+            periodEnd: resolved.subscription.periodEnd.toISOString(),
+            cancelAtPeriodEnd: resolved.subscription.cancelAtPeriodEnd,
+          }
+        : null,
       av30Cap: resolved.av30Cap,
       maxChildren: resolved.maxChildren,
       currentAv30: resolved.currentAv30,
@@ -116,6 +128,19 @@ export class BillingController {
   @Post("portal")
   @UseGuards(AuthUserGuard)
   async createPortalSession(@CurrentOrg("orgId") orgId: string) {
+    const institutionalSubscription = await prisma.subscription.findFirst({
+      where: {
+        orgId,
+        planCode: { in: Object.keys(INSTITUTIONAL_PLANS) },
+      },
+      select: { id: true },
+    });
+    if (institutionalSubscription) {
+      throw new ForbiddenException({
+        code: "INSTITUTIONAL_PORTAL_UNAVAILABLE",
+        message: "Use the supported institutional billing actions.",
+      });
+    }
     const org = await prisma.org.findUniqueOrThrow({
       where: { id: orgId },
       select: { stripeCustomerId: true },
@@ -137,7 +162,10 @@ export class BillingController {
         ...(returnUrl ? { return_url: returnUrl } : {}),
       });
     } catch (error) {
-      this.logger.error(`Failed to create Stripe billing portal session for org ${orgId}`, error);
+      this.logger.error(
+        `Failed to create Stripe billing portal session for org ${orgId}`,
+        error,
+      );
       throw error;
     }
     return { url: session.url };

@@ -74,6 +74,12 @@ export class BuyNowService {
   async checkout(
     request: BuyNowCheckoutRequest,
   ): Promise<BuyNowCheckoutResponse> {
+    if (request.org.sector) {
+      throw new ConflictException({
+        code: "INSTITUTIONAL_CHECKOUT_UNAVAILABLE",
+        message: "Institutional checkout is not available yet.",
+      });
+    }
     // Normalize plan code for Stripe compatibility
     // Frontend sends CORE_*, Stripe expects MINIMUM_*
     const normalizedPlanCode = this.normalizePlanCode(request.plan.planCode);
@@ -306,10 +312,13 @@ export class BuyNowService {
         "Selected modules are not eligible for the selected plan.",
       );
     }
-    if (uniqueModules.some((module) =>
-      policy.eligibleOptionalModules.some((code) =>
-        code === module && !isConfiguratorModuleReady(code),
-      ))) {
+    if (
+      uniqueModules.some((module) =>
+        policy.eligibleOptionalModules.some(
+          (code) => code === module && !isConfiguratorModuleReady(code),
+        ),
+      )
+    ) {
       throw new BadRequestException("Selected modules are not yet available.");
     }
 
@@ -387,12 +396,18 @@ export class BuyNowService {
 
     const orgForMaster = await prisma.org.findUnique({
       where: { id: orgId },
-      select: { isMasterOrg: true },
+      select: { isMasterOrg: true, sector: true },
     });
     if (orgForMaster?.isMasterOrg) {
       throw new BadRequestException(
         "Master organisations cannot purchase plans or add-ons.",
       );
+    }
+    if (orgForMaster?.sector) {
+      throw new ConflictException({
+        code: "INSTITUTIONAL_CHECKOUT_UNAVAILABLE",
+        message: "Use the institutional billing renewal flow.",
+      });
     }
 
     const normalizedPlanCode = this.normalizePlanCode(request.planCode);

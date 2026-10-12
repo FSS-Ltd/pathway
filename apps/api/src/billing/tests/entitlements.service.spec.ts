@@ -111,6 +111,41 @@ describe("EntitlementsService", () => {
     expect(result.source).toBe("snapshot");
   });
 
+  it("does not apply historic staff or child caps to enrolled-child subscriptions", async () => {
+    prismaMock.subscription.findFirst.mockResolvedValue({
+      id: "sub_institutional",
+      orgId,
+      provider: BillingProvider.STRIPE,
+      planCode: "INSTITUTIONAL_GROWTH_MONTHLY",
+      status: SubscriptionStatus.ACTIVE,
+      periodStart: new Date("2026-10-01T00:00:00Z"),
+      periodEnd: new Date("2026-11-01T00:00:00Z"),
+      cancelAtPeriodEnd: false,
+    });
+    prismaMock.orgEntitlementSnapshot.findFirst.mockResolvedValue({
+      maxSites: 1,
+      av30Included: 50,
+      storageGbIncluded: 120,
+      leaderSeatsIncluded: 10,
+      flagsJson: { maxChildrenIncluded: 75 },
+      source: "historic_plan",
+    });
+    prismaMock.usageCounters.findFirst.mockResolvedValue({
+      av30: 100,
+      storageGb: 8,
+      smsMonth: 0,
+      calculatedAt: new Date("2026-10-11T00:00:00Z"),
+    });
+
+    const result = await service.resolve(orgId);
+
+    expect(result.av30Cap).toBeNull();
+    expect(result.maxChildren).toBeNull();
+    expect(result.maxSites).toBe(2);
+    expect(result.storageGbCap).toBe(120);
+    expect(result.currentAv30).toBe(100);
+  });
+
   it("uses plan catalogue when snapshot is missing", async () => {
     const subscription = {
       id: "sub_cancel",
@@ -142,7 +177,10 @@ describe("EntitlementsService", () => {
     expect(result.subscription?.planCode).toBe("GROWTH_YEARLY");
     expect(result.source).toBe("plan_catalogue");
     expect(result.flags).toEqual(
-      expect.objectContaining({ planTier: "growth", planCode: "GROWTH_YEARLY" }),
+      expect.objectContaining({
+        planTier: "growth",
+        planCode: "GROWTH_YEARLY",
+      }),
     );
   });
 

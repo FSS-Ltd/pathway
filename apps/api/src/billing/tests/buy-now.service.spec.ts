@@ -134,6 +134,55 @@ describe("BuyNowService", () => {
     expect(result.warnings).not.toContain("unknown_plan_code");
   });
 
+  it("does not open legacy checkout for a new institutional organisation", async () => {
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await expect(
+      service.checkout({
+        ...baseRequest,
+        org: { ...baseRequest.org, sector: "SCHOOL" },
+        plan: { planCode: "STARTER_MONTHLY" },
+      }),
+    ).rejects.toMatchObject({
+      response: { code: "INSTITUTIONAL_CHECKOUT_UNAVAILABLE" },
+    });
+
+    expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
+    expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it("does not open legacy checkout for an existing institutional organisation", async () => {
+    prismaMock.org.findUnique.mockResolvedValue({
+      isMasterOrg: false,
+      sector: "CHURCH",
+    });
+    const service = new BuyNowService(
+      previewService,
+      providerMock,
+      auth0ManagementMock as Auth0ManagementService,
+      contextMock as PathwayRequestContext,
+      providerConfig,
+    );
+
+    await expect(
+      service.purchaseForOrg(
+        { planCode: "STARTER_MONTHLY" },
+        { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+      ),
+    ).rejects.toMatchObject({
+      response: { code: "INSTITUTIONAL_CHECKOUT_UNAVAILABLE" },
+    });
+
+    expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
+    expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
+  });
+
   it("rejects an unknown public plan before creating a pending order", async () => {
     const service = new BuyNowService(
       previewService,
@@ -477,13 +526,15 @@ describe("BuyNowService", () => {
       providerConfig,
     );
 
-    await expect(service.purchaseForOrg(
-      {
-        planCode: "STARTER_MONTHLY",
-        selectedModules: [Module.FINANCE],
-      },
-      { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
-    )).rejects.toThrow("Use the renewal change flow");
+    await expect(
+      service.purchaseForOrg(
+        {
+          planCode: "STARTER_MONTHLY",
+          selectedModules: [Module.FINANCE],
+        },
+        { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+      ),
+    ).rejects.toThrow("Use the renewal change flow");
 
     expect(prismaMock.subscription.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -665,10 +716,12 @@ describe("BuyNowService", () => {
       contextMock as PathwayRequestContext,
       providerConfig,
     );
-    await expect(service.purchaseForOrg(
-      { planCode: "GROWTH_99_MONTHLY" },
-      { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
-    )).rejects.toThrow("Use the renewal change flow");
+    await expect(
+      service.purchaseForOrg(
+        { planCode: "GROWTH_99_MONTHLY" },
+        { orgId: "org_1", tenantId: "tenant_1", userId: "user_1" },
+      ),
+    ).rejects.toThrow("Use the renewal change flow");
     expect(prismaMock.pendingOrder.create).not.toHaveBeenCalled();
     expect(providerMock.createCheckoutSession).not.toHaveBeenCalled();
   });

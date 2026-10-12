@@ -282,23 +282,13 @@ describe("configurator checkout and rollout source contracts", () => {
     expect(summary).not.toContain("status-error");
   });
 
-  it("locks the configurator while checkout is pending", () => {
+  it("does not expose legacy checkout on the institutional estimator", () => {
     const configurePage = readSource("app/configure/page.tsx");
-    const summary = readSource("app/configure/steps/summary.tsx");
-
-    expect(configurePage).toContain("useRef");
-    expect(configurePage).toContain("checkoutInFlightRef");
-    expect(configurePage).toContain("if (checkoutInFlightRef.current) return;");
-    expect(configurePage).toContain("checkoutInFlightRef.current = true;");
-    expect(configurePage).toContain("checkoutInFlightRef.current = false;");
     expect(configurePage).toContain(
-      'isBackDisabled={currentStep === "plan" || isCheckoutPending}',
+      "New-plan checkout is currently unavailable.",
     );
-    expect(configurePage).toContain(
-      "if (isCheckoutPending || checkoutInFlightRef.current) return;",
-    );
-    expect(summary.match(/disabled=\{isCheckoutPending\}/g)).toHaveLength(5);
-    expect(summary).toContain("disabled={disabled}");
+    expect(configurePage).not.toContain("createCheckoutSession");
+    expect(configurePage).not.toContain("buildCheckoutPayload");
   });
 
   it("builds checkout payloads with included and paid modules kept distinct", () => {

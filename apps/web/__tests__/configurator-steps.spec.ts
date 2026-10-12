@@ -49,8 +49,12 @@ describe("configurator step contracts", () => {
       expect(yearlyState).toMatchObject({
         planCode: yearly,
         frequency: "yearly",
-        selectedOptionalModules: monthly.startsWith("STARTER") ? ["ASSET_MANAGEMENT"] : [],
-        selectedIncludedModules: monthly.startsWith("STARTER") ? [] : ["ASSET_MANAGEMENT"],
+        selectedOptionalModules: monthly.startsWith("STARTER")
+          ? ["ASSET_MANAGEMENT"]
+          : [],
+        selectedIncludedModules: monthly.startsWith("STARTER")
+          ? []
+          : ["ASSET_MANAGEMENT"],
       });
       expect(selectFrequency(yearlyState, "monthly", PRICES).planCode).toBe(
         monthly,
@@ -83,36 +87,18 @@ describe("configurator step contracts", () => {
       );
     }
 
-    for (const component of [
-      "OrgTypeStep",
-      "VerticalStep",
-      "IncludedStep",
-      "ModulesStep",
-      "PlanStep",
-      "StorageStep",
-      "SummaryStep",
-    ]) {
-      expect(page).toContain(component);
-    }
-    expect(page).not.toContain("will be available here in the next stage");
+    expect(page).toContain("INSTITUTIONAL_PLANS");
+    expect(page).toContain("estimateInstitutionalPrice");
+    expect(page).not.toContain("createCheckoutSession");
   });
 
-  it("renders Plan first and sends only live module prices to policy actions", () => {
+  it("preserves the child count across plans and announces changing totals", () => {
     const page = readFileSync(join(configureDirectory, "page.tsx"), "utf8");
 
-    expect(page).toContain("useRouter");
-    expect(page).toContain('router.push("/demo?plan=enterprise")');
-    expect(page).toContain("prices: billingPrices.modulePrices");
-    expect(page).toContain(
-      "selectedOptionalModules={state.selectedOptionalModules}",
-    );
-    expect(page).toContain(
-      "selectedIncludedModules={state.selectedIncludedModules}",
-    );
-    expect(page).toContain("eligibleOptionalModules={eligibleOptionalModules}");
-    expect(page.indexOf('{currentStep === "plan"')).toBeLessThan(
-      page.indexOf('{currentStep === "org-type"'),
-    );
+    expect(page).toContain("setPlanCode(plan.code)");
+    expect(page).toContain("setCountInput(event.target.value)");
+    expect(page).toContain('aria-live="polite"');
+    expect(page).toContain("No optional modules are ready to offer yet.");
   });
 
   it("routes Enterprise directly to the demo path without a checkout plan", () => {

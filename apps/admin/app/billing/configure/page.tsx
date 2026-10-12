@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
+import { useAdminContext } from "@/lib/admin-context";
 import { getConfiguratorPlanPolicy, PLANS } from "@pathway/pricing";
 import {
   ADDON_PRICES,
@@ -134,6 +136,7 @@ function buildRedirectUrl(path: string): string | null {
 
 export default function ConfigurePlanPage() {
   const router = useRouter();
+  const { state: adminState } = useAdminContext();
   const { data: session, status: sessionStatus } = useSession();
   const { role, isLoading: isLoadingAccess } = useAdminAccess();
   const [state, dispatch] = useReducer(
@@ -381,6 +384,26 @@ export default function ConfigurePlanPage() {
         title="You don't have access to billing"
         message="Billing and subscription management is only available to organisation admins."
       />
+    );
+  }
+
+  if (adminState.status === "ready" && adminState.snapshot.org.sector) {
+    return (
+      <div className="space-y-3 rounded-xl border border-border-subtle bg-surface p-6">
+        <h1 className="font-heading text-2xl font-bold">
+          Enrolled-child billing
+        </h1>
+        <p className="text-sm text-text-muted">
+          Plan changes are reviewed against your confirmed continuing roll for
+          the next eligible renewal.
+        </p>
+        <Link
+          href="/billing/institutional"
+          className="text-sm font-semibold text-accent-strong underline"
+        >
+          View institutional billing
+        </Link>
+      </div>
     );
   }
 
