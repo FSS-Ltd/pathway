@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import process from "node:process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { URL, fileURLToPath } from "node:url";
 
 export function validatePrismaMigrationUrl(databaseUrl, supabaseUrl) {
   if (!databaseUrl?.trim()) {
@@ -28,8 +28,8 @@ export function validatePrismaMigrationUrl(databaseUrl, supabaseUrl) {
   if (!connection.password) {
     throw new Error("DIRECT_URL must include the database password.");
   }
-  if (connection.searchParams.get("schema") !== "app") {
-    throw new Error("DIRECT_URL must include schema=app for migrations.");
+  if (connection.searchParams.get("schema") !== "public") {
+    throw new Error("DIRECT_URL must include schema=public for migrations.");
   }
 
   const projectRef = parseSupabaseProjectRef(supabaseUrl);
