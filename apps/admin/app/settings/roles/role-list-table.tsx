@@ -21,6 +21,7 @@ export function RoleListTable({ roles }: RoleListTableProps) {
           )}
         </div>
       ),
+      sortValue: (row) => row.name,
     },
     {
       id: "scope",
@@ -31,6 +32,7 @@ export function RoleListTable({ roles }: RoleListTableProps) {
         </Badge>
       ),
       width: "140px",
+      priority: "secondary",
     },
     {
       id: "type",
@@ -41,6 +43,7 @@ export function RoleListTable({ roles }: RoleListTableProps) {
         </Badge>
       ),
       width: "110px",
+      priority: "secondary",
     },
     {
       id: "permissions",
@@ -51,6 +54,7 @@ export function RoleListTable({ roles }: RoleListTableProps) {
         </span>
       ),
       width: "110px",
+      priority: "secondary",
     },
   ];
 
@@ -58,6 +62,9 @@ export function RoleListTable({ roles }: RoleListTableProps) {
     <DataTable
       columns={columns}
       data={roles}
+      caption="Role definitions"
+      rowKey={(role) => role.id}
+      pagination={{ mode: "client" }}
       emptyMessage="No role definitions are available."
     />
   );

@@ -1,14 +1,13 @@
 "use client";
 
-import React from "react";
-import { Badge, Button, Card, DataTable, type ColumnDef } from "@pathway/ui";
+import { Badge, Card, DataTable, type ColumnDef } from "@pathway/ui";
 import {
   fetchAccessAuditEvents,
   type AdminAccessAuditEvent,
   type PersonRow,
 } from "@/lib/api-client";
 import { formatAuditTimestamp } from "@/lib/roles";
-import { requestFailure } from "@/lib/request-error";
+import { useCursorPage } from "./use-cursor-page";
 
 export type AuditLogPanelProps = {
   people: PersonRow[];
@@ -27,45 +26,10 @@ function actionLabel(action: string): string {
 }
 
 export function AuditLogPanel({ people }: AuditLogPanelProps) {
-  const [events, setEvents] = React.useState<AdminAccessAuditEvent[]>([]);
-  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-
-  const load = React.useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const result = await fetchAccessAuditEvents();
-      setEvents(result.items);
-      setNextCursor(result.nextCursor);
-    } catch (err) {
-      setError(requestFailure(err, "Unable to load the audit log.").message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  React.useEffect(() => {
-    void load();
-  }, [load]);
-
-  const handleLoadMore = async () => {
-    if (!nextCursor) return;
-    setIsLoadingMore(true);
-    try {
-      const result = await fetchAccessAuditEvents({ cursor: nextCursor });
-      setEvents((prev) => [...prev, ...result.items]);
-      setNextCursor(result.nextCursor);
-    } catch (err) {
-      setError(
-        requestFailure(err, "Unable to load more audit events.").message,
-      );
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
+  const auditPage = useCursorPage(
+    fetchAccessAuditEvents,
+    "Unable to load the audit log.",
+  );
 
   const columns: ColumnDef<AdminAccessAuditEvent>[] = [
     {
@@ -96,6 +60,7 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
         </Badge>
       ),
       width: "110px",
+      priority: "secondary",
     },
     {
       id: "action",
@@ -106,41 +71,30 @@ export function AuditLogPanel({ people }: AuditLogPanelProps) {
         </span>
       ),
       width: "160px",
+      priority: "secondary",
     },
   ];
 
   return (
     <Card title="Audit log" description="Recent role and assignment changes">
-      {error && (
-        <div className="mb-3 rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-sm text-status-danger">
-          {error}
-        </div>
-      )}
-      {isLoading ? (
-        <div className="py-8 text-center text-sm text-text-muted">
-          Loading...
-        </div>
-      ) : (
-        <>
-          <DataTable
-            columns={columns}
-            data={events}
-            emptyMessage="No audit events yet."
-          />
-          {nextCursor && (
-            <div className="mt-3 flex justify-center">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleLoadMore}
-                disabled={isLoadingMore}
-              >
-                {isLoadingMore ? "Loading…" : "Load more"}
-              </Button>
-            </div>
-          )}
-        </>
-      )}
+      <DataTable
+        columns={columns}
+        data={auditPage.items}
+        caption="Access audit log"
+        rowKey={(event) => event.id}
+        isLoading={auditPage.isLoading}
+        errorMessage={auditPage.error}
+        onRetry={auditPage.refresh}
+        emptyMessage="No audit events yet."
+        pagination={{
+          mode: "server",
+          pageIndex: auditPage.pageIndex,
+          pageSize: auditPage.pageSize,
+          hasNextPage: auditPage.hasNextPage,
+          onPageChange: auditPage.changePage,
+          onPageSizeChange: auditPage.changePageSize,
+        }}
+      />
     </Card>
   );
 }
