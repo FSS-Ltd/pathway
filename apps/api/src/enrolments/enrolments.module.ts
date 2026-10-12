@@ -8,5 +8,6 @@ import { EnrolmentRollService } from "./enrolment-roll.service";
   imports: [AuthModule],
   controllers: [EnrolmentsController],
   providers: [EnrolmentIdentitiesService, EnrolmentRollService],
+  exports: [EnrolmentRollService],
 })
 export class EnrolmentsModule {}

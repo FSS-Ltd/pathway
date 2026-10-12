@@ -44,7 +44,7 @@ describe("configureCiRlsRole", () => {
       statements.push(statement.trim());
     });
 
-    expect(statements).toHaveLength(66);
+    expect(statements).toHaveLength(69);
     expect(statements[0]).toContain('CREATE ROLE "pathway_e2e_rls"');
     expect(statements).toEqual(
       expect.arrayContaining([
@@ -66,6 +66,7 @@ describe("configureCiRlsRole", () => {
         'GRANT SELECT ON TABLE "OrgVertical" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgModule" TO "pathway_e2e_rls";',
         'GRANT SELECT ON TABLE "OrgChildIdentity", "OrgChildSiteLink", "EnrolmentRevision", "EnrolmentRollConfirmation" TO "pathway_e2e_rls";',
+        'GRANT SELECT ON TABLE "InstitutionalBillingPolicy", "InstitutionalBillingSnapshot", "InstitutionalQuoteAcceptance" TO "pathway_e2e_rls";',
         'GRANT "pathway_e2e_rls" TO "pathway_test_user";',
         expect.stringContaining('CREATE ROLE "pathway_e2e_outbox_denied"'),
         'GRANT SELECT ON TABLE "OutboxEvent" TO "pathway_e2e_outbox_denied";',
