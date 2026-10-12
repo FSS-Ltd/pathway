@@ -21,11 +21,13 @@ import { BehaviourPolicyService } from "./behaviour-policy.service";
 import { BehaviourQueryService } from "./behaviour-query.service";
 import { BehaviourReviewService } from "./behaviour-review.service";
 import { BehaviourRetractionService } from "./behaviour-retraction.service";
+import { BehaviourTrendsService } from "./behaviour-trends.service";
 import { DemeritStageService } from "./demerit-stage.service";
 import {
   behaviourCorrectionSchema,
   behaviourListQuerySchema,
   behaviourRetractionSchema,
+  behaviourTrendsQuerySchema,
   createBehaviourBatchSchema,
   createBehaviourEntrySchema,
 } from "./dto/behaviour-entry.dto";
@@ -54,6 +56,8 @@ export class BehaviourController {
     private readonly reviewService: BehaviourReviewService,
     @Inject(BehaviourRetractionService)
     private readonly retractionService: BehaviourRetractionService,
+    @Inject(BehaviourTrendsService)
+    private readonly trendsService: BehaviourTrendsService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
@@ -87,6 +91,22 @@ export class BehaviourController {
       return await this.queryService.list(
         this.actor(),
         await behaviourListQuerySchema.parseAsync(query),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(error.flatten());
+      }
+      throw error;
+    }
+  }
+
+  @Get("trends")
+  @RequirePermission("ace.behaviour.read")
+  async trends(@Query() query: unknown) {
+    try {
+      return await this.trendsService.get(
+        this.actor(),
+        await behaviourTrendsQuerySchema.parseAsync(query),
       );
     } catch (error) {
       if (error instanceof z.ZodError) {
