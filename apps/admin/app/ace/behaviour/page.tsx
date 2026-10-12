@@ -4,22 +4,25 @@ import React from "react";
 import { useAdminContext } from "@/lib/admin-context";
 import { NoAccessCard } from "@/components/no-access-card";
 import { BehaviourForm } from "@/components/ace/behaviour/behaviour-form";
-import { BehaviourHistory } from "@/components/ace/behaviour/behaviour-history";
+import { BehaviourBatchForm } from "@/components/ace/behaviour/behaviour-batch-form";
+import { BehaviourRecentWorkspace } from "@/components/ace/behaviour/behaviour-recent-workspace";
 import { BehaviourStageReview } from "@/components/ace/behaviour/behaviour-stage-review";
+import { BehaviourTrends } from "@/components/ace/behaviour/behaviour-trends";
+import {
+  BehaviourWorkspaceTabs,
+  type BehaviourWorkspaceTab,
+} from "@/components/ace/behaviour/behaviour-workspace-tabs";
 import { isValidIanaTimeZone } from "@/components/ace/behaviour/behaviour-time";
 import {
-  correctBehaviour,
   createDemeritOverride,
-  fetchBehaviourHistory,
   fetchBehaviourPolicy,
   fetchBehaviourReviewRequests,
   fetchBehaviourReviewFact,
   fetchChildren,
   fetchDemeritStatus,
   recordBehaviour,
-  retractBehaviour,
+  recordBehaviourBatch,
   type AdminBehaviourCategory,
-  type AdminBehaviourEntry,
 } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { requestFailure } from "@/lib/request-error";
@@ -38,14 +41,19 @@ export default function BehaviourPage() {
     permissions,
     "ace.behaviour.policy.manage",
   );
+  const permissionKey = permissions?.slice().sort().join("|") ?? "none";
   const [children, setChildren] = React.useState<
     Array<{ id: string; fullName: string }>
   >([]);
   const [categories, setCategories] = React.useState<AdminBehaviourCategory[]>(
     [],
   );
-  const [history, setHistory] = React.useState<AdminBehaviourEntry[]>([]);
-  const [canVoid, setCanVoid] = React.useState(false);
+  const [loadedSiteId, setLoadedSiteId] = React.useState<string | null>(null);
+  const [tab, setTab] = React.useState<BehaviourWorkspaceTab>("record");
+  const [entryMode, setEntryMode] = React.useState<"single" | "batch">(
+    "single",
+  );
+  const loadId = React.useRef(0);
   const activeSite =
     adminState.status === "ready"
       ? adminState.snapshot.sites.find(
@@ -54,47 +62,59 @@ export default function BehaviourPage() {
       : null;
   const activeSiteId = activeSite?.id ?? null;
   const siteTimeZone = activeSite?.timezone ?? null;
+  const siteReady = Boolean(activeSiteId && loadedSiteId === activeSiteId);
+  const siteChildren = siteReady ? children : [];
+  const siteCategories = siteReady ? categories : [];
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [stageRefreshKey, setStageRefreshKey] = React.useState(0);
+  const [refreshKey, setRefreshKey] = React.useState(0);
 
   const load = React.useCallback(async () => {
+    const request = ++loadId.current;
     setIsLoading(true);
     setError(null);
-    setHistory([]);
-    setCanVoid(false);
+    setChildren([]);
+    setCategories([]);
+    setLoadedSiteId(null);
     try {
-      const [nextChildren, policy, nextHistory] = await Promise.all([
-        fetchChildren(),
-        fetchBehaviourPolicy(),
-        fetchBehaviourHistory({ limit: 50 }),
-      ]);
       if (!siteTimeZone || !isValidIanaTimeZone(siteTimeZone)) {
         throw new Error("The active site timezone is unavailable.");
       }
+      const [nextChildren, policy] = await Promise.all([
+        fetchChildren(),
+        fetchBehaviourPolicy(),
+      ]);
+      if (request !== loadId.current) return;
       setChildren(
         nextChildren
           .filter((child) => child.status === "active")
           .map((child) => ({ id: child.id, fullName: child.fullName })),
       );
       setCategories(policy.categories);
-      setHistory(nextHistory.items);
-      setCanVoid(nextHistory.canVoid === true);
-      setStageRefreshKey((current) => current + 1);
+      setLoadedSiteId(activeSiteId);
+      setRefreshKey((current) => current + 1);
     } catch (cause) {
-      setError(
-        requestFailure(cause, "Unable to load behaviour capture.").message,
-      );
-      setHistory([]);
-      setCanVoid(false);
+      if (request === loadId.current)
+        setError(
+          requestFailure(cause, "Unable to load behaviour categories.").message,
+        );
     } finally {
-      setIsLoading(false);
+      if (request === loadId.current) setIsLoading(false);
     }
   }, [activeSiteId, siteTimeZone]);
 
   React.useEffect(() => {
-    if (isLoadingAccess || !canRead) return;
+    if (isLoadingAccess || !canRead) {
+      loadId.current += 1;
+      setChildren([]);
+      setCategories([]);
+      setLoadedSiteId(null);
+      return;
+    }
     void load();
+    return () => {
+      loadId.current += 1;
+    };
   }, [canRead, isLoadingAccess, load]);
 
   if (isLoadingAccess) return null;
@@ -108,62 +128,162 @@ export default function BehaviourPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4">
-      <div>
-        <h1 className="font-heading text-2xl font-semibold text-text-primary">
-          Behaviour capture
-        </h1>
-        <p className="text-sm text-text-muted">
-          Record site categories and correct current facts without replacing the
-          server-owned behaviour policy or escalation rules.
+    <div className="mx-auto max-w-[90rem] space-y-5 pb-8">
+      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-border-subtle pb-5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+            ACE · Behaviour
+          </p>
+          <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
+            Behaviour
+          </h1>
+          <p className="mt-1 text-sm text-text-muted">
+            Record a moment, review recent entries, and see the pattern in one
+            workspace.
+          </p>
+        </div>
+        {activeSite ? (
+          <span className="rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-text-muted">
+            {activeSite.name}
+          </span>
+        ) : null}
+      </header>
+
+      <BehaviourWorkspaceTabs value={tab} onChange={setTab} />
+
+      {error ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-status-danger/30 bg-status-danger/5 p-4 text-sm text-status-danger"
+        >
+          {error}
         </p>
+      ) : null}
+
+      <div
+        id="behaviour-record-panel"
+        role="tabpanel"
+        aria-labelledby="behaviour-record-tab"
+        hidden={tab !== "record"}
+      >
+        <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
+          <div className="min-w-0">
+            {canRecord && siteTimeZone && isValidIanaTimeZone(siteTimeZone) ? (
+              <section className="rounded-xl border border-border-subtle bg-surface p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="font-heading text-lg font-semibold text-text-primary">
+                      Record behaviour
+                    </h2>
+                    <p className="text-sm text-text-muted">
+                      Choose a single entry or record up to 50 facts in one
+                      batch.
+                    </p>
+                  </div>
+                  <div
+                    role="group"
+                    aria-label="Recording mode"
+                    className="inline-flex gap-1 rounded-lg bg-muted p-1"
+                  >
+                    {(["single", "batch"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={entryMode === mode}
+                        onClick={() => setEntryMode(mode)}
+                        className={`min-h-9 rounded-md px-3 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${entryMode === mode ? "bg-surface text-text-primary shadow-sm" : "text-text-muted"}`}
+                      >
+                        {mode === "single" ? "Single" : "Batch"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div hidden={entryMode !== "single"}>
+                  <BehaviourForm
+                    key={`single-${activeSiteId}`}
+                    children={siteChildren}
+                    categories={siteCategories}
+                    canSensitive={canSensitive}
+                    siteTimeZone={siteTimeZone}
+                    disabled={isLoading || !siteReady}
+                    onSave={recordBehaviour}
+                    onSuccess={load}
+                    compact
+                  />
+                </div>
+                <div hidden={entryMode !== "batch"} className="mt-4">
+                  <BehaviourBatchForm
+                    key={`batch-${activeSiteId}-${canSensitive}`}
+                    children={siteChildren}
+                    categories={siteCategories}
+                    canSensitive={canSensitive}
+                    siteTimeZone={siteTimeZone}
+                    disabled={isLoading || !siteReady}
+                    onSave={recordBehaviourBatch}
+                    onSuccess={load}
+                  />
+                </div>
+              </section>
+            ) : (
+              <p className="rounded-xl bg-muted p-4 text-sm text-text-muted">
+                Recording is unavailable for this site or access level.
+              </p>
+            )}
+          </div>
+          {siteTimeZone && isValidIanaTimeZone(siteTimeZone) ? (
+            <BehaviourRecentWorkspace
+              key={`recent-${activeSiteId}-${permissionKey}`}
+              children={siteChildren}
+              categories={siteCategories}
+              canCorrect={canCorrect}
+              canVoid={canManagePolicy}
+              canSensitive={canSensitive}
+              siteTimeZone={siteTimeZone}
+              refreshKey={refreshKey}
+              onChanged={load}
+            />
+          ) : null}
+        </div>
+        {siteTimeZone && isValidIanaTimeZone(siteTimeZone) ? (
+          <details className="mt-4 rounded-xl border border-border-subtle bg-surface">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+              Stage status, escalation and review requests
+            </summary>
+            <div className="border-t border-border-subtle p-3">
+              <BehaviourStageReview
+                key={`stage-${activeSiteId}`}
+                children={siteChildren}
+                siteTimeZone={siteTimeZone}
+                canSensitive={canSensitive}
+                canManagePolicy={canManagePolicy}
+                refreshKey={refreshKey}
+                loadStatus={fetchDemeritStatus}
+                loadRequests={fetchBehaviourReviewRequests}
+                loadFact={fetchBehaviourReviewFact}
+                saveOverride={createDemeritOverride}
+                onSaved={load}
+              />
+            </div>
+          </details>
+        ) : null}
       </div>
 
-      {canRecord && siteTimeZone ? (
-        <BehaviourForm
-          key={`behaviour-form-${activeSiteId}`}
-          children={children}
-          categories={categories}
-          canSensitive={canSensitive}
-          siteTimeZone={siteTimeZone}
-          disabled={isLoading}
-          onSave={recordBehaviour}
-          onSuccess={load}
-        />
-      ) : null}
-
-      {siteTimeZone && isValidIanaTimeZone(siteTimeZone) ? (
-        <BehaviourStageReview
-          key={`behaviour-stage-${activeSiteId}`}
-          children={children}
-          siteTimeZone={siteTimeZone}
-          canSensitive={canSensitive}
-          canManagePolicy={canManagePolicy}
-          refreshKey={stageRefreshKey}
-          loadStatus={fetchDemeritStatus}
-          loadRequests={fetchBehaviourReviewRequests}
-          loadFact={fetchBehaviourReviewFact}
-          saveOverride={createDemeritOverride}
-          onSaved={load}
-        />
-      ) : null}
-
-      <BehaviourHistory
-        key={`behaviour-history-${activeSiteId}`}
-        isLoading={isLoading}
-        error={error}
-        items={history}
-        children={children}
-        categories={categories}
-        canCorrect={canCorrect}
-        canVoid={canVoid && canManagePolicy}
-        canSensitive={canSensitive}
-        siteTimeZone={siteTimeZone ?? "UTC"}
-        onRetry={() => void load()}
-        onCorrect={correctBehaviour}
-        onRetract={retractBehaviour}
-        onSuccess={load}
-      />
+      <div
+        id="behaviour-trends-panel"
+        role="tabpanel"
+        aria-labelledby="behaviour-trends-tab"
+        hidden={tab !== "trends"}
+      >
+        {siteTimeZone && isValidIanaTimeZone(siteTimeZone) ? (
+          <BehaviourTrends
+            key={`trends-${activeSiteId}-${permissionKey}`}
+            active={tab === "trends"}
+            canSensitive={canSensitive}
+            siteTimeZone={siteTimeZone}
+            refreshKey={refreshKey}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

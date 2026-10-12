@@ -65,8 +65,22 @@ typecheck, lint, format, build, 1,366 API unit tests, and 17 guarded
 PostgreSQL behaviour integration tests passed. The database tests cover
 filter-bound cursor paging under backdated inserts, spring and autumn
 daylight-saving boundaries, current-fact aggregates, empty buckets, site
-scope, and sensitive-total denial. Latest-head CI and merge evidence remain
-pending.
+scope, and sensitive-total denial. All eight applicable CI checks passed on
+latest head `c441c070299a71caddfe115a6ebbbf5ac7f54470`; GitHub confirms
+its merge into `master` as `26c9a272bbb3d8d5f46643b20161fc976a2386bb`
+on 12 October 2026.
+
+Step ACE-B04, the one-page admin behaviour workspace, starts from that merged
+commit on `feature/ace-behaviour-web-workspace`. The Record and Trends tabs,
+single and batch recording, paginated recent entries, site-local date filters,
+and accessible chart/data summary passed local admin typecheck, changed-file
+lint and format checks, the full admin test script, and a production admin
+build with nonproduction public Clerk configuration and mock API mode. The new
+interaction tests cover keyboard tab focus, batch cap/retry, cursor paging,
+filter reset, a daylight-saving date window, and trends controls. Graphify's
+code graph was refreshed. Browser inspection was declined by the user after
+the local page redirected to the external sign-in domain. PR, checked
+revision, CI and merge evidence remain pending.
 
 Build update (10 October): step 1.3e5d merged in
 [PR #546](https://github.com/FSS-Ltd/pathway/pull/546) at
