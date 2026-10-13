@@ -634,8 +634,13 @@ completed database, API, admin and web jobs at the merge commit. Vercel reports
 all three production deployments READY, and a read-only production query found
 `20261013170000_ace_message_email_notifications` finished in the Prisma
 migration ledger. The API project has `CRON_SECRET`, `RESEND_API_KEY`, and
-`RESEND_FROM` configured. Cron execution and a consented delivery smoke still
-need production evidence. The new migration also applied on disposable
+`RESEND_FROM` configured. Vercel's production CDN request log shows the
+`/api/internal/message-email/run` cron returning HTTP 200 each minute from
+18:07 to 18:22 UTC on deployment `dpl_HbTRhiqVN8cXekhnqgUGJvcaYaHc`;
+request `zc2dz-1791915731473-d44cc1e27139` identified `vercel-cron/1.0`
+at 18:22 UTC. An unauthenticated request returned HTTP 401. This proves the
+minute schedule and authorization gate, while a consented provider delivery
+smoke remains outstanding. The new migration also applied on disposable
 PostgreSQL databases using both `schema=app` and `schema=public`; the HTTP
 security suite exercised self-scoped preferences, tenant RLS, one-send
 idempotency, and cron authorization. If rollout needs to stop, pause the
@@ -643,8 +648,12 @@ message-email cron; persisted messaging and REST reads continue.
 Mobile push and same-device foreground suppression remain deferred, so
 ACE-M06 remains incomplete and the plan count stays **48/150 (32%)**.
 
-Build step 1.3e6h is the ACE-M12 web conversation access-state correction on
-`feature/ace-m12-web-messaging-access-states`. A denied thread read, read-cursor
+Build step 1.3e6h, the ACE-M12 web conversation access-state correction, merged
+in [PR #621](https://github.com/FSS-Ltd/pathway/pull/621) from checked head
+`359f964380544e7ba122e04a651b5d5ece94abce` as
+`85793a64fb407b320e683c2780efb5831f535a1f` on 13 October 2026. All
+eight latest-head checks passed, including the admin unit job that ran the
+staff and guardian messaging interaction tests. A denied thread read, read-cursor
 save, older-page read, or send clears cached thread content and hides the
 composer until a fresh authorized read succeeds. A denied send also keeps the
 composer unavailable if the user still has read access. The staff split view
@@ -652,6 +661,18 @@ moves keyboard focus to the selected conversation heading and back to the list
 heading. Staff and guardian interaction tests cover denial and retry. This is
 web-only M12 evidence; signed-in keyboard and screen-reader browser checks
 remain required before counting ACE-M12 complete. Mobile stays paused.
+
+Build step 1.3e6i is the production ACE message read-cursor correction in
+[PR #622](https://github.com/FSS-Ltd/pathway/pull/622), opened from
+`16ae9ea5bfc4cbd39dd59e2dd926580e76644348`. A signed-in demo-school
+staff-room read produced HTTP 500; production API logs showed PostgreSQL
+`42883` because an unqualified `MessageDeliveryStatus` cast resolved to the
+`public` enum while the delivery column uses `app`. A database regression
+reproduced that error before the fix and passed after the query let PostgreSQL
+infer the enum from the column. Both affected PostgreSQL suites passed 63/63
+tests locally. The PR still needs latest-head CI, merge, production deployment,
+and a live read-cursor retry before this correction can be called released.
+ACE-M12 remains open and the count stays **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
