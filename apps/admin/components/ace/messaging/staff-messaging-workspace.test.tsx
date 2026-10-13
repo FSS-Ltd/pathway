@@ -80,6 +80,7 @@ async function run(): Promise<void> {
   let postCount = 0;
   let roomOpenCount = 0;
   let readCursorSaved = false;
+  let threadReads = 0;
   let denyThread = false;
   let denySend = false;
   const sentRequestIds: string[] = [];
@@ -176,6 +177,7 @@ async function run(): Promise<void> {
           });
     }
     if (url.pathname.endsWith("/messages")) {
+      threadReads += 1;
       if (denyThread) return jsonResponse({ message: "access changed" }, 403);
       if (
         url.pathname.includes(newConversationId) ||
@@ -499,6 +501,13 @@ async function run(): Promise<void> {
     denyThread = true;
     await act(async () => window.dispatchEvent(new dom.window.Event("focus")));
     assert.match(container.textContent ?? "", /Conversation unavailable/);
+    assert.doesNotMatch(
+      container.textContent ?? "",
+      /Live updates|Connecting updates|Refreshing automatically/,
+    );
+    const readsAfterDenial = threadReads;
+    await act(async () => window.dispatchEvent(new dom.window.Event("focus")));
+    assert.equal(threadReads, readsAfterDenial);
     assert.doesNotMatch(container.textContent ?? "", /Good morning/);
     assert.doesNotMatch(
       container.querySelector("ol")?.textContent ?? "",

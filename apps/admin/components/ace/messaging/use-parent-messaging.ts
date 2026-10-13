@@ -49,7 +49,7 @@ export function useParentMessaging(siteId: string, userId: string) {
   const identityRef = React.useRef<string | null>(null);
   const realtimeStatus = useMessageRealtime({
     kind: "parent",
-    conversationId: conversation?.id ?? null,
+    conversationId: threadAccessLost ? null : (conversation?.id ?? null),
     siteId,
     onInvalidate: () => {
       setListRevision((revision) => revision + 1);

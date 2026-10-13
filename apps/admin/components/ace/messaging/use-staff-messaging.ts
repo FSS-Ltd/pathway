@@ -70,7 +70,7 @@ export function useStaffMessaging(
   selectedIdRef.current = selectedId;
   const realtimeStatus = useMessageRealtime({
     kind: channel,
-    conversationId: selectedId,
+    conversationId: threadAccessLost ? null : selectedId,
     siteRevision,
     onInvalidate: () => {
       setListRevision((revision) => revision + 1);

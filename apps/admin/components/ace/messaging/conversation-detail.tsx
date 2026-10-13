@@ -82,20 +82,22 @@ export function ConversationDetail({
                   ? "Your school team"
                   : "Direct staff conversation")}
           </p>
-          <p
-            className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"
-            role="status"
-          >
-            <span
-              aria-hidden="true"
-              className={`h-1.5 w-1.5 rounded-full ${messaging.realtimeStatus === "live" ? "bg-status-success" : "bg-status-warning"}`}
-            />
-            {messaging.realtimeStatus === "live"
-              ? "Live updates"
-              : messaging.realtimeStatus === "connecting"
-                ? "Connecting updates…"
-                : "Refreshing automatically"}
-          </p>
+          {!messaging.threadAccessLost ? (
+            <p
+              className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"
+              role="status"
+            >
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 rounded-full ${messaging.realtimeStatus === "live" ? "bg-status-success" : "bg-status-warning"}`}
+              />
+              {messaging.realtimeStatus === "live"
+                ? "Live updates"
+                : messaging.realtimeStatus === "connecting"
+                  ? "Connecting updates…"
+                  : "Refreshing automatically"}
+            </p>
+          ) : null}
         </div>
       </header>
 
