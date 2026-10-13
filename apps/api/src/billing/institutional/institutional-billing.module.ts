@@ -12,6 +12,8 @@ import {
   loadBillingProviderConfig,
 } from "../billing-provider.config";
 import { InstitutionalQuoteService } from "./institutional-quote.service";
+import { BillingPricingService } from "../pricing.service";
+import { InstitutionalPriceResolver } from "./institutional-price-resolver";
 
 @Module({
   imports: [AuthModule, EnrolmentsModule],
@@ -25,6 +27,8 @@ import { InstitutionalQuoteService } from "./institutional-quote.service";
     InstitutionalCensusService,
     InstitutionalCheckoutService,
     InstitutionalOperationService,
+    BillingPricingService,
+    InstitutionalPriceResolver,
     { provide: BILLING_PROVIDER_CONFIG, useFactory: loadBillingProviderConfig },
   ],
   exports: [InstitutionalQuoteService, InstitutionalCensusService],

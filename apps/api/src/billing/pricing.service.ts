@@ -19,6 +19,9 @@ export type BillingPrice = {
   unitAmount: number;
   interval: "month" | "year" | null;
   intervalCount: number | null;
+  active: boolean;
+  livemode: boolean;
+  usageType: "licensed" | "metered" | null;
   productName?: string | null;
   description?: string | null;
 };
@@ -60,9 +63,7 @@ export class BillingPricingService {
       this.config.activeProvider === "STRIPE_TEST";
 
     if (!this.stripe || !this.config.stripe.priceMap) {
-      const reason = !this.stripe
-        ? "no_stripe_client"
-        : "no_price_map";
+      const reason = !this.stripe ? "no_stripe_client" : "no_price_map";
       const diag = this.config.stripe.priceMapDiagnostics;
       this.logger.warn(
         `pricing_unavailable: ${reason} (stripe=${Boolean(this.stripe)}, priceMap=${Boolean(this.config.stripe.priceMap)}` +
@@ -94,7 +95,8 @@ export class BillingPricingService {
           expand: ["product"],
         });
         const interval =
-          price.recurring?.interval === "month" || price.recurring?.interval === "year"
+          price.recurring?.interval === "month" ||
+          price.recurring?.interval === "year"
             ? price.recurring.interval
             : null;
         const product =
@@ -104,13 +106,25 @@ export class BillingPricingService {
             ? (price.product as Stripe.Product)
             : null;
 
+        if (
+          price.unit_amount === null ||
+          !Number.isSafeInteger(price.unit_amount) ||
+          price.unit_amount < 0
+        ) {
+          warnings.push(`price_amount_unavailable:${code}`);
+          continue;
+        }
+
         prices.push({
           code,
           priceId,
           currency: price.currency,
-          unitAmount: price.unit_amount ?? 0,
+          unitAmount: price.unit_amount,
           interval,
           intervalCount: price.recurring?.interval_count ?? null,
+          active: price.active,
+          livemode: price.livemode,
+          usageType: price.recurring?.usage_type ?? null,
           productName: product?.name ?? null,
           description: product?.description ?? null,
         });
@@ -141,4 +155,3 @@ export class BillingPricingService {
     this.cache = { fetchedAt: Date.now(), data };
   }
 }
-

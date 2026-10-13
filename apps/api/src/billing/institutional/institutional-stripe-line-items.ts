@@ -1,8 +1,10 @@
 import {
   calculateInstitutionalQuote,
   INSTITUTIONAL_CHILD_PRICE_CODES,
+  INSTITUTIONAL_MAPPED_PRICING_VERSION,
   INSTITUTIONAL_PRICING_VERSION,
 } from "@pathway/pricing";
+import { quoteFromFrozenInstitutionalPrices } from "./institutional-frozen-pricing";
 import { isInstitutionalPlanCode } from "./institutional-selection";
 import { institutionalStripePriceId } from "./institutional-stripe-prices";
 
@@ -13,6 +15,7 @@ export type PricedInstitutionalSnapshot = Readonly<{
   subtotalPence: number | null;
   includedModules: readonly string[];
   paidModules: readonly string[];
+  lines?: unknown;
 }>;
 
 export type InstitutionalStripeItem = Readonly<{
@@ -20,11 +23,30 @@ export type InstitutionalStripeItem = Readonly<{
   quantity: number;
 }>;
 
-/** Recalculate instead of trusting a mutable price map or arbitrary snapshot JSON. */
+/** Validate frozen V2 amounts; retain V1 recalculation only for historical snapshots. */
 export function stripeItemsForSnapshot(
   snapshot: PricedInstitutionalSnapshot,
   priceMap: Readonly<Record<string, string | undefined>>,
 ): InstitutionalStripeItem[] {
+  if (snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
+    if (snapshot.enrolledChildren === null) {
+      throw new Error("INVALID_INSTITUTIONAL_SNAPSHOT");
+    }
+    let quote;
+    try {
+      quote = quoteFromFrozenInstitutionalPrices(
+        snapshot,
+        snapshot.enrolledChildren,
+      );
+    } catch {
+      throw new Error("INVALID_INSTITUTIONAL_SNAPSHOT");
+    }
+    if (quote.kind !== "priced")
+      throw new Error("INVALID_INSTITUTIONAL_SNAPSHOT");
+    return quote.lines
+      .filter((line) => line.quantity > 0)
+      .map((line) => ({ price: line.priceId, quantity: line.quantity }));
+  }
   if (
     snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION ||
     !isInstitutionalPlanCode(snapshot.planCode) ||

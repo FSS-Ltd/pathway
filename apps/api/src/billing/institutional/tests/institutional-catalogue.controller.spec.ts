@@ -1,8 +1,33 @@
-import { BadRequestException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
 import { InstitutionalCatalogueController } from "../institutional-catalogue.controller";
 
 describe("public institutional estimate", () => {
-  const controller = new InstitutionalCatalogueController();
+  const mappedPrices = {
+    resolve: async () => ({
+      STARTER_49_MONTHLY: { priceId: "price_base", unitAmountPence: 5700 },
+      STARTER_49_YEARLY: { priceId: "price_yearbase", unitAmountPence: 51000 },
+      INSTITUTIONAL_CHILD_UP_TO_100_MONTHLY: {
+        priceId: "price_child",
+        unitAmountPence: 175,
+      },
+      INSTITUTIONAL_CHILD_UP_TO_100_YEARLY: {
+        priceId: "price_yearchild",
+        unitAmountPence: 1234,
+      },
+      INSTITUTIONAL_CHILD_101_TO_250_MONTHLY: {
+        priceId: "price_upperchild",
+        unitAmountPence: 99,
+      },
+      INSTITUTIONAL_CHILD_101_TO_250_YEARLY: {
+        priceId: "price_yearupperchild",
+        unitAmountPence: 812,
+      },
+    }),
+  };
+  const controller = new InstitutionalCatalogueController(mappedPrices);
 
   it("lists the three monthly plans without enabling checkout", () => {
     const catalogue = controller.catalogue();
@@ -42,4 +67,36 @@ describe("public institutional estimate", () => {
       ).toThrow(BadRequestException);
     },
   );
+
+  it("returns mapped annual prices and marks unmapped plans unavailable", async () => {
+    const catalogue = await controller.mappedCatalogue();
+    expect(catalogue.plans).toHaveLength(6);
+    expect(
+      catalogue.plans.find(
+        (plan) => plan.planCode === "INSTITUTIONAL_STARTER_YEARLY",
+      ),
+    ).toMatchObject({ available: true, basePrice: { unitAmountPence: 51000 } });
+    expect(
+      catalogue.plans.find(
+        (plan) => plan.planCode === "INSTITUTIONAL_GROWTH_YEARLY",
+      ),
+    ).toMatchObject({ available: false, basePrice: null });
+    await expect(
+      controller.mappedEstimate({
+        planCode: "INSTITUTIONAL_STARTER_YEARLY",
+        enrolledChildren: 26,
+        storageChoice: "none",
+      }),
+    ).resolves.toMatchObject({ kind: "priced", subtotalPence: 52234 });
+  });
+
+  it("reports missing mapped components as retryable unavailable prices", async () => {
+    await expect(
+      controller.mappedEstimate({
+        planCode: "INSTITUTIONAL_GROWTH_YEARLY",
+        enrolledChildren: 75,
+        storageChoice: "none",
+      }),
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
 });
