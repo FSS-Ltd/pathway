@@ -11,6 +11,7 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
@@ -31,8 +32,10 @@ import { ParentMessagingCommandService } from "./parent-messaging-command.servic
 import { ParentMessagingConversationService } from "./parent-messaging-conversation.service";
 import { ParentMessagingReadCursorService } from "./parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "./parent-messaging.service";
+import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.interceptor";
 
 @UseGuards(AuthUserGuard)
+@UseInterceptors(MessagingBoundaryAuditInterceptor)
 @IndependentTransaction()
 @Controller("ace/parent/sites/:siteId/messages/conversations")
 export class ParentMessagingController {

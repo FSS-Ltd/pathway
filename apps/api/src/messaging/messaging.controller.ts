@@ -11,6 +11,7 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
@@ -35,8 +36,10 @@ import { StaffSchoolTeamHistoryService } from "./staff-school-team-history.servi
 import { StaffSchoolTeamReadCursorService } from "./staff-school-team-read-cursor.service";
 import { StaffSchoolTeamCommandService } from "./staff-school-team-command.service";
 import { StaffSchoolTeamService } from "./staff-school-team.service";
+import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.interceptor";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
+@UseInterceptors(MessagingBoundaryAuditInterceptor)
 @Controller("ace/messages/conversations")
 export class MessagingController {
   constructor(
