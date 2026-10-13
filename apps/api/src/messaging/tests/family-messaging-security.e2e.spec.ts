@@ -12,6 +12,10 @@ import {
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import {
+  registerGuardianMessageEmailCase,
+  registerStaffMessageEmailCases,
+} from "./message-email-security.cases";
+import {
   requireDatabase,
   seedE2eAuthUser,
   seedE2eTypedRole,
@@ -129,6 +133,18 @@ async function realtimePolicyAllows(
 describe("ACE family messaging web security gate", () => {
   let app: INestApplication | undefined;
   const authorization: Record<string, string> = {};
+  const emailContext = () => ({
+    app,
+    authorization,
+    orgId,
+    otherOrgId,
+    siteId,
+    otherSiteId,
+    teacherId,
+    staffConversationId,
+    parentConversationId,
+    staffPath,
+  });
   let staffConversationId = "";
   let parentConversationId = "";
   let guardianIdentityId = "";
@@ -682,6 +698,8 @@ describe("ACE family messaging web security gate", () => {
     ).toBe(beforeCursors);
   });
 
+  registerGuardianMessageEmailCase(emailContext);
+
   it("removes family messaging when the parent portal or relationship ends", async () => {
     if (!app) return;
     const server = app.getHttpServer();
@@ -813,4 +831,6 @@ describe("ACE family messaging web security gate", () => {
       });
     }
   });
+
+  registerStaffMessageEmailCases(emailContext);
 });

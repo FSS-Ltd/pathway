@@ -71,6 +71,7 @@ export class DispatchOutboxJob {
       const claimed = await this.client.runForOrg(orgId, async (events) => {
         const candidates = await events.findMany({
           where: {
+            eventType: { not: "ace.message.sent" },
             OR: [
               { status: "PENDING", nextAttemptAt: { lte: now } },
               { status: "PROCESSING", claimedAt: { lte: leaseCutoff } },

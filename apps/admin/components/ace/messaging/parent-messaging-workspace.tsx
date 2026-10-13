@@ -8,6 +8,7 @@ import { useSession } from "@/lib/use-session-compat";
 import { ConversationDetail } from "./conversation-detail";
 import { RecipientPicker } from "./recipient-picker";
 import { useParentMessaging } from "./use-parent-messaging";
+import { MessageEmailSettings } from "./message-email-settings";
 
 const responderCopy = {
   title: "Choose a school team member",
@@ -52,6 +53,11 @@ export function ParentMessagesView({
           conversation stays with this school site.
         </p>
       </header>
+
+      <MessageEmailSettings
+        path={`/ace/parent/sites/${encodeURIComponent(siteId)}/messages/notifications`}
+        conversationId={messaging.conversation?.id ?? null}
+      />
 
       {messaging.listLoading ? (
         <Card>

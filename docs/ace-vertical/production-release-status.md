@@ -1,14 +1,15 @@
 # ACE production release status
 
-Checked on 9 October 2026. Production API, admin, and web aliases point to
+Baseline checked on 9 October 2026; ACE-M05 was rechecked on 13 October 2026.
+At the baseline, production API, admin, and web aliases pointed to
 READY deployments at merged commit `5c26afca3caca259cc592b20f3b4ebe51ee873fa`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through C07f are now served by all three apps.
 The [ACE master implementation plan](../superpowers/plans/2026-07-25-ace-vertical-master-plan.md)
 defines 150 delivery tasks. Merged task PRs are evidenced for its 22 foundation,
-20 daily-operations, ACE-M15 identity, and ACE-M01/M02/M03/M04 messaging tasks:
-**47/150, or 31⅓% (31.33%) verified plan-task completion**. The later
+20 daily-operations, ACE-M15 identity, and ACE-M01/M02/M03/M04/M05 messaging tasks:
+**48/150, or 32% verified plan-task completion**. The later
 messaging, learning, add-on, and
 launch tracks have not been fully reconciled task by task; this is a documented
 minimum, not an estimate of all
@@ -20,7 +21,7 @@ and core-journey tasks with 9 pilot/launch tasks: **97/150 (about 65%)** if all
 53 optional add-on tasks are deferred. This is a task-count milestone, not an
 automatic readiness threshold; the nine launch tasks require UAT, security,
 accessibility, performance, restore, support, and staged go/no-go evidence.
-With 47 tasks currently evidenced, 50 core/launch tasks remain to be verified
+With 48 tasks currently evidenced, 49 core/launch tasks remain to be verified
 or completed; some later work is already partially merged. The delivery waves
 are: reconcile ACE-M and ACE-C task evidence against merged PRs, finish the
 remaining ACE-M messaging/notices/identity tasks through the M20 gate, finish
@@ -597,16 +598,39 @@ authorized demo-school conversation member as well as two unauthorized joins.
 The database authorization function approved that member, but Supabase
 Realtime's read-access probe uses a row with `private = false` even for a
 private channel. The #616 SELECT policies require `private = true`, so they
-deny every join. Corrective step 1.3e6f2 is open in
-[PR #619](https://github.com/FSS-Ltd/pathway/pull/619) from implementation
-commit `9ced59ae`. The migration changes only those SELECT policies; the
-topic, capability, membership, and no-publish checks remain. A disposable
-local PostgreSQL fixture reproduced zero visible probe rows before the
-migration and one authorized, zero unauthorized rows after it. Production
-policy rollout and allowed/denied live joins remain open. Web REST polling
-preserves message correctness. The verified master-plan count remains
-**47/150 (31⅓%, 31.33%)**
-until the corrective PR is green, merged, deployed, and live access is verified.
+deny every join. Corrective step 1.3e6f2 merged in
+[PR #619](https://github.com/FSS-Ltd/pathway/pull/619) from checked head
+`44976c5890a529111f75d4c0cd2316f2dca8960c` as
+`5f2f47aef091bb9a3714404613e11262dae2fbcf` on 13 October 2026 at
+16:23 UTC. All eight latest-head checks passed; Integration ran both affected
+PostgreSQL messaging suites (90 suites, 560 tests). Deployment workflow
+[38430049157](https://github.com/FSS-Ltd/pathway/actions/runs/38430049157)
+completed database, API, admin and web deployment. Production Prisma recorded
+`20261013160000_ace_realtime_read_probe` finished at 16:23:53 UTC. The two
+SELECT policies now allow the Realtime private-channel read probe while
+retaining topic, capability, membership and no-publish checks. A live
+demo-school participant subscribed successfully; a nonmember and a request
+for another conversation both returned `CHANNEL_ERROR Unauthorized`. The
+smoke test read and sent no messages. The ACE-M05 acceptance gate is met:
+**48/150 (32%)** verified plan tasks. ACE-M06 web email delivery is the
+current step; mobile push remains deferred by product direction and does not
+count as an accepted M06 task.
+
+Build step 1.3e6g, the ACE-M06 web email slice, is being implemented on
+`feature/ace-m06-web-notification-fanout`. It adds self-service staff and
+guardian email preferences, site-timezone quiet hours, per-conversation email
+mute, a minute cron consuming the existing content-free message outbox event,
+and a durable one-attempt recipient ledger. Email is off until each user
+enables it. Provider mail uses generic copy only; no message text enters the
+email, notification ledger, or provider request. The production API Vercel
+project has `CRON_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM` configured, but
+this step is not deployed or accepted yet. The new migration applied on
+disposable PostgreSQL databases using both `schema=app` and `schema=public`;
+the PostgreSQL HTTP security suite exercised self-scoped preferences, tenant
+RLS, one-send idempotency, and cron authorization. If rollout needs to stop,
+pause the message-email cron; persisted messaging and REST reads continue.
+Mobile push and same-device foreground suppression remain deferred, so
+ACE-M06 remains incomplete and the plan count stays **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
