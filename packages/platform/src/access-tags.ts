@@ -64,6 +64,12 @@ export const ACCESS_TAG_DEFINITIONS = {
       "Correct behaviour records within existing site and child scope.",
     permissionKeys: ["ace.behaviour.correct"],
   },
+  "behaviour-category-creator": {
+    label: "Behaviour category creator",
+    description:
+      "View behaviour and create Merit, Demerit, or General categories at an ACE site.",
+    permissionKeys: ["ace.behaviour.read", "ace.behaviour.categories.create"],
+  },
   "student-drillthrough-viewer": {
     label: "Student drillthrough viewer",
     description:

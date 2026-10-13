@@ -55,6 +55,7 @@ export const SYSTEM_ROLE_TEMPLATES = {
       "ace.behaviour.read",
       "ace.behaviour.record",
       "ace.behaviour.correct",
+      "ace.behaviour.categories.create",
       "ace.behaviour.policy.manage",
       "ace.reports.read",
       "ace.reports.review",

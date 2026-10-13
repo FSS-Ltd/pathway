@@ -263,6 +263,7 @@ enum AccessTagKey {
   SENSITIVE_NOTE_VIEWER       @map("sensitive-note-viewer")
   BEHAVIOUR_VIEWER            @map("behaviour-viewer")
   BEHAVIOUR_CORRECTOR         @map("behaviour-corrector")
+  BEHAVIOUR_CATEGORY_CREATOR  @map("behaviour-category-creator")
   STUDENT_DRILLTHROUGH_VIEWER @map("student-drillthrough-viewer")
   PACE_FULL_ACCESS            @map("pace-full-access")
   SUPERVISOR_ALL_STUDENTS     @map("supervisor-all-students")

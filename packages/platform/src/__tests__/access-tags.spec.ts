@@ -13,6 +13,7 @@ const availableTags = [
   "attendance-recorder",
   "behaviour-viewer",
   "behaviour-corrector",
+  "behaviour-category-creator",
   "pace-full-access",
   "parent-message-responder",
 ] as const satisfies readonly AccessTagKey[];
@@ -66,6 +67,13 @@ describe("access-tag catalogue", () => {
   it("grants correction without granting recording or voiding", () => {
     expect(accessTagPermissionKeys("behaviour-corrector")).toEqual([
       "ace.behaviour.correct",
+    ]);
+  });
+
+  it("grants category creation and workspace read without policy management", () => {
+    expect(accessTagPermissionKeys("behaviour-category-creator")).toEqual([
+      "ace.behaviour.read",
+      "ace.behaviour.categories.create",
     ]);
   });
 
