@@ -696,7 +696,9 @@ counted complete. The ACE-M06 consented provider delivery check was deferred
 for the product owner to run manually; the test account's email alerts were
 left disabled.
 
-Build step 1.3e6k fixes the same observed keyboard focus gap in the shared
+Build step 1.3e6k in
+[PR #625](https://github.com/FSS-Ltd/pathway/pull/625) fixes the same observed
+keyboard focus gap in the shared
 notice inbox for staff and guardians. A signed-in 320px browser reproduction
 showed focus on the page body after opening a notice and after returning to the
 list. The step must pass current-revision CI, merge, and a production keyboard
