@@ -200,6 +200,7 @@ enum ChildGuardianContactType {
 // Selected once at initial plan purchase; drives which features are visible to the org.
 // Keep in sync with SectorId in apps/web/content/sectors.ts and Sector in packages/types.
 enum OrgSector {
+  LEARNING_CENTRE
   CHURCH
   CLUB
   SCHOOL
@@ -210,6 +211,8 @@ enum OrgSector {
 // Superset of OrgSector — SCHOOL splits into three verticals. Not yet consumed by any
 // application code; PR 1.2 adds the OrgVertical/OrgModule models that reference these.
 enum Vertical {
+  ACE_LEARNING_CENTRE
+  PUBLIC_LEARNING_CENTRE
   CHURCH
   INDEPENDENT_SCHOOL
   ACE_SCHOOL

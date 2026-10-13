@@ -1,3 +1,4 @@
+import { INSTITUTIONAL_VERTICALS } from "@pathway/types";
 import { createHash } from "node:crypto";
 import {
   INSTITUTIONAL_MAPPED_PRICING_VERSION,
@@ -39,15 +40,7 @@ const publicOrderSchema = z.object({
   }),
   includedModules: z.array(z.nativeEnum(Module)),
   paidModules: z.array(z.nativeEnum(Module)),
-  setting: z.enum([
-    "CHURCH",
-    "INDEPENDENT_SCHOOL",
-    "ACE_SCHOOL",
-    "STATE_SCHOOL",
-    "NURSERY",
-    "CHARITY",
-    "CLUB",
-  ]),
+  setting: z.enum(INSTITUTIONAL_VERTICALS),
   requestFingerprint: z.string().length(64),
 });
 

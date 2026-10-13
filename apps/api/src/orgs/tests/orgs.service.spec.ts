@@ -111,7 +111,8 @@ describe("OrgsService", () => {
       key: input.key,
     })),
     getPublicUrl: jest.fn(
-      (key: string) => `https://supabase.test/storage/v1/object/public/public-bucket/${key}`,
+      (key: string) =>
+        `https://supabase.test/storage/v1/object/public/public-bucket/${key}`,
     ),
   };
 
@@ -243,9 +244,7 @@ describe("OrgsService", () => {
         vertical: "CLUB",
       });
 
-      await expect(
-        service.changeVertical("org_1", "CLUB"),
-      ).resolves.toEqual({
+      await expect(service.changeVertical("org_1", "CLUB")).resolves.toEqual({
         orgId: "org_1",
         vertical: "CLUB",
       });
@@ -254,6 +253,58 @@ describe("OrgsService", () => {
         create: { orgId: "org_1", vertical: "CLUB" },
         update: { vertical: "CLUB" },
       });
+    });
+
+    it.each(["ACE_LEARNING_CENTRE", "PUBLIC_LEARNING_CENTRE"] as const)(
+      "preserves %s identity for a Learning Centre",
+      async (vertical) => {
+        jest.mocked(prismaMock.org.findUnique).mockResolvedValue({
+          id: "org_1",
+          name: "Centre",
+          slug: "centre",
+          sector: "LEARNING_CENTRE",
+        });
+        await service.changeVertical("org_1", vertical);
+        expect(prismaMock.orgVertical.upsert).toHaveBeenCalledWith({
+          where: { orgId: "org_1" },
+          create: { orgId: "org_1", vertical },
+          update: { vertical },
+        });
+      },
+    );
+
+    it.each([
+      ["LEARNING_CENTRE", "ACE_SCHOOL"],
+      ["LEARNING_CENTRE", "STATE_SCHOOL"],
+      ["SCHOOL", "ACE_LEARNING_CENTRE"],
+      ["SCHOOL", "PUBLIC_LEARNING_CENTRE"],
+      ["LEARNING_CENTRE", "HOME_EDUCATION"],
+    ] as const)(
+      "rejects sector %s with type %s without writing",
+      async (sector, vertical) => {
+        jest.mocked(prismaMock.org.findUnique).mockResolvedValue({
+          id: "org_1",
+          name: "Centre",
+          slug: "centre",
+          sector,
+        });
+        await expect(service.changeVertical("org_1", vertical)).rejects.toThrow(
+          "Provider type does not match the organisation sector",
+        );
+        expect(prismaMock.orgVertical.upsert).not.toHaveBeenCalled();
+      },
+    );
+
+    it("retains the master organisation's ability to preview another sector", async () => {
+      jest.mocked(prismaMock.org.findUnique).mockResolvedValue({
+        id: "org_1",
+        name: "Master",
+        slug: "master",
+        sector: "SCHOOL",
+        isMasterOrg: true,
+      });
+      await service.changeVertical("org_1", "PUBLIC_LEARNING_CENTRE");
+      expect(prismaMock.orgVertical.upsert).toHaveBeenCalled();
     });
 
     it("rejects a missing organisation before writing", async () => {
@@ -303,9 +354,9 @@ describe("OrgsService", () => {
         isMasterOrg: false,
       });
 
-      await expect(
-        service.changeSector("org_1", "CHURCH"),
-      ).rejects.toThrow("Sector can only be changed for the master organisation");
+      await expect(service.changeSector("org_1", "CHURCH")).rejects.toThrow(
+        "Sector can only be changed for the master organisation",
+      );
       expect(prismaMock.org.update).not.toHaveBeenCalled();
     });
   });
@@ -313,7 +364,12 @@ describe("OrgsService", () => {
   describe("list / getBySlug logoUrl", () => {
     it("maps a null logoStorageKey to a null logoUrl", async () => {
       (prismaMock.org.findMany as jest.Mock).mockResolvedValue([
-        { id: "org_1", name: "Acme Church", slug: "acme-church", logoStorageKey: null },
+        {
+          id: "org_1",
+          name: "Acme Church",
+          slug: "acme-church",
+          logoStorageKey: null,
+        },
       ]);
 
       const [org] = await service.list("org_1");
@@ -334,7 +390,9 @@ describe("OrgsService", () => {
 
       const [org] = await service.list("org_1");
 
-      expect(mockStorage.getPublicUrl).toHaveBeenCalledWith("orgs/org_1/logo.png");
+      expect(mockStorage.getPublicUrl).toHaveBeenCalledWith(
+        "orgs/org_1/logo.png",
+      );
       expect(org.logoUrl).toBe(
         "https://supabase.test/storage/v1/object/public/public-bucket/orgs/org_1/logo.png",
       );
@@ -390,7 +448,11 @@ describe("OrgsService", () => {
     });
 
     it("uploads to the public bucket and persists the storage key", async () => {
-      const result = await service.uploadLogo("org_1", validBase64, "image/png");
+      const result = await service.uploadLogo(
+        "org_1",
+        validBase64,
+        "image/png",
+      );
 
       expect(mockStorage.uploadObject).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -402,7 +464,10 @@ describe("OrgsService", () => {
       expect(prismaMock.org.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "org_1" },
-          data: { logoStorageKey: "orgs/org_1/logo.png", logoContentType: "image/png" },
+          data: {
+            logoStorageKey: "orgs/org_1/logo.png",
+            logoContentType: "image/png",
+          },
         }),
       );
       expect(result.logoUrl).toContain("orgs/org_1/logo.png");
@@ -413,7 +478,10 @@ describe("OrgsService", () => {
       await service.uploadLogo("org_1", dataUrl);
 
       expect(mockStorage.uploadObject).toHaveBeenCalledWith(
-        expect.objectContaining({ key: "orgs/org_1/logo.webp", contentType: "image/webp" }),
+        expect.objectContaining({
+          key: "orgs/org_1/logo.webp",
+          contentType: "image/webp",
+        }),
       );
     });
   });

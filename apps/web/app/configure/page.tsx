@@ -6,7 +6,7 @@ import {
   isMappedInstitutionalPlanCode,
   type InstitutionalMappedQuote,
 } from "@pathway/pricing";
-import type { Vertical } from "@pathway/types";
+import { isVertical, type Vertical } from "@pathway/types";
 import { ConfiguratorStage } from "../../components/configurator/stage";
 import { InstitutionalBreakdown } from "../../components/configurator/institutional-breakdown";
 import {
@@ -39,7 +39,11 @@ import {
   type InstitutionalConfiguration,
   type InstitutionalStep,
 } from "./institutional-flow";
-import { INITIAL_CONFIGURATOR_STATE, type ConfiguratorStep } from "./state";
+import {
+  verticalsForOrgType,
+  INITIAL_CONFIGURATOR_STATE,
+  type ConfiguratorStep,
+} from "./state";
 
 const STORAGE_KEY = "nexsteps-institutional-configuration";
 const STAGE_STEPS: Record<InstitutionalStep, ConfiguratorStep> = {
@@ -62,24 +66,22 @@ function restoredConfiguration(
     typeof saved.planCode !== "string" ||
     !isMappedInstitutionalPlanCode(saved.planCode) ||
     (saved.orgType !== null &&
-      !["SCHOOL", "CHURCH", "CHARITY", "CLUB", "NURSERY"].includes(
-        String(saved.orgType),
-      )) ||
+      ![
+        "SCHOOL",
+        "CHURCH",
+        "CHARITY",
+        "CLUB",
+        "NURSERY",
+        "LEARNING_CENTRE",
+      ].includes(String(saved.orgType))) ||
     typeof saved.countInput !== "string" ||
     !["none", "100", "200", "1000"].includes(String(saved.storageChoice))
   )
     return null;
-  const setting = [
-    "CHURCH",
-    "INDEPENDENT_SCHOOL",
-    "ACE_SCHOOL",
-    "STATE_SCHOOL",
-    "NURSERY",
-    "CHARITY",
-    "CLUB",
-  ].includes(String(saved.setting))
-    ? (saved.setting as InstitutionalConfiguration["setting"])
-    : null;
+  const setting =
+    isVertical(saved.setting) && saved.setting !== "HOME_EDUCATION"
+      ? saved.setting
+      : null;
   const configuration: InstitutionalConfiguration = {
     ...INITIAL_CONFIGURATION,
     planCode: saved.planCode,
@@ -91,15 +93,12 @@ function restoredConfiguration(
       saved.storageChoice as InstitutionalConfiguration["storageChoice"],
   };
   if (
-    (configuration.orgType === null && setting !== null) ||
-    (configuration.orgType === "SCHOOL" &&
-      setting !== null &&
-      !["INDEPENDENT_SCHOOL", "ACE_SCHOOL", "STATE_SCHOOL"].includes(
-        setting,
-      )) ||
-    (configuration.orgType !== null &&
-      configuration.orgType !== "SCHOOL" &&
-      setting !== configuration.orgType)
+    (setting !== null &&
+      (!configuration.orgType ||
+        !verticalsForOrgType(configuration.orgType).includes(setting))) ||
+    (setting === null &&
+      configuration.orgType !== null &&
+      verticalsForOrgType(configuration.orgType).length === 1)
   )
     return null;
   configuration.step = stepsFor(configuration.orgType).includes(
@@ -115,7 +114,8 @@ function restoredConfiguration(
   ) {
     configuration.step = "organisation";
   } else if (
-    configuration.orgType === "SCHOOL" &&
+    configuration.orgType !== null &&
+    verticalsForOrgType(configuration.orgType).length > 1 &&
     setting === null &&
     restoredIndex > steps.indexOf("setting")
   ) {
@@ -252,7 +252,7 @@ export default function ConfigurePage() {
     else if (step === "organisation" && !configuration.orgType)
       setNavigationError("Choose your organisation type.");
     else if (step === "setting" && !configuration.setting)
-      setNavigationError("Choose your school setting.");
+      setNavigationError("Choose your setting.");
     else if (
       step === "pupils" &&
       (count === null || !configuration.declarationAccepted)
@@ -394,14 +394,18 @@ export default function ConfigurePage() {
                       onSelect={(orgType) =>
                         update({
                           orgType,
-                          setting: orgType === "SCHOOL" ? null : orgType,
+                          setting:
+                            orgType === "SCHOOL" ||
+                            orgType === "LEARNING_CENTRE"
+                              ? null
+                              : orgType,
                         })
                       }
                     />
                   )}
                   {configuration.step === "setting" && (
                     <VerticalStep
-                      orgType="SCHOOL"
+                      orgType={configuration.orgType ?? "SCHOOL"}
                       vertical={configuration.setting as Vertical | null}
                       onSelect={(setting) =>
                         update({
@@ -455,7 +459,7 @@ export default function ConfigurePage() {
                       {navigationError}
                     </p>
                   )}
-                  <div className="mt-8 flex justify-between gap-4 border-t border-border-subtle pt-5">
+                  <div className="mt-8 flex flex-wrap justify-between gap-4 border-t border-border-subtle pt-5">
                     <button
                       type="button"
                       disabled={configuration.step === "plan"}

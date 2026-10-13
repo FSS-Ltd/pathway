@@ -209,5 +209,8 @@ export default async function globalSetup(): Promise<void> {
     );
   } finally {
     await closePrisma();
+    // In-band workers must create their client in Jest's own realm. Reusing
+    // this disconnected outer-realm singleton breaks Prisma error instanceof checks.
+    Reflect.deleteProperty(globalThis, "__prisma");
   }
 }

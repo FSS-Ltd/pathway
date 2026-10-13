@@ -1,5 +1,5 @@
 import type { Module } from "@pathway/db";
-import type { Sector } from "@pathway/types";
+import type { Sector, InstitutionalVertical } from "@pathway/types";
 import type { PlanCode, PlanTier } from "./billing-plans";
 
 export type BuyNowPlanSelection = {
@@ -21,6 +21,7 @@ export type BuyNowOrgDetails = {
   // Required for new-org public checkout (enforced by BuyNowOrgDetailsDto); omitted
   // when this shape is reused as provider metadata for an existing org's purchase.
   sector?: Sector;
+  vertical?: InstitutionalVertical;
   source?: string;
 };
 

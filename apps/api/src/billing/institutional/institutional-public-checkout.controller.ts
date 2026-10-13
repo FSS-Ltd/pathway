@@ -1,3 +1,4 @@
+import { INSTITUTIONAL_VERTICALS } from "@pathway/types";
 import {
   BadRequestException,
   Body,
@@ -20,15 +21,7 @@ const checkoutSchema = z.object({
   ]),
   enrolledChildren: z.number().int().nonnegative().safe(),
   declarationAccepted: z.literal(true),
-  setting: z.enum([
-    "CHURCH",
-    "INDEPENDENT_SCHOOL",
-    "ACE_SCHOOL",
-    "STATE_SCHOOL",
-    "NURSERY",
-    "CHARITY",
-    "CLUB",
-  ]),
+  setting: z.enum(INSTITUTIONAL_VERTICALS),
   storageChoice: z.enum(["none", "100", "200", "1000"]),
   includedModules: z.array(z.nativeEnum(Module)).default([]),
   paidModules: z.array(z.nativeEnum(Module)).default([]),

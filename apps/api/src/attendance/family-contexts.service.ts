@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import { BadRequestException, Injectable } from "@nestjs/common";
 import {
   prisma,
@@ -98,7 +99,7 @@ export class FamilyContextsService {
     const items: FamilyContext[] = [];
     const now = new Date();
     for (const site of sites) {
-      const isAceSchool = site.org.orgVertical?.vertical === "ACE_SCHOOL";
+      const isAceSchool = isAceVertical(site.org.orgVertical?.vertical);
       const schoolDay = localDate(now, site.timezone ?? "");
       const scoped = await withTenantRlsContext(
         site.id,

@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import { StudentDailyAttendanceService } from "../attendance/student-daily-attendance.service";
@@ -42,7 +43,7 @@ export class StudentSelfService {
         org: { select: { orgVertical: { select: { vertical: true } } } },
       },
     });
-    if (site?.org.orgVertical?.vertical !== "ACE_SCHOOL") {
+    if (!site || !isAceVertical(site.org.orgVertical?.vertical)) {
       throw new NotFoundException("Student summary not found");
     }
     const asOf = new Date();

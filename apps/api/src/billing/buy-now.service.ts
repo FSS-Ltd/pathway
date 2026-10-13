@@ -167,6 +167,7 @@ export class BuyNowService {
         contactEmail: normalizedEmail,
         password: request.org.password,
         sector: request.org.sector ?? "",
+        ...(request.org.vertical ? { vertical: request.org.vertical } : {}),
         planCode: sanitisedPlan.planCode,
       };
 

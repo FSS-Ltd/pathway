@@ -134,3 +134,18 @@ describe("capability maps completeness", () => {
     expect(grantedCapabilities).not.toContain("merit.wallet.read");
   });
 });
+
+it("gives Learning Centres the same entitlements as their selected screen family", () => {
+  expect(VERTICAL_CAPABILITIES.ACE_LEARNING_CENTRE).toEqual(
+    VERTICAL_CAPABILITIES.ACE_SCHOOL,
+  );
+  expect(VERTICAL_CAPABILITIES.PUBLIC_LEARNING_CENTRE).toEqual(
+    VERTICAL_CAPABILITIES.STATE_SCHOOL,
+  );
+  expect(VERTICAL_CAPABILITIES.ACE_LEARNING_CENTRE).toContain(
+    "ace.dashboard.read",
+  );
+  expect(VERTICAL_CAPABILITIES.PUBLIC_LEARNING_CENTRE).not.toContain(
+    "ace.dashboard.read",
+  );
+});

@@ -23,7 +23,12 @@ import {
 } from "class-validator";
 import { Type, Transform } from "class-transformer";
 import { Module } from "@pathway/db";
-import { SECTOR_LABELS, type Sector } from "@pathway/types";
+import {
+  SECTOR_LABELS,
+  INSTITUTIONAL_VERTICALS,
+  type InstitutionalVertical,
+  type Sector,
+} from "@pathway/types";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { BuyNowService } from "./buy-now.service";
 import type {
@@ -94,6 +99,10 @@ class BuyNowOrgDetailsDto implements BuyNowOrgDetails {
 
   @IsIn(Object.keys(SECTOR_LABELS))
   sector!: Sector;
+
+  @IsOptional()
+  @IsIn(INSTITUTIONAL_VERTICALS)
+  vertical?: InstitutionalVertical;
 
   @IsOptional()
   @IsString()

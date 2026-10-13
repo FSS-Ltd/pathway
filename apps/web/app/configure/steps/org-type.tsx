@@ -15,6 +15,7 @@ const ORG_TYPE_LABELS: Record<OrgType, string> = {
   CHARITY: "Charity",
   CLUB: "Club",
   NURSERY: "Nursery",
+  LEARNING_CENTRE: "Learning Centre",
 };
 
 export function OrgTypeStep({ orgType, onSelect }: OrgTypeStepProps) {

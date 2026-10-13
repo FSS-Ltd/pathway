@@ -1,3 +1,5 @@
+import { institutionalSector } from "@pathway/types";
+import type { InstitutionalVertical } from "@pathway/types";
 import {
   BadRequestException,
   ConflictException,
@@ -38,14 +40,7 @@ export type PublicInstitutionalCheckoutInput = {
   planCode: InstitutionalMappedPlanCode;
   enrolledChildren: number;
   declarationAccepted: true;
-  setting:
-    | "CHURCH"
-    | "INDEPENDENT_SCHOOL"
-    | "ACE_SCHOOL"
-    | "STATE_SCHOOL"
-    | "NURSERY"
-    | "CHARITY"
-    | "CLUB";
+  setting: InstitutionalVertical;
   storageChoice: InstitutionalStorageChoice;
   includedModules: Module[];
   paidModules: Module[];
@@ -179,12 +174,8 @@ export class InstitutionalPublicCheckoutService {
             contactName: input.org.contactName.trim(),
             contactEmail: email,
             password: input.org.password,
-            sector:
-              input.setting === "CHURCH" ||
-              input.setting === "CHARITY" ||
-              input.setting === "CLUB"
-                ? input.setting
-                : "SCHOOL",
+            sector: institutionalSector(input.setting),
+            vertical: input.setting,
             planCode: input.planCode,
           },
         },

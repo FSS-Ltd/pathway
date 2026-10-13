@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import {
   ConflictException,
   Injectable,
@@ -18,7 +19,7 @@ export async function requireAceStudentSite(
       org: { select: { orgVertical: { select: { vertical: true } } } },
     },
   });
-  if (!site || site.org.orgVertical?.vertical !== "ACE_SCHOOL") {
+  if (!site || !isAceVertical(site.org.orgVertical?.vertical)) {
     throw new NotFoundException("Student portal site not found");
   }
 }

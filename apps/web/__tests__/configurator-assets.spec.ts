@@ -86,6 +86,8 @@ describe("configurator imagery and motion contract", () => {
       "/configurator/verticals/nursery.png",
       "/configurator/verticals/charity.png",
       "/configurator/verticals/club.png",
+      "/configurator/verticals/ace-school.png",
+      "/configurator/verticals/state-school.png",
     ]);
     expect(["100", "200", "1000"].map(storageImagePath)).toEqual([
       "/configurator/storage/storage-100gb.png",

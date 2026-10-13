@@ -25,6 +25,7 @@ const ORG_VERTICALS: Record<OrgType, Vertical[]> = {
   CHARITY: ["CHARITY"],
   CLUB: ["CLUB"],
   NURSERY: ["NURSERY"],
+  LEARNING_CENTRE: ["ACE_LEARNING_CENTRE", "PUBLIC_LEARNING_CENTRE"],
 };
 
 const PRICES = {
@@ -62,6 +63,7 @@ describe("configurator state", () => {
       "CHARITY",
       "CHURCH",
       "CLUB",
+      "LEARNING_CENTRE",
       "NURSERY",
       "SCHOOL",
     ]);
@@ -193,16 +195,16 @@ describe("configurator state", () => {
     expect(availableIncludedChoice.selectedOptionalModules).toContain(
       "ADVANCED_REPORTING",
     );
-    const noIncludedSlots = toggleModule(availableIncludedChoice, "ASSET_MANAGEMENT", {
-      ...PRICES,
-      MODULE_AI_WORKSPACE_MONTHLY: { amountMajor: 25 },
-      MODULE_ADVANCED_REPORTING_MONTHLY: { amountMajor: 27 },
-    });
-    const unavailablePaidExtra = toggleModule(
-      noIncludedSlots,
-      "LEARNING",
-      {},
+    const noIncludedSlots = toggleModule(
+      availableIncludedChoice,
+      "ASSET_MANAGEMENT",
+      {
+        ...PRICES,
+        MODULE_AI_WORKSPACE_MONTHLY: { amountMajor: 25 },
+        MODULE_ADVANCED_REPORTING_MONTHLY: { amountMajor: 27 },
+      },
     );
+    const unavailablePaidExtra = toggleModule(noIncludedSlots, "LEARNING", {});
     expect(unavailablePaidExtra).toBe(noIncludedSlots);
   });
 
@@ -347,7 +349,10 @@ describe("configurator state", () => {
       selectedIncludedModules: ["FINANCE", "FINANCE"],
       selectedOptionalModules: ["FINANCE", "ASSET_MANAGEMENT"],
     };
-    expect(configuredModulesForState(state)).toEqual(["FINANCE", "ASSET_MANAGEMENT"]);
+    expect(configuredModulesForState(state)).toEqual([
+      "FINANCE",
+      "ASSET_MANAGEMENT",
+    ]);
   });
 
   it("returns a deduplicated included and optional module union", () => {

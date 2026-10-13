@@ -27,10 +27,13 @@ export function VerticalStep({
           id="configurator-step-title"
           className="font-heading text-2xl font-bold text-text-primary"
         >
-          Which setting best describes your school?
+          Which setting best describes your{" "}
+          {orgType === "LEARNING_CENTRE" ? "learning centre" : "school"}?
         </h2>
         <p className="text-text-muted">
-          Choose the setting that most closely matches your daily work.
+          {orgType === "LEARNING_CENTRE"
+            ? "Choose ACE or Public. Public means non-ACE; it does not mean government-funded."
+            : "Choose the setting that most closely matches your daily work."}
         </p>
       </div>
       <SelectionCardGroup className="grid gap-3">

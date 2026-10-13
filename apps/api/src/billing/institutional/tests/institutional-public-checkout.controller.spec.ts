@@ -43,6 +43,8 @@ describe("public institutional checkout settings", () => {
     "INDEPENDENT_SCHOOL",
     "ACE_SCHOOL",
     "STATE_SCHOOL",
+    "ACE_LEARNING_CENTRE",
+    "PUBLIC_LEARNING_CENTRE",
     "NURSERY",
     "CHARITY",
     "CLUB",
