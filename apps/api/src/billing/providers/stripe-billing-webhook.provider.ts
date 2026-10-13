@@ -9,6 +9,7 @@ import {
   type BillingProviderConfig,
 } from "../billing-provider.config";
 import { BillingProvider, SubscriptionStatus } from "@pathway/db";
+import { institutionalStripeKey } from "../institutional/institutional-provider-guard";
 
 // SNAPSHOT webhook handler: this is the only Stripe endpoint that processes
 // subscription/checkout/invoice events. Stripe dashboard should send the six
@@ -76,10 +77,9 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
   }
 
   async holdDraftInvoice(invoiceId: string): Promise<void> {
-    if (
-      process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED !== "true" ||
-      !/^(?:rk|sk)_test_/.test(this.config.stripe.secretKey ?? "")
-    ) {
+    try {
+      institutionalStripeKey(this.config, "PROVIDER_WRITES");
+    } catch {
       throw new Error("Institutional draft invoice hold is disabled.");
     }
     const invoice = await this.stripe.invoices.update(invoiceId, {
@@ -303,6 +303,7 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
         : (invoice.subscription?.id ?? "");
     const orgId = invoice.metadata?.orgId ?? "";
     const pendingOrderId = invoice.metadata?.pendingOrderId ?? null;
+    const subscriptionLine = this.subscriptionLine(invoice, subId);
     const customerId =
       typeof invoice.customer === "string"
         ? invoice.customer
@@ -318,6 +319,12 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       providerCheckoutId: invoice.metadata?.providerCheckoutId ?? null,
       providerCustomerId: customerId,
       status: SubscriptionStatus.PAST_DUE,
+      periodStart: subscriptionLine?.period?.start
+        ? new Date(subscriptionLine.period.start * 1000)
+        : null,
+      periodEnd: subscriptionLine?.period?.end
+        ? new Date(subscriptionLine.period.end * 1000)
+        : null,
     };
   }
 }

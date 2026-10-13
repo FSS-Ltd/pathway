@@ -154,6 +154,9 @@ export class InstitutionalQuoteService {
       selectionPlan = input.planCode;
     }
     const selection = validateInstitutionalSelection(selectionPlan, input);
+    if (mapped && selection.paidModules.length > 0) {
+      throw new BadRequestException({ code: "MODULE_PRICE_UNAVAILABLE" });
+    }
     if (
       input.declaredChildren !== undefined &&
       (!Number.isSafeInteger(input.declaredChildren) ||
@@ -185,6 +188,7 @@ export class InstitutionalQuoteService {
       });
       const currentModules = currentSubscription?.currentInstitutionalSnapshot;
       if (
+        !mapped &&
         currentModules &&
         (currentModules.includedModules.length > 0 ||
           currentModules.paidModules.length > 0)
@@ -417,26 +421,6 @@ export class InstitutionalQuoteService {
           policy.pricingVersion !== snapshot.pricingVersion)
       ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
-      }
-      if (snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
-        const activeSubscription = await tx.subscription.findFirst({
-          where: {
-            orgId,
-            status: {
-              in: [
-                SubscriptionStatus.ACTIVE,
-                SubscriptionStatus.PAST_DUE,
-                SubscriptionStatus.TRIALING,
-              ],
-            },
-          },
-          select: { id: true },
-        });
-        if (activeSubscription) {
-          throw new ConflictException({
-            code: "RENEWAL_CONFIGURATION_NOT_READY",
-          });
-        }
       }
       if (snapshot.countSource === InstitutionalCountSource.DECLARED) {
         const confirmedRoll = await tx.enrolmentRollConfirmation.findFirst({

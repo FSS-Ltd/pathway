@@ -14,6 +14,8 @@ import {
 import { InstitutionalQuoteService } from "./institutional-quote.service";
 import { BillingPricingService } from "../pricing.service";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
+import { InstitutionalPublicCheckoutController } from "./institutional-public-checkout.controller";
+import { InstitutionalPublicCheckoutService } from "./institutional-public-checkout.service";
 
 @Module({
   imports: [AuthModule, EnrolmentsModule],
@@ -21,6 +23,7 @@ import { InstitutionalPriceResolver } from "./institutional-price-resolver";
     InstitutionalBillingController,
     InstitutionalCatalogueController,
     InstitutionalBillingInternalController,
+    InstitutionalPublicCheckoutController,
   ],
   providers: [
     InstitutionalQuoteService,
@@ -29,6 +32,7 @@ import { InstitutionalPriceResolver } from "./institutional-price-resolver";
     InstitutionalOperationService,
     BillingPricingService,
     InstitutionalPriceResolver,
+    InstitutionalPublicCheckoutService,
     { provide: BILLING_PROVIDER_CONFIG, useFactory: loadBillingProviderConfig },
   ],
   exports: [InstitutionalQuoteService, InstitutionalCensusService],
