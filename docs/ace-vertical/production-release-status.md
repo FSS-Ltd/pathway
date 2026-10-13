@@ -7,8 +7,8 @@ live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through C07f are now served by all three apps.
 The [ACE master implementation plan](../superpowers/plans/2026-07-25-ace-vertical-master-plan.md)
 defines 150 delivery tasks. Merged task PRs are evidenced for its 22 foundation,
-20 daily-operations, ACE-M15 identity, and ACE-M01 messaging-policy tasks:
-**44/150, or 29⅓% (29.33%) verified plan-task completion**. The later
+20 daily-operations, ACE-M15 identity, and ACE-M01/M02 messaging tasks:
+**45/150, or 30% verified plan-task completion**. The later
 messaging, learning, add-on, and
 launch tracks have not been fully reconciled task by task; this is a documented
 minimum, not an estimate of all
@@ -20,7 +20,7 @@ and core-journey tasks with 9 pilot/launch tasks: **97/150 (about 65%)** if all
 53 optional add-on tasks are deferred. This is a task-count milestone, not an
 automatic readiness threshold; the nine launch tasks require UAT, security,
 accessibility, performance, restore, support, and staged go/no-go evidence.
-With 44 tasks currently evidenced, 53 core/launch tasks remain to be verified
+With 45 tasks currently evidenced, 52 core/launch tasks remain to be verified
 or completed; some later work is already partially merged. The delivery waves
 are: reconcile ACE-M and ACE-C task evidence against merged PRs, finish the
 remaining ACE-M messaging/notices/identity tasks through the M20 gate, finish
@@ -519,17 +519,32 @@ confirmed the merge on 11 October 2026 at 23:01 UTC as
 `2d8aee6e885f0ba32845a721f34de4db1481876e`. ACE-M01 is evidenced; the
 verified master-plan count is **44/150 (29⅓%, 29.33%)**.
 
-Build step 1.3e6c, ACE-M02 authorised conversation creation and inbox reads,
-is in progress on `feature/ace-m02-authorized-inbox`. Existing API routes and
+Build step 1.3e6c ([PR #611](https://github.com/FSS-Ltd/pathway/pull/611),
+merged into `master`) completed ACE-M02 authorised conversation creation and
+inbox reads. Existing API routes and
 web consumers are reused. A PostgreSQL E2E now verifies same-time keyset
 pagination and site-bound cursor denial; the existing database and HTTP suites
 cover canonical parent, staff-direct, and staffroom creation, active
 relationships, and inaccessible-ID responses. A shared messaging interceptor
 logs content-free 403/404 boundary decisions after the permission guard. Local
 messaging unit, PostgreSQL messaging storage and HTTP security tests, API
-typecheck, lint, format, and build passed. Latest-head CI and merge evidence
-are pending; this step does not change the verified plan-task count before its
-own green PR merges.
+typecheck, lint, format, and build passed. All eight latest-head checks passed
+on `e985bc9f98c7c731c0d3b2eeadfa121640777d03` (CI run 38386625212;
+CodeQL run 38386622500). CI ran both messaging PostgreSQL suites, with 90
+suites and 554 tests passed and none skipped. GitHub confirmed the merge on
+13 October 2026 at 11:06 UTC as
+`495c1b5a78ee0043b70ec9471a82c60bf9c1133e`. ACE-M02 is evidenced; the
+verified master-plan count is **45/150 (30%)**.
+
+Build step 1.3e6d, ACE-M03 idempotent web message sending, is in progress on
+`feature/ace-m03-idempotent-send`. It retains the shared `clientRequestId`
+contract and all existing web composers. The three send paths now share a
+site-and-sender retry key backed by the existing organisation-scoped outbox
+unique constraint. New messages, recipient deliveries, content-free audit, and
+identifier-only outbox events commit in one transaction. Local API typecheck,
+lint, format, build, three messaging command unit suites, and both PostgreSQL
+messaging suites passed. Latest-head CI is pending; this step does not change
+the verified count until its own green PR merges.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

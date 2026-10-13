@@ -1124,6 +1124,9 @@ describe("ACE parent/staff messaging and notices storage", () => {
   afterEach(async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     await deleteMessagingRowsIfPresent(prisma);
+    await prisma.outboxEvent.deleteMany({
+      where: { orgId: fixture.orgAId, eventType: "ace.message.sent" },
+    });
     await prisma.auditEvent.deleteMany({
       where: { orgId: fixture.orgAId, entityType: "ACE_MESSAGE" },
     });
@@ -1573,14 +1576,25 @@ describe("ACE parent/staff messaging and notices storage", () => {
       fixture.tenantAId,
       fixture.orgAId,
       async (tx) => {
-        const [messages, deliveries, raw] = await Promise.all([
+        const [messages, deliveries, raw, outbox] = await Promise.all([
           tx.message.findMany({ where: { conversationId: opened.id } }),
           tx.messageDelivery.findMany({ where: { messageId: first.id } }),
           tx.$queryRaw<Array<{ bodyEncrypted: string }>>`
             SELECT "bodyEncrypted" FROM "Message" WHERE "id" = ${first.id}
           `,
+          tx.outboxEvent.findMany({
+            where: {
+              orgId: fixture.orgAId,
+              idempotencyKey: `ace.message.send:${actor.tenantId}:${actor.userId}:${input.clientRequestId}`,
+            },
+            select: {
+              aggregateId: true,
+              eventType: true,
+              payload: true,
+            },
+          }),
         ]);
-        return { messages, deliveries, raw };
+        return { messages, deliveries, raw, outbox };
       },
     );
     expect(evidence.messages).toHaveLength(1);
@@ -1588,6 +1602,18 @@ describe("ACE parent/staff messaging and notices storage", () => {
     expect(evidence.raw[0].bodyEncrypted).toMatch(/^v1:/);
     expect(evidence.deliveries).toHaveLength(1);
     expect(evidence.deliveries[0].status).toBe("PENDING");
+    expect(evidence.outbox).toEqual([
+      {
+        aggregateId: first.id,
+        eventType: "ace.message.sent",
+        payload: {
+          tenantId: actor.tenantId,
+          conversationId: opened.id,
+          messageId: first.id,
+        },
+      },
+    ]);
+    expect(JSON.stringify(evidence.outbox)).not.toContain(input.body);
     expect(
       await prisma.auditEvent.count({
         where: {
@@ -1602,6 +1628,15 @@ describe("ACE parent/staff messaging and notices storage", () => {
       (await new MessagingService().listStaffConversations(actor, {})).items[0]
         .latestMessage?.preview,
     ).toBe(input.body);
+    const room = await new MessagingConversationService().openStaffRoom(actor);
+    await expect(
+      service.sendStaffMessage(actor, room.id, input),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(
+      await withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        tx.message.count({ where: { conversationId: room.id } }),
+      ),
+    ).toBe(0);
     await expect(
       service.sendStaffMessage(
         { ...actor, userId: fixture.staffCId },
