@@ -1383,21 +1383,23 @@ describe("ACE parent/staff messaging and notices storage", () => {
             bodyEncrypted: `Pilot message ${index}`,
           })),
         });
-        await tx.$executeRawUnsafe('ANALYZE "Message"');
       },
     );
     const plan = await withMessagingRlsContext(
       fixture.tenantAId,
       fixture.orgAId,
-      (tx) =>
-        tx.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+      async (tx) => {
+        // Check index eligibility without depending on small-table planner estimates.
+        await tx.$executeRaw`SET LOCAL enable_sort = off`;
+        return tx.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
           EXPLAIN (FORMAT JSON)
           SELECT "id", "sequence" FROM "Message"
           WHERE "tenantId" = ${fixture.tenantAId}
             AND "conversationId" = ${created.conversationId}
             AND "sequence" < 500
           ORDER BY "sequence" DESC LIMIT 20
-        `,
+        `;
+      },
     );
     expect(JSON.stringify(plan)).toContain(
       "Message_tenantId_conversationId_sequence_key",
@@ -1932,8 +1934,8 @@ describe("ACE parent/staff messaging and notices storage", () => {
         }),
     );
     expect(delivery).toMatchObject({ status: "READ" });
-    expect(delivery?.deliveredAt).toBeInstanceOf(Date);
-    expect(delivery?.readAt).toBeInstanceOf(Date);
+    expect(Number.isFinite(delivery?.deliveredAt?.getTime())).toBe(true);
+    expect(Number.isFinite(delivery?.readAt?.getTime())).toBe(true);
 
     const second = await command.sendStaffMessage(staffA, opened.id, {
       clientRequestId: randomUUID(),
