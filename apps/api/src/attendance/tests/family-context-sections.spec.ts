@@ -9,6 +9,7 @@ describe("family section navigation", () => {
 
   it("offers parent inboxes and ACE volunteering when readers are available", () => {
     expect(parentSectionsForSite(active, false, true)).toEqual([
+      "parent-summary",
       "attendance",
       "sessions",
       "subject-timetable",
@@ -25,11 +26,17 @@ describe("family section navigation", () => {
         false,
         false,
       ),
-    ).toEqual(["attendance", "sessions", "subject-timetable"]);
+    ).toEqual([
+      "parent-summary",
+      "attendance",
+      "sessions",
+      "subject-timetable",
+    ]);
   });
 
   it("does not advertise parent inboxes to an account with a student identity", () => {
     expect(parentSectionsForSite(active, true, true)).toEqual([
+      "parent-summary",
       "attendance",
       "sessions",
       "subject-timetable",

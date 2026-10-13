@@ -146,7 +146,7 @@ describe("Children (e2e)", () => {
       async (tx) =>
         tx.group.create({
           data: {
-            name: "Older",
+            name: `Older-${nonce}`,
             minAge: 8,
             maxAge: 10,
             tenantId: otherTenantId,

@@ -8,7 +8,13 @@ export type ChildProfileTabId =
   | "details"
   | "contacts"
   | "registration"
-  | "attendance";
+  | "attendance"
+  | "academics"
+  | "pace"
+  | "behaviour"
+  | "discipline"
+  | "merits"
+  | "notes";
 export type ChildProfileTab = { id: ChildProfileTabId; label: string };
 
 export function ChildProfileNavigation({

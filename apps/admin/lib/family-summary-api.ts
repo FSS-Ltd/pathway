@@ -4,6 +4,7 @@ import {
   buildAuthHeaders,
   isUsingMockApi,
 } from "./api-client";
+import type { StudentOverviewResponse } from "./child-overview-api";
 
 type SectionResult<T> =
   | { status: "ready"; data: T }
@@ -62,4 +63,33 @@ export async function fetchFamilySummary(
     );
   }
   return response.json() as Promise<FamilySummary>;
+}
+
+export async function fetchFamilyChildOverview(
+  siteId: string,
+  childId: string,
+  signal?: AbortSignal,
+): Promise<StudentOverviewResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("Family overview is unavailable in mock mode.");
+  }
+  const response = await apiFetch(
+    `${API_BASE_URL}/family/sites/${encodeURIComponent(siteId)}/children/${encodeURIComponent(childId)}/overview`,
+    {
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      signal,
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      response.status === 404
+        ? "This child’s overview is no longer available to your account."
+        : response.status === 401 || response.status === 403
+          ? "Your family access could not be verified. Sign in again and retry."
+          : "Family overview could not be loaded. Please try again.",
+    );
+  }
+  return response.json() as Promise<StudentOverviewResponse>;
 }
