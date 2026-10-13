@@ -5,18 +5,18 @@ Updated: 2026-10-13. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
 ## Current step: 1.3
 
-**State: implementing; no PR yet; not complete.** Steps 1.1 and 1.2 are merged.
+**State: PR #627 open; CI running; not complete.** Steps 1.1 and 1.2 are merged.
 No later step has started and no country pack is published.
 
-| Evidence               | Value                                                                                                         |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Scope                  | Compliance navigation and Checks & Training, permissions, encryption, immutable history and integration tests |
-| Branch                 | `feature/compliance-checks-training`                                                                          |
-| Verified starting base | `72d46b6367a7e30afa122a533b4f92f4a8002fc0`                                                                    |
-| Predecessor            | [PR #626](https://github.com/FSS-Ltd/pathway/pull/626), host-confirmed merged 2026-10-13T21:15:32Z            |
-| PR / revision / CI     | Not raised; local implementation and verification underway                                                    |
-| Merge state            | Unmerged; no completion claim                                                                                 |
-| Next permitted action  | Verify 1.3, raise its PR, verify latest CI and merge before 1.4                                               |
+| Evidence               | Value                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Scope                  | Compliance navigation and Checks & Training, permissions, encryption, immutable history and integration tests       |
+| Branch                 | `feature/compliance-checks-training`                                                                                |
+| Verified starting base | `72d46b6367a7e30afa122a533b4f92f4a8002fc0`                                                                          |
+| Predecessor            | [PR #626](https://github.com/FSS-Ltd/pathway/pull/626), host-confirmed merged 2026-10-13T21:15:32Z                  |
+| PR / revision / CI     | [PR #627](https://github.com/FSS-Ltd/pathway/pull/627); head `b2770cc1c43bbccbefef920363e28d6e533b40c2`; CI running |
+| Merge state            | Unmerged; no completion claim                                                                                       |
+| Next permitted action  | Verify 1.3, raise its PR, verify latest CI and merge before 1.4                                                     |
 
 ## Step 1.1 verification and merge
 
@@ -279,3 +279,31 @@ credentials, deployment, external certificate check or user communication occurr
 
 Local verification is not step completion. Raise the step's PR, verify current
 revision CI and host-confirmed merge before starting 1.4.
+
+## Step 1.3 PR and current gate
+
+[PR #627](https://github.com/FSS-Ltd/pathway/pull/627) was raised after local
+verification and commit hooks passed. Current head:
+`b2770cc1c43bbccbefef920363e28d6e533b40c2`. CI run
+[38472359363](https://github.com/FSS-Ltd/pathway/actions/runs/38472359363) and
+CodeQL run [38472356500](https://github.com/FSS-Ltd/pathway/actions/runs/38472356500)
+are running. No merge has occurred; 1.4 remains unstarted. Commit hooks also passed
+workers (11 suites / 45 tests) and auth (3 suites / 13 tests). The existing workers
+suite reported an open-handle/forced-worker-exit warning despite passing; no worker
+implementation changed in this step.
+
+### Step 1.3 CI correction
+
+The first host run exposed stale explicit grant expectations in
+`packages/db/src/__tests__/system-role-seed-command.spec.ts`: the approved
+Organisation Head, Site Lead and Safeguarding Lead arrays omitted the two new
+compliance permissions. Their intended templates were correctly seeded. Updated
+only those six expected entries; ordinary staff/parent/student expectations stay
+unchanged. No application permission behavior was altered by this correction.
+
+Ran the exact CI protected-seed proof against a newly migrated disposable database
+on a separate PostgreSQL container: all 3 suites / 13 tests passed. DB typecheck,
+explicit test-file ESLint, Prettier and diff inspection passed. The failed initial
+run is retained as evidence, not counted as a passing gate. A fresh revision must
+pass all required host checks before merge. Initial CI checkout logs verified
+test-merge `743f6589c2d66c3f6bf27e81a7cb21f1d57b1ff3` for head `b2770cc1…`.
