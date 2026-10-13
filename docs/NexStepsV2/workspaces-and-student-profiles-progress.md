@@ -12,7 +12,7 @@ latest revision and GitHub confirms its merge.
    confirmed merge commit `c11f51b1dc2340b1149c79e2875aa8a596246dff`
    on 2026-10-12 at 13:41 UTC.
 2. **Compact per-person permission badges — merged.** [PR #603](https://github.com/FSS-Ltd/pathway/pull/603) passed all eight checks on head `e60719b757ba65f7987d54c65798fb4dad89e6e7`. GitHub confirmed merge commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163` on 2026-10-13 at 07:59 UTC.
-3. **ACE behaviour category creation and creator badge — in progress.** Branch `feature/ace-behaviour-category-creation` starts from merged commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163`. PR, CI and merge evidence will be added before step 4 begins.
+3. **ACE behaviour category creation and creator badge — in progress.** [PR #604](https://github.com/FSS-Ltd/pathway/pull/604) from branch `feature/ace-behaviour-category-creation` starts from merged commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163`. CI and merge evidence will be added before step 4 begins.
 4. **Staff and parent student overviews — planned.** Begins after step 3 merge.
 5. **ACE PACE placement management in profile editing — planned.** Begins after step 4 merge.
 
