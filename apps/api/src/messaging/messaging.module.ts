@@ -7,6 +7,7 @@ import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.in
 import { MessagingCommandService } from "./messaging-command.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingService } from "./messaging.service";
+import { MessageRealtimePublisher } from "./message-realtime.publisher";
 import { ParentMessagingController } from "./parent-messaging.controller";
 import { ParentMessagingCommandService } from "./parent-messaging-command.service";
 import { ParentMessagingConversationService } from "./parent-messaging-conversation.service";
@@ -17,10 +18,20 @@ import { StaffSchoolTeamHistoryService } from "./staff-school-team-history.servi
 import { StaffSchoolTeamReadCursorService } from "./staff-school-team-read-cursor.service";
 import { StaffSchoolTeamCommandService } from "./staff-school-team-command.service";
 import { StaffSchoolTeamService } from "./staff-school-team.service";
+import {
+  ParentRealtimeTokenController,
+  StaffRealtimeTokenController,
+} from "../realtime/realtime-token.controller";
+import { RealtimeTokenService } from "../realtime/realtime-token.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [MessagingController, ParentMessagingController],
+  controllers: [
+    MessagingController,
+    ParentMessagingController,
+    StaffRealtimeTokenController,
+    ParentRealtimeTokenController,
+  ],
   providers: [
     MessagingBoundaryAuditInterceptor,
     MessagingService,
@@ -35,6 +46,8 @@ import { StaffSchoolTeamService } from "./staff-school-team.service";
     ParentMessagingConversationService,
     ParentMessagingHistoryService,
     ParentMessagingReadCursorService,
+    RealtimeTokenService,
+    MessageRealtimePublisher,
   ],
   exports: [ParentMessagingService],
 })

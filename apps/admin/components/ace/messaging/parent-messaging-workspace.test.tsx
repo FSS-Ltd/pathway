@@ -64,6 +64,9 @@ async function run(): Promise<void> {
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
+    if (url.pathname.endsWith("/realtime-token")) {
+      return jsonResponse({ message: "Live updates unavailable" }, 503);
+    }
     assert.equal(
       new Headers(init?.headers).get("Authorization"),
       "Bearer parent-token",

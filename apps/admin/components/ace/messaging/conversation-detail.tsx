@@ -4,8 +4,10 @@ import * as React from "react";
 import { Button } from "@pathway/ui";
 import type { StaffConversation, StaffMessage } from "@/lib/ace-messaging-api";
 import { ConversationAvatar } from "./conversation-avatar";
+import type { MessageRealtimeStatus } from "./use-message-realtime";
 
 export type MessageDetailState = {
+  realtimeStatus: MessageRealtimeStatus;
   messages: StaffMessage[];
   nextMessageCursor: string | null;
   threadLoading: boolean;
@@ -71,6 +73,20 @@ export function ConversationDetail({
                 : conversation.kind === "PARENT_STAFF"
                   ? "Your school team"
                   : "Direct staff conversation")}
+          </p>
+          <p
+            className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"
+            role="status"
+          >
+            <span
+              aria-hidden="true"
+              className={`h-1.5 w-1.5 rounded-full ${messaging.realtimeStatus === "live" ? "bg-status-success" : "bg-status-warning"}`}
+            />
+            {messaging.realtimeStatus === "live"
+              ? "Live updates"
+              : messaging.realtimeStatus === "connecting"
+                ? "Connecting updates…"
+                : "Refreshing automatically"}
           </p>
         </div>
       </header>

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { prisma, withTenantRlsContext } from "@pathway/db";
+import { jwtVerify, type JWTPayload } from "jose";
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import {
@@ -102,6 +103,20 @@ const actors: Record<string, Actor> = {
 const staffPath = "/ace/messages/conversations";
 const parentPath = (site: string) =>
   `/ace/parent/sites/${site}/messages/conversations`;
+const realtimeSecret = "ace-realtime-e2e-secret-with-at-least-32-characters";
+
+async function realtimePolicyAllows(
+  claims: JWTPayload,
+  conversationId: string,
+): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('request.jwt.claims', ${JSON.stringify(claims)}, true)`;
+    const [row] = await tx.$queryRaw<Array<{ allowed: boolean }>>`
+      SELECT app.authorize_ace_realtime_topic(${`ace:conversation:${conversationId}`}) AS allowed
+    `;
+    return row?.allowed ?? false;
+  });
+}
 
 describe("ACE family messaging web security gate", () => {
   let app: INestApplication | undefined;
@@ -109,9 +124,17 @@ describe("ACE family messaging web security gate", () => {
   let staffConversationId = "";
   let parentConversationId = "";
   let guardianIdentityId = "";
+  const originalRealtimeEnvironment = {
+    url: process.env.SUPABASE_URL,
+    key: process.env.SUPABASE_PUBLISHABLE_KEY,
+    secret: process.env.SUPABASE_JWT_SECRET,
+  };
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_e2e";
+    process.env.SUPABASE_JWT_SECRET = realtimeSecret;
     await prisma.org.createMany({
       data: [
         {
@@ -277,6 +300,14 @@ describe("ACE family messaging web security gate", () => {
 
   afterAll(async () => {
     await app?.close();
+    for (const [name, value] of [
+      ["SUPABASE_URL", originalRealtimeEnvironment.url],
+      ["SUPABASE_PUBLISHABLE_KEY", originalRealtimeEnvironment.key],
+      ["SUPABASE_JWT_SECRET", originalRealtimeEnvironment.secret],
+    ] as const) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
   });
 
   it("limits staff messaging to current site staff despite permission tags", async () => {
@@ -353,6 +384,127 @@ describe("ACE family messaging web security gate", () => {
       .get(`${parentPath(otherSiteId)}/${parentConversationId}/messages`)
       .set("Authorization", authorization.guardian);
     expect(wrongSite.status).toBe(404);
+  });
+
+  it("issues short private realtime claims only to current conversation participants", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const staff = await request(server)
+      .post(`${staffPath}/${staffConversationId}/realtime-token`)
+      .set("Authorization", authorization.teacher)
+      .expect(201);
+    const guardian = await request(server)
+      .post(`${parentPath(siteId)}/${parentConversationId}/realtime-token`)
+      .set("Authorization", authorization.guardian)
+      .expect(201);
+
+    for (const [response, userId, conversationId] of [
+      [staff, teacherId, staffConversationId],
+      [guardian, guardianId, parentConversationId],
+    ] as const) {
+      const verified = await jwtVerify(
+        response.body.token,
+        new TextEncoder().encode(realtimeSecret),
+        { algorithms: ["HS256"] },
+      );
+      expect(verified.payload.exp! - verified.payload.iat!).toBe(120);
+      expect(verified.payload).toMatchObject({
+        sub: userId,
+        role: "authenticated",
+        ace_site_id: siteId,
+        ace_org_id: orgId,
+        ace_realtime_topics: [`ace:conversation:${conversationId}`],
+      });
+      expect(response.body).toMatchObject({
+        private: true,
+        authoritativeSource: "rest",
+        refetchOn: ["reconnect", "event_loss", "token_refresh"],
+      });
+      expect(response.headers["cache-control"]).toBe("no-store");
+      expect(await realtimePolicyAllows(verified.payload, conversationId)).toBe(
+        true,
+      );
+      expect(
+        await realtimePolicyAllows(
+          verified.payload,
+          parentConversationId === conversationId
+            ? staffConversationId
+            : parentConversationId,
+        ),
+      ).toBe(false);
+    }
+
+    await request(server)
+      .post(`${staffPath}/${staffConversationId}/realtime-token`)
+      .expect(401);
+    for (const actor of ["supervisor", "otherSiteStaff"] as const) {
+      const response = await request(server)
+        .post(`${staffPath}/${staffConversationId}/realtime-token`)
+        .set("Authorization", authorization[actor]);
+      expect([403, 404]).toContain(response.status);
+    }
+    for (const actor of ["otherGuardian", "student"] as const) {
+      const response = await request(server)
+        .post(`${parentPath(siteId)}/${parentConversationId}/realtime-token`)
+        .set("Authorization", authorization[actor]);
+      expect(response.status).toBe(404);
+    }
+  });
+
+  it("revokes a pre-issued claim when the ACE capability is removed", async () => {
+    if (!app) return;
+    const response = await request(app.getHttpServer())
+      .post(`${staffPath}/${staffConversationId}/realtime-token`)
+      .set("Authorization", authorization.teacher)
+      .expect(201);
+    const { payload } = await jwtVerify(
+      response.body.token,
+      new TextEncoder().encode(realtimeSecret),
+    );
+    await prisma.orgVertical.delete({ where: { orgId } });
+    try {
+      expect(await realtimePolicyAllows(payload, staffConversationId)).toBe(
+        false,
+      );
+      await request(app.getHttpServer())
+        .post(`${staffPath}/${staffConversationId}/realtime-token`)
+        .set("Authorization", authorization.teacher)
+        .expect(403);
+    } finally {
+      await prisma.orgVertical.create({
+        data: { orgId, vertical: "ACE_SCHOOL" },
+      });
+    }
+  });
+
+  it("revokes a pre-issued staff claim when its read role is deactivated", async () => {
+    if (!app) return;
+    const response = await request(app.getHttpServer())
+      .post(`${staffPath}/${staffConversationId}/realtime-token`)
+      .set("Authorization", authorization.teacher)
+      .expect(201);
+    const { payload } = await jwtVerify(
+      response.body.token,
+      new TextEncoder().encode(realtimeSecret),
+    );
+    const assignment = await prisma.userRoleAssignment.findFirstOrThrow({
+      where: { orgId, tenantId: siteId, userId: teacherId, revokedAt: null },
+      select: { roleDefinitionId: true },
+    });
+    await prisma.orgRoleDefinition.update({
+      where: { id: assignment.roleDefinitionId },
+      data: { isActive: false },
+    });
+    try {
+      expect(await realtimePolicyAllows(payload, staffConversationId)).toBe(
+        false,
+      );
+    } finally {
+      await prisma.orgRoleDefinition.update({
+        where: { id: assignment.roleDefinitionId },
+        data: { isActive: true },
+      });
+    }
   });
 
   it("denies sends and read cursors for unjoined or wrong-site conversations", async () => {
@@ -485,6 +637,14 @@ describe("ACE family messaging web security gate", () => {
       .get(path)
       .set("Authorization", authorization.guardian);
     expect(linked.status).toBe(200);
+    const token = await request(server)
+      .post(`${path}/${parentConversationId}/realtime-token`)
+      .set("Authorization", authorization.guardian)
+      .expect(201);
+    const { payload } = await jwtVerify(
+      token.body.token,
+      new TextEncoder().encode(realtimeSecret),
+    );
     const unavailableRoutes = [
       () => request(server).get(path),
       () => request(server).get(`${path}/${parentConversationId}/messages`),
@@ -515,6 +675,9 @@ describe("ACE family messaging web security gate", () => {
     });
     try {
       await expectUnavailable();
+      expect(await realtimePolicyAllows(payload, parentConversationId)).toBe(
+        false,
+      );
     } finally {
       await prisma.org.update({
         where: { id: orgId },
@@ -528,6 +691,9 @@ describe("ACE family messaging web security gate", () => {
       }),
     );
     await expectUnavailable();
+    expect(await realtimePolicyAllows(payload, parentConversationId)).toBe(
+      false,
+    );
     expect(
       await prisma.message.count({
         where: { tenantId: siteId, conversationId: parentConversationId },
@@ -541,10 +707,21 @@ describe("ACE family messaging web security gate", () => {
     const messageCount = await prisma.message.count({
       where: { tenantId: siteId, conversationId: staffConversationId },
     });
+    const token = await request(server)
+      .post(`${staffPath}/${staffConversationId}/realtime-token`)
+      .set("Authorization", authorization.teacher)
+      .expect(201);
+    const { payload } = await jwtVerify(
+      token.body.token,
+      new TextEncoder().encode(realtimeSecret),
+    );
     await prisma.siteMembership.delete({
       where: { tenantId_userId: { tenantId: siteId, userId: teacherId } },
     });
     try {
+      expect(await realtimePolicyAllows(payload, staffConversationId)).toBe(
+        false,
+      );
       const paths = [
         staffPath,
         `${staffPath}/recipients`,

@@ -7,8 +7,8 @@ live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through C07f are now served by all three apps.
 The [ACE master implementation plan](../superpowers/plans/2026-07-25-ace-vertical-master-plan.md)
 defines 150 delivery tasks. Merged task PRs are evidenced for its 22 foundation,
-20 daily-operations, ACE-M15 identity, and ACE-M01/M02/M03 messaging tasks:
-**46/150, or 30⅔% (30.67%) verified plan-task completion**. The later
+20 daily-operations, ACE-M15 identity, and ACE-M01/M02/M03/M04 messaging tasks:
+**47/150, or 31⅓% (31.33%) verified plan-task completion**. The later
 messaging, learning, add-on, and
 launch tracks have not been fully reconciled task by task; this is a documented
 minimum, not an estimate of all
@@ -20,7 +20,7 @@ and core-journey tasks with 9 pilot/launch tasks: **97/150 (about 65%)** if all
 53 optional add-on tasks are deferred. This is a task-count milestone, not an
 automatic readiness threshold; the nine launch tasks require UAT, security,
 accessibility, performance, restore, support, and staged go/no-go evidence.
-With 46 tasks currently evidenced, 51 core/launch tasks remain to be verified
+With 47 tasks currently evidenced, 50 core/launch tasks remain to be verified
 or completed; some later work is already partially merged. The delivery waves
 are: reconcile ACE-M and ACE-C task evidence against merged PRs, finish the
 remaining ACE-M messaging/notices/identity tasks through the M20 gate, finish
@@ -552,8 +552,8 @@ the merge on 13 October 2026 at 11:51 UTC as
 `a4c55edcd1b326037665b809c979becc0a9a8724`. ACE-M03 is evidenced; the
 verified master-plan count is **46/150 (30⅔%, 30.67%)**.
 
-Build step 1.3e6e, ACE-M04 message history and read state, is in progress on
-`feature/ace-m04-message-history`. The current implementation adds
+Build step 1.3e6e, ACE-M04 message history and read state, merged in
+[PR #614](https://github.com/FSS-Ltd/pathway/pull/614). The implementation adds
 participant-scoped opaque history cursors, batched delivery-state reads, and
 forward-only delivery updates when a read cursor advances. Staff school-team
 history continues to withhold guardian read receipts; the parent school-team
@@ -562,8 +562,25 @@ view shows sent/delivered without revealing staff readers. The existing
 history keyset query; a 500-message PostgreSQL fixture and query plan inspect
 that index. Local API and admin builds, typechecks, targeted lint and format,
 the two PostgreSQL messaging suites, affected unit and admin workspace tests,
-and the shared platform suite passed. This step does not change the verified
-count until its own green PR merges.
+and the shared platform suite passed. All eight applicable latest-head checks
+passed on `24a2fd7eeca0e2d93aafb36f5ba8824b704cd90e`; the Integration
+job ran both messaging PostgreSQL suites within 90 suites and 555 tests, with
+none skipped. GitHub confirmed the merge into `master` on 13 October 2026 at
+13:04 UTC as `7bde7936fc78c3c8eeebdad213b557a5357711c3`. ACE-M04 is
+evidenced; the verified master-plan count is **47/150 (31⅓%, 31.33%)**.
+
+Build step 1.3e6f, ACE-M05 private message realtime, is in progress on
+`feature/ace-m05-realtime-web`. The API issues two-minute, one-conversation
+private Broadcast claims after the existing staff or guardian access checks.
+The Supabase policy rechecks active participation, site/organisation, ACE
+capability, guardian relationship, and current staff read role. Send and read
+invalidation events contain IDs only and publish after database commit. The
+admin web client refetches REST history on events, reconnects, focus, and a
+bounded polling interval. Live enablement requires the restored production
+Supabase project to provide its JWT signing secret and publishable key to the
+API Vercel environment; without them, token issuance returns 503 and web REST
+polling remains available. This step does not change the verified count until
+its own PR has green latest-head CI and a confirmed merge.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
