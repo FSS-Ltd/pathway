@@ -1181,6 +1181,13 @@ export type AdminBehaviourPolicyResponse = {
   } | null;
 };
 
+export type AdminCreateBehaviourCategoryInput = {
+  name: string;
+  type: AdminBehaviourType;
+  visibility: AdminBehaviourVisibility;
+  expectedCategoryVersion: number;
+};
+
 export type AdminBehaviourEntry = {
   id: string;
   childId: string;
@@ -1350,6 +1357,18 @@ export async function fetchBehaviourPolicy(): Promise<AdminBehaviourPolicyRespon
   }
   return behaviourRequest<AdminBehaviourPolicyResponse>(
     "/ace/behaviour/policy",
+  );
+}
+
+export function createBehaviourCategory(
+  input: AdminCreateBehaviourCategoryInput,
+): Promise<AdminBehaviourPolicyResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("Behaviour categories are not available in mock mode.");
+  }
+  return behaviourRequest<AdminBehaviourPolicyResponse>(
+    "/ace/behaviour/policy/categories",
+    { method: "POST", body: JSON.stringify(input) },
   );
 }
 

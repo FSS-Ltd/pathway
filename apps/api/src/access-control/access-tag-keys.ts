@@ -12,6 +12,7 @@ const TAG_KEYS = [
   ["sensitive-note-viewer", StoredAccessTagKey.SENSITIVE_NOTE_VIEWER],
   ["behaviour-viewer", StoredAccessTagKey.BEHAVIOUR_VIEWER],
   ["behaviour-corrector", StoredAccessTagKey.BEHAVIOUR_CORRECTOR],
+  ["behaviour-category-creator", StoredAccessTagKey.BEHAVIOUR_CATEGORY_CREATOR],
   [
     "student-drillthrough-viewer",
     StoredAccessTagKey.STUDENT_DRILLTHROUGH_VIEWER,

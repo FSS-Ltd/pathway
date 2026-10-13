@@ -27,6 +27,18 @@ const CORE_PERMISSIONS = [
 ];
 
 describe("ACE system role templates", () => {
+  it("grants category creation to Organisation Head by default only", () => {
+    expect(SYSTEM_ROLE_TEMPLATES.organisationHead.permissions).toContain(
+      "ace.behaviour.categories.create",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.siteLead.permissions).not.toContain(
+      "ace.behaviour.categories.create",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.staff.permissions).not.toContain(
+      "ace.behaviour.categories.create",
+    );
+  });
+
   it("defines the approved protected template scopes and permission mappings", () => {
     expect(SYSTEM_ROLE_TEMPLATES).toEqual({
       organisationHead: {
@@ -76,6 +88,7 @@ describe("ACE system role templates", () => {
           "ace.behaviour.read",
           "ace.behaviour.record",
           "ace.behaviour.correct",
+          "ace.behaviour.categories.create",
           "ace.behaviour.policy.manage",
           "ace.reports.read",
           "ace.reports.review",

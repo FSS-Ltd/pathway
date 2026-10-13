@@ -62,6 +62,7 @@ export const VERTICAL_CAPABILITIES = {
     "ace.behaviour.record",
     "ace.behaviour.correct",
     "ace.behaviour.sensitive.read",
+    "ace.behaviour.categories.create",
     "ace.behaviour.policy.manage",
     "ace.reports.read",
     "ace.reports.compile",

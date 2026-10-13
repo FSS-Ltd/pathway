@@ -31,7 +31,10 @@ import {
   createBehaviourBatchSchema,
   createBehaviourEntrySchema,
 } from "./dto/behaviour-entry.dto";
-import { updateBehaviourPolicySchema } from "./dto/behaviour-policy.dto";
+import {
+  createBehaviourCategorySchema,
+  updateBehaviourPolicySchema,
+} from "./dto/behaviour-policy.dto";
 import {
   demeritOverrideSchema,
   demeritStatusQuerySchema,
@@ -74,6 +77,22 @@ export class BehaviourController {
     try {
       return await this.policyService.update(
         await updateBehaviourPolicySchema.parseAsync(body),
+        this.actor(),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        throw new BadRequestException(error.flatten());
+      }
+      throw error;
+    }
+  }
+
+  @Post("policy/categories")
+  @RequirePermission("ace.behaviour.categories.create")
+  async createCategory(@Body() body: unknown) {
+    try {
+      return await this.policyService.createCategory(
+        await createBehaviourCategorySchema.parseAsync(body),
         this.actor(),
       );
     } catch (error) {

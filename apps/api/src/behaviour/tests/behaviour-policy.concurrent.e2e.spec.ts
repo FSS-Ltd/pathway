@@ -7,6 +7,7 @@ import {
   withTenantRlsContext,
 } from "@pathway/db";
 import { AceSettingsService } from "../../ace-settings/ace-settings.service";
+import { OutboxService } from "../../common/outbox/outbox.service";
 import { BehaviourPolicyService } from "../behaviour-policy.service";
 import {
   isDatabaseAvailable,
@@ -118,7 +119,9 @@ async function clearBehaviourPolicyFixtures(fixture: Fixture): Promise<void> {
       "DemeritPolicy",
       "BehaviourCategory"
   `);
-  await prisma.outboxEvent.deleteMany({ where: { aggregateId: fixture.tenantId } });
+  await prisma.outboxEvent.deleteMany({
+    where: { aggregateId: fixture.tenantId },
+  });
   await prisma.auditEvent.deleteMany({ where: { tenantId: fixture.tenantId } });
 }
 
@@ -197,7 +200,9 @@ describe("ACE behaviour and settings demerit policy concurrency", () => {
     if (!isDatabaseAvailable() || !fixture) return;
 
     await clearBehaviourPolicyFixtures(fixture);
-    await prisma.siteMembership.deleteMany({ where: { userId: fixture.actorId } });
+    await prisma.siteMembership.deleteMany({
+      where: { userId: fixture.actorId },
+    });
     await prisma.user.deleteMany({ where: { id: fixture.actorId } });
     await prisma.tenant.deleteMany({ where: { id: fixture.tenantId } });
     await prisma.org.deleteMany({ where: { id: fixture.orgId } });
@@ -212,7 +217,13 @@ describe("ACE behaviour and settings demerit policy concurrency", () => {
       userId: fixture.actorId,
     };
     const settingsService = new AceSettingsService();
-    const behaviourService = new BehaviourPolicyService();
+    const behaviourService = new BehaviourPolicyService(new OutboxService(), {
+      resolve: async () => ({
+        allowed: true,
+        reason: "allowed",
+        sourceRoleIds: [],
+      }),
+    });
     const lock = await holdSettingsLock(fixture.tenantId);
     const settingsUpdate = settingsService.update(
       {
@@ -276,8 +287,10 @@ describe("ACE behaviour and settings demerit policy concurrency", () => {
 
     let results: PromiseSettledResult<unknown>[];
     try {
-      await waitFor("both policy services waiting on the shared lock", async () =>
-        (await waitingSettingsLocks(lockObserver, fixture!.tenantId)) === 2,
+      await waitFor(
+        "both policy services waiting on the shared lock",
+        async () =>
+          (await waitingSettingsLocks(lockObserver, fixture!.tenantId)) === 2,
       );
     } finally {
       await lock.release();
@@ -299,5 +312,66 @@ describe("ACE behaviour and settings demerit policy concurrency", () => {
       orderBy: { version: "asc" },
     });
     expect(demeritVersions).toEqual([{ version: 1 }, { version: 2 }]);
+  });
+
+  it("serialises simultaneous category creations without rewriting demerit policy", async () => {
+    if (!isDatabaseAvailable() || !fixture) return;
+    const actor = {
+      tenantId: fixture.tenantId,
+      orgId: fixture.orgId,
+      userId: fixture.actorId,
+    };
+    const service = new BehaviourPolicyService(new OutboxService(), {
+      resolve: async () => ({
+        allowed: true,
+        reason: "allowed",
+        sourceRoleIds: [],
+      }),
+    });
+    const before = await service.get(actor);
+    const lock = await holdSettingsLock(fixture.tenantId);
+    const first = service.createCategory(
+      {
+        name: "Kindness",
+        type: "MERIT",
+        visibility: "GENERAL",
+        expectedCategoryVersion: before.categoryVersion,
+      },
+      actor,
+    );
+    const second = service.createCategory(
+      {
+        name: "Effort",
+        type: "MERIT",
+        visibility: "GENERAL",
+        expectedCategoryVersion: before.categoryVersion,
+      },
+      actor,
+    );
+
+    let results: PromiseSettledResult<unknown>[];
+    try {
+      await waitFor(
+        "both category commands waiting on the shared lock",
+        async () =>
+          (await waitingSettingsLocks(lockObserver, fixture!.tenantId)) === 2,
+      );
+    } finally {
+      await lock.release();
+      results = await Promise.allSettled([first, second]);
+    }
+
+    expect(
+      results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(1);
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toBeInstanceOf(ConflictException);
+    const after = await service.get(actor);
+    expect(after.categoryVersion).toBe(before.categoryVersion + 1);
+    expect(after.categories).toHaveLength(before.categories.length + 1);
+    expect(after.demeritPolicy).toEqual(before.demeritPolicy);
   });
 });

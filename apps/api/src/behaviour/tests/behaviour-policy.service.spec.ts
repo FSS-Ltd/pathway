@@ -2,14 +2,19 @@ import "reflect-metadata";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { CAPABILITY_DEFINITIONS } from "@pathway/platform";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
+import { OutboxService } from "../../common/outbox/outbox.service";
 import { BehaviourController } from "../behaviour.controller";
 import { BehaviourPolicyService } from "../behaviour-policy.service";
-import { updateBehaviourPolicySchema } from "../dto/behaviour-policy.dto";
+import {
+  createBehaviourCategorySchema,
+  updateBehaviourPolicySchema,
+} from "../dto/behaviour-policy.dto";
 
 jest.mock("@pathway/db", () => ({
   Prisma: {
@@ -100,7 +105,12 @@ function createService(tx = createTransaction()) {
     .mockImplementation(async (_tenantId, _orgId, callback) =>
       callback(tx as never),
     );
-  return { service: new BehaviourPolicyService(), tx };
+  const resolve = jest.fn().mockResolvedValue({ allowed: true });
+  return {
+    service: new BehaviourPolicyService(new OutboxService(), { resolve }),
+    tx,
+    resolve,
+  };
 }
 
 function actor() {
@@ -135,6 +145,24 @@ function arrangeCurrentPolicy(tx: ReturnType<typeof createTransaction>): void {
 }
 
 describe("behaviour policy boundary", () => {
+  it("accepts only a category name, type, visibility and expected version for creation", () => {
+    expect(
+      createBehaviourCategorySchema.safeParse({
+        name: "Service",
+        type: "MERIT",
+        expectedCategoryVersion: 2,
+      }).success,
+    ).toBe(true);
+    expect(
+      createBehaviourCategorySchema.safeParse({
+        name: "Service",
+        type: "MERIT",
+        expectedCategoryVersion: 2,
+        code: "client-selected",
+      }).success,
+    ).toBe(false);
+  });
+
   it("accepts Merit, Demerit, and General categories with visibility, inactive, and serious configuration", () => {
     expect(updateBehaviourPolicySchema.safeParse(validCommand()).success).toBe(
       true,
@@ -186,11 +214,21 @@ describe("behaviour policy boundary", () => {
         BehaviourController.prototype.update,
       ),
     ).toBe("ace.behaviour.policy.manage");
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSION,
+        BehaviourController.prototype.createCategory,
+      ),
+    ).toBe("ace.behaviour.categories.create");
     expect(CAPABILITY_DEFINITIONS["ace.behaviour.read"].requiredVertical).toBe(
       "ACE_SCHOOL",
     );
     expect(
       CAPABILITY_DEFINITIONS["ace.behaviour.policy.manage"].requiredVertical,
+    ).toBe("ACE_SCHOOL");
+    expect(
+      CAPABILITY_DEFINITIONS["ace.behaviour.categories.create"]
+        .requiredVertical,
     ).toBe("ACE_SCHOOL");
   });
 });
@@ -229,6 +267,128 @@ describe("BehaviourPolicyService", () => {
       orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
       select: expect.any(Object),
     });
+  });
+
+  it("hides sensitive category names from readers without sensitive access", async () => {
+    const { service, tx, resolve } = createService();
+    arrangeCurrentPolicy(tx);
+    resolve.mockResolvedValue({ allowed: false });
+
+    await expect(service.get(actor())).resolves.toMatchObject({
+      categoryVersion: 2,
+      categories: [currentCategories[0]],
+    });
+  });
+
+  it("appends only a category snapshot and leaves demerit thresholds unchanged", async () => {
+    const { service, tx } = createService();
+    arrangeCurrentPolicy(tx);
+    tx.behaviourCategory.createMany.mockResolvedValue({ count: 4 });
+    tx.auditEvent.create.mockResolvedValue({});
+    tx.outboxEvent.createMany.mockResolvedValue({ count: 1 });
+    tx.outboxEvent.findFirstOrThrow.mockResolvedValue({ id: "outbox-1" });
+
+    const result = await service.createCategory(
+      {
+        name: "  Helpful   service  ",
+        type: "MERIT",
+        visibility: "GENERAL",
+        expectedCategoryVersion: 2,
+      },
+      actor(),
+    );
+
+    expect(result.categoryVersion).toBe(3);
+    expect(result.demeritPolicy).toEqual(currentDemeritPolicy);
+    expect(result.categories).toHaveLength(4);
+    expect(result.categories[3]).toMatchObject({
+      code: expect.stringMatching(/^category-[0-9a-f-]{36}$/),
+      label: "Helpful service",
+      type: "MERIT",
+      visibility: "GENERAL",
+      isActive: true,
+      isSerious: false,
+      sortOrder: 4,
+    });
+    expect(tx.behaviourCategory.createMany).toHaveBeenCalledWith({
+      data: [...currentCategories, result.categories[3]].map((category) => ({
+        ...category,
+        tenantId: TENANT_ID,
+        policyVersion: 3,
+        createdByUserId: ACTOR_ID,
+        reason: "Created behaviour category",
+      })),
+    });
+    expect(tx.demeritPolicy.create).not.toHaveBeenCalled();
+    expect(tx.auditEvent.create).toHaveBeenCalled();
+    expect(tx.outboxEvent.createMany).toHaveBeenCalled();
+  });
+
+  it("does not expose existing sensitive categories in the creation response", async () => {
+    const { service, tx, resolve } = createService();
+    arrangeCurrentPolicy(tx);
+    resolve.mockResolvedValue({ allowed: false });
+    tx.behaviourCategory.createMany.mockResolvedValue({ count: 4 });
+    tx.auditEvent.create.mockResolvedValue({});
+    tx.outboxEvent.createMany.mockResolvedValue({ count: 1 });
+    tx.outboxEvent.findFirstOrThrow.mockResolvedValue({ id: "outbox-1" });
+
+    const result = await service.createCategory(
+      {
+        name: "Recognition",
+        type: "MERIT",
+        visibility: "GENERAL",
+        expectedCategoryVersion: 2,
+      },
+      actor(),
+    );
+
+    expect(result.categories.map((category) => category.label)).toEqual([
+      currentCategories[0].label,
+      "Recognition",
+    ]);
+  });
+
+  it("rejects duplicate names, stale versions and cross-organisation sites before writing", async () => {
+    const { service, tx } = createService();
+    arrangeCurrentPolicy(tx);
+    const command = {
+      name: "SERVICE",
+      type: "MERIT" as const,
+      visibility: "GENERAL" as const,
+      expectedCategoryVersion: 2,
+    };
+    await expect(
+      service.createCategory(command, actor()),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.createCategory(
+        { ...command, name: "New", expectedCategoryVersion: 1 },
+        actor(),
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    tx.tenant.findFirst.mockResolvedValue(null);
+    await expect(
+      service.createCategory({ ...command, name: "New" }, actor()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.behaviourCategory.createMany).not.toHaveBeenCalled();
+  });
+
+  it("requires sensitive access before creating a sensitive category", async () => {
+    const { service, resolve } = createService();
+    resolve.mockResolvedValue({ allowed: false });
+    await expect(
+      service.createCategory(
+        {
+          name: "Pastoral concern",
+          type: "GENERAL",
+          visibility: "SENSITIVE",
+          expectedCategoryVersion: 2,
+        },
+        actor(),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(withTenantRlsContext).not.toHaveBeenCalled();
   });
 
   it("returns an empty version-zero category policy before first configuration", async () => {

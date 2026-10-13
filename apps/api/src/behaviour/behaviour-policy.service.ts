@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -11,9 +12,12 @@ import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { acquireAceSettingsWriteLock } from "../ace-settings/ace-settings-write-lock";
+import { EffectivePermissionsService } from "../access-control/effective-permissions.service";
 import {
+  createBehaviourCategorySchema,
   updateBehaviourPolicySchema,
   type BehaviourCategoryDto,
+  type CreateBehaviourCategoryDto,
   type UpdateBehaviourPolicyDto,
 } from "./dto/behaviour-policy.dto";
 
@@ -45,14 +49,113 @@ export interface BehaviourPolicyResponse {
 export class BehaviourPolicyService {
   constructor(
     @Inject(OutboxService)
-    private readonly outbox: OutboxService = new OutboxService(),
+    private readonly outbox: OutboxService,
+    @Inject(EffectivePermissionsService)
+    private readonly permissions: Pick<EffectivePermissionsService, "resolve">,
   ) {}
 
   async get(actor: BehaviourPolicyActor): Promise<BehaviourPolicyResponse> {
-    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      await this.requireSite(tx, actor);
-      return this.loadCurrentPolicy(tx, actor.tenantId);
-    });
+    const canSensitive = await this.canReadSensitive(actor);
+    const policy = await withTenantRlsContext(
+      actor.tenantId,
+      actor.orgId,
+      async (tx) => {
+        await this.requireSite(tx, actor);
+        return this.loadCurrentPolicy(tx, actor.tenantId);
+      },
+    );
+    return this.visiblePolicy(policy, canSensitive);
+  }
+
+  async createCategory(
+    input: CreateBehaviourCategoryDto,
+    actor: BehaviourPolicyActor,
+  ): Promise<BehaviourPolicyResponse> {
+    const parsed = createBehaviourCategorySchema.safeParse(input);
+    if (!parsed.success) throw new BadRequestException(parsed.error.flatten());
+    const command = parsed.data;
+    const canSensitive = await this.canReadSensitive(actor);
+    if (command.visibility === "SENSITIVE" && !canSensitive) {
+      throw new ForbiddenException("Sensitive behaviour access is required");
+    }
+
+    try {
+      const policy = await withTenantRlsContext(
+        actor.tenantId,
+        actor.orgId,
+        async (tx) => {
+          await acquireAceSettingsWriteLock(tx, actor.tenantId);
+          await this.requireSite(tx, actor);
+          const current = await this.loadCurrentPolicy(tx, actor.tenantId);
+          this.assertExpectedVersion(
+            command.expectedCategoryVersion,
+            current.categoryVersion,
+            "Behaviour categories",
+          );
+          if (current.categories.length >= 200) {
+            throw new BadRequestException("Behaviour category limit reached");
+          }
+          const label = command.name.replace(/\s+/g, " ").trim();
+          const normalised = normaliseCategoryName(label);
+          if (
+            current.categories.some(
+              (category) =>
+                normaliseCategoryName(category.label) === normalised,
+            )
+          ) {
+            throw new BadRequestException(
+              "A category with this name already exists",
+            );
+          }
+
+          const categoryVersion = current.categoryVersion + 1;
+          const categories: BehaviourCategoryDto[] = [
+            ...current.categories,
+            {
+              code: `category-${randomUUID()}`,
+              label,
+              type: command.type,
+              visibility: command.visibility,
+              isActive: true,
+              isSerious: false,
+              sortOrder:
+                Math.max(
+                  -1,
+                  ...current.categories.map((item) => item.sortOrder),
+                ) + 1,
+            },
+          ];
+          await tx.behaviourCategory.createMany({
+            data: categories.map((category) => ({
+              ...category,
+              tenantId: actor.tenantId,
+              policyVersion: categoryVersion,
+              createdByUserId: actor.userId,
+              reason: "Created behaviour category",
+            })),
+          });
+          const eventMetadata = {
+            categoryCount: categories.length,
+            categoryVersion,
+            demeritPolicyVersion: current.demeritPolicy?.version ?? 0,
+          };
+          await this.recordPolicyChange(tx, actor, eventMetadata);
+          return {
+            categoryVersion,
+            categories,
+            demeritPolicy: current.demeritPolicy,
+          };
+        },
+      );
+      return this.visiblePolicy(policy, canSensitive);
+    } catch (error) {
+      if (isUniqueConstraintError(error)) {
+        throw new ConflictException(
+          "Behaviour categories changed before this update completed",
+        );
+      }
+      throw error;
+    }
   }
 
   async update(
@@ -106,22 +209,7 @@ export class BehaviourPolicyService {
             demeritPolicyVersion: demeritPolicy.version,
           };
 
-          await recordAuditEventInTransaction(tx, {
-            actorUserId: actor.userId,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-            entityType: AuditEntityType.ACE_RECORD,
-            entityId: actor.tenantId,
-            action: AuditAction.UPDATED,
-            metadata: eventMetadata,
-          });
-          await this.outbox.enqueue(tx, {
-            aggregateType: "ACE_BEHAVIOUR_POLICY",
-            aggregateId: actor.tenantId,
-            eventType: "ace.behaviour.policy.updated",
-            payload: eventMetadata,
-            idempotencyKey: `ace-behaviour-policy:${actor.tenantId}:${randomUUID()}`,
-          });
+          await this.recordPolicyChange(tx, actor, eventMetadata);
 
           return {
             categoryVersion,
@@ -161,6 +249,58 @@ export class BehaviourPolicyService {
       : [];
 
     return { categoryVersion, categories, demeritPolicy };
+  }
+
+  private async recordPolicyChange(
+    tx: Prisma.TransactionClient,
+    actor: BehaviourPolicyActor,
+    metadata: {
+      categoryCount: number;
+      categoryVersion: number;
+      demeritPolicyVersion: number;
+    },
+  ): Promise<void> {
+    await recordAuditEventInTransaction(tx, {
+      actorUserId: actor.userId,
+      tenantId: actor.tenantId,
+      orgId: actor.orgId,
+      entityType: AuditEntityType.ACE_RECORD,
+      entityId: actor.tenantId,
+      action: AuditAction.UPDATED,
+      metadata,
+    });
+    await this.outbox.enqueue(tx, {
+      aggregateType: "ACE_BEHAVIOUR_POLICY",
+      aggregateId: actor.tenantId,
+      eventType: "ace.behaviour.policy.updated",
+      payload: metadata,
+      idempotencyKey: `ace-behaviour-policy:${actor.tenantId}:${randomUUID()}`,
+    });
+  }
+
+  private async canReadSensitive(
+    actor: BehaviourPolicyActor,
+  ): Promise<boolean> {
+    const decision = await this.permissions.resolve({
+      ...actor,
+      permission: "ace.behaviour.sensitive.read",
+      now: new Date(),
+    });
+    return decision.allowed;
+  }
+
+  private visiblePolicy(
+    policy: BehaviourPolicyResponse,
+    canSensitive: boolean,
+  ): BehaviourPolicyResponse {
+    return canSensitive
+      ? policy
+      : {
+          ...policy,
+          categories: policy.categories.filter(
+            (category) => category.visibility === "GENERAL",
+          ),
+        };
   }
 
   private findCurrentDemeritPolicy(
@@ -255,4 +395,12 @@ function isUniqueConstraintError(error: unknown): boolean {
     "code" in error &&
     error.code === "P2002"
   );
+}
+
+function normaliseCategoryName(name: string): string {
+  return name
+    .normalize("NFKC")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("en-GB");
 }

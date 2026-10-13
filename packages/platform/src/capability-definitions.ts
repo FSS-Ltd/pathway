@@ -571,6 +571,14 @@ export const CAPABILITY_DEFINITIONS = {
     true,
     aceRequirement,
   ),
+  "ace.behaviour.categories.create": defineCapability(
+    "Create behaviour categories",
+    "Add a Merit, Demerit, or General category at the active ACE site",
+    "site",
+    "standard",
+    true,
+    aceRequirement,
+  ),
   "ace.behaviour.policy.manage": defineCapability(
     "Manage behaviour policy",
     "Update the active behaviour policy",

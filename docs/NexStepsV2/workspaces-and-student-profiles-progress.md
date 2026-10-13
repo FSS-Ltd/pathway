@@ -11,8 +11,8 @@ latest revision and GitHub confirms its merge.
    passed on head `66bd9ca905256d805abe07eefd5656709016697d`. GitHub
    confirmed merge commit `c11f51b1dc2340b1149c79e2875aa8a596246dff`
    on 2026-10-12 at 13:41 UTC.
-2. **Compact per-person permission badges — in progress.** [PR #603](https://github.com/FSS-Ltd/pathway/pull/603) uses branch `feature/compact-permission-badges` from the merged Academic setup correction at `a8dbf4193d07d469b9d23282cb4cc90be3066d2f`. CI and merge evidence will be added before step 3 begins.
-3. **ACE behaviour category creation and creator badge — planned.** Begins after step 2 merge.
+2. **Compact per-person permission badges — merged.** [PR #603](https://github.com/FSS-Ltd/pathway/pull/603) passed all eight checks on head `e60719b757ba65f7987d54c65798fb4dad89e6e7`. GitHub confirmed merge commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163` on 2026-10-13 at 07:59 UTC.
+3. **ACE behaviour category creation and creator badge — in progress.** [PR #604](https://github.com/FSS-Ltd/pathway/pull/604) from branch `feature/ace-behaviour-category-creation` starts from merged commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163`. CI and merge evidence will be added before step 4 begins.
 4. **Staff and parent student overviews — planned.** Begins after step 3 merge.
 5. **ACE PACE placement management in profile editing — planned.** Begins after step 4 merge.
 
@@ -38,3 +38,21 @@ visual review remains unavailable in the isolated checkout.
 Behaviour, merits, demerits, discipline and PACE remain ACE-only. Academic
 results appear only from supported data sources. Finance and merit-wallet
 tabs stay hidden while those modules are unavailable.
+
+Step 3 adds the `behaviour-category-creator` value to the persisted
+`AccessTagKey` enum, plus the ACE-only
+`ace.behaviour.categories.create` permission. Deployment must apply the
+migration, synchronise permission definitions, and run the protected
+system-role seed so existing Organisation Head roles receive the default
+permission. The seed retains explicit badge exclusions. No live database
+seed or production migration has been run from this worktree.
+
+Step 3 local verification: Prisma validation; platform, auth, DB, API, and
+admin typechecks; changed-file ESLint and Prettier; API behaviour policy unit
+tests (18 passed); database-backed policy concurrency tests (2 passed);
+platform access-tag tests (7 passed); auth template tests (7 passed); DB role
+seed tests (4 passed, 1 existing environment-gated skip); the full admin unit
+script; and the admin production build all passed. Authenticated visual review
+remains unavailable in this isolated checkout. The Graphify code graph was
+updated; its HTML view was omitted by Graphify because the graph exceeds its
+visualisation size limit.
