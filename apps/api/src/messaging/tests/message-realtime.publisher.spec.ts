@@ -30,6 +30,10 @@ describe("MessageRealtimePublisher", () => {
       "https://project.supabase.co/realtime/v1/api/broadcast/ace%3Aconversation%3Aconversation-id/events/message.created?private=true",
       expect.objectContaining({
         method: "POST",
+        headers: {
+          apikey: "server-only-secret",
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           type: "message.created",
           conversationId: "conversation-id",

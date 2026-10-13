@@ -25,7 +25,6 @@ export class MessageRealtimePublisher {
         method: "POST",
         headers: {
           apikey: secretKey,
-          Authorization: `Bearer ${secretKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
