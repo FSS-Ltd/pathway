@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import type { PermissionKey } from "@pathway/platform";
@@ -269,7 +270,7 @@ export class StudentOverviewService {
       timezone: site.timezone,
       sector: site.org.sector,
       parentPortalEnabled: site.org.parentPortalEnabled,
-      isAceSchool: site.org.orgVertical?.vertical === "ACE_SCHOOL",
+      isAceSchool: isAceVertical(site.org.orgVertical?.vertical),
     };
   }
 
@@ -338,7 +339,11 @@ export class StudentOverviewService {
   ): Promise<StudentOverviewResponse["period"]> {
     const today =
       localDate(now, site.timezone || "UTC") ?? now.toISOString().slice(0, 10);
-    if (site.sector === "SCHOOL" || site.isAceSchool) {
+    if (
+      site.sector === "SCHOOL" ||
+      site.sector === "LEARNING_CENTRE" ||
+      site.isAceSchool
+    ) {
       const year = await withTenantRlsContext(site.id, site.orgId, (tx) =>
         tx.academicYear.findFirst({
           where: {

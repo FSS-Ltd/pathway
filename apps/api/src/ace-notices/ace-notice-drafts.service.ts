@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import {
   BadRequestException,
   ConflictException,
@@ -230,7 +231,7 @@ export class AceNoticeDraftsService {
   }
 
   private assertSchoolScope(scope: string, vertical: string | null): void {
-    if (scope !== "SITE" && vertical !== "ACE_SCHOOL") {
+    if (scope !== "SITE" && !isAceVertical(vertical)) {
       throw new BadRequestException(
         "School audiences require an ACE school site",
       );

@@ -25,6 +25,7 @@
   "dependencies": {
     "@clerk/nextjs": "6.39.6",
     "@pathway/platform": "workspace:*",
+    "@pathway/types": "workspace:*",
     "@pathway/pricing": "workspace:*",
     "@pathway/util": "workspace:*",
     "@supabase/supabase-js": "^2.117.3",

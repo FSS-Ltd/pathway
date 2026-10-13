@@ -13,9 +13,14 @@ import { InstitutionalWebhookService } from "../institutional-webhook.service";
 import type { BillingWebhookProvider } from "../../billing-webhook.provider";
 
 describe("public institutional order activation (e2e)", () => {
-  it.each(["monthly", "yearly"] as const)(
-    "materialises one accepted %s quote after payment and tolerates replay",
-    async (interval) => {
+  it.each([
+    ["monthly", "INDEPENDENT_SCHOOL"],
+    ["yearly", "INDEPENDENT_SCHOOL"],
+    ["monthly", "ACE_LEARNING_CENTRE"],
+    ["yearly", "PUBLIC_LEARNING_CENTRE"],
+  ] as const)(
+    "materialises one accepted %s %s quote after payment and tolerates replay",
+    async (interval, setting) => {
       if (!requireDatabase()) return;
       const yearly = interval === "yearly";
       const orgId = randomUUID();
@@ -97,7 +102,7 @@ describe("public institutional order activation (e2e)", () => {
             quote,
             includedModules: [],
             paidModules: [],
-            setting: "INDEPENDENT_SCHOOL",
+            setting,
             requestFingerprint: "a".repeat(64),
           },
           pendingOrgDetails: {
@@ -127,7 +132,7 @@ describe("public institutional order activation (e2e)", () => {
       expect(snapshot.acceptance?.acceptedAt).toEqual(order.createdAt);
       expect(
         await prisma.orgVertical.findUniqueOrThrow({ where: { orgId } }),
-      ).toMatchObject({ vertical: "INDEPENDENT_SCHOOL" });
+      ).toMatchObject({ vertical: setting });
       expect(
         await prisma.institutionalBillingSnapshot.count({ where: { orgId } }),
       ).toBe(1);

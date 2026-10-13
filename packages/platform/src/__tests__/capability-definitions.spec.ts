@@ -216,7 +216,8 @@ describe("capability definitions", () => {
     });
     expect(VERTICAL_CAPABILITIES.ACE_SCHOOL).toContain("ace.attendance.export");
     for (const vertical of Object.values(Vertical).filter(
-      (value) => value !== Vertical.ACE_SCHOOL,
+      (value) =>
+        value !== Vertical.ACE_SCHOOL && value !== Vertical.ACE_LEARNING_CENTRE,
     )) {
       expect(VERTICAL_CAPABILITIES[vertical]).not.toContain(
         "ace.attendance.export",
@@ -236,7 +237,8 @@ describe("capability definitions", () => {
     ).not.toHaveProperty("requiredModule");
     expect(CAPABILITY_DEFINITIONS["notices.read"].scope).toBe("site");
     for (const vertical of Object.values(Vertical).filter(
-      (value) => value !== Vertical.ACE_SCHOOL,
+      (value) =>
+        value !== Vertical.ACE_SCHOOL && value !== Vertical.ACE_LEARNING_CENTRE,
     )) {
       expect(VERTICAL_CAPABILITIES[vertical]).not.toContain(
         "ace.parent.notices.read",

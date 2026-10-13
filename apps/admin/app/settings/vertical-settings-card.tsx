@@ -1,11 +1,17 @@
 "use client";
 
 import React from "react";
+import { institutionalSector } from "@pathway/types";
 import { Badge, Button, Card, Label } from "@pathway/ui";
-import { VERTICAL_LABELS, type AdminVertical } from "../../lib/api-client";
+import {
+  VERTICAL_LABELS,
+  type AdminVertical,
+  type AdminOrgSector,
+} from "../../lib/api-client";
 
 type VerticalSettingsCardProps = {
   vertical: AdminVertical | null;
+  sector?: AdminOrgSector | null;
   canEdit: boolean;
   isLoading: boolean;
   isSaving: boolean;
@@ -21,6 +27,7 @@ const verticalOptions = Object.entries(VERTICAL_LABELS) as Array<
 
 export function VerticalSettingsCard({
   vertical,
+  sector,
   canEdit,
   isLoading,
   isSaving,
@@ -79,11 +86,18 @@ export function VerticalSettingsCard({
               <option value="" disabled>
                 Select a vertical
               </option>
-              {verticalOptions.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
+              {verticalOptions
+                .filter(
+                  ([value]) =>
+                    !sector ||
+                    value === vertical ||
+                    institutionalSector(value) === sector,
+                )
+                .map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
             </select>
           </div>
 

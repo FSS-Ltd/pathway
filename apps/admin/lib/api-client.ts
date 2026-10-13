@@ -454,13 +454,19 @@ export type AdminBuyNowPurchaseRequest = {
   cancelUrl?: string | null;
 };
 
-export type AdminOrgSector = "CHURCH" | "CLUB" | "SCHOOL" | "CHARITY";
+export type AdminOrgSector =
+  | "CHURCH"
+  | "CLUB"
+  | "SCHOOL"
+  | "CHARITY"
+  | "LEARNING_CENTRE";
 
 export const ORG_SECTOR_LABELS: Record<AdminOrgSector, string> = {
   CHURCH: "Church",
   CLUB: "Club",
   SCHOOL: "School",
   CHARITY: "Charity",
+  LEARNING_CENTRE: "Learning Centre",
 };
 
 export type AdminVertical =
@@ -470,7 +476,9 @@ export type AdminVertical =
   | "STATE_SCHOOL"
   | "NURSERY"
   | "CHARITY"
-  | "CLUB";
+  | "CLUB"
+  | "ACE_LEARNING_CENTRE"
+  | "PUBLIC_LEARNING_CENTRE";
 
 export const VERTICAL_LABELS: Record<AdminVertical, string> = {
   CHURCH: "Church",
@@ -479,6 +487,8 @@ export const VERTICAL_LABELS: Record<AdminVertical, string> = {
   STATE_SCHOOL: "State School",
   NURSERY: "Nursery",
   CHARITY: "Charity",
+  ACE_LEARNING_CENTRE: "ACE Learning Centre",
+  PUBLIC_LEARNING_CENTRE: "Public Learning Centre",
   CLUB: "Club",
 };
 

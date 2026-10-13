@@ -1,3 +1,5 @@
+import { pendingOrganisationProfile } from "./pending-organisation-profile";
+import { parsePublicInstitutionalOrder } from "./institutional/institutional-public-order";
 import {
   Body,
   Controller,
@@ -938,7 +940,10 @@ export class BillingWebhookController {
     const contactEmail = details.contactEmail;
     const password = details.password;
     const planCode = details.planCode;
-    const sector = isOrgSector(details.sector) ? details.sector : undefined;
+    const { sector, vertical } = pendingOrganisationProfile(
+      details,
+      parsePublicInstitutionalOrder(pendingOrder.flags)?.setting,
+    );
 
     if (!orgName || !slug || !contactEmail) {
       throw new Error("Missing required org details");
@@ -972,6 +977,10 @@ export class BillingWebhookController {
           sector,
         },
       });
+
+      if (vertical) {
+        await tx.orgVertical.create({ data: { orgId: org.id, vertical } });
+      }
 
       // Create tenant
       const tenant = await tx.tenant.create({

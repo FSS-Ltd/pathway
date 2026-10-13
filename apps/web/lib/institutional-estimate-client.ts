@@ -1,3 +1,4 @@
+import type { InstitutionalVertical } from "@pathway/types";
 import type {
   InstitutionalMappedPlanCode,
   InstitutionalMappedQuote,
@@ -28,14 +29,7 @@ export type PublicInstitutionalCheckoutInput = {
   planCode: InstitutionalMappedPlanCode;
   enrolledChildren: number;
   declarationAccepted: true;
-  setting:
-    | "CHURCH"
-    | "INDEPENDENT_SCHOOL"
-    | "ACE_SCHOOL"
-    | "STATE_SCHOOL"
-    | "NURSERY"
-    | "CHARITY"
-    | "CLUB";
+  setting: InstitutionalVertical;
   storageChoice: InstitutionalStorageChoice;
   includedModules: [];
   paidModules: [];

@@ -51,6 +51,8 @@ function defineCapability(
   };
 }
 
+// Metadata identifies the canonical screen family. VERTICAL_CAPABILITIES is the
+// entitlement authority and grants this family to ACE Learning Centres too.
 const aceRequirement = { requiredVertical: Vertical.ACE_SCHOOL } as const;
 
 export const CAPABILITY_DEFINITIONS = {

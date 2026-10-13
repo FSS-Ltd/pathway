@@ -32,7 +32,10 @@ import {
 } from "../../lib/api-client";
 import { toLocalDateKey } from "../../lib/date";
 import { useAdminAccess } from "../../lib/use-admin-access";
-import { canAccessAdminSection, canAccessSafeguardingAdmin } from "../../lib/access";
+import {
+  canAccessAdminSection,
+  canAccessSafeguardingAdmin,
+} from "../../lib/access";
 import type { AdminRoleInfo } from "../../lib/access";
 import { canPerform } from "../../lib/permissions";
 import { NoAccessCard } from "../../components/no-access-card";
@@ -56,9 +59,10 @@ export default function SettingsPage() {
   const snapshot = adminState.status === "ready" ? adminState.snapshot : null;
   const contextOrg = snapshot?.org ?? null;
   const contextSiteState: ActiveSiteState | null = React.useMemo(
-    () => snapshot
-      ? { activeSiteId: snapshot.activeSiteId, sites: snapshot.sites }
-      : null,
+    () =>
+      snapshot
+        ? { activeSiteId: snapshot.activeSiteId, sites: snapshot.sites }
+        : null,
     [snapshot?.activeSiteId, snapshot?.sites],
   );
   const { data: session, status: sessionStatus } = useSession();
@@ -68,9 +72,14 @@ export default function SettingsPage() {
     currentOrgIsMasterOrg,
   } = useAdminAccess();
   const [org, setOrg] = React.useState<AdminOrgOverview | null>(null);
-  const [retention, setRetention] = React.useState<AdminRetentionOverview | null>(null);
-  const [billing, setBilling] = React.useState<AdminBillingOverview | null>(null);
-  const [siteState, setSiteState] = React.useState<ActiveSiteState | null>(null);
+  const [retention, setRetention] =
+    React.useState<AdminRetentionOverview | null>(null);
+  const [billing, setBilling] = React.useState<AdminBillingOverview | null>(
+    null,
+  );
+  const [siteState, setSiteState] = React.useState<ActiveSiteState | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -113,9 +122,12 @@ export default function SettingsPage() {
 
   const [exportLoading, setExportLoading] = React.useState(false);
   const [exportError, setExportError] = React.useState<string | null>(null);
-  const [deactivateConfirmOpen, setDeactivateConfirmOpen] = React.useState(false);
+  const [deactivateConfirmOpen, setDeactivateConfirmOpen] =
+    React.useState(false);
   const [deactivateLoading, setDeactivateLoading] = React.useState(false);
-  const [deactivateError, setDeactivateError] = React.useState<string | null>(null);
+  const [deactivateError, setDeactivateError] = React.useState<string | null>(
+    null,
+  );
 
   const [signupUrl, setSignupUrl] = React.useState("");
 
@@ -211,7 +223,7 @@ export default function SettingsPage() {
     const reader = new FileReader();
     reader.onload = async () => {
       const dataUrl = reader.result as string;
-      const base64 = dataUrl.includes(",") ? dataUrl.split(",")[1] ?? "" : "";
+      const base64 = dataUrl.includes(",") ? (dataUrl.split(",")[1] ?? "") : "";
       if (!base64) return;
       setLogoError(null);
       setSavingLogo(true);
@@ -220,7 +232,9 @@ export default function SettingsPage() {
         setOrg((prev) => (prev ? { ...prev, logoUrl } : prev));
         await refreshAccess();
       } catch (err) {
-        setLogoError(err instanceof Error ? err.message : "Failed to upload logo");
+        setLogoError(
+          err instanceof Error ? err.message : "Failed to upload logo",
+        );
       } finally {
         setSavingLogo(false);
       }
@@ -237,7 +251,9 @@ export default function SettingsPage() {
       setOrg((prev) => (prev ? { ...prev, logoUrl } : prev));
       await refreshAccess();
     } catch (err) {
-      setLogoError(err instanceof Error ? err.message : "Failed to remove logo");
+      setLogoError(
+        err instanceof Error ? err.message : "Failed to remove logo",
+      );
     } finally {
       setSavingLogo(false);
     }
@@ -404,7 +420,9 @@ export default function SettingsPage() {
       await deactivateOrganisation();
       setDeactivateConfirmOpen(false);
     } catch (e) {
-      setDeactivateError(e instanceof Error ? e.message : "Deactivation failed");
+      setDeactivateError(
+        e instanceof Error ? e.message : "Deactivation failed",
+      );
     } finally {
       setDeactivateLoading(false);
     }
@@ -447,10 +465,16 @@ export default function SettingsPage() {
             Settings & Organisation
           </h1>
           <p className="text-sm text-text-muted">
-            Organisation details, plan tier, and key data policies for this Nexsteps account.
+            Organisation details, plan tier, and key data policies for this
+            Nexsteps account.
           </p>
         </div>
-        <Button variant="secondary" size="sm" onClick={load} disabled={isLoading}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={load}
+          disabled={isLoading}
+        >
           Refresh
         </Button>
       </div>
@@ -473,7 +497,11 @@ export default function SettingsPage() {
           title="Organisation Profile"
           actions={
             canEditOrg && !editingOrg && org ? (
-              <Button variant="secondary" size="sm" onClick={handleStartEditOrg}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleStartEditOrg}
+              >
                 Edit
               </Button>
             ) : undefined
@@ -492,7 +520,9 @@ export default function SettingsPage() {
                   placeholder="Organisation name"
                 />
               </div>
-              <p className="text-sm text-text-muted">Slug: {org?.slug ?? "—"} (read-only)</p>
+              <p className="text-sm text-text-muted">
+                Slug: {org?.slug ?? "—"} (read-only)
+              </p>
               {org?.sector && (
                 <p className="text-sm text-text-muted">
                   Sector: {ORG_SECTOR_LABELS[org.sector]} (read-only)
@@ -505,17 +535,27 @@ export default function SettingsPage() {
                 <Button size="sm" onClick={handleSaveOrg} disabled={savingOrg}>
                   {savingOrg ? "Saving…" : "Save"}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={handleCancelEditOrg}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleCancelEditOrg}
+                >
                   Cancel
                 </Button>
               </div>
             </div>
           ) : org ? (
             <div className="space-y-2">
-              <p className="text-lg font-semibold text-text-primary">{org.name}</p>
-              <p className="text-sm text-text-muted">Slug: {org.slug ?? "Not configured"}</p>
+              <p className="text-lg font-semibold text-text-primary">
+                {org.name}
+              </p>
               <p className="text-sm text-text-muted">
-                {org.isMultiSite ? "Multi-site organisation" : "Single-site organisation"}
+                Slug: {org.slug ?? "Not configured"}
+              </p>
+              <p className="text-sm text-text-muted">
+                {org.isMultiSite
+                  ? "Multi-site organisation"
+                  : "Single-site organisation"}
               </p>
               {org.sector && (
                 <p className="text-sm text-text-muted">
@@ -527,7 +567,9 @@ export default function SettingsPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-text-muted">Organisation information is not available.</p>
+            <p className="text-sm text-text-muted">
+              Organisation information is not available.
+            </p>
           )}
         </Card>
 
@@ -568,7 +610,11 @@ export default function SettingsPage() {
                         disabled={savingLogo}
                         onClick={() => logoInputRef.current?.click()}
                       >
-                        {savingLogo ? "Saving…" : org?.logoUrl ? "Replace logo" : "Upload logo"}
+                        {savingLogo
+                          ? "Saving…"
+                          : org?.logoUrl
+                            ? "Replace logo"
+                            : "Upload logo"}
                       </Button>
                       {org?.logoUrl && (
                         <Button
@@ -602,6 +648,7 @@ export default function SettingsPage() {
 
         <VerticalSettingsCard
           vertical={org?.vertical ?? null}
+          sector={currentOrgIsMasterOrg ? null : org?.sector}
           canEdit={canEditOrg}
           isLoading={isLoading}
           isSaving={savingVertical}
@@ -635,7 +682,11 @@ export default function SettingsPage() {
           title="Active Site"
           actions={
             canEditSite && !editingSite && currentSite ? (
-              <Button variant="secondary" size="sm" onClick={handleStartEditSite}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleStartEditSite}
+              >
                 Edit
               </Button>
             ) : undefined
@@ -667,17 +718,27 @@ export default function SettingsPage() {
                 <p className="text-sm text-status-danger">{siteSaveError}</p>
               )}
               <div className="flex gap-2">
-                <Button size="sm" onClick={handleSaveSite} disabled={savingSite}>
+                <Button
+                  size="sm"
+                  onClick={handleSaveSite}
+                  disabled={savingSite}
+                >
                   {savingSite ? "Saving…" : "Save"}
                 </Button>
-                <Button size="sm" variant="secondary" onClick={handleCancelEditSite}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleCancelEditSite}
+                >
                   Cancel
                 </Button>
               </div>
             </div>
           ) : currentSite ? (
             <div className="space-y-2">
-              <p className="text-lg font-semibold text-text-primary">{currentSite.name}</p>
+              <p className="text-lg font-semibold text-text-primary">
+                {currentSite.name}
+              </p>
               <p className="text-sm text-text-muted">
                 Timezone: {currentSite.timezone ?? "Not configured in-app yet."}
               </p>
@@ -713,7 +774,9 @@ export default function SettingsPage() {
                   <Link href="/billing">Manage plan</Link>
                 </Button>
               ) : (
-                <p className="text-sm text-text-muted">Contact your admin to change plan or billing.</p>
+                <p className="text-sm text-text-muted">
+                  Contact your admin to change plan or billing.
+                </p>
               )}
             </div>
           )}
@@ -729,15 +792,21 @@ export default function SettingsPage() {
               retention.notesRetentionYears) ? (
             <ul className="space-y-2 text-sm text-text-primary">
               {retention.attendanceRetentionYears != null && (
-                <li>Attendance retained for {retention.attendanceRetentionYears} years.</li>
+                <li>
+                  Attendance retained for {retention.attendanceRetentionYears}{" "}
+                  years.
+                </li>
               )}
               {retention.safeguardingRetentionYears != null && (
                 <li>
-                  Safeguarding concerns retained for {retention.safeguardingRetentionYears} years.
+                  Safeguarding concerns retained for{" "}
+                  {retention.safeguardingRetentionYears} years.
                 </li>
               )}
               {retention.notesRetentionYears != null && (
-                <li>Notes retained for {retention.notesRetentionYears} years.</li>
+                <li>
+                  Notes retained for {retention.notesRetentionYears} years.
+                </li>
               )}
             </ul>
           ) : (
@@ -754,7 +823,8 @@ export default function SettingsPage() {
         >
           <div className="space-y-4">
             <p className="text-sm text-text-muted">
-              Paste the signup URL below to generate a QR code. Parents can scan it to complete registration.
+              Paste the signup URL below to generate a QR code. Parents can scan
+              it to complete registration.
             </p>
             {/* TODO: replace with signed invite token from API (site-scoped, expiring). */}
             <div className="space-y-2">
@@ -835,10 +905,13 @@ export default function SettingsPage() {
                     Are you sure you want to deactivate this organisation?
                   </p>
                   <p className="mb-4 text-sm text-text-muted">
-                    This action may affect all sites and data. Confirm only if you understand the consequences.
+                    This action may affect all sites and data. Confirm only if
+                    you understand the consequences.
                   </p>
                   {deactivateError && (
-                    <p className="mb-3 text-sm text-status-danger">{deactivateError}</p>
+                    <p className="mb-3 text-sm text-status-danger">
+                      {deactivateError}
+                    </p>
                   )}
                   <div className="flex gap-2">
                     <Button
@@ -847,7 +920,9 @@ export default function SettingsPage() {
                       disabled={deactivateLoading}
                       onClick={handleDeactivateConfirm}
                     >
-                      {deactivateLoading ? "Deactivating…" : "Yes, deactivate organisation"}
+                      {deactivateLoading
+                        ? "Deactivating…"
+                        : "Yes, deactivate organisation"}
                     </Button>
                     <Button
                       variant="secondary"

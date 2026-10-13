@@ -1,3 +1,4 @@
+import { verticalScreen } from "@pathway/types";
 import type { AdminOrgSector, AdminVertical } from "./api-client";
 
 /**
@@ -6,7 +7,10 @@ import type { AdminOrgSector, AdminVertical } from "./api-client";
  * have a `sector`. `SCHOOL` sector has no single vertical (see
  * packages/platform/src/sector-mapping.ts), so it gets its own row.
  */
-export type OrgUiKey = AdminVertical | "SCHOOL" | "UNKNOWN";
+export type OrgUiKey =
+  | Exclude<AdminVertical, "ACE_LEARNING_CENTRE" | "PUBLIC_LEARNING_CENTRE">
+  | "SCHOOL"
+  | "UNKNOWN";
 
 /**
  * Route href -> label override. Deliberately string-only: this object must
@@ -23,13 +27,14 @@ const SECTOR_TO_KEY: Record<AdminOrgSector, OrgUiKey> = {
   CLUB: "CLUB",
   CHARITY: "CHARITY",
   SCHOOL: "SCHOOL",
+  LEARNING_CENTRE: "SCHOOL",
 };
 
 export function resolveOrgUiKey(
   vertical: AdminVertical | null | undefined,
   sector: AdminOrgSector | null | undefined,
 ): OrgUiKey {
-  if (vertical) return vertical;
+  if (vertical) return verticalScreen(vertical);
   if (sector) return SECTOR_TO_KEY[sector];
   return "UNKNOWN";
 }

@@ -1,3 +1,5 @@
+import type { InstitutionalVertical } from "@pathway/types";
+import { verticalsForOrgType, type OrgType } from "./state";
 import type {
   InstitutionalMappedPlanCode,
   InstitutionalStorageChoice,
@@ -16,16 +18,8 @@ export type InstitutionalStep =
 export type InstitutionalConfiguration = {
   step: InstitutionalStep;
   planCode: InstitutionalMappedPlanCode;
-  orgType: "SCHOOL" | "CHURCH" | "CHARITY" | "CLUB" | "NURSERY" | null;
-  setting:
-    | "CHURCH"
-    | "INDEPENDENT_SCHOOL"
-    | "ACE_SCHOOL"
-    | "STATE_SCHOOL"
-    | "NURSERY"
-    | "CHARITY"
-    | "CLUB"
-    | null;
+  orgType: OrgType | null;
+  setting: InstitutionalVertical | null;
   countInput: string;
   declarationAccepted: boolean;
   storageChoice: InstitutionalStorageChoice;
@@ -55,7 +49,7 @@ export const STEP_LABELS: Record<InstitutionalStep, string> = {
 export function stepsFor(
   orgType: InstitutionalConfiguration["orgType"],
 ): InstitutionalStep[] {
-  return orgType && orgType !== "SCHOOL"
+  return orgType && verticalsForOrgType(orgType).length === 1
     ? [
         "plan",
         "organisation",
