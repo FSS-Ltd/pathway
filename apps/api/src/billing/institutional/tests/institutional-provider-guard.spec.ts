@@ -15,6 +15,7 @@ describe("institutional Stripe environment guard", () => {
     process.env.INSTITUTIONAL_CHECKOUT_ENABLED = "true";
     process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED = "true";
     delete process.env.INSTITUTIONAL_LIVE_ACTIVATION_VERIFIED;
+    delete process.env.INSTITUTIONAL_LIVE_LAUNCH_APPROVED;
   });
 
   afterAll(() => {
@@ -30,6 +31,32 @@ describe("institutional Stripe environment guard", () => {
   it("keeps live activation disabled without the independent gate", () => {
     expect(() =>
       institutionalStripeKey(config("STRIPE", "sk_live_example"), "CHECKOUT"),
+    ).toThrow();
+  });
+
+  it("permits an explicitly approved live launch without claiming verification", () => {
+    process.env.INSTITUTIONAL_LIVE_LAUNCH_APPROVED = "true";
+    expect(
+      institutionalStripeKey(config("STRIPE", "sk_live_example"), "CHECKOUT"),
+    ).toBe("sk_live_example");
+    expect(
+      institutionalStripeKey(
+        config("STRIPE", "rk_live_example"),
+        "PROVIDER_WRITES",
+      ),
+    ).toBe("rk_live_example");
+    expect(process.env.INSTITUTIONAL_LIVE_ACTIVATION_VERIFIED).toBeUndefined();
+
+    process.env.INSTITUTIONAL_CHECKOUT_ENABLED = "false";
+    expect(() =>
+      institutionalStripeKey(config("STRIPE", "sk_live_example"), "CHECKOUT"),
+    ).toThrow();
+    process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED = "false";
+    expect(() =>
+      institutionalStripeKey(
+        config("STRIPE", "rk_live_example"),
+        "PROVIDER_WRITES",
+      ),
     ).toThrow();
   });
 

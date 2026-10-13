@@ -13,7 +13,8 @@ export function institutionalStripeKey(
     (providerIsLive && /^(?:sk|rk)_live_/.test(key ?? ""));
   const liveEnabled =
     !providerIsLive ||
-    process.env.INSTITUTIONAL_LIVE_ACTIVATION_VERIFIED === "true";
+    process.env.INSTITUTIONAL_LIVE_ACTIVATION_VERIFIED === "true" ||
+    process.env.INSTITUTIONAL_LIVE_LAUNCH_APPROVED === "true";
   if (
     !key ||
     !environmentMatches ||
