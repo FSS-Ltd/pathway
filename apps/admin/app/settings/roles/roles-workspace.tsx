@@ -92,20 +92,22 @@ export default function RolesWorkspace() {
     void loadMatrix();
   }, [loadMatrix]);
 
-  const loadPerson = React.useCallback(async () => {
-    if (!selected || !snapshot || !canReadPeople) return;
+  const loadPerson = React.useCallback(async (): Promise<boolean> => {
+    if (!selected || !snapshot || !canReadPeople) return false;
     const version = ++accessRequest.current;
     setLoadingPerson(true);
     setAccessError(null);
     try {
       const next = await fetchPersonAccess(selected.id);
       if (version === accessRequest.current) setAccess(next);
+      return version === accessRequest.current;
     } catch (failure) {
       if (version === accessRequest.current)
         setAccessError(
           requestFailure(failure, "Unable to load this person's access.")
             .message,
         );
+      return false;
     } finally {
       if (version === accessRequest.current) setLoadingPerson(false);
     }
@@ -277,7 +279,11 @@ export default function RolesWorkspace() {
                   onTabChange={setPersonTab}
                   onBack={() => setSelected(null)}
                   onRefresh={async () => {
-                    await loadPerson();
+                    if (!(await loadPerson())) {
+                      throw new Error(
+                        "Access changed, but its current state could not be loaded. Refresh and try again.",
+                      );
+                    }
                     directory.refresh();
                   }}
                   orgName={orgName}

@@ -11,7 +11,7 @@ latest revision and GitHub confirms its merge.
    passed on head `66bd9ca905256d805abe07eefd5656709016697d`. GitHub
    confirmed merge commit `c11f51b1dc2340b1149c79e2875aa8a596246dff`
    on 2026-10-12 at 13:41 UTC.
-2. **Compact per-person permission badges — planned.** Begins after the Academic setup width correction merges.
+2. **Compact per-person permission badges — in progress.** Branch `feature/compact-permission-badges` starts from the merged Academic setup correction at `a8dbf4193d07d469b9d23282cb4cc90be3066d2f`. PR, CI and merge evidence will be added before step 3 begins.
 3. **ACE behaviour category creation and creator badge — planned.** Begins after step 2 merge.
 4. **Staff and parent student overviews — planned.** Begins after step 3 merge.
 5. **ACE PACE placement management in profile editing — planned.** Begins after step 4 merge.
@@ -24,9 +24,16 @@ this isolated checkout; no live sign-in was attempted.
 
 The user identified the Academic setup page's remaining `max-w-4xl` wrapper
 after step 1 merged. [Follow-up PR #602](https://github.com/FSS-Ltd/pathway/pull/602)
-starts from the merged `master`, removes that constraint, and arranges its
-settings in a responsive grid. CI, authenticated visual review, and merge
-remain pending before step 2 begins.
+removed that constraint and arranged its settings in a responsive grid. All
+eight CI checks passed on its latest revision. GitHub confirmed merge commit
+`a8dbf4193d07d469b9d23282cb4cc90be3066d2f`. Authenticated visual review
+was unavailable in the isolated checkout.
+
+Step 2 replaces the person badge table with wrapping pill controls and a
+hover/focus/touch details panel. The existing mutation, exclusion confirmation,
+and revision contracts remain. Local admin typecheck, targeted integration
+test, changed-file lint and Prettier, and production build passed. Authenticated
+visual review remains unavailable in the isolated checkout.
 
 Behaviour, merits, demerits, discipline and PACE remain ACE-only. Academic
 results appear only from supported data sources. Finance and merit-wallet
