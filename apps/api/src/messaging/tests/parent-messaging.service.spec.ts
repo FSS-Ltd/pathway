@@ -3,6 +3,10 @@ import { prisma, withTenantRlsContext } from "@pathway/db";
 import { ParentMessagingHistoryService } from "../parent-messaging-history.service";
 import { ParentMessagingReadCursorService } from "../parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "../parent-messaging.service";
+import {
+  decodeMessageHistoryCursor,
+  encodeMessageHistoryCursor,
+} from "../message-history-cursor";
 
 jest.mock("@pathway/auth", () => ({
   SYSTEM_ROLE_TEMPLATES: {
@@ -19,6 +23,7 @@ jest.mock("@pathway/db", () => ({
 function setup() {
   const tx = {
     $queryRaw: jest.fn().mockResolvedValue([{ lastReadSequence: 6 }]),
+    $executeRaw: jest.fn().mockResolvedValue(0),
     user: { findFirst: jest.fn().mockResolvedValue({ id: "parent-a" }) },
     guardianIdentity: {
       findFirst: jest.fn().mockResolvedValue({ id: "guardian-a" }),
@@ -43,7 +48,9 @@ function setup() {
     },
     messageParticipantReadCursor: {
       findUnique: jest.fn().mockResolvedValue({ lastReadSequence: 2 }),
+      findMany: jest.fn().mockResolvedValue([]),
     },
+    messageDelivery: { findMany: jest.fn().mockResolvedValue([]) },
     message: {
       count: jest.fn().mockResolvedValue(3),
       findFirst: jest.fn().mockResolvedValue({ id: "message-six" }),
@@ -247,9 +254,10 @@ describe("parent messaging history", () => {
       { id: "message-five", sequence: 5 },
     ]);
 
-    await expect(
-      history.list("site-a", "parent-a", "conversation-a", { limit: 1 }),
-    ).resolves.toEqual({
+    const page = await history.list("site-a", "parent-a", "conversation-a", {
+      limit: 1,
+    });
+    expect(page).toEqual({
       items: [
         {
           id: "message-six",
@@ -257,10 +265,19 @@ describe("parent messaging history", () => {
           body: "A school update",
           createdAt: "2026-10-08T10:05:00.000Z",
           sender: { id: "staff-a", displayName: "Ms Taylor" },
+          deliveryState: null,
         },
       ],
-      nextBefore: 6,
+      nextCursor: expect.any(String),
     });
+    expect(
+      decodeMessageHistoryCursor(
+        page.nextCursor!,
+        "site-a",
+        "parent-a",
+        "conversation-a",
+      ),
+    ).toBe(6);
     expect(tx.permissionDefinition.findUnique).toHaveBeenCalledWith({
       where: { key: "messaging.messages.read" },
       select: { isActive: true },
@@ -282,9 +299,15 @@ describe("parent messaging history", () => {
     expect(tx.messageParticipantReadCursor.findUnique).not.toHaveBeenCalled();
   });
 
-  it("pages before a sequence and hides unrelated conversations", async () => {
+  it("pages with a scoped cursor and hides unrelated conversations", async () => {
     const { tx, history } = setup();
-    await history.list("site-a", "parent-a", "conversation-a", { before: 5 });
+    const cursor = encodeMessageHistoryCursor(
+      5,
+      "site-a",
+      "parent-a",
+      "conversation-a",
+    );
+    await history.list("site-a", "parent-a", "conversation-a", { cursor });
     expect(tx.message.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -301,6 +324,32 @@ describe("parent messaging history", () => {
       history.list("site-a", "parent-a", "other-conversation", {}),
     ).rejects.toThrow("Messages not found");
     expect(tx.message.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps school-team reader state private in guardian history", async () => {
+    const { tx, history } = setup();
+    tx.message.findMany.mockResolvedValueOnce([
+      {
+        id: "message-six",
+        sequence: 6,
+        bodyEncrypted: "Could we talk?",
+        createdAt: new Date("2026-10-08T10:05:00.000Z"),
+        sender: {
+          kind: "GUARDIAN",
+          userId: "parent-a",
+          user: { displayName: "Parent", name: null },
+        },
+      },
+    ]);
+    tx.messageDelivery.findMany.mockResolvedValueOnce([
+      {
+        messageId: "message-six",
+        recipientParticipantId: "staff-participant",
+        status: "READ",
+      },
+    ]);
+    const page = await history.list("site-a", "parent-a", "conversation-a", {});
+    expect(page.items[0].deliveryState).toBe("delivered");
   });
 
   it("denies an ended relationship before reading messages", async () => {

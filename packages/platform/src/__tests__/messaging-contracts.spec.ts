@@ -3,6 +3,7 @@ import {
   conversationKindSchema,
   inboxRowSchema,
   messageSchema,
+  messageCursorSchema,
   recipientSearchResultSchema,
 } from "../messaging/contracts";
 
@@ -27,9 +28,14 @@ describe("shared messaging contracts", () => {
         body: "Hello",
         createdAt: "2026-10-11T12:00:00.000Z",
         sender: { id, displayName: "School team" },
+        deliveryState: null,
         recipientRead: null,
       }).success,
     ).toBe(true);
+    expect(messageCursorSchema.safeParse("opaque-history-cursor").success).toBe(
+      true,
+    );
+    expect(messageCursorSchema.safeParse(1).success).toBe(false);
     expect(
       recipientSearchResultSchema.safeParse({ id, displayName: "Teacher" })
         .success,

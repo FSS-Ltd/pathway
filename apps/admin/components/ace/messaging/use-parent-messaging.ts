@@ -19,7 +19,9 @@ export function useParentMessaging(siteId: string, userId: string) {
   const [listError, setListError] = React.useState<string | null>(null);
   const [listRevision, setListRevision] = React.useState(0);
   const [messages, setMessages] = React.useState<StaffMessage[]>([]);
-  const [nextBefore, setNextBefore] = React.useState<number | null>(null);
+  const [nextMessageCursor, setNextMessageCursor] = React.useState<
+    string | null
+  >(null);
   const [threadLoading, setThreadLoading] = React.useState(false);
   const [threadError, setThreadError] = React.useState<string | null>(null);
   const [threadMoreLoading, setThreadMoreLoading] = React.useState(false);
@@ -66,7 +68,7 @@ export function useParentMessaging(siteId: string, userId: string) {
     if (!conversationId) return;
     const controller = new AbortController();
     setMessages([]);
-    setNextBefore(null);
+    setNextMessageCursor(null);
     setThreadLoading(true);
     setThreadError(null);
     void fetchParentMessages(siteId, conversationId, {
@@ -78,12 +80,9 @@ export function useParentMessaging(siteId: string, userId: string) {
           page.items
             .slice()
             .reverse()
-            .map((item) => ({
-              ...item,
-              recipientRead: item.sender.id === userId ? false : null,
-            })),
+            .map((item) => normalizeParentMessage(item, userId)),
         );
-        setNextBefore(page.nextBefore);
+        setNextMessageCursor(page.nextCursor);
         const newest = page.items[0];
         if (newest) {
           void advanceParentReadCursor(
@@ -131,26 +130,23 @@ export function useParentMessaging(siteId: string, userId: string) {
   }
 
   async function loadOlderMessages(): Promise<void> {
-    if (!conversationId || !nextBefore || threadMoreLoading) return;
+    if (!conversationId || !nextMessageCursor || threadMoreLoading) return;
     const current = threadGeneration.current;
     setThreadMoreLoading(true);
     setThreadError(null);
     try {
       const page = await fetchParentMessages(siteId, conversationId, {
-        before: nextBefore,
+        cursor: nextMessageCursor,
       });
       if (current !== threadGeneration.current) return;
       setMessages((items) => [
         ...page.items
           .slice()
           .reverse()
-          .map((item) => ({
-            ...item,
-            recipientRead: item.sender.id === userId ? false : null,
-          })),
+          .map((item) => normalizeParentMessage(item, userId)),
         ...items,
       ]);
-      setNextBefore(page.nextBefore);
+      setNextMessageCursor(page.nextCursor);
     } catch (error) {
       if (current === threadGeneration.current) {
         setThreadError(
@@ -197,6 +193,7 @@ export function useParentMessaging(siteId: string, userId: string) {
                 createdAt: sent.createdAt,
                 sender: { id: userId, displayName: "You" },
                 recipientRead: false,
+                deliveryState: "sent",
               },
             ],
       );
@@ -230,7 +227,7 @@ export function useParentMessaging(siteId: string, userId: string) {
     retryList: () => setListRevision((value) => value + 1),
     open,
     messages,
-    nextBefore,
+    nextMessageCursor,
     threadLoading,
     threadError,
     threadMoreLoading,
@@ -241,5 +238,18 @@ export function useParentMessaging(siteId: string, userId: string) {
     sendError,
     changeDraft,
     send,
+  };
+}
+
+function normalizeParentMessage(
+  item: Omit<StaffMessage, "recipientRead">,
+  userId: string,
+): StaffMessage {
+  const deliveryState =
+    item.deliveryState ?? (item.sender.id === userId ? "sent" : null);
+  return {
+    ...item,
+    deliveryState,
+    recipientRead: deliveryState === null ? null : deliveryState === "read",
   };
 }

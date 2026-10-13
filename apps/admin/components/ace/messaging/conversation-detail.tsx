@@ -7,7 +7,7 @@ import { ConversationAvatar } from "./conversation-avatar";
 
 export type MessageDetailState = {
   messages: StaffMessage[];
-  nextBefore: number | null;
+  nextMessageCursor: string | null;
   threadLoading: boolean;
   threadError: string | null;
   threadMoreLoading: boolean;
@@ -79,7 +79,7 @@ export function ConversationDetail({
         className="min-h-0 flex-1 overflow-y-auto bg-shell/70 px-4 pb-6 sm:px-8"
         aria-label="Messages"
       >
-        {messaging.nextBefore ? (
+        {messaging.nextMessageCursor ? (
           <div className="mb-5 text-center">
             <Button
               type="button"
@@ -147,8 +147,7 @@ function MessageList({
 }) {
   const latestOutgoingId = messages.reduce<string | null>(
     (latest, message) =>
-      message.sender.id === currentUserId &&
-      typeof message.recipientRead === "boolean"
+      message.sender.id === currentUserId && message.deliveryState !== null
         ? message.id
         : latest,
     null,
@@ -226,7 +225,11 @@ function MessageList({
                 </div>
                 {message.id === latestOutgoingId ? (
                   <p className="mt-1 text-right text-xs text-text-muted">
-                    {message.recipientRead ? "Read" : "Sent"}
+                    {message.deliveryState === "read"
+                      ? "Read"
+                      : message.deliveryState === "delivered"
+                        ? "Delivered"
+                        : "Sent"}
                   </p>
                 ) : null}
               </div>

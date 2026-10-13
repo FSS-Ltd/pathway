@@ -124,7 +124,7 @@ async function run(): Promise<void> {
               },
             ]
           : [],
-        nextBefore: null,
+        nextCursor: null,
       });
     }
     return jsonResponse({
