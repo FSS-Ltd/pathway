@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { prisma, withTenantRlsContext } from "@pathway/db";
-import { jwtVerify, type JWTPayload } from "jose";
+import {
+  exportJWK,
+  generateKeyPair,
+  jwtVerify,
+  type JWTPayload,
+  type KeyLike,
+} from "jose";
 import request from "supertest";
 import { AppModule } from "../../app.module";
 import {
@@ -104,6 +110,8 @@ const staffPath = "/ace/messages/conversations";
 const parentPath = (site: string) =>
   `/ace/parent/sites/${site}/messages/conversations`;
 const realtimeSecret = "ace-realtime-e2e-secret-with-at-least-32-characters";
+const realtimeKeyId = randomUUID();
+let realtimeVerificationKey: KeyLike;
 
 async function realtimePolicyAllows(
   claims: JWTPayload,
@@ -127,14 +135,23 @@ describe("ACE family messaging web security gate", () => {
   const originalRealtimeEnvironment = {
     url: process.env.SUPABASE_URL,
     key: process.env.SUPABASE_PUBLISHABLE_KEY,
-    secret: process.env.SUPABASE_JWT_SECRET,
+    signingJwk: process.env.SUPABASE_JWT_SIGNING_JWK,
+    legacySecret: process.env.SUPABASE_JWT_SECRET,
+    namedLegacySecret: process.env.SUPABASE_LEGACY_JWT_SECRET,
   };
 
   beforeAll(async () => {
     if (!requireDatabase()) return;
     process.env.SUPABASE_URL = "https://project.supabase.co";
     process.env.SUPABASE_PUBLISHABLE_KEY = "sb_publishable_e2e";
-    process.env.SUPABASE_JWT_SECRET = realtimeSecret;
+    const { publicKey, privateKey } = await generateKeyPair("ES256", {
+      extractable: true,
+    });
+    realtimeVerificationKey = publicKey;
+    process.env.SUPABASE_JWT_SIGNING_JWK = JSON.stringify({
+      ...(await exportJWK(privateKey)),
+      kid: realtimeKeyId,
+    });
     await prisma.org.createMany({
       data: [
         {
@@ -303,7 +320,12 @@ describe("ACE family messaging web security gate", () => {
     for (const [name, value] of [
       ["SUPABASE_URL", originalRealtimeEnvironment.url],
       ["SUPABASE_PUBLISHABLE_KEY", originalRealtimeEnvironment.key],
-      ["SUPABASE_JWT_SECRET", originalRealtimeEnvironment.secret],
+      ["SUPABASE_JWT_SIGNING_JWK", originalRealtimeEnvironment.signingJwk],
+      ["SUPABASE_JWT_SECRET", originalRealtimeEnvironment.legacySecret],
+      [
+        "SUPABASE_LEGACY_JWT_SECRET",
+        originalRealtimeEnvironment.namedLegacySecret,
+      ],
     ] as const) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
@@ -404,9 +426,14 @@ describe("ACE family messaging web security gate", () => {
     ] as const) {
       const verified = await jwtVerify(
         response.body.token,
-        new TextEncoder().encode(realtimeSecret),
-        { algorithms: ["HS256"] },
+        realtimeVerificationKey,
+        { algorithms: ["ES256"] },
       );
+      expect(verified.protectedHeader).toMatchObject({
+        alg: "ES256",
+        kid: realtimeKeyId,
+        typ: "JWT",
+      });
       expect(verified.payload.exp! - verified.payload.iat!).toBe(120);
       expect(verified.payload).toMatchObject({
         sub: userId,
@@ -451,6 +478,30 @@ describe("ACE family messaging web security gate", () => {
     }
   });
 
+  it("keeps Realtime unavailable when only legacy JWT secrets are configured", async () => {
+    if (!app) return;
+    const signingJwk = process.env.SUPABASE_JWT_SIGNING_JWK;
+    const legacySecret = process.env.SUPABASE_JWT_SECRET;
+    const namedLegacySecret = process.env.SUPABASE_LEGACY_JWT_SECRET;
+    delete process.env.SUPABASE_JWT_SIGNING_JWK;
+    process.env.SUPABASE_JWT_SECRET = realtimeSecret;
+    process.env.SUPABASE_LEGACY_JWT_SECRET = realtimeSecret;
+    try {
+      await request(app.getHttpServer())
+        .post(`${staffPath}/${staffConversationId}/realtime-token`)
+        .set("Authorization", authorization.teacher)
+        .expect(503);
+    } finally {
+      if (signingJwk === undefined) delete process.env.SUPABASE_JWT_SIGNING_JWK;
+      else process.env.SUPABASE_JWT_SIGNING_JWK = signingJwk;
+      if (legacySecret === undefined) delete process.env.SUPABASE_JWT_SECRET;
+      else process.env.SUPABASE_JWT_SECRET = legacySecret;
+      if (namedLegacySecret === undefined)
+        delete process.env.SUPABASE_LEGACY_JWT_SECRET;
+      else process.env.SUPABASE_LEGACY_JWT_SECRET = namedLegacySecret;
+    }
+  });
+
   it("revokes a pre-issued claim when the ACE capability is removed", async () => {
     if (!app) return;
     const response = await request(app.getHttpServer())
@@ -459,7 +510,8 @@ describe("ACE family messaging web security gate", () => {
       .expect(201);
     const { payload } = await jwtVerify(
       response.body.token,
-      new TextEncoder().encode(realtimeSecret),
+      realtimeVerificationKey,
+      { algorithms: ["ES256"] },
     );
     await prisma.orgVertical.delete({ where: { orgId } });
     try {
@@ -485,7 +537,8 @@ describe("ACE family messaging web security gate", () => {
       .expect(201);
     const { payload } = await jwtVerify(
       response.body.token,
-      new TextEncoder().encode(realtimeSecret),
+      realtimeVerificationKey,
+      { algorithms: ["ES256"] },
     );
     const assignment = await prisma.userRoleAssignment.findFirstOrThrow({
       where: { orgId, tenantId: siteId, userId: teacherId, revokedAt: null },
@@ -643,7 +696,8 @@ describe("ACE family messaging web security gate", () => {
       .expect(201);
     const { payload } = await jwtVerify(
       token.body.token,
-      new TextEncoder().encode(realtimeSecret),
+      realtimeVerificationKey,
+      { algorithms: ["ES256"] },
     );
     const unavailableRoutes = [
       () => request(server).get(path),
@@ -713,7 +767,8 @@ describe("ACE family messaging web security gate", () => {
       .expect(201);
     const { payload } = await jwtVerify(
       token.body.token,
-      new TextEncoder().encode(realtimeSecret),
+      realtimeVerificationKey,
+      { algorithms: ["ES256"] },
     );
     await prisma.siteMembership.delete({
       where: { tenantId_userId: { tenantId: siteId, userId: teacherId } },

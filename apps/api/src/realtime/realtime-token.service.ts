@@ -10,6 +10,7 @@ import {
 } from "@pathway/platform";
 import { SignJWT } from "jose";
 import { randomUUID } from "node:crypto";
+import { loadRealtimeSigningKey } from "./realtime-signing-key";
 import {
   assertMessagingActor,
   requireCurrentStaff,
@@ -99,6 +100,7 @@ async function issueToken(
   conversationId: string,
 ): Promise<MessageRealtimeSubscription> {
   const config = realtimeConfiguration();
+  const { key, kid } = await loadRealtimeSigningKey();
   const topic = messageConversationRealtimeTopic(conversationId);
   const issuedAt = Math.floor(Date.now() / 1_000);
   const expiresAt = issuedAt + TOKEN_LIFETIME_SECONDS;
@@ -108,13 +110,13 @@ async function issueToken(
     ace_site_id: actor.tenantId,
     ace_org_id: actor.orgId,
   })
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setProtectedHeader({ alg: "ES256", kid, typ: "JWT" })
     .setSubject(actor.userId)
     .setAudience("authenticated")
     .setIssuedAt(issuedAt)
     .setExpirationTime(expiresAt)
     .setJti(randomUUID())
-    .sign(new TextEncoder().encode(config.jwtSecret));
+    .sign(key);
   return {
     token,
     topic,
@@ -130,12 +132,10 @@ async function issueToken(
 function realtimeConfiguration(): {
   url: string;
   publishableKey: string;
-  jwtSecret: string;
 } {
   const rawUrl = process.env.SUPABASE_URL?.trim();
   const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY?.trim();
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET?.trim();
-  if (!rawUrl || !publishableKey || !jwtSecret || jwtSecret.length < 32) {
+  if (!rawUrl || !publishableKey) {
     throw new ServiceUnavailableException("Live messaging is unavailable");
   }
   let url: URL;
@@ -155,5 +155,5 @@ function realtimeConfiguration(): {
   ) {
     throw new ServiceUnavailableException("Live messaging is unavailable");
   }
-  return { url: url.origin, publishableKey, jwtSecret };
+  return { url: url.origin, publishableKey };
 }
