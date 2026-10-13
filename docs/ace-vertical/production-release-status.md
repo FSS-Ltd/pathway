@@ -569,7 +569,8 @@ none skipped. GitHub confirmed the merge into `master` on 13 October 2026 at
 13:04 UTC as `7bde7936fc78c3c8eeebdad213b557a5357711c3`. ACE-M04 is
 evidenced; the verified master-plan count is **47/150 (31⅓%, 31.33%)**.
 
-Build step 1.3e6f, ACE-M05 private message realtime, is in progress on
+Build step 1.3e6f, ACE-M05 private message realtime, is in progress in draft
+[PR #616](https://github.com/FSS-Ltd/pathway/pull/616) on
 `feature/ace-m05-realtime-web`. The API issues two-minute, one-conversation
 private Broadcast claims after the existing staff or guardian access checks.
 The Supabase policy rechecks active participation, site/organisation, ACE
