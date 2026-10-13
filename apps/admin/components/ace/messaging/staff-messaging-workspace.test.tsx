@@ -80,6 +80,8 @@ async function run(): Promise<void> {
   let postCount = 0;
   let roomOpenCount = 0;
   let readCursorSaved = false;
+  let denyThread = false;
+  let denySend = false;
   const sentRequestIds: string[] = [];
   const recipientSearches: string[] = [];
   let alexSearchFailed = false;
@@ -160,6 +162,7 @@ async function run(): Promise<void> {
       };
       sentRequestIds.push(body.clientRequestId);
       assert.equal(body.body, "Hello team");
+      if (denySend) return jsonResponse({ message: "access changed" }, 403);
       return postCount === 1
         ? jsonResponse({ message: "temporary error" }, 500)
         : jsonResponse({
@@ -173,6 +176,7 @@ async function run(): Promise<void> {
           });
     }
     if (url.pathname.endsWith("/messages")) {
+      if (denyThread) return jsonResponse({ message: "access changed" }, 403);
       if (
         url.pathname.includes(newConversationId) ||
         url.pathname.includes(roomConversationId)
@@ -246,6 +250,11 @@ async function run(): Promise<void> {
     assert.ok(conversationButton);
     assert.match(conversationButton.textContent ?? "", /1 unread message/);
     await act(async () => conversationButton.click());
+    assert.equal(
+      document.activeElement?.textContent?.trim(),
+      "Sam Adeyemi",
+      "opening a thread moves keyboard focus to its heading",
+    );
     assert.doesNotMatch(container.textContent ?? "", /unread message/);
     assert.match(container.textContent ?? "", /Welcome/);
     assert.match(container.textContent ?? "", /How are you\?/);
@@ -270,6 +279,18 @@ async function run(): Promise<void> {
       null,
     );
     assert.ok(container.querySelector('label[for="staff-message-draft"]'));
+
+    const backToList = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.getAttribute("aria-label") === "Back to conversations",
+    );
+    assert.ok(backToList);
+    await act(async () => backToList.click());
+    assert.equal(
+      document.activeElement?.textContent?.trim(),
+      "Conversations",
+      "returning to the list restores a keyboard focus landmark",
+    );
+    await act(async () => conversationButton.click());
 
     const textarea = container.querySelector("textarea");
     const form = container.querySelector("form");
@@ -458,6 +479,84 @@ async function run(): Promise<void> {
     assert.match(container.textContent ?? "", /do not have permission to send/);
     assert.doesNotMatch(container.textContent ?? "", /New message/);
     assert.doesNotMatch(container.textContent ?? "", /Staff room/);
+
+    await act(async () =>
+      root.render(
+        <StaffMessagingWorkspace
+          currentUserId={staffId}
+          canSend
+          canCreate
+          familyMessagingEnabled
+        />,
+      ),
+    );
+    const guardedConversation = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.includes("Sam Adeyemi"));
+    assert.ok(guardedConversation);
+    await act(async () => window.dispatchEvent(new dom.window.Event("focus")));
+    assert.match(container.textContent ?? "", /Welcome/);
+    denyThread = true;
+    await act(async () => window.dispatchEvent(new dom.window.Event("focus")));
+    assert.match(container.textContent ?? "", /Conversation unavailable/);
+    assert.doesNotMatch(container.textContent ?? "", /Good morning/);
+    assert.doesNotMatch(
+      container.querySelector("ol")?.textContent ?? "",
+      /Welcome/,
+    );
+    assert.equal(container.querySelector("textarea"), null);
+    await act(async () => guardedConversation.click());
+    assert.match(container.textContent ?? "", /Conversation unavailable/);
+    const deniedBack = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Back to conversations"]',
+    );
+    assert.ok(deniedBack);
+    await act(async () => deniedBack.click());
+    await act(async () => guardedConversation.click());
+    assert.match(container.textContent ?? "", /Conversation unavailable/);
+    assert.equal(container.querySelector("textarea"), null);
+
+    denyThread = false;
+    const retryThread = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Try again",
+    );
+    assert.ok(retryThread);
+    await act(async () => retryThread.click());
+    assert.match(container.textContent ?? "", /Welcome/);
+    assert.ok(container.querySelector("textarea"));
+
+    denySend = true;
+    const guardedDraft = container.querySelector("textarea");
+    const guardedForm = container.querySelector("form");
+    assert.ok(guardedDraft && guardedForm);
+    await changeDraft(guardedDraft, "Hello team");
+    await act(async () =>
+      guardedForm.dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      ),
+    );
+    assert.match(container.textContent ?? "", /Conversation unavailable/);
+    assert.equal(container.querySelector("textarea"), null);
+    assert.doesNotMatch(
+      container.querySelector("ol")?.textContent ?? "",
+      /Welcome/,
+    );
+    const retryReadAfterDeniedSend = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.trim() === "Try again");
+    assert.ok(retryReadAfterDeniedSend);
+    await act(async () => retryReadAfterDeniedSend.click());
+    assert.match(container.textContent ?? "", /Welcome/);
+    assert.match(container.textContent ?? "", /Sending access has changed/);
+    assert.equal(container.querySelector("textarea"), null);
+    const readOnlyBack = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Back to conversations"]',
+    );
+    assert.ok(readOnlyBack);
+    await act(async () => readOnlyBack.click());
+    await act(async () => guardedConversation.click());
+    assert.match(container.textContent ?? "", /Sending access has changed/);
+    assert.equal(container.querySelector("textarea"), null);
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;

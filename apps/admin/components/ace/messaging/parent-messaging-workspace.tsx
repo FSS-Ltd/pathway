@@ -56,7 +56,11 @@ export function ParentMessagesView({
 
       <MessageEmailSettings
         path={`/ace/parent/sites/${encodeURIComponent(siteId)}/messages/notifications`}
-        conversationId={messaging.conversation?.id ?? null}
+        conversationId={
+          messaging.threadAccessLost
+            ? null
+            : (messaging.conversation?.id ?? null)
+        }
       />
 
       {messaging.listLoading ? (
