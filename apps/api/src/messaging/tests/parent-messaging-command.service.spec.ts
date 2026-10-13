@@ -55,10 +55,15 @@ function setup() {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({
         id: "message-a",
+        conversationId,
         sequence: 1,
         bodyEncrypted: input.body,
         createdAt,
       }),
+    },
+    outboxEvent: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: "outbox-a" }),
     },
   };
   jest.mocked(prisma.tenant.findUnique).mockResolvedValue({
@@ -136,15 +141,31 @@ describe("parent school-team message send", () => {
       tx,
       expect.objectContaining({
         actorUserId: parentId,
-        metadata: { conversationId, sequence: 1 },
+        metadata: { conversationId, sequence: 1, recipientCount: 1 },
       }),
     );
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        orgId: "org-a",
+        aggregateType: "ACE_MESSAGE",
+        aggregateId: "message-a",
+        eventType: "ace.message.sent",
+        payload: {
+          tenantId: siteId,
+          conversationId,
+          messageId: "message-a",
+        },
+        idempotencyKey: `ace.message.send:${siteId}:${parentId}:${input.clientRequestId}`,
+      },
+      select: { id: true },
+    });
   });
 
   it("returns an identical retry without a second write and rejects changed text", async () => {
     const { tx, service } = setup();
     tx.message.findFirst.mockResolvedValue({
       id: "message-a",
+      conversationId,
       sequence: 1,
       bodyEncrypted: input.body,
       createdAt,
@@ -162,6 +183,23 @@ describe("parent school-team message send", () => {
     expect(tx.message.create).not.toHaveBeenCalled();
     expect(tx.siteMembership.findMany).not.toHaveBeenCalled();
     expect(recordAuditEventInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects reuse of a send ID for another conversation", async () => {
+    const { tx, service } = setup();
+    tx.outboxEvent.findUnique.mockResolvedValue({ aggregateId: "message-a" });
+    tx.message.findFirst.mockResolvedValue({
+      id: "message-a",
+      conversationId: "another-conversation",
+      sequence: 1,
+      bodyEncrypted: input.body,
+      createdAt,
+    });
+    await expect(
+      service.send(siteId, parentId, conversationId, input),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.message.create).not.toHaveBeenCalled();
+    expect(tx.outboxEvent.create).not.toHaveBeenCalled();
   });
 
   it("omits a former responder when another approved staff participant remains", async () => {

@@ -1,13 +1,14 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@pathway/db";
 import type { PermissionKey } from "@pathway/platform";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import type { SendMessageInput } from "./dto/messaging-command.dto";
+import {
+  findMessageRetry,
+  messageSendIdempotencyKey,
+  recordMessageSent,
+} from "./message-send-outbox";
 import {
   parentConversationScope,
   withParentMessagingAccess,
@@ -29,7 +30,11 @@ export class ParentMessagingCommandService {
       userId,
       SEND_PERMISSION,
       async (tx, guardianId, orgId) => {
-        const lockKey = `ace-parent-message-send:${siteId}:${conversationId}:${userId}:${input.clientRequestId}`;
+        const lockKey = messageSendIdempotencyKey(
+          siteId,
+          userId,
+          input.clientRequestId,
+        );
         await tx.$executeRaw(
           Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
         );
@@ -54,34 +59,15 @@ export class ParentMessagingCommandService {
           throw new NotFoundException("Messages not found");
         }
 
-        const existing = await tx.message.findFirst({
-          where: {
-            tenantId: siteId,
-            conversationId,
-            senderParticipantId: sender.id,
-            clientRequestId: input.clientRequestId,
-          },
-          select: {
-            id: true,
-            sequence: true,
-            bodyEncrypted: true,
-            createdAt: true,
-          },
-        });
-        if (existing) {
-          if (existing.bodyEncrypted !== input.body) {
-            throw new ConflictException("Client request ID already used");
-          }
-          return {
-            id: existing.id,
-            conversationId,
-            clientRequestId: input.clientRequestId,
-            sequence: existing.sequence,
-            body: existing.bodyEncrypted,
-            createdAt: existing.createdAt.toISOString(),
-            reused: true,
-          };
-        }
+        const scope = {
+          tenantId: siteId,
+          orgId,
+          userId,
+          conversationId,
+          senderParticipantId: sender.id,
+        };
+        const retry = await findMessageRetry(tx, scope, input);
+        if (retry) return retry;
 
         const staff = conversation.participants.filter(
           (participant) => participant.kind === "STAFF",
@@ -135,8 +121,13 @@ export class ParentMessagingCommandService {
           entityType: AuditEntityType.ACE_MESSAGE,
           entityId: message.id,
           action: AuditAction.CREATED,
-          metadata: { conversationId, sequence: message.sequence },
+          metadata: {
+            conversationId,
+            sequence: message.sequence,
+            recipientCount: recipients.length,
+          },
         });
+        await recordMessageSent(tx, scope, input.clientRequestId, message.id);
         return {
           id: message.id,
           conversationId,

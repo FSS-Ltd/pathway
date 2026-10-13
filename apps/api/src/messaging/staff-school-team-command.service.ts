@@ -1,12 +1,13 @@
-import {
-  ConflictException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import type { SendMessageInput } from "./dto/messaging-command.dto";
+import {
+  findMessageRetry,
+  messageSendIdempotencyKey,
+  recordMessageSent,
+} from "./message-send-outbox";
 import { assertMessagingActor, type MessagingActor } from "./messaging-access";
 import {
   requireStaffSchoolTeamAccess,
@@ -24,7 +25,11 @@ export class StaffSchoolTeamCommandService {
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       const now = new Date();
       await requireStaffSchoolTeamAccess(tx, actor, now);
-      const lockKey = `ace-staff-school-team-send:${actor.tenantId}:${conversationId}:${actor.userId}:${input.clientRequestId}`;
+      const lockKey = messageSendIdempotencyKey(
+        actor.tenantId,
+        actor.userId,
+        input.clientRequestId,
+      );
       await tx.$executeRaw(
         Prisma.sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
       );
@@ -62,34 +67,13 @@ export class StaffSchoolTeamCommandService {
         throw new NotFoundException("Messages not found");
       }
 
-      const existing = await tx.message.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          conversationId,
-          senderParticipantId: sender.id,
-          clientRequestId: input.clientRequestId,
-        },
-        select: {
-          id: true,
-          sequence: true,
-          bodyEncrypted: true,
-          createdAt: true,
-        },
-      });
-      if (existing) {
-        if (existing.bodyEncrypted !== input.body) {
-          throw new ConflictException("Client request ID already used");
-        }
-        return {
-          id: existing.id,
-          conversationId,
-          clientRequestId: input.clientRequestId,
-          sequence: existing.sequence,
-          body: existing.bodyEncrypted,
-          createdAt: existing.createdAt.toISOString(),
-          reused: true,
-        };
-      }
+      const scope = {
+        ...actor,
+        conversationId,
+        senderParticipantId: sender.id,
+      };
+      const retry = await findMessageRetry(tx, scope, input);
+      if (retry) return retry;
 
       const message = await tx.message.create({
         data: {
@@ -129,8 +113,13 @@ export class StaffSchoolTeamCommandService {
         entityType: AuditEntityType.ACE_MESSAGE,
         entityId: message.id,
         action: AuditAction.CREATED,
-        metadata: { conversationId, sequence: message.sequence },
+        metadata: {
+          conversationId,
+          sequence: message.sequence,
+          recipientCount: 1,
+        },
       });
+      await recordMessageSent(tx, scope, input.clientRequestId, message.id);
       return {
         id: message.id,
         conversationId,

@@ -60,10 +60,15 @@ function setup() {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockResolvedValue({
         id: "message-id",
+        conversationId,
         sequence: 2,
         bodyEncrypted: input.body,
         createdAt,
       }),
+    },
+    outboxEvent: {
+      findUnique: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: "outbox-a" }),
     },
   };
   jest
@@ -128,15 +133,31 @@ describe("staff school-team reply", () => {
       tx,
       expect.objectContaining({
         actorUserId: actor.userId,
-        metadata: { conversationId, sequence: 2 },
+        metadata: { conversationId, sequence: 2, recipientCount: 1 },
       }),
     );
+    expect(tx.outboxEvent.create).toHaveBeenCalledWith({
+      data: {
+        orgId: actor.orgId,
+        aggregateType: "ACE_MESSAGE",
+        aggregateId: "message-id",
+        eventType: "ace.message.sent",
+        payload: {
+          tenantId: actor.tenantId,
+          conversationId,
+          messageId: "message-id",
+        },
+        idempotencyKey: `ace.message.send:${actor.tenantId}:${actor.userId}:${input.clientRequestId}`,
+      },
+      select: { id: true },
+    });
   });
 
   it("reuses an identical request ID without writing again and rejects changed text", async () => {
     const { tx, service } = setup();
     tx.message.findFirst.mockResolvedValue({
       id: "message-id",
+      conversationId,
       sequence: 2,
       bodyEncrypted: input.body,
       createdAt,
@@ -152,6 +173,23 @@ describe("staff school-team reply", () => {
     ).rejects.toBeInstanceOf(ConflictException);
     expect(tx.message.create).not.toHaveBeenCalled();
     expect(recordAuditEventInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects reuse of a send ID for another conversation", async () => {
+    const { tx, service } = setup();
+    tx.outboxEvent.findUnique.mockResolvedValue({ aggregateId: "message-id" });
+    tx.message.findFirst.mockResolvedValue({
+      id: "message-id",
+      conversationId: "another-conversation",
+      sequence: 2,
+      bodyEncrypted: input.body,
+      createdAt,
+    });
+    await expect(
+      service.send(actor, conversationId, input),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.message.create).not.toHaveBeenCalled();
+    expect(tx.outboxEvent.create).not.toHaveBeenCalled();
   });
 
   it("denies a former responder or a missing current guardian participant", async () => {
