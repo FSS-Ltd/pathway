@@ -5,6 +5,7 @@ import {
   isUsingMockApi,
 } from "./api-client";
 import { apiErrorFromResponse } from "./api-transport";
+import type { MessageRealtimeSubscription } from "@pathway/platform";
 
 export type StaffConversation = {
   id: string;
@@ -64,6 +65,21 @@ export type SentStaffMessage = {
 };
 
 const basePath = "/ace/messages/conversations";
+
+export async function issueStaffRealtimeToken(
+  conversationId: string,
+  channel: "staff" | "school-team",
+  signal?: AbortSignal,
+): Promise<MessageRealtimeSubscription> {
+  const path = channel === "school-team" ? `${basePath}/school-team` : basePath;
+  return request(
+    `${path}/${encodeURIComponent(conversationId)}/realtime-token`,
+    {
+      method: "POST",
+      signal,
+    },
+  );
+}
 
 export async function searchStaffRecipients(
   search: string,

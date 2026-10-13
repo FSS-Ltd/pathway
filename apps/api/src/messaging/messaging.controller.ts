@@ -18,6 +18,7 @@ import { z } from "zod";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
+import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
 import {
   createStaffConversationSchema,
   sendMessageSchema,
@@ -37,6 +38,7 @@ import { StaffSchoolTeamReadCursorService } from "./staff-school-team-read-curso
 import { StaffSchoolTeamCommandService } from "./staff-school-team-command.service";
 import { StaffSchoolTeamService } from "./staff-school-team.service";
 import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.interceptor";
+import { MessageRealtimePublisher } from "./message-realtime.publisher";
 
 @UseGuards(AuthUserGuard, PermissionGuard)
 @UseInterceptors(MessagingBoundaryAuditInterceptor)
@@ -58,6 +60,8 @@ export class MessagingController {
     private readonly schoolTeamCommands: StaffSchoolTeamCommandService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
+    @Inject(MessageRealtimePublisher)
+    private readonly realtime: MessageRealtimePublisher,
   ) {}
 
   @Get()
@@ -155,14 +159,22 @@ export class MessagingController {
   }
 
   @Put("school-team/:id/read-cursor")
+  @IndependentTransaction()
   @RequirePermission("messaging.messages.read")
   async schoolTeamReadCursor(@Param("id") id: string, @Body() body: unknown) {
     try {
-      return await this.schoolTeamCursors.advance(
+      const conversationId = await conversationIdSchema.parseAsync(id);
+      const result = await this.schoolTeamCursors.advance(
         this.actor(),
-        await conversationIdSchema.parseAsync(id),
+        conversationId,
         await readCursorSchema.parseAsync(body),
       );
+      await this.realtime.publishAfterCommit({
+        type: "conversation.read",
+        conversationId,
+        readerScope: "participant",
+      });
+      return result;
     } catch (error) {
       if (error instanceof z.ZodError)
         throw new BadRequestException(error.flatten());
@@ -171,15 +183,25 @@ export class MessagingController {
   }
 
   @Post("school-team/:id/messages")
+  @IndependentTransaction()
   @HttpCode(HttpStatus.OK)
   @RequirePermission("messaging.messages.send")
   async schoolTeamSend(@Param("id") id: string, @Body() body: unknown) {
     try {
-      return await this.schoolTeamCommands.send(
+      const conversationId = await conversationIdSchema.parseAsync(id);
+      const result = await this.schoolTeamCommands.send(
         this.actor(),
-        await conversationIdSchema.parseAsync(id),
+        conversationId,
         await sendMessageSchema.parseAsync(body),
       );
+      if (!result.reused) {
+        await this.realtime.publishAfterCommit({
+          type: "message.created",
+          conversationId,
+          messageId: result.id,
+        });
+      }
+      return result;
     } catch (error) {
       if (error instanceof z.ZodError)
         throw new BadRequestException(error.flatten());
@@ -188,15 +210,25 @@ export class MessagingController {
   }
 
   @Post(":id/messages")
+  @IndependentTransaction()
   @HttpCode(HttpStatus.OK)
   @RequirePermission("messaging.messages.send")
   async send(@Param("id") id: string, @Body() body: unknown) {
     try {
-      return await this.commands.sendStaffMessage(
+      const conversationId = await conversationIdSchema.parseAsync(id);
+      const result = await this.commands.sendStaffMessage(
         this.actor(),
-        await conversationIdSchema.parseAsync(id),
+        conversationId,
         await sendMessageSchema.parseAsync(body),
       );
+      if (!result.reused) {
+        await this.realtime.publishAfterCommit({
+          type: "message.created",
+          conversationId,
+          messageId: result.id,
+        });
+      }
+      return result;
     } catch (error) {
       if (error instanceof z.ZodError)
         throw new BadRequestException(error.flatten());
@@ -205,14 +237,22 @@ export class MessagingController {
   }
 
   @Put(":id/read-cursor")
+  @IndependentTransaction()
   @RequirePermission("messaging.messages.read")
   async readCursor(@Param("id") id: string, @Body() body: unknown) {
     try {
-      return await this.service.advanceStaffReadCursor(
+      const conversationId = await conversationIdSchema.parseAsync(id);
+      const result = await this.service.advanceStaffReadCursor(
         this.actor(),
-        await conversationIdSchema.parseAsync(id),
+        conversationId,
         await readCursorSchema.parseAsync(body),
       );
+      await this.realtime.publishAfterCommit({
+        type: "conversation.read",
+        conversationId,
+        readerScope: "participant",
+      });
+      return result;
     } catch (error) {
       if (error instanceof z.ZodError)
         throw new BadRequestException(error.flatten());

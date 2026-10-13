@@ -97,6 +97,9 @@ async function run(): Promise<void> {
       readCursorSaved = true;
       return jsonResponse({ lastReadSequence: 3 });
     }
+    if (url.pathname.endsWith("/realtime-token")) {
+      return jsonResponse({ message: "Live updates unavailable" }, 503);
+    }
     if (url.pathname.endsWith("/recipients")) {
       const search = url.searchParams.get("search") ?? "";
       recipientSearches.push(search);

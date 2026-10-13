@@ -11,6 +11,9 @@ import {
   type ParentConversation,
 } from "@/lib/ace-parent-messaging-api";
 import { requestFailure } from "@/lib/request-error";
+import { ApiError } from "@/lib/api-transport";
+import { useMessageRealtime } from "./use-message-realtime";
+import { mergeMessageHistory } from "./merge-message-history";
 
 export function useParentMessaging(siteId: string, userId: string) {
   const [conversation, setConversation] =
@@ -32,16 +35,41 @@ export function useParentMessaging(siteId: string, userId: string) {
   const generation = React.useRef(0);
   const threadGeneration = React.useRef(0);
   const requestId = React.useRef<string | null>(null);
+  const lastReadAttempt = React.useRef<{
+    conversationId: string;
+    sequence: number;
+  } | null>(null);
+  const messagesRef = React.useRef(messages);
+  const nextMessageCursorRef = React.useRef(nextMessageCursor);
+  messagesRef.current = messages;
+  nextMessageCursorRef.current = nextMessageCursor;
+  const identityRef = React.useRef<string | null>(null);
+  const realtimeStatus = useMessageRealtime({
+    kind: "parent",
+    conversationId: conversation?.id ?? null,
+    siteId,
+    onInvalidate: () => {
+      setListRevision((revision) => revision + 1);
+      setThreadRevision((revision) => revision + 1);
+    },
+  });
 
   React.useEffect(() => {
     const current = ++generation.current;
     const controller = new AbortController();
     setListLoading(true);
     setListError(null);
-    setConversation(null);
-    setMessages([]);
-    setDraft("");
-    requestId.current = null;
+    const identity = `${siteId}:${userId}`;
+    if (identityRef.current !== identity) {
+      identityRef.current = identity;
+      setConversation(null);
+      setMessages([]);
+      messagesRef.current = [];
+      nextMessageCursorRef.current = null;
+      setDraft("");
+      requestId.current = null;
+      lastReadAttempt.current = null;
+    }
     void fetchParentConversation(siteId, controller.signal)
       .then((item) => {
         if (current === generation.current) setConversation(item);
@@ -52,6 +80,10 @@ export function useParentMessaging(siteId: string, userId: string) {
           requestFailure(error, "Your school messages could not be loaded.")
             .message,
         );
+        setConversation(null);
+        setMessages([]);
+        messagesRef.current = [];
+        nextMessageCursorRef.current = null;
       })
       .finally(() => {
         if (current === generation.current) setListLoading(false);
@@ -67,8 +99,6 @@ export function useParentMessaging(siteId: string, userId: string) {
     const current = ++threadGeneration.current;
     if (!conversationId) return;
     const controller = new AbortController();
-    setMessages([]);
-    setNextMessageCursor(null);
     setThreadLoading(true);
     setThreadError(null);
     void fetchParentMessages(siteId, conversationId, {
@@ -76,21 +106,37 @@ export function useParentMessaging(siteId: string, userId: string) {
     })
       .then((page) => {
         if (current !== threadGeneration.current) return;
-        setMessages(
-          page.items
-            .slice()
-            .reverse()
-            .map((item) => normalizeParentMessage(item, userId)),
+        const latest = page.items
+          .slice()
+          .reverse()
+          .map((item) => normalizeParentMessage(item, userId));
+        const merged = mergeMessageHistory(
+          messagesRef.current,
+          latest,
+          nextMessageCursorRef.current,
+          page.nextCursor,
         );
-        setNextMessageCursor(page.nextCursor);
+        messagesRef.current = merged.messages;
+        nextMessageCursorRef.current = merged.nextCursor;
+        setMessages(merged.messages);
+        setNextMessageCursor(merged.nextCursor);
         const newest = page.items[0];
-        if (newest) {
+        if (
+          newest &&
+          (lastReadAttempt.current?.conversationId !== conversationId ||
+            newest.sequence > lastReadAttempt.current.sequence)
+        ) {
+          lastReadAttempt.current = {
+            conversationId,
+            sequence: newest.sequence,
+          };
           void advanceParentReadCursor(
             siteId,
             conversationId,
             newest.sequence,
           ).catch(() => {
             if (current === threadGeneration.current) {
+              lastReadAttempt.current = null;
               setThreadError(
                 "Messages loaded, but read status could not be saved.",
               );
@@ -101,6 +147,15 @@ export function useParentMessaging(siteId: string, userId: string) {
       .catch((error: unknown) => {
         if (current !== threadGeneration.current || controller.signal.aborted)
           return;
+        if (
+          error instanceof ApiError &&
+          [401, 403, 404].includes(error.status)
+        ) {
+          messagesRef.current = [];
+          nextMessageCursorRef.current = null;
+          setMessages([]);
+          setNextMessageCursor(null);
+        }
         setThreadError(
           requestFailure(error, "Unable to load messages.").message,
         );
@@ -221,6 +276,7 @@ export function useParentMessaging(siteId: string, userId: string) {
   }
 
   return {
+    realtimeStatus,
     conversation,
     listLoading,
     listError,

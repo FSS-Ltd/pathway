@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { requestFailure } from "@/lib/request-error";
+import { ApiError } from "@/lib/api-transport";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import {
   advanceStaffReadCursor,
@@ -18,6 +19,8 @@ import {
   type StaffMessage,
   type StaffRecipient,
 } from "@/lib/ace-messaging-api";
+import { useMessageRealtime } from "./use-message-realtime";
+import { mergeMessageHistory } from "./merge-message-history";
 
 export function useStaffMessaging(
   currentUserId: string,
@@ -52,7 +55,24 @@ export function useStaffMessaging(
   const selectedIdRef = React.useRef(selectedId);
   const openedConversation = React.useRef<StaffConversation | null>(null);
   const requestIds = React.useRef<Record<string, string>>({});
+  const lastReadAttempt = React.useRef<{
+    conversationId: string;
+    sequence: number;
+  } | null>(null);
+  const messagesRef = React.useRef(messages);
+  const nextMessageCursorRef = React.useRef(nextMessageCursor);
+  messagesRef.current = messages;
+  nextMessageCursorRef.current = nextMessageCursor;
   selectedIdRef.current = selectedId;
+  const realtimeStatus = useMessageRealtime({
+    kind: channel,
+    conversationId: selectedId,
+    siteRevision,
+    onInvalidate: () => {
+      setListRevision((revision) => revision + 1);
+      setThreadRevision((revision) => revision + 1);
+    },
+  });
 
   React.useEffect(() => {
     const unsubscribe = subscribeToActiveSiteChanges(() => {
@@ -61,6 +81,8 @@ export function useStaffMessaging(
       selectedIdRef.current = null;
       openedConversation.current = null;
       setConversations([]);
+      messagesRef.current = [];
+      nextMessageCursorRef.current = null;
       setNextCursor(null);
       setSelectedId(null);
       setMessages([]);
@@ -70,6 +92,7 @@ export function useStaffMessaging(
       setSendError(null);
       setDrafts({});
       requestIds.current = {};
+      lastReadAttempt.current = null;
       setRoomOpening(false);
       setRoomError(null);
       setListMoreLoading(false);
@@ -105,6 +128,14 @@ export function useStaffMessaging(
       })
       .catch((error: unknown) => {
         if (!active || controller.signal.aborted) return;
+        if (
+          error instanceof ApiError &&
+          [401, 403, 404].includes(error.status)
+        ) {
+          setConversations([]);
+          setSelectedId(null);
+          setMessages([]);
+        }
         setListError(
           messageFrom(
             error,
@@ -133,8 +164,6 @@ export function useStaffMessaging(
     let active = true;
     const generation = ++threadGeneration.current;
     const controller = new AbortController();
-    setMessages([]);
-    setNextMessageCursor(null);
     setThreadMoreLoading(false);
     setThreadLoading(true);
     setThreadError(null);
@@ -146,15 +175,30 @@ export function useStaffMessaging(
     )
       .then((page) => {
         if (!active || generation !== threadGeneration.current) return;
-        setMessages(
-          page.items
-            .slice()
-            .reverse()
-            .map((item) => normalizeMessage(item, schoolTeam)),
+        const latest = page.items
+          .slice()
+          .reverse()
+          .map((item) => normalizeMessage(item, schoolTeam));
+        const merged = mergeMessageHistory(
+          messagesRef.current,
+          latest,
+          nextMessageCursorRef.current,
+          page.nextCursor,
         );
-        setNextMessageCursor(page.nextCursor);
+        messagesRef.current = merged.messages;
+        nextMessageCursorRef.current = merged.nextCursor;
+        setMessages(merged.messages);
+        setNextMessageCursor(merged.nextCursor);
         const newest = page.items[0];
-        if (newest) {
+        if (
+          newest &&
+          (lastReadAttempt.current?.conversationId !== selectedId ||
+            newest.sequence > lastReadAttempt.current.sequence)
+        ) {
+          lastReadAttempt.current = {
+            conversationId: selectedId,
+            sequence: newest.sequence,
+          };
           void (
             schoolTeam ? advanceSchoolTeamReadCursor : advanceStaffReadCursor
           )(selectedId, newest.sequence)
@@ -170,6 +214,7 @@ export function useStaffMessaging(
             })
             .catch(() => {
               if (active && generation === threadGeneration.current) {
+                lastReadAttempt.current = null;
                 setThreadError(
                   "Messages loaded, but read status could not be saved.",
                 );
@@ -179,6 +224,15 @@ export function useStaffMessaging(
       })
       .catch((error: unknown) => {
         if (!active || controller.signal.aborted) return;
+        if (
+          error instanceof ApiError &&
+          [401, 403, 404].includes(error.status)
+        ) {
+          messagesRef.current = [];
+          nextMessageCursorRef.current = null;
+          setMessages([]);
+          setNextMessageCursor(null);
+        }
         setThreadError(messageFrom(error, "Unable to load messages."));
       })
       .finally(() => {
@@ -308,7 +362,10 @@ export function useStaffMessaging(
   function selectConversation(id: string | null) {
     threadGeneration.current += 1;
     selectedIdRef.current = id;
+    lastReadAttempt.current = null;
     setSelectedId(id);
+    messagesRef.current = [];
+    nextMessageCursorRef.current = null;
     setMessages([]);
     setNextMessageCursor(null);
     setThreadError(null);
@@ -371,6 +428,7 @@ export function useStaffMessaging(
   }
 
   return {
+    realtimeStatus,
     siteRevision,
     conversations,
     nextCursor,
