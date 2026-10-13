@@ -569,9 +569,11 @@ none skipped. GitHub confirmed the merge into `master` on 13 October 2026 at
 13:04 UTC as `7bde7936fc78c3c8eeebdad213b557a5357711c3`. ACE-M04 is
 evidenced; the verified master-plan count is **47/150 (31⅓%, 31.33%)**.
 
-Build step 1.3e6f, ACE-M05 private message realtime, is in progress in draft
-[PR #616](https://github.com/FSS-Ltd/pathway/pull/616) on
-`feature/ace-m05-realtime-web`. The API issues two-minute, one-conversation
+Build step 1.3e6f, ACE-M05 private message realtime, merged in
+[PR #616](https://github.com/FSS-Ltd/pathway/pull/616) at checked head
+`9cb821a239416dbb31fefdec6e638a0cb9e54022`. All eight applicable
+checks passed; GitHub reports the 13 October 2026 14:56 UTC merge commit
+`bdb674f724834219469d5b757a811a23419597eb`. The API issues two-minute, one-conversation
 private Broadcast claims after the existing staff or guardian access checks.
 The Supabase policy rechecks active participation, site/organisation, ACE
 capability, guardian relationship, and current staff read role. Send and read
@@ -579,16 +581,19 @@ invalidation events contain IDs only and publish after database commit. The
 admin web client refetches REST history on events, reconnects, focus, and a
 bounded polling interval. The restored production Supabase project is connected,
 and its publishable key is configured in the API Vercel production environment.
-The signing contract uses an imported ES256 key rather than the project's legacy
-shared JWT secret. The API requires the matching private JWK in its encrypted
+The merged revision signs with the project's legacy shared JWT secret. The
+corrective branch `fix/ace-m05-es256-signing` changes the contract to an
+imported ES256 key. The corrected API requires the matching private JWK in its encrypted
 `SUPABASE_JWT_SIGNING_JWK` environment variable and issues no Realtime token
 when it is absent, even if legacy JWT variables are present. Live enablement
-requires importing and activating that signing key in Supabase, configuring the
-API variable, and deploying this PR's private Realtime policy migration on the
-project. Key activation changes the project's Auth signing key and must be
-planned as a production change. Until then, token issuance returns 503 and web
-REST polling remains available. This step does not change the verified count
-until its own PR has green latest-head CI and a confirmed merge.
+requires importing and activating that signing key in Supabase and configuring
+the API variable. A read-only production check on 13 October 2026 confirmed
+that #616's three private `realtime.messages` policies are installed. Key
+activation changes the project's Auth signing key and must be planned as a
+production change. The live subscription and denial smoke tests remain open;
+web REST polling preserves message correctness. ACE-M05 does not advance the
+verified count until the corrective PR is green and merged and the live gate is
+evidenced.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

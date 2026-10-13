@@ -21,9 +21,9 @@ Never put it in source, CI output, this document, or a browser environment.
    JWKS endpoint. A standby key also appears in JWKS, so discovery alone does
    not prove activation. Verify affected Supabase Auth clients can obtain and
    use new tokens.
-5. Deploy PR #616's `20261013140000_ace_private_message_realtime` migration to
-   the production project. Verify the private `realtime.messages` policy exists,
-   then smoke-test an allowed conversation and a denied cross-conversation
+5. Verify PR #616's `20261013140000_ace_private_message_realtime` migration
+   and its private `realtime.messages` policies on the production project, then
+   smoke-test an allowed conversation and a denied cross-conversation
    subscription. The web client must still refetch REST history after reconnect.
 6. After successful verification, remove the unused legacy JWT variables from
    `nexsteps-api`. Do not revoke the previous project key until its valid tokens
