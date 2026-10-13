@@ -3,6 +3,7 @@ import { AccessControlModule } from "../access-control/access-control.module";
 import { AuthModule } from "../auth/auth.module";
 import { CommonModule } from "../common/common.module";
 import { MessagingController } from "./messaging.controller";
+import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.interceptor";
 import { MessagingCommandService } from "./messaging-command.service";
 import { MessagingConversationService } from "./messaging-conversation.service";
 import { MessagingService } from "./messaging.service";
@@ -21,6 +22,7 @@ import { StaffSchoolTeamService } from "./staff-school-team.service";
   imports: [CommonModule, AuthModule, AccessControlModule],
   controllers: [MessagingController, ParentMessagingController],
   providers: [
+    MessagingBoundaryAuditInterceptor,
     MessagingService,
     MessagingConversationService,
     MessagingCommandService,

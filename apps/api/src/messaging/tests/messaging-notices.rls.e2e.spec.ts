@@ -1289,6 +1289,55 @@ describe("ACE parent/staff messaging and notices storage", () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it("pages same-time staff conversations without repeating or crossing sites", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const ids = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversations = await Promise.all([
+          createStaffConversation(tx, fixture, "STAFF_DIRECT"),
+          createStaffConversation(tx, fixture, "STAFF_ROOM"),
+        ]);
+        const conversationIds = conversations.map(
+          (item) => item.conversationId,
+        );
+        await tx.messageConversation.updateMany({
+          where: { id: { in: conversationIds }, tenantId: fixture.tenantAId },
+          data: { updatedAt: new Date(Date.now() + 60_000) },
+        });
+        const ordered = await tx.messageConversation.findMany({
+          where: { id: { in: conversationIds }, tenantId: fixture.tenantAId },
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          select: { id: true },
+        });
+        return ordered.map((conversation) => conversation.id);
+      },
+    );
+    const service = new MessagingService();
+
+    const first = await service.listStaffConversations(actor, { limit: 1 });
+    expect(first.items.map((item) => item.id)).toEqual([ids[0]]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const second = await service.listStaffConversations(actor, {
+      limit: 1,
+      cursor: first.nextCursor ?? undefined,
+    });
+    expect(second.items.map((item) => item.id)).toEqual([ids[1]]);
+    await expect(
+      service.listStaffConversations(
+        { ...actor, tenantId: fixture.tenantBId, orgId: fixture.orgBId },
+        { limit: 1, cursor: first.nextCursor ?? undefined },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it("opens one audited direct conversation for two current site staff", async () => {
     if (!isDatabaseAvailable()) return;
 
