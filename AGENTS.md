@@ -22,6 +22,10 @@ After changes, every agent must run `graphify update .` when code files changed,
 
 ---
 
+## Codex verification before completion
+
+**Codex must verify before claiming completion.** Inspect every changed file and the final diff; run the applicable formatting, lint, type, test, integration, and build checks; and exercise changed user flows in the running application. UI work requires actual desktop/mobile and accessibility inspection. Compliance work additionally requires source/applicability review, persistence checks, progress-calculation checks, and permission/tenant-isolation tests. Record commands, results, and inspected scenarios. If any required check is unavailable or failing, report the exact limitation and do not call the work complete. Build-step completion also requires passing CI on the latest required revision and verified PR merge.
+
 ## Branch naming
 
 Never create or push a branch with the `codex/` prefix. Use the repository's
