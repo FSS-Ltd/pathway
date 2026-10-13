@@ -2,7 +2,7 @@
 
 import React from "react";
 import type { AccessTagKey } from "@pathway/platform/access-tags";
-import { Badge, DataTable, Label, Select, type ColumnDef } from "@pathway/ui";
+import { Label, Select } from "@pathway/ui";
 import type {
   BadgeScope,
   BadgeState,
@@ -14,8 +14,9 @@ import {
   setPersonBadgeState,
 } from "@/lib/roles-access-api";
 import { BadgeExclusionDialog } from "./badge-exclusion-dialog";
+import { PersonBadgeControl } from "./person-badge-control";
 
-type WriteStatus =
+export type BadgeWriteStatus =
   | { kind: "pending" }
   | { kind: "saved" }
   | {
@@ -26,19 +27,6 @@ type WriteStatus =
       scope: BadgeScope;
       requestId: string;
     };
-
-function explicitState(
-  badge: PersonBadge,
-  scope: BadgeScope,
-  siteId: string | null,
-): BadgeState {
-  const tenantId = scope === "organisation" ? null : siteId;
-  if (badge.exclusions.some((entry) => entry.tenantId === tenantId))
-    return "excluded";
-  if (badge.directGrants.some((entry) => entry.tenantId === tenantId))
-    return "enabled";
-  return "inherit";
-}
 
 export function PersonBadges({
   access,
@@ -52,13 +40,14 @@ export function PersonBadges({
   const [scope, setScope] = React.useState<BadgeScope>(
     siteId ? "site" : "organisation",
   );
-  const [statuses, setStatuses] = React.useState<Record<string, WriteStatus>>(
-    {},
-  );
+  const [statuses, setStatuses] = React.useState<
+    Record<string, BadgeWriteStatus>
+  >({});
   const [confirmBadge, setConfirmBadge] = React.useState<PersonBadge | null>(
     null,
   );
   const triggerRef = React.useRef<HTMLElement | null>(null);
+
   React.useEffect(() => {
     setScope(siteId ? "site" : "organisation");
     setStatuses({});
@@ -71,9 +60,10 @@ export function PersonBadges({
     targetScope = scope,
     requestId = crypto.randomUUID(),
   ) => {
+    const statusKey = `${targetScope}:${badge.key}`;
     setStatuses((current) => ({
       ...current,
-      [badge.key]: { kind: "pending" },
+      [statusKey]: { kind: "pending" },
     }));
     try {
       await setPersonBadgeState({
@@ -90,13 +80,13 @@ export function PersonBadges({
       await onRefresh();
       setStatuses((current) => ({
         ...current,
-        [badge.key]: { kind: "saved" },
+        [statusKey]: { kind: "saved" },
       }));
     } catch (failure) {
       const error = failure instanceof BadgeMutationError ? failure : null;
       setStatuses((current) => ({
         ...current,
-        [badge.key]: {
+        [statusKey]: {
           kind: "error",
           message:
             failure instanceof Error
@@ -105,12 +95,22 @@ export function PersonBadges({
           blockingTags: error?.blockingTags ?? [],
           state,
           scope: targetScope,
-          requestId,
+          requestId:
+            error?.code === "BADGE_STATE_CONFLICT"
+              ? crypto.randomUUID()
+              : requestId,
         },
       }));
-      if (error?.code === "BADGE_STATE_CONFLICT") void onRefresh();
+      if (error?.code === "BADGE_STATE_CONFLICT") {
+        try {
+          await onRefresh();
+        } catch {
+          /* The visible error remains retryable. */
+        }
+      }
     }
   };
+
   const requestState = (badge: PersonBadge, state: BadgeState) => {
     if (state === "excluded") {
       triggerRef.current =
@@ -118,7 +118,9 @@ export function PersonBadges({
           ? document.activeElement
           : null;
       setConfirmBadge(badge);
-    } else void write(badge, state);
+    } else {
+      void write(badge, state);
+    }
   };
   const closeConfirmation = () => {
     setConfirmBadge(null);
@@ -128,139 +130,14 @@ export function PersonBadges({
   const badgeNames = new Map(
     access.badges.map((badge) => [badge.key, badge.label]),
   );
-  const columns: ColumnDef<PersonBadge>[] = [
-    {
-      id: "badge",
-      header: "Badge",
-      cell: (badge) => (
-        <div>
-          <span className="font-medium text-text-primary">{badge.label}</span>
-          <p className="text-xs text-text-muted">{badge.description}</p>
-          {!badge.available && <Badge variant="secondary">Unavailable</Badge>}
-        </div>
-      ),
-    },
-    {
-      id: "effective",
-      header: "Effective access",
-      cell: (badge) => (
-        <span className="inline-flex flex-wrap items-center gap-1.5">
-          <Badge
-            variant={
-              badge.selected
-                ? "success"
-                : badge.effectiveCoverage === "partial"
-                  ? "accent"
-                  : "secondary"
-            }
-          >
-            {badge.selected
-              ? "Included"
-              : badge.effectiveCoverage === "partial"
-                ? "Partial"
-                : "No access"}
-          </Badge>
-          {explicitState(badge, scope, siteId) === "inherit" &&
-            badge.selected && (
-              <span className="text-xs text-text-muted">Inherited</span>
-            )}
-        </span>
-      ),
-    },
-    {
-      id: "sources",
-      header: "Sources",
-      priority: "secondary",
-      cell: (badge) => (
-        <span className="text-xs text-text-muted">
-          {[
-            ...badge.sourceRoleIds.map((id) => roleNames.get(id) ?? id),
-            ...(badge.directGrants.length ? ["Direct badge grant"] : []),
-          ].join(", ") || "No role or grant source"}
-          {badge.blockingTags.length > 0 &&
-            ` · Blocked by ${badge.blockingTags.map((key) => badgeNames.get(key) ?? key).join(", ")}`}
-        </span>
-      ),
-    },
-    {
-      id: "controls",
-      header: "Selected scope",
-      cell: (badge) => {
-        const status = statuses[badge.key];
-        const currentState = explicitState(badge, scope, siteId);
-        const editable = badge.editableScopes.includes(scope);
-        return (
-          <div className="min-w-48">
-            <div
-              className="flex flex-wrap gap-1"
-              aria-label={`${badge.label} state for ${scope}`}
-            >
-              {(["enabled", "excluded", "inherit"] as const).map((state) => (
-                <button
-                  key={state}
-                  type="button"
-                  aria-pressed={currentState === state}
-                  disabled={
-                    !editable ||
-                    status?.kind === "pending" ||
-                    currentState === state
-                  }
-                  onClick={() => requestState(badge, state)}
-                  className="rounded-md border border-border-subtle px-2 py-1 text-xs capitalize text-text-secondary hover:bg-muted aria-pressed:border-accent-primary aria-pressed:bg-accent-primary/10 aria-pressed:text-accent-primary disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info"
-                >
-                  {state}
-                </button>
-              ))}
-            </div>
-            <span role="status" className="mt-1 block text-xs text-text-muted">
-              {status?.kind === "pending" && "Saving…"}
-              {status?.kind === "saved" && "Saved"}
-              {status?.kind === "error" && (
-                <span className="text-status-danger">
-                  {status.message}
-                  {status.blockingTags.length > 0 &&
-                    ` ${status.blockingTags.map((key) => badgeNames.get(key) ?? key).join(", ")}`}
-                  {editable && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void write(
-                          badge,
-                          status.state,
-                          status.scope,
-                          status.requestId,
-                        )
-                      }
-                      className="ml-1 rounded underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-info"
-                    >
-                      Retry
-                    </button>
-                  )}
-                </span>
-              )}
-              {!status &&
-                !editable &&
-                (access.superUserExempt
-                  ? "Platform superuser is exempt"
-                  : !badge.available
-                    ? "Unavailable"
-                    : !access.canAdministerBadges
-                      ? "Organisation Head required"
-                      : scope === "site" && !access.targetInSelectedSite
-                        ? "Person is not in this site"
-                        : "Not editable in this scope")}
-            </span>
-          </div>
-        );
-      },
-    },
-  ];
+
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="max-w-xl text-sm text-text-muted">
-          Included badges reflect role and direct grants. An exclusion removes
-          its mapped permissions until explicitly cleared.
+          Select badges to add permissions. Selected badges may come from roles
+          or direct grants. Excluding a badge removes its mapped permissions
+          until cleared.
         </p>
         <div className="w-48">
           <Label htmlFor="badge-scope">Edit scope</Label>
@@ -277,14 +154,31 @@ export function PersonBadges({
           </Select>
         </div>
       </div>
-      <DataTable
-        data={access.badges}
-        columns={columns}
-        caption={`Badges for ${access.user.displayName || access.user.name || access.user.email}`}
-        rowKey={(badge) => badge.key}
-        pagination={{ mode: "client" }}
-        emptyMessage="No badges are defined."
-      />
+      {access.badges.length ? (
+        <ul
+          aria-label={`Badges for ${access.user.displayName || access.user.name || access.user.email}`}
+          className="flex flex-wrap items-start gap-3"
+        >
+          {access.badges.map((badge) => (
+            <PersonBadgeControl
+              key={badge.key}
+              badge={badge}
+              access={access}
+              scope={scope}
+              siteId={siteId}
+              status={statuses[`${scope}:${badge.key}`]}
+              roleNames={roleNames}
+              badgeNames={badgeNames}
+              onStateChange={(state) => requestState(badge, state)}
+              onRetry={(status) =>
+                void write(badge, status.state, status.scope, status.requestId)
+              }
+            />
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-text-muted">No badges are defined.</p>
+      )}
       {confirmBadge && (
         <BadgeExclusionDialog
           badge={confirmBadge}
