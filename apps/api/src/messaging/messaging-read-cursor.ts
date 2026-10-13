@@ -26,7 +26,7 @@ export async function advanceMessageReadCursor(
   const readAt = new Date();
   await tx.$executeRaw`
     UPDATE "MessageDelivery" AS delivery
-    SET "status" = 'READ'::"MessageDeliveryStatus",
+    SET "status" = 'READ',
         "deliveredAt" = COALESCE(delivery."deliveredAt", ${readAt}),
         "readAt" = GREATEST(COALESCE(delivery."deliveredAt", ${readAt}), ${readAt}),
         "updatedAt" = ${readAt}
@@ -37,7 +37,7 @@ export async function advanceMessageReadCursor(
       AND message."sequence" <= ${rows[0].lastReadSequence}
       AND delivery."tenantId" = ${siteId}
       AND delivery."recipientParticipantId" = ${participantId}
-      AND delivery."status" <> 'READ'::"MessageDeliveryStatus"
+      AND delivery."status" <> 'READ'
   `;
   return { lastReadSequence: rows[0].lastReadSequence };
 }

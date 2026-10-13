@@ -28,6 +28,7 @@ import { StaffSchoolTeamHistoryService } from "../staff-school-team-history.serv
 import { StaffSchoolTeamReadCursorService } from "../staff-school-team-read-cursor.service";
 import { StaffSchoolTeamCommandService } from "../staff-school-team-command.service";
 import { StaffSchoolTeamService } from "../staff-school-team.service";
+import { advanceMessageReadCursor } from "../messaging-read-cursor";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -2051,6 +2052,53 @@ describe("ACE parent/staff messaging and notices storage", () => {
         lastReadSequence: second.sequence,
       },
     ]);
+  });
+
+  it("advances a read cursor when another schema defines the delivery enum", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createStaffConversation(
+          tx,
+          fixture,
+          "STAFF_DIRECT",
+        );
+        const message = await tx.message.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            conversationId: conversation.conversationId,
+            senderParticipantId: conversation.staffParticipantIds[0],
+            clientRequestId: randomUUID(),
+            bodyEncrypted: "Schema boundary",
+          },
+        });
+        return { ...conversation, sequence: message.sequence };
+      },
+    );
+
+    await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await tx.$executeRawUnsafe(
+          `CREATE TYPE pg_temp."MessageDeliveryStatus" AS ENUM ('PENDING', 'DELIVERED', 'READ')`,
+        );
+        await tx.$executeRawUnsafe("SET LOCAL search_path TO pg_temp, app");
+        await expect(
+          advanceMessageReadCursor(
+            tx,
+            fixture.tenantAId,
+            created.conversationId,
+            created.staffParticipantIds[0],
+            created.sequence,
+          ),
+        ).resolves.toEqual({ lastReadSequence: created.sequence });
+        await tx.$executeRawUnsafe('DROP TYPE pg_temp."MessageDeliveryStatus"');
+      },
+    );
   });
 
   it("permits one general parent conversation per guardian and valid staff conversation kinds", async () => {
