@@ -94,6 +94,13 @@ describe("DispatchOutboxJob", () => {
       payload: { noticeId: "notice-1" },
       idempotencyKey: "notice-1:published",
     });
+    expect(outboxEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          eventType: { not: "ace.message.sent" },
+        }),
+      }),
+    );
     expect(outboxEvent.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "DISPATCHED" }),

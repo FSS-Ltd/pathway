@@ -1,9 +1,15 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { Resend } from "resend";
 import { renderBehaviourNotification } from "./templates/behaviour-notification";
+import {
+  MESSAGE_EMAIL_BODY,
+  MESSAGE_EMAIL_SUBJECT,
+} from "../messaging/message-email-policy";
 
 /** Resend requires: `email@example.com` or `Name <email@example.com>` */
 const DEFAULT_FROM = "Nexsteps <noreply@mail.nexsteps.dev>";
+
+export class MessageEmailProviderRejectedError extends Error {}
 
 const FEEDBACK_RECIPIENT = "support@faithfulsoftware.dev";
 const DEMO_REQUEST_RECIPIENT = "sales@faithfulsoftware.dev";
@@ -180,6 +186,28 @@ export class MailerService {
         "RESEND_API_KEY not set - email sending disabled (emails will be logged only)",
       );
     }
+  }
+
+  isMessageEmailAvailable(): boolean {
+    return this.isEnabled && this.resend !== null;
+  }
+
+  async sendMessageNotification(to: string, deliveryId: string): Promise<string> {
+    if (!this.resend) throw new Error("Message email provider unavailable");
+    const result = await this.resend.emails.send(
+      {
+        from: this.fromAddress,
+        to,
+        subject: MESSAGE_EMAIL_SUBJECT,
+        text: MESSAGE_EMAIL_BODY,
+        html: `<p>${MESSAGE_EMAIL_BODY}</p>`,
+      },
+      { idempotencyKey: `ace-message-email:${deliveryId}` },
+    );
+    if (result.error || !result.data?.id) {
+      throw new MessageEmailProviderRejectedError("Message email provider rejected delivery");
+    }
+    return result.data.id;
   }
 
   async sendBehaviourNotification(

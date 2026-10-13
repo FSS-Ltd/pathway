@@ -1108,6 +1108,7 @@ model Tenant {
   messages                           Message[]
   messageParticipantReadCursors      MessageParticipantReadCursor[]
   messageDeliveries                  MessageDelivery[]
+  messageEmailPreferences            MessageEmailPreference[]
   messageAttachments                 MessageAttachment[]
   aceNotices                         AceNotice[]
   aceNoticeAudienceMembers           AceNoticeAudienceMember[]
@@ -1298,6 +1299,7 @@ model User {
   aceCommunityModerationActions   AceCommunityModerationAction[]   @relation("AceCommunityModerationActionModerator")
   createdMessageConversations       MessageConversation[]          @relation("MessageConversationCreatedBy")
   messageParticipants               MessageParticipant[]           @relation("MessageParticipantUser")
+  messageEmailPreferences           MessageEmailPreference[]
   createdAceNotices                 AceNotice[]                    @relation("AceNoticeCreatedBy")
   scheduledAceNotices               AceNotice[]                    @relation("AceNoticeScheduledBy")
   aceNoticeAudienceMemberships      AceNoticeAudienceMember[]      @relation("AceNoticeAudienceRecipient")
@@ -2065,6 +2067,7 @@ model MessageParticipant {
   guardianIdentityId String?
   joinedAt           DateTime               @default(now())
   removedAt          DateTime?
+  mutedAt            DateTime?
 
   tenant           Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   conversation     MessageConversation            @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
@@ -2073,6 +2076,7 @@ model MessageParticipant {
   sentMessages     Message[]
   readCursors      MessageParticipantReadCursor[]
   deliveries       MessageDelivery[]
+  emailDeliveries  MessageEmailDelivery[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, conversationId, userId])
@@ -2090,11 +2094,12 @@ model Message {
   bodyEncrypted       String   @db.Text
   createdAt           DateTime @default(now())
 
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  conversation MessageConversation @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  sender       MessageParticipant  @relation(fields: [senderParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  deliveries   MessageDelivery[]
-  attachments  MessageAttachment[]
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation    MessageConversation    @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sender          MessageParticipant     @relation(fields: [senderParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  deliveries      MessageDelivery[]
+  emailDeliveries MessageEmailDelivery[]
+  attachments     MessageAttachment[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, conversationId, sequence])
@@ -2138,6 +2143,40 @@ model MessageDelivery {
   @@unique([id, tenantId])
   @@unique([tenantId, messageId, recipientParticipantId])
   @@index([tenantId, recipientParticipantId, status, createdAt])
+}
+
+model MessageEmailPreference {
+  id              String   @id @default(uuid())
+  tenantId        String
+  userId          String
+  enabled         Boolean  @default(false)
+  quietHoursStart String?  @db.VarChar(5)
+  quietHoursEnd   String?  @db.VarChar(5)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "MessageEmailPreference_tenant_fkey")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict, map: "MessageEmailPreference_user_fkey")
+
+  @@unique([tenantId, userId])
+}
+
+model MessageEmailDelivery {
+  id                     String    @id @default(uuid())
+  tenantId               String
+  messageId              String
+  recipientParticipantId String
+  status                 String    @default("CLAIMED") @db.VarChar(16)
+  providerId             String?
+  failureCategory        String?   @db.VarChar(64)
+  claimedAt              DateTime  @default(now())
+  sentAt                 DateTime?
+
+  message              Message            @relation(fields: [messageId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MessageEmailDelivery_message_fkey")
+  recipientParticipant MessageParticipant @relation(fields: [recipientParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MessageEmailDelivery_participant_fkey")
+
+  @@unique([tenantId, messageId, recipientParticipantId])
+  @@index([tenantId, status, claimedAt])
 }
 
 model MessageAttachment {

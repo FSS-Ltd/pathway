@@ -185,6 +185,8 @@ async function deleteIdentityRowsIfPresent(
       "AceNoticeAudienceMember",
       "AceNotice",
       "MessageAttachment",
+      "MessageEmailDelivery",
+      "MessageEmailPreference",
       "MessageDelivery",
       "MessageParticipantReadCursor",
       "Message",

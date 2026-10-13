@@ -8,6 +8,7 @@ import { useStaffMessaging } from "./use-staff-messaging";
 import { ConversationList } from "./conversation-list";
 import { ConversationDetail } from "./conversation-detail";
 import { NewStaffConversation } from "./new-staff-conversation";
+import { MessageEmailSettings } from "./message-email-settings";
 
 export function StaffMessagingWorkspace({
   currentUserId,
@@ -99,6 +100,11 @@ function StaffConversationPane({
 
   return (
     <>
+      <MessageEmailSettings
+        key={messaging.siteRevision}
+        path="/ace/messages/notifications"
+        conversationId={messaging.selectedId}
+      />
       <div className="grid h-[min(75dvh,50rem)] min-h-[28rem] overflow-hidden rounded-3xl border border-border-subtle bg-surface shadow-card md:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)]">
         <section
           aria-label="Conversations"
