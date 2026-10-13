@@ -657,22 +657,35 @@ staff and guardian messaging interaction tests. A denied thread read, read-curso
 save, older-page read, or send clears cached thread content and hides the
 composer until a fresh authorized read succeeds. A denied send also keeps the
 composer unavailable if the user still has read access. The staff split view
-moves keyboard focus to the selected conversation heading and back to the list
-heading. Staff and guardian interaction tests cover denial and retry. This is
-web-only M12 evidence; signed-in keyboard and screen-reader browser checks
-remain required before counting ACE-M12 complete. Mobile stays paused.
+includes focus transfer to the selected conversation heading and back to the
+list heading. Staff and guardian interaction tests cover denial and retry.
+A signed-in production keyboard check found that activating a staff conversation
+left focus on its list button, and returning from the 320px detail view left
+focus on the page body. That focus defect and a screen-reader browser check
+remain open before counting ACE-M12 complete. Mobile stays paused.
 
-Build step 1.3e6i is the production ACE message read-cursor correction in
-[PR #622](https://github.com/FSS-Ltd/pathway/pull/622), opened from
-`16ae9ea5bfc4cbd39dd59e2dd926580e76644348`. A signed-in demo-school
+Build step 1.3e6i, the production ACE message read-cursor correction, merged
+in [PR #622](https://github.com/FSS-Ltd/pathway/pull/622) from checked head
+`9d044655a5c2df4239f895460d5914aa2a7b51a3` as
+`f39fa0e6e5b2e5af2ca8f5a1130a16c411d42c7b` on 13 October 2026.
+All eight latest-head checks passed. CI applied 138 migrations and ran the
+`messaging-notices.rls` and `family-messaging-security` PostgreSQL suites:
+90 integration suites and 564 tests passed. A signed-in demo-school
 staff-room read produced HTTP 500; production API logs showed PostgreSQL
 `42883` because an unqualified `MessageDeliveryStatus` cast resolved to the
 `public` enum while the delivery column uses `app`. A database regression
 reproduced that error before the fix and passed after the query let PostgreSQL
 infer the enum from the column. Both affected PostgreSQL suites passed 63/63
-tests locally. The PR still needs latest-head CI, merge, production deployment,
-and a live read-cursor retry before this correction can be called released.
+tests locally. Vercel's `api.nexsteps.dev` alias serves READY deployment
+`dpl_EynDhu5C8AMUp86deQfAjTWvdZPW` at the merge commit. A signed-in
+Demo ACE School staff-room retry returned HTTP 200 for the read-cursor request,
+with no prior error shown; no message was sent. The correction is released.
 ACE-M12 remains open and the count stays **48/150 (32%)**.
+
+Build step 1.3e6j addresses the observed ACE-M12 browser focus defect in the
+staff messaging workspace. It must preserve the existing message, permission,
+and responsive states, then pass local checks, latest-head CI, merge, and a
+signed-in production keyboard retry before the focus correction is released.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

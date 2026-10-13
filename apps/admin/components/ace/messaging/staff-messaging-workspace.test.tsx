@@ -251,12 +251,17 @@ async function run(): Promise<void> {
     ).find((button) => button.textContent?.includes("Sam Adeyemi"));
     assert.ok(conversationButton);
     assert.match(conversationButton.textContent ?? "", /1 unread message/);
-    await act(async () => conversationButton.click());
+    await act(async () => {
+      conversationButton.focus();
+      conversationButton.click();
+    });
+    await new Promise((resolve) => dom.window.setTimeout(resolve, 10));
     assert.equal(
       document.activeElement?.textContent?.trim(),
       "Sam Adeyemi",
-      "opening a thread moves keyboard focus to its heading",
+      "opening a thread restores heading focus after browser button focus",
     );
+    assert.equal(document.activeElement?.tagName, "H2");
     assert.doesNotMatch(container.textContent ?? "", /unread message/);
     assert.match(container.textContent ?? "", /Welcome/);
     assert.match(container.textContent ?? "", /How are you\?/);
@@ -287,6 +292,7 @@ async function run(): Promise<void> {
     );
     assert.ok(backToList);
     await act(async () => backToList.click());
+    await new Promise((resolve) => dom.window.setTimeout(resolve, 10));
     assert.equal(
       document.activeElement?.textContent?.trim(),
       "Conversations",
@@ -346,6 +352,9 @@ async function run(): Promise<void> {
     );
     await act(async () => staffRoom.click());
     assert.equal(roomOpenCount, 2);
+    await new Promise((resolve) => dom.window.setTimeout(resolve, 10));
+    assert.equal(document.activeElement?.tagName, "H2");
+    assert.equal(document.activeElement?.textContent?.trim(), "Staff room");
     assert.match(container.textContent ?? "", /Start the conversation below/);
     assert.ok(
       Array.from(

@@ -101,11 +101,17 @@ function StaffConversationPane({
     (conversation) => conversation.id === messaging.selectedId,
   );
   React.useEffect(() => {
-    if (selected && !composing) detailHeadingRef.current?.focus();
-    if (!messaging.selectedId && returningToList.current) {
-      listHeadingRef.current?.focus();
-      returningToList.current = false;
-    }
+    const focusDetail = Boolean(selected && !composing);
+    const focusList = !messaging.selectedId && returningToList.current;
+    if (!focusDetail && !focusList) return;
+    if (focusList) returningToList.current = false;
+
+    // Let the activating button finish its native focus action first.
+    const timeout = window.setTimeout(() => {
+      if (focusDetail) detailHeadingRef.current?.focus();
+      if (focusList) listHeadingRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [selected?.id, messaging.selectedId, composing]);
 
   return (
