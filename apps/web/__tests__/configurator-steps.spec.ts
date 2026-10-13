@@ -87,7 +87,7 @@ describe("configurator step contracts", () => {
       );
     }
 
-    expect(page).toContain("INSTITUTIONAL_PLANS");
+    expect(page).toContain("fetchInstitutionalCatalogue");
     expect(page).toContain("estimateInstitutionalPrice");
     expect(page).not.toContain("createCheckoutSession");
   });
@@ -95,10 +95,23 @@ describe("configurator step contracts", () => {
   it("preserves the child count across plans and announces changing totals", () => {
     const page = readFileSync(join(configureDirectory, "page.tsx"), "utf8");
 
-    expect(page).toContain("setPlanCode(plan.code)");
-    expect(page).toContain("setCountInput(event.target.value)");
-    expect(page).toContain('aria-live="polite"');
-    expect(page).toContain("No optional modules are ready to offer yet.");
+    const breakdown = readFileSync(
+      join(
+        process.cwd(),
+        "components/configurator/institutional-breakdown.tsx",
+      ),
+      "utf8",
+    );
+    const options = readFileSync(
+      join(stepsDirectory, "institutional-options.tsx"),
+      "utf8",
+    );
+    expect(page).toContain("update({ planCode })");
+    expect(page).toContain(
+      "onCountChange={(countInput) => update({ countInput })}",
+    );
+    expect(breakdown).toContain('aria-live="polite"');
+    expect(options).toMatch(/Optional modules are not yet\s+available/);
   });
 
   it("routes Enterprise directly to the demo path without a checkout plan", () => {

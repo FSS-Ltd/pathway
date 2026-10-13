@@ -282,11 +282,10 @@ describe("configurator checkout and rollout source contracts", () => {
     expect(summary).not.toContain("status-error");
   });
 
-  it("does not expose legacy checkout on the institutional estimator", () => {
+  it("uses the mapped institutional checkout rather than legacy checkout", () => {
     const configurePage = readSource("app/configure/page.tsx");
-    expect(configurePage).toContain(
-      "New-plan checkout is currently unavailable.",
-    );
+    expect(configurePage).toContain("startPublicInstitutionalCheckout");
+    expect(configurePage).toContain("idempotencyKey:");
     expect(configurePage).not.toContain("createCheckoutSession");
     expect(configurePage).not.toContain("buildCheckoutPayload");
   });

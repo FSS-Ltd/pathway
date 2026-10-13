@@ -40,10 +40,13 @@ const publicOrderSchema = z.object({
   includedModules: z.array(z.nativeEnum(Module)),
   paidModules: z.array(z.nativeEnum(Module)),
   setting: z.enum([
+    "CHURCH",
     "INDEPENDENT_SCHOOL",
     "ACE_SCHOOL",
     "STATE_SCHOOL",
     "NURSERY",
+    "CHARITY",
+    "CLUB",
   ]),
   requestFingerprint: z.string().length(64),
 });

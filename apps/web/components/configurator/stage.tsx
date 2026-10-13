@@ -23,6 +23,7 @@ import {
 
 type ConfiguratorStageProps = {
   state: ConfiguratorState;
+  planLabel?: string;
 };
 
 const STEP_ORDER: ConfiguratorState["step"][] = [
@@ -90,7 +91,10 @@ function SchoolPreview({
   );
 }
 
-export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
+export function ConfiguratorStage({
+  state,
+  planLabel,
+}: ConfiguratorStageProps) {
   const prefersReducedMotion = useReducedMotion() ?? false;
   const previousStep = useRef(state.step);
   const stageControls = useAnimationControls();
@@ -107,7 +111,7 @@ export function ConfiguratorStage({ state }: ConfiguratorStageProps) {
     previousStep.current = state.step;
   }, [prefersReducedMotion, stageControls, state.step]);
 
-  const scene = buildSceneModel(state);
+  const scene = buildSceneModel(state, planLabel);
   const imageMotion = sceneImageMotion(prefersReducedMotion);
   const swapTransition = prefersReducedMotion ? instantSwap : backdropFade;
 
