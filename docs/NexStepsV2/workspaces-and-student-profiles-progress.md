@@ -12,8 +12,8 @@ latest revision and GitHub confirms its merge.
    confirmed merge commit `c11f51b1dc2340b1149c79e2875aa8a596246dff`
    on 2026-10-12 at 13:41 UTC.
 2. **Compact per-person permission badges — merged.** [PR #603](https://github.com/FSS-Ltd/pathway/pull/603) passed all eight checks on head `e60719b757ba65f7987d54c65798fb4dad89e6e7`. GitHub confirmed merge commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163` on 2026-10-13 at 07:59 UTC.
-3. **ACE behaviour category creation and creator badge — in progress.** [PR #604](https://github.com/FSS-Ltd/pathway/pull/604) from branch `feature/ace-behaviour-category-creation` starts from merged commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163`. CI and merge evidence will be added before step 4 begins.
-4. **Staff and parent student overviews — planned.** Begins after step 3 merge.
+3. **ACE behaviour category creation and creator badge — merged.** [PR #604](https://github.com/FSS-Ltd/pathway/pull/604) from branch `feature/ace-behaviour-category-creation` started from merged commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163`. All eight CI checks passed on head `9c5ab68b9cb50ce0a35ecdfbf9f5d7a6b333c140`. GitHub confirmed merge commit `17788327d19b5a5bbc837685bf206483f77dfa98` on 2026-10-13 at 08:47 UTC.
+4. **Staff and parent student overviews — in progress.** Branch `feature/student-overviews` starts from the step 3 merge commit `17788327d19b5a5bbc837685bf206483f77dfa98`.
 5. **ACE PACE placement management in profile editing — planned.** Begins after step 4 merge.
 
 Step 1 local verification: admin typecheck, changed-file lint and Prettier,
@@ -56,3 +56,26 @@ script; and the admin production build all passed. Authenticated visual review
 remains unavailable in this isolated checkout. The Graphify code graph was
 updated; its HTML view was omitted by Graphify because the graph exceeds its
 visualisation size limit.
+
+Step 4 adds separate staff and linked-parent overview endpoints with explicit
+section states and server-approved tabs/actions. The family landing advertises
+the generic overview across sectors, while ACE summary pages retain their
+notices and messages. ACE parent PACE and general behaviour counts require a
+full current guardian link, active enrolment, and the parent-progress grant;
+sensitive behaviour entries are filtered before aggregation. Existing family
+release policy keeps parent reports hidden. Parent contacts and registration
+remain hidden because the current records include other guardians' private
+details and sensitive intake information without a family-visibility rule.
+Staff academic results use published family-safe term-report summaries; no
+general gradebook data source exists.
+
+Step 4 local verification: admin and API typechecks and production builds,
+the full admin test script, all 199 API unit suites (1,423 tests), three
+database-backed family/child integration suites (20 tests), changed-file
+ESLint and Prettier, and `git diff --check` passed. The integration run first
+exposed a stale fixed-name fixture in the existing child test; its name now
+uses that test's per-run nonce and the rerun passed. Authenticated visual
+review at the planned widths and zoom remains unavailable because Clerk's
+external sign-in handshake cannot be completed from this isolated checkout.
+The Graphify code graph was refreshed after the implementation; its HTML view
+is omitted automatically because the graph exceeds the visualisation limit.

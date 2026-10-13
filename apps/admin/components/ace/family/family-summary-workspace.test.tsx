@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
 import { setApiClientToken } from "@/lib/api-client";
+import type { StudentOverviewResponse } from "@/lib/child-overview-api";
 import { FamilySummaryView } from "./family-summary-workspace";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
@@ -20,6 +21,88 @@ Object.defineProperty(globalThis, "navigator", {
   configurable: true,
 });
 
+const overview: StudentOverviewResponse = {
+  identity: {
+    id: "child-one",
+    firstName: "Ari",
+    lastName: "Alpha",
+    preferredName: null,
+    yearGroup: "Year 5",
+    groupName: "Oak",
+    status: "enrolled",
+  },
+  period: {
+    from: "2026-09-01",
+    to: "2026-10-11",
+    label: "Current academic year",
+    source: "academic-year",
+  },
+  tabs: ["overview", "attendance", "pace", "behaviour"],
+  actions: [],
+  sections: {
+    attendance: {
+      status: "ready",
+      data: {
+        total: 10,
+        present: 8,
+        absent: 1,
+        late: 1,
+        attendanceRate: 80,
+      },
+    },
+    academics: { status: "unavailable", reason: "Not published" },
+    pace: {
+      status: "ready",
+      data: {
+        subjects: [
+          {
+            subjectId: "subject-one",
+            subjectName: "Maths",
+            currentPace: 3,
+            targetPace: 4,
+            completedPaces: 2,
+            trackStatus: null,
+          },
+        ],
+      },
+    },
+    behaviour: { status: "error" },
+    discipline: { status: "unavailable", reason: "Not released" },
+    merits: { status: "empty" },
+  },
+};
+
+const genericOverview: StudentOverviewResponse = {
+  ...overview,
+  period: {
+    from: "2026-09-12",
+    to: "2026-10-11",
+    label: "Last 30 days",
+    source: "last-30-days",
+  },
+  tabs: ["overview", "attendance"],
+};
+
+const aceServices = {
+  siteId: "site-one",
+  childId: "child-one",
+  childName: "Ari Alpha",
+  asOf: "2026-10-11T12:00:00.000Z",
+  sections: {
+    attendance: { status: "unavailable" },
+    notices: {
+      status: "error",
+      message: "This section could not be loaded.",
+    },
+    messages: { status: "ready", data: { unreadCount: 2 } },
+    homework: { status: "unavailable" },
+    reports: { status: "unavailable" },
+    slips: { status: "unavailable" },
+    faith: { status: "unavailable" },
+    finance: { status: "unavailable" },
+  },
+};
+
 async function run() {
   const { createRoot } = await import("react-dom/client");
   const container = document.createElement("div");
@@ -28,40 +111,32 @@ async function run() {
   const originalFetch = globalThis.fetch;
   const requested: string[] = [];
   let denied = false;
+  let generic = false;
+  let servicesFailed = false;
+  let overviewFailed = false;
   setApiClientToken("family-token");
   globalThis.fetch = async (input, init) => {
-    requested.push(String(input));
+    const url = String(input);
+    requested.push(url);
     assert.equal(
       new Headers(init?.headers).get("Authorization"),
       "Bearer family-token",
     );
     if (denied) return new Response("", { status: 404 });
+    if (servicesFailed && url.endsWith("/summary")) {
+      return new Response("", { status: 500 });
+    }
+    if (overviewFailed && url.endsWith("/overview")) {
+      return new Response("", { status: 500 });
+    }
     return new Response(
-      JSON.stringify({
-        siteId: "site-one",
-        childId: "child-one",
-        childName: "Ari Alpha",
-        asOf: "2026-10-11T12:00:00.000Z",
-        sections: {
-          attendance: {
-            status: "ready",
-            data: {
-              counts: { present: 1, absent: 0, late: 0 },
-              items: [{ date: "2026-10-10", status: "PRESENT" }],
-            },
-          },
-          notices: {
-            status: "error",
-            message: "This section could not be loaded.",
-          },
-          messages: { status: "ready", data: { unreadCount: 2 } },
-          homework: { status: "unavailable" },
-          reports: { status: "unavailable" },
-          slips: { status: "unavailable" },
-          faith: { status: "unavailable" },
-          finance: { status: "unavailable" },
-        },
-      }),
+      JSON.stringify(
+        url.endsWith("/overview")
+          ? generic
+            ? genericOverview
+            : overview
+          : aceServices,
+      ),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   };
@@ -76,28 +151,89 @@ async function run() {
         />,
       );
     });
-    assert.deepEqual(requested, [
+    assert.deepEqual(requested.sort(), [
       "http://api.test/ace/family/sites/site-one/children/child-one/summary",
+      "http://api.test/family/sites/site-one/children/child-one/overview",
     ]);
     assert.match(container.textContent ?? "", /Ari Alpha’s overview/);
-    assert.match(container.textContent ?? "", /1 present/);
+    assert.match(container.textContent ?? "", /80% attendance/);
+    assert.match(container.textContent ?? "", /Current academic year/);
     assert.match(container.textContent ?? "", /2 unread messages/);
     assert.match(
       container.textContent ?? "",
       /This section could not be loaded/,
     );
-    assert.equal(container.querySelectorAll('[role="alert"]').length, 1);
-    assert.doesNotMatch(container.textContent ?? "", /Homework|Finance|Faith/);
+    assert.doesNotMatch(
+      container.textContent ?? "",
+      /Finance|Notes|Registration/,
+    );
+    const attendanceTab = Array.from(
+      container.querySelectorAll('[role="group"] button'),
+    ).find((button) => button.textContent?.trim() === "Attendance");
+    assert.ok(attendanceTab);
+    await act(async () => attendanceTab.click());
     assert.equal(
       container.querySelector('a[href$="/attendance"]')?.getAttribute("href"),
       "/ace/parent/sites/site-one/children/child-one/attendance",
     );
-    const sectionRetry = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent?.trim() === "Try again",
+
+    servicesFailed = true;
+    await act(async () => {
+      root.render(
+        <FamilySummaryView
+          key="services-failed"
+          siteId="site-one"
+          childId="child-one"
+          status="authenticated"
+        />,
+      );
+    });
+    assert.match(container.textContent ?? "", /Ari Alpha’s overview/);
+    assert.match(container.textContent ?? "", /School updates/);
+    assert.match(
+      container.textContent ?? "",
+      /Family summary could not be loaded/,
     );
-    assert.ok(sectionRetry);
-    await act(async () => sectionRetry.click());
-    assert.equal(requested.length, 2);
+
+    servicesFailed = false;
+    overviewFailed = true;
+    await act(async () => {
+      root.render(
+        <FamilySummaryView
+          key="overview-failed"
+          siteId="site-one"
+          childId="child-one"
+          status="authenticated"
+        />,
+      );
+    });
+    assert.match(
+      container.textContent ?? "",
+      /Family overview could not be loaded/,
+    );
+    assert.match(container.textContent ?? "", /2 unread messages/);
+
+    requested.length = 0;
+    generic = true;
+    overviewFailed = false;
+    await act(async () => {
+      root.render(
+        <FamilySummaryView
+          key="generic"
+          siteId="site-one"
+          childId="child-one"
+          status="authenticated"
+          includeAceServices={false}
+        />,
+      );
+    });
+    assert.deepEqual(requested, [
+      "http://api.test/family/sites/site-one/children/child-one/overview",
+    ]);
+    assert.doesNotMatch(container.textContent ?? "", /School updates|messages/);
+    assert.doesNotMatch(container.textContent ?? "", /PACE|Behaviour/);
+    assert.match(container.textContent ?? "", /Last 30 days/);
+    assert.equal(container.querySelector('a[href$="/attendance"]'), null);
 
     denied = true;
     await act(async () => {
@@ -107,6 +243,7 @@ async function run() {
           siteId="site-one"
           childId="child-one"
           status="authenticated"
+          includeAceServices={false}
         />,
       );
     });
