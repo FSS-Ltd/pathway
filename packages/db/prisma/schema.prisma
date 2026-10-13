@@ -162,6 +162,7 @@ enum AuditAction {
 }
 
 enum AuditEntityType {
+  COMPLIANCE_PERSONNEL
   CONCERN
   CHILD_NOTE
   ORG_ROLE
@@ -943,6 +944,8 @@ enum HandoverLogStatus {
 
 // NEW: Org (Suite) — business/billing owner; may contain multiple Tenants (sites)
 model Org {
+  compliancePersonnelRecords CompliancePersonnelRecord[]
+  compliancePersonnelRevisions CompliancePersonnelRevision[]
   id                  String                   @id @default(uuid())
   name                String
   slug                String                   @unique
@@ -996,6 +999,8 @@ model Org {
 // maps directly to this model. Future migrations may introduce a dedicated `Site`
 // wrapper but the tenant id remains the canonical RLS key.
 model Tenant {
+  compliancePersonnelRecords CompliancePersonnelRecord[]
+  compliancePersonnelRevisions CompliancePersonnelRevision[]
   id       String  @id @default(uuid())
   name     String
   slug     String  @unique
@@ -1179,6 +1184,11 @@ model UserOrgRole {
 }
 
 model User {
+  complianceSubjects CompliancePersonnelRecord[] @relation("ComplianceSubject")
+  complianceCreated CompliancePersonnelRecord[] @relation("ComplianceCreated")
+  complianceUpdated CompliancePersonnelRecord[] @relation("ComplianceUpdated")
+  complianceVerified CompliancePersonnelRecord[] @relation("ComplianceVerified")
+  complianceRevisions CompliancePersonnelRevision[]
   id                String    @id @default(uuid())
   email             String?   @unique
   name              String?
@@ -4436,4 +4446,84 @@ model Correspondence {
   @@unique([id, tenantId])
   @@index([tenantId, status, responseDueAt])
   @@index([tenantId, childId])
+}
+
+enum ComplianceRecordKind {
+  BACKGROUND_CHECK
+  SAFEGUARDING_TRAINING
+  FIRST_AID
+  QUALIFICATION
+  OTHER_TRAINING
+}
+
+enum ComplianceCheckScheme {
+  DBS
+  PVG
+  ACCESSNI
+  LOCAL
+}
+
+enum ComplianceRecordStatus {
+  PENDING
+  RECORDED
+  VERIFIED
+}
+
+// All free text is encrypted through pii-encryption.ts. Dates are review metadata,
+// not certificate expiry dates. Archiving retains the immutable revision history.
+model CompliancePersonnelRecord {
+  id                String                        @id @default(uuid())
+  orgId             String
+  tenantId          String
+  subjectName       String
+  subjectUserId     String?
+  roleDescription   String
+  kind              ComplianceRecordKind
+  scheme            ComplianceCheckScheme?
+  title             String
+  provider          String?
+  reference         String?
+  completedOn       DateTime?                     @db.Date
+  reviewDueOn       DateTime?                     @db.Date
+  status            ComplianceRecordStatus        @default(PENDING)
+  notes             String?
+  verificationNotes String?
+  version           Int                           @default(1)
+  verifiedAt        DateTime?
+  verifiedByUserId  String?
+  archivedAt        DateTime?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+  createdByUserId   String
+  updatedByUserId   String
+  org               Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant            Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  subject           User?                         @relation("ComplianceSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  createdBy         User                          @relation("ComplianceCreated", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy         User                          @relation("ComplianceUpdated", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  verifiedBy        User?                         @relation("ComplianceVerified", fields: [verifiedByUserId], references: [id], onDelete: Restrict)
+  revisions         CompliancePersonnelRevision[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, archivedAt, createdAt, id])
+  @@index([tenantId, orgId, reviewDueOn])
+  @@index([subjectUserId])
+}
+
+model CompliancePersonnelRevision {
+  id          String                    @id @default(uuid())
+  orgId       String
+  tenantId    String
+  recordId    String
+  version     Int
+  actorUserId String
+  createdAt   DateTime                  @default(now())
+  snapshot    Json
+  org         Org                       @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant      Tenant                    @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  record      CompliancePersonnelRecord @relation(fields: [recordId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor       User                      @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([recordId, version])
+  @@index([tenantId, orgId, recordId, version])
 }

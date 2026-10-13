@@ -9,7 +9,7 @@ jest.mock("@pathway/db", () => ({
 }));
 
 import { getOrgCapabilities, orgHasCapability } from "../capabilities";
-import { MODULE_CAPABILITIES } from "../capability-maps";
+import { MODULE_CAPABILITIES, VERTICAL_CAPABILITIES } from "../capability-maps";
 
 describe("getOrgCapabilities", () => {
   beforeEach(() => {
@@ -19,7 +19,9 @@ describe("getOrgCapabilities", () => {
   it("includes core Learning even when there is no vertical or module grant", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([]);
-    expect(await getOrgCapabilities("org-1")).toEqual(MODULE_CAPABILITIES.LEARNING);
+    expect(await getOrgCapabilities("org-1")).toEqual(
+      MODULE_CAPABILITIES.LEARNING,
+    );
   });
 
   it("returns the vertical's capabilities when only a vertical is set", async () => {
@@ -58,7 +60,9 @@ describe("getOrgCapabilities", () => {
     orgModuleFindMany.mockResolvedValueOnce([
       { module: "FINANCE", expiresAt: new Date(Date.now() - 1_000_000) },
     ]);
-    expect(await getOrgCapabilities("org-1")).toEqual(MODULE_CAPABILITIES.LEARNING);
+    expect(await getOrgCapabilities("org-1")).toEqual(
+      MODULE_CAPABILITIES.LEARNING,
+    );
   });
 
   it("returns a deduped union of vertical + active module capabilities", async () => {
@@ -119,5 +123,26 @@ describe("orgHasCapability", () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([]);
     expect(await orgHasCapability("org-1", "finance.invoices")).toBe(false);
+  });
+});
+
+describe("institutional compliance entitlements", () => {
+  it("includes personnel checks for every institution without granting them to Home", () => {
+    for (const [vertical, capabilities] of Object.entries(
+      VERTICAL_CAPABILITIES,
+    )) {
+      for (const permission of [
+        "compliance.checks.read",
+        "compliance.checks.manage",
+      ]) {
+        expect((capabilities as readonly string[]).includes(permission)).toBe(
+          vertical !== "HOME_EDUCATION",
+        );
+      }
+    }
+    for (const capabilities of Object.values(MODULE_CAPABILITIES)) {
+      expect(capabilities).not.toContain("compliance.checks.read");
+      expect(capabilities).not.toContain("compliance.checks.manage");
+    }
   });
 });

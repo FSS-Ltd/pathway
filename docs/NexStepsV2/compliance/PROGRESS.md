@@ -3,20 +3,20 @@
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
 Updated: 2026-10-13. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
-## Current step: 1.2
+## Current step: 1.3
 
-**State: locally verified; preparing PR; not complete.** Step
-1.1 is merged. No step 1.3 work has started and no country pack is published.
+**State: implementing; no PR yet; not complete.** Steps 1.1 and 1.2 are merged.
+No later step has started and no country pack is published.
 
-| Evidence               | Value                                                                                                     |
-| ---------------------- | --------------------------------------------------------------------------------------------------------- |
-| Scope                  | Learning Centre taxonomy, school screen/capability reuse, configurator and payment-confirmed provisioning |
-| Branch                 | `feature/learning-centres-provisioning`                                                                   |
-| Verified starting base | `049abc31c4835067e15316e815b3f2b679d79c83`                                                                |
-| Predecessor            | [PR #624](https://github.com/FSS-Ltd/pathway/pull/624), host-confirmed merged 2026-10-13T20:14:10Z        |
-| PR / revision / CI     | Pending local verification and PR creation                                                                |
-| Merge state            | Unmerged; no completion claim                                                                             |
-| Next permitted action  | Finish checks, raise 1.2 PR, verify latest CI and merge; only then start 1.3                              |
+| Evidence               | Value                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Scope                  | Compliance navigation and Checks & Training, permissions, encryption, immutable history and integration tests |
+| Branch                 | `feature/compliance-checks-training`                                                                          |
+| Verified starting base | `72d46b6367a7e30afa122a533b4f92f4a8002fc0`                                                                    |
+| Predecessor            | [PR #626](https://github.com/FSS-Ltd/pathway/pull/626), host-confirmed merged 2026-10-13T21:15:32Z            |
+| PR / revision / CI     | Not raised; local implementation and verification underway                                                    |
+| Merge state            | Unmerged; no completion claim                                                                                 |
+| Next permitted action  | Verify 1.3, raise its PR, verify latest CI and merge before 1.4                                               |
 
 ## Step 1.1 verification and merge
 
@@ -72,7 +72,7 @@ catalogue is changed. Required repository CI remains a merge gate.
 
 ## Subsequent steps
 
-Steps 1.3–1.6 and 2.01–2.31 are **planned, not started**, as specified in
+Steps 1.4–1.6 and 2.01–2.31 are **planned, not started**, as specified in
 DELIVERY.md and jurisdictions.csv. Before starting each, refresh the host evidence
 for its predecessor and record the merged base. UI rollout and production
 deployment remain separate from documentation and require their own authorization.
@@ -137,21 +137,21 @@ Commands use repository pnpm 9.7 via `PATH=/tmp/compliance-bin:$PATH corepack pn
 Disposable PostgreSQL 16 runs only at localhost:55439, database
 `pathway_test_e2e`, schema `app`; no production data or service was used.
 
-| Check                                       | Result                                                                                            |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| API unit suite                              | 212 suites / 1,496 tests passed before final added settings tests; final targeted 34 tests passed |
-| Web unit suite                              | 21 suites / 160 tests passed on final rerun                                                       |
-| Admin unit suite                            | Passed (exit 0); UI mapping assertions cover both Learning Centre screen families                 |
-| Platform unit suite                         | 180 passed; five opt-in destructive database-smoke tests skipped locally                          |
-| Workspace `pnpm -r typecheck`               | Passed after generated enums and settings prop correction                                         |
-| Root lint and explicit admin app/lib ESLint | Passed; changed admin test inputs made precisely typed                                            |
-| Changed-file Prettier check                 | Passed                                                                                            |
-| `prisma validate` / `prisma:generate`       | Passed using disposable database configuration                                                    |
-| `permission-definitions:check`              | Passed; registry drift zero                                                                       |
-| API / admin builds                          | Passed; admin uses local API URL and synthetic Clerk publishable key for static compilation       |
-| Web build                                   | Passed                                                                                            |
-| Database integration                        | Final full run: 91 suites / 568 tests passed, including both new provisioning/replay cases        |
-| Independent branch review                   | No critical/important findings; saved single-choice configuration edge fixed and exercised        |
+| Check                                       | Result                                                                                          |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| API unit suite                              | Final pre-commit run: 212 suites / 1,504 tests passed; workers 45 and auth 12 tests also passed |
+| Web unit suite                              | 21 suites / 160 tests passed on final rerun                                                     |
+| Admin unit suite                            | Passed (exit 0); UI mapping assertions cover both Learning Centre screen families               |
+| Platform unit suite                         | 180 passed; five opt-in destructive database-smoke tests skipped locally                        |
+| Workspace `pnpm -r typecheck`               | Passed after generated enums and settings prop correction                                       |
+| Root lint and explicit admin app/lib ESLint | Passed; changed admin test inputs made precisely typed                                          |
+| Changed-file Prettier check                 | Passed                                                                                          |
+| `prisma validate` / `prisma:generate`       | Passed using disposable database configuration                                                  |
+| `permission-definitions:check`              | Passed; registry drift zero                                                                     |
+| API / admin builds                          | Passed; admin uses local API URL and synthetic Clerk publishable key for static compilation     |
+| Web build                                   | Passed                                                                                          |
+| Database integration                        | Final full run: 91 suites / 568 tests passed, including both new provisioning/replay cases      |
+| Independent branch review                   | No critical/important findings; saved single-choice configuration edge fixed and exercised      |
 
 Browser inspection used the running web application with intercepted pricing and
 checkout responses, plus the actual admin settings component and compiled admin
@@ -181,3 +181,101 @@ restoration occurred. The formatting passes the repository formatter. Later
 compliance features, country packs and production deployment remain outside 1.2.
 
 Final verification: web/admin/API builds, workspace typechecks, all 16 root lint tasks, explicit admin lint, changed-file Prettier, schema validation, registry drift check and final diff check passed. Web build also required the synthetic Clerk build key. Review findings are resolved or explicitly dispositioned above.
+
+## Step 1.2 host evidence
+
+Initial head `496b54bf1403c8804d058b18345d8ddb522b8d12` passed all eight checks
+on tested merge `77a3a2dabe0349ebfb7bf04d8c9b43279b7d656c` in
+[CI run 38465903055](https://github.com/FSS-Ltd/pathway/actions/runs/38465903055).
+Master advanced to `3bf7af04c4737fc330ee1d12c612c4a9631ac067` during that run
+(notice-inbox keyboard focus fix). Merged that base without conflicts; admin unit
+suite/build and all pre-commit checks passed again. Current head
+`93f983cec14045b3a2dc7c2dffc7cae3dd8f08a8` has fresh
+[CI run 38467377848](https://github.com/FSS-Ltd/pathway/actions/runs/38467377848)
+in progress. Old-head CI does not substitute for current-head checks.
+No step 1.3 implementation has started.
+
+## Step 1.2 final host evidence and 1.3 start
+
+GitHub confirms PR #626 MERGED at 2026-10-13T21:15:32Z, merge commit
+`72d46b6367a7e30afa122a533b4f92f4a8002fc0`. Final head
+`93f983cec14045b3a2dc7c2dffc7cae3dd8f08a8` passed all eight applicable checks;
+CI run [38467377848](https://github.com/FSS-Ltd/pathway/actions/runs/38467377848)
+checked test-merge `baa266050d73162bf3809315f637a6758733c04e`.
+CodeQL run [38467369539](https://github.com/FSS-Ltd/pathway/actions/runs/38467369539)
+and aggregate CodeQL passed. Step 1.2 is complete. Its earlier pending evidence
+above records the pre-merge state and is superseded by this host verification.
+
+The optional permission-definition database suite was subsequently run against
+an isolated disposable database: all nine tests passed, including the five that
+were skipped in the ordinary unit run. No production database was used.
+
+Step 1.3 started from the verified merged commit above. The latest user explicitly
+authorized raising and merging the plan PRs after verification. No production
+deployment is authorized by that instruction.
+
+## Step 1.3 local implementation and verification
+
+Implemented Compliance navigation, preserving existing safeguarding route/access
+rules, and a role-specific Checks & Training register. The typed API derives site
+and actor from authentication; administrator/safeguarding-lead defaults grant the
+new institutional permissions without extending them to Home or ordinary adults.
+Additive tables have forced RLS, composite ownership constraints, encrypted free
+text/snapshots and immutable revisions. Edits use optimistic versions and atomic
+history/audit writes. Archived records remain readable, and restricted paginated
+exports are audited. [CHECKS-OPERATIONS.md](CHECKS-OPERATIONS.md) records the data
+lifecycle, rollout prerequisites and terminology sources.
+
+Checked locally on 13 October 2026 using repository pnpm 9.7 via Corepack:
+
+| Command / inspection                                                                                                                                             | Result                                                                                     |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `pnpm typecheck`                                                                                                                                                 | All 16 workspace tasks passed                                                              |
+| `pnpm lint`                                                                                                                                                      | All 16 workspace tasks passed                                                              |
+| Explicit admin ESLint on changed `app`, `components/compliance`, and `lib` files                                                                                 | Passed; does not rely on the admin script's `src` glob                                     |
+| Explicit API ESLint on `src/compliance`, module and audit additions                                                                                              | Passed                                                                                     |
+| `pnpm --filter @pathway/api test:unit --runInBand compliance`                                                                                                    | 215 suites / 1,532 tests passed (worktree path matched the full unit suite)                |
+| `pnpm --filter @pathway/api test:integration --runInBand`                                                                                                        | 93 suites / 576 tests passed against disposable PostgreSQL                                 |
+| Final `test:integration --runInBand --runTestsByPath src/compliance/tests/compliance.e2e.spec.ts src/compliance/tests/compliance-personnel.database.e2e.spec.ts` | 2 suites / 8 tests passed after review fixes                                               |
+| `pnpm --filter @pathway/admin test`                                                                                                                              | Full admin suite passed; new register test included in package command                     |
+| Final focused `tsx components/compliance/checks-register.test.tsx` with explicit test API environment                                                            | Passed, including pending-history/save regression                                          |
+| DB, platform and auth unit suites                                                                                                                                | Passed: 63, 183 and 13 tests respectively; ordinary commands skip existing opt-in DB tests |
+| Opt-in `permission-definition-database.integration` on separate disposable database                                                                              | All 9 tests passed                                                                         |
+| `pnpm permission-definitions:check` against migrated test database                                                                                               | Registry drift zero                                                                        |
+| Prisma validation/generation and fresh-database migration                                                                                                        | Passed                                                                                     |
+| Admin, web and API production builds                                                                                                                             | Passed; admin/API rebuilt after review fixes                                               |
+| Prettier check of every changed/new TS/TSX/JSON/Markdown file; `git diff --check`                                                                                | Passed                                                                                     |
+| Independent whole-branch review and narrow fix verification                                                                                                      | Two P2 findings fixed; no remaining findings                                               |
+
+The normal register flow now audits the IDs of returned records, since opening an
+editor from a list otherwise bypassed detail-read auditing. The API regression
+checks the actual HTTP response, audit metadata and `private, no-store` header.
+An interrupted history request now resets loading on record-version changes;
+the regression failed before the fix and passed afterward. The same interleaving
+was exercised in a real browser by delaying history, saving, then loading history
+again successfully.
+
+Actual component/browser inspection used the existing compiled admin CSS and
+components in a local fixture: desktop 1440×1000, mobile 390×844, 200% root text,
+keyboard focus into details and back to the initiating row, save/verify, history,
+archive confirmation and retry/conflict states. Mobile rows and primary-action
+contrast were corrected. No horizontal overflow was observed. Screenshots are
+local task artifacts under `/tmp/compliance-ui-preview/`, not production data.
+This browser fixture does not claim a signed-in Clerk end-to-end session; the
+separate HTTP tests use the real AppModule, test authentication, permission
+resolution and PostgreSQL to exercise persistence and authorization boundaries.
+
+API tests cover read-only/ordinary-user denial, cross-site reads and writes,
+foreign subject links, injected scope, concurrent saves (one success/one 409),
+audit-failure rollback, immutable revisions, raw encryption, departed subject
+history, archive retention and restricted exports. Existing safeguarding/Home
+suites remain green. Checklist applicability/progress, medical views, agreements
+and country packs are not implemented or certified in this step.
+
+Builds use `NEXT_PUBLIC_API_URL=http://localhost:3333` and the synthetic test Clerk
+publishable key; initial missing build-time configuration was corrected before
+passing reruns. Prisma validation used the disposable database URL. No production
+credentials, deployment, external certificate check or user communication occurred.
+
+Local verification is not step completion. Raise the step's PR, verify current
+revision CI and host-confirmed merge before starting 1.4.

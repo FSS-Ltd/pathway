@@ -433,6 +433,20 @@ export const CAPABILITY_DEFINITIONS = {
     "site",
     "protected",
   ),
+  "compliance.checks.read": defineCapability(
+    "View personnel checks and training",
+    "View sensitive personnel evidence for the active site",
+    "site",
+    "protected",
+    false,
+  ),
+  "compliance.checks.manage": defineCapability(
+    "Manage personnel checks and training",
+    "Record and verify personnel evidence for the active site",
+    "site",
+    "protected",
+    false,
+  ),
   "safeguarding.concerns.record": defineCapability(
     "Record safeguarding concerns",
     "Record safeguarding concerns for the active site",

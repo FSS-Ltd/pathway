@@ -57,10 +57,19 @@ describe("withPiiEncryption", () => {
     const result = (await invoke(
       "Child",
       "create",
-      { data: { firstName: "Ada", allergies: "peanuts", notes: "loves painting" } },
+      {
+        data: {
+          firstName: "Ada",
+          allergies: "peanuts",
+          notes: "loves painting",
+        },
+      },
       (args) => {
         capturedArgs = args as typeof capturedArgs;
-        return { id: "c1", ...(args as { data: Record<string, unknown> }).data };
+        return {
+          id: "c1",
+          ...(args as { data: Record<string, unknown> }).data,
+        };
       },
     )) as Record<string, unknown>;
 
@@ -96,7 +105,10 @@ describe("withPiiEncryption", () => {
       },
       (args) => {
         capturedArgs = args as typeof capturedArgs;
-        return { id: "b1", ...(args as { data: Record<string, unknown> }).data };
+        return {
+          id: "b1",
+          ...(args as { data: Record<string, unknown> }).data,
+        };
       },
     )) as Record<string, unknown>;
 
@@ -122,11 +134,16 @@ describe("withPiiEncryption", () => {
       },
       (args) => {
         responseArgs = args as typeof responseArgs;
-        return { id: "response-1", ...(args as { data: Record<string, unknown> }).data };
+        return {
+          id: "response-1",
+          ...(args as { data: Record<string, unknown> }).data,
+        };
       },
     )) as Record<string, unknown>;
 
-    expect(isEncryptedField(responseArgs?.data.responsePayload as string)).toBe(true);
+    expect(isEncryptedField(responseArgs?.data.responsePayload as string)).toBe(
+      true,
+    );
     expect(response.responsePayload).toBe(
       "Guardian confirmed medical details by phone.",
     );
@@ -143,12 +160,17 @@ describe("withPiiEncryption", () => {
       },
       (args) => {
         exceptionArgs = args as typeof exceptionArgs;
-        return { id: "exception-1", ...(args as { data: Record<string, unknown> }).data };
+        return {
+          id: "exception-1",
+          ...(args as { data: Record<string, unknown> }).data,
+        };
       },
     )) as Record<string, unknown>;
 
     expect(isEncryptedField(exceptionArgs?.data.reason as string)).toBe(true);
-    expect(exception.reason).toBe("Guardian gave verbal consent while travelling.");
+    expect(exception.reason).toBe(
+      "Guardian gave verbal consent while travelling.",
+    );
   });
 
   it("leaves models with no registered fields untouched", async () => {
@@ -159,7 +181,10 @@ describe("withPiiEncryption", () => {
       "Org",
       "create",
       { data: { name: "Acme Youth Club" } },
-      (args) => ({ id: "o1", ...(args as { data: Record<string, unknown> }).data }),
+      (args) => ({
+        id: "o1",
+        ...(args as { data: Record<string, unknown> }).data,
+      }),
     );
 
     expect(result).toEqual({ id: "o1", name: "Acme Youth Club" });
@@ -185,7 +210,11 @@ describe("withPiiEncryption", () => {
     const { fakeClient, invoke } = makeFakeClient();
     withPiiEncryption(fakeClient);
 
-    const details = { orgName: "Acme", contactEmail: "a@b.com", password: "hunter2" };
+    const details = {
+      orgName: "Acme",
+      contactEmail: "a@b.com",
+      password: "hunter2",
+    };
     let capturedArgs: { data: Record<string, unknown> } | undefined;
 
     const result = (await invoke(
@@ -194,11 +223,16 @@ describe("withPiiEncryption", () => {
       { data: { planCode: "trial", pendingOrgDetails: details } },
       (args) => {
         capturedArgs = args as typeof capturedArgs;
-        return { id: "po1", ...(args as { data: Record<string, unknown> }).data };
+        return {
+          id: "po1",
+          ...(args as { data: Record<string, unknown> }).data,
+        };
       },
     )) as Record<string, unknown>;
 
-    expect(JSON.stringify(capturedArgs?.data.pendingOrgDetails)).not.toContain("hunter2");
+    expect(JSON.stringify(capturedArgs?.data.pendingOrgDetails)).not.toContain(
+      "hunter2",
+    );
     expect(result.pendingOrgDetails).toEqual(details);
   });
 
@@ -241,7 +275,10 @@ describe("withPiiEncryption", () => {
       { data: { allergies: already } },
       (args) => {
         capturedArgs = args as typeof capturedArgs;
-        return { id: "c1", ...(args as { data: Record<string, unknown> }).data };
+        return {
+          id: "c1",
+          ...(args as { data: Record<string, unknown> }).data,
+        };
       },
     );
 
@@ -264,7 +301,9 @@ describe("withPiiEncryptionTransaction", () => {
     const transaction = {
       childNote,
     } as unknown as Prisma.TransactionClient;
-    const encryptedTransaction = withPiiEncryptionTransaction(transaction) as unknown as {
+    const encryptedTransaction = withPiiEncryptionTransaction(
+      transaction,
+    ) as unknown as {
       childNote: typeof childNote;
     };
 
@@ -276,5 +315,74 @@ describe("withPiiEncryptionTransaction", () => {
     expect(isEncryptedField(storedText)).toBe(true);
     expect(created.text).toBe("Private note");
     expect(read.text).toBe("Private note");
+  });
+});
+
+describe("compliance personnel encryption", () => {
+  it("encrypts every free-text field while retaining typed filter metadata", async () => {
+    const { fakeClient, invoke } = makeFakeClient();
+    withPiiEncryption(fakeClient);
+    const fields = [
+      "subjectName",
+      "roleDescription",
+      "title",
+      "provider",
+      "reference",
+      "notes",
+      "verificationNotes",
+    ];
+    const data = Object.fromEntries(
+      fields.map((field) => [field, `Sensitive ${field}`]),
+    );
+    let stored: Record<string, unknown> = {};
+    const result = await invoke(
+      "CompliancePersonnelRecord",
+      "create",
+      {
+        data: {
+          ...data,
+          tenantId: "site-a",
+          kind: "BACKGROUND_CHECK",
+          scheme: "DBS",
+        },
+      },
+      (args) => {
+        stored = (args as { data: Record<string, unknown> }).data;
+        return stored;
+      },
+    );
+    for (const field of fields)
+      expect(isEncryptedField(String(stored[field]))).toBe(true);
+    expect(stored.tenantId).toBe("site-a");
+    expect(stored.scheme).toBe("DBS");
+    expect(result).toEqual({
+      ...data,
+      tenantId: "site-a",
+      kind: "BACKGROUND_CHECK",
+      scheme: "DBS",
+    });
+  });
+
+  it("encrypts revision snapshots as an envelope and decrypts historical evidence", async () => {
+    const { fakeClient, invoke } = makeFakeClient();
+    withPiiEncryption(fakeClient);
+    const snapshot = {
+      subjectName: "Alex Example",
+      notes: "Private verification",
+      version: 1,
+    };
+    let stored: Record<string, unknown> = {};
+    const result = await invoke(
+      "CompliancePersonnelRevision",
+      "create",
+      { data: { snapshot, version: 1 } },
+      (args) => {
+        stored = (args as { data: Record<string, unknown> }).data;
+        return stored;
+      },
+    );
+    expect(stored.snapshot).toEqual({ __enc: expect.any(String) });
+    expect(JSON.stringify(stored)).not.toContain("Alex Example");
+    expect(result).toEqual({ snapshot, version: 1 });
   });
 });

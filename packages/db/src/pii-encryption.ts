@@ -10,6 +10,15 @@ import type { Prisma, PrismaClient } from "@prisma/client";
  * which is out of scope for this pass.
  */
 const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
+  CompliancePersonnelRecord: [
+    "subjectName",
+    "roleDescription",
+    "title",
+    "provider",
+    "reference",
+    "notes",
+    "verificationNotes",
+  ],
   Child: [
     "allergies",
     "additionalNeedsNotes",
@@ -42,6 +51,7 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
  * during the buy-now checkout flow.
  */
 const ENCRYPTED_JSON_FIELDS: Record<string, readonly string[]> = {
+  CompliancePersonnelRevision: ["snapshot"],
   PendingOrder: ["pendingOrgDetails"],
   ChildRegistrationSubmission: ["payload"],
 };
