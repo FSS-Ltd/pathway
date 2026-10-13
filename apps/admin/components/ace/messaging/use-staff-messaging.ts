@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { requestFailure } from "@/lib/request-error";
-import { ApiError } from "@/lib/api-transport";
 import { subscribeToActiveSiteChanges } from "@/lib/active-site-events";
 import {
   advanceStaffReadCursor,
@@ -21,6 +20,7 @@ import {
 } from "@/lib/ace-messaging-api";
 import { useMessageRealtime } from "./use-message-realtime";
 import { mergeMessageHistory } from "./merge-message-history";
+import { isMessageAccessDenied } from "./is-message-access-denied";
 
 export function useStaffMessaging(
   currentUserId: string,
@@ -44,6 +44,8 @@ export function useStaffMessaging(
   >(null);
   const [threadLoading, setThreadLoading] = React.useState(false);
   const [threadError, setThreadError] = React.useState<string | null>(null);
+  const [threadAccessLost, setThreadAccessLost] = React.useState(false);
+  const [sendAccessLost, setSendAccessLost] = React.useState(false);
   const [threadMoreLoading, setThreadMoreLoading] = React.useState(false);
   const [drafts, setDrafts] = React.useState<Record<string, string>>({});
   const [sendingId, setSendingId] = React.useState<string | null>(null);
@@ -54,6 +56,8 @@ export function useStaffMessaging(
   const threadGeneration = React.useRef(0);
   const selectedIdRef = React.useRef(selectedId);
   const openedConversation = React.useRef<StaffConversation | null>(null);
+  const deniedThreadIds = React.useRef(new Set<string>());
+  const deniedSendIds = React.useRef(new Set<string>());
   const requestIds = React.useRef<Record<string, string>>({});
   const lastReadAttempt = React.useRef<{
     conversationId: string;
@@ -66,7 +70,7 @@ export function useStaffMessaging(
   selectedIdRef.current = selectedId;
   const realtimeStatus = useMessageRealtime({
     kind: channel,
-    conversationId: selectedId,
+    conversationId: threadAccessLost ? null : selectedId,
     siteRevision,
     onInvalidate: () => {
       setListRevision((revision) => revision + 1);
@@ -80,6 +84,8 @@ export function useStaffMessaging(
       threadGeneration.current += 1;
       selectedIdRef.current = null;
       openedConversation.current = null;
+      deniedThreadIds.current.clear();
+      deniedSendIds.current.clear();
       setConversations([]);
       messagesRef.current = [];
       nextMessageCursorRef.current = null;
@@ -89,6 +95,8 @@ export function useStaffMessaging(
       setNextMessageCursor(null);
       setListError(null);
       setThreadError(null);
+      setThreadAccessLost(false);
+      setSendAccessLost(false);
       setSendError(null);
       setDrafts({});
       requestIds.current = {};
@@ -119,19 +127,22 @@ export function useStaffMessaging(
       .then((page) => {
         if (!active || generation !== siteGeneration.current) return;
         const opened = openedConversation.current;
-        setConversations(
+        const items =
           opened && !page.items.some((item) => item.id === opened.id)
             ? [opened, ...page.items]
-            : page.items,
+            : page.items;
+        setConversations(
+          items.map((item) =>
+            deniedThreadIds.current.has(item.id)
+              ? { ...item, latestMessage: null, unreadCount: 0 }
+              : item,
+          ),
         );
         setNextCursor(page.nextCursor);
       })
       .catch((error: unknown) => {
         if (!active || controller.signal.aborted) return;
-        if (
-          error instanceof ApiError &&
-          [401, 403, 404].includes(error.status)
-        ) {
+        if (isMessageAccessDenied(error)) {
           setConversations([]);
           setSelectedId(null);
           setMessages([]);
@@ -189,6 +200,10 @@ export function useStaffMessaging(
         nextMessageCursorRef.current = merged.nextCursor;
         setMessages(merged.messages);
         setNextMessageCursor(merged.nextCursor);
+        if (deniedThreadIds.current.delete(selectedId)) {
+          setListRevision((revision) => revision + 1);
+        }
+        setThreadAccessLost(false);
         const newest = page.items[0];
         if (
           newest &&
@@ -212,8 +227,12 @@ export function useStaffMessaging(
               }
               setListRevision((revision) => revision + 1);
             })
-            .catch(() => {
+            .catch((error: unknown) => {
               if (active && generation === threadGeneration.current) {
+                if (isMessageAccessDenied(error)) {
+                  denyThreadAccess();
+                  return;
+                }
                 lastReadAttempt.current = null;
                 setThreadError(
                   "Messages loaded, but read status could not be saved.",
@@ -224,14 +243,9 @@ export function useStaffMessaging(
       })
       .catch((error: unknown) => {
         if (!active || controller.signal.aborted) return;
-        if (
-          error instanceof ApiError &&
-          [401, 403, 404].includes(error.status)
-        ) {
-          messagesRef.current = [];
-          nextMessageCursorRef.current = null;
-          setMessages([]);
-          setNextMessageCursor(null);
+        if (isMessageAccessDenied(error)) {
+          denyThreadAccess();
+          return;
         }
         setThreadError(messageFrom(error, "Unable to load messages."));
       })
@@ -291,7 +305,11 @@ export function useStaffMessaging(
       setNextMessageCursor(page.nextCursor);
     } catch (error) {
       if (generation === threadGeneration.current) {
-        setThreadError(messageFrom(error, "Unable to load older messages."));
+        if (isMessageAccessDenied(error)) {
+          denyThreadAccess();
+        } else {
+          setThreadError(messageFrom(error, "Unable to load older messages."));
+        }
       }
     } finally {
       if (generation === threadGeneration.current) setThreadMoreLoading(false);
@@ -306,7 +324,7 @@ export function useStaffMessaging(
   }
 
   async function send() {
-    if (!selectedId || sendingId) return;
+    if (!selectedId || sendingId || threadAccessLost || sendAccessLost) return;
     const conversationId = selectedId;
     const body = drafts[conversationId]?.trim();
     if (!body || body.length > 4000) return;
@@ -349,10 +367,19 @@ export function useStaffMessaging(
       }
       setListRevision((revision) => revision + 1);
     } catch (error) {
-      if (site === siteGeneration.current) {
-        setSendError(
-          messageFrom(error, "Unable to send your message. Try again."),
-        );
+      if (
+        site === siteGeneration.current &&
+        selectedIdRef.current === conversationId
+      ) {
+        if (isMessageAccessDenied(error)) {
+          deniedSendIds.current.add(conversationId);
+          setSendAccessLost(true);
+          denyThreadAccess();
+        } else {
+          setSendError(
+            messageFrom(error, "Unable to send your message. Try again."),
+          );
+        }
       }
     } finally {
       if (site === siteGeneration.current) setSendingId(null);
@@ -360,6 +387,10 @@ export function useStaffMessaging(
   }
 
   function selectConversation(id: string | null) {
+    if (id && id === selectedIdRef.current) {
+      setThreadRevision((revision) => revision + 1);
+      return;
+    }
     threadGeneration.current += 1;
     selectedIdRef.current = id;
     lastReadAttempt.current = null;
@@ -369,9 +400,41 @@ export function useStaffMessaging(
     setMessages([]);
     setNextMessageCursor(null);
     setThreadError(null);
+    setThreadAccessLost(id ? deniedThreadIds.current.has(id) : false);
+    setSendAccessLost(id ? deniedSendIds.current.has(id) : false);
     setThreadMoreLoading(false);
     setSendError(null);
     setRoomError(null);
+  }
+
+  function denyThreadAccess() {
+    threadGeneration.current += 1;
+    const deniedId = selectedIdRef.current;
+    if (deniedId) deniedThreadIds.current.add(deniedId);
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === deniedId
+          ? { ...conversation, latestMessage: null, unreadCount: 0 }
+          : conversation,
+      ),
+    );
+    if (openedConversation.current?.id === deniedId) {
+      openedConversation.current = {
+        ...openedConversation.current,
+        latestMessage: null,
+        unreadCount: 0,
+      };
+    }
+    messagesRef.current = [];
+    nextMessageCursorRef.current = null;
+    lastReadAttempt.current = null;
+    setMessages([]);
+    setNextMessageCursor(null);
+    setThreadLoading(false);
+    setThreadMoreLoading(false);
+    setThreadError(null);
+    setSendError(null);
+    setThreadAccessLost(true);
   }
 
   function selectOpenedConversation(
@@ -445,6 +508,8 @@ export function useStaffMessaging(
     nextMessageCursor,
     threadLoading,
     threadError,
+    threadAccessLost,
+    sendAccessLost,
     threadMoreLoading,
     draft: selectedId ? (drafts[selectedId] ?? "") : "",
     sending: sendingId !== null,

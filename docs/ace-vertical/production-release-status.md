@@ -616,21 +616,42 @@ smoke test read and sent no messages. The ACE-M05 acceptance gate is met:
 current step; mobile push remains deferred by product direction and does not
 count as an accepted M06 task.
 
-Build step 1.3e6g, the ACE-M06 web email slice, is being implemented on
-`feature/ace-m06-web-notification-fanout`. It adds self-service staff and
+Build step 1.3e6g, the ACE-M06 web email slice, merged in
+[PR #620](https://github.com/FSS-Ltd/pathway/pull/620) from checked head
+`e9c469b5d9c14769001127d43d157a1248ee82b1` as
+`8db88386bc161122b213b4cf855ca9cd82fdab0c` on 13 October 2026.
+All eight latest-head checks passed; the Integration job applied the new
+migration and ran the affected PostgreSQL messaging, identity and reporting
+suites (90 suites, 563 tests), plus both single-connection suites (13 tests).
+The step adds self-service staff and
 guardian email preferences, site-timezone quiet hours, per-conversation email
 mute, a minute cron consuming the existing content-free message outbox event,
 and a durable one-attempt recipient ledger. Email is off until each user
 enables it. Provider mail uses generic copy only; no message text enters the
-email, notification ledger, or provider request. The production API Vercel
-project has `CRON_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM` configured, but
-this step is not deployed or accepted yet. The new migration applied on
-disposable PostgreSQL databases using both `schema=app` and `schema=public`;
-the PostgreSQL HTTP security suite exercised self-scoped preferences, tenant
-RLS, one-send idempotency, and cron authorization. If rollout needs to stop,
-pause the message-email cron; persisted messaging and REST reads continue.
+email, notification ledger, or provider request. Production workflow
+[38440987449](https://github.com/FSS-Ltd/pathway/actions/runs/38440987449)
+completed database, API, admin and web jobs at the merge commit. Vercel reports
+all three production deployments READY, and a read-only production query found
+`20261013170000_ace_message_email_notifications` finished in the Prisma
+migration ledger. The API project has `CRON_SECRET`, `RESEND_API_KEY`, and
+`RESEND_FROM` configured. Cron execution and a consented delivery smoke still
+need production evidence. The new migration also applied on disposable
+PostgreSQL databases using both `schema=app` and `schema=public`; the HTTP
+security suite exercised self-scoped preferences, tenant RLS, one-send
+idempotency, and cron authorization. If rollout needs to stop, pause the
+message-email cron; persisted messaging and REST reads continue.
 Mobile push and same-device foreground suppression remain deferred, so
 ACE-M06 remains incomplete and the plan count stays **48/150 (32%)**.
+
+Build step 1.3e6h is the ACE-M12 web conversation access-state correction on
+`feature/ace-m12-web-messaging-access-states`. A denied thread read, read-cursor
+save, older-page read, or send clears cached thread content and hides the
+composer until a fresh authorized read succeeds. A denied send also keeps the
+composer unavailable if the user still has read access. The staff split view
+moves keyboard focus to the selected conversation heading and back to the list
+heading. Staff and guardian interaction tests cover denial and retry. This is
+web-only M12 evidence; signed-in keyboard and screen-reader browser checks
+remain required before counting ACE-M12 complete. Mobile stays paused.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
