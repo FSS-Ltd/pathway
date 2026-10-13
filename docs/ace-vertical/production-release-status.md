@@ -579,11 +579,16 @@ invalidation events contain IDs only and publish after database commit. The
 admin web client refetches REST history on events, reconnects, focus, and a
 bounded polling interval. The restored production Supabase project is connected,
 and its publishable key is configured in the API Vercel production environment.
-Live enablement still requires the matching JWT signing secret there and this
-PR's private Realtime policy migration on that project. Until then, token
-issuance returns 503 and web REST polling remains available. This step does not
-change the verified count until its own PR has green latest-head CI and a
-confirmed merge.
+The signing contract uses an imported ES256 key rather than the project's legacy
+shared JWT secret. The API requires the matching private JWK in its encrypted
+`SUPABASE_JWT_SIGNING_JWK` environment variable and issues no Realtime token
+when it is absent, even if legacy JWT variables are present. Live enablement
+requires importing and activating that signing key in Supabase, configuring the
+API variable, and deploying this PR's private Realtime policy migration on the
+project. Key activation changes the project's Auth signing key and must be
+planned as a production change. Until then, token issuance returns 503 and web
+REST polling remains available. This step does not change the verified count
+until its own PR has green latest-head CI and a confirmed merge.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
