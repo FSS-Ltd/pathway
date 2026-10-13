@@ -1,0 +1,32 @@
+step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
+2.01,GB-ENG,GB,England,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.02,GB-WLS,GB,Wales,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.03,GB-SCT,GB,Scotland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.04,GB-NIR,GB,Northern Ireland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.05,IE,IE,Ireland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.06,AT,AT,Austria,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.07,BE,BE,Belgium,NOT_REVIEWED,Language communities and regions; local authorities
+2.08,BG,BG,Bulgaria,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.09,HR,HR,Croatia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.10,CY,CY,Cyprus,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.11,CZ,CZ,Czechia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.12,DK,DK,Denmark,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.13,EE,EE,Estonia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.14,FI,FI,Finland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.15,FR,FR,France,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.16,DE,DE,Germany,NOT_REVIEWED,Länder and local authorities
+2.17,GR,GR,Greece,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.18,HU,HU,Hungary,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.19,IT,IT,Italy,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.20,LV,LV,Latvia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.21,LT,LT,Lithuania,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.22,LU,LU,Luxembourg,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.23,MT,MT,Malta,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.24,NL,NL,Netherlands,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.25,PL,PL,Poland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.26,PT,PT,Portugal,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.27,RO,RO,Romania,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.28,SK,SK,Slovakia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.29,SI,SI,Slovenia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.30,ES,ES,Spain,NOT_REVIEWED,Autonomous communities and cities; local authorities
+2.31,SE,SE,Sweden,NOT_REVIEWED,Relevant regional and local authorities; inventory pending

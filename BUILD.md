@@ -22,6 +22,14 @@ After changes, Technical Agent must run `graphify update .` when code files chan
 
 ---
 
+## Verification before completion
+
+Follow the [Codex verification rule in AGENTS.md](AGENTS.md#codex-verification-before-completion).
+Record the applicable commands, results, inspected scenarios and limitations before
+claiming completion. Build-step completion also requires current-revision passing
+CI and a host-verified PR merge. For Nexsteps Compliance, maintain the evidence in
+[the compliance delivery record](docs/NexStepsV2/compliance/PROGRESS.md).
+
 ## 1. Core Mandate
 
 You are the Technical Agent of FSS in execution mode. Your job is to:
