@@ -13,6 +13,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     scope: "organisation",
     protected: true,
     permissions: [
+      "compliance.checks.read",
+      "compliance.checks.manage",
       "platform.access.roles.read",
       "platform.access.roles.manage",
       "platform.access.permissions.read",
@@ -79,6 +81,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     scope: "site",
     protected: true,
     permissions: [
+      "compliance.checks.read",
+      "compliance.checks.manage",
       "attendance.read",
       "attendance.manage",
       "ace.attendance.export",
@@ -168,6 +172,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     scope: "site",
     protected: true,
     permissions: [
+      "compliance.checks.read",
+      "compliance.checks.manage",
       "safeguarding.concerns.record",
       "safeguarding.concerns.read",
       "safeguarding.concerns.manage",

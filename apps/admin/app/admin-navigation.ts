@@ -1,3 +1,5 @@
+import React from "react";
+import { ListChecks } from "lucide-react";
 import type { Capability, PermissionKey } from "@pathway/platform";
 import { defaultSidebarItems, type SidebarNavItem } from "@pathway/ui";
 import {
@@ -150,13 +152,24 @@ const navItemsWithAccess: (SidebarNavItem & {
     href: "/safeguarding/concerns/new",
     iconIndex: 18,
     access: "staff-or-admin",
-    group: "Safeguarding",
+    group: "Compliance",
   }, // All staff can create
   {
     ...defaultSidebarItems[10],
     access: "safeguarding-admin",
-    group: "Safeguarding",
+    group: "Compliance",
   }, // Safeguarding (view dashboard)
+  {
+    label: "Checks & Training",
+    href: "/compliance/checks",
+    icon: React.createElement(ListChecks, {
+      "aria-hidden": true,
+      className: "h-5 w-5",
+    }),
+    capability: "compliance.checks.read",
+    permission: "compliance.checks.read",
+    group: "Compliance",
+  },
   { ...defaultSidebarItems[11], access: "billing", group: "Admin" }, // Billing (org admin only)
   {
     label: "Blog",

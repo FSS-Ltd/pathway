@@ -46,6 +46,8 @@ describe("ACE system role templates", () => {
         scope: "organisation",
         protected: true,
         permissions: [
+          "compliance.checks.read",
+          "compliance.checks.manage",
           "platform.access.roles.read",
           "platform.access.roles.manage",
           "platform.access.permissions.read",
@@ -112,6 +114,8 @@ describe("ACE system role templates", () => {
         scope: "site",
         protected: true,
         permissions: [
+          "compliance.checks.read",
+          "compliance.checks.manage",
           "attendance.read",
           "attendance.manage",
           "ace.attendance.export",
@@ -201,6 +205,8 @@ describe("ACE system role templates", () => {
         scope: "site",
         protected: true,
         permissions: [
+          "compliance.checks.read",
+          "compliance.checks.manage",
           "safeguarding.concerns.record",
           "safeguarding.concerns.read",
           "safeguarding.concerns.manage",
@@ -335,6 +341,26 @@ describe("ACE system role templates", () => {
       const permissions = SYSTEM_ROLE_TEMPLATES[key].permissions;
       for (const forbidden of siteOrOrgOnlyCore) {
         expect(permissions).not.toContain(forbidden);
+      }
+    }
+  });
+});
+
+describe("institutional compliance role defaults", () => {
+  it("limits personnel access to administrators and safeguarding leads", () => {
+    for (const [name, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
+      const allowed = [
+        "organisationHead",
+        "siteLead",
+        "safeguardingLead",
+      ].includes(name);
+      for (const permission of [
+        "compliance.checks.read",
+        "compliance.checks.manage",
+      ]) {
+        expect(
+          (template.permissions as readonly string[]).includes(permission),
+        ).toBe(allowed);
       }
     }
   });

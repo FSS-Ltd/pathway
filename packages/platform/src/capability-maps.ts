@@ -25,8 +25,14 @@ const PLATFORM_CORE_CAPABILITIES = [
   "safeguarding.concerns.manage",
 ] as const satisfies readonly Capability[];
 
-const ACE_SCREEN_CAPABILITIES = [
+const INSTITUTIONAL_CORE_CAPABILITIES = [
   ...PLATFORM_CORE_CAPABILITIES,
+  "compliance.checks.read",
+  "compliance.checks.manage",
+] as const satisfies readonly Capability[];
+
+const ACE_SCREEN_CAPABILITIES = [
+  ...INSTITUTIONAL_CORE_CAPABILITIES,
   "ace.attendance.export",
   "students.manage",
   "classes.manage",
@@ -80,7 +86,7 @@ const ACE_SCREEN_CAPABILITIES = [
 ] as const satisfies readonly Capability[];
 
 const STATE_SCREEN_CAPABILITIES = [
-  ...PLATFORM_CORE_CAPABILITIES,
+  ...INSTITUTIONAL_CORE_CAPABILITIES,
   "students.manage",
   "classes.manage",
   "parents.read",
@@ -89,13 +95,13 @@ const STATE_SCREEN_CAPABILITIES = [
 
 export const VERTICAL_CAPABILITIES = {
   CHURCH: [
-    ...PLATFORM_CORE_CAPABILITIES,
+    ...INSTITUTIONAL_CORE_CAPABILITIES,
     "volunteers.manage",
     "giving.manage",
     "calendar.read",
   ],
   INDEPENDENT_SCHOOL: [
-    ...PLATFORM_CORE_CAPABILITIES,
+    ...INSTITUTIONAL_CORE_CAPABILITIES,
     "students.manage",
     "classes.manage",
     "parents.read",
@@ -105,13 +111,17 @@ export const VERTICAL_CAPABILITIES = {
   ACE_LEARNING_CENTRE: ACE_SCREEN_CAPABILITIES,
   STATE_SCHOOL: STATE_SCREEN_CAPABILITIES,
   PUBLIC_LEARNING_CENTRE: STATE_SCREEN_CAPABILITIES,
-  NURSERY: [...PLATFORM_CORE_CAPABILITIES, "children.manage", "parents.read"],
+  NURSERY: [
+    ...INSTITUTIONAL_CORE_CAPABILITIES,
+    "children.manage",
+    "parents.read",
+  ],
   CHARITY: [
-    ...PLATFORM_CORE_CAPABILITIES,
+    ...INSTITUTIONAL_CORE_CAPABILITIES,
     "volunteers.manage",
     "calendar.read",
   ],
-  CLUB: [...PLATFORM_CORE_CAPABILITIES, "members.manage", "calendar.read"],
+  CLUB: [...INSTITUTIONAL_CORE_CAPABILITIES, "members.manage", "calendar.read"],
   HOME_EDUCATION: [
     ...PLATFORM_CORE_CAPABILITIES,
     "learning.log.read",

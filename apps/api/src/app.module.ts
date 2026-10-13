@@ -1,3 +1,4 @@
+import { ComplianceModule } from "./compliance/compliance.module";
 import { Module } from "@nestjs/common";
 import { CommonModule } from "./common/common.module";
 import { OrgsModule } from "./orgs/orgs.module";
@@ -57,6 +58,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
 @Module({
   imports: [
     CommonModule,
+    ComplianceModule,
     HealthModule,
     AuthModule,
     MailerModule,
