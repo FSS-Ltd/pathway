@@ -129,6 +129,7 @@ const SECTION_5_2_KEYS = [
 
 const ADDITIONAL_MATRIX_KEYS = [
   "ace.attendance.export",
+  "ace.behaviour.categories.create",
   "ace.parent.notices.read",
   "platform.access.roles.read",
   "platform.access.roles.manage",
@@ -173,8 +174,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 116 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(116);
+  it("contains exactly the 117 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(117);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
