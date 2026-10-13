@@ -817,6 +817,31 @@ export async function createStudentSubject(
   return response.json() as Promise<AdminStudentSubjectPlacement>;
 }
 
+export type EndAdminStudentSubjectInput = {
+  endsOn: string;
+  reason: string;
+};
+
+export async function endStudentSubject(
+  childId: string,
+  enrollmentId: string,
+  input: EndAdminStudentSubjectInput,
+): Promise<void> {
+  if (isUsingMockApi())
+    throw new Error("Subject placements are not available in mock mode.");
+  const response = await fetch(
+    `${API_BASE_URL}/ace/students/${encodeURIComponent(childId)}/subjects/${encodeURIComponent(enrollmentId)}`,
+    {
+      method: "DELETE",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok) throw await studentSubjectsRequestError(response);
+}
+
 /** Academic calendars are scoped to the authenticated user's active site. */
 export async function fetchAcademicCalendar(): Promise<AdminAcademicCalendar> {
   if (isUsingMockApi()) {

@@ -11,7 +11,7 @@ import {
 } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { useSession } from "@/lib/use-session-compat";
-import { SubjectPlacementForm } from "./subject-placement-form";
+import { SubjectPlacementForm } from "@/components/ace/pace/subject-placement-form";
 
 export default function StudentSubjectsPage({
   params,

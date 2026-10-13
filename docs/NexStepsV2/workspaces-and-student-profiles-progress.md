@@ -13,8 +13,8 @@ latest revision and GitHub confirms its merge.
    on 2026-10-12 at 13:41 UTC.
 2. **Compact per-person permission badges — merged.** [PR #603](https://github.com/FSS-Ltd/pathway/pull/603) passed all eight checks on head `e60719b757ba65f7987d54c65798fb4dad89e6e7`. GitHub confirmed merge commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163` on 2026-10-13 at 07:59 UTC.
 3. **ACE behaviour category creation and creator badge — merged.** [PR #604](https://github.com/FSS-Ltd/pathway/pull/604) from branch `feature/ace-behaviour-category-creation` started from merged commit `b8e5da8fb7d46bf513d77ddc8e2cc508c548a163`. All eight CI checks passed on head `9c5ab68b9cb50ce0a35ecdfbf9f5d7a6b333c140`. GitHub confirmed merge commit `17788327d19b5a5bbc837685bf206483f77dfa98` on 2026-10-13 at 08:47 UTC.
-4. **Staff and parent student overviews — in progress.** Branch `feature/student-overviews` starts from the step 3 merge commit `17788327d19b5a5bbc837685bf206483f77dfa98`.
-5. **ACE PACE placement management in profile editing — planned.** Begins after step 4 merge.
+4. **Staff and parent student overviews — merged.** [PR #607](https://github.com/FSS-Ltd/pathway/pull/607) passed all eight CI checks on head `8692ba8ed74f04f57f385f2ea599e2b24ec51ab7`. GitHub confirmed merge commit `35e5bcf6ad907d12d02053eacb7324235288f2a3` on 2026-10-13 at 09:38 UTC.
+5. **ACE PACE placement management in profile editing — PR open.** [PR #608](https://github.com/FSS-Ltd/pathway/pull/608) from branch `feature/ace-pace-profile-placement` starts from the step 4 merge commit `35e5bcf6ad907d12d02053eacb7324235288f2a3`. CI and merge evidence will be recorded after GitHub reports the final revision.
 
 Step 1 local verification: admin typecheck, changed-file lint and Prettier,
 shell/navigation regression checks, and production build passed. The build
@@ -79,3 +79,18 @@ review at the planned widths and zoom remains unavailable because Clerk's
 external sign-in handshake cannot be completed from this isolated checkout.
 The Graphify code graph was refreshed after the implementation; its HTML view
 is omitted automatically because the graph exceeds the visualisation limit.
+
+Step 5 adds an ACE-only Subjects & PACEs editor tab for authorised staff,
+reusing the existing assignment and revision form. An unassignment requires an
+end date, reason and confirmation. The new endpoint verifies the active site,
+child and `ace.pace.record` permission, serialises against PACE commands, keeps
+the placement and assessment history, clears the disposable active progress
+projection, and writes audit and outbox records atomically. There is no schema
+migration. The active placement list now shows current progress from the
+projection rather than a stale starting value. API/admin typechecks, the full
+admin test script, all 201 API unit suites (1,434 tests), the database-backed
+PACE placement lifecycle test, and both production builds passed. Changed-file
+lint and formatting were checked explicitly. Authenticated responsive and
+focus review remains unavailable in this isolated checkout because Clerk's
+external sign-in handshake cannot be completed here. The Graphify code graph
+was refreshed; its HTML view exceeds the visualisation size limit.
