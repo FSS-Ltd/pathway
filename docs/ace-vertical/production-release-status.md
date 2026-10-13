@@ -597,12 +597,15 @@ authorized demo-school conversation member as well as two unauthorized joins.
 The database authorization function approved that member, but Supabase
 Realtime's read-access probe uses a row with `private = false` even for a
 private channel. The #616 SELECT policies require `private = true`, so they
-deny every join. Corrective step 1.3e6f2 changes only those SELECT policies;
-the topic, capability, membership, and no-publish checks remain. A disposable
+deny every join. Corrective step 1.3e6f2 is open in
+[PR #619](https://github.com/FSS-Ltd/pathway/pull/619) from implementation
+commit `9ced59ae`. The migration changes only those SELECT policies; the
+topic, capability, membership, and no-publish checks remain. A disposable
 local PostgreSQL fixture reproduced zero visible probe rows before the
 migration and one authorized, zero unauthorized rows after it. Production
 policy rollout and allowed/denied live joins remain open. Web REST polling
-preserves message correctness. ACE-M05 remains **47/150 (31⅓%, 31.33%)**
+preserves message correctness. The verified master-plan count remains
+**47/150 (31⅓%, 31.33%)**
 until the corrective PR is green, merged, deployed, and live access is verified.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
