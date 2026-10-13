@@ -577,11 +577,13 @@ The Supabase policy rechecks active participation, site/organisation, ACE
 capability, guardian relationship, and current staff read role. Send and read
 invalidation events contain IDs only and publish after database commit. The
 admin web client refetches REST history on events, reconnects, focus, and a
-bounded polling interval. Live enablement requires the restored production
-Supabase project to provide its JWT signing secret and publishable key to the
-API Vercel environment; without them, token issuance returns 503 and web REST
-polling remains available. This step does not change the verified count until
-its own PR has green latest-head CI and a confirmed merge.
+bounded polling interval. The restored production Supabase project is connected,
+and its publishable key is configured in the API Vercel production environment.
+Live enablement still requires the matching JWT signing secret there and this
+PR's private Realtime policy migration on that project. Until then, token
+issuance returns 503 and web REST polling remains available. This step does not
+change the verified count until its own PR has green latest-head CI and a
+confirmed merge.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
