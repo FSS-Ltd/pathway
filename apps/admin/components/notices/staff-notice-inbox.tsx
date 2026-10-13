@@ -37,6 +37,7 @@ function receiptStatus(notice: NoticeSummary): string {
 
 function NoticeDetail({
   notice,
+  headingRef,
   readPending,
   readError,
   onRead,
@@ -45,6 +46,7 @@ function NoticeDetail({
   onAcknowledge,
 }: {
   notice: NoticeDetailData;
+  headingRef: React.Ref<HTMLHeadingElement>;
   readPending: boolean;
   readError: string | null;
   onRead: () => void;
@@ -58,7 +60,11 @@ function NoticeDetail({
         <p className="text-xs font-semibold uppercase tracking-wide text-accent-strong">
           {audienceLabel(notice.audience)}
         </p>
-        <h2 className="mt-2 font-heading text-2xl font-semibold leading-tight text-text-primary">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="mt-2 rounded-sm font-heading text-2xl font-semibold leading-tight text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+        >
           {notice.title}
         </h2>
         <p className="mt-2 text-sm text-text-muted">
@@ -141,6 +147,35 @@ export function NoticeInboxView({
   reader: "staff" | "parent";
 }) {
   const isParent = reader === "parent";
+  const listHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const detailHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const detailRegionRef = React.useRef<HTMLElement>(null);
+  const openingNotice = React.useRef(false);
+  const returningToList = React.useRef(false);
+
+  React.useEffect(() => {
+    if (!openingNotice.current && !returningToList.current) return;
+    const timeout = window.setTimeout(() => {
+      if (openingNotice.current && inbox.selectedId) {
+        const heading =
+          inbox.detail?.id === inbox.selectedId
+            ? detailHeadingRef.current
+            : null;
+        (heading ?? detailRegionRef.current)?.focus();
+        if (heading) openingNotice.current = false;
+      }
+      if (
+        !inbox.selectedId &&
+        (returningToList.current || openingNotice.current)
+      ) {
+        listHeadingRef.current?.focus();
+        returningToList.current = false;
+        openingNotice.current = false;
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [inbox.selectedId, inbox.detail?.id]);
+
   return (
     <main className="flex min-w-0 flex-col gap-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -174,7 +209,11 @@ export function NoticeInboxView({
           className={`${inbox.selectedId ? "hidden md:block" : "block"} min-w-0 border-border-subtle md:border-r`}
         >
           <div className="border-b border-border-subtle px-5 py-4">
-            <h2 className="font-heading text-lg font-semibold text-text-primary">
+            <h2
+              ref={listHeadingRef}
+              tabIndex={-1}
+              className="rounded-sm font-heading text-lg font-semibold text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+            >
               Your notices
             </h2>
           </div>
@@ -222,7 +261,11 @@ export function NoticeInboxView({
                 <button
                   type="button"
                   aria-pressed={inbox.selectedId === notice.id}
-                  onClick={() => inbox.select(notice.id)}
+                  onClick={() => {
+                    openingNotice.current = true;
+                    returningToList.current = false;
+                    inbox.select(notice.id);
+                  }}
                   className={`w-full px-5 py-4 text-left hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-strong ${inbox.selectedId === notice.id ? "bg-accent-subtle" : ""}`}
                 >
                   <span className="block font-semibold text-text-primary">
@@ -256,8 +299,10 @@ export function NoticeInboxView({
         </section>
 
         <section
+          ref={detailRegionRef}
+          tabIndex={-1}
           aria-label="Notice detail"
-          className={`${inbox.selectedId ? "block" : "hidden md:block"} min-w-0 bg-shell/70`}
+          className={`${inbox.selectedId ? "block" : "hidden md:block"} min-w-0 bg-shell/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-accent-strong`}
         >
           {inbox.selectedId ? (
             <div className="border-b border-border-subtle p-4 md:hidden">
@@ -265,7 +310,11 @@ export function NoticeInboxView({
                 type="button"
                 variant="secondary"
                 size="sm"
-                onClick={() => inbox.select(null)}
+                onClick={() => {
+                  openingNotice.current = false;
+                  returningToList.current = true;
+                  inbox.select(null);
+                }}
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to
                 notices
@@ -295,6 +344,7 @@ export function NoticeInboxView({
           {inbox.detail ? (
             <NoticeDetail
               notice={inbox.detail}
+              headingRef={detailHeadingRef}
               readPending={inbox.readPending}
               readError={inbox.readError}
               onRead={() => void inbox.markRead()}

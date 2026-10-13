@@ -45,7 +45,8 @@ async function run() {
   const root = createRoot(container);
   const originalFetch = globalThis.fetch;
   const requested: string[] = [];
-  let listMode: "filled" | "historical" | "empty" | "denied" = "filled";
+  let listMode: "filled" | "historical" | "detail-denied" | "empty" | "denied" =
+    "filled";
   setApiClientToken("notice-token");
   globalThis.fetch = async (input, init) => {
     const url = String(input);
@@ -59,6 +60,8 @@ async function run() {
       return Response.json({ readAt: "2026-10-10T11:00:00.000Z" });
     }
     if (url.endsWith(`/${notice.id}`)) {
+      if (listMode === "detail-denied")
+        return new Response("", { status: 403 });
       return Response.json({
         ...notice,
         historical: listMode === "historical",
@@ -67,7 +70,7 @@ async function run() {
     }
     return Response.json({
       items:
-        listMode === "filled"
+        listMode === "filled" || listMode === "detail-denied"
           ? [notice]
           : listMode === "historical"
             ? [{ ...notice, historical: true, deliveredAt: null }]
@@ -82,6 +85,23 @@ async function run() {
     assert.match(container.textContent ?? "", /Unread/);
     assert.doesNotMatch(container.textContent ?? "", /Please read this update/);
 
+    const noticeButton = container.querySelector<HTMLButtonElement>(
+      'section[aria-label="Staff notice list"] li button',
+    );
+    assert.ok(noticeButton);
+    noticeButton.focus();
+    await act(async () => click(container, "Staff update"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(
+      document.activeElement,
+      container.querySelector('section[aria-label="Notice detail"] h2'),
+    );
+    await act(async () => click(container, "Back to notices"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(
+      document.activeElement,
+      container.querySelector('section[aria-label="Staff notice list"] h2'),
+    );
     await act(async () => click(container, "Staff update"));
     assert.match(container.textContent ?? "", /Please read this update/);
     await act(async () => click(container, "Mark as read"));
@@ -98,6 +118,16 @@ async function run() {
     await act(async () => click(container, "Staff update"));
     assert.match(container.textContent ?? "", /read status was not recorded/);
     assert.doesNotMatch(container.textContent ?? "", /Mark as read/);
+
+    listMode = "detail-denied";
+    await act(async () => click(container, "Refresh"));
+    await act(async () => click(container, "Staff update"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(
+      document.activeElement,
+      container.querySelector('section[aria-label="Staff notice list"] h2'),
+    );
+    assert.match(container.textContent ?? "", /do not have permission/);
 
     listMode = "empty";
     await act(async () => click(container, "Refresh"));

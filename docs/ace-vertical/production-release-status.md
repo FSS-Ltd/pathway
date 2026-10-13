@@ -683,11 +683,25 @@ with no prior error shown; no message was sent. The correction is released.
 ACE-M12 remains open and the count stays **48/150 (32%)**.
 
 Build step 1.3e6j in
-[PR #623](https://github.com/FSS-Ltd/pathway/pull/623) addresses the observed
-ACE-M12 browser focus defect in the staff messaging workspace. It must preserve
-the existing message, permission, and responsive states, then pass latest-head
-CI, merge, and a signed-in production keyboard retry before the focus
-correction is released.
+[PR #623](https://github.com/FSS-Ltd/pathway/pull/623) merged from checked head
+`572c543ee296998bffc1bf05e107985b0eb4302f` as
+`ee57c7263d4ba6a776b6ce92fa29906a81255aee` on 13 October 2026. All
+eight latest-head checks passed. Production workflow
+[38458652774](https://github.com/FSS-Ltd/pathway/actions/runs/38458652774)
+passed, and `app.nexsteps.dev` served the merge commit. A signed-in keyboard
+retry after reloading the deployed bundle focused the staff and direct-thread
+headings after opening, and the list heading after returning from the 320px
+detail view. The screen-reader browser check remains open, so ACE-M12 is not
+counted complete. The ACE-M06 consented provider delivery check was deferred
+for the product owner to run manually; the test account's email alerts were
+left disabled.
+
+Build step 1.3e6k fixes the same observed keyboard focus gap in the shared
+notice inbox for staff and guardians. A signed-in 320px browser reproduction
+showed focus on the page body after opening a notice and after returning to the
+list. The step must pass current-revision CI, merge, and a production keyboard
+retry before the correction is released. ACE-M14 remains open while mobile
+notice work is paused.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

@@ -83,6 +83,23 @@ async function run() {
         "GET http://api.test/ace/parent/sites/site-a/notices?limit=25",
       ),
     );
+    const noticeButton = container.querySelector<HTMLButtonElement>(
+      'section[aria-label="School notice list"] li button',
+    );
+    assert.ok(noticeButton);
+    noticeButton.focus();
+    await act(async () => click(container, "School update"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(
+      document.activeElement,
+      container.querySelector('section[aria-label="Notice detail"] h2'),
+    );
+    await act(async () => click(container, "Back to notices"));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(
+      document.activeElement,
+      container.querySelector('section[aria-label="School notice list"] h2'),
+    );
     await act(async () => click(container, "School update"));
     assert.match(container.textContent ?? "", /Please read this update/);
     await act(async () => click(container, "Mark as read"));
