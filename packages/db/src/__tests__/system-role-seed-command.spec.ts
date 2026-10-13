@@ -15,6 +15,7 @@ const REPOSITORY_ROOT = path.resolve(__dirname, "../../../..");
 const APPROVED_GRANTS = {
   "Organisation Head": [
     "ace.attendance.export",
+    "ace.behaviour.categories.create",
     "ace.behaviour.correct",
     "ace.behaviour.policy.manage",
     "ace.behaviour.read",
