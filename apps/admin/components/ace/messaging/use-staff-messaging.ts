@@ -36,7 +36,9 @@ export function useStaffMessaging(
   const [listMoreLoading, setListMoreLoading] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<StaffMessage[]>([]);
-  const [nextBefore, setNextBefore] = React.useState<number | null>(null);
+  const [nextMessageCursor, setNextMessageCursor] = React.useState<
+    string | null
+  >(null);
   const [threadLoading, setThreadLoading] = React.useState(false);
   const [threadError, setThreadError] = React.useState<string | null>(null);
   const [threadMoreLoading, setThreadMoreLoading] = React.useState(false);
@@ -62,7 +64,7 @@ export function useStaffMessaging(
       setNextCursor(null);
       setSelectedId(null);
       setMessages([]);
-      setNextBefore(null);
+      setNextMessageCursor(null);
       setListError(null);
       setThreadError(null);
       setSendError(null);
@@ -124,7 +126,7 @@ export function useStaffMessaging(
   React.useEffect(() => {
     if (!selectedId) {
       setMessages([]);
-      setNextBefore(null);
+      setNextMessageCursor(null);
       setThreadLoading(false);
       return;
     }
@@ -132,7 +134,7 @@ export function useStaffMessaging(
     const generation = ++threadGeneration.current;
     const controller = new AbortController();
     setMessages([]);
-    setNextBefore(null);
+    setNextMessageCursor(null);
     setThreadMoreLoading(false);
     setThreadLoading(true);
     setThreadError(null);
@@ -148,17 +150,9 @@ export function useStaffMessaging(
           page.items
             .slice()
             .reverse()
-            .map((item) => ({
-              ...item,
-              recipientRead:
-                !schoolTeam &&
-                "recipientRead" in item &&
-                typeof item.recipientRead === "boolean"
-                  ? item.recipientRead
-                  : null,
-            })),
+            .map((item) => normalizeMessage(item, schoolTeam)),
         );
-        setNextBefore(page.nextBefore);
+        setNextMessageCursor(page.nextCursor);
         const newest = page.items[0];
         if (newest) {
           void (
@@ -221,7 +215,7 @@ export function useStaffMessaging(
   }
 
   async function loadOlderMessages() {
-    if (!selectedId || !nextBefore || threadMoreLoading) return;
+    if (!selectedId || !nextMessageCursor || threadMoreLoading) return;
     const conversationId = selectedId;
     const generation = threadGeneration.current;
     setThreadMoreLoading(true);
@@ -230,25 +224,17 @@ export function useStaffMessaging(
       const page = await (
         schoolTeam ? fetchSchoolTeamMessages : fetchStaffMessages
       )(conversationId, {
-        before: nextBefore,
+        cursor: nextMessageCursor,
       });
       if (generation !== threadGeneration.current) return;
       setMessages((current) => [
         ...page.items
           .slice()
           .reverse()
-          .map((item) => ({
-            ...item,
-            recipientRead:
-              !schoolTeam &&
-              "recipientRead" in item &&
-              typeof item.recipientRead === "boolean"
-                ? item.recipientRead
-                : null,
-          })),
+          .map((item) => normalizeMessage(item, schoolTeam)),
         ...current,
       ]);
-      setNextBefore(page.nextBefore);
+      setNextMessageCursor(page.nextCursor);
     } catch (error) {
       if (generation === threadGeneration.current) {
         setThreadError(messageFrom(error, "Unable to load older messages."));
@@ -287,6 +273,9 @@ export function useStaffMessaging(
       delete requestIds.current[conversationId];
       setDrafts((current) => ({ ...current, [conversationId]: "" }));
       if (selectedIdRef.current === conversationId) {
+        const directConversation = conversations.some(
+          (item) => item.id === conversationId && item.kind === "STAFF_DIRECT",
+        );
         setMessages((current) =>
           current.some((message) => message.id === sent.id)
             ? current
@@ -298,11 +287,8 @@ export function useStaffMessaging(
                   body: sent.body,
                   createdAt: sent.createdAt,
                   sender: { id: currentUserId, displayName: "You" },
-                  recipientRead:
-                    conversations.find((item) => item.id === conversationId)
-                      ?.kind === "STAFF_DIRECT"
-                      ? false
-                      : null,
+                  recipientRead: directConversation ? false : null,
+                  deliveryState: directConversation ? "sent" : null,
                 },
               ],
         );
@@ -324,7 +310,7 @@ export function useStaffMessaging(
     selectedIdRef.current = id;
     setSelectedId(id);
     setMessages([]);
-    setNextBefore(null);
+    setNextMessageCursor(null);
     setThreadError(null);
     setThreadMoreLoading(false);
     setSendError(null);
@@ -398,7 +384,7 @@ export function useStaffMessaging(
     roomOpening,
     roomError,
     messages,
-    nextBefore,
+    nextMessageCursor,
     threadLoading,
     threadError,
     threadMoreLoading,
@@ -416,4 +402,24 @@ export function useStaffMessaging(
 
 function messageFrom(error: unknown, fallback: string): string {
   return requestFailure(error, fallback).message;
+}
+
+function normalizeMessage(
+  item: StaffMessage | Omit<StaffMessage, "recipientRead">,
+  schoolTeam: boolean,
+): StaffMessage {
+  const recipientRead =
+    !schoolTeam &&
+    "recipientRead" in item &&
+    typeof item.recipientRead === "boolean"
+      ? item.recipientRead
+      : null;
+  return {
+    ...item,
+    recipientRead,
+    deliveryState: schoolTeam
+      ? null
+      : (item.deliveryState ??
+        (recipientRead === null ? null : recipientRead ? "read" : "sent")),
+  };
 }

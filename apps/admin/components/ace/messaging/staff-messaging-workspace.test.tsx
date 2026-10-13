@@ -174,7 +174,7 @@ async function run(): Promise<void> {
         url.pathname.includes(newConversationId) ||
         url.pathname.includes(roomConversationId)
       ) {
-        return jsonResponse({ items: [], nextBefore: null });
+        return jsonResponse({ items: [], nextCursor: null });
       }
       return jsonResponse({
         items: [
@@ -203,7 +203,7 @@ async function run(): Promise<void> {
             recipientRead: null,
           },
         ],
-        nextBefore: null,
+        nextCursor: null,
       });
     }
     return jsonResponse({

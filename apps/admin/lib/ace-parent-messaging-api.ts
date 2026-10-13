@@ -61,11 +61,11 @@ export async function openParentConversation(
 export async function fetchParentMessages(
   siteId: string,
   conversationId: string,
-  input: { before?: number; signal?: AbortSignal } = {},
-): Promise<{ items: ParentMessage[]; nextBefore: number | null }> {
+  input: { cursor?: string; signal?: AbortSignal } = {},
+): Promise<{ items: ParentMessage[]; nextCursor: string | null }> {
   requireLiveMessaging();
   const query = new URLSearchParams({ limit: "50" });
-  if (input.before) query.set("before", String(input.before));
+  if (input.cursor) query.set("cursor", input.cursor);
   return request(
     `${pathForSite(siteId)}/${encodeURIComponent(conversationId)}/messages?${query}`,
     { signal: input.signal },

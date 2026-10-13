@@ -1292,6 +1292,120 @@ describe("ACE parent/staff messaging and notices storage", () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it("pages equal-time messages by sequence with a scoped history cursor", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createStaffConversation(
+          tx,
+          fixture,
+          "STAFF_DIRECT",
+        );
+        const messages = [];
+        const createdAt = new Date("2026-10-13T09:00:00.000Z");
+        for (const body of ["First", "Second", "Third"]) {
+          messages.push(
+            await tx.message.create({
+              data: {
+                tenantId: fixture.tenantAId,
+                conversationId: conversation.conversationId,
+                senderParticipantId: conversation.staffParticipantIds[0],
+                clientRequestId: randomUUID(),
+                bodyEncrypted: body,
+                createdAt,
+              },
+            }),
+          );
+        }
+        return { ...conversation, messages };
+      },
+    );
+    expect(
+      new Set(created.messages.map((message) => message.createdAt.getTime()))
+        .size,
+    ).toBe(1);
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const service = new MessagingService();
+    const first = await service.listStaffMessages(
+      actor,
+      created.conversationId,
+      {
+        limit: 2,
+      },
+    );
+    expect(first.items.map((message) => message.body)).toEqual([
+      "Third",
+      "Second",
+    ]);
+    if (!first.nextCursor) throw new Error("Missing older-message cursor");
+    const older = await service.listStaffMessages(
+      actor,
+      created.conversationId,
+      {
+        limit: 2,
+        cursor: first.nextCursor,
+      },
+    );
+    expect(older.items.map((message) => message.body)).toEqual(["First"]);
+    expect(older.nextCursor).toBeNull();
+    await expect(
+      service.listStaffMessages(
+        { ...actor, userId: fixture.staffBId },
+        created.conversationId,
+        { cursor: first.nextCursor },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.listStaffMessages(
+        { ...actor, userId: fixture.staffCId },
+        created.conversationId,
+        { cursor: first.nextCursor },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await tx.message.createMany({
+          data: Array.from({ length: 500 }, (_, index) => ({
+            tenantId: fixture.tenantAId,
+            conversationId: created.conversationId,
+            senderParticipantId: created.staffParticipantIds[0],
+            clientRequestId: randomUUID(),
+            bodyEncrypted: `Pilot message ${index}`,
+          })),
+        });
+      },
+    );
+    const plan = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        // Check index eligibility without depending on small-table planner estimates.
+        await tx.$executeRaw`SET LOCAL enable_sort = off`;
+        return tx.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+          EXPLAIN (FORMAT JSON)
+          SELECT "id", "sequence" FROM "Message"
+          WHERE "tenantId" = ${fixture.tenantAId}
+            AND "conversationId" = ${created.conversationId}
+            AND "sequence" < 500
+          ORDER BY "sequence" DESC LIMIT 20
+        `;
+      },
+    );
+    expect(JSON.stringify(plan)).toContain(
+      "Message_tenantId_conversationId_sequence_key",
+    );
+  });
+
   it("pages same-time staff conversations without repeating or crossing sites", async () => {
     if (!isDatabaseAvailable()) return;
 
@@ -1781,17 +1895,47 @@ describe("ACE parent/staff messaging and notices storage", () => {
 
     expect(
       (await service.listStaffMessages(staffA, opened.id, {})).items[0],
-    ).toMatchObject({ id: first.id, recipientRead: false });
+    ).toMatchObject({
+      id: first.id,
+      recipientRead: false,
+      deliveryState: "sent",
+    });
     expect(
       (await service.listStaffMessages(staffB, opened.id, {})).items[0],
     ).toMatchObject({ id: first.id, recipientRead: null });
+
+    await withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+      tx.messageDelivery.updateMany({
+        where: { messageId: first.id, tenantId: fixture.tenantAId },
+        data: { status: "DELIVERED", deliveredAt: new Date() },
+      }),
+    );
+    expect(
+      (await service.listStaffMessages(staffA, opened.id, {})).items[0],
+    ).toMatchObject({ deliveryState: "delivered" });
 
     await service.advanceStaffReadCursor(staffB, opened.id, {
       sequence: first.sequence,
     });
     expect(
       (await service.listStaffMessages(staffA, opened.id, {})).items[0],
-    ).toMatchObject({ id: first.id, recipientRead: true });
+    ).toMatchObject({
+      id: first.id,
+      recipientRead: true,
+      deliveryState: "read",
+    });
+    const delivery = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.messageDelivery.findFirst({
+          where: { tenantId: fixture.tenantAId, messageId: first.id },
+          select: { status: true, deliveredAt: true, readAt: true },
+        }),
+    );
+    expect(delivery).toMatchObject({ status: "READ" });
+    expect(Number.isFinite(delivery?.deliveredAt?.getTime())).toBe(true);
+    expect(Number.isFinite(delivery?.readAt?.getTime())).toBe(true);
 
     const second = await command.sendStaffMessage(staffA, opened.id, {
       clientRequestId: randomUUID(),
@@ -1963,7 +2107,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
           sender: { id: fixture.staffAId },
         },
       ],
-      nextBefore: null,
+      nextCursor: null,
     });
     await expect(
       history.list(

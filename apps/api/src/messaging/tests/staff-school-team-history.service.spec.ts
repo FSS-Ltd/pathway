@@ -3,6 +3,10 @@ import { NotFoundException } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { REQUIRED_PERMISSION } from "../../access-control/require-permission.decorator";
 import { MessagingController } from "../messaging.controller";
+import {
+  decodeMessageHistoryCursor,
+  encodeMessageHistoryCursor,
+} from "../message-history-cursor";
 import { StaffSchoolTeamHistoryService } from "../staff-school-team-history.service";
 
 jest.mock("@pathway/db", () => ({
@@ -30,6 +34,10 @@ function setup() {
       findFirst: jest.fn().mockResolvedValue({ id: conversationId }),
     },
     message: { findMany: jest.fn().mockResolvedValue([]) },
+    messageDelivery: { findMany: jest.fn().mockResolvedValue([]) },
+    messageParticipantReadCursor: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
   };
   jest
     .mocked(withTenantRlsContext)
@@ -68,9 +76,15 @@ describe("staff school-team message history", () => {
       { id: "next", sequence: 3 },
     ]);
 
+    const cursor = encodeMessageHistoryCursor(
+      5,
+      actor.tenantId,
+      actor.userId,
+      conversationId,
+    );
     const result = await service.list(actor, conversationId, {
       limit: 1,
-      before: 5,
+      cursor,
     });
 
     expect(result).toEqual({
@@ -81,10 +95,19 @@ describe("staff school-team message history", () => {
           body: "A family message",
           createdAt: time.toISOString(),
           sender: { id: "guardian", displayName: "Parent" },
+          deliveryState: null,
         },
       ],
-      nextBefore: 4,
+      nextCursor: expect.any(String),
     });
+    expect(
+      decodeMessageHistoryCursor(
+        result.nextCursor!,
+        actor.tenantId,
+        actor.userId,
+        conversationId,
+      ),
+    ).toBe(4);
     expect(tx.messageConversation.findFirst).toHaveBeenCalledWith({
       where: expect.objectContaining({
         id: conversationId,

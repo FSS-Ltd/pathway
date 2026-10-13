@@ -13,11 +13,8 @@ export const messageDeliveryStateSchema = z.enum([
   "read",
 ]);
 export const conversationCursorSchema = z.string().min(1).max(512);
-export const messageCursorSchema = z
-  .number()
-  .int()
-  .positive()
-  .max(2_147_483_647);
+export const messageCursorSchema = z.string().min(1).max(512);
+const messageSequenceSchema = z.number().int().positive().max(2_147_483_647);
 
 export const inboxRowSchema = z
   .object({
@@ -39,7 +36,7 @@ export const inboxRowSchema = z
 export const messageSchema = z
   .object({
     id: idSchema,
-    sequence: messageCursorSchema,
+    sequence: messageSequenceSchema,
     body: z.string().min(1).max(4_000),
     createdAt: dateTimeSchema,
     sender: z
@@ -48,6 +45,7 @@ export const messageSchema = z
         displayName: z.string().trim().min(1).max(200),
       })
       .strict(),
+    deliveryState: z.enum(["sent", "delivered", "read"]).nullable(),
     recipientRead: z.boolean().nullable().optional(),
   })
   .strict();

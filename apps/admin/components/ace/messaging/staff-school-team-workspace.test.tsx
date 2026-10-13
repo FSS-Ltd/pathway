@@ -112,7 +112,7 @@ async function run(): Promise<void> {
             sender: { id: "parent-id", displayName: "Amira" },
           },
         ],
-        nextBefore: null,
+        nextCursor: null,
       });
     }
     if (url.pathname.endsWith("/school-team")) {
