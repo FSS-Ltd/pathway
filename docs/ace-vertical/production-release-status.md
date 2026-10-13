@@ -582,7 +582,8 @@ admin web client refetches REST history on events, reconnects, focus, and a
 bounded polling interval. The restored production Supabase project is connected,
 and its publishable key is configured in the API Vercel production environment.
 The merged revision signs with the project's legacy shared JWT secret. The
-corrective branch `fix/ace-m05-es256-signing` changes the contract to an
+corrective draft [PR #617](https://github.com/FSS-Ltd/pathway/pull/617) on
+`fix/ace-m05-es256-signing` changes the contract to an
 imported ES256 key. The corrected API requires the matching private JWK in its encrypted
 `SUPABASE_JWT_SIGNING_JWK` environment variable and issues no Realtime token
 when it is absent, even if legacy JWT variables are present. Live enablement
