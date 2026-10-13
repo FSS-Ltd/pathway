@@ -15,6 +15,7 @@ import { EnrolmentIdentitiesService } from "../../../enrolments/enrolment-identi
 import { EnrolmentRollService } from "../../../enrolments/enrolment-roll.service";
 import { InstitutionalCensusService } from "../institutional-census.service";
 import { InstitutionalQuoteService } from "../institutional-quote.service";
+import { InstitutionalPriceResolver } from "../institutional-price-resolver";
 import { censusCutoffFor, localDateAt } from "../institutional-time";
 
 const starter = "INSTITUTIONAL_STARTER_MONTHLY";
@@ -502,5 +503,87 @@ describe("institutional quotes and census (e2e)", () => {
     expect(following.snapshot.planCode).toBe(
       "INSTITUTIONAL_PROFESSIONAL_MONTHLY",
     );
+  });
+
+  it("freezes mapped Price IDs and amounts when the map changes before acceptance", async () => {
+    if (!app) return;
+    const mappedOrgId = randomUUID();
+    const mappedTenantId = randomUUID();
+    await prisma.org.create({
+      data: {
+        id: mappedOrgId,
+        name: "Mapped quote e2e",
+        slug: `mapped-quote-${mappedOrgId}`,
+        planCode: "starter",
+      },
+    });
+    await prisma.tenant.create({
+      data: {
+        id: mappedTenantId,
+        orgId: mappedOrgId,
+        name: "Main site",
+        slug: `mapped-quote-${mappedTenantId}`,
+        timezone: "Europe/London",
+      },
+    });
+    const billing = await seedE2eAuthUser({
+      subject: `mapped-quote-billing-${mappedOrgId}`,
+      tenantId: mappedTenantId,
+      orgId: mappedOrgId,
+      orgRole: "ORG_BILLING",
+    });
+    const resolver = app.get(InstitutionalPriceResolver);
+    const priceSpy = jest.spyOn(resolver, "resolve").mockResolvedValue({
+      STARTER_49_YEARLY: {
+        priceId: "price_acceptedbase",
+        unitAmountPence: 51_000,
+      },
+      INSTITUTIONAL_CHILD_UP_TO_100_YEARLY: {
+        priceId: "price_acceptedfirst",
+        unitAmountPence: 1_234,
+      },
+      INSTITUTIONAL_CHILD_101_TO_250_YEARLY: {
+        priceId: "price_acceptedsecond",
+        unitAmountPence: 812,
+      },
+    });
+    try {
+      const quote = await request(app.getHttpServer())
+        .post("/billing/institutional/quotes/v2")
+        .set("Authorization", billing.authorization)
+        .send({
+          planCode: "INSTITUTIONAL_STARTER_YEARLY",
+          storageChoice: "none",
+          declaredChildren: 26,
+          declarationAccepted: true,
+        });
+      expect(quote.status).toBe(201);
+      expect(quote.body).toMatchObject({
+        status: "PRICED",
+        pricingVersion: "ENROLLED_CHILDREN_V2",
+        subtotalPence: 52_234,
+      });
+      priceSpy.mockResolvedValue({});
+      const accepted = await request(app.getHttpServer())
+        .post("/billing/institutional/quotes/accept")
+        .set("Authorization", billing.authorization)
+        .send({
+          snapshotId: quote.body.id,
+          idempotencyKey: `mapped-accept-${mappedOrgId}`,
+        });
+      expect(accepted.status).toBe(201);
+      const stored =
+        await prisma.institutionalBillingSnapshot.findUniqueOrThrow({
+          where: { id: quote.body.id },
+        });
+      expect(stored.subtotalPence).toBe(52_234);
+      expect(stored.lines).toMatchObject([
+        { priceId: "price_acceptedbase", quantity: 1 },
+        { priceId: "price_acceptedfirst", quantity: 1 },
+        { priceId: "price_acceptedsecond", quantity: 0 },
+      ]);
+    } finally {
+      priceSpy.mockRestore();
+    }
   });
 });

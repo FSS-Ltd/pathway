@@ -1,5 +1,6 @@
 import { BillingProvider } from "@pathway/db";
 import { type PlanCode } from "./billing-plans";
+import type { InstitutionalMappedPriceCode } from "@pathway/pricing";
 import type { InstitutionalStripePriceCode } from "./institutional/institutional-stripe-prices";
 
 export type ActiveBillingProvider =
@@ -40,7 +41,8 @@ export type PriceCode =
   | PlanCode
   | AddonPriceCode
   | ModulePriceCode
-  | InstitutionalStripePriceCode;
+  | InstitutionalStripePriceCode
+  | InstitutionalMappedPriceCode;
 
 export type StripePriceMap = Partial<Record<PriceCode, string>>;
 
@@ -100,7 +102,9 @@ const ALLOWED_PRICE_CODES: Set<PriceCode> = new Set([
   "INSTITUTIONAL_GROWTH_MONTHLY",
   "INSTITUTIONAL_PROFESSIONAL_MONTHLY",
   "INSTITUTIONAL_CHILD_UP_TO_100_MONTHLY",
+  "INSTITUTIONAL_CHILD_UP_TO_100_YEARLY",
   "INSTITUTIONAL_CHILD_101_TO_250_MONTHLY",
+  "INSTITUTIONAL_CHILD_101_TO_250_YEARLY",
   // Phase 3 PR 3.1: module add-on price codes.
   "MODULE_FINANCE_MONTHLY",
   "MODULE_FINANCE_YEARLY",

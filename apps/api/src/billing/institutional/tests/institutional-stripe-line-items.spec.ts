@@ -1,4 +1,8 @@
-import { INSTITUTIONAL_PRICING_VERSION } from "@pathway/pricing";
+import {
+  calculateMappedInstitutionalQuote,
+  INSTITUTIONAL_MAPPED_PRICING_VERSION,
+  INSTITUTIONAL_PRICING_VERSION,
+} from "@pathway/pricing";
 import { stripeItemsForSnapshot } from "../institutional-stripe-line-items";
 
 const priceMap = {
@@ -18,6 +22,49 @@ const starter = {
 };
 
 describe("institutional Stripe line items", () => {
+  it("uses accepted V2 Price IDs and amounts after the map changes", () => {
+    const quote = calculateMappedInstitutionalQuote({
+      planCode: "INSTITUTIONAL_STARTER_MONTHLY",
+      enrolledChildren: 25,
+      storageChoice: "none",
+      prices: {
+        STARTER_49_MONTHLY: {
+          priceId: "price_accepted",
+          unitAmountPence: 5700,
+        },
+        INSTITUTIONAL_CHILD_UP_TO_100_MONTHLY: {
+          priceId: "price_first",
+          unitAmountPence: 175,
+        },
+        INSTITUTIONAL_CHILD_101_TO_250_MONTHLY: {
+          priceId: "price_second",
+          unitAmountPence: 99,
+        },
+      },
+    });
+    expect(quote.kind).toBe("priced");
+    if (quote.kind !== "priced") return;
+    const mapped = {
+      ...starter,
+      pricingVersion: INSTITUTIONAL_MAPPED_PRICING_VERSION,
+      subtotalPence: 5700,
+      enrolledChildren: 25,
+      lines: quote.lines,
+    };
+    expect(
+      stripeItemsForSnapshot(mapped, { STARTER_49_MONTHLY: "price_new" }),
+    ).toEqual([{ price: "price_accepted", quantity: 1 }]);
+    expect(() =>
+      stripeItemsForSnapshot(
+        {
+          ...mapped,
+          lines: [{ ...mapped.lines[0], subtotalPence: 5701 }],
+        },
+        {},
+      ),
+    ).toThrow("INVALID_INSTITUTIONAL_SNAPSHOT");
+  });
+
   it("keeps the base charge when the count is zero", () => {
     expect(stripeItemsForSnapshot(starter, priceMap)).toEqual([
       { price: "price_starter", quantity: 1 },
