@@ -226,8 +226,39 @@ export class InstitutionalCheckoutService {
         return { checkoutUrl: session.url, pendingOrderId: order.id };
       throw new ConflictException({ code: "CHECKOUT_EXPIRED" });
     }
-    const successUrl = this.config.stripe.successUrlDefault;
-    const cancelUrl = this.config.stripe.cancelUrlDefault;
+    const adminUrl = process.env.ADMIN_URL?.trim();
+    const mappedCheckout =
+      snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION;
+    let adminOrigin: URL | null = null;
+    if (mappedCheckout) {
+      try {
+        adminOrigin = new URL(adminUrl ?? "");
+        if (
+          adminOrigin.protocol !== "https:" &&
+          !(
+            adminOrigin.protocol === "http:" &&
+            adminOrigin.hostname === "localhost"
+          )
+        )
+          throw new Error("Invalid admin checkout return URL");
+      } catch {
+        throw new ServiceUnavailableException({
+          code: "CHECKOUT_URLS_MISSING",
+        });
+      }
+    }
+    const successUrl = adminOrigin
+      ? new URL(
+          "/billing/institutional?checkout=pending",
+          adminOrigin,
+        ).toString()
+      : this.config.stripe.successUrlDefault;
+    const cancelUrl = adminOrigin
+      ? new URL(
+          "/billing/institutional?checkout=cancelled",
+          adminOrigin,
+        ).toString()
+      : this.config.stripe.cancelUrlDefault;
     if (!successUrl || !cancelUrl) {
       throw new ServiceUnavailableException({ code: "CHECKOUT_URLS_MISSING" });
     }

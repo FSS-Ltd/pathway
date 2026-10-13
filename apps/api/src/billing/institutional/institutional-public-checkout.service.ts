@@ -38,7 +38,14 @@ export type PublicInstitutionalCheckoutInput = {
   planCode: InstitutionalMappedPlanCode;
   enrolledChildren: number;
   declarationAccepted: true;
-  setting: "INDEPENDENT_SCHOOL" | "ACE_SCHOOL" | "STATE_SCHOOL" | "NURSERY";
+  setting:
+    | "CHURCH"
+    | "INDEPENDENT_SCHOOL"
+    | "ACE_SCHOOL"
+    | "STATE_SCHOOL"
+    | "NURSERY"
+    | "CHARITY"
+    | "CLUB";
   storageChoice: InstitutionalStorageChoice;
   includedModules: Module[];
   paidModules: Module[];
@@ -144,7 +151,7 @@ export class InstitutionalPublicCheckoutService {
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-|-$/g, "")
-          .slice(0, 40) || "school";
+          .slice(0, 40) || "organisation";
       order = await prisma.pendingOrder.upsert({
         where: { id: orderId },
         update: {},
@@ -172,7 +179,12 @@ export class InstitutionalPublicCheckoutService {
             contactName: input.org.contactName.trim(),
             contactEmail: email,
             password: input.org.password,
-            sector: "SCHOOL",
+            sector:
+              input.setting === "CHURCH" ||
+              input.setting === "CHARITY" ||
+              input.setting === "CLUB"
+                ? input.setting
+                : "SCHOOL",
             planCode: input.planCode,
           },
         },

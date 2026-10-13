@@ -21,9 +21,7 @@ export type SceneSlot = {
 
 type SceneObjectCount = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
-const SCENE_SLOTS: Readonly<
-  Record<SceneObjectCount, readonly SceneSlot[]>
-> = {
+const SCENE_SLOTS: Readonly<Record<SceneObjectCount, readonly SceneSlot[]>> = {
   1: [{ left: "41%", bottom: "1%", width: "18%" }],
   2: [
     { left: "20%", bottom: "1%", width: "18%" },
@@ -140,16 +138,16 @@ export type SceneImageMotion = {
   transition: typeof reducedMotionFade | typeof springEnter;
 };
 
-function sceneCaption(state: ConfiguratorState): string {
+function sceneCaption(state: ConfiguratorState, planLabel?: string): string {
   if (state.orgType === "SCHOOL" && !state.vertical) {
     return "School workspace preview showing Independent School, ACE School and State School.";
   }
 
-  if (!state.vertical || !state.planCode) {
+  if (!state.vertical || (!state.planCode && !planLabel)) {
     return "Choose a setting and plan to complete your configuration.";
   }
 
-  return `${VERTICAL_LABELS[state.vertical]} · ${PLANS[state.planCode].displayName} · billed ${state.frequency}`;
+  return `${VERTICAL_LABELS[state.vertical]} · ${planLabel ?? (state.planCode ? PLANS[state.planCode].displayName : "Nexsteps")} · billed ${state.frequency}`;
 }
 
 function sceneBase(state: ConfiguratorState): SceneBase {
@@ -202,7 +200,10 @@ function sceneAccessibleDescription(
   return `${sentence}. Included modules: ${moduleList(includedModulesForState(state))}. Optional modules: ${moduleList(state.selectedOptionalModules)}. Extra storage: ${storage}.`;
 }
 
-export function buildSceneModel(state: ConfiguratorState): SceneModel {
+export function buildSceneModel(
+  state: ConfiguratorState,
+  planLabel?: string,
+): SceneModel {
   const layers: Array<Pick<SceneForegroundLayer, "id" | "imagePath">> =
     configuredModulesForState(state).map((module) => ({
       id: module,
@@ -215,7 +216,7 @@ export function buildSceneModel(state: ConfiguratorState): SceneModel {
     });
   }
   const slots = sceneSlots(layers.length);
-  const caption = sceneCaption(state);
+  const caption = sceneCaption(state, planLabel);
 
   return {
     base: sceneBase(state),

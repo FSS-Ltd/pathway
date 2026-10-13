@@ -15,7 +15,7 @@ export default function BuyCancelledPage() {
           href="/configure"
           className="rounded-md bg-pw-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-600"
         >
-          Start over
+          Return to configuration
         </Link>
         <a
           href="mailto:support@nexsteps.dev?subject=Need%20help%20with%20Buy%20Now"

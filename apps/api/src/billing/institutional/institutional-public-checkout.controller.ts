@@ -21,10 +21,13 @@ const checkoutSchema = z.object({
   enrolledChildren: z.number().int().nonnegative().safe(),
   declarationAccepted: z.literal(true),
   setting: z.enum([
+    "CHURCH",
     "INDEPENDENT_SCHOOL",
     "ACE_SCHOOL",
     "STATE_SCHOOL",
     "NURSERY",
+    "CHARITY",
+    "CLUB",
   ]),
   storageChoice: z.enum(["none", "100", "200", "1000"]),
   includedModules: z.array(z.nativeEnum(Module)).default([]),

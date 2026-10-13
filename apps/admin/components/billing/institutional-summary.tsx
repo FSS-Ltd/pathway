@@ -1,7 +1,8 @@
 import { Card } from "@pathway/ui";
 import {
-  INSTITUTIONAL_PLANS,
-  type InstitutionalPlanCode,
+  mappedInstitutionalPlanDetails,
+  type InstitutionalMappedPlanCode,
+  type InstitutionalMappedQuoteLine,
   type InstitutionalQuoteLine,
 } from "@pathway/pricing";
 import type { InstitutionalSummary } from "../../lib/institutional-billing-client";
@@ -20,27 +21,29 @@ export const date = (value: string | null) =>
         timeStyle: "short",
       }).format(new Date(value))
     : "Not set";
-export const planName = (code: InstitutionalPlanCode) =>
-  INSTITUTIONAL_PLANS[code].tier;
+export const planName = (code: InstitutionalMappedPlanCode) =>
+  mappedInstitutionalPlanDetails(code).tier;
+export const billingPeriod = (code: InstitutionalMappedPlanCode) =>
+  mappedInstitutionalPlanDetails(code).interval === "year" ? "year" : "month";
 
-function PriceLines({ lines }: { lines: InstitutionalQuoteLine[] }) {
-  const amount = (component: InstitutionalQuoteLine["component"]) =>
-    lines.find((line) => line.component === component)?.subtotalPence ?? 0;
+type PriceLine = InstitutionalQuoteLine | InstitutionalMappedQuoteLine;
+
+function PriceLines({ lines }: { lines: PriceLine[] }) {
+  const labels: Record<PriceLine["component"], string> = {
+    BASE: "Base",
+    CHILDREN_UP_TO_100: "Additional children to 100",
+    CHILDREN_101_TO_250: "Children 101–250",
+    STORAGE: "Extra storage",
+  };
   if (!lines.length) return null;
   return (
     <dl className="space-y-1 text-xs text-text-muted">
-      <div className="flex justify-between gap-3">
-        <dt>Base</dt>
-        <dd>{money(amount("BASE"))}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt>Additional children to 100</dt>
-        <dd>{money(amount("CHILDREN_UP_TO_100"))}</dd>
-      </div>
-      <div className="flex justify-between gap-3">
-        <dt>Children 101–250</dt>
-        <dd>{money(amount("CHILDREN_101_TO_250"))}</dd>
-      </div>
+      {lines.map((line, index) => (
+        <div key={index} className="flex justify-between gap-3">
+          <dt>{labels[line.component]}</dt>
+          <dd>{money(line.subtotalPence)}</dd>
+        </div>
+      ))}
     </dl>
   );
 }
@@ -66,7 +69,10 @@ export function InstitutionalSummaryCards({
               <p className="text-xl font-bold capitalize">
                 {planName(summary.currentPaid.planCode)}
               </p>
-              <p>{money(summary.currentPaid.subtotalPence)} / month</p>
+              <p>
+                {money(summary.currentPaid.subtotalPence)} payable per{" "}
+                {billingPeriod(summary.currentPaid.planCode)}
+              </p>
               <PriceLines lines={summary.currentPaid.lines} />
               <p className="text-text-muted">
                 {summary.currentPaid.enrolledChildren ?? "Unconfirmed"} enrolled
@@ -87,8 +93,7 @@ export function InstitutionalSummaryCards({
             </div>
           ) : (
             <p className="text-sm text-text-muted">
-              No enrolled-child subscription is active. New checkout is
-              currently unavailable.
+              No enrolled-child subscription is active yet.
             </p>
           )}
         </Card>
@@ -96,26 +101,14 @@ export function InstitutionalSummaryCards({
           {summary.liveForecast?.kind === "priced" ? (
             <div className="space-y-2 text-sm">
               <p className="text-xl font-bold">
-                {money(summary.liveForecast.subtotalPence)} / month
+                {money(summary.liveForecast.subtotalPence)} payable per{" "}
+                {billingPeriod(summary.liveForecast.planCode)}
               </p>
               <p className="text-text-muted">
                 {summary.liveForecast.enrolledChildren} enrolled ·{" "}
                 {summary.liveForecast.includedChildren} included
               </p>
-              <p className="text-text-muted">
-                To child 100:{" "}
-                {money(
-                  summary.liveForecast.lines.find(
-                    (line) => line.component === "CHILDREN_UP_TO_100",
-                  )?.subtotalPence ?? 0,
-                )}{" "}
-                · Children 101–250:{" "}
-                {money(
-                  summary.liveForecast.lines.find(
-                    (line) => line.component === "CHILDREN_101_TO_250",
-                  )?.subtotalPence ?? 0,
-                )}
-              </p>
+              <PriceLines lines={[...summary.liveForecast.lines]} />
               <p className="text-text-muted">
                 This may change before the census.
               </p>
@@ -132,7 +125,8 @@ export function InstitutionalSummaryCards({
           {summary.frozenRenewal ? (
             <div className="space-y-2 text-sm">
               <p className="text-xl font-bold">
-                {money(summary.frozenRenewal.subtotalPence)} / month
+                {money(summary.frozenRenewal.subtotalPence)} payable per{" "}
+                {billingPeriod(summary.frozenRenewal.planCode)}
               </p>
               <PriceLines lines={summary.frozenRenewal.lines} />
               <p className="text-text-muted capitalize">
