@@ -86,4 +86,42 @@ describe("Stripe institutional invoice webhook mapping", () => {
       else process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED = old;
     }
   });
+
+  it("maps the failed invoice period so stale failures cannot downgrade a renewed subscription", async () => {
+    const raw = JSON.stringify({
+      id: "evt_failed_1",
+      type: "invoice.payment_failed",
+      data: {
+        object: {
+          id: "in_failed_1",
+          subscription: "sub_1",
+          metadata: { orgId: "org_1" },
+          lines: {
+            has_more: false,
+            data: [
+              {
+                id: "il_failed_1",
+                type: "subscription",
+                subscription: "sub_1",
+                period: { start: 1_893_456_000, end: 1_896_134_400 },
+              },
+            ],
+          },
+        },
+      },
+    });
+    const signature = stripe.webhooks.generateTestHeaderString({
+      payload: raw,
+      secret,
+    });
+    const event = await new StripeBillingWebhookProvider(config).verifyAndParse(
+      null,
+      signature,
+      Buffer.from(raw),
+    );
+    expect(event).toMatchObject({
+      kind: "invoice.payment_failed",
+      periodStart: new Date("2030-01-01T00:00:00.000Z"),
+    });
+  });
 });

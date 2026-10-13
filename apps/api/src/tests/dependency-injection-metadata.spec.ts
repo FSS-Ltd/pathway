@@ -31,6 +31,7 @@ import { StripeBillingWebhookProvider } from "../billing/providers/stripe-billin
 import { StripeBuyNowProvider } from "../billing/providers/stripe-buy-now.provider";
 import { BillingWebhookController } from "../billing/webhook.controller";
 import { InstitutionalWebhookService } from "../billing/institutional/institutional-webhook.service";
+import { InstitutionalPublicActivationService } from "../billing/institutional/institutional-public-activation.service";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { OutboxService } from "../common/outbox/outbox.service";
 import { LoggingService } from "../common/logging/logging.service";
@@ -224,7 +225,8 @@ describe("dependency injection metadata", () => {
         { index: 2, param: ModuleRef },
         { index: 3, param: BILLING_PROVIDER_CONFIG },
         { index: 4, param: InstitutionalWebhookService },
-        { index: 5, param: LoggingService },
+        { index: 5, param: InstitutionalPublicActivationService },
+        { index: 6, param: LoggingService },
       ],
     },
     {

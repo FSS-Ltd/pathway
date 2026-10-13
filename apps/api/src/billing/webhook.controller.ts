@@ -48,6 +48,7 @@ import { getAuthProviderMode } from "../config/runtime-env";
 import Stripe from "stripe";
 import { addOnSubscriptionPlanCode } from "./subscription-plan-code";
 import { InstitutionalWebhookService } from "./institutional/institutional-webhook.service";
+import { InstitutionalPublicActivationService } from "./institutional/institutional-public-activation.service";
 import {
   cancelPaidSourceGrants,
   reconcileSubscriptionModuleGrants,
@@ -143,6 +144,8 @@ export class BillingWebhookController {
     private readonly billingConfig: BillingProviderConfig,
     @Inject(InstitutionalWebhookService)
     private readonly institutionalWebhook: InstitutionalWebhookService,
+    @Inject(InstitutionalPublicActivationService)
+    private readonly publicInstitutionalActivation: InstitutionalPublicActivationService,
     @Optional()
     @Inject(LoggingService)
     logging?: LoggingService,
@@ -243,6 +246,33 @@ export class BillingWebhookController {
     event: ParsedBillingWebhookEvent,
     claimId: string,
   ): Promise<WebhookResult> {
+    const publicOrder = await this.findPendingOrder(event);
+    if (
+      this.publicInstitutionalActivation.isPublicInstitutionalOrder(
+        publicOrder,
+      ) &&
+      publicOrder &&
+      publicOrder.status === PendingOrderStatus.PENDING &&
+      !publicOrder.institutionalSnapshotId
+    ) {
+      if (
+        event.kind === "invoice.draft" &&
+        !this.publicInstitutionalActivation.draftInvoiceMatches(
+          event,
+          publicOrder,
+        )
+      ) {
+        if (!event.invoice?.id || !this.provider.holdDraftInvoice) {
+          throw new Error("Institutional draft invoice could not be held.");
+        }
+        await this.provider.holdDraftInvoice(event.invoice.id);
+      }
+      if (event.kind !== "invoice.paid") {
+        await finishBillingEvent(claimId, event.orgId, true);
+        return { status: "ok", eventId: event.eventId };
+      }
+      this.publicInstitutionalActivation.assertPaidInvoice(event, publicOrder);
+    }
     // If orgId is "pending", resolve the actual orgId from the pending order
     if (event.orgId === "pending" || !event.orgId) {
       const pendingOrder = await this.findPendingOrder(event);
@@ -255,6 +285,18 @@ export class BillingWebhookController {
         // Create org/tenant/user NOW before processing the event
         const created = await this.createOrgFromPendingDetails(pendingOrder);
 
+        if (
+          this.publicInstitutionalActivation.isPublicInstitutionalOrder(
+            pendingOrder,
+          )
+        ) {
+          await this.publicInstitutionalActivation.attachAcceptedQuote(
+            pendingOrder.id,
+            created.orgId,
+            created.tenantId,
+          );
+        }
+
         // Update the event orgId for subsequent processing
         event = { ...event, orgId: created.orgId };
 
@@ -265,6 +307,24 @@ export class BillingWebhookController {
       } else if (pendingOrder?.orgId) {
         // Org was already created, use the existing orgId
         event = { ...event, orgId: pendingOrder.orgId };
+        if (
+          event.kind === "invoice.paid" &&
+          !pendingOrder.institutionalSnapshotId &&
+          pendingOrder.tenantId &&
+          this.publicInstitutionalActivation.isPublicInstitutionalOrder(
+            pendingOrder,
+          )
+        ) {
+          this.publicInstitutionalActivation.assertPaidInvoice(
+            event,
+            pendingOrder,
+          );
+          await this.publicInstitutionalActivation.attachAcceptedQuote(
+            pendingOrder.id,
+            pendingOrder.orgId,
+            pendingOrder.tenantId,
+          );
+        }
       }
       if ((!event.orgId || event.orgId === "pending") && event.subscriptionId) {
         const subscription = await prisma.subscription.findUnique({
@@ -867,6 +927,10 @@ export class BillingWebhookController {
   private async createOrgFromPendingDetails(
     pendingOrder: PendingOrderRecord,
   ): Promise<{ orgId: string; tenantId: string }> {
+    const requireIdentity =
+      this.publicInstitutionalActivation.isPublicInstitutionalOrder(
+        pendingOrder,
+      );
     const details = pendingOrder.pendingOrgDetails as Record<string, string>;
     const orgName = details.orgName;
     const slug = details.slug;
@@ -922,6 +986,9 @@ export class BillingWebhookController {
       let user = await tx.user.findUnique({
         where: { email: contactEmail },
       });
+      if (requireIdentity && user) {
+        throw new Error("Institutional account email requires review");
+      }
 
       if (!user) {
         user = await tx.user.create({
@@ -1006,8 +1073,11 @@ export class BillingWebhookController {
                   userId: user.id,
                   email: contactEmail,
                 });
+                if (requireIdentity)
+                  throw new Error("Identity provisioning unavailable");
               }
             } catch (error) {
+              if (requireIdentity) throw error;
               this.logger.error("Failed to create Auth0 user", {
                 userId: user.id,
                 email: contactEmail,
@@ -1017,6 +1087,8 @@ export class BillingWebhookController {
               // Don't fail the whole transaction if Auth0 creation fails
             }
           } else {
+            if (requireIdentity)
+              throw new Error("Identity provider unavailable");
             this.logger.warn(
               "Auth0ManagementService not ready (credentials missing or invalid)",
               {
@@ -1070,8 +1142,11 @@ export class BillingWebhookController {
                   userId: user.id,
                   email: contactEmail,
                 });
+                if (requireIdentity)
+                  throw new Error("Identity provisioning unavailable");
               }
             } catch (error) {
+              if (requireIdentity) throw error;
               this.logger.error("Failed to create Clerk user", {
                 userId: user.id,
                 email: contactEmail,
@@ -1081,6 +1156,8 @@ export class BillingWebhookController {
               // Don't fail the whole transaction if Clerk creation fails
             }
           } else {
+            if (requireIdentity)
+              throw new Error("Identity provider unavailable");
             this.logger.warn(
               "ClerkManagementService not ready (secret key missing)",
               {
@@ -1097,6 +1174,7 @@ export class BillingWebhookController {
           provider: existingIdentity.provider,
         });
       } else if (!password) {
+        if (requireIdentity) throw new Error("Identity password unavailable");
         this.logger.warn(
           "No password provided, skipping identity provider user creation",
           {

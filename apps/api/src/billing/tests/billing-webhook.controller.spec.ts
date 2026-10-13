@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { BillingWebhookController } from "../webhook.controller";
 import { InstitutionalWebhookService } from "../institutional/institutional-webhook.service";
+import { InstitutionalPublicActivationService } from "../institutional/institutional-public-activation.service";
 import {
   BillingWebhookProvider,
   ParsedBillingWebhookEvent,
@@ -141,6 +142,15 @@ describe("BillingWebhookController", () => {
   let provider: BillingWebhookProvider;
   let entitlements: jest.Mocked<Pick<EntitlementsService, "resolve">>;
   let billingConfig: BillingProviderConfig;
+  let publicActivation: jest.Mocked<
+    Pick<
+      InstitutionalPublicActivationService,
+      | "isPublicInstitutionalOrder"
+      | "draftInvoiceMatches"
+      | "assertPaidInvoice"
+      | "attachAcceptedQuote"
+    >
+  >;
   const logging = new LoggingService();
 
   beforeEach(() => {
@@ -234,6 +244,12 @@ describe("BillingWebhookController", () => {
       stripe: {},
       goCardless: {},
     };
+    publicActivation = {
+      isPublicInstitutionalOrder: jest.fn().mockReturnValue(false),
+      draftInvoiceMatches: jest.fn().mockReturnValue(true),
+      assertPaidInvoice: jest.fn(),
+      attachAcceptedQuote: jest.fn(),
+    };
 
     controller = new BillingWebhookController(
       provider as unknown as BillingWebhookProvider,
@@ -241,8 +257,74 @@ describe("BillingWebhookController", () => {
       moduleRef,
       billingConfig,
       new InstitutionalWebhookService(provider, billingConfig),
+      publicActivation as InstitutionalPublicActivationService,
       logging,
     );
+  });
+
+  it("does not provision a public institutional order before invoice parity", async () => {
+    const paidEvent: ParsedBillingWebhookEvent = {
+      ...baseEvent,
+      kind: "invoice.paid",
+      orgId: "",
+      pendingOrderId: "order_1",
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue(paidEvent);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue({
+      id: "order_1",
+      orgId: null,
+      institutionalSnapshotId: null,
+      status: PendingOrderStatus.PENDING,
+    });
+    publicActivation.isPublicInstitutionalOrder.mockReturnValue(true);
+    publicActivation.assertPaidInvoice.mockImplementation(() => {
+      throw new Error("Invoice mismatch");
+    });
+
+    await expect(
+      controller.handleWebhook({ dummy: true }, "test-signature"),
+    ).rejects.toThrow("Invoice mismatch");
+    expect(publicActivation.attachAcceptedQuote).not.toHaveBeenCalled();
+    expect(prismaMock.subscription.upsert).not.toHaveBeenCalled();
+    expect(finishBillingEvent).toHaveBeenCalledWith(
+      "billing_event_1",
+      "",
+      false,
+    );
+  });
+
+  it("holds a mismatched public institutional draft invoice", async () => {
+    const draftEvent: ParsedBillingWebhookEvent = {
+      ...baseEvent,
+      kind: "invoice.draft",
+      orgId: "",
+      pendingOrderId: "order_1",
+      invoice: {
+        id: "in_draft",
+        status: "draft",
+        currency: "gbp",
+        linesComplete: true,
+        lines: [],
+      },
+    };
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue(draftEvent);
+    provider.holdDraftInvoice = jest.fn().mockResolvedValue(undefined);
+    prismaMock.pendingOrder.findUnique.mockResolvedValue({
+      id: "order_1",
+      orgId: null,
+      institutionalSnapshotId: null,
+      status: PendingOrderStatus.PENDING,
+    });
+    publicActivation.isPublicInstitutionalOrder.mockReturnValue(true);
+    publicActivation.draftInvoiceMatches.mockReturnValue(false);
+
+    const result = await controller.handleWebhook(
+      { dummy: true },
+      "test-signature",
+    );
+    expect(result.status).toBe("ok");
+    expect(provider.holdDraftInvoice).toHaveBeenCalledWith("in_draft");
+    expect(publicActivation.attachAcceptedQuote).not.toHaveBeenCalled();
   });
 
   it("handles subscription update and records billing event", async () => {

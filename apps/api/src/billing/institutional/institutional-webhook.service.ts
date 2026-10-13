@@ -7,8 +7,13 @@ import {
   InstitutionalBillingOperationKind,
   InstitutionalBillingOperationStatus,
   InstitutionalSnapshotKind,
+  Module,
 } from "@pathway/db";
-import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
+import {
+  INSTITUTIONAL_PLANS,
+  isMappedInstitutionalPlanCode,
+  mappedInstitutionalSelectionPlanCode,
+} from "@pathway/pricing";
 import {
   BILLING_WEBHOOK_PROVIDER,
   type BillingWebhookProvider,
@@ -22,6 +27,11 @@ import { censusCutoffFor } from "./institutional-time";
 import { isInstitutionalPlanCode } from "./institutional-selection";
 import { invoiceMatchesSnapshot } from "./institutional-invoice-match";
 import { quoteWasAcceptedForCheckout } from "./institutional-quote-freshness";
+import { parsePublicInstitutionalOrder } from "./institutional-public-order";
+import {
+  reconcileSubscriptionModuleGrants,
+  updateSubscriptionGrantPeriod,
+} from "../module-grants";
 
 @Injectable()
 export class InstitutionalWebhookService {
@@ -87,7 +97,11 @@ export class InstitutionalWebhookService {
       return true;
     }
     if (event.kind === "invoice.payment_failed") {
-      if (subscription) {
+      if (
+        subscription &&
+        event.periodStart &&
+        subscription.periodStart <= event.periodStart
+      ) {
         await prisma.subscription.updateMany({
           where: { id: subscription.id, orgId: event.orgId },
           data: { status: SubscriptionStatus.PAST_DUE },
@@ -142,7 +156,12 @@ export class InstitutionalWebhookService {
       effectivePeriod &&
       event.periodStart &&
       event.periodEnd &&
-      invoiceMatchesSnapshot(event, snapshot, priceMap);
+      invoiceMatchesSnapshot(
+        event,
+        snapshot,
+        priceMap,
+        !!pendingOrder && pendingOrder.status !== PendingOrderStatus.COMPLETED,
+      );
     if (!matches) {
       await prisma.institutionalBillingPolicy.updateMany({
         where: { orgId: event.orgId },
@@ -194,10 +213,18 @@ export class InstitutionalWebhookService {
       ) {
         return;
       }
-      if (!isInstitutionalPlanCode(snapshot.planCode)) {
+      if (
+        !isInstitutionalPlanCode(snapshot.planCode) &&
+        !isMappedInstitutionalPlanCode(snapshot.planCode)
+      ) {
         throw new Error("Institutional snapshot plan is invalid.");
       }
-      const plan = INSTITUTIONAL_PLANS[snapshot.planCode];
+      const plan =
+        INSTITUTIONAL_PLANS[
+          isInstitutionalPlanCode(snapshot.planCode)
+            ? snapshot.planCode
+            : mappedInstitutionalSelectionPlanCode(snapshot.planCode)
+        ];
       const paid = await tx.subscription.upsert({
         where: { providerSubId: event.subscriptionId },
         update: {
@@ -237,6 +264,9 @@ export class InstitutionalWebhookService {
             completedAt: new Date(),
             providerSubscriptionId: event.subscriptionId,
             providerCustomerId: event.providerCustomerId ?? undefined,
+            pendingOrgDetails: parsePublicInstitutionalOrder(pendingOrder.flags)
+              ? {}
+              : undefined,
           },
         });
       }
@@ -272,6 +302,30 @@ export class InstitutionalWebhookService {
           source: "institutional_invoice",
         },
       });
+      if (
+        pendingOrder?.institutionalSnapshotId === snapshot.id &&
+        pendingOrder.status !== PendingOrderStatus.COMPLETED
+      ) {
+        await reconcileSubscriptionModuleGrants(
+          tx,
+          event.orgId,
+          event.subscriptionId,
+          {
+            included: [
+              ...new Set([Module.LEARNING, ...snapshot.includedModules]),
+            ],
+            paid: snapshot.paidModules,
+          },
+          event.periodEnd!,
+        );
+      } else {
+        await updateSubscriptionGrantPeriod(
+          tx,
+          event.orgId,
+          event.subscriptionId,
+          event.periodEnd!,
+        );
+      }
       await tx.institutionalBillingPolicy.updateMany({
         where: { orgId: event.orgId, reviewReason: "INVOICE_MISMATCH" },
         data: { reviewReason: null },
