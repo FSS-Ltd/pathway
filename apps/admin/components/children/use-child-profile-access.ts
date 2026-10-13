@@ -40,6 +40,16 @@ export function useChildProfileAccess(guardianIds?: readonly string[]) {
     canViewAttendance: permissions?.includes("attendance.read") ?? isAdmin,
     canViewRegistration:
       !isLoadingAccess && (isAdmin || role.isRegistrationStaff === true),
+    canViewPace:
+      !isLoadingAccess &&
+      orgKey === "ACE_SCHOOL" &&
+      capabilities.includes("ace.pace.read") &&
+      (permissions?.includes("ace.pace.read") ?? false),
+    canRecordPace:
+      !isLoadingAccess &&
+      orgKey === "ACE_SCHOOL" &&
+      capabilities.includes("ace.pace.record") &&
+      (permissions?.includes("ace.pace.record") ?? false),
     canAccessSafeguarding: !isLoadingAccess && canAccessSafeguardingAdmin(role),
   };
 }

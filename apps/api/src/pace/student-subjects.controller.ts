@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Inject,
   Param,
@@ -13,7 +14,10 @@ import { z } from "zod";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
-import { createStudentSubjectSchema } from "./dto/student-subject.dto";
+import {
+  createStudentSubjectSchema,
+  endStudentSubjectSchema,
+} from "./dto/student-subject.dto";
 import { PaceQueryService } from "./pace-query.service";
 import { StudentSubjectsService } from "./student-subjects.service";
 
@@ -47,6 +51,27 @@ export class StudentSubjectsController {
       return await this.service.place(
         childId,
         await createStudentSubjectSchema.parseAsync(body),
+        this.actor(),
+      );
+    } catch (error) {
+      if (error instanceof z.ZodError)
+        throw new BadRequestException(error.flatten());
+      throw error;
+    }
+  }
+
+  @Delete(":childId/subjects/:enrollmentId")
+  @RequirePermission("ace.pace.record")
+  async end(
+    @Param("childId") childId: string,
+    @Param("enrollmentId") enrollmentId: string,
+    @Body() body: unknown,
+  ) {
+    try {
+      return await this.service.end(
+        childId,
+        enrollmentId,
+        await endStudentSubjectSchema.parseAsync(body),
         this.actor(),
       );
     } catch (error) {

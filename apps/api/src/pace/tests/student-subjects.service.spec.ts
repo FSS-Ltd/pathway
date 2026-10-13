@@ -50,8 +50,15 @@ function transaction() {
       create: jest.fn(),
       updateMany: jest.fn(),
     },
-    paceAssessment: { findMany: jest.fn().mockResolvedValue([]) },
-    paceProgress: { upsert: jest.fn().mockResolvedValue({}) },
+    paceAssessment: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    paceProgress: {
+      findMany: jest.fn().mockResolvedValue([]),
+      upsert: jest.fn().mockResolvedValue({}),
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     auditEvent: { create: jest.fn() },
     outboxEvent: { createMany: jest.fn(), findFirstOrThrow: jest.fn() },
   };
@@ -80,6 +87,9 @@ describe("StudentSubjectsService", () => {
       { id: "subject-1", name: "Mathematics" },
       { id: "subject-2", name: "English" },
     ]);
+    tx.paceProgress.findMany.mockResolvedValue([
+      { subjectId: "subject-1", currentPace: 4, targetPace: 12 },
+    ]);
 
     await expect(service.list("child-1", actor)).resolves.toEqual({
       placements: [
@@ -91,7 +101,7 @@ describe("StudentSubjectsService", () => {
           endsOn: null,
           status: "ACTIVE",
           startingPace: 1,
-          currentPace: 2,
+          currentPace: 4,
           targetPace: 12,
         },
       ],
@@ -343,5 +353,155 @@ describe("StudentSubjectsService", () => {
     await expect(
       service.place("child-1", command(), actor),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("ends the exact active placement, removes only its projection, and records an audit and event", async () => {
+    const { service, tx } = createService();
+    tx.tenant.findFirst.mockResolvedValue({ timezone: "Europe/London" });
+    tx.child.findFirst.mockResolvedValue({ id: "child-1" });
+    tx.studentSubjectEnrollment.findFirst.mockResolvedValue({
+      id: "enrollment-1",
+      subjectId: "subject-1",
+      startsOn: new Date("2026-09-01T12:00:00.000Z"),
+    });
+    tx.studentSubjectEnrollment.updateMany.mockResolvedValue({ count: 1 });
+    tx.auditEvent.create.mockResolvedValue({});
+    tx.outboxEvent.createMany.mockResolvedValue({ count: 1 });
+    tx.outboxEvent.findFirstOrThrow.mockResolvedValue({ id: "outbox-1" });
+
+    await expect(
+      service.end(
+        "child-1",
+        "enrollment-1",
+        {
+          endsOn: "2026-09-30",
+          reason: "Subject completed",
+        },
+        actor,
+      ),
+    ).resolves.toEqual({
+      id: "enrollment-1",
+      status: "ENDED",
+      endsOn: "2026-09-30",
+    });
+    expect(tx.studentSubjectEnrollment.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "enrollment-1",
+        tenantId: "tenant-1",
+        childId: "child-1",
+        status: "ACTIVE",
+      },
+      data: { status: "ENDED", endsOn: new Date("2026-09-30T12:00:00.000Z") },
+    });
+    expect(tx.paceProgress.deleteMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant-1",
+        childId: "child-1",
+        subjectId: "subject-1",
+      },
+    });
+    expect(tx.paceAssessment.findFirst).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant-1",
+        childId: "child-1",
+        subjectId: "subject-1",
+        assessedOn: { gte: new Date("2026-10-01T00:00:00.000Z") },
+      },
+      select: { id: true },
+    });
+    expect(tx.auditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "UPDATED",
+          entityId: "enrollment-1",
+        }),
+      }),
+    );
+    expect(tx.outboxEvent.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [
+          expect.objectContaining({ eventType: "ace.student-subject.ended" }),
+        ],
+      }),
+    );
+  });
+
+  it("rejects an invalid end date, missing placement, or concurrent change without deleting progress", async () => {
+    const { service, tx } = createService();
+    await expect(
+      service.end(
+        "child-1",
+        "enrollment-1",
+        {
+          endsOn: "2026-02-30",
+          reason: "Done",
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    tx.tenant.findFirst.mockResolvedValue({ timezone: "Europe/London" });
+    tx.child.findFirst.mockResolvedValue({ id: "child-1" });
+    await expect(
+      service.end(
+        "child-1",
+        "enrollment-1",
+        {
+          endsOn: "2026-09-30",
+          reason: "Done",
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    tx.studentSubjectEnrollment.findFirst.mockResolvedValue({
+      id: "enrollment-1",
+      subjectId: "subject-1",
+      startsOn: new Date("2026-09-01T12:00:00.000Z"),
+    });
+    await expect(
+      service.end(
+        "child-1",
+        "enrollment-1",
+        {
+          endsOn: "2026-08-31",
+          reason: "Done",
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.end(
+        "child-1",
+        "enrollment-1",
+        { endsOn: "2100-01-01", reason: "Done" },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    tx.paceAssessment.findFirst.mockResolvedValueOnce({
+      id: "later-assessment",
+    });
+    await expect(
+      service.end(
+        "child-1",
+        "enrollment-1",
+        {
+          endsOn: "2026-09-30",
+          reason: "Done",
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    tx.studentSubjectEnrollment.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      service.end(
+        "child-1",
+        "enrollment-1",
+        {
+          endsOn: "2026-09-30",
+          reason: "Done",
+        },
+        actor,
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(tx.paceProgress.deleteMany).not.toHaveBeenCalled();
   });
 });

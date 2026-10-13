@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import React, { act } from "react";
-import { SubjectPlacementForm } from "./subject-placement-form";
+import { SubjectPlacementForm } from "@/components/ace/pace/subject-placement-form";
+import { EndSubjectPlacementDialog } from "@/components/children/end-subject-placement-dialog";
 
 const dom = new JSDOM("<!doctype html><html><body></body></html>", {
   url: "http://localhost",
@@ -98,7 +99,7 @@ async function run(): Promise<void> {
   const { createRoot } = await import("react-dom/client");
   const container = document.createElement("div");
   document.body.append(container);
-  let root = createRoot(container);
+  const root = createRoot(container);
   try {
     await render(root, props({ isLoading: true }));
     assert.ok(
@@ -147,6 +148,7 @@ async function run(): Promise<void> {
     document.body.append(revisionContainer);
     const revisionRoot = createRoot(revisionContainer);
     const revisionSaves: unknown[] = [];
+    const endRequests: string[] = [];
     await render(
       revisionRoot,
       props({
@@ -164,6 +166,7 @@ async function run(): Promise<void> {
           },
         ],
         onSave: async (value) => void revisionSaves.push(value),
+        onEnd: (placement) => void endRequests.push(placement.id),
       }),
     );
     assert.match(
@@ -171,6 +174,12 @@ async function run(): Promise<void> {
       /Replace an active placement \(optional\)/,
       "offers an explicit revision choice",
     );
+    const endButton = Array.from(
+      revisionContainer.querySelectorAll("button"),
+    ).find((button) => button.textContent?.includes("Unassign subject"));
+    assert.ok(endButton, "offers an explicit unassignment action");
+    await act(async () => endButton.click());
+    assert.deepEqual(endRequests, ["enrollment-1"]);
     await changeSelect(
       select(revisionContainer, "subject-placement-replacement"),
       "enrollment-1",
@@ -284,6 +293,65 @@ async function run(): Promise<void> {
     );
     await act(async () => keyboardRoot.unmount());
     keyboardContainer.remove();
+
+    const dialogContainer = document.createElement("div");
+    document.body.append(dialogContainer);
+    const dialogRoot = createRoot(dialogContainer);
+    const endings: unknown[] = [];
+    let closed = false;
+    await act(async () =>
+      dialogRoot.render(
+        <EndSubjectPlacementDialog
+          placement={{
+            id: "enrollment-1",
+            subjectId: "subject-1",
+            subjectName: "Mathematics",
+            startsOn: "2026-09-01",
+            endsOn: null,
+            status: "ACTIVE",
+            startingPace: 1,
+            currentPace: 2,
+            targetPace: 12,
+          }}
+          onSave={async (value) => void endings.push(value)}
+          onClose={() => {
+            closed = true;
+          }}
+        />,
+      ),
+    );
+    assert.equal(document.activeElement?.id, "end-subject-date");
+    await change(input(dialogContainer, "end-subject-date"), "2026-08-31");
+    await change(
+      input(dialogContainer, "end-subject-reason"),
+      "Subject complete",
+    );
+    const endForm = dialogContainer.querySelector("form");
+    assert.ok(endForm);
+    await submit(endForm);
+    assert.match(
+      dialogContainer.textContent ?? "",
+      /End date must be on or after/,
+    );
+    assert.deepEqual(endings, []);
+    await change(input(dialogContainer, "end-subject-date"), "2026-09-30");
+    await submit(endForm);
+    assert.deepEqual(endings, [
+      { endsOn: "2026-09-30", reason: "Subject complete" },
+    ]);
+    assert.equal(closed, true, "closes after a successful unassignment");
+    closed = false;
+    await act(async () =>
+      dialogContainer.querySelector('[role="dialog"]')?.dispatchEvent(
+        new dom.window.KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+        }),
+      ),
+    );
+    assert.equal(closed, true);
+    await act(async () => dialogRoot.unmount());
+    dialogContainer.remove();
   } finally {
     container.remove();
   }
