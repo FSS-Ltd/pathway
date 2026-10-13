@@ -682,10 +682,12 @@ Demo ACE School staff-room retry returned HTTP 200 for the read-cursor request,
 with no prior error shown; no message was sent. The correction is released.
 ACE-M12 remains open and the count stays **48/150 (32%)**.
 
-Build step 1.3e6j addresses the observed ACE-M12 browser focus defect in the
-staff messaging workspace. It must preserve the existing message, permission,
-and responsive states, then pass local checks, latest-head CI, merge, and a
-signed-in production keyboard retry before the focus correction is released.
+Build step 1.3e6j in
+[PR #623](https://github.com/FSS-Ltd/pathway/pull/623) addresses the observed
+ACE-M12 browser focus defect in the staff messaging workspace. It must preserve
+the existing message, permission, and responsive states, then pass latest-head
+CI, merge, and a signed-in production keyboard retry before the focus
+correction is released.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
