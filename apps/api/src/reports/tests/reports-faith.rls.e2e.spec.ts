@@ -795,6 +795,8 @@ describe("ACE report publication storage", () => {
         "AceNoticeAudienceMember",
         "AceNotice",
         "MessageAttachment",
+        "MessageEmailDelivery",
+        "MessageEmailPreference",
         "MessageDelivery",
         "MessageParticipantReadCursor",
         "Message",

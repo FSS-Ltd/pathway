@@ -478,6 +478,8 @@ async function deleteMessagingRowsIfPresent(
       "AceNoticeAudienceMember",
       "AceNotice",
       "MessageAttachment",
+      "MessageEmailDelivery",
+      "MessageEmailPreference",
       "MessageDelivery",
       "MessageParticipantReadCursor",
       "Message",
@@ -893,6 +895,8 @@ describe("ACE parent/staff messaging and notices storage", () => {
       "MessageAttachment",
       "MessageConversation",
       "MessageDelivery",
+      "MessageEmailDelivery",
+      "MessageEmailPreference",
       "MessageParticipant",
       "MessageParticipantReadCursor",
     ]);
