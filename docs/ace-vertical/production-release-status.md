@@ -581,20 +581,29 @@ invalidation events contain IDs only and publish after database commit. The
 admin web client refetches REST history on events, reconnects, focus, and a
 bounded polling interval. The restored production Supabase project is connected,
 and its publishable key is configured in the API Vercel production environment.
-The merged revision signs with the project's legacy shared JWT secret. The
-corrective draft [PR #617](https://github.com/FSS-Ltd/pathway/pull/617) on
-`fix/ace-m05-es256-signing` changes the contract to an
-imported ES256 key. The corrected API requires the matching private JWK in its encrypted
-`SUPABASE_JWT_SIGNING_JWK` environment variable and issues no Realtime token
-when it is absent, even if legacy JWT variables are present. Live enablement
-requires importing and activating that signing key in Supabase and configuring
-the API variable. A read-only production check on 13 October 2026 confirmed
-that #616's three private `realtime.messages` policies are installed. Key
-activation changes the project's Auth signing key and must be planned as a
-production change. The live subscription and denial smoke tests remain open;
-web REST polling preserves message correctness. ACE-M05 does not advance the
-verified count until the corrective PR is green and merged and the live gate is
-evidenced.
+Step 1.3e6f1, the ES256 signing correction, merged in
+[PR #617](https://github.com/FSS-Ltd/pathway/pull/617) from checked head
+`a8243eeaee7331ed1438c175a423931640fea129` as
+`2e76161853902a1d4cc696891d76d70a402428a2` on 13 October 2026.
+All five applicable checks passed; the Integration job ran both affected
+PostgreSQL messaging suites (90 suites, 559 tests, none skipped). The matching
+API production deployment is READY and serving `api.nexsteps.dev`. Its
+encrypted `SUPABASE_JWT_SIGNING_JWK` matches the restored Supabase project's
+ES256 key `b9c58d97-f603-477e-9245-45563340b74e`, which the project now
+shows as CURRENT. The API no longer falls back to legacy JWT variables.
+
+The first live private-channel join smoke on 13 October 2026 denied an
+authorized demo-school conversation member as well as two unauthorized joins.
+The database authorization function approved that member, but Supabase
+Realtime's read-access probe uses a row with `private = false` even for a
+private channel. The #616 SELECT policies require `private = true`, so they
+deny every join. Corrective step 1.3e6f2 changes only those SELECT policies;
+the topic, capability, membership, and no-publish checks remain. A disposable
+local PostgreSQL fixture reproduced zero visible probe rows before the
+migration and one authorized, zero unauthorized rows after it. Production
+policy rollout and allowed/denied live joins remain open. Web REST polling
+preserves message correctness. ACE-M05 remains **47/150 (31⅓%, 31.33%)**
+until the corrective PR is green, merged, deployed, and live access is verified.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
