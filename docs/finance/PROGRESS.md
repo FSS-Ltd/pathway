@@ -2,13 +2,11 @@
 
 Every T01–T19 step is a separate PR. The next step may not start until the current PR revision has applicable passing CI and GitHub confirms the PR merged into master. A draft, local commit, green stale revision or merge-queue entry does not clear the gate.
 
-**T01:** Discovery and compatibility findings recorded. [PR #632](https://github.com/FSS-Ltd/pathway/pull/632) is still a draft; current-revision CI and merge are pending.
-
-The previous checked revision was `216b966c36d9fd1a0924bdd10bd84cbca10650c0`. Its CI passed before the current documentation update. Current-revision CI must pass before merge.
+**T01:** Discovery and compatibility findings recorded. [PR #632](https://github.com/FSS-Ltd/pathway/pull/632) is merged to `master` at `2c84296f9e6a729ec919889489a837f45fbb990b`.
 
 ### T01 CI evidence
 
-On PR head `216b966c36d9fd1a0924bdd10bd84cbca10650c0`, GitHub reported passing typecheck, lint, all unit-test suites, integration tests, organisation-role RLS, permission-definition database, system-role seed database identity, both Analyze jobs and CodeQL. This result predates the current documentation update and must be superseded by current-revision CI before merge.
+On final PR head `29dafff55b662bb276991a5f739f0e5049663387`, GitHub reported passing typecheck/lint/unit tests, integration tests, organisation-role RLS, permission-definition database, system-role seed database identity, Analyze actions, Analyze JS/TS and CodeQL. GitHub confirmed merge on 15 October 2026 at 12:36:36 UTC with merge commit `2c84296f9e6a729ec919889489a837f45fbb990b`.
 
 ## T01 evidence
 
@@ -25,4 +23,8 @@ On PR head `216b966c36d9fd1a0924bdd10bd84cbca10650c0`, GitHub reported passing t
 
 ## Merge gate
 
-PR #632 remains draft until the current documentation revision has passed local review and current-revision CI. T01's compatibility evidence records both the sandbox account facts and the specific missing school-connected fixture; the account-scoped payment tests are acceptance criteria in T07–T10, and Bacs remains blocked in T13. Record the final checked head and required CI results from GitHub, then add the merge commit and timestamp only after GitHub confirms merge. T02 is not permitted to start before T01 is merged.
+T01's compatibility evidence records both the sandbox account facts and the specific missing school-connected fixture; the account-scoped payment tests are acceptance criteria in T07–T10, and Bacs remains blocked in T13.
+
+**T02:** In progress on `build/finance-t02-ledger-schema`. Adds tenant/org-scoped GBP ledger tables, integer minor-unit rules, tenant RLS, schema checks and concurrent invoice-number sequence coverage. T02 local verification and PR evidence will be recorded here before T03 starts.
+
+T02 local verification on 15 October 2026: Prisma schema validation and client generation passed; the dedicated local E2E database applied migration `20261018000000_finance_ledger_foundation` and reported up to date. API and database typechecks, targeted ESLint, Prettier, the Finance money unit test, schema contract tests, and all four Finance RLS/ledger E2E tests passed. The strict RLS gate passed with the repository's `SUPABASE_RLS_GATE_ACCEPTED=true` setting; it reported three existing unrelated app tables (`ChildGuardianContact`, `IdentityWebhookEvent`, `OrgDeletedUser`) as disabled, which that accepted gate permits. The normal E2E global setup could not run locally because pnpm attempted an install and hit `EPERM` creating a worktree temp file; the Finance E2E suite was run after a guarded Prisma reset of the dedicated local E2E database and the repository's RLS-role provisioning helper. CI remains required before merge.

@@ -110,6 +110,29 @@ enum SubscriptionStatus {
   INCOMPLETE
 }
 
+enum FinanceCurrency {
+  GBP
+}
+
+enum FinanceInvoiceStatus {
+  DRAFT
+  IN_REVIEW
+  ISSUED
+  VOID
+}
+
+enum FinanceReceiptStatus {
+  PROCESSING
+  CONFIRMED
+  FAILED
+}
+
+enum FinanceReceiptSource {
+  MANUAL_TRANSFER
+  STRIPE_CARD
+  STRIPE_BACS
+}
+
 enum PendingOrderStatus {
   PENDING
   COMPLETED
@@ -1001,6 +1024,7 @@ model Org {
   roleAssignments     UserRoleAssignment[]
   accessTagGrants     AccessTagGrant[]
   accessTagExclusions AccessTagExclusion[]
+  financeProfiles     FinanceProfile[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -1099,6 +1123,7 @@ model Tenant {
   studentIdentityLinks   StudentIdentityLink[]
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites  FamilyIdentityInvite[]
+  financeProfile        FinanceProfile?
   aceTermReports         AceTermReport[]
   aceReportCompilations  AceReportCompilation[]
   aceReportDrafts        AceReportDraft[]
@@ -4741,4 +4766,115 @@ model ComplianceEvidence {
   createdBy          User      @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, orgId, requirementId, id])
+}
+
+model FinanceProfile {
+  id              String                        @id @default(uuid())
+  orgId           String
+  tenantId        String
+  legalEntityName String
+  currency        FinanceCurrency               @default(GBP)
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  org             Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant          Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  invoiceSequence FinanceInvoiceNumberSequence?
+  invoices        FinanceInvoice[]
+  receipts        FinanceReceipt[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, orgId])
+  @@index([orgId, tenantId])
+}
+
+model FinanceInvoiceNumberSequence {
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  lastIssuedNumber BigInt         @default(0)
+  updatedAt        DateTime       @updatedAt
+  financeProfile   FinanceProfile @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@id([financeProfileId, tenantId, orgId])
+  @@index([tenantId, orgId])
+}
+
+model FinanceInvoice {
+  id               String                     @id @default(uuid())
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  invoiceNumber    BigInt?
+  status           FinanceInvoiceStatus       @default(DRAFT)
+  currency         FinanceCurrency            @default(GBP)
+  subtotalMinor    BigInt                     @default(0)
+  taxMinor         BigInt                     @default(0)
+  totalMinor       BigInt                     @default(0)
+  issuedAt         DateTime?
+  dueAt            DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  financeProfile   FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  lines            FinanceInvoiceLine[]
+  allocations      FinanceReceiptAllocation[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, status, dueAt])
+  @@index([financeProfileId, status, createdAt])
+}
+
+model FinanceInvoiceLine {
+  id                 String         @id @default(uuid())
+  invoiceId          String
+  tenantId           String
+  orgId              String
+  lineOrder          Int
+  description        String
+  quantity           Decimal        @db.Decimal(12, 3)
+  unitAmountMinor    BigInt
+  taxRateBasisPoints Int            @default(0)
+  netAmountMinor     BigInt
+  taxAmountMinor     BigInt
+  totalMinor         BigInt
+  createdAt          DateTime       @default(now())
+  invoice            FinanceInvoice @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@unique([invoiceId, lineOrder])
+  @@index([tenantId, orgId, invoiceId])
+}
+
+model FinanceReceipt {
+  id               String                     @id @default(uuid())
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  amountMinor      BigInt
+  currency         FinanceCurrency            @default(GBP)
+  source           FinanceReceiptSource
+  status           FinanceReceiptStatus       @default(PROCESSING)
+  confirmedAt      DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  financeProfile   FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  allocations      FinanceReceiptAllocation[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, status, confirmedAt])
+  @@index([financeProfileId, createdAt])
+}
+
+model FinanceReceiptAllocation {
+  id          String         @id @default(uuid())
+  receiptId   String
+  invoiceId   String
+  tenantId    String
+  orgId       String
+  amountMinor BigInt
+  createdAt   DateTime       @default(now())
+  receipt     FinanceReceipt @relation(fields: [receiptId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice     FinanceInvoice @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@index([tenantId, receiptId, createdAt])
+  @@index([tenantId, invoiceId, createdAt])
 }
