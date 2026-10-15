@@ -16,7 +16,7 @@ export default function TermsPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-16 md:py-24">
       <div className="flex flex-col gap-4">
         <h1 className="text-4xl font-bold text-pw-text">Terms of Service</h1>
-        <p className="text-sm text-pw-text-muted">Last updated: {new Date().toLocaleDateString()}</p>
+        <p className="text-sm text-pw-text-muted">Last updated: 15 October 2026</p>
       </div>
 
       {/* Summary cards */}
@@ -30,8 +30,8 @@ export default function TermsPage() {
           </div>
           <p className="mt-2 text-sm text-pw-text-muted">
             Nexsteps is a UK-based SaaS platform for schools, churches, clubs and charities to manage
-            sessions, attendance, staff and parent communication. By using the Service, your organisation
-            agrees to these Terms and is responsible for how it is used by its users.
+            sessions, attendance, staff and parent communication. Organisations that subscribe to the Service
+            agree to these Terms and are responsible for how their users access it.
           </p>
         </article>
 
@@ -79,14 +79,15 @@ export default function TermsPage() {
             1. Acceptance of these terms
           </h2>
           <p>
-            These Terms of Service (&quot;Terms&quot;) govern your access to and use of the Nexsteps platform,
-            websites and related services (together, the &quot;Service&quot;). By creating an account, accessing
-            or using the Service, you agree to be bound by these Terms.
+            These Terms of Service (&quot;Terms&quot;) govern an organisation&apos;s subscription to the Nexsteps
+            platform, websites and related services (together, the &quot;Service&quot;). Individual account holders
+            use the Service under the separate <a href="/user-agreement">User Agreement</a>. Creating an
+            individual account does not bind an organisation to these Terms or its payment obligations.
           </p>
           <p>
-            If you are using the Service on behalf of an organisation (for example, a school, church, club or
-            charity), you confirm that you have authority to bind that organisation to these Terms. In that case,
-            references to &quot;you&quot; or &quot;Customer&quot; mean the organisation you represent.
+            These Terms bind an organisation (for example, a school, church, club or charity) when its
+            authorised representative accepts them on its behalf. References to &quot;you&quot; or
+            &quot;Customer&quot; mean that organisation.
           </p>
 
           <h2 className="mt-8 text-lg font-semibold text-pw-text first:mt-0 text-center">
