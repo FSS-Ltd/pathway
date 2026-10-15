@@ -54,7 +54,7 @@ import { BlogModule } from "./blog/blog.module";
 import { HandoverModule } from "./handover/handover.module";
 import { GuestPassModule } from "./guest-pass/guest-pass.module";
 import { AccessControlModule } from "./access-control/access-control.module";
-import { FinanceAccessModule } from "./finance/access/finance-access.module";
+import { FinanceModule } from "./finance/finance.module";
 
 @Module({
   imports: [
@@ -89,7 +89,7 @@ import { FinanceAccessModule } from "./finance/access/finance-access.module";
     OrgsModule,
     PlatformModule,
     AccessControlModule,
-    FinanceAccessModule,
+    FinanceModule,
     BillingModule,
     InstitutionalBillingModule,
     AceSettingsModule,

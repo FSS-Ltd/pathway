@@ -17,12 +17,18 @@ const tenantBId = requiredFixture("E2E_TENANT2_ID");
 const financeTables = [
   "FinanceProfile",
   "FinanceInvoiceNumberSequence",
+  "FinanceCreditNoteNumberSequence",
   "FinanceInvoice",
   "FinanceInvoiceLine",
+  "FinanceInvoiceEvent",
   "FinanceReceipt",
   "FinanceReceiptAllocation",
   "FinancePayerAccount",
   "FinancePayerGrant",
+  "FinanceCreditNote",
+  "FinanceCreditNoteLine",
+  "FinanceCreditNoteEvent",
+  "FinanceCommandReceipt",
 ] as const;
 
 interface FinanceProfileFixture {
@@ -347,6 +353,142 @@ describe("Finance ledger database foundation", () => {
     } finally {
       await removeProfile(profile);
     }
+  });
+
+  it("keeps an issued invoice snapshot immutable, including after voiding", async () => {
+    if (!requireDatabase()) return;
+
+    const invoiceId = randomUUID();
+    const creatorId = randomUUID();
+    const approverId = randomUUID();
+    const invoiceNumber = BigInt(
+      `0x${randomUUID().replaceAll("-", "").slice(0, 12)}`,
+    );
+    const issuedAt = new Date();
+    const voidedAt = new Date(issuedAt.getTime() + 1_000);
+    const rollbackFixture = new Error("rollback Finance snapshot fixture");
+
+    await expect(
+      withTenantRlsContext(tenantAId, orgId, async (tx) => {
+        await tx.user.createMany({
+          data: [
+            {
+              id: creatorId,
+              email: `finance-creator-${creatorId}@example.test`,
+            },
+            {
+              id: approverId,
+              email: `finance-approver-${approverId}@example.test`,
+            },
+          ],
+        });
+        const profile = await tx.financeProfile.create({
+          data: {
+            id: randomUUID(),
+            tenantId: tenantAId,
+            orgId,
+            legalEntityName: `Finance test ${randomUUID()}`,
+          },
+        });
+        const payerAccount = await tx.financePayerAccount.create({
+          data: {
+            financeProfileId: profile.id,
+            tenantId: tenantAId,
+            orgId,
+            displayName: "Immutable snapshot payer",
+          },
+        });
+        await tx.financeInvoice.create({
+          data: {
+            id: invoiceId,
+            financeProfileId: profile.id,
+            payerAccountId: payerAccount.id,
+            tenantId: tenantAId,
+            orgId,
+            createdByUserId: creatorId,
+            subtotalMinor: 100n,
+            taxMinor: 20n,
+            totalMinor: 120n,
+          },
+        });
+        await tx.financeInvoiceLine.create({
+          data: {
+            invoiceId,
+            tenantId: tenantAId,
+            orgId,
+            lineOrder: 0,
+            description: "Snapshot line",
+            quantity: "1.000",
+            unitAmountMinor: 100n,
+            taxRateBasisPoints: 2000,
+            netAmountMinor: 100n,
+            taxAmountMinor: 20n,
+            totalMinor: 120n,
+          },
+        });
+        await tx.financeInvoice.update({
+          where: { id: invoiceId },
+          data: { status: "IN_REVIEW" },
+        });
+        await tx.financeInvoice.update({
+          where: { id: invoiceId },
+          data: {
+            invoiceNumber,
+            status: "ISSUED",
+            issuedAt,
+            approvedAt: issuedAt,
+            approvedByUserId: approverId,
+            payerNameSnapshot: payerAccount.displayName,
+            legalEntityNameSnapshot: profile.legalEntityName,
+          },
+        });
+
+        await tx.$executeRaw`SAVEPOINT finance_invoice_snapshot_check`;
+        await expectCheckViolation(
+          () =>
+            tx.$executeRaw`
+            UPDATE "FinanceInvoice"
+            SET "subtotalMinor" = 110, "totalMinor" = 130
+            WHERE "id" = ${invoiceId}
+          `,
+        );
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT finance_invoice_snapshot_check`;
+
+        await tx.$executeRaw`SAVEPOINT finance_invoice_line_snapshot_check`;
+        await expectCheckViolation(
+          () =>
+            tx.$executeRaw`DELETE FROM "FinanceInvoiceLine" WHERE "invoiceId" = ${invoiceId}`,
+        );
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT finance_invoice_line_snapshot_check`;
+
+        await tx.financeInvoice.update({
+          where: { id: invoiceId },
+          data: {
+            status: "VOID",
+            voidedAt,
+            voidedByUserId: approverId,
+            voidReason: "Duplicate issue",
+          },
+        });
+        await tx.$executeRaw`SAVEPOINT finance_void_snapshot_check`;
+        await expectCheckViolation(
+          () =>
+            tx.$executeRaw`
+            UPDATE "FinanceInvoice"
+            SET "dueAt" = CURRENT_TIMESTAMP
+            WHERE "id" = ${invoiceId}
+          `,
+        );
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT finance_void_snapshot_check`;
+        await tx.$executeRaw`SAVEPOINT finance_void_line_snapshot_check`;
+        await expectCheckViolation(
+          () =>
+            tx.$executeRaw`DELETE FROM "FinanceInvoiceLine" WHERE "invoiceId" = ${invoiceId}`,
+        );
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT finance_void_line_snapshot_check`;
+        throw rollbackFixture;
+      }),
+    ).rejects.toBe(rollbackFixture);
   });
 
   it("allocates unique consecutive invoice numbers during concurrent issuance", async () => {

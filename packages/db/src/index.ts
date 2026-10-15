@@ -65,6 +65,12 @@ export async function resetDatabase() {
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
         "OutboxEvent",
+        "FinanceCommandReceipt",
+        "FinanceCreditNoteEvent",
+        "FinanceCreditNoteLine",
+        "FinanceCreditNote",
+        "FinanceCreditNoteNumberSequence",
+        "FinanceInvoiceEvent",
         "FinanceReceiptAllocation",
         "FinanceReceipt",
         "FinanceInvoiceLine",
@@ -136,6 +142,12 @@ export async function resetDatabase() {
     await prisma.$executeRawUnsafe(`
       TRUNCATE TABLE
         "OutboxEvent",
+        "FinanceCommandReceipt",
+        "FinanceCreditNoteEvent",
+        "FinanceCreditNoteLine",
+        "FinanceCreditNote",
+        "FinanceCreditNoteNumberSequence",
+        "FinanceInvoiceEvent",
         "FinanceReceiptAllocation",
         "FinanceReceipt",
         "FinanceInvoiceLine",

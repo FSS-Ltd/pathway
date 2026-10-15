@@ -121,6 +121,55 @@ enum FinanceInvoiceStatus {
   VOID
 }
 
+enum FinanceInvoiceEventType {
+  CREATED
+  UPDATED
+  SUBMITTED_FOR_REVIEW
+  APPROVED
+  CHANGES_REQUESTED
+  ISSUED
+  VOIDED
+}
+
+enum FinanceCreditNoteStatus {
+  DRAFT
+  IN_REVIEW
+  ISSUED
+  VOID
+}
+
+enum FinanceCreditNoteEventType {
+  CREATED
+  UPDATED
+  SUBMITTED_FOR_REVIEW
+  APPROVED
+  CHANGES_REQUESTED
+  ISSUED
+  VOIDED
+}
+
+enum FinanceCommandType {
+  CREATE_INVOICE
+  UPDATE_INVOICE
+  SUBMIT_INVOICE_FOR_REVIEW
+  APPROVE_INVOICE
+  REQUEST_INVOICE_CHANGES
+  ISSUE_INVOICE
+  VOID_INVOICE
+  CREATE_CREDIT_NOTE
+  UPDATE_CREDIT_NOTE
+  SUBMIT_CREDIT_FOR_REVIEW
+  APPROVE_CREDIT_NOTE
+  REQUEST_CREDIT_CHANGES
+  ISSUE_CREDIT_NOTE
+  VOID_CREDIT_NOTE
+}
+
+enum FinanceCommandResourceType {
+  INVOICE
+  CREDIT_NOTE
+}
+
 enum FinanceReceiptStatus {
   PROCESSING
   CONFIRMED
@@ -1291,6 +1340,15 @@ model User {
   financePayerGrants                FinancePayerGrant[]                 @relation("FinancePayerGrantPayer")
   financePayerGrantsIssued          FinancePayerGrant[]                 @relation("FinancePayerGrantGrantedBy")
   financePayerGrantsRevoked         FinancePayerGrant[]                 @relation("FinancePayerGrantRevokedBy")
+  financeInvoicesCreated            FinanceInvoice[]                    @relation("FinanceInvoiceCreatedBy")
+  financeInvoicesApproved           FinanceInvoice[]                    @relation("FinanceInvoiceApprovedBy")
+  financeInvoicesVoided              FinanceInvoice[]                    @relation("FinanceInvoiceVoidedBy")
+  financeInvoiceEvents               FinanceInvoiceEvent[]               @relation("FinanceInvoiceEventActor")
+  financeCreditNotesCreated          FinanceCreditNote[]                  @relation("FinanceCreditNoteCreatedBy")
+  financeCreditNotesApproved         FinanceCreditNote[]                  @relation("FinanceCreditNoteApprovedBy")
+  financeCreditNotesVoided            FinanceCreditNote[]                  @relation("FinanceCreditNoteVoidedBy")
+  financeCreditNoteEvents            FinanceCreditNoteEvent[]             @relation("FinanceCreditNoteEventActor")
+  financeCommands                    FinanceCommandReceipt[]               @relation("FinanceCommandActor")
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
@@ -4772,19 +4830,21 @@ model ComplianceEvidence {
 }
 
 model FinanceProfile {
-  id              String                        @id @default(uuid())
-  orgId           String
-  tenantId        String
-  legalEntityName String
-  currency        FinanceCurrency               @default(GBP)
-  createdAt       DateTime                      @default(now())
-  updatedAt       DateTime                      @updatedAt
-  org             Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
-  tenant          Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
-  invoiceSequence FinanceInvoiceNumberSequence?
-  invoices        FinanceInvoice[]
-  receipts        FinanceReceipt[]
-  payerAccounts   FinancePayerAccount[]
+  id                 String                           @id @default(uuid())
+  orgId              String
+  tenantId           String
+  legalEntityName    String
+  currency           FinanceCurrency                  @default(GBP)
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+  org                Org                              @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant             Tenant                           @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  invoiceSequence    FinanceInvoiceNumberSequence?
+  creditNoteSequence FinanceCreditNoteNumberSequence?
+  invoices           FinanceInvoice[]
+  receipts           FinanceReceipt[]
+  payerAccounts      FinancePayerAccount[]
+  creditNotes        FinanceCreditNote[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
@@ -4801,6 +4861,7 @@ model FinancePayerAccount {
   updatedAt        DateTime            @updatedAt
   financeProfile   FinanceProfile      @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
   grants           FinancePayerGrant[]
+  invoices         FinanceInvoice[]
 
   @@unique([id, tenantId, orgId])
   @@index([financeProfileId, displayName])
@@ -4839,49 +4900,191 @@ model FinanceInvoiceNumberSequence {
   @@index([tenantId, orgId])
 }
 
-model FinanceInvoice {
-  id               String                     @id @default(uuid())
+model FinanceCreditNoteNumberSequence {
   financeProfileId String
   tenantId         String
   orgId            String
-  invoiceNumber    BigInt?
-  status           FinanceInvoiceStatus       @default(DRAFT)
-  currency         FinanceCurrency            @default(GBP)
-  subtotalMinor    BigInt                     @default(0)
-  taxMinor         BigInt                     @default(0)
-  totalMinor       BigInt                     @default(0)
-  issuedAt         DateTime?
-  dueAt            DateTime?
-  createdAt        DateTime                   @default(now())
-  updatedAt        DateTime                   @updatedAt
-  financeProfile   FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
-  lines            FinanceInvoiceLine[]
-  allocations      FinanceReceiptAllocation[]
+  lastIssuedNumber BigInt         @default(0)
+  updatedAt        DateTime       @updatedAt
+  financeProfile   FinanceProfile @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@id([financeProfileId, tenantId, orgId])
+  @@index([tenantId, orgId])
+}
+
+model FinanceInvoice {
+  id                      String                     @id @default(uuid())
+  financeProfileId        String
+  payerAccountId          String?
+  tenantId                String
+  orgId                   String
+  invoiceNumber           BigInt?
+  status                  FinanceInvoiceStatus       @default(DRAFT)
+  currency                FinanceCurrency            @default(GBP)
+  subtotalMinor           BigInt                     @default(0)
+  taxMinor                BigInt                     @default(0)
+  totalMinor              BigInt                     @default(0)
+  issuedAt                DateTime?
+  dueAt                   DateTime?
+  payerNameSnapshot       String?
+  legalEntityNameSnapshot String?
+  createdByUserId         String?
+  approvedAt              DateTime?
+  approvedByUserId        String?
+  voidedAt                DateTime?
+  voidedByUserId          String?
+  voidReason              String?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  financeProfile          FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount            FinancePayerAccount?       @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  createdBy               User?                      @relation("FinanceInvoiceCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy              User?                      @relation("FinanceInvoiceApprovedBy", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  voidedBy                User?                      @relation("FinanceInvoiceVoidedBy", fields: [voidedByUserId], references: [id], onDelete: Restrict)
+  lines                   FinanceInvoiceLine[]
+  allocations             FinanceReceiptAllocation[]
+  events                  FinanceInvoiceEvent[]
+  creditNotes             FinanceCreditNote[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, status, dueAt])
   @@index([financeProfileId, status, createdAt])
+  @@index([tenantId, orgId, payerAccountId, status])
 }
 
 model FinanceInvoiceLine {
-  id                 String         @id @default(uuid())
+  id                 String                  @id @default(uuid())
   invoiceId          String
   tenantId           String
   orgId              String
   lineOrder          Int
   description        String
-  quantity           Decimal        @db.Decimal(12, 3)
+  quantity           Decimal                 @db.Decimal(12, 3)
   unitAmountMinor    BigInt
-  taxRateBasisPoints Int            @default(0)
+  taxRateBasisPoints Int                     @default(0)
   netAmountMinor     BigInt
   taxAmountMinor     BigInt
   totalMinor         BigInt
-  createdAt          DateTime       @default(now())
-  invoice            FinanceInvoice @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  createdAt          DateTime                @default(now())
+  invoice            FinanceInvoice          @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  creditNoteLines    FinanceCreditNoteLine[]
 
   @@unique([invoiceId, lineOrder])
+  @@unique([id, tenantId, orgId])
+  @@unique([id, invoiceId, tenantId, orgId])
   @@index([tenantId, orgId, invoiceId])
+}
+
+model FinanceInvoiceEvent {
+  id          String                  @id @default(uuid())
+  invoiceId   String
+  tenantId    String
+  orgId       String
+  actorUserId String
+  type        FinanceInvoiceEventType
+  reason      String?
+  createdAt   DateTime                @default(now())
+  invoice     FinanceInvoice          @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor       User                    @relation("FinanceInvoiceEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, invoiceId, createdAt])
+}
+
+model FinanceCreditNote {
+  id                      String                   @id @default(uuid())
+  financeProfileId        String
+  invoiceId               String
+  tenantId                String
+  orgId                   String
+  creditNumber            BigInt?
+  status                  FinanceCreditNoteStatus  @default(DRAFT)
+  reason                  String
+  currency                FinanceCurrency          @default(GBP)
+  subtotalMinor           BigInt                   @default(0)
+  taxMinor                BigInt                   @default(0)
+  totalMinor              BigInt                   @default(0)
+  payerNameSnapshot       String?
+  legalEntityNameSnapshot String?
+  createdByUserId         String?
+  approvedAt              DateTime?
+  approvedByUserId        String?
+  issuedAt                DateTime?
+  voidedAt                DateTime?
+  voidedByUserId          String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  financeProfile          FinanceProfile           @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice                 FinanceInvoice           @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  createdBy               User?                    @relation("FinanceCreditNoteCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy              User?                    @relation("FinanceCreditNoteApprovedBy", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  voidedBy                User?                    @relation("FinanceCreditNoteVoidedBy", fields: [voidedByUserId], references: [id], onDelete: Restrict)
+  lines                   FinanceCreditNoteLine[]
+  events                  FinanceCreditNoteEvent[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([id, invoiceId, tenantId, orgId])
+  @@unique([tenantId, creditNumber])
+  @@index([tenantId, orgId, invoiceId, status])
+  @@index([financeProfileId, status, createdAt])
+}
+
+model FinanceCreditNoteLine {
+  id                  String             @id @default(uuid())
+  creditNoteId        String
+  invoiceId           String
+  sourceInvoiceLineId String
+  tenantId            String
+  orgId               String
+  description         String
+  quantity            Decimal            @db.Decimal(12, 3)
+  unitAmountMinor     BigInt
+  taxRateBasisPoints  Int
+  netAmountMinor      BigInt
+  taxAmountMinor      BigInt
+  totalMinor          BigInt
+  createdAt           DateTime           @default(now())
+  creditNote          FinanceCreditNote  @relation(fields: [creditNoteId, invoiceId, tenantId, orgId], references: [id, invoiceId, tenantId, orgId], onDelete: Restrict)
+  sourceInvoiceLine   FinanceInvoiceLine @relation(fields: [sourceInvoiceLineId, invoiceId, tenantId, orgId], references: [id, invoiceId, tenantId, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, creditNoteId])
+  @@index([tenantId, orgId, sourceInvoiceLineId])
+}
+
+model FinanceCreditNoteEvent {
+  id           String                     @id @default(uuid())
+  creditNoteId String
+  tenantId     String
+  orgId        String
+  actorUserId  String
+  type         FinanceCreditNoteEventType
+  reason       String?
+  createdAt    DateTime                   @default(now())
+  creditNote   FinanceCreditNote          @relation(fields: [creditNoteId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor        User                       @relation("FinanceCreditNoteEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, creditNoteId, createdAt])
+}
+
+model FinanceCommandReceipt {
+  id             String                     @id @default(uuid())
+  tenantId       String
+  orgId          String
+  actorUserId    String
+  idempotencyKey String                     @db.VarChar(128)
+  commandType    FinanceCommandType
+  resourceType   FinanceCommandResourceType
+  resourceId     String?
+  requestHash    String                     @db.VarChar(64)
+  createdAt      DateTime                   @default(now())
+  actor          User                       @relation("FinanceCommandActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, orgId, actorUserId, idempotencyKey])
+  @@index([tenantId, orgId, resourceType, resourceId])
 }
 
 model FinanceReceipt {
