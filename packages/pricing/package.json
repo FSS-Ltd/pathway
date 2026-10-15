@@ -12,7 +12,7 @@
     "build": "echo pricing-build",
     "lint": "eslint \"src/**/*.{ts,tsx,js}\" --no-error-on-unmatched-pattern",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx src/__tests__/institutional-pricing.test.ts",
-    "test:unit": "tsx src/__tests__/institutional-pricing.test.ts"
+    "test": "tsx src/__tests__/institutional-pricing.test.ts && tsx src/__tests__/declared-capacity-pricing.test.ts",
+    "test:unit": "tsx src/__tests__/institutional-pricing.test.ts && tsx src/__tests__/declared-capacity-pricing.test.ts"
   }
 }
