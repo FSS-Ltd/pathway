@@ -1,48 +1,69 @@
 # Finance provider compatibility evidence
 
-**As-of:** 15 October 2026.
+**As of:** 15 October 2026.
 
-**Decision:** No live collection is authorised. One-off collection is proposed through Stripe Connect direct charges; direct-charge Bacs compatibility remains unproven and is a hard gate.
+**Decision:** No live collection is authorised. One-off card collection is planned through Stripe Connect direct charges. The connected school account and account-scoped transaction path must be exercised in T07–T10 before release. Direct-charge Bacs remains blocked pending explicit Stripe compatibility evidence; do not substitute another charge model.
 
-## What is established from documentation
+## What is established
 
-| Area                      | Documented fact                                                                                                                              | T01 result                                                                                                              |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Stripe direct charges     | A direct charge is created on a connected account and uses account-scoped access.                                                            | This is consistent with school-owned funds, but application compatibility and account eligibility must still be tested. |
-| Bacs Direct Debit         | Stripe describes delayed confirmation and Connect requirements. A successful mandate setup or submission does not establish payment success. | Provider documentation alone does not prove the planned direct-charge Bacs configuration for a GB school.               |
-| NexSteps provider version | Existing lockfile resolves Stripe SDK 14.25.0; current subscription clients pin API version 2023-10-16.                                      | The existing subscription client cannot be treated as a compatibility test for Finance Connect or Bacs.                 |
-| Money ownership           | Finance requires one connected account/legal entity per school and no application fee or transfer flow.                                      | Test-account evidence must show the charge and balance movement in the intended connected account.                      |
+### Direct card charges
 
-Sources: [Stripe direct charges](https://docs.stripe.com/connect/direct-charges), [Stripe Bacs Direct Debit](https://docs.stripe.com/payments/bacs-debit). These documents were checked for this plan; revalidate requirements and eligibility immediately before provider integration.
+[Stripe documents direct charges](https://docs.stripe.com/connect/direct-charges) as charges created on a connected account using account-scoped access. This matches the school-owned-funds boundary. The application must resolve account context server-side and test a sandbox flow before release.
 
-## Sandbox proof status
+### NexSteps Sandbox account
 
-**Status: BLOCKED — no authorised disposable Stripe test platform/connected-account credentials were available in the T01 environment.**
+A read-only Stripe response on 15 October 2026 showed test mode (`livemode=false`), GB, a Standard company account, active card and transfer capabilities, and charges and payouts enabled. The account itself is eligible for card payments. This snapshot does not prove that a school connected account can accept a direct charge through the application.
 
-No provider API calls, connected-account creation, onboarding, Checkout session, PaymentIntent, Bacs mandate, charge, refund, payout or webhook simulation was performed. No production account, key, Stripe Product or Stripe Price was accessed or changed. This is a missing test fixture, not evidence of compatibility or incompatibility. Do not mark T01 provider proof complete.
+### School connected-account fixture
 
-Before T07 can pass, use an explicitly authorised Stripe sandbox and disposable school-like connected account to record evidence for:
+Read-only v1 and v2 connected-account list responses returned no accounts. No school-like account was available for a Connect-scoped direct-charge test. This is a specific fixture gap, not evidence that direct card charges are incompatible.
 
-1. Account country, legal-entity type, account ownership and the capabilities available for the intended GB direct-charge flow.
-2. Account-scoped creation and retrieval of a one-off hosted card payment; server-side account resolution; no client-supplied connected-account ID.
-3. Charge, balance transaction, actual fee, connected-account payout and refund visibility in the correct connected account.
-4. Signed event delivery and recovery using account-scoped event identity; duplicate delivery; out-of-order delivery; lost response after provider acceptance; idempotent retry without a second charge.
-5. Payer/customer separation across two test schools, proving no cross-school customer reuse or invoice lookup.
-6. Disconnected/restricted account behavior and safe cancellation of an unresolved attempt.
-7. An explicit compatibility decision for Pay by Bank if it is included in the one-off release. It is optional until the supported method/account combination is proven.
+### Bacs Direct Debit
 
-Record API/SDK version, test account capability snapshot, redacted event IDs, expected/actual account context, test run date, and result. Never put API keys, bank details or personal data in this evidence.
+[Stripe's Bacs guide](https://docs.stripe.com/payments/bacs-debit) documents delayed confirmation and Connect use through destination charges. It does not document the planned direct-charge Bacs flow. The sandbox response included Bacs display settings but no `bacs_debit_payments` capability. Display settings are not capability or payment evidence. Keep direct-charge Bacs disabled and obtain provider confirmation plus exact-path tests before T13 can pass. Do not silently switch to destination charges.
 
-## Bacs release gate
+### NexSteps application version
 
-Bacs must remain unavailable to live tenants until T13 proves the exact intended direct-charge account/method configuration in sandbox. The proof must include:
+The repository lockfile resolves Stripe SDK 14.25.0; existing subscription clients pin API version 2023-10-16. These settings do not prove compatibility for Finance Connect, hosted payments or Bacs. Verify the Finance adapter against the repository's pinned versions during implementation.
 
-- Hosted mandate setup and mandate activation states.
-- A submitted debit that remains processing for the documented settlement delay; no premature receipt allocation or “paid” status.
-- Confirmed success, failure, cancellation and delayed return/dispute paths, including a return after a refund.
-- Duplicate, out-of-order and missed webhook recovery.
-- Reconciliation to connected-account balance transactions, fees and payouts.
-- A second school account proving tenant/account separation.
-- Parent messaging that prevents a second payment while outcome is pending.
+### Money ownership
 
-If this exact path is unsupported, stop and raise a product/architecture decision. Do not substitute destination charges, separate charges and transfers, another provider, or live enablement without approval. Live Bacs stays disabled after sandbox tests until the release assurance and explicit pilot gates are complete.
+Finance requires one connected account and legal entity per school, with no platform collection, application fee or transfer flow. T07–T10 must demonstrate that the charge, balance transaction, fees and payout belong to the intended school account.
+
+No credentials, account identifiers, service-user numbers, bank details or personal data are stored in this document. No Stripe objects were created or changed, and no payment, mandate, refund or payout was made. Sources were reviewed on the date above; revalidate provider requirements before implementation and release.
+
+## Verification assigned to delivery steps
+
+These tests depend on the application adapter and a disposable school-connected sandbox account. They are not prerequisites to documenting T01's architecture and account-level compatibility findings.
+
+### T07: Connected account
+
+Complete or reconnect a disposable school account. Verify country, ownership, card capability and server-side tenant-to-account binding. Confirm cancellation and restricted/disconnected behavior. Keep Finance entitlement separate from school payment collection.
+
+### T08: Webhook resilience
+
+Verify signed webhook ingestion, durable acknowledgement, replay after queue failure, duplicate delivery, out-of-order events and idempotent application.
+
+### T09: Hosted card checkout
+
+Create and recover one hosted card checkout per invoice obligation, including provider timeout and repeated requests. Confirm account-scoped access and no platform fee or cross-school customer reuse.
+
+### T10: Confirmed receipts
+
+Post only confirmed receipts. Reconcile charge, balance transaction, actual processor fee and payout in the correct school account. Test partial, failed and delayed outcomes.
+
+### T12: Refunds and returns
+
+Test independently approved refunds, disputes and returns, including a return after a refund. Preserve both movements and reconcile provider evidence.
+
+### T13: Bacs compatibility
+
+Keep Bacs live-disabled. Prove the exact school-account/method configuration, hosted mandate setup, delayed processing, success, failure, cancellation, return, duplicate and missed-event recovery before any release. If direct-charge Bacs is unsupported, raise an architecture decision; do not choose destination charges or another provider without approval.
+
+For each test, record the repository and provider API/SDK versions, date, redacted event identifiers, expected and actual account context, and result. Use disposable test data only.
+
+## Bacs safety gate
+
+Bacs submission is not a receipt. Do not reduce an invoice balance until a signed provider event confirms settlement. Stripe documents typical settlement delays of four business days for an existing mandate and seven for a new mandate; sandbox timing may be accelerated. Families must see a pending state and must not be prompted to pay again while an attempt is unresolved.
+
+Live Bacs remains disabled until T13's exact-path tests, T18 assurance and the separately authorised pilot gates pass. A documentation gap or failed test is a blocker, not permission to change the charge model.

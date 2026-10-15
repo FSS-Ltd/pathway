@@ -1,6 +1,6 @@
 # NexSteps Finance add-on build plan
 
-**Status:** T01 discovery specification; provider sandbox proof remains outstanding.
+**Status:** T01 discovery specification and provider account findings recorded. A school-connected card transaction is assigned to T07–T10; direct-charge Bacs remains blocked pending exact-path provider evidence in T13.
 
 **Market:** Great Britain, GBP, one finance legal entity and one collection account per tenant for the initial release.
 
@@ -149,7 +149,7 @@ Each task is a standalone branch and pull request using a purpose-based prefix s
 | **T18** | Cross-tenant, entitlement, accessibility, ledger, export, retention and provider assurance matrix passes at the release candidate.                                                                 |                   4–6 |
 | **T19** | Explicitly authorised, reconciled live pilot and operational handover. Reconcile school receipts, invoice balances, fees and payouts; no cross-tenant/unentitled access.                           |                   2–3 |
 
-The task estimates sum to **66–102 engineering-days** for the expanded scope. This replaces the earlier 30–45 day estimate, which did not include the clarified servicing policy, frozen statements, defined reports, expanded UX/accessibility work and per-task delivery gates. Provider onboarding/approval, sandbox access, bank return timing, review queues and CI/merge waiting are calendar dependencies and excluded; re-estimate after T01 sandbox proof and T02 schema review.
+The task estimates sum to **66–102 engineering-days** for the expanded scope. This replaces the earlier 30–45 day estimate, which did not include the clarified servicing policy, frozen statements, defined reports, expanded UX/accessibility work and per-task delivery gates. Provider onboarding/approval, sandbox access, bank return timing, review queues and CI/merge waiting are calendar dependencies and excluded; re-estimate after reviewing the T01 account evidence and T02 schema findings.
 
 ## 9. T01 repository findings
 
@@ -161,4 +161,4 @@ Current source seams and gaps are recorded in [repository-map.md](repository-map
 - Existing Stripe billing handles NexSteps subscriptions and uses SDK 14.25.0 with API version 2023-10-16. No school collection Connect adapter or separate Finance webhook inbox was found.
 - The current paywall must use server-side entitlement, role and payer checks, not the presence/absence of a navigation item or active-module guard alone.
 
-Provider source references and the missing test account are in [provider-compatibility.md](provider-compatibility.md). Until its compatibility steps pass, direct-charge collection is not approved and Bacs remains disabled.
+Provider source references, the read-only sandbox capability snapshot, and the missing school-connected test fixture are in [provider-compatibility.md](provider-compatibility.md). The snapshot supports proceeding to the planned card integration tests, but does not itself prove an account-scoped school payment. Bacs remains disabled until the exact method/account path passes T13.
