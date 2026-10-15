@@ -727,7 +727,10 @@ surface and reviewed write paths; this is not a global PII-reader redesign.
 Full integration passed 100 suites / 614 tests. Admin regression tests and the
 API, admin and web production builds passed. Final independent UI re-review found
 no blockers; changed-file and diff inspection, formatting and whitespace checks
-passed. Commit hooks will rerun the complete API unit suite after the fixture
-correction. Current-revision PR/CI/merge remain required. Live Clerk/production key
+passed. Commit hooks passed the complete API unit suite after the fixture correction:
+222 suites / 1,573 tests, workers 45 and auth 15. PR
+[#633](https://github.com/FSS-Ltd/pathway/pull/633) is open; initial implementation
+revision `bda05e0a580158d6841c15bca8cd8d7be33727cd` passed local verification.
+Current-revision host CI and merge remain required. Live Clerk/production key
 compatibility and clinical recovery are not verified; no production action is
 authorized or claimed by this fix branch.
