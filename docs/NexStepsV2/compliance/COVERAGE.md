@@ -25,16 +25,17 @@ This compact matrix is research tracking data, not runtime requirements.
 
 ## Status vocabulary
 
-| Status                   | Meaning                                                                          |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| NOT_REVIEWED             | No completed source/applicability review; visible coverage gap                   |
-| IN_REVIEW                | Research/review in progress; not publishable                                     |
-| REVIEWED                 | Sources, applicability and fixtures approved for an identified version and scope |
-| PUBLISHED                | Reviewed version released through its verified delivery step                     |
-| REVIEWED_NO_REQUIREMENTS | Explicit reviewed, sourced reason for no requirements in this precise scope      |
-| STALE                    | Review window expired or source change needs assessment; visible gap             |
-| UNAVAILABLE              | Applicable content cannot be supplied; reason recorded; visible gap              |
-| WITHDRAWN                | Removed from current use; history retained; visible gap                          |
+| Status                   | Meaning                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| NOT_REVIEWED             | No completed source/applicability review; visible coverage gap                                           |
+| IN_REVIEW                | Research/review in progress; not publishable                                                             |
+| REVIEWED                 | Sources, applicability and fixtures approved for an identified version and scope                         |
+| PUBLISHED                | Reviewed version released through its verified delivery step                                             |
+| PARTIALLY_PUBLISHED      | Reviewed actions available; specific national/regional/specialist gaps remain and count as coverage gaps |
+| REVIEWED_NO_REQUIREMENTS | Explicit reviewed, sourced reason for no requirements in this precise scope                              |
+| STALE                    | Review window expired or source change needs assessment; visible gap                                     |
+| UNAVAILABLE              | Applicable content cannot be supplied; reason recorded; visible gap                                      |
+| WITHDRAWN                | Removed from current use; history retained; visible gap                                                  |
 
 Changing a cell out of NOT_REVIEWED requires a linked pack/review record with the
 metadata in RESEARCH.md. The bare CSV status is never sufficient publication evidence.
@@ -57,3 +58,7 @@ Publication must disclose precisely which sector/topic/subdivision cells are cov
 and which remain unknown. A site missing a required regional field cannot silently
 inherit a supposedly complete national checklist. Completion counts only applicable
 published actions while displaying these coverage gaps independently.
+
+Partial publication never establishes complete coverage. Only individually reviewed
+requirements with current sources are selected. The cell must identify its remaining
+gaps and retain a review record; regional scope and expiry remain separate checks.

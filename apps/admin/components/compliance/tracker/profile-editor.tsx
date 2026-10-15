@@ -14,6 +14,15 @@ const profileLabels: Record<string, string> = {
   provisionPattern: "Provision pattern",
   ace: "ACE participation",
   icce: "Offers ICCE qualifications",
+  personalDataController: "Acts as a personal data controller",
+  employsStaff: "Employs staff",
+  controlsPremises: "Controls non-domestic premises",
+  foodBusiness: "Confirmed food business",
+  operatesVehicles: "Operates its own passenger vehicles",
+  schoolCategory: "English school category",
+  eyfsApplies: "Subject to the Early Years Foundation Stage",
+  englandSchoolMedicalDutiesApply:
+    "Subject to English school medical/allergy duties (CFA section 100)",
 };
 function profileValue(
   key: string,

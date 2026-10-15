@@ -43,6 +43,7 @@ const status = z.enum([
   "IN_REVIEW",
   "REVIEWED",
   "PUBLISHED",
+  "PARTIALLY_PUBLISHED",
   "REVIEWED_NO_REQUIREMENTS",
   "STALE",
   "UNAVAILABLE",
@@ -53,6 +54,7 @@ const sourceEffective = z
     from: date.nullable(),
     to: date.nullable(),
     unknownReason: text.nullable(),
+    currentAsOf: date.nullable().optional(),
   })
   .strict()
   .refine(
@@ -83,6 +85,19 @@ const source = z
   })
   .strict()
   .superRefine((s, c) => {
+    const currentAsOf = s.effective.currentAsOf;
+    if (
+      currentAsOf &&
+      (currentAsOf > s.review.verifiedAt ||
+        currentAsOf > s.retrievedAt ||
+        currentAsOf > s.review.reviewDueAt)
+    )
+      c.addIssue({
+        code: "custom",
+        path: ["effective", "currentAsOf"],
+        message:
+          "Current applicability observation must not postdate retrieval or review",
+      });
     if (s.publishedAt === null && !s.publishedDateUnknownReason)
       c.addIssue({
         code: "custom",
@@ -154,8 +169,16 @@ const coverage = z
   .strict()
   .superRefine((c, ctx) => {
     if (
-      (["PUBLISHED", "REVIEWED_NO_REQUIREMENTS"].includes(c.status) ||
-        ["PUBLISHED", "REVIEWED_NO_REQUIREMENTS"].includes(c.regionalStatus)) &&
+      ([
+        "PUBLISHED",
+        "PARTIALLY_PUBLISHED",
+        "REVIEWED_NO_REQUIREMENTS",
+      ].includes(c.status) ||
+        [
+          "PUBLISHED",
+          "PARTIALLY_PUBLISHED",
+          "REVIEWED_NO_REQUIREMENTS",
+        ].includes(c.regionalStatus)) &&
       (!c.review || !c.sourceIds.length)
     )
       ctx.addIssue({
@@ -222,9 +245,11 @@ export const catalogueSchema = z
           !v.sources.some(
             (source) =>
               source.id === id &&
-              (!["PUBLISHED", "REVIEWED_NO_REQUIREMENTS"].includes(
-                cell.status,
-              ) ||
+              (![
+                "PUBLISHED",
+                "PARTIALLY_PUBLISHED",
+                "REVIEWED_NO_REQUIREMENTS",
+              ].includes(cell.status) ||
                 source.state === "REVIEWED") &&
               source.territory.includes(cell.jurisdiction),
           )

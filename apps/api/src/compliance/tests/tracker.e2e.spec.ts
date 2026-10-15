@@ -17,6 +17,7 @@ import {
 import { AppModule } from "../../app.module";
 import { TrackerCatalogueService } from "../catalogue/catalogue.service";
 import { TRACKER_CATALOGUE } from "../catalogue";
+import { normalizeTrackerProfile } from "../tracker.dto";
 import { TrackerProfileService } from "../tracker-profile.service";
 import { TrackerService } from "../tracker.service";
 import { SupabaseStorageService } from "../../common/storage/supabase-storage.service";
@@ -206,7 +207,7 @@ describe("Site tracker persistence and permission boundaries", () => {
     expect(list.body.items).toEqual([]);
     const saved = await save();
     expect((await app.get(TrackerProfileService).get(actor))?.profile).toEqual(
-      testProfile,
+      normalizeTrackerProfile(testProfile),
     );
     await request(server)
       .put("/compliance/tracker/profile")

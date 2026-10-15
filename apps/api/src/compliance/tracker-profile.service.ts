@@ -14,6 +14,7 @@ import {
   lockTrackerSite,
 } from "./tracker-access";
 import { trackerLocation, trackerJurisdictionSelect } from "./tracker-location";
+import { normalizeTrackerProfile } from "./tracker.dto";
 import { serializeTrackerProfile } from "./tracker-record";
 @Injectable()
 export class TrackerProfileService {
@@ -45,7 +46,6 @@ export class TrackerProfileService {
   ): Promise<TrackerProfile> {
     return this.access.run(actor, "manage", async (tx) => {
       await lockTrackerSite(tx, actor);
-      await trackerLocation(tx, input.profile.jurisdictionId);
       const scope = trackerScope(actor);
       const current = await tx.complianceSiteProfile.findFirst({
         where: scope,
@@ -54,22 +54,22 @@ export class TrackerProfileService {
         throw new ConflictException(
           "The site profile changed. Reload before saving your draft.",
         );
-      if (
-        current &&
-        isDeepStrictEqual(
-          serializeTrackerProfile(current).profile,
-          input.profile,
-        )
-      ) {
+      const currentProfile = current ? serializeTrackerProfile(current) : null;
+      const profile = normalizeTrackerProfile(
+        input.profile,
+        currentProfile?.profile,
+      );
+      await trackerLocation(tx, profile.jurisdictionId);
+      if (current && isDeepStrictEqual(currentProfile?.profile, profile)) {
         await auditTracker(tx, actor, AuditAction.VIEWED, [current.id]);
         return serializeTrackerProfile(current);
       }
-      const profileJson = JSON.stringify(input.profile);
+      const profileJson = JSON.stringify(profile);
       const version = input.expectedVersion + 1;
       const data = {
         profileJson,
         version,
-        jurisdictionId: input.profile.jurisdictionId,
+        jurisdictionId: profile.jurisdictionId,
         updatedByUserId: actor.userId,
       };
       const saved = current

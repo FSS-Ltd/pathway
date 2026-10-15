@@ -128,7 +128,7 @@ function attest(catalogue = fixture()): TrackerAttestation {
   };
 }
 describe("institutional tracker catalogue and engine", () => {
-  it("mirrors every research cell without publishing obligations", () => {
+  it("mirrors every research cell and publishes only the reviewed England core", () => {
     const lines = readFileSync(
       resolve(process.cwd(), "../../docs/NexStepsV2/compliance/coverage.csv"),
       "utf8",
@@ -148,7 +148,54 @@ describe("institutional tracker catalogue and engine", () => {
       ),
     ).toEqual(expected);
     expect(expected).toHaveLength(1488);
-    expect(TRACKER_CATALOGUE.requirements).toEqual([]);
+    expect(TRACKER_CATALOGUE.requirements.length).toBeGreaterThan(0);
+    expect(
+      TRACKER_CATALOGUE.requirements.every(
+        (item) => item.jurisdiction === "GB-ENG",
+      ),
+    ).toBe(true);
+  });
+  it("exposes a reviewed partial core while retaining coverage gaps, expiry and unresolved regional scope", () => {
+    const catalogue = fixture();
+    catalogue.coverage[0]!.status = "PARTIALLY_PUBLISHED";
+    catalogue.coverage[0]!.regionalStatus = "IN_REVIEW";
+    catalogue.coverage[0]!.requiresRegion = true;
+    catalogue.coverage[0]!.reason =
+      "Reviewed national core; local safeguards and specialist duties remain unreviewed.";
+    const result = buildTrackerChecklist({
+      catalogue,
+      profile,
+      location,
+      attestations: [attest(catalogue)],
+      evidenceCounts: {},
+      now,
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.progress.completed).toBe(1);
+    expect(result.progress.applicable).toBe(1);
+    expect(
+      result.coverage.find((cell) => cell.topic === "safeguarding")!.status,
+    ).toBe("PARTIALLY_PUBLISHED");
+    expect(
+      result.coverage.find((cell) => cell.topic === "safeguarding")!
+        .regionalStatus,
+    ).toBe("UNAVAILABLE");
+    expect(result.coverageGaps).toBe(8);
+    catalogue.sources[0]!.state = "WITHDRAWN";
+    const withdrawn = buildTrackerChecklist({
+      catalogue,
+      profile,
+      location,
+      attestations: [attest(catalogue)],
+      evidenceCounts: {},
+      now,
+    });
+    expect(withdrawn.items).toEqual([]);
+    expect(withdrawn.progress.applicable).toBe(0);
+    expect(
+      withdrawn.coverage.find((cell) => cell.topic === "safeguarding")!.status,
+    ).toBe("STALE");
+    expect(withdrawn.coverageGaps).toBe(8);
   });
   it("preserves unknown in negation and nested groups", () => {
     expect(
@@ -393,7 +440,14 @@ describe("institutional tracker catalogue and engine", () => {
     expect(result.coverage.every((cell) => cell.sector === "NURSERY")).toBe(
       true,
     );
-    expect(result.progress.applicable).toBe(0);
+    expect(result.progress.applicable).toBeGreaterThan(0);
+    expect(
+      result.items.some(
+        (item) =>
+          item.requirement.id === "eng.independent-registration" &&
+          item.applicability === "APPLICABLE",
+      ),
+    ).toBe(true);
     expect(result.coverageGaps).toBe(8);
   });
   it("counts unknown activity separately and evaluates age boundaries", () => {
