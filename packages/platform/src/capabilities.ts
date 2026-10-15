@@ -1,8 +1,12 @@
-import type { Prisma } from "@prisma/client";
+import { Module, ModuleStatus, type Prisma } from "@prisma/client";
 import type { Capability } from "./types";
 import { prisma } from "./db";
 import { getOrgVertical, type OrgVerticalReader } from "./vertical";
-import { VERTICAL_CAPABILITIES, MODULE_CAPABILITIES } from "./capability-maps";
+import {
+  FINANCE_SERVICING_CAPABILITIES,
+  VERTICAL_CAPABILITIES,
+  MODULE_CAPABILITIES,
+} from "./capability-maps";
 
 export interface OrgCapabilityReader extends OrgVerticalReader {
   orgModule: Pick<Prisma.TransactionClient["orgModule"], "findMany">;
@@ -15,7 +19,10 @@ export async function getOrgCapabilities(
   const now = Date.now();
   const vertical = await getOrgVertical(orgId, client);
   const modules = await client.orgModule.findMany({
-    where: { orgId, status: "ACTIVE" },
+    where: {
+      orgId,
+      OR: [{ status: ModuleStatus.ACTIVE }, { module: Module.FINANCE }],
+    },
   });
 
   const caps = new Set<Capability>();
@@ -26,7 +33,15 @@ export async function getOrgCapabilities(
   // optional-module billing or an OrgModule grant.
   for (const c of MODULE_CAPABILITIES.LEARNING) caps.add(c);
   for (const m of modules) {
-    if (m.expiresAt && m.expiresAt.getTime() <= now) continue;
+    const isCurrent =
+      m.status === ModuleStatus.ACTIVE &&
+      (!m.expiresAt || m.expiresAt.getTime() > now);
+    if (!isCurrent) {
+      if (m.module === Module.FINANCE) {
+        for (const c of FINANCE_SERVICING_CAPABILITIES) caps.add(c);
+      }
+      continue;
+    }
     for (const c of MODULE_CAPABILITIES[m.module]) caps.add(c);
   }
   return [...caps];

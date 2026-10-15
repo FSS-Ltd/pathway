@@ -21,6 +21,8 @@ const financeTables = [
   "FinanceInvoiceLine",
   "FinanceReceipt",
   "FinanceReceiptAllocation",
+  "FinancePayerAccount",
+  "FinancePayerGrant",
 ] as const;
 
 interface FinanceProfileFixture {
@@ -45,11 +47,42 @@ async function createProfile(tenantId: string): Promise<FinanceProfileFixture> {
 
 async function removeProfile(profile: FinanceProfileFixture): Promise<void> {
   await withTenantRlsContext(profile.tenantId, orgId, async (tx) => {
+    const payerAccounts = await tx.financePayerAccount.findMany({
+      where: { financeProfileId: profile.id },
+      select: { id: true },
+    });
+    await tx.financePayerGrant.deleteMany({
+      where: {
+        financePayerAccountId: { in: payerAccounts.map(({ id }) => id) },
+      },
+    });
+    await tx.financePayerAccount.deleteMany({
+      where: { financeProfileId: profile.id },
+    });
     await tx.financeInvoiceNumberSequence.deleteMany({
       where: { financeProfileId: profile.id },
     });
     await tx.financeProfile.delete({ where: { id: profile.id } });
   });
+}
+
+async function createPayerAccount(
+  profile: FinanceProfileFixture,
+  displayName: string,
+): Promise<string> {
+  const id = randomUUID();
+  await withTenantRlsContext(profile.tenantId, orgId, (tx) =>
+    tx.financePayerAccount.create({
+      data: {
+        id,
+        financeProfileId: profile.id,
+        tenantId: profile.tenantId,
+        orgId,
+        displayName,
+      },
+    }),
+  );
+  return id;
 }
 
 async function expectCheckViolation(operation: () => Promise<unknown>) {
@@ -126,6 +159,116 @@ describe("Finance ledger database foundation", () => {
     } finally {
       await removeProfile(profileB);
       await removeProfile(profileA);
+    }
+  });
+
+  it("isolates payer grants by tenant and rejects forged account scope", async () => {
+    if (!requireDatabase()) return;
+    if (process.env.E2E_TENANT_RLS_ROLE !== tenantRlsRole) {
+      throw new Error("Finance payer grant test requires the tenant RLS role");
+    }
+
+    const payerUserId = randomUUID();
+    const grantAId = randomUUID();
+    const grantBId = randomUUID();
+    let profileA: FinanceProfileFixture | null = null;
+    let profileB: FinanceProfileFixture | null = null;
+
+    try {
+      profileA = await createProfile(tenantAId);
+      profileB = await createProfile(tenantBId);
+      const accountAId = await createPayerAccount(profileA, "Payer A");
+      const accountBId = await createPayerAccount(profileB, "Payer B");
+      await prisma.user.create({
+        data: {
+          id: payerUserId,
+          email: `finance-payer-${payerUserId}@example.test`,
+        },
+      });
+
+      await withTenantRlsContext(tenantAId, orgId, (tx) =>
+        tx.financePayerGrant.create({
+          data: {
+            id: grantAId,
+            financePayerAccountId: accountAId,
+            tenantId: tenantAId,
+            orgId,
+            payerUserId,
+            grantedByUserId: payerUserId,
+          },
+        }),
+      );
+      await withTenantRlsContext(tenantBId, orgId, (tx) =>
+        tx.financePayerGrant.create({
+          data: {
+            id: grantBId,
+            financePayerAccountId: accountBId,
+            tenantId: tenantBId,
+            orgId,
+            payerUserId,
+            grantedByUserId: payerUserId,
+          },
+        }),
+      );
+
+      await expect(
+        withTenantRlsContext(tenantAId, orgId, (tx) =>
+          tx.financePayerGrant.create({
+            data: {
+              id: randomUUID(),
+              financePayerAccountId: accountAId,
+              tenantId: tenantAId,
+              orgId,
+              payerUserId,
+              grantedByUserId: payerUserId,
+            },
+          }),
+        ),
+      ).rejects.toMatchObject({ code: "P2002" });
+
+      await withTenantRlsContext(tenantAId, orgId, async (tx) => {
+        await tx.financePayerGrant.update({
+          where: { id: grantAId },
+          data: { revokedAt: new Date(), revokedByUserId: payerUserId },
+        });
+        await tx.financePayerGrant.create({
+          data: {
+            financePayerAccountId: accountAId,
+            tenantId: tenantAId,
+            orgId,
+            payerUserId,
+            grantedByUserId: payerUserId,
+          },
+        });
+      });
+
+      await withTenantRlsContext(tenantAId, orgId, async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${tenantRlsRole}"`);
+        const visible = await tx.financePayerGrant.findMany({
+          where: { id: { in: [grantAId, grantBId] } },
+          select: { id: true },
+        });
+        expect(visible.map(({ id }) => id)).toEqual([grantAId]);
+
+        await expect(
+          tx.$executeRaw`
+            INSERT INTO "FinancePayerGrant" (
+              "id", "financePayerAccountId", "tenantId", "orgId",
+              "payerUserId", "grantedByUserId"
+            ) VALUES (
+              ${randomUUID()}, ${accountBId}, ${tenantBId}, ${orgId},
+              ${payerUserId}, ${payerUserId}
+            )
+          `,
+        ).rejects.toMatchObject({ code: "P2010", meta: { code: "42501" } });
+      });
+    } finally {
+      try {
+        if (profileB) await removeProfile(profileB);
+        if (profileA) await removeProfile(profileA);
+      } finally {
+        await prisma.user.deleteMany({ where: { id: payerUserId } });
+      }
     }
   });
 

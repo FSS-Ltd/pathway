@@ -41,6 +41,8 @@ const REQUIRED_RLS_TABLES = [
   "FinanceInvoiceLine",
   "FinanceReceipt",
   "FinanceReceiptAllocation",
+  "FinancePayerAccount",
+  "FinancePayerGrant",
   "EnrolmentRollConfirmation",
   "AcademicYear",
   "AcademicPeriod",

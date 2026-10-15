@@ -172,7 +172,9 @@ const APPROVED_GRANTS = {
     "safeguarding.concerns.read",
     "safeguarding.concerns.record",
   ],
+  "Finance Administrator": [],
   "Finance Operator": [],
+  "Finance Approver": [],
   Parent: [
     "ace.faith.read",
     "ace.faith.reflect",
@@ -356,7 +358,7 @@ describeIfSeedProof("system-role seed command orchestration", () => {
     const rolesAfterFirstRun = await selectRoleState();
     const systemRoles = rolesAfterFirstRun.filter(({ isSystem }) => isSystem);
 
-    expect(rolesAfterFirstRun).toHaveLength(8);
+    expect(rolesAfterFirstRun).toHaveLength(10);
     expect(
       rolesAfterFirstRun.filter(({ name }) => name === "Organisation Head"),
     ).toHaveLength(2);
@@ -365,7 +367,7 @@ describeIfSeedProof("system-role seed command orchestration", () => {
       isSystem: false,
       version: 7,
     });
-    expect(systemRoles).toHaveLength(7);
+    expect(systemRoles).toHaveLength(9);
     for (const role of systemRoles) {
       expect(role).toMatchObject({
         isActive: true,

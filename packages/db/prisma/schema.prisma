@@ -1288,6 +1288,9 @@ model User {
   staffActivities                   StaffActivity[]
   identities                        UserIdentity[]
   guardianIdentities                GuardianIdentity[]
+  financePayerGrants                FinancePayerGrant[]                 @relation("FinancePayerGrantPayer")
+  financePayerGrantsIssued          FinancePayerGrant[]                 @relation("FinancePayerGrantGrantedBy")
+  financePayerGrantsRevoked         FinancePayerGrant[]                 @relation("FinancePayerGrantRevokedBy")
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
@@ -4781,10 +4784,47 @@ model FinanceProfile {
   invoiceSequence FinanceInvoiceNumberSequence?
   invoices        FinanceInvoice[]
   receipts        FinanceReceipt[]
+  payerAccounts   FinancePayerAccount[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
   @@index([orgId, tenantId])
+}
+
+model FinancePayerAccount {
+  id               String              @id @default(uuid())
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  displayName      String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  financeProfile   FinanceProfile      @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  grants           FinancePayerGrant[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([financeProfileId, displayName])
+  @@index([tenantId, orgId, createdAt])
+}
+
+model FinancePayerGrant {
+  id                    String              @id @default(uuid())
+  financePayerAccountId String
+  tenantId              String
+  orgId                 String
+  payerUserId           String
+  grantedByUserId       String
+  revokedByUserId       String?
+  grantedAt             DateTime            @default(now())
+  revokedAt             DateTime?
+  payerAccount          FinancePayerAccount @relation(fields: [financePayerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payer                 User                @relation("FinancePayerGrantPayer", fields: [payerUserId], references: [id], onDelete: Restrict)
+  grantedBy             User                @relation("FinancePayerGrantGrantedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+  revokedBy             User?               @relation("FinancePayerGrantRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, financePayerAccountId, payerUserId, revokedAt])
+  @@index([payerUserId, tenantId, orgId, revokedAt])
 }
 
 model FinanceInvoiceNumberSequence {

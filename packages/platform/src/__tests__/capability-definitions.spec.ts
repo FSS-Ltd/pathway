@@ -114,6 +114,17 @@ const SECTION_5_2_KEYS = [
   "finance.family_invoices.manage",
   "finance.family_payments.record",
   "finance.family_reports.read",
+  "finance.invoices.read",
+  "finance.invoices.manage",
+  "finance.payments.read",
+  "finance.payments.manage",
+  "finance.reports.read",
+  "finance.statements.read",
+  "finance.exports.create",
+  "finance.payer_access.manage",
+  "finance.approvals.review",
+  "finance.family_payments.pay",
+  "finance.family_statements.read",
   "merit.wallet.read",
   "merit.wallet.adjust",
   "merit.wallet.transfer",
@@ -182,8 +193,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 125 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(125);
+  it("contains exactly the 136 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(136);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
