@@ -4,6 +4,10 @@ import Link from "next/link";
 import { Button } from "@pathway/ui";
 import type { ComplianceMedicalRecord } from "@pathway/types";
 import { complianceMedicalClient } from "@/lib/compliance-medical-client";
+import {
+  hasUnavailableMedical,
+  writableMedicalValues,
+} from "@/lib/medical-read";
 import { ApiError } from "@/lib/api-transport";
 import {
   MedicalFields,
@@ -35,6 +39,12 @@ export function MedicalEditor({
   const [error, setError] = React.useState<string | null>(null);
   const [conflict, setConflict] = React.useState(false);
   const [saved, setSaved] = React.useState(false);
+  const [dirty, setDirty] = React.useState(false);
+  const unavailable = Boolean(
+    (record && hasUnavailableMedical(record)) ||
+    (draft && hasUnavailableMedical(draft)) ||
+    (latest && hasUnavailableMedical(latest)),
+  );
   const controller = React.useRef<AbortController | null>(null);
   const load = React.useCallback(
     async (comparison = false) => {
@@ -53,6 +63,7 @@ export function MedicalEditor({
           else {
             setRecord(result);
             setDraft(values(result));
+            setDirty(false);
           }
         }
       } catch {
@@ -71,7 +82,16 @@ export function MedicalEditor({
     return () => controller.current?.abort();
   }, [load]);
   async function save() {
-    if (!record || !draft || !canManage || conflict || busy) return;
+    if (
+      !record ||
+      !draft ||
+      !canManage ||
+      conflict ||
+      busy ||
+      unavailable ||
+      !writableMedicalValues(draft)
+    )
+      return;
     controller.current?.abort();
     const current = new AbortController();
     controller.current = current;
@@ -88,15 +108,22 @@ export function MedicalEditor({
         setRecord(result);
         setDraft(values(result));
         setSaved(true);
+        setDirty(false);
       }
     } catch (failure) {
       if (!current.signal.aborted) {
-        const changed = failure instanceof ApiError && failure.status === 409;
+        const changed =
+          failure instanceof ApiError &&
+          (failure.status === 409 || failure.status === 503);
+        const unreadable =
+          failure instanceof ApiError && failure.status === 503;
         setConflict(changed);
         setError(
-          changed
-            ? "This record changed elsewhere. Your draft is preserved. Load the latest information to compare before saving."
-            : "Medical information could not be saved. Check the details and retry. Your draft is preserved.",
+          unreadable
+            ? "Medical information is temporarily unavailable. Your draft is preserved. Load the latest information before saving."
+            : changed
+              ? "This record changed elsewhere. Your draft is preserved. Load the latest information to compare before saving."
+              : "Medical information could not be saved. Check the details and retry. Your draft is preserved.",
         );
       }
     } finally {
@@ -146,6 +173,24 @@ export function MedicalEditor({
           )}
         </div>
       )}
+      {unavailable && (
+        <div role="alert" className="space-y-3">
+          <p>
+            Some medical information could not be read. Saving is blocked to
+            protect the existing record. Retry; if it remains unavailable, ask
+            an administrator to restore access. Do not treat unavailable
+            information as no medical needs.
+          </p>
+          <Button
+            className="min-h-11 h-auto whitespace-normal py-2"
+            variant="secondary"
+            disabled={busy}
+            onClick={() => void load(conflict || Boolean(latest) || dirty)}
+          >
+            Retry unavailable information
+          </Button>
+        </div>
+      )}
       {latest && (
         <section
           aria-label="Latest medical information"
@@ -160,11 +205,12 @@ export function MedicalEditor({
           <div className="flex flex-wrap gap-3">
             <Button
               className="min-h-11 h-auto whitespace-normal py-2"
-              disabled={busy}
+              disabled={busy || hasUnavailableMedical(latest)}
               variant="secondary"
               onClick={() => {
                 setRecord(latest);
                 setDraft(values(latest));
+                setDirty(false);
                 setLatest(null);
                 setConflict(false);
                 setError(null);
@@ -174,7 +220,7 @@ export function MedicalEditor({
             </Button>
             <Button
               className="min-h-11 h-auto whitespace-normal py-2"
-              disabled={busy}
+              disabled={busy || hasUnavailableMedical(latest)}
               variant="secondary"
               onClick={() => {
                 setRecord(latest);
@@ -201,14 +247,15 @@ export function MedicalEditor({
               value={draft}
               onChange={(value) => {
                 setDraft(value);
+                setDirty(true);
                 setSaved(false);
               }}
-              disabled={busy}
+              disabled={busy || unavailable}
             />
             <Button
               className="min-h-11 h-auto whitespace-normal py-2 text-text-primary"
               type="submit"
-              disabled={busy || conflict}
+              disabled={busy || conflict || unavailable}
             >
               Save medical information
             </Button>

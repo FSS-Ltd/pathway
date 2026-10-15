@@ -1,8 +1,15 @@
 /** Unknown information must never be presented as an explicit absence of needs. */
 export type MedicalField =
+  | { status: "UNAVAILABLE"; details: null }
   | { status: "UNKNOWN"; details: null }
   | { status: "NONE"; details: null }
   | { status: "RECORDED"; details: string };
+
+/** Only readable states can be submitted as replacement clinical information. */
+export type WritableMedicalField = Exclude<
+  MedicalField,
+  { status: "UNAVAILABLE" }
+>;
 
 export interface ComplianceMedicalRecord {
   id: string;
@@ -23,7 +30,7 @@ export interface ComplianceMedicalPage {
 
 export interface ComplianceMedicalUpdate {
   expectedUpdatedAt: string;
-  allergies: MedicalField;
-  medicalConditions: MedicalField;
-  medicationAtSite: MedicalField;
+  allergies: WritableMedicalField;
+  medicalConditions: WritableMedicalField;
+  medicationAtSite: WritableMedicalField;
 }

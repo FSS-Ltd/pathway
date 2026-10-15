@@ -5,8 +5,10 @@ import {
   NotFoundException,
   Inject,
   Optional,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
+import { isEncryptedField } from "@pathway/util";
 import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
 import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
@@ -454,6 +456,22 @@ export class ChildrenService {
       if (!isSiteAdmin) {
         input = { ...input, guardianIds: undefined };
       }
+    }
+
+    if (
+      input.allergies !== undefined &&
+      input.allergies !== current.allergies
+    ) {
+      if (isEncryptedField(current.allergies.trim()))
+        throw new ServiceUnavailableException({
+          code: "MEDICAL_INFORMATION_UNAVAILABLE",
+          message:
+            "Medical information could not be read. Retry or ask an administrator to restore access before saving.",
+        });
+      if (isEncryptedField(input.allergies.trim()))
+        throw new BadRequestException(
+          "Encrypted medical values cannot be submitted as clinical text",
+        );
     }
 
     // If group provided, ensure it belongs to the same tenant

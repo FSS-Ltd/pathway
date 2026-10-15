@@ -3,20 +3,20 @@
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
 Updated: 2026-10-15. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
-## Current step: 1.6
+## Current step: medical encrypted-value correction
 
-**State: implementation in progress; not complete.** Steps 1.1–1.5 are merged.
+**State: medical correction in progress; not complete.** Steps 1.1–1.6 are merged. England research is preserved; its runtime pack is not published.
 No country pack is published.
 
 | Evidence               | Value                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| Scope                  | Site profiles, applicability, manual tracker/progress, evidence and live signals                   |
-| Branch                 | `feature/compliance-site-tracker`                                                                  |
-| Verified starting base | `b905f2385776e8210edc99a435fd63d1e1c9ffcf`                                                         |
-| Predecessor            | [PR #630](https://github.com/FSS-Ltd/pathway/pull/630), host-confirmed merged 2026-10-15T10:13:08Z |
-| PR / revision / CI     | Draft PR #631; integration fixture correction under verification                                   |
+| Scope                  | Unreadable medical fields, overwrite prevention and truthful live evidence                         |
+| Branch                 | `fix/compliance-medical-ciphertext`                                                                |
+| Verified starting base | `47d698d053df8d91696fec7e330d837e28f93c2b`                                                         |
+| Predecessor            | [PR #631](https://github.com/FSS-Ltd/pathway/pull/631), host-confirmed merged 2026-10-15T11:18:42Z |
+| PR / revision / CI     | Not raised; local fix verification in progress                                                     |
 | Merge state            | Unmerged; no completion claim                                                                      |
-| Next permitted action  | Implement and verify 1.6, raise its PR, verify latest CI and merge before 2.01                     |
+| Next permitted action  | Verify and deliver this correction; resume the preserved England research afterward                |
 
 ## Step 1.1 verification and merge
 
@@ -655,3 +655,82 @@ received a clean independent narrow review.
 The verified fixture and this ledger update are being added to PR #631. Final
 current-head host CI, required-review state and verified merge remain outstanding;
 step 1.6 is not complete and no 2.01 work has started.
+
+### Step 1.6 current revision awaiting host verification
+
+PR #631 is ready for review on head
+`4c4840d78949053af088784c425a7a6dfe0f4210` (base `b905f238…`). The correction's
+commit hooks also passed workspace lint, API 1,567 tests, workers 45 and auth 15.
+[CI 38724378768](https://github.com/FSS-Ltd/pathway/actions/runs/38724378768) and
+[CodeQL 38724375610](https://github.com/FSS-Ltd/pathway/actions/runs/38724375610)
+are running for this revision. Earlier draft-head results are superseded.
+Required checks and the actual host merge remain the only progression gate;
+no next-step implementation has started.
+
+### Step 1.6 verified merge and step 2.01 start
+
+GitHub confirms PR #631 MERGED at 2026-10-15T11:18:42Z by `jntagengwa`, merge
+commit `47d698d053df8d91696fec7e330d837e28f93c2b`. All eight checks passed on
+head `4c4840d78949053af088784c425a7a6dfe0f4210`. Both completed checkout logs
+confirm tested merge `19ceed58e9e671eeb7c3b20922721e51a9d59f88`; the earlier
+pre-run API test-merge estimate `07ddeda7…` was not the checked revision. Host
+integration passed 99 suites/606 tests plus the separate one-connection proof
+(two suites/13 tests). Step 1.6 is complete.
+
+Step 2.01 (England) starts from the refreshed verified merge on its own branch.
+Research covers six institutional sectors, eight topics, actual provider status,
+activity/age conditions and national/local boundaries. Source review, fixtures,
+coverage updates and full delivery verification remain required before its PR.
+
+## Medical encrypted-value correction
+
+User reported live allergy text still encrypted. Prioritizing a separate fix branch
+`fix/compliance-medical-ciphertext` from verified merge `47d698d0…`. England research
+notes are preserved untracked and excluded from this fix PR. Source inspection
+confirms failed-decryption ciphertext can be serialized as RECORDED. Live API
+revision `b905f238…` includes the medical implementation; PII key metadata is present.
+Supabase read-only aggregate access was denied, so live data/key recovery is not
+claimed. The signed-in browser medical page stalled while loading admin context.
+See MEDICAL-READ-RECOVERY.md for scope and verification.
+
+### Medical correction review and local verification
+
+Implemented UNAVAILABLE/null medical read states for remaining encrypted envelopes,
+DTO rejection of submitted ciphertext, server-side whole-record overwrite prevention,
+and legacy allergy replacement protection after existing authorization checks.
+Unrelated legacy edits and identical resubmissions preserve existing values. The
+admin client also sanitizes older responses, shows retry/unavailable feedback, and
+blocks saves and unsafe conflict acceptance while preserving drafts. The tracker
+reads bounded clinical pages through the PII layer and reports unavailable evidence
+as UNKNOWN instead of counting it complete. No key or stored clinical value changed.
+
+Independent whole-fix review found no blocking correctness/security issues. A minor
+duplicate progress-table header was corrected. Scope is the Compliance Medical
+surface and reviewed write paths; this is not a global PII-reader redesign.
+
+- Focused existing/recovery HTTP: two suites / 13 tests passed. Includes wrong-key
+  and malformed values in all three fields, list/detail/export safety, blocked NONE
+  overwrite with raw ciphertext unchanged, legacy unrelated/identical writes, and
+  read/manage/cross-site/cross-organisation boundaries.
+- Medical serializer/DTO units: six passed. Medical signal units: three passed,
+  including unreadable data, missing confirmation and bounded pagination.
+- Initial full API units: 221 suites / 1,572 tests passed, one new signal fixture
+  assertion failed because its third row was omitted. Corrected the fixture and
+  all three focused signal tests passed; commit hooks will rerun the full suite.
+- Workspace typecheck and lint: 16 tasks each passed. Backend/admin focused types,
+  explicit changed-source ESLint, formatting and whitespace checks passed.
+- Actual component inspection: desktop, 390px mobile, 200% text and keyboard retry;
+  unavailable current/draft/comparison states, preserved conflict drafts, old-response
+  ciphertext suppression, zero writes before recovery, retry restoring readable
+  synthetic content. Inspected screenshots in `/tmp/compliance-medical-recovery-preview/`.
+
+Full integration passed 100 suites / 614 tests. Admin regression tests and the
+API, admin and web production builds passed. Final independent UI re-review found
+no blockers; changed-file and diff inspection, formatting and whitespace checks
+passed. Commit hooks passed the complete API unit suite after the fixture correction:
+222 suites / 1,573 tests, workers 45 and auth 15. PR
+[#633](https://github.com/FSS-Ltd/pathway/pull/633) is open; initial implementation
+revision `bda05e0a580158d6841c15bca8cd8d7be33727cd` passed local verification.
+Current-revision host CI and merge remain required. Live Clerk/production key
+compatibility and clinical recovery are not verified; no production action is
+authorized or claimed by this fix branch.

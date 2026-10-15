@@ -3,6 +3,7 @@ import type { Prisma } from "@pathway/db";
 import type { PermissionKey } from "@pathway/platform";
 import type { TrackerSignalKey } from "@pathway/types";
 import type { ComplianceActor } from "./compliance.service";
+import { medicalField } from "./medical-record";
 import {
   aceSignal,
   attendanceSignal,
@@ -74,33 +75,51 @@ async function medical(
   tx: Prisma.TransactionClient,
   actor: ComplianceActor,
   now: Date,
-): Promise<SignalObservation> {
+): Promise<SignalObservation | null> {
   const where: Prisma.ChildWhereInput = {
     tenantId: actor.tenantId,
     OR: [{ isGuest: false }, { guestExpiresAt: { gt: now } }],
   };
-  const [count, missingCount] = await Promise.all([
-    tx.child.count({ where }),
-    tx.child.count({
-      where: {
-        AND: [
-          where,
-          {
-            OR: [
-              { allergiesConfirmedAt: null },
-              { medicalConditions: null },
-              { medicationAtSite: null },
-            ],
-          },
-        ],
+  let count = 0;
+  let missingCount = 0;
+  let cursor: string | undefined;
+  // Read bounded pages through the PII layer: raw non-null counts cannot establish
+  // whether encrypted clinical information can actually be read.
+  for (;;) {
+    const rows = await tx.child.findMany({
+      where: { ...where, ...(cursor ? { id: { gt: cursor } } : {}) },
+      orderBy: { id: "asc" },
+      take: 250,
+      select: {
+        id: true,
+        allergies: true,
+        allergiesConfirmedAt: true,
+        medicalConditions: true,
+        medicationAtSite: true,
       },
-    }),
-  ]);
+    });
+    for (const row of rows) {
+      const fields = [
+        medicalField(row.allergies, row.allergiesConfirmedAt !== null),
+        medicalField(row.medicalConditions, true),
+        medicalField(row.medicationAtSite, true),
+      ];
+      if (fields.some((field) => field.status === "UNAVAILABLE")) return null;
+      count++;
+      if (
+        row.allergiesConfirmedAt === null ||
+        fields.some((field) => field.status === "UNKNOWN")
+      )
+        missingCount++;
+    }
+    if (rows.length < 250) break;
+    cursor = rows[rows.length - 1].id;
+  }
   return {
     count,
     missingCount,
     description:
-      "Child records; gaps lack an allergy confirmation, medical-condition entry or medication entry. A recorded none is distinct from missing information.",
+      "Readable child medical records; gaps lack an allergy confirmation, medical-condition entry or medication entry. A recorded none is distinct from missing information.",
     href: "/compliance/medical",
   };
 }
