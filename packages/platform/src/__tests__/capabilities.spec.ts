@@ -136,6 +136,8 @@ describe("institutional compliance entitlements", () => {
         "compliance.checks.manage",
         "compliance.medical.read",
         "compliance.medical.manage",
+        "compliance.agreements.read",
+        "compliance.agreements.manage",
       ]) {
         expect((capabilities as readonly string[]).includes(permission)).toBe(
           vertical !== "HOME_EDUCATION",
@@ -147,6 +149,8 @@ describe("institutional compliance entitlements", () => {
       expect(capabilities).not.toContain("compliance.checks.manage");
       expect(capabilities).not.toContain("compliance.medical.read");
       expect(capabilities).not.toContain("compliance.medical.manage");
+      expect(capabilities).not.toContain("compliance.agreements.read");
+      expect(capabilities).not.toContain("compliance.agreements.manage");
     }
   });
 });

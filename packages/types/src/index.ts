@@ -5,3 +5,4 @@ export * from "./vertical";
 export * from "./institutional-profile";
 export * from "./compliance";
 export * from "./medical";
+export * from "./agreements";

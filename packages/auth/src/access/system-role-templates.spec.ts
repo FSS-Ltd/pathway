@@ -50,6 +50,8 @@ describe("ACE system role templates", () => {
           "compliance.checks.manage",
           "compliance.medical.read",
           "compliance.medical.manage",
+          "compliance.agreements.read",
+          "compliance.agreements.manage",
           "platform.access.roles.read",
           "platform.access.roles.manage",
           "platform.access.permissions.read",
@@ -120,6 +122,8 @@ describe("ACE system role templates", () => {
           "compliance.checks.manage",
           "compliance.medical.read",
           "compliance.medical.manage",
+          "compliance.agreements.read",
+          "compliance.agreements.manage",
           "attendance.read",
           "attendance.manage",
           "ace.attendance.export",
@@ -381,6 +385,22 @@ describe("medical information role defaults", () => {
       expect(permissions.includes("compliance.medical.manage")).toBe(
         ["organisationHead", "siteLead"].includes(name),
       );
+    }
+  });
+});
+
+describe("agreement role defaults", () => {
+  it("reserves general agreement access for administrators", () => {
+    for (const [name, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
+      const permissions: readonly string[] = template.permissions;
+      for (const permission of [
+        "compliance.agreements.read",
+        "compliance.agreements.manage",
+      ]) {
+        expect(permissions.includes(permission)).toBe(
+          ["organisationHead", "siteLead"].includes(name),
+        );
+      }
     }
   });
 });

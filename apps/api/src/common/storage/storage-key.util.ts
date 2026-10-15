@@ -64,7 +64,7 @@ export function noticeAttachmentKey(
 
 /** Private buckets may only receive tenant-isolated classes registered here. */
 export function isPrivateStorageKey(key: string): boolean {
-  return /^tenants\/[^/]+\/(?:children\/[^/]+\/photo\.[^/]+|staff\/[^/]+\/avatar\.[^/]+|lessons\/[^/]+\/resources\/[^/]+|reports\/[^/]+\/bundle\.csv|privacy-exports\/[^/]+\/export\.zip|messages\/[^/]+\/[^/]+|notices\/[^/]+\/[^/]+)$/.test(
+  return /^tenants\/[^/]+\/(?:children\/[^/]+\/photo\.[^/]+|staff\/[^/]+\/avatar\.[^/]+|lessons\/[^/]+\/resources\/[^/]+|reports\/[^/]+\/bundle\.csv|privacy-exports\/[^/]+\/export\.zip|messages\/[^/]+\/[^/]+|notices\/[^/]+\/[^/]+|agreements\/[0-9a-f-]{36}\/document\.pdf)$/.test(
     key,
   );
 }

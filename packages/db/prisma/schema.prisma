@@ -164,6 +164,7 @@ enum AuditAction {
 enum AuditEntityType {
   CHILD_MEDICAL
   COMPLIANCE_PERSONNEL
+  COMPLIANCE_AGREEMENT
   CONCERN
   CHILD_NOTE
   ORG_ROLE
@@ -946,6 +947,10 @@ enum HandoverLogStatus {
 // NEW: Org (Suite) — business/billing owner; may contain multiple Tenants (sites)
 model Org {
   compliancePersonnelRecords CompliancePersonnelRecord[]
+  agreementDocuments ComplianceAgreementDocument[]
+  agreementVersions ComplianceAgreementVersion[]
+  agreementAssignments ComplianceAgreementAssignment[]
+  agreementAcceptances ComplianceAgreementAcceptance[]
   compliancePersonnelRevisions CompliancePersonnelRevision[]
   id                  String                   @id @default(uuid())
   name                String
@@ -1001,6 +1006,10 @@ model Org {
 // wrapper but the tenant id remains the canonical RLS key.
 model Tenant {
   compliancePersonnelRecords CompliancePersonnelRecord[]
+  agreementDocuments ComplianceAgreementDocument[]
+  agreementVersions ComplianceAgreementVersion[]
+  agreementAssignments ComplianceAgreementAssignment[]
+  agreementAcceptances ComplianceAgreementAcceptance[]
   compliancePersonnelRevisions CompliancePersonnelRevision[]
   id       String  @id @default(uuid())
   name     String
@@ -1190,6 +1199,11 @@ model User {
   complianceUpdated CompliancePersonnelRecord[] @relation("ComplianceUpdated")
   complianceVerified CompliancePersonnelRecord[] @relation("ComplianceVerified")
   complianceRevisions CompliancePersonnelRevision[]
+  agreementDocumentsCreated ComplianceAgreementDocument[]
+  agreementVersionsCreated ComplianceAgreementVersion[]
+  agreementAssignmentsReceived ComplianceAgreementAssignment[] @relation("AgreementRecipient")
+  agreementAssignmentsCreated ComplianceAgreementAssignment[] @relation("AgreementAssigner")
+  agreementAcceptancesRecorded ComplianceAgreementAcceptance[]
   id                String    @id @default(uuid())
   email             String?   @unique
   name              String?
@@ -4531,4 +4545,95 @@ model CompliancePersonnelRevision {
 
   @@unique([recordId, version])
   @@index([tenantId, orgId, recordId, version])
+}
+
+enum ComplianceAgreementAcceptanceMethod {
+  ACKNOWLEDGED
+  RECORDED_SIGNED_COPY
+}
+
+model ComplianceAgreementDocument {
+  id              String                       @id @default(uuid())
+  tenantId        String
+  orgId           String
+  latestVersion   Int                          @default(1)
+  createdAt       DateTime                     @default(now())
+  createdByUserId String
+  createdBy       User                         @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions        ComplianceAgreementVersion[]
+  org             Org                          @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant          Tenant                       @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, createdAt, id])
+}
+
+model ComplianceAgreementVersion {
+  id                 String                          @id @default(uuid())
+  tenantId           String
+  orgId              String
+  documentId         String
+  version            Int
+  title              String
+  contentText        String
+  originalStorageKey String?
+  originalFileName   String?
+  originalSha256     String?
+  createdAt          DateTime                        @default(now())
+  createdByUserId    String
+  createdBy          User                            @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  document           ComplianceAgreementDocument     @relation(fields: [documentId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  assignments        ComplianceAgreementAssignment[]
+  org                Org                             @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant             Tenant                          @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([documentId, version])
+  @@index([tenantId, orgId, documentId, version])
+}
+
+model ComplianceAgreementAssignment {
+  id               String                         @id @default(uuid())
+  tenantId         String
+  orgId            String
+  versionId        String
+  recipientUserId  String
+  assignedAt       DateTime                       @default(now())
+  assignedByUserId String
+  adultConfirmedAt DateTime
+  supersededAt     DateTime?
+  version          ComplianceAgreementVersion     @relation(fields: [versionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  recipient        User                           @relation("AgreementRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+  assignedBy       User                           @relation("AgreementAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  acceptance       ComplianceAgreementAcceptance?
+  org              Org                            @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant           Tenant                         @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([versionId, recipientUserId])
+  @@index([tenantId, orgId, recipientUserId, assignedAt, id])
+  @@index([tenantId, orgId, assignedAt, id])
+}
+
+model ComplianceAgreementAcceptance {
+  id               String                              @id @default(uuid())
+  tenantId         String
+  orgId            String
+  assignmentId     String                              @unique
+  method           ComplianceAgreementAcceptanceMethod
+  typedName        String
+  recordedAt       DateTime                            @default(now())
+  recordedByUserId String
+  signedOn         DateTime?                           @db.Date
+  signedStorageKey String?
+  signedFileName   String?
+  signedSha256     String?
+  assignment       ComplianceAgreementAssignment       @relation(fields: [assignmentId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  recordedBy       User                                @relation(fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  org              Org                                 @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant           Tenant                              @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([assignmentId, tenantId, orgId])
+  @@index([tenantId, orgId, recordedAt, id])
 }
