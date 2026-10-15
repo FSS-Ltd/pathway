@@ -128,6 +128,27 @@ describe("FinanceAccessService", () => {
     ).resolves.toBeUndefined();
   });
 
+  it("requires active access and reviewer permission for invoice approvals", async () => {
+    await expect(
+      service.authorizeIndependentFinanceApproval(scope, "staff-a", "staff-b"),
+    ).rejects.toThrow(ForbiddenException);
+
+    reader.findModule.mockResolvedValue({
+      status: ModuleStatus.ACTIVE,
+      expiresAt: null,
+    });
+    await expect(
+      service.authorizeIndependentFinanceApproval(scope, "staff-a", "staff-b"),
+    ).resolves.toBeUndefined();
+    expect(permissions.resolve).toHaveBeenCalledWith({
+      userId: "staff-b",
+      orgId: scope.orgId,
+      tenantId: scope.tenantId,
+      permission: "finance.approvals.review",
+      now: expect.any(Date),
+    });
+  });
+
   it("continues servicing an existing receipt regardless of entitlement", async () => {
     reader.hasReceipt.mockResolvedValue(true);
     await expect(

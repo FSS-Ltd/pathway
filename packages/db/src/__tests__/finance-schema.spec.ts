@@ -25,10 +25,16 @@ describe("Finance schema contract", () => {
       "model FinanceInvoiceNumberSequence",
       "model FinanceInvoice",
       "model FinanceInvoiceLine",
+      "model FinanceInvoiceEvent",
       "model FinanceReceipt",
       "model FinanceReceiptAllocation",
       "model FinancePayerAccount",
       "model FinancePayerGrant",
+      "model FinanceCreditNoteNumberSequence",
+      "model FinanceCreditNote",
+      "model FinanceCreditNoteLine",
+      "model FinanceCreditNoteEvent",
+      "model FinanceCommandReceipt",
     ]) {
       expect(schema.includes(declaration)).toBe(true);
     }
@@ -42,13 +48,14 @@ describe("Finance schema contract", () => {
     expect(/taxMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/totalMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/amountMinor\s+BigInt/.test(schema)).toBe(true);
-    expect(financeMigrations).toHaveLength(2);
+    expect(financeMigrations).toHaveLength(6);
 
     for (const financeMigration of financeMigrations) {
       const migration = readFileSync(
         path.join(migrationDirectory, financeMigration, "migration.sql"),
         "utf8",
       );
+      if (!migration.includes("CREATE TABLE")) continue;
       expect(migration.includes("ENABLE ROW LEVEL SECURITY")).toBe(true);
       expect(migration.includes("FORCE ROW LEVEL SECURITY")).toBe(true);
       expect(migration.includes("app.current_tenant_id()")).toBe(true);
@@ -72,12 +79,18 @@ describe("Finance schema contract", () => {
     for (const table of [
       "FinanceProfile",
       "FinanceInvoiceNumberSequence",
+      "FinanceCreditNoteNumberSequence",
       "FinanceInvoice",
       "FinanceInvoiceLine",
+      "FinanceInvoiceEvent",
       "FinanceReceipt",
       "FinanceReceiptAllocation",
       "FinancePayerAccount",
       "FinancePayerGrant",
+      "FinanceCreditNote",
+      "FinanceCreditNoteLine",
+      "FinanceCreditNoteEvent",
+      "FinanceCommandReceipt",
     ]) {
       expect(rlsGate.includes(`"${table}"`)).toBe(true);
     }

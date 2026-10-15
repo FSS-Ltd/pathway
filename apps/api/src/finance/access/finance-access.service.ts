@@ -66,6 +66,25 @@ export class FinanceAccessService {
       throw new ForbiddenException("Independent Finance approval required");
     }
     await this.assertStaffAction(scope, "APPROVE_AUTOMATED_DEBIT");
+    await this.assertApprovalPermission(scope, approverUserId);
+  }
+
+  async authorizeIndependentFinanceApproval(
+    scope: FinanceAccessScope,
+    requesterUserId: string,
+    approverUserId: string,
+  ): Promise<void> {
+    if (!isIndependentFinanceApproval(requesterUserId, approverUserId)) {
+      throw new ForbiddenException("Independent Finance approval required");
+    }
+    await this.assertStaffAction(scope, "REVIEW_INVOICE");
+    await this.assertApprovalPermission(scope, approverUserId);
+  }
+
+  private async assertApprovalPermission(
+    scope: FinanceAccessScope,
+    approverUserId: string,
+  ): Promise<void> {
     const decision = await this.permissions.resolve({
       userId: approverUserId,
       orgId: scope.orgId,

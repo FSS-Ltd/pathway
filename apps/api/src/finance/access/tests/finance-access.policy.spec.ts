@@ -66,8 +66,16 @@ describe("Finance access policy", () => {
     }
     for (const action of [
       "CREATE_INVOICE",
+      "UPDATE_INVOICE",
+      "SUBMIT_INVOICE_FOR_REVIEW",
+      "REVIEW_INVOICE",
       "ISSUE_INVOICE",
+      "VOID_INVOICE",
       "CREATE_CREDIT",
+      "UPDATE_CREDIT",
+      "SUBMIT_CREDIT_FOR_REVIEW",
+      "ISSUE_CREDIT",
+      "VOID_CREDIT",
       "RECORD_RECEIPT",
       "ALLOCATE_RECEIPT",
       "GRANT_PAYER_ACCESS",
