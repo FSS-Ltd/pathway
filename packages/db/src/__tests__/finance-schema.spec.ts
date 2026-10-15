@@ -7,8 +7,8 @@ const schema = readFileSync(
 );
 const migrationDirectory = path.resolve(process.cwd(), "prisma/migrations");
 const migrations = readdirSync(migrationDirectory);
-const financeMigration = migrations.find((name) =>
-  name.includes("finance_ledger_foundation"),
+const financeMigrations = migrations.filter((name) =>
+  name.includes("finance_"),
 );
 const rlsGate = readFileSync(
   path.resolve(process.cwd(), "../../scripts/check-supabase-rls.mjs"),
@@ -27,6 +27,8 @@ describe("Finance schema contract", () => {
       "model FinanceInvoiceLine",
       "model FinanceReceipt",
       "model FinanceReceiptAllocation",
+      "model FinancePayerAccount",
+      "model FinancePayerGrant",
     ]) {
       expect(schema.includes(declaration)).toBe(true);
     }
@@ -40,18 +42,30 @@ describe("Finance schema contract", () => {
     expect(/taxMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/totalMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/amountMinor\s+BigInt/.test(schema)).toBe(true);
-    expect(financeMigration).toBeDefined();
+    expect(financeMigrations).toHaveLength(2);
 
-    if (!financeMigration) return;
-    const migration = readFileSync(
-      path.join(migrationDirectory, financeMigration, "migration.sql"),
+    for (const financeMigration of financeMigrations) {
+      const migration = readFileSync(
+        path.join(migrationDirectory, financeMigration, "migration.sql"),
+        "utf8",
+      );
+      expect(migration.includes("ENABLE ROW LEVEL SECURITY")).toBe(true);
+      expect(migration.includes("FORCE ROW LEVEL SECURITY")).toBe(true);
+      expect(migration.includes("app.current_tenant_id()")).toBe(true);
+      expect(migration.includes("app.current_org_id()")).toBe(true);
+      expect(migration.includes("CHECK")).toBe(true);
+    }
+    const payerAccessMigration = readFileSync(
+      path.join(
+        migrationDirectory,
+        "20261019000000_finance_payer_access",
+        "migration.sql",
+      ),
       "utf8",
     );
-    expect(migration.includes("ENABLE ROW LEVEL SECURITY")).toBe(true);
-    expect(migration.includes("FORCE ROW LEVEL SECURITY")).toBe(true);
-    expect(migration.includes("app.current_tenant_id()")).toBe(true);
-    expect(migration.includes("app.current_org_id()")).toBe(true);
-    expect(migration.includes("CHECK")).toBe(true);
+    expect(payerAccessMigration).toContain(
+      '"FinancePayerGrant_active_account_user_key"',
+    );
   });
 
   it("includes every Finance table in the strict Supabase RLS gate", () => {
@@ -62,6 +76,8 @@ describe("Finance schema contract", () => {
       "FinanceInvoiceLine",
       "FinanceReceipt",
       "FinanceReceiptAllocation",
+      "FinancePayerAccount",
+      "FinancePayerGrant",
     ]) {
       expect(rlsGate.includes(`"${table}"`)).toBe(true);
     }

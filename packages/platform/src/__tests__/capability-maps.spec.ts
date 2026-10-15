@@ -1,5 +1,9 @@
 import { Vertical, Module } from "@prisma/client";
-import { VERTICAL_CAPABILITIES, MODULE_CAPABILITIES } from "../capability-maps";
+import {
+  FINANCE_SERVICING_CAPABILITIES,
+  VERTICAL_CAPABILITIES,
+  MODULE_CAPABILITIES,
+} from "../capability-maps";
 
 const PLATFORM_CORE_KEYS = [
   "attendance.read",
@@ -113,11 +117,37 @@ describe("capability maps completeness", () => {
   it("maps Finance and Advanced Reporting keys to their real modules", () => {
     expect(MODULE_CAPABILITIES.FINANCE).toEqual(
       expect.arrayContaining([
+        "finance.invoices.read",
+        "finance.invoices.manage",
+        "finance.payments.read",
+        "finance.payments.manage",
+        "finance.reports.read",
+        "finance.statements.read",
+        "finance.exports.create",
+        "finance.payer_access.manage",
+        "finance.approvals.review",
         "finance.family_invoices.read",
         "finance.family_invoices.manage",
         "finance.family_payments.record",
+        "finance.family_payments.pay",
         "finance.family_reports.read",
+        "finance.family_statements.read",
       ]),
+    );
+    expect(FINANCE_SERVICING_CAPABILITIES).toEqual(
+      expect.arrayContaining([
+        "finance.invoices.read",
+        "finance.payments.read",
+        "finance.reports.read",
+        "finance.statements.read",
+        "finance.exports.create",
+        "finance.family_invoices.read",
+        "finance.family_payments.pay",
+        "finance.family_statements.read",
+      ]),
+    );
+    expect(FINANCE_SERVICING_CAPABILITIES).not.toContain(
+      "finance.invoices.manage",
     );
     expect(MODULE_CAPABILITIES.ADVANCED_REPORTING).toEqual(
       expect.arrayContaining(["advanced_reporting.ace.multisite.read"]),

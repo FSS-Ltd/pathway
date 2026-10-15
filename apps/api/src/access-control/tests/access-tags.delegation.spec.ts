@@ -87,7 +87,9 @@ function fixture(options: FixtureOptions = {}) {
       findMany: jest
         .fn()
         .mockResolvedValue(
-          moduleActive ? [{ module: "FINANCE", expiresAt: null }] : [],
+          moduleActive
+            ? [{ module: "FINANCE", status: "ACTIVE", expiresAt: null }]
+            : [],
         ),
     },
     accessTagGrant: { findMany: jest.fn().mockResolvedValue([]) },
