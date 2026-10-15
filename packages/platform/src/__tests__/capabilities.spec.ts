@@ -133,6 +133,8 @@ describe("institutional compliance entitlements", () => {
     )) {
       for (const permission of [
         "compliance.checks.read",
+        "compliance.tracker.read",
+        "compliance.tracker.manage",
         "compliance.checks.manage",
         "compliance.medical.read",
         "compliance.medical.manage",
@@ -146,6 +148,8 @@ describe("institutional compliance entitlements", () => {
     }
     for (const capabilities of Object.values(MODULE_CAPABILITIES)) {
       expect(capabilities).not.toContain("compliance.checks.read");
+      expect(capabilities).not.toContain("compliance.tracker.read");
+      expect(capabilities).not.toContain("compliance.tracker.manage");
       expect(capabilities).not.toContain("compliance.checks.manage");
       expect(capabilities).not.toContain("compliance.medical.read");
       expect(capabilities).not.toContain("compliance.medical.manage");

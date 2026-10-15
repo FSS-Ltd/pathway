@@ -28,6 +28,8 @@ const PLATFORM_CORE_CAPABILITIES = [
 const INSTITUTIONAL_CORE_CAPABILITIES = [
   ...PLATFORM_CORE_CAPABILITIES,
   "compliance.checks.read",
+  "compliance.tracker.read",
+  "compliance.tracker.manage",
   "compliance.checks.manage",
   "compliance.medical.read",
   "compliance.medical.manage",

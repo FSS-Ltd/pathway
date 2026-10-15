@@ -148,6 +148,17 @@ const navItemsWithAccess: (SidebarNavItem & {
     group: "Guest & Handover",
   },
   {
+    label: "Overview & Tracker",
+    href: "/compliance",
+    icon: React.createElement(ListChecks, {
+      "aria-hidden": true,
+      className: "h-5 w-5",
+    }),
+    capability: "compliance.tracker.read",
+    permission: "compliance.tracker.read",
+    group: "Compliance",
+  },
+  {
     label: "Create concern",
     href: "/safeguarding/concerns/new",
     iconIndex: 18,

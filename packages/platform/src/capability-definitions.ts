@@ -447,6 +447,20 @@ export const CAPABILITY_DEFINITIONS = {
     "protected",
     false,
   ),
+  "compliance.tracker.read": defineCapability(
+    "View compliance tracker",
+    "View the institutional site checklist and evidence",
+    "site",
+    "protected",
+    false,
+  ),
+  "compliance.tracker.manage": defineCapability(
+    "Manage compliance tracker",
+    "Manage site profiles and manual compliance confirmations",
+    "site",
+    "protected",
+    false,
+  ),
   "compliance.agreements.read": defineCapability(
     "View user agreements",
     "View institutional user agreements for the active site",

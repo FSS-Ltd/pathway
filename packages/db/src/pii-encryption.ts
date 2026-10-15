@@ -10,6 +10,10 @@ import type { Prisma, PrismaClient } from "@prisma/client";
  * which is out of scope for this pass.
  */
 const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
+  ComplianceSiteProfile: ["profileJson"],
+  ComplianceProfileRevision: ["profileJson"],
+  ComplianceAttestation: ["notes", "notApplicableReason"],
+  ComplianceEvidence: ["title", "notes", "fileName"],
   ComplianceAgreementVersion: ["title", "contentText", "originalFileName"],
   ComplianceAgreementAcceptance: ["typedName", "signedFileName"],
   CompliancePersonnelRecord: [
