@@ -40,7 +40,7 @@ Prefer existing NestJS, Prisma/Postgres RLS, transactional/outbox work, private 
 
 ### 6. Gate commercial billing and provider methods independently
 
-Finance stays unavailable without an active entitlement. The catalogue price remains Proposed, so no new standalone checkout price is created. Eligible plan/bundle entitlements grant access once with no duplicate add-on item. Use school-scoped direct charges only after sandbox proof; no application fee or shared collection account. Do not launch Bacs until the exact direct-charge method path passes delayed-payment, returns and reconciliation tests.
+Finance stays unavailable without an active entitlement. The catalogue currently lists £15/£150 as Proposed; the user has specified £29 monthly / £290 annually as the target standalone Stripe prices. Reconcile the catalogue and Stripe configuration in T07, and do not enable standalone checkout until required commercial approval is in place. Eligible plan/bundle entitlements grant access once with no duplicate add-on item. Use school-scoped direct charges only after sandbox proof; no application fee or shared collection account. Do not launch Bacs until the exact direct-charge method path passes delayed-payment, returns and reconciliation tests.
 
 **Reason:** A payment architecture decision is not commercial approval or proof of provider capability.
 

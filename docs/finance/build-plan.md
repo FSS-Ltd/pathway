@@ -26,7 +26,7 @@ Family collections and SaaS billing use separate account identities, services, i
 
 ## 2. Commercial and entitlement contract
 
-Finance is a paid capability. The catalogue remains the commercial source of truth. Finance is currently **Proposed** at £15 monthly / £150 annually. Do not create a Finance Stripe Product or Price, add a live Finance checkout, or imply that a proposed price is approved.
+Finance is a paid capability. The catalogue remains the commercial source of truth. It currently lists Finance as **Proposed** at £15 monthly / £150 annually. The user has since specified target standalone Stripe prices of **£29 monthly / £290 annually**. Reconcile the catalogue and Stripe configuration to those target amounts in T07; live checkout remains gated on commercial approval.
 
 Finance access may be granted exactly once through an active standalone Finance add-on, eligible selected plan entitlement, or eligible bundle entitlement. Existing subscriptions retain the included entitlements already granted to them. Growth and Professional selections, the Operations bundle, and the All Included bundle must be resolved from the current catalogue; the included bundle and plan module cannot also be charged as a separate add-on. A catalogue eligibility rule is not itself proof that a customer has purchased or selected Finance.
 
@@ -135,7 +135,7 @@ Each task is a standalone branch and pull request using a purpose-based prefix s
 | **T04** | Draft, review, issue, void and credit commands with server-calculated totals and immutable issued invoice/tax snapshots. Test numbering races, idempotency and corrections.                        |                   3–5 |
 | **T05** | Confirmed receipts, append-only allocations, reversals and shared balance projection. Test partial, combined, duplicate, excess and racing receipts.                                               |                   4–6 |
 | **T06** | School bank details, transfer references and independently approved manual receipts. A parent declaration never changes debt.                                                                      |                   2–4 |
-| **T07** | School-scoped Stripe connection and cancellation handling. Prove plan, bundle and paid add-on access resolves once, without duplicate SaaS billing. No live price while Proposed.                  |                   4–6 |
+| **T07** | School Stripe connection/cancellation; reconcile target prices (£29/month; £290/year); verify plan, bundle and add-on access never double bills.                                                   |                   4–6 |
 | **T08** | Signed, durable webhook inbox and replayable worker. Acknowledged events survive queue failure; duplicate and out-of-order events post once.                                                       |                   4–6 |
 | **T09** | At most one unresolved checkout attempt per invoice obligation. Recover after provider timeout; no platform fee or cross-school customer reuse.                                                    |                   3–4 |
 | **T10** | Post only provider-confirmed receipts and allocate safely. Keep processing, family debt, fees and payouts distinct.                                                                                |                   3–4 |
