@@ -21,6 +21,8 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
   ],
   Child: [
     "allergies",
+    "medicalConditions",
+    "medicationAtSite",
     "additionalNeedsNotes",
     "gpName",
     "gpPhone",

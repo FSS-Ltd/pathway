@@ -1,9 +1,21 @@
 "use client";
-
-import { useParams } from "next/navigation";
+import React, { Suspense } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { ChildProfileWorkspace } from "../../../../components/children/child-profile-workspace";
-
-export default function EditChildProfilePage() {
+import { MedicalAccess } from "@/components/compliance/medical-access";
+function ChildEditContent() {
   const { childId } = useParams<{ childId: string }>();
-  return <ChildProfileWorkspace childId={childId} />;
+  const search = useSearchParams();
+  return search.get("section") === "medical" ? (
+    <MedicalAccess childId={childId} />
+  ) : (
+    <ChildProfileWorkspace childId={childId} />
+  );
+}
+export default function EditChildProfilePage() {
+  return (
+    <Suspense fallback={<p role="status">Loading child profile…</p>}>
+      <ChildEditContent />
+    </Suspense>
+  );
 }

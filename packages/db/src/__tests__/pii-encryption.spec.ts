@@ -49,6 +49,35 @@ beforeAll(() => {
 });
 
 describe("withPiiEncryption", () => {
+  it("encrypts medical details while preserving unknown and confirmation metadata", async () => {
+    const { fakeClient, invoke } = makeFakeClient();
+    withPiiEncryption(fakeClient);
+    const confirmedAt = new Date("2026-10-15T10:00:00Z");
+    const input = {
+      medicalConditions: "Asthma",
+      medicationAtSite: "Inhaler held by trained staff",
+      allergiesConfirmedAt: confirmedAt,
+    };
+    const result = await invoke("Child", "update", { data: input }, (args) => {
+      const data = (args as { data: Record<string, unknown> }).data;
+      expect(isEncryptedField(data.medicalConditions as string)).toBe(true);
+      expect(isEncryptedField(data.medicationAtSite as string)).toBe(true);
+      expect(data.allergiesConfirmedAt).toEqual(confirmedAt);
+      return data;
+    });
+    expect(result).toEqual(input);
+    const cleared = await invoke(
+      "Child",
+      "update",
+      { data: { medicalConditions: null, medicationAtSite: null } },
+      (args) => (args as { data: Record<string, unknown> }).data,
+    );
+    expect(cleared).toEqual({
+      medicalConditions: null,
+      medicationAtSite: null,
+    });
+  });
+
   it("encrypts registered string fields on write and decrypts them back on read", async () => {
     const { fakeClient, invoke } = makeFakeClient();
     withPiiEncryption(fakeClient);
