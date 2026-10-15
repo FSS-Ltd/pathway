@@ -1,22 +1,22 @@
 # Compliance delivery progress
 
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
-Updated: 2026-10-13. Base repository: `FSS-Ltd/pathway`; branch: `master`.
+Updated: 2026-10-15. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
-## Current step: 1.3
+## Current step: 1.4
 
-**State: PR #627 open; CI running; not complete.** Steps 1.1 and 1.2 are merged.
-No later step has started and no country pack is published.
+**State: implementation in progress; not complete.** Steps 1.1–1.3 are merged.
+No country pack is published.
 
-| Evidence               | Value                                                                                                               |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Scope                  | Compliance navigation and Checks & Training, permissions, encryption, immutable history and integration tests       |
-| Branch                 | `feature/compliance-checks-training`                                                                                |
-| Verified starting base | `72d46b6367a7e30afa122a533b4f92f4a8002fc0`                                                                          |
-| Predecessor            | [PR #626](https://github.com/FSS-Ltd/pathway/pull/626), host-confirmed merged 2026-10-13T21:15:32Z                  |
-| PR / revision / CI     | [PR #627](https://github.com/FSS-Ltd/pathway/pull/627); head `b2770cc1c43bbccbefef920363e28d6e533b40c2`; CI running |
-| Merge state            | Unmerged; no completion claim                                                                                       |
-| Next permitted action  | Verify 1.3, raise its PR, verify latest CI and merge before 1.4                                                     |
+| Evidence               | Value                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Scope                  | Medical Information, existing child health editing integration and access-boundary tests                                 |
+| Branch                 | `feature/compliance-medical-information`                                                                                 |
+| Verified starting base | `64ba6eecca4f625118578706df8d7d10f6aa3ebb`                                                                               |
+| Predecessor            | [PR #627](https://github.com/FSS-Ltd/pathway/pull/627), host-confirmed merged 2026-10-13T21:59:16Z; rechecked 2026-10-15 |
+| PR / revision / CI     | Not raised; local implementation and verification required first                                                         |
+| Merge state            | Unmerged; no completion claim                                                                                            |
+| Next permitted action  | Implement and verify 1.4, raise its PR, verify latest CI and merge before 1.5                                            |
 
 ## Step 1.1 verification and merge
 
@@ -72,7 +72,7 @@ catalogue is changed. Required repository CI remains a merge gate.
 
 ## Subsequent steps
 
-Steps 1.4–1.6 and 2.01–2.31 are **planned, not started**, as specified in
+Steps 1.5–1.6 and 2.01–2.31 are **planned, not started**, as specified in
 DELIVERY.md and jurisdictions.csv. Before starting each, refresh the host evidence
 for its predecessor and record the merged base. UI rollout and production
 deployment remain separate from documentation and require their own authorization.
@@ -307,3 +307,108 @@ explicit test-file ESLint, Prettier and diff inspection passed. The failed initi
 run is retained as evidence, not counted as a passing gate. A fresh revision must
 pass all required host checks before merge. Initial CI checkout logs verified
 test-merge `743f6589c2d66c3f6bf27e81a7cb21f1d57b1ff3` for head `b2770cc1…`.
+
+### Step 1.3 refreshed CI
+
+Correction head `559b7ae5355805c1527a77fcc70df5b30d44c708` is pushed to PR #627.
+Commit hooks passed again. Fresh CI run
+[38473567651](https://github.com/FSS-Ltd/pathway/actions/runs/38473567651) and
+CodeQL run [38473563698](https://github.com/FSS-Ltd/pathway/actions/runs/38473563698)
+are running. Earlier passing checks are not used to waive the new revision's gate.
+
+## Step 1.3 final host evidence and 1.4 start
+
+GitHub confirms PR #627 MERGED at 2026-10-13T21:59:16Z, merge commit
+`64ba6eecca4f625118578706df8d7d10f6aa3ebb`. Final head
+`559b7ae5355805c1527a77fcc70df5b30d44c708` passed all eight applicable checks
+in CI run [38473567651](https://github.com/FSS-Ltd/pathway/actions/runs/38473567651),
+CodeQL run [38473563698](https://github.com/FSS-Ltd/pathway/actions/runs/38473563698)
+and aggregate CodeQL. Checkout logs confirmed tested merge
+`9e885030b03f72aee6d618826d212c94eda9a057`. Earlier pending entries above
+are historical and superseded by this evidence. Step 1.3 is complete.
+
+Step 1.4 starts from that merged base; GitHub merge and remote master were
+rechecked on 15 October 2026. Medical Information reuses child records and the
+existing child editing route. Nullable encrypted medical-condition and medication
+fields distinguish unknown from explicitly recorded none. Legacy allergy defaults
+cannot prove an explicit confirmation, so an additive confirmation timestamp
+preserves that distinction without rewriting historical data. Safeguarding leads
+receive read access; institutional administrators receive read and edit access.
+All new clinical data stays outside the broad legacy child response projection.
+
+## Step 1.4 implementation and verification
+
+Medical Information now reads the existing active-site child records, distinguishing
+unknown information from confirmed none and recorded needs. Editing reuses the
+child edit route with a focused medical section. The two new clinical fields are
+encrypted; existing allergy defaults gain nullable confirmation metadata without
+backfilling an assumption. Administrators manage the register; safeguarding leads
+read it. Legacy general child and household responses do not expose the new fields.
+[MEDICAL-OPERATIONS.md](MEDICAL-OPERATIONS.md) records the access, export, retention
+and additive rollout/rollback contract.
+
+Verified on 15 October 2026 with pnpm 9.7 via Corepack and disposable local
+PostgreSQL only. No production deployment or data operation occurred.
+
+| Check                                                                     | Result                                                                                                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm typecheck`                                                          | All 16 workspace tasks passed after correcting the audit enum and Child test fixture                                     |
+| `pnpm lint`                                                               | All 16 workspace tasks passed                                                                                            |
+| Explicit ESLint on every changed admin `app`, `components` and `lib` file | Passed after final accessibility changes                                                                                 |
+| Explicit ESLint on changed API files                                      | Passed                                                                                                                   |
+| `pnpm --filter @pathway/api test:unit --runInBand`                        | Final run: 216 suites / 1,536 tests passed                                                                               |
+| Focused medical, child and attendance unit tests                          | 3 suites / 50 tests passed                                                                                               |
+| Medical HTTP/PostgreSQL integration                                       | 5 scenarios passed, including pagination, encryption, cross-site/org denial, Home denial, concurrency and audit rollback |
+| `pnpm --filter @pathway/admin test`                                       | Full suite passed, including medical state, retry, conflict, pagination, read-only and cancellation tests                |
+| Auth, platform and DB unit suites                                         | 14, 185 and 64 tests passed; existing opt-in database suites skipped by ordinary unit commands                           |
+| Exact protected system-role seed proof on dedicated database              | 3 suites / 13 tests passed, including precise read-only safeguarding grants                                              |
+| Opt-in permission-definition database smoke                               | All 9 tests passed                                                                                                       |
+| Prisma validation, generation and both additive migrations                | Passed on disposable databases                                                                                           |
+| Web, admin and API production builds                                      | Passed; admin rebuilt after accessibility corrections                                                                    |
+| Changed-file Prettier and final diff check                                | Passed; all changed/new source and documentation inspected                                                               |
+| Independent whole-branch review                                           | No actionable findings                                                                                                   |
+
+The running component fixture was inspected at desktop 1440×1000 and mobile
+390×844, with keyboard save and 200% text. Unknown, confirmed-none and recorded
+needs remain distinct. No horizontal overflow was observed. Primary button text
+contrast and enlarged select labels were corrected and reinspected. A simulated
+409 preserves the draft and displays the latest saved record for comparison;
+read-only views contain no edit action. Screenshots remain local under
+`/tmp/compliance-medical-preview/` and contain synthetic records only.
+
+The fixture uses the actual components and admin styles, with controlled API
+responses. It is not a signed-in Clerk browser claim. Separate real AppModule,
+authentication/permission and PostgreSQL tests verify the server boundaries and
+persistence. Existing Home and safeguarding flows are included in the full suites.
+There is no checklist/progress engine change in this step, so those scenarios
+remain mandatory in step 1.6.
+
+Initial failures were corrected and rerun: a missing audit enum and outdated
+full-Child fixture, a test-only SQL UUID cast on a text identifier, and a browser
+fixture missing Next.js environment values. The first full API unit run overlapped
+the new legacy-concurrency implementation and observed its new regression before
+the fix; the final stable run passed all 1,536 tests. Local package-cache sandbox
+access required the normal approved escalation. No check was waived.
+
+The permission registry drift check passed against the application test database.
+The protected-seed proof database deliberately contains a `site.active` fixture,
+so its initial drift result was not used as application-registry evidence. The
+opt-in permission smoke and protected seed suites remain separate passing checks.
+
+An initial full integration run passed 93 suites and 579 tests, but the existing
+family-messaging suite encountered a socket hangup and its dependent cron assertion
+then failed. Isolated rerun passed all 15 tests without changing messaging code;
+the precise transport cause is unconfirmed. A final complete rerun is required
+before the PR. Browser retry and empty-state checks also passed after correcting
+the temporary fixture's failure injection for React StrictMode.
+
+### Step 1.4 final local gate
+
+The final complete integration rerun passed **94 suites / 581 tests**, including
+the previously interrupted family-messaging tests. Final API unit results remain
+216 suites / 1,536 tests. Registry drift is zero on the application test database.
+All required local checks for this step are now passing. The corrected primary
+button measures 7.13:1 text contrast in the rendered browser fixture. The final
+diff and all 38 changed/new feature files were inspected; generated logs and local
+browser artifacts are excluded. Proceed to PR, current-revision CI and verified
+merge; step 1.4 is not yet complete.

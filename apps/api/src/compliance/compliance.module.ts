@@ -5,9 +5,12 @@ import { CommonModule } from "../common/common.module";
 import { ComplianceController } from "./compliance.controller";
 import { ComplianceService } from "./compliance.service";
 
+import { MedicalController } from "./medical.controller";
+import { MedicalService } from "./medical.service";
+
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [ComplianceController],
-  providers: [ComplianceService],
+  controllers: [ComplianceController, MedicalController],
+  providers: [ComplianceService, MedicalService],
 })
 export class ComplianceModule {}

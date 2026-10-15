@@ -447,6 +447,20 @@ export const CAPABILITY_DEFINITIONS = {
     "protected",
     false,
   ),
+  "compliance.medical.read": defineCapability(
+    "View medical information",
+    "View sensitive child medical information for the active site",
+    "site",
+    "protected",
+    false,
+  ),
+  "compliance.medical.manage": defineCapability(
+    "Manage medical information",
+    "Update sensitive child medical information for the active site",
+    "site",
+    "protected",
+    false,
+  ),
   "safeguarding.concerns.record": defineCapability(
     "Record safeguarding concerns",
     "Record safeguarding concerns for the active site",

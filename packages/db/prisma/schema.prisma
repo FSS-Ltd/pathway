@@ -162,6 +162,7 @@ enum AuditAction {
 }
 
 enum AuditEntityType {
+  CHILD_MEDICAL
   COMPLIANCE_PERSONNEL
   CONCERN
   CHILD_NOTE
@@ -1675,8 +1676,9 @@ model ChildRegistrationSubmission {
   @@index([tenantId, childId, submittedAt])
 }
 
-// allergies/additionalNeedsNotes/gpName/gpPhone/specialNeedsOther/notes are encrypted
-// at rest — see packages/db/src/pii-encryption.ts. dateOfBirth is NOT yet encrypted
+// Child medical content is encrypted at rest (including medicalConditions and
+// medicationAtSite); see the full field list in packages/db/src/pii-encryption.ts.
+// dateOfBirth is NOT yet encrypted
 // (would require a DateTime -> String column change; tracked as a follow-up).
 model Child {
   id                         String                      @id @default(uuid())
@@ -1685,6 +1687,9 @@ model Child {
   preferredName              String?
   dateOfBirth                DateTime?
   allergies                  String                      @default("unknown")
+  allergiesConfirmedAt       DateTime?
+  medicalConditions          String?
+  medicationAtSite           String?
   additionalNeedsNotes       String?
   // Safeguarding-relevant info from public signup
   schoolName                 String?

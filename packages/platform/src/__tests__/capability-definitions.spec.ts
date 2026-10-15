@@ -161,6 +161,8 @@ const NEW_PLATFORM_CORE_KEYS = [
   "notices.publish",
   "compliance.checks.read",
   "compliance.checks.manage",
+  "compliance.medical.read",
+  "compliance.medical.manage",
   "safeguarding.concerns.record",
   "safeguarding.concerns.read",
   "safeguarding.concerns.manage",
@@ -176,8 +178,8 @@ const APPROVED_REGISTRY_KEYS = [
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 119 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(119);
+  it("contains exactly the 121 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(121);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );

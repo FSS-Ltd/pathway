@@ -15,6 +15,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     permissions: [
       "compliance.checks.read",
       "compliance.checks.manage",
+      "compliance.medical.read",
+      "compliance.medical.manage",
       "platform.access.roles.read",
       "platform.access.roles.manage",
       "platform.access.permissions.read",
@@ -83,6 +85,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     permissions: [
       "compliance.checks.read",
       "compliance.checks.manage",
+      "compliance.medical.read",
+      "compliance.medical.manage",
       "attendance.read",
       "attendance.manage",
       "ace.attendance.export",
@@ -174,6 +178,7 @@ export const SYSTEM_ROLE_TEMPLATES = {
     permissions: [
       "compliance.checks.read",
       "compliance.checks.manage",
+      "compliance.medical.read",
       "safeguarding.concerns.record",
       "safeguarding.concerns.read",
       "safeguarding.concerns.manage",

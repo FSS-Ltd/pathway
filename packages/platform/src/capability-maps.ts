@@ -29,6 +29,8 @@ const INSTITUTIONAL_CORE_CAPABILITIES = [
   ...PLATFORM_CORE_CAPABILITIES,
   "compliance.checks.read",
   "compliance.checks.manage",
+  "compliance.medical.read",
+  "compliance.medical.manage",
 ] as const satisfies readonly Capability[];
 
 const ACE_SCREEN_CAPABILITIES = [

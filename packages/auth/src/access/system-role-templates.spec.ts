@@ -48,6 +48,8 @@ describe("ACE system role templates", () => {
         permissions: [
           "compliance.checks.read",
           "compliance.checks.manage",
+          "compliance.medical.read",
+          "compliance.medical.manage",
           "platform.access.roles.read",
           "platform.access.roles.manage",
           "platform.access.permissions.read",
@@ -116,6 +118,8 @@ describe("ACE system role templates", () => {
         permissions: [
           "compliance.checks.read",
           "compliance.checks.manage",
+          "compliance.medical.read",
+          "compliance.medical.manage",
           "attendance.read",
           "attendance.manage",
           "ace.attendance.export",
@@ -207,6 +211,7 @@ describe("ACE system role templates", () => {
         permissions: [
           "compliance.checks.read",
           "compliance.checks.manage",
+          "compliance.medical.read",
           "safeguarding.concerns.record",
           "safeguarding.concerns.read",
           "safeguarding.concerns.manage",
@@ -362,6 +367,20 @@ describe("institutional compliance role defaults", () => {
           (template.permissions as readonly string[]).includes(permission),
         ).toBe(allowed);
       }
+    }
+  });
+});
+
+describe("medical information role defaults", () => {
+  it("allows administrators to manage and safeguarding leads only to read", () => {
+    for (const [name, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
+      const permissions: readonly string[] = template.permissions;
+      expect(permissions.includes("compliance.medical.read")).toBe(
+        ["organisationHead", "siteLead", "safeguardingLead"].includes(name),
+      );
+      expect(permissions.includes("compliance.medical.manage")).toBe(
+        ["organisationHead", "siteLead"].includes(name),
+      );
     }
   });
 });

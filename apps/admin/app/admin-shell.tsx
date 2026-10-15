@@ -53,6 +53,7 @@ const titleMap: Record<string, string> = {
   "/notices": "Notices & Announcements",
   "/safeguarding": "Safeguarding",
   "/compliance/checks": "Checks & Training",
+  "/compliance/medical": "Medical Information",
   "/safeguarding/concerns/new": "Create concern",
   "/safeguarding/concerns": "Concern details",
   "/safeguarding/notes/new": "Create positive note",

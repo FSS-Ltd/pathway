@@ -170,6 +170,17 @@ const navItemsWithAccess: (SidebarNavItem & {
     permission: "compliance.checks.read",
     group: "Compliance",
   },
+  {
+    label: "Medical Information",
+    href: "/compliance/medical",
+    icon: React.createElement(ListChecks, {
+      "aria-hidden": true,
+      className: "h-5 w-5",
+    }),
+    capability: "compliance.medical.read",
+    permission: "compliance.medical.read",
+    group: "Compliance",
+  },
   { ...defaultSidebarItems[11], access: "billing", group: "Admin" }, // Billing (org admin only)
   {
     label: "Blog",

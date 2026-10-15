@@ -127,13 +127,15 @@ describe("orgHasCapability", () => {
 });
 
 describe("institutional compliance entitlements", () => {
-  it("includes personnel checks for every institution without granting them to Home", () => {
+  it("includes institutional compliance without granting it to Home", () => {
     for (const [vertical, capabilities] of Object.entries(
       VERTICAL_CAPABILITIES,
     )) {
       for (const permission of [
         "compliance.checks.read",
         "compliance.checks.manage",
+        "compliance.medical.read",
+        "compliance.medical.manage",
       ]) {
         expect((capabilities as readonly string[]).includes(permission)).toBe(
           vertical !== "HOME_EDUCATION",
@@ -143,6 +145,8 @@ describe("institutional compliance entitlements", () => {
     for (const capabilities of Object.values(MODULE_CAPABILITIES)) {
       expect(capabilities).not.toContain("compliance.checks.read");
       expect(capabilities).not.toContain("compliance.checks.manage");
+      expect(capabilities).not.toContain("compliance.medical.read");
+      expect(capabilities).not.toContain("compliance.medical.manage");
     }
   });
 });
