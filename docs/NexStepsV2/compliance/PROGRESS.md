@@ -14,7 +14,7 @@ No country pack is published.
 | Branch                 | `feature/compliance-site-tracker`                                                                  |
 | Verified starting base | `b905f2385776e8210edc99a435fd63d1e1c9ffcf`                                                         |
 | Predecessor            | [PR #630](https://github.com/FSS-Ltd/pathway/pull/630), host-confirmed merged 2026-10-15T10:13:08Z |
-| PR / revision / CI     | Not raised; local verification required first                                                      |
+| PR / revision / CI     | Draft PR #631; integration fixture correction under verification                                   |
 | Merge state            | Unmerged; no completion claim                                                                      |
 | Next permitted action  | Implement and verify 1.6, raise its PR, verify latest CI and merge before 2.01                     |
 
@@ -626,3 +626,32 @@ not resolve it. A representative planner-fixture correction is under investigati
 no assertion is waived. The tracker implementation will be raised as a draft PR
 with this blocker, as required by the repository gate. It is not complete and
 2.01 remains prohibited. Final workspace typechecks passed all 16 tasks.
+
+### Step 1.6 draft PR
+
+[PR #631](https://github.com/FSS-Ltd/pathway/pull/631) is OPEN/DRAFT on head
+`8463501f899d3b1381e2ec5ab9b16394ad339e35`, based on `b905f238…`. It records the
+remaining integration blocker. Commit hooks passed workspace lint, API 221 suites /
+1,567 tests, workers 45 tests and auth 15 tests. CI run `38723813034` and CodeQL
+`38723811095` started; pending results do not satisfy the gate.
+
+The correction uses a representative 32-user × 32-role identity fixture inside a
+rolled-back transaction. It preserves the exact partial-index assertion and query
+shape, without changing production indexes, disabling competing indexes or waiving
+checks. Independent narrow review passed; the focused seven-test run passed against
+the previously failing populated database. A full normal-reset integration run is
+now verifying the correction before it is committed to the draft PR.
+
+### Step 1.6 integration blocker resolved
+
+The complete normal-reset integration suite passed **99 suites / 606 tests** with
+the representative index fixture, including the previously failing overlap test.
+This supersedes the earlier failed runs; the original failures remain documented.
+Only test setup changed: the production query/index/constraints and the exact
+index assertion are unchanged. The fixture rolls back all inserted users, roles,
+memberships and assignments and propagates unexpected errors. The correction
+received a clean independent narrow review.
+
+The verified fixture and this ledger update are being added to PR #631. Final
+current-head host CI, required-review state and verified merge remain outstanding;
+step 1.6 is not complete and no 2.01 work has started.
