@@ -47,6 +47,8 @@ describe("ACE system role templates", () => {
         protected: true,
         permissions: [
           "compliance.checks.read",
+          "compliance.tracker.read",
+          "compliance.tracker.manage",
           "compliance.checks.manage",
           "compliance.medical.read",
           "compliance.medical.manage",
@@ -119,6 +121,8 @@ describe("ACE system role templates", () => {
         protected: true,
         permissions: [
           "compliance.checks.read",
+          "compliance.tracker.read",
+          "compliance.tracker.manage",
           "compliance.checks.manage",
           "compliance.medical.read",
           "compliance.medical.manage",
@@ -214,6 +218,8 @@ describe("ACE system role templates", () => {
         protected: true,
         permissions: [
           "compliance.checks.read",
+          "compliance.tracker.read",
+          "compliance.tracker.manage",
           "compliance.checks.manage",
           "compliance.medical.read",
           "safeguarding.concerns.record",
@@ -365,6 +371,8 @@ describe("institutional compliance role defaults", () => {
       ].includes(name);
       for (const permission of [
         "compliance.checks.read",
+        "compliance.tracker.read",
+        "compliance.tracker.manage",
         "compliance.checks.manage",
       ]) {
         expect(

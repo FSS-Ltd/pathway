@@ -50,6 +50,23 @@ beforeAll(() => {
 
 describe("withPiiEncryption", () => {
   it.each([
+    ["ComplianceSiteProfile", { profileJson: "private profile" }],
+    [
+      "ComplianceProfileRevision",
+      { profileJson: "private historical profile" },
+    ],
+    [
+      "ComplianceAttestation",
+      { notes: "private note", notApplicableReason: "private reason" },
+    ],
+    [
+      "ComplianceEvidence",
+      {
+        title: "private evidence",
+        notes: "private note",
+        fileName: "private.pdf",
+      },
+    ],
     [
       "ComplianceAgreementVersion",
       {

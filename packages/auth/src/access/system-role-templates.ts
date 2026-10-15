@@ -14,6 +14,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     protected: true,
     permissions: [
       "compliance.checks.read",
+      "compliance.tracker.read",
+      "compliance.tracker.manage",
       "compliance.checks.manage",
       "compliance.medical.read",
       "compliance.medical.manage",
@@ -86,6 +88,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     protected: true,
     permissions: [
       "compliance.checks.read",
+      "compliance.tracker.read",
+      "compliance.tracker.manage",
       "compliance.checks.manage",
       "compliance.medical.read",
       "compliance.medical.manage",
@@ -181,6 +185,8 @@ export const SYSTEM_ROLE_TEMPLATES = {
     protected: true,
     permissions: [
       "compliance.checks.read",
+      "compliance.tracker.read",
+      "compliance.tracker.manage",
       "compliance.checks.manage",
       "compliance.medical.read",
       "safeguarding.concerns.record",

@@ -90,7 +90,7 @@ export async function resolveDailyAttendanceExportScope(
   return { leader, assignments };
 }
 
-async function resolveDailyAttendanceRoleScope(
+export async function resolveDailyAttendanceRoleScope(
   tx: Prisma.TransactionClient,
   actor: DailyAttendanceActor,
   permission: "attendance.read" | "attendance.manage" | "ace.attendance.export",

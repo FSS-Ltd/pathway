@@ -162,6 +162,7 @@ enum AuditAction {
 }
 
 enum AuditEntityType {
+  COMPLIANCE_TRACKER
   CHILD_MEDICAL
   COMPLIANCE_PERSONNEL
   COMPLIANCE_AGREEMENT
@@ -946,6 +947,10 @@ enum HandoverLogStatus {
 
 // NEW: Org (Suite) — business/billing owner; may contain multiple Tenants (sites)
 model Org {
+  complianceProfiles ComplianceSiteProfile[]
+  complianceProfileRevisions ComplianceProfileRevision[]
+  complianceAttestations ComplianceAttestation[]
+  complianceEvidence ComplianceEvidence[]
   compliancePersonnelRecords CompliancePersonnelRecord[]
   agreementDocuments ComplianceAgreementDocument[]
   agreementVersions ComplianceAgreementVersion[]
@@ -1005,6 +1010,10 @@ model Org {
 // maps directly to this model. Future migrations may introduce a dedicated `Site`
 // wrapper but the tenant id remains the canonical RLS key.
 model Tenant {
+  complianceProfiles ComplianceSiteProfile[]
+  complianceProfileRevisions ComplianceProfileRevision[]
+  complianceAttestations ComplianceAttestation[]
+  complianceEvidence ComplianceEvidence[]
   compliancePersonnelRecords CompliancePersonnelRecord[]
   agreementDocuments ComplianceAgreementDocument[]
   agreementVersions ComplianceAgreementVersion[]
@@ -1194,6 +1203,10 @@ model UserOrgRole {
 }
 
 model User {
+  complianceProfilesUpdated ComplianceSiteProfile[]
+  complianceProfilesRecorded ComplianceProfileRevision[]
+  complianceAttestationsCreated ComplianceAttestation[]
+  complianceEvidenceCreated ComplianceEvidence[]
   complianceSubjects CompliancePersonnelRecord[] @relation("ComplianceSubject")
   complianceCreated CompliancePersonnelRecord[] @relation("ComplianceCreated")
   complianceUpdated CompliancePersonnelRecord[] @relation("ComplianceUpdated")
@@ -4291,6 +4304,7 @@ model IdentityWebhookEvent {
 // for the RLS/CHECK-constraint treatment this schema does not model.
 
 model Jurisdiction {
+  complianceProfiles ComplianceSiteProfile[]
   id                   String                    @id @default(uuid())
   countryCode          String                    @db.Char(2) // ISO 3166-1 alpha-2
   subdivisionCode      String? // ISO 3166-2, null at COUNTRY level
@@ -4636,4 +4650,95 @@ model ComplianceAgreementAcceptance {
   @@unique([id, tenantId, orgId])
   @@unique([assignmentId, tenantId, orgId])
   @@index([tenantId, orgId, recordedAt, id])
+}
+
+enum ComplianceAttestationStatus {
+  COMPLETE
+  NOT_STARTED
+  NOT_APPLICABLE
+}
+
+model ComplianceSiteProfile {
+  id              String                      @id @default(uuid())
+  tenantId        String                      @unique
+  orgId           String
+  jurisdictionId  String?
+  version         Int
+  profileJson     String
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  updatedByUserId String
+  tenant          Tenant                      @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org             Org                         @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  jurisdiction    Jurisdiction?               @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  updatedBy       User                        @relation(fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  revisions       ComplianceProfileRevision[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([orgId, tenantId])
+}
+
+model ComplianceProfileRevision {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  orgId           String
+  profileId       String
+  version         Int
+  profileJson     String
+  createdAt       DateTime                @default(now())
+  createdByUserId String
+  profile         ComplianceSiteProfile   @relation(fields: [profileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant          Tenant                  @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org             Org                     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdBy       User                    @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  attestations    ComplianceAttestation[]
+
+  @@unique([profileId, version, tenantId, orgId])
+  @@index([tenantId, orgId, version])
+}
+
+model ComplianceAttestation {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  orgId               String
+  profileId           String
+  profileVersion      Int
+  requirementId       String
+  requirementVersion  Int
+  revision            Int
+  requirementJson     String
+  status              ComplianceAttestationStatus
+  notes               String
+  notApplicableReason String?
+  reviewDueAt         DateTime?
+  createdAt           DateTime                    @default(now())
+  createdByUserId     String
+  profileRevision     ComplianceProfileRevision   @relation(fields: [profileId, profileVersion, tenantId, orgId], references: [profileId, version, tenantId, orgId], onDelete: Restrict)
+  tenant              Tenant                      @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                 Org                         @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdBy           User                        @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, requirementId, revision])
+  @@index([tenantId, orgId, requirementId, id])
+}
+
+model ComplianceEvidence {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  orgId              String
+  requirementId      String
+  requirementVersion Int
+  title              String
+  notes              String
+  fileName           String
+  storageKey         String
+  sha256             String
+  createdAt          DateTime  @default(now())
+  createdByUserId    String
+  archivedAt         DateTime?
+  tenant             Tenant    @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                Org       @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdBy          User      @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, orgId, requirementId, id])
 }

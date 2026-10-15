@@ -1,3 +1,12 @@
+import { TrackerHistoryService } from "./tracker-history.service";
+import { TrackerCatalogueService } from "./catalogue/catalogue.service";
+import { TrackerSignalsService } from "./tracker-signals.service";
+import { TrackerAccessService } from "./tracker-access";
+import { TrackerFiles } from "./tracker-files";
+import { TrackerEvidenceService } from "./tracker-evidence.service";
+import { TrackerProfileService } from "./tracker-profile.service";
+import { TrackerService } from "./tracker.service";
+import { TrackerController } from "./tracker.controller";
 import { AgreementAccessService } from "./agreement-access";
 import { AgreementFiles } from "./agreement-files";
 import { AgreementPublicationService } from "./agreement-publication.service";
@@ -16,8 +25,22 @@ import { MedicalService } from "./medical.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [ComplianceController, MedicalController, AgreementsController],
+  controllers: [
+    TrackerController,
+    ComplianceController,
+    MedicalController,
+    AgreementsController,
+  ],
   providers: [
+    TrackerHistoryService,
+    TrackerService,
+    TrackerProfileService,
+    TrackerEvidenceService,
+    TrackerFiles,
+    TrackerAccessService,
+    TrackerSignalsService,
+    TrackerCatalogueService,
+
     ComplianceService,
     MedicalService,
     AgreementAccessService,

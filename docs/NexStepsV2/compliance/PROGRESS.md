@@ -3,20 +3,20 @@
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
 Updated: 2026-10-15. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
-## Current step: 1.5
+## Current step: 1.6
 
-**State: locally verified; PR/CI/merge pending; not complete.** Steps 1.1–1.4 are merged.
+**State: implementation in progress; not complete.** Steps 1.1–1.5 are merged.
 No country pack is published.
 
-| Evidence               | Value                                                                                                   |
-| ---------------------- | ------------------------------------------------------------------------------------------------------- |
-| Scope                  | Versioned User Agreements, adult assignments, acknowledgements, signed copies and historical acceptance |
-| Branch                 | `feature/compliance-user-agreements`                                                                    |
-| Verified starting base | `c4bbe0317ae4ee988785394788313fc1b7e2dc5b`                                                              |
-| Predecessor            | [PR #628](https://github.com/FSS-Ltd/pathway/pull/628), host-confirmed merged 2026-10-15T09:19:13Z      |
-| PR / revision / CI     | Not raised; local verification required first                                                           |
-| Merge state            | Unmerged; no completion claim                                                                           |
-| Next permitted action  | Implement and verify 1.5, raise its PR, verify latest CI and merge before 1.6                           |
+| Evidence               | Value                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| Scope                  | Site profiles, applicability, manual tracker/progress, evidence and live signals                   |
+| Branch                 | `feature/compliance-site-tracker`                                                                  |
+| Verified starting base | `b905f2385776e8210edc99a435fd63d1e1c9ffcf`                                                         |
+| Predecessor            | [PR #630](https://github.com/FSS-Ltd/pathway/pull/630), host-confirmed merged 2026-10-15T10:13:08Z |
+| PR / revision / CI     | Draft PR #631; integration fixture correction under verification                                   |
+| Merge state            | Unmerged; no completion claim                                                                      |
+| Next permitted action  | Implement and verify 1.6, raise its PR, verify latest CI and merge before 2.01                     |
 
 ## Step 1.1 verification and merge
 
@@ -72,7 +72,7 @@ catalogue is changed. Required repository CI remains a merge gate.
 
 ## Subsequent steps
 
-Steps 1.6 and 2.01–2.31 are **planned, not started**, as specified in
+Steps 2.01–2.31 are **planned, not started**, as specified in
 DELIVERY.md and jurisdictions.csv. Before starting each, refresh the host evidence
 for its predecessor and record the merged base. UI rollout and production
 deployment remain separate from documentation and require their own authorization.
@@ -529,3 +529,129 @@ Browser checks additionally confirmed disabled pending-save controls, loading,
 success and refresh persistence. Generated logs and local screenshots are excluded
 from the PR. No outstanding review finding. Proceed to PR and host CI; step 1.5
 remains unmerged and is not yet complete.
+
+### Step 1.5 PR and host checks
+
+[PR #630](https://github.com/FSS-Ltd/pathway/pull/630) opened after all local
+checks and commit hooks passed. Head `3185a9b4a928de93d6ea330b6c913641465c6a72`.
+[CI run 38717233596](https://github.com/FSS-Ltd/pathway/actions/runs/38717233596)
+and [CodeQL run 38717229552](https://github.com/FSS-Ltd/pathway/actions/runs/38717229552)
+are in progress. Host base advanced to `b3b592be79238f25d9453f5e1bde9dc311f76f72`
+(PR #629 public privacy/individual legal documents). Its shared type export addition
+is nonconflicting; the host reports this PR mergeable. The institutional agreement
+register remains distinct from public platform legal documents. Combined-revision
+CI must pass before merge; step 1.6 has not started.
+
+Seven of eight host checks have passed: type/lint/unit, all CodeQL results,
+permission-definition DB, role-seed identity and organisation-role RLS. Integration
+is still running. The completed unit checkout log confirms merge revision
+`a8a7b192308248ca2e4f63ae68a0dd8c099992a8`, combining head `3185a9b4…` with
+base `b3b592be…`; its API result is 218 suites / 1,541 tests. Pending integration
+is not a passing gate and no merge is claimed at this point.
+
+### Step 1.5 final host evidence
+
+GitHub confirms PR #630 MERGED at 2026-10-15T10:13:08Z; merge commit
+`b905f2385776e8210edc99a435fd63d1e1c9ffcf`. All eight current-head checks passed
+for `3185a9b4a928de93d6ea330b6c913641465c6a72`; the unit and integration logs
+both verify test-merge `a8a7b192308248ca2e4f63ae68a0dd8c099992a8`. Host integration
+passed 97 suites / 591 tests plus the separate 13-test database proof. The host
+reported CLEAN/MERGEABLE with no required approval outstanding before merge.
+Step 1.5 is complete. Earlier pending entries are superseded by this evidence.
+Step 1.6 starts from the refreshed merged base; no production deployment occurred.
+
+## Step 1.6 implementation and review
+
+Implemented the site profile, versioned catalogue/applicability engine, manual
+tracker, private institutional evidence and seven permission-filtered signal
+readers. All 1,488 jurisdiction/sector/topic cells remain explicitly unreviewed;
+no legal pack or legal-certification claim ships in this step. The additive
+migration preserves household content and adds missing EU location choices.
+
+Independent whole-branch review found two issues: whitespace-only regional fields
+could be interpreted as known, and withdrawn requirements lacked a discoverable
+history entry. Regional blanks now normalize to unknown. A bounded retained-history
+index and read-only UI are being verified, including evidence-only requirements.
+Parent review also made unchanged profile saves idempotent, preserving confirmations.
+Browser inspection found and corrected progress-label overflow at 200% text size.
+
+Initial verification (final changed-revision checks still pending):
+
+- Workspace typecheck: 16 tasks passed. Initial lint: 15 passed, API failed on one
+  unused import; removed and focused API lint passed, final workspace run pending.
+- API unit tests: 221 suites / 1,565 tests passed before the history follow-up.
+- Focused tracker/evidence HTTP tests: 14 passed before historical-index expansion.
+- Database unit tests: 70 passed; auth: 15 passed. Platform exact registry-count
+  fixture corrected for the two added capabilities; rerun 189 passed.
+- Protected system-role seed proof: 13 passed after correcting expected grant
+  ordering. Permission-definition database smoke: nine passed. Registry drift: zero.
+- Prisma validation, API build and web build passed.
+
+Full integration, final admin build/UI inspection, final formatting/diff inspection,
+review of the history correction and host CI/merge remain required. The work is
+not complete and no next-step implementation has started.
+
+### Step 1.6 final review and browser evidence
+
+Both independent-review findings are fixed and the narrow re-review is clean.
+The retained-history API includes a scoped union of confirmations and evidence,
+bounded pages and scoped cursors. Its read-only UI works even when no current
+requirements remain. Expanded HTTP coverage passed 15 tests, including withdrawal,
+profile moves, evidence-only records and pagination. DTO coverage passed four tests.
+
+Actual rendered components were exercised at desktop width, 390px mobile and 200%
+text. Verified keyboard confirmation/history, manual progress 0→1, conflict
+comparison and retry with preserved notes, pending controls, initial error/retry,
+failed-refresh gating, profile editing, empty coverage, read-only access and PDF
+upload/archive/download. The enlarged mobile document width remained 390px.
+Screenshots were inspected in `/tmp/compliance-tracker-preview/`. Browser checks
+use synthetic API responses with actual components; authenticated HTTP/database
+tests separately verify persistence and access. Live Clerk and external private
+storage credentials were not exercised; storage transfers use the test adapter.
+
+`pnpm --filter @pathway/admin test`, admin/API/web builds, explicit changed admin
+source ESLint, final workspace lint (16 tasks), Prisma validation and Prettier
+checks on all 59 changed TS/TSX/JSON/Markdown files passed. New Prisma model blocks
+were formatted without rewriting pre-existing schema formatting; SQL reviewed.
+
+The first full integration run passed 98 suites/605 tests and failed one existing
+assignment-overlap EXPLAIN assertion: PostgreSQL chose its organisation index
+instead of the expected partial index. The index exists; the fixture table had
+unanalysed statistics. The isolated seven-test suite passed unchanged. A complete
+unchanged rerun is underway; no unrelated assertion or production index was altered.
+
+The second full integration run reproduced the same single query-plan assertion
+failure (98 suites / 605 tests passed). Refreshing fixture statistics alone did
+not resolve it. A representative planner-fixture correction is under investigation;
+no assertion is waived. The tracker implementation will be raised as a draft PR
+with this blocker, as required by the repository gate. It is not complete and
+2.01 remains prohibited. Final workspace typechecks passed all 16 tasks.
+
+### Step 1.6 draft PR
+
+[PR #631](https://github.com/FSS-Ltd/pathway/pull/631) is OPEN/DRAFT on head
+`8463501f899d3b1381e2ec5ab9b16394ad339e35`, based on `b905f238…`. It records the
+remaining integration blocker. Commit hooks passed workspace lint, API 221 suites /
+1,567 tests, workers 45 tests and auth 15 tests. CI run `38723813034` and CodeQL
+`38723811095` started; pending results do not satisfy the gate.
+
+The correction uses a representative 32-user × 32-role identity fixture inside a
+rolled-back transaction. It preserves the exact partial-index assertion and query
+shape, without changing production indexes, disabling competing indexes or waiving
+checks. Independent narrow review passed; the focused seven-test run passed against
+the previously failing populated database. A full normal-reset integration run is
+now verifying the correction before it is committed to the draft PR.
+
+### Step 1.6 integration blocker resolved
+
+The complete normal-reset integration suite passed **99 suites / 606 tests** with
+the representative index fixture, including the previously failing overlap test.
+This supersedes the earlier failed runs; the original failures remain documented.
+Only test setup changed: the production query/index/constraints and the exact
+index assertion are unchanged. The fixture rolls back all inserted users, roles,
+memberships and assignments and propagates unexpected errors. The correction
+received a clean independent narrow review.
+
+The verified fixture and this ledger update are being added to PR #631. Final
+current-head host CI, required-review state and verified merge remain outstanding;
+step 1.6 is not complete and no 2.01 work has started.
