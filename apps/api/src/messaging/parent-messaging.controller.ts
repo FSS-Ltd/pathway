@@ -11,6 +11,7 @@ import {
   Put,
   Query,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { z } from "zod";
@@ -31,8 +32,11 @@ import { ParentMessagingCommandService } from "./parent-messaging-command.servic
 import { ParentMessagingConversationService } from "./parent-messaging-conversation.service";
 import { ParentMessagingReadCursorService } from "./parent-messaging-read-cursor.service";
 import { ParentMessagingService } from "./parent-messaging.service";
+import { MessagingBoundaryAuditInterceptor } from "./messaging-boundary-audit.interceptor";
+import { MessageRealtimePublisher } from "./message-realtime.publisher";
 
 @UseGuards(AuthUserGuard)
+@UseInterceptors(MessagingBoundaryAuditInterceptor)
 @IndependentTransaction()
 @Controller("ace/parent/sites/:siteId/messages/conversations")
 export class ParentMessagingController {
@@ -49,6 +53,8 @@ export class ParentMessagingController {
     private readonly readCursor: ParentMessagingReadCursorService,
     @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
+    @Inject(MessageRealtimePublisher)
+    private readonly realtime: MessageRealtimePublisher,
   ) {}
 
   @Get()
@@ -121,12 +127,21 @@ export class ParentMessagingController {
     @Body() body: unknown,
   ) {
     try {
-      return await this.commands.send(
+      const conversationId = await conversationIdSchema.parseAsync(id);
+      const result = await this.commands.send(
         siteId,
         this.requestContext.requireContext().user.userId,
-        await conversationIdSchema.parseAsync(id),
+        conversationId,
         await sendMessageSchema.parseAsync(body),
       );
+      if (!result.reused) {
+        await this.realtime.publishAfterCommit({
+          type: "message.created",
+          conversationId,
+          messageId: result.id,
+        });
+      }
+      return result;
     } catch (error) {
       if (error instanceof z.ZodError) {
         throw new BadRequestException(error.flatten());
@@ -142,12 +157,19 @@ export class ParentMessagingController {
     @Body() body: unknown,
   ) {
     try {
-      return await this.readCursor.advance(
+      const conversationId = await conversationIdSchema.parseAsync(id);
+      const result = await this.readCursor.advance(
         siteId,
         this.requestContext.requireContext().user.userId,
-        await conversationIdSchema.parseAsync(id),
+        conversationId,
         await readCursorSchema.parseAsync(body),
       );
+      await this.realtime.publishAfterCommit({
+        type: "conversation.read",
+        conversationId,
+        readerScope: "participant",
+      });
+      return result;
     } catch (error) {
       if (error instanceof z.ZodError) {
         throw new BadRequestException(error.flatten());

@@ -1,14 +1,16 @@
 # ACE production release status
 
-Checked on 9 October 2026. Production API, admin, and web aliases point to
+Baseline checked on 9 October 2026; ACE-M05 was rechecked on 13 October 2026.
+At the baseline, production API, admin, and web aliases pointed to
 READY deployments at merged commit `5c26afca3caca259cc592b20f3b4ebe51ee873fa`.
 The API uses the restored London Supabase project `jzofykdzpuslpdyfovxp`;
 live `/health` returned HTTP 200 with a database timestamp. The merged ACE
 changes through C07f are now served by all three apps.
 The [ACE master implementation plan](../superpowers/plans/2026-07-25-ace-vertical-master-plan.md)
 defines 150 delivery tasks. Merged task PRs are evidenced for its 22 foundation,
-20 daily-operations, and ACE-M15 identity tasks: **43/150, or 28⅔% (28.67%)
-verified plan-task completion**. The later messaging, learning, add-on, and
+20 daily-operations, ACE-M15 identity, and ACE-M01/M02/M03/M04/M05 messaging tasks:
+**48/150, or 32% verified plan-task completion**. The later
+messaging, learning, add-on, and
 launch tracks have not been fully reconciled task by task; this is a documented
 minimum, not an estimate of all
 delivered outcomes. Earlier 81% and 52% qualitative estimates below use a
@@ -19,7 +21,7 @@ and core-journey tasks with 9 pilot/launch tasks: **97/150 (about 65%)** if all
 53 optional add-on tasks are deferred. This is a task-count milestone, not an
 automatic readiness threshold; the nine launch tasks require UAT, security,
 accessibility, performance, restore, support, and staged go/no-go evidence.
-With 43 tasks currently evidenced, 54 core/launch tasks remain to be verified
+With 48 tasks currently evidenced, 49 core/launch tasks remain to be verified
 or completed; some later work is already partially merged. The delivery waves
 are: reconcile ACE-M and ACE-C task evidence against merged PRs, finish the
 remaining ACE-M messaging/notices/identity tasks through the M20 gate, finish
@@ -504,15 +506,204 @@ single-connection suites and 13 tests. GitHub confirmed PR #577 merged to
 `c137c9228b3720d775059790c40cb4a073fd6d33`.
 
 Build step 1.3e6b ([PR #579](https://github.com/FSS-Ltd/pathway/pull/579),
-open against `master`) is the ACE-M01 shared recipient policy and web/API
+merged into `master`) is the ACE-M01 shared recipient policy and web/API
 messaging contract. It applies one pure, tested participant decision to parent-staff,
 staff-direct, and staffroom creation while preserving the current site,
 relationship, responder-capability, and RLS checks. The shared DTO schemas
 match the existing inbox, history, compose, cursor, and recipient responses;
 student direct messaging is absent from the conversation kind type and schema.
-Local verification passed. Current-head CI and merge evidence are pending. The
-verified master-plan count remains **43/150 (28⅔%, 28.67%)** until this step
-passes CI and merges.
+Local verification passed. All eight latest-head checks passed on
+`61208dd1621f426506374a6f2bfdee6af336878f` (CI run 38181952781;
+CodeQL run 38181949251). The PostgreSQL integration job ran both messaging
+E2E suites, with 85 suites and 527 tests passed and none skipped. GitHub
+confirmed the merge on 11 October 2026 at 23:01 UTC as
+`2d8aee6e885f0ba32845a721f34de4db1481876e`. ACE-M01 is evidenced; the
+verified master-plan count is **44/150 (29⅓%, 29.33%)**.
+
+Build step 1.3e6c ([PR #611](https://github.com/FSS-Ltd/pathway/pull/611),
+merged into `master`) completed ACE-M02 authorised conversation creation and
+inbox reads. Existing API routes and
+web consumers are reused. A PostgreSQL E2E now verifies same-time keyset
+pagination and site-bound cursor denial; the existing database and HTTP suites
+cover canonical parent, staff-direct, and staffroom creation, active
+relationships, and inaccessible-ID responses. A shared messaging interceptor
+logs content-free 403/404 boundary decisions after the permission guard. Local
+messaging unit, PostgreSQL messaging storage and HTTP security tests, API
+typecheck, lint, format, and build passed. All eight latest-head checks passed
+on `e985bc9f98c7c731c0d3b2eeadfa121640777d03` (CI run 38386625212;
+CodeQL run 38386622500). CI ran both messaging PostgreSQL suites, with 90
+suites and 554 tests passed and none skipped. GitHub confirmed the merge on
+13 October 2026 at 11:06 UTC as
+`495c1b5a78ee0043b70ec9471a82c60bf9c1133e`. ACE-M02 is evidenced; the
+verified master-plan count is **45/150 (30%)**.
+
+Build step 1.3e6d ([PR #613](https://github.com/FSS-Ltd/pathway/pull/613),
+merged into `master`) completed ACE-M03 idempotent web message sending. It
+retains the shared `clientRequestId`
+contract and all existing web composers. The three send paths now share a
+site-and-sender retry key backed by the existing organisation-scoped outbox
+unique constraint. New messages, recipient deliveries, content-free audit, and
+identifier-only outbox events commit in one transaction. Local API typecheck,
+lint, format, build, three messaging command unit suites, and both PostgreSQL
+messaging suites passed. All eight latest-head checks passed on
+`bd2f2ac59915ba5282ec934f9af17daab0c0bf12` (CI run 38390498396;
+CodeQL run 38390496384). The PostgreSQL integration job ran both messaging
+suites, with 90 suites and 554 tests passed and none skipped. GitHub confirmed
+the merge on 13 October 2026 at 11:51 UTC as
+`a4c55edcd1b326037665b809c979becc0a9a8724`. ACE-M03 is evidenced; the
+verified master-plan count is **46/150 (30⅔%, 30.67%)**.
+
+Build step 1.3e6e, ACE-M04 message history and read state, merged in
+[PR #614](https://github.com/FSS-Ltd/pathway/pull/614). The implementation adds
+participant-scoped opaque history cursors, batched delivery-state reads, and
+forward-only delivery updates when a read cursor advances. Staff school-team
+history continues to withhold guardian read receipts; the parent school-team
+view shows sent/delivered without revealing staff readers. The existing
+`Message(tenantId, conversationId, sequence)` unique index supports the
+history keyset query; a 500-message PostgreSQL fixture and query plan inspect
+that index. Local API and admin builds, typechecks, targeted lint and format,
+the two PostgreSQL messaging suites, affected unit and admin workspace tests,
+and the shared platform suite passed. All eight applicable latest-head checks
+passed on `24a2fd7eeca0e2d93aafb36f5ba8824b704cd90e`; the Integration
+job ran both messaging PostgreSQL suites within 90 suites and 555 tests, with
+none skipped. GitHub confirmed the merge into `master` on 13 October 2026 at
+13:04 UTC as `7bde7936fc78c3c8eeebdad213b557a5357711c3`. ACE-M04 is
+evidenced; the verified master-plan count is **47/150 (31⅓%, 31.33%)**.
+
+Build step 1.3e6f, ACE-M05 private message realtime, merged in
+[PR #616](https://github.com/FSS-Ltd/pathway/pull/616) at checked head
+`9cb821a239416dbb31fefdec6e638a0cb9e54022`. All eight applicable
+checks passed; GitHub reports the 13 October 2026 14:56 UTC merge commit
+`bdb674f724834219469d5b757a811a23419597eb`. The API issues two-minute, one-conversation
+private Broadcast claims after the existing staff or guardian access checks.
+The Supabase policy rechecks active participation, site/organisation, ACE
+capability, guardian relationship, and current staff read role. Send and read
+invalidation events contain IDs only and publish after database commit. The
+admin web client refetches REST history on events, reconnects, focus, and a
+bounded polling interval. The restored production Supabase project is connected,
+and its publishable key is configured in the API Vercel production environment.
+Step 1.3e6f1, the ES256 signing correction, merged in
+[PR #617](https://github.com/FSS-Ltd/pathway/pull/617) from checked head
+`a8243eeaee7331ed1438c175a423931640fea129` as
+`2e76161853902a1d4cc696891d76d70a402428a2` on 13 October 2026.
+All five applicable checks passed; the Integration job ran both affected
+PostgreSQL messaging suites (90 suites, 559 tests, none skipped). The matching
+API production deployment is READY and serving `api.nexsteps.dev`. Its
+encrypted `SUPABASE_JWT_SIGNING_JWK` matches the restored Supabase project's
+ES256 key `b9c58d97-f603-477e-9245-45563340b74e`, which the project now
+shows as CURRENT. The API no longer falls back to legacy JWT variables.
+
+The first live private-channel join smoke on 13 October 2026 denied an
+authorized demo-school conversation member as well as two unauthorized joins.
+The database authorization function approved that member, but Supabase
+Realtime's read-access probe uses a row with `private = false` even for a
+private channel. The #616 SELECT policies require `private = true`, so they
+deny every join. Corrective step 1.3e6f2 merged in
+[PR #619](https://github.com/FSS-Ltd/pathway/pull/619) from checked head
+`44976c5890a529111f75d4c0cd2316f2dca8960c` as
+`5f2f47aef091bb9a3714404613e11262dae2fbcf` on 13 October 2026 at
+16:23 UTC. All eight latest-head checks passed; Integration ran both affected
+PostgreSQL messaging suites (90 suites, 560 tests). Deployment workflow
+[38430049157](https://github.com/FSS-Ltd/pathway/actions/runs/38430049157)
+completed database, API, admin and web deployment. Production Prisma recorded
+`20261013160000_ace_realtime_read_probe` finished at 16:23:53 UTC. The two
+SELECT policies now allow the Realtime private-channel read probe while
+retaining topic, capability, membership and no-publish checks. A live
+demo-school participant subscribed successfully; a nonmember and a request
+for another conversation both returned `CHANNEL_ERROR Unauthorized`. The
+smoke test read and sent no messages. The ACE-M05 acceptance gate is met:
+**48/150 (32%)** verified plan tasks. ACE-M06 web email delivery is the
+current step; mobile push remains deferred by product direction and does not
+count as an accepted M06 task.
+
+Build step 1.3e6g, the ACE-M06 web email slice, merged in
+[PR #620](https://github.com/FSS-Ltd/pathway/pull/620) from checked head
+`e9c469b5d9c14769001127d43d157a1248ee82b1` as
+`8db88386bc161122b213b4cf855ca9cd82fdab0c` on 13 October 2026.
+All eight latest-head checks passed; the Integration job applied the new
+migration and ran the affected PostgreSQL messaging, identity and reporting
+suites (90 suites, 563 tests), plus both single-connection suites (13 tests).
+The step adds self-service staff and
+guardian email preferences, site-timezone quiet hours, per-conversation email
+mute, a minute cron consuming the existing content-free message outbox event,
+and a durable one-attempt recipient ledger. Email is off until each user
+enables it. Provider mail uses generic copy only; no message text enters the
+email, notification ledger, or provider request. Production workflow
+[38440987449](https://github.com/FSS-Ltd/pathway/actions/runs/38440987449)
+completed database, API, admin and web jobs at the merge commit. Vercel reports
+all three production deployments READY, and a read-only production query found
+`20261013170000_ace_message_email_notifications` finished in the Prisma
+migration ledger. The API project has `CRON_SECRET`, `RESEND_API_KEY`, and
+`RESEND_FROM` configured. Vercel's production CDN request log shows the
+`/api/internal/message-email/run` cron returning HTTP 200 each minute from
+18:07 to 18:22 UTC on deployment `dpl_HbTRhiqVN8cXekhnqgUGJvcaYaHc`;
+request `zc2dz-1791915731473-d44cc1e27139` identified `vercel-cron/1.0`
+at 18:22 UTC. An unauthenticated request returned HTTP 401. This proves the
+minute schedule and authorization gate, while a consented provider delivery
+smoke remains outstanding. The new migration also applied on disposable
+PostgreSQL databases using both `schema=app` and `schema=public`; the HTTP
+security suite exercised self-scoped preferences, tenant RLS, one-send
+idempotency, and cron authorization. If rollout needs to stop, pause the
+message-email cron; persisted messaging and REST reads continue.
+Mobile push and same-device foreground suppression remain deferred, so
+ACE-M06 remains incomplete and the plan count stays **48/150 (32%)**.
+
+Build step 1.3e6h, the ACE-M12 web conversation access-state correction, merged
+in [PR #621](https://github.com/FSS-Ltd/pathway/pull/621) from checked head
+`359f964380544e7ba122e04a651b5d5ece94abce` as
+`85793a64fb407b320e683c2780efb5831f535a1f` on 13 October 2026. All
+eight latest-head checks passed, including the admin unit job that ran the
+staff and guardian messaging interaction tests. A denied thread read, read-cursor
+save, older-page read, or send clears cached thread content and hides the
+composer until a fresh authorized read succeeds. A denied send also keeps the
+composer unavailable if the user still has read access. The staff split view
+includes focus transfer to the selected conversation heading and back to the
+list heading. Staff and guardian interaction tests cover denial and retry.
+A signed-in production keyboard check found that activating a staff conversation
+left focus on its list button, and returning from the 320px detail view left
+focus on the page body. That focus defect and a screen-reader browser check
+remain open before counting ACE-M12 complete. Mobile stays paused.
+
+Build step 1.3e6i, the production ACE message read-cursor correction, merged
+in [PR #622](https://github.com/FSS-Ltd/pathway/pull/622) from checked head
+`9d044655a5c2df4239f895460d5914aa2a7b51a3` as
+`f39fa0e6e5b2e5af2ca8f5a1130a16c411d42c7b` on 13 October 2026.
+All eight latest-head checks passed. CI applied 138 migrations and ran the
+`messaging-notices.rls` and `family-messaging-security` PostgreSQL suites:
+90 integration suites and 564 tests passed. A signed-in demo-school
+staff-room read produced HTTP 500; production API logs showed PostgreSQL
+`42883` because an unqualified `MessageDeliveryStatus` cast resolved to the
+`public` enum while the delivery column uses `app`. A database regression
+reproduced that error before the fix and passed after the query let PostgreSQL
+infer the enum from the column. Both affected PostgreSQL suites passed 63/63
+tests locally. Vercel's `api.nexsteps.dev` alias serves READY deployment
+`dpl_EynDhu5C8AMUp86deQfAjTWvdZPW` at the merge commit. A signed-in
+Demo ACE School staff-room retry returned HTTP 200 for the read-cursor request,
+with no prior error shown; no message was sent. The correction is released.
+ACE-M12 remains open and the count stays **48/150 (32%)**.
+
+Build step 1.3e6j in
+[PR #623](https://github.com/FSS-Ltd/pathway/pull/623) merged from checked head
+`572c543ee296998bffc1bf05e107985b0eb4302f` as
+`ee57c7263d4ba6a776b6ce92fa29906a81255aee` on 13 October 2026. All
+eight latest-head checks passed. Production workflow
+[38458652774](https://github.com/FSS-Ltd/pathway/actions/runs/38458652774)
+passed, and `app.nexsteps.dev` served the merge commit. A signed-in keyboard
+retry after reloading the deployed bundle focused the staff and direct-thread
+headings after opening, and the list heading after returning from the 320px
+detail view. The screen-reader browser check remains open, so ACE-M12 is not
+counted complete. The ACE-M06 consented provider delivery check was deferred
+for the product owner to run manually; the test account's email alerts were
+left disabled.
+
+Build step 1.3e6k in
+[PR #625](https://github.com/FSS-Ltd/pathway/pull/625) fixes the same observed
+keyboard focus gap in the shared
+notice inbox for staff and guardians. A signed-in 320px browser reproduction
+showed focus on the page body after opening a notice and after returning to the
+list. The step must pass current-revision CI, merge, and a production keyboard
+retry before the correction is released. ACE-M14 remains open while mobile
+notice work is paused.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

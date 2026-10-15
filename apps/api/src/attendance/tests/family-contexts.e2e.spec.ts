@@ -222,6 +222,7 @@ describe("ACE family context discovery", () => {
       ).map(({ key }) => key),
     );
     const parentSections = [
+      "parent-summary",
       "attendance",
       "sessions",
       "subject-timetable",

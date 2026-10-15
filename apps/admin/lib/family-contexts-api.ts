@@ -15,6 +15,7 @@ export type FamilyContext = {
 };
 
 export type FamilySection =
+  | "parent-summary"
   | "ace-summary"
   | "student-summary"
   | "attendance"

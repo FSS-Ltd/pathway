@@ -35,12 +35,7 @@ export const parentRecipientQuerySchema = z
 export const messageQuerySchema = z
   .object({
     limit,
-    before: z
-      .string()
-      .regex(/^[1-9]\d{0,9}$/)
-      .transform(Number)
-      .pipe(z.number().int().max(2_147_483_647))
-      .optional(),
+    cursor: z.string().min(1).max(512).optional(),
   })
   .strict();
 

@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   Inject,
+  Logger,
   NotFoundException,
 } from "@nestjs/common";
 import {
@@ -14,9 +15,11 @@ import {
 } from "@pathway/db";
 import {
   calculateInstitutionalQuote,
+  INSTITUTIONAL_MAPPED_PLAN_CODES,
+  INSTITUTIONAL_MAPPED_PRICING_VERSION,
   INSTITUTIONAL_PLANS,
   INSTITUTIONAL_PRICING_VERSION,
-  type InstitutionalPlanCode,
+  isMappedInstitutionalPlanCode,
 } from "@pathway/pricing";
 import { EnrolmentRollService } from "../../enrolments/enrolment-roll.service";
 import {
@@ -25,9 +28,13 @@ import {
 } from "./institutional-quote.service";
 import { isInstitutionalPlanCode } from "./institutional-selection";
 import { censusCutoffFor, localDateAt } from "./institutional-time";
+import { quoteFromFrozenInstitutionalPrices } from "./institutional-frozen-pricing";
 
-function institutionalPlanCode(value: string): InstitutionalPlanCode {
-  if (!isInstitutionalPlanCode(value)) {
+function institutionalPlanCode(value: string): string {
+  if (
+    !isInstitutionalPlanCode(value) &&
+    !isMappedInstitutionalPlanCode(value)
+  ) {
     throw new ConflictException({ code: "SCHOOL_PRICING_NOT_AVAILABLE" });
   }
   return value;
@@ -35,6 +42,8 @@ function institutionalPlanCode(value: string): InstitutionalPlanCode {
 
 @Injectable()
 export class InstitutionalCensusService {
+  private readonly logger = new Logger(InstitutionalCensusService.name);
+
   constructor(
     @Inject(EnrolmentRollService) private readonly roll: EnrolmentRollService,
     @Inject(InstitutionalQuoteService)
@@ -60,6 +69,11 @@ export class InstitutionalCensusService {
           currentInstitutionalSnapshot: {
             select: {
               createdAt: true,
+              pricingVersion: true,
+              planCode: true,
+              enrolledChildren: true,
+              subtotalPence: true,
+              lines: true,
               includedModules: true,
               paidModules: true,
             },
@@ -101,9 +115,13 @@ export class InstitutionalCensusService {
         },
         orderBy: { acceptance: { acceptedAt: "desc" } },
       });
-      const renewalPlanCode = acceptedChange
-        ? institutionalPlanCode(acceptedChange.planCode)
-        : planCode;
+      const renewalPlanCode = institutionalPlanCode(
+        acceptedChange?.planCode ?? planCode,
+      );
+      const priceTemplate =
+        acceptedChange ?? current.currentInstitutionalSnapshot;
+      const pricingVersion =
+        priceTemplate?.pricingVersion ?? INSTITUTIONAL_PRICING_VERSION;
       const confirmation = await tx.enrolmentRollConfirmation.findFirst({
         where: { orgId: current.orgId, revisionCutoff: { lte: cutoffAt } },
         orderBy: [{ revisionCutoff: "desc" }, { id: "desc" }],
@@ -119,25 +137,41 @@ export class InstitutionalCensusService {
             )
           ).enrolledCount
         : null;
-      const priced =
+      let priced = null;
+      if (
         count !== null &&
-        policy.pricingVersion === INSTITUTIONAL_PRICING_VERSION
-          ? calculateInstitutionalQuote({
-              planCode: renewalPlanCode,
-              enrolledChildren: count,
-              pricingVersion: INSTITUTIONAL_PRICING_VERSION,
-            })
-          : null;
+        pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION &&
+        priceTemplate
+      ) {
+        try {
+          priced = quoteFromFrozenInstitutionalPrices(priceTemplate, count);
+        } catch (error) {
+          this.logger.warn(
+            `Institutional renewal price review required for subscription ${current.id}: ${error instanceof Error ? error.message : "invalid snapshot"}`,
+          );
+          priced = null;
+        }
+      } else if (
+        count !== null &&
+        policy.pricingVersion === INSTITUTIONAL_PRICING_VERSION &&
+        isInstitutionalPlanCode(renewalPlanCode)
+      ) {
+        priced = calculateInstitutionalQuote({
+          planCode: renewalPlanCode,
+          enrolledChildren: count,
+          pricingVersion: INSTITUTIONAL_PRICING_VERSION,
+        });
+      }
       const status =
         priced?.kind === "priced"
           ? InstitutionalSnapshotStatus.PRICED
           : InstitutionalSnapshotStatus.REVIEW_REQUIRED;
       const reviewReason = !confirmation
         ? "ROLL_UNVERIFIED"
-        : policy.pricingVersion !== INSTITUTIONAL_PRICING_VERSION
-          ? "PRICING_VERSION_CHANGED"
-          : priced?.kind === "contact_sales"
-            ? "OVER_250_CHILDREN"
+        : priced?.kind === "contact_sales"
+          ? "OVER_250_CHILDREN"
+          : !priced
+            ? "PRICING_REVIEW_REQUIRED"
             : null;
       const snapshot = await tx.institutionalBillingSnapshot.create({
         data: {
@@ -147,7 +181,7 @@ export class InstitutionalCensusService {
           kind: InstitutionalSnapshotKind.CENSUS,
           status,
           planCode: renewalPlanCode,
-          pricingVersion: INSTITUTIONAL_PRICING_VERSION,
+          pricingVersion,
           countSource: confirmation ? InstitutionalCountSource.VERIFIED : null,
           enrolledChildren: count,
           includedChildren:
@@ -189,7 +223,12 @@ export class InstitutionalCensusService {
       const subscription = await tx.subscription.findFirst({
         where: {
           orgId,
-          planCode: { in: Object.keys(INSTITUTIONAL_PLANS) },
+          planCode: {
+            in: [
+              ...Object.keys(INSTITUTIONAL_PLANS),
+              ...INSTITUTIONAL_MAPPED_PLAN_CODES,
+            ],
+          },
           status: {
             in: [
               SubscriptionStatus.ACTIVE,
@@ -241,15 +280,32 @@ export class InstitutionalCensusService {
           : subscription
             ? null
             : (policy?.declaredChildren ?? null);
-      const forecast =
-        planCode && forecastCount !== null
-          ? calculateInstitutionalQuote({
-              planCode,
-              enrolledChildren: forecastCount,
-              pricingVersion: INSTITUTIONAL_PRICING_VERSION,
-            })
-          : null;
+      let forecast = null;
+      if (planCode && forecastCount !== null) {
+        const template =
+          acceptedChange ?? subscription?.currentInstitutionalSnapshot;
+        if (template?.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
+          try {
+            forecast = quoteFromFrozenInstitutionalPrices(
+              template,
+              forecastCount,
+            );
+          } catch (error) {
+            this.logger.warn(
+              `Institutional forecast price review required for subscription ${subscription?.id}: ${error instanceof Error ? error.message : "invalid snapshot"}`,
+            );
+            forecast = null;
+          }
+        } else if (isInstitutionalPlanCode(planCode)) {
+          forecast = calculateInstitutionalQuote({
+            planCode,
+            enrolledChildren: forecastCount,
+            pricingVersion: INSTITUTIONAL_PRICING_VERSION,
+          });
+        }
+      }
       return {
+        orgId,
         currentPaid: subscription
           ? {
               planCode,

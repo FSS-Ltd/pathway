@@ -164,7 +164,10 @@ export class BehaviourReviewService {
         select: { id: true },
       }),
       tx.orgVertical.findFirst({
-        where: { orgId: actor.orgId, vertical: "ACE_SCHOOL" },
+        where: {
+          orgId: actor.orgId,
+          vertical: { in: ["ACE_SCHOOL", "ACE_LEARNING_CENTRE"] },
+        },
         select: { orgId: true },
       }),
       currentReviewerKinds(tx, actor, now),

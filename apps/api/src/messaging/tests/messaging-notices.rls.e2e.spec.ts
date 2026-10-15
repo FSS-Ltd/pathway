@@ -28,6 +28,7 @@ import { StaffSchoolTeamHistoryService } from "../staff-school-team-history.serv
 import { StaffSchoolTeamReadCursorService } from "../staff-school-team-read-cursor.service";
 import { StaffSchoolTeamCommandService } from "../staff-school-team-command.service";
 import { StaffSchoolTeamService } from "../staff-school-team.service";
+import { advanceMessageReadCursor } from "../messaging-read-cursor";
 
 const TENANT_RLS_ROLE = "pathway_e2e_tenant_rls";
 const CONCURRENT_PUBLICATION_WAIT_MS = 200;
@@ -478,6 +479,8 @@ async function deleteMessagingRowsIfPresent(
       "AceNoticeAudienceMember",
       "AceNotice",
       "MessageAttachment",
+      "MessageEmailDelivery",
+      "MessageEmailPreference",
       "MessageDelivery",
       "MessageParticipantReadCursor",
       "Message",
@@ -893,6 +896,8 @@ describe("ACE parent/staff messaging and notices storage", () => {
       "MessageAttachment",
       "MessageConversation",
       "MessageDelivery",
+      "MessageEmailDelivery",
+      "MessageEmailPreference",
       "MessageParticipant",
       "MessageParticipantReadCursor",
     ]);
@@ -1124,6 +1129,9 @@ describe("ACE parent/staff messaging and notices storage", () => {
   afterEach(async () => {
     if (!isDatabaseAvailable() || !fixture) return;
     await deleteMessagingRowsIfPresent(prisma);
+    await prisma.outboxEvent.deleteMany({
+      where: { orgId: fixture.orgAId, eventType: "ace.message.sent" },
+    });
     await prisma.auditEvent.deleteMany({
       where: { orgId: fixture.orgAId, entityType: "ACE_MESSAGE" },
     });
@@ -1287,6 +1295,169 @@ describe("ACE parent/staff messaging and notices storage", () => {
     await expect(
       service.listStaffMessages(unjoined, created.conversationId, {}),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("pages equal-time messages by sequence with a scoped history cursor", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createStaffConversation(
+          tx,
+          fixture,
+          "STAFF_DIRECT",
+        );
+        const messages = [];
+        const createdAt = new Date("2026-10-13T09:00:00.000Z");
+        for (const body of ["First", "Second", "Third"]) {
+          messages.push(
+            await tx.message.create({
+              data: {
+                tenantId: fixture.tenantAId,
+                conversationId: conversation.conversationId,
+                senderParticipantId: conversation.staffParticipantIds[0],
+                clientRequestId: randomUUID(),
+                bodyEncrypted: body,
+                createdAt,
+              },
+            }),
+          );
+        }
+        return { ...conversation, messages };
+      },
+    );
+    expect(
+      new Set(created.messages.map((message) => message.createdAt.getTime()))
+        .size,
+    ).toBe(1);
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const service = new MessagingService();
+    const first = await service.listStaffMessages(
+      actor,
+      created.conversationId,
+      {
+        limit: 2,
+      },
+    );
+    expect(first.items.map((message) => message.body)).toEqual([
+      "Third",
+      "Second",
+    ]);
+    if (!first.nextCursor) throw new Error("Missing older-message cursor");
+    const older = await service.listStaffMessages(
+      actor,
+      created.conversationId,
+      {
+        limit: 2,
+        cursor: first.nextCursor,
+      },
+    );
+    expect(older.items.map((message) => message.body)).toEqual(["First"]);
+    expect(older.nextCursor).toBeNull();
+    await expect(
+      service.listStaffMessages(
+        { ...actor, userId: fixture.staffBId },
+        created.conversationId,
+        { cursor: first.nextCursor },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.listStaffMessages(
+        { ...actor, userId: fixture.staffCId },
+        created.conversationId,
+        { cursor: first.nextCursor },
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await tx.message.createMany({
+          data: Array.from({ length: 500 }, (_, index) => ({
+            tenantId: fixture.tenantAId,
+            conversationId: created.conversationId,
+            senderParticipantId: created.staffParticipantIds[0],
+            clientRequestId: randomUUID(),
+            bodyEncrypted: `Pilot message ${index}`,
+          })),
+        });
+      },
+    );
+    const plan = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        // Check index eligibility without depending on small-table planner estimates.
+        await tx.$executeRaw`SET LOCAL enable_sort = off`;
+        return tx.$queryRaw<Array<{ "QUERY PLAN": unknown }>>`
+          EXPLAIN (FORMAT JSON)
+          SELECT "id", "sequence" FROM "Message"
+          WHERE "tenantId" = ${fixture.tenantAId}
+            AND "conversationId" = ${created.conversationId}
+            AND "sequence" < 500
+          ORDER BY "sequence" DESC LIMIT 20
+        `;
+      },
+    );
+    expect(JSON.stringify(plan)).toContain(
+      "Message_tenantId_conversationId_sequence_key",
+    );
+  });
+
+  it("pages same-time staff conversations without repeating or crossing sites", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const actor = {
+      tenantId: fixture.tenantAId,
+      orgId: fixture.orgAId,
+      userId: fixture.staffAId,
+    };
+    const ids = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversations = await Promise.all([
+          createStaffConversation(tx, fixture, "STAFF_DIRECT"),
+          createStaffConversation(tx, fixture, "STAFF_ROOM"),
+        ]);
+        const conversationIds = conversations.map(
+          (item) => item.conversationId,
+        );
+        await tx.messageConversation.updateMany({
+          where: { id: { in: conversationIds }, tenantId: fixture.tenantAId },
+          data: { updatedAt: new Date(Date.now() + 60_000) },
+        });
+        const ordered = await tx.messageConversation.findMany({
+          where: { id: { in: conversationIds }, tenantId: fixture.tenantAId },
+          orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+          select: { id: true },
+        });
+        return ordered.map((conversation) => conversation.id);
+      },
+    );
+    const service = new MessagingService();
+
+    const first = await service.listStaffConversations(actor, { limit: 1 });
+    expect(first.items.map((item) => item.id)).toEqual([ids[0]]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const second = await service.listStaffConversations(actor, {
+      limit: 1,
+      cursor: first.nextCursor ?? undefined,
+    });
+    expect(second.items.map((item) => item.id)).toEqual([ids[1]]);
+    await expect(
+      service.listStaffConversations(
+        { ...actor, tenantId: fixture.tenantBId, orgId: fixture.orgBId },
+        { limit: 1, cursor: first.nextCursor ?? undefined },
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it("opens one audited direct conversation for two current site staff", async () => {
@@ -1524,14 +1695,25 @@ describe("ACE parent/staff messaging and notices storage", () => {
       fixture.tenantAId,
       fixture.orgAId,
       async (tx) => {
-        const [messages, deliveries, raw] = await Promise.all([
+        const [messages, deliveries, raw, outbox] = await Promise.all([
           tx.message.findMany({ where: { conversationId: opened.id } }),
           tx.messageDelivery.findMany({ where: { messageId: first.id } }),
           tx.$queryRaw<Array<{ bodyEncrypted: string }>>`
             SELECT "bodyEncrypted" FROM "Message" WHERE "id" = ${first.id}
           `,
+          tx.outboxEvent.findMany({
+            where: {
+              orgId: fixture.orgAId,
+              idempotencyKey: `ace.message.send:${actor.tenantId}:${actor.userId}:${input.clientRequestId}`,
+            },
+            select: {
+              aggregateId: true,
+              eventType: true,
+              payload: true,
+            },
+          }),
         ]);
-        return { messages, deliveries, raw };
+        return { messages, deliveries, raw, outbox };
       },
     );
     expect(evidence.messages).toHaveLength(1);
@@ -1539,6 +1721,18 @@ describe("ACE parent/staff messaging and notices storage", () => {
     expect(evidence.raw[0].bodyEncrypted).toMatch(/^v1:/);
     expect(evidence.deliveries).toHaveLength(1);
     expect(evidence.deliveries[0].status).toBe("PENDING");
+    expect(evidence.outbox).toEqual([
+      {
+        aggregateId: first.id,
+        eventType: "ace.message.sent",
+        payload: {
+          tenantId: actor.tenantId,
+          conversationId: opened.id,
+          messageId: first.id,
+        },
+      },
+    ]);
+    expect(JSON.stringify(evidence.outbox)).not.toContain(input.body);
     expect(
       await prisma.auditEvent.count({
         where: {
@@ -1553,6 +1747,15 @@ describe("ACE parent/staff messaging and notices storage", () => {
       (await new MessagingService().listStaffConversations(actor, {})).items[0]
         .latestMessage?.preview,
     ).toBe(input.body);
+    const room = await new MessagingConversationService().openStaffRoom(actor);
+    await expect(
+      service.sendStaffMessage(actor, room.id, input),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(
+      await withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+        tx.message.count({ where: { conversationId: room.id } }),
+      ),
+    ).toBe(0);
     await expect(
       service.sendStaffMessage(
         { ...actor, userId: fixture.staffCId },
@@ -1697,17 +1900,47 @@ describe("ACE parent/staff messaging and notices storage", () => {
 
     expect(
       (await service.listStaffMessages(staffA, opened.id, {})).items[0],
-    ).toMatchObject({ id: first.id, recipientRead: false });
+    ).toMatchObject({
+      id: first.id,
+      recipientRead: false,
+      deliveryState: "sent",
+    });
     expect(
       (await service.listStaffMessages(staffB, opened.id, {})).items[0],
     ).toMatchObject({ id: first.id, recipientRead: null });
+
+    await withMessagingRlsContext(fixture.tenantAId, fixture.orgAId, (tx) =>
+      tx.messageDelivery.updateMany({
+        where: { messageId: first.id, tenantId: fixture.tenantAId },
+        data: { status: "DELIVERED", deliveredAt: new Date() },
+      }),
+    );
+    expect(
+      (await service.listStaffMessages(staffA, opened.id, {})).items[0],
+    ).toMatchObject({ deliveryState: "delivered" });
 
     await service.advanceStaffReadCursor(staffB, opened.id, {
       sequence: first.sequence,
     });
     expect(
       (await service.listStaffMessages(staffA, opened.id, {})).items[0],
-    ).toMatchObject({ id: first.id, recipientRead: true });
+    ).toMatchObject({
+      id: first.id,
+      recipientRead: true,
+      deliveryState: "read",
+    });
+    const delivery = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      (tx) =>
+        tx.messageDelivery.findFirst({
+          where: { tenantId: fixture.tenantAId, messageId: first.id },
+          select: { status: true, deliveredAt: true, readAt: true },
+        }),
+    );
+    expect(delivery).toMatchObject({ status: "READ" });
+    expect(Number.isFinite(delivery?.deliveredAt?.getTime())).toBe(true);
+    expect(Number.isFinite(delivery?.readAt?.getTime())).toBe(true);
 
     const second = await command.sendStaffMessage(staffA, opened.id, {
       clientRequestId: randomUUID(),
@@ -1821,6 +2054,53 @@ describe("ACE parent/staff messaging and notices storage", () => {
     ]);
   });
 
+  it("advances a read cursor when another schema defines the delivery enum", async () => {
+    if (!isDatabaseAvailable()) return;
+
+    const created = await withMessagingRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        const conversation = await createStaffConversation(
+          tx,
+          fixture,
+          "STAFF_DIRECT",
+        );
+        const message = await tx.message.create({
+          data: {
+            tenantId: fixture.tenantAId,
+            conversationId: conversation.conversationId,
+            senderParticipantId: conversation.staffParticipantIds[0],
+            clientRequestId: randomUUID(),
+            bodyEncrypted: "Schema boundary",
+          },
+        });
+        return { ...conversation, sequence: message.sequence };
+      },
+    );
+
+    await withTenantRlsContext(
+      fixture.tenantAId,
+      fixture.orgAId,
+      async (tx) => {
+        await tx.$executeRawUnsafe(
+          `CREATE TYPE pg_temp."MessageDeliveryStatus" AS ENUM ('PENDING', 'DELIVERED', 'READ')`,
+        );
+        await tx.$executeRawUnsafe("SET LOCAL search_path TO pg_temp, app");
+        await expect(
+          advanceMessageReadCursor(
+            tx,
+            fixture.tenantAId,
+            created.conversationId,
+            created.staffParticipantIds[0],
+            created.sequence,
+          ),
+        ).resolves.toEqual({ lastReadSequence: created.sequence });
+        await tx.$executeRawUnsafe('DROP TYPE pg_temp."MessageDeliveryStatus"');
+      },
+    );
+  });
+
   it("permits one general parent conversation per guardian and valid staff conversation kinds", async () => {
     if (!isDatabaseAvailable()) return;
 
@@ -1879,7 +2159,7 @@ describe("ACE parent/staff messaging and notices storage", () => {
           sender: { id: fixture.staffAId },
         },
       ],
-      nextBefore: null,
+      nextCursor: null,
     });
     await expect(
       history.list(

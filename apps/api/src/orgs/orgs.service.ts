@@ -1,3 +1,4 @@
+import { institutionalSector } from "@pathway/types";
 import {
   BadRequestException,
   ConflictException,
@@ -201,7 +202,7 @@ export class OrgsService {
         orgSlug: dto.org?.slug,
         code:
           typeof e === "object" && e !== null && "code" in e
-            ? (e as { code?: string }).code ?? "unknown"
+            ? ((e as { code?: string }).code ?? "unknown")
             : "unknown",
       });
       this.handlePrismaError(e);
@@ -338,10 +339,20 @@ export class OrgsService {
   async changeVertical(orgId: string, vertical: Vertical) {
     const org = await prisma.org.findUnique({
       where: { id: orgId },
-      select: { id: true },
+      select: { id: true, sector: true, isMasterOrg: true },
     });
     if (!org) {
       throw new NotFoundException("Organisation not found");
+    }
+    if (
+      !org.isMasterOrg &&
+      org.sector &&
+      (vertical === "HOME_EDUCATION" ||
+        institutionalSector(vertical) !== org.sector)
+    ) {
+      throw new BadRequestException(
+        "Provider type does not match the organisation sector",
+      );
     }
     return prisma.orgVertical.upsert({
       where: { orgId },

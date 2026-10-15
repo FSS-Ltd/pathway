@@ -19,6 +19,7 @@ import {
 import {
   isDateOnly,
   type CreateStudentSubjectDto,
+  type EndStudentSubjectDto,
 } from "./dto/student-subject.dto";
 
 export interface StudentSubjectsActor {
@@ -76,7 +77,7 @@ export class StudentSubjectsService {
 
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await this.requireSiteAndChild(tx, childId, actor);
-      const [placements, subjects] = await Promise.all([
+      const [placements, subjects, progress] = await Promise.all([
         tx.studentSubjectEnrollment.findMany({
           where: { tenantId: actor.tenantId, childId, status: "ACTIVE" },
           orderBy: [{ subject: { name: "asc" } }, { startsOn: "asc" }],
@@ -87,11 +88,119 @@ export class StudentSubjectsService {
           orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
           select: { id: true, name: true },
         }),
+        tx.paceProgress.findMany({
+          where: { tenantId: actor.tenantId, childId },
+          select: { subjectId: true, currentPace: true, targetPace: true },
+        }),
       ]);
+      const progressBySubject = new Map(
+        progress.map((row) => [row.subjectId, row]),
+      );
       return {
-        placements: placements.map((placement) => this.toResponse(placement)),
+        placements: placements.map((placement) => {
+          const current = progressBySubject.get(placement.subject.id);
+          return {
+            ...this.toResponse(placement),
+            currentPace: current?.currentPace ?? placement.currentPace,
+            targetPace: current?.targetPace ?? placement.targetPace,
+          };
+        }),
         subjects,
       };
+    });
+  }
+
+  async end(
+    childId: string,
+    enrollmentId: string,
+    command: EndStudentSubjectDto,
+    actor: StudentSubjectsActor,
+  ): Promise<{ id: string; status: "ENDED"; endsOn: string }> {
+    this.assertActor(actor);
+    this.assertChildId(childId);
+    if (!enrollmentId?.trim())
+      throw new BadRequestException("A placement is required");
+    if (!isDateOnly(command.endsOn))
+      throw new BadRequestException("Placement dates must use YYYY-MM-DD");
+    if (!command.reason?.trim())
+      throw new BadRequestException("A reason is required to end a placement");
+
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      const timezone = await this.requireSiteAndChild(tx, childId, actor);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`ace-pace-assessment:${actor.tenantId}:${childId}`}, 0))`;
+      const enrollment = await tx.studentSubjectEnrollment.findFirst({
+        where: {
+          id: enrollmentId,
+          tenantId: actor.tenantId,
+          childId,
+          status: "ACTIVE",
+        },
+        select: { id: true, subjectId: true, startsOn: true },
+      });
+      if (!enrollment)
+        throw new NotFoundException("Active placement not found");
+      if (command.endsOn < formatDateOnly(enrollment.startsOn))
+        throw new BadRequestException(
+          "End date must be on or after the placement start date",
+        );
+      if (command.endsOn > formatSiteDate(new Date(), timezone))
+        throw new BadRequestException("End date cannot be in the future");
+      const laterAssessment = await tx.paceAssessment.findFirst({
+        where: {
+          tenantId: actor.tenantId,
+          childId,
+          subjectId: enrollment.subjectId,
+          assessedOn: { gte: nextDay(command.endsOn) },
+        },
+        select: { id: true },
+      });
+      if (laterAssessment)
+        throw new BadRequestException(
+          "End date must include recorded assessments",
+        );
+
+      const ended = await tx.studentSubjectEnrollment.updateMany({
+        where: {
+          id: enrollment.id,
+          tenantId: actor.tenantId,
+          childId,
+          status: "ACTIVE",
+        },
+        data: { status: "ENDED", endsOn: toDatabaseDate(command.endsOn) },
+      });
+      if (ended.count !== 1)
+        throw new ConflictException(
+          "The active placement changed before it could be ended",
+        );
+      await tx.paceProgress.deleteMany({
+        where: {
+          tenantId: actor.tenantId,
+          childId,
+          subjectId: enrollment.subjectId,
+        },
+      });
+      await recordAuditEventInTransaction(tx, {
+        actorUserId: actor.userId,
+        tenantId: actor.tenantId,
+        orgId: actor.orgId,
+        entityType: AuditEntityType.ACE_RECORD,
+        entityId: enrollment.id,
+        action: AuditAction.UPDATED,
+        metadata: {
+          placementType: "ENDED",
+          subjectId: enrollment.subjectId,
+          endsOn: command.endsOn,
+          reason: command.reason.trim(),
+        },
+      });
+      await this.outbox.enqueue(tx, {
+        aggregateType: "STUDENT_SUBJECT_ENROLLMENT",
+        aggregateId: enrollment.id,
+        eventType: "ace.student-subject.ended",
+        payload: { subjectId: enrollment.subjectId },
+        idempotencyKey: `ace-student-subject:${enrollment.id}:${randomUUID()}`,
+      });
+      return { id: enrollment.id, status: "ENDED", endsOn: command.endsOn };
     });
   }
 
@@ -303,7 +412,7 @@ export class StudentSubjectsService {
     tx: Prisma.TransactionClient,
     childId: string,
     actor: StudentSubjectsActor,
-  ): Promise<void> {
+  ): Promise<string> {
     const site = await tx.tenant.findFirst({
       where: { id: actor.tenantId, orgId: actor.orgId },
       select: { timezone: true },
@@ -316,6 +425,7 @@ export class StudentSubjectsService {
       select: { id: true },
     });
     if (!child) throw new NotFoundException("Child not found");
+    return site.timezone;
   }
 
   private toResponse(
@@ -358,10 +468,28 @@ function formatDateOnly(value: Date): string {
   ].join("-");
 }
 
+function formatSiteDate(value: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const part = (type: string) =>
+    parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
 function previousDate(value: string): string {
   const date = toDatabaseDate(value);
   date.setUTCDate(date.getUTCDate() - 1);
   return formatDateOnly(date);
+}
+
+function nextDay(value: string): Date {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date;
 }
 
 function isIanaTimezone(value: string | null): value is string {

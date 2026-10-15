@@ -1,4 +1,9 @@
-import { VERTICAL_OPTIONS, type Vertical } from "@pathway/types";
+import {
+  VERTICAL_OPTIONS,
+  verticalScreen,
+  type Vertical,
+  type VerticalScreen,
+} from "@pathway/types";
 import type { ConfiguratorModuleCode } from "@pathway/pricing";
 
 export type WebModule = ConfiguratorModuleCode;
@@ -26,7 +31,7 @@ export function moduleImagePath(module: WebModule): string {
 }
 
 export function verticalImagePath(vertical: Vertical): string {
-  const slug = vertical.toLowerCase().replace(/_/g, "-");
+  const slug = verticalScreen(vertical).toLowerCase().replace(/_/g, "-");
   return `/configurator/verticals/${slug}.png`;
 }
 
@@ -101,7 +106,7 @@ export const MODULE_CATALOG: Record<WebModule, ModuleCatalogEntry> = {
   ),
 };
 
-export const VERTICAL_FEATURES: Record<Vertical, string[]> = {
+const SCREEN_FEATURES: Record<VerticalScreen, string[]> = {
   CHURCH: [
     "View attendance",
     "Manage attendance registers",
@@ -165,6 +170,12 @@ export const VERTICAL_FEATURES: Record<Vertical, string[]> = {
   ],
 };
 
+export const VERTICAL_FEATURES: Record<Vertical, string[]> = {
+  ...SCREEN_FEATURES,
+  ACE_LEARNING_CENTRE: SCREEN_FEATURES.ACE_SCHOOL,
+  PUBLIC_LEARNING_CENTRE: SCREEN_FEATURES.STATE_SCHOOL,
+};
+
 export type ConfiguratorOption =
   | { kind: "module"; module: WebModule }
   | { kind: "storage"; storageChoice: StorageChoice };
@@ -185,8 +196,10 @@ export const CONFIGURATOR_IMAGE_PATHS: readonly string[] = [
   // configurator (see apps/web/app/configure/state.ts's VERTICALS_BY_ORG_TYPE), and
   // has no configurator artwork asset — NexSteps Home has its own onboarding
   // (docs/NexStepsV2/07-nexsteps-home.md).
-  ...VERTICAL_OPTIONS.filter(({ value }) => value !== "HOME_EDUCATION").map(
-    ({ value }) => verticalImagePath(value),
+  ...new Set(
+    VERTICAL_OPTIONS.filter(({ value }) => value !== "HOME_EDUCATION").map(
+      ({ value }) => verticalImagePath(value),
+    ),
   ),
 ];
 

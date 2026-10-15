@@ -5,6 +5,7 @@ import {
   Injectable,
   Inject,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import {
   applyTenantContext,
@@ -22,9 +23,17 @@ import {
 } from "@pathway/db";
 import {
   calculateInstitutionalQuote,
+  calculateMappedInstitutionalQuote,
   INSTITUTIONAL_PLANS,
   INSTITUTIONAL_PRICING_VERSION,
+  INSTITUTIONAL_MAPPED_PRICING_VERSION,
+  INSTITUTIONAL_MAPPED_PLAN_CODES,
+  InstitutionalMappedPriceError,
+  isMappedInstitutionalPlanCode,
+  mappedInstitutionalSelectionPlanCode,
   type InstitutionalPlanCode,
+  type InstitutionalMappedPlanCode,
+  type InstitutionalStorageChoice,
 } from "@pathway/pricing";
 import { EnrolmentRollService } from "../../enrolments/enrolment-roll.service";
 import {
@@ -37,12 +46,21 @@ import {
   localDateAt,
   QUOTE_VALIDITY_MS,
 } from "./institutional-time";
+import { InstitutionalPriceResolver } from "./institutional-price-resolver";
 
 export type CreateInstitutionalQuoteInput = InstitutionalModuleSelection & {
   planCode: InstitutionalPlanCode;
   declaredChildren?: number;
   declarationAccepted?: boolean;
 };
+
+export type CreateMappedInstitutionalQuoteInput =
+  InstitutionalModuleSelection & {
+    planCode: InstitutionalMappedPlanCode;
+    storageChoice: InstitutionalStorageChoice;
+    declaredChildren?: number;
+    declarationAccepted?: boolean;
+  };
 
 export async function withInstitutionalOrgLock<T>(
   orgId: string,
@@ -61,6 +79,8 @@ export async function withInstitutionalOrgLock<T>(
 export class InstitutionalQuoteService {
   constructor(
     @Inject(EnrolmentRollService) private readonly roll: EnrolmentRollService,
+    @Inject(InstitutionalPriceResolver)
+    private readonly mappedPrices: InstitutionalPriceResolver,
   ) {}
 
   async assertBillingRole(orgId: string, userId: string): Promise<void> {
@@ -117,13 +137,26 @@ export class InstitutionalQuoteService {
   async createQuote(
     orgId: string,
     actorUserId: string,
-    input: CreateInstitutionalQuoteInput,
+    input: CreateInstitutionalQuoteInput | CreateMappedInstitutionalQuoteInput,
     now = new Date(),
   ) {
-    if (!isInstitutionalPlanCode(input.planCode)) {
-      throw new BadRequestException({ code: "INVALID_PLAN" });
+    const mapped = "storageChoice" in input;
+    let selectionPlan: InstitutionalPlanCode;
+    if ("storageChoice" in input) {
+      if (!isMappedInstitutionalPlanCode(input.planCode)) {
+        throw new BadRequestException({ code: "INVALID_PLAN" });
+      }
+      selectionPlan = mappedInstitutionalSelectionPlanCode(input.planCode);
+    } else {
+      if (!isInstitutionalPlanCode(input.planCode)) {
+        throw new BadRequestException({ code: "INVALID_PLAN" });
+      }
+      selectionPlan = input.planCode;
     }
-    const selection = validateInstitutionalSelection(input.planCode, input);
+    const selection = validateInstitutionalSelection(selectionPlan, input);
+    if (mapped && selection.paidModules.length > 0) {
+      throw new BadRequestException({ code: "MODULE_PRICE_UNAVAILABLE" });
+    }
     if (
       input.declaredChildren !== undefined &&
       (!Number.isSafeInteger(input.declaredChildren) ||
@@ -131,11 +164,17 @@ export class InstitutionalQuoteService {
     ) {
       throw new BadRequestException({ code: "INVALID_COUNT" });
     }
+    const prices = mapped ? await this.mappedPrices.resolve() : null;
     return withInstitutionalOrgLock(orgId, async (tx) => {
       const currentSubscription = await tx.subscription.findFirst({
         where: {
           orgId,
-          planCode: { in: Object.keys(INSTITUTIONAL_PLANS) },
+          planCode: {
+            in: [
+              ...Object.keys(INSTITUTIONAL_PLANS),
+              ...INSTITUTIONAL_MAPPED_PLAN_CODES,
+            ],
+          },
           status: {
             in: [
               SubscriptionStatus.ACTIVE,
@@ -149,6 +188,7 @@ export class InstitutionalQuoteService {
       });
       const currentModules = currentSubscription?.currentInstitutionalSnapshot;
       if (
+        !mapped &&
         currentModules &&
         (currentModules.includedModules.length > 0 ||
           currentModules.paidModules.length > 0)
@@ -221,11 +261,37 @@ export class InstitutionalQuoteService {
         enrolledChildren = policy.declaredChildren;
         countSource = InstitutionalCountSource.DECLARED;
       }
-      const priced = calculateInstitutionalQuote({
-        planCode: input.planCode,
-        enrolledChildren,
-        pricingVersion: INSTITUTIONAL_PRICING_VERSION,
-      });
+      let priced;
+      try {
+        priced =
+          "storageChoice" in input && prices
+            ? calculateMappedInstitutionalQuote({
+                planCode: input.planCode,
+                enrolledChildren,
+                storageChoice: input.storageChoice,
+                prices,
+              })
+            : calculateInstitutionalQuote({
+                planCode: selectionPlan,
+                enrolledChildren,
+                pricingVersion: INSTITUTIONAL_PRICING_VERSION,
+              });
+      } catch (error) {
+        if (
+          error instanceof InstitutionalMappedPriceError &&
+          error.code === "MISSING_PRICE"
+        ) {
+          throw new ServiceUnavailableException({
+            code: "INSTITUTIONAL_PRICE_UNAVAILABLE",
+            priceCode: error.priceCode,
+            retryable: true,
+          });
+        }
+        throw error;
+      }
+      const pricingVersion = mapped
+        ? INSTITUTIONAL_MAPPED_PRICING_VERSION
+        : INSTITUTIONAL_PRICING_VERSION;
       const previous = await tx.institutionalBillingSnapshot.findFirst({
         where: {
           orgId,
@@ -245,7 +311,7 @@ export class InstitutionalQuoteService {
               ? InstitutionalSnapshotStatus.PRICED
               : InstitutionalSnapshotStatus.CONTACT_SALES,
           planCode: input.planCode,
-          pricingVersion: INSTITUTIONAL_PRICING_VERSION,
+          pricingVersion,
           countSource,
           enrolledChildren,
           includedChildren:
@@ -272,6 +338,15 @@ export class InstitutionalQuoteService {
       });
       return snapshot;
     });
+  }
+
+  async createMappedQuote(
+    orgId: string,
+    actorUserId: string,
+    input: CreateMappedInstitutionalQuoteInput,
+    now = new Date(),
+  ) {
+    return this.createQuote(orgId, actorUserId, input, now);
   }
 
   async acceptQuote(
@@ -319,21 +394,32 @@ export class InstitutionalQuoteService {
       });
       if (
         supersedingQuote ||
-        snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION
+        (snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION &&
+          snapshot.pricingVersion !== INSTITUTIONAL_MAPPED_PRICING_VERSION)
       ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-      if (!isInstitutionalPlanCode(snapshot.planCode)) {
+      if (
+        !isInstitutionalPlanCode(snapshot.planCode) &&
+        !isMappedInstitutionalPlanCode(snapshot.planCode)
+      ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-      validateInstitutionalSelection(snapshot.planCode, {
+      const selectionPlan = isInstitutionalPlanCode(snapshot.planCode)
+        ? snapshot.planCode
+        : mappedInstitutionalSelectionPlanCode(snapshot.planCode);
+      validateInstitutionalSelection(selectionPlan, {
         includedModules: snapshot.includedModules,
         paidModules: snapshot.paidModules,
       });
       const policy = await tx.institutionalBillingPolicy.findUnique({
         where: { orgId },
       });
-      if (!policy || policy.pricingVersion !== snapshot.pricingVersion) {
+      if (
+        !policy ||
+        (snapshot.pricingVersion === INSTITUTIONAL_PRICING_VERSION &&
+          policy.pricingVersion !== snapshot.pricingVersion)
+      ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
       if (snapshot.countSource === InstitutionalCountSource.DECLARED) {

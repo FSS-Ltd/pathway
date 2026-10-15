@@ -5,6 +5,7 @@ import {
   isUsingMockApi,
 } from "./api-client";
 import { apiErrorFromResponse } from "./api-transport";
+import type { MessageRealtimeSubscription } from "@pathway/platform";
 
 export type StaffConversation = {
   id: string;
@@ -21,6 +22,7 @@ export type StaffMessage = {
   body: string;
   createdAt: string;
   sender: { id: string; displayName: string };
+  deliveryState: "sent" | "delivered" | "read" | null;
   recipientRead: boolean | null;
 };
 
@@ -44,12 +46,12 @@ export type StaffConversationPage = {
 
 export type StaffMessagePage = {
   items: StaffMessage[];
-  nextBefore: number | null;
+  nextCursor: string | null;
 };
 
 export type SchoolTeamMessagePage = {
   items: Omit<StaffMessage, "recipientRead">[];
-  nextBefore: number | null;
+  nextCursor: string | null;
 };
 
 export type SentStaffMessage = {
@@ -63,6 +65,21 @@ export type SentStaffMessage = {
 };
 
 const basePath = "/ace/messages/conversations";
+
+export async function issueStaffRealtimeToken(
+  conversationId: string,
+  channel: "staff" | "school-team",
+  signal?: AbortSignal,
+): Promise<MessageRealtimeSubscription> {
+  const path = channel === "school-team" ? `${basePath}/school-team` : basePath;
+  return request(
+    `${path}/${encodeURIComponent(conversationId)}/realtime-token`,
+    {
+      method: "POST",
+      signal,
+    },
+  );
+}
 
 export async function searchStaffRecipients(
   search: string,
@@ -110,11 +127,11 @@ export async function fetchStaffConversations(
 
 export async function fetchStaffMessages(
   conversationId: string,
-  input: { before?: number; signal?: AbortSignal } = {},
+  input: { cursor?: string; signal?: AbortSignal } = {},
 ): Promise<StaffMessagePage> {
-  if (isUsingMockApi()) return { items: [], nextBefore: null };
+  if (isUsingMockApi()) return { items: [], nextCursor: null };
   const query = new URLSearchParams({ limit: "50" });
-  if (input.before) query.set("before", String(input.before));
+  if (input.cursor) query.set("cursor", input.cursor);
   return request(
     `${basePath}/${encodeURIComponent(conversationId)}/messages?${query}`,
     {
@@ -162,11 +179,11 @@ export async function fetchSchoolTeamConversations(
 
 export async function fetchSchoolTeamMessages(
   conversationId: string,
-  input: { before?: number; signal?: AbortSignal } = {},
+  input: { cursor?: string; signal?: AbortSignal } = {},
 ): Promise<SchoolTeamMessagePage> {
-  if (isUsingMockApi()) return { items: [], nextBefore: null };
+  if (isUsingMockApi()) return { items: [], nextCursor: null };
   const query = new URLSearchParams({ limit: "50" });
-  if (input.before) query.set("before", String(input.before));
+  if (input.cursor) query.set("cursor", input.cursor);
   return request(
     `${schoolTeamPath}/${encodeURIComponent(conversationId)}/messages?${query}`,
     { signal: input.signal },

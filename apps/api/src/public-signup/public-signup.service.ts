@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import {
   BadRequestException,
   Injectable,
@@ -129,7 +130,7 @@ export class PublicSignupService {
       siteName: link.tenant.name,
       siteTimezone: link.tenant.timezone ?? null,
       parentPortalEnabled: link.org.parentPortalEnabled,
-      isAceSchool: link.org.orgVertical?.vertical === "ACE_SCHOOL",
+      isAceSchool: isAceVertical(link.org.orgVertical?.vertical),
     };
   }
 

@@ -254,5 +254,70 @@ describe("ACE subject placement progress baseline", () => {
       completedPaces: 1,
       lastAssessmentId: recorded.assessment.id,
     });
+    // Ending the revised placement leaves its completed assessment facts intact.
+    const active = await withTenantRlsContext(tenantId, orgId, (tx) =>
+      tx.studentSubjectEnrollment.findFirstOrThrow({
+        where: { tenantId, childId, subjectId, status: "ACTIVE" },
+      }),
+    );
+    const command = { endsOn: "2026-08-13", reason: "Subject completed" };
+    await expect(
+      service.end(childId, active.id, command, {
+        ...actor,
+        tenantId: otherSiteId,
+      }),
+    ).rejects.toThrow("Child not found");
+
+    const failingEndOutbox = new OutboxService();
+    jest
+      .spyOn(failingEndOutbox, "enqueue")
+      .mockRejectedValueOnce(new Error("outbox failed"));
+    await expect(
+      new StudentSubjectsService(failingEndOutbox).end(
+        childId,
+        active.id,
+        command,
+        actor,
+      ),
+    ).rejects.toThrow("outbox failed");
+    const stillActive = await withTenantRlsContext(tenantId, orgId, (tx) =>
+      tx.studentSubjectEnrollment.findFirstOrThrow({
+        where: { id: active.id },
+      }),
+    );
+    expect(stillActive.status).toBe("ACTIVE");
+
+    await expect(
+      service.end(childId, active.id, command, actor),
+    ).resolves.toEqual({
+      id: active.id,
+      status: "ENDED",
+      endsOn: command.endsOn,
+    });
+    const result = await withTenantRlsContext(tenantId, orgId, async (tx) => ({
+      ended: await tx.studentSubjectEnrollment.findFirstOrThrow({
+        where: { id: active.id },
+      }),
+      progress: await tx.paceProgress.findFirst({
+        where: { tenantId, childId, subjectId },
+      }),
+      assessments: await tx.paceAssessment.count({
+        where: { tenantId, childId, subjectId },
+      }),
+      audit: await tx.auditEvent.findMany({
+        where: { entityId: active.id, action: "UPDATED" },
+      }),
+    }));
+    expect(result.ended).toMatchObject({
+      status: "ENDED",
+      reason: revision.reason,
+    });
+    expect(result.ended.endsOn).toEqual(new Date("2026-08-13T00:00:00.000Z"));
+    expect(result.progress).toBeNull();
+    expect(result.assessments).toBeGreaterThanOrEqual(2);
+    expect(result.audit).toHaveLength(1);
+    await expect(
+      service.end(childId, active.id, command, actor),
+    ).rejects.toThrow("Active placement not found");
   });
 });

@@ -21,6 +21,9 @@ import { InstitutionalCensusService } from "./institutional-census.service";
 import { withInstitutionalOrgLock } from "./institutional-quote.service";
 import { stripeItemsForSnapshot } from "./institutional-stripe-line-items";
 import { scheduleInstitutionalRenewal } from "./institutional-subscription-schedule";
+import { institutionalStripeKey } from "./institutional-provider-guard";
+import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
+import { INSTITUTIONAL_MAPPED_PRICING_VERSION } from "@pathway/pricing";
 
 @Injectable()
 export class InstitutionalOperationService {
@@ -32,16 +35,7 @@ export class InstitutionalOperationService {
   ) {}
 
   private stripe(): Stripe {
-    if (
-      process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED !== "true" ||
-      this.config.activeProvider !== "STRIPE_TEST" ||
-      !this.config.stripe.secretKey?.startsWith("sk_test_")
-    ) {
-      throw new ServiceUnavailableException({
-        code: "INSTITUTIONAL_PROVIDER_WRITES_DISABLED",
-      });
-    }
-    return new Stripe(this.config.stripe.secretKey, {
+    return new Stripe(institutionalStripeKey(this.config, "PROVIDER_WRITES"), {
       apiVersion: "2023-10-16",
     });
   }
@@ -206,6 +200,22 @@ export class InstitutionalOperationService {
       snapshot,
       this.config.stripe.priceMap ?? {},
     );
+    if (snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
+      for (const item of mapped) {
+        try {
+          validateFrozenStripePrice(
+            await stripe.prices.retrieve(item.price),
+            snapshot,
+            item.price,
+            this.config.activeProvider === "STRIPE",
+          );
+        } catch {
+          throw new ConflictException({
+            code: "RENEWAL_PRICE_REVIEW_REQUIRED",
+          });
+        }
+      }
+    }
     if (!subscription.currentInstitutionalSnapshot) {
       throw new ConflictException({ code: "CURRENT_SNAPSHOT_REQUIRED" });
     }

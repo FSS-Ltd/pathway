@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import { AceNoticeParentInboxService } from "../ace-notices/ace-notice-parent-inbox.service";
@@ -61,7 +62,7 @@ export class FamilyService {
     });
     if (
       !site?.org.parentPortalEnabled ||
-      site.org.orgVertical?.vertical !== "ACE_SCHOOL"
+      !isAceVertical(site.org.orgVertical?.vertical)
     ) {
       throw new NotFoundException("Family summary not found");
     }

@@ -454,13 +454,19 @@ export type AdminBuyNowPurchaseRequest = {
   cancelUrl?: string | null;
 };
 
-export type AdminOrgSector = "CHURCH" | "CLUB" | "SCHOOL" | "CHARITY";
+export type AdminOrgSector =
+  | "CHURCH"
+  | "CLUB"
+  | "SCHOOL"
+  | "CHARITY"
+  | "LEARNING_CENTRE";
 
 export const ORG_SECTOR_LABELS: Record<AdminOrgSector, string> = {
   CHURCH: "Church",
   CLUB: "Club",
   SCHOOL: "School",
   CHARITY: "Charity",
+  LEARNING_CENTRE: "Learning Centre",
 };
 
 export type AdminVertical =
@@ -470,7 +476,9 @@ export type AdminVertical =
   | "STATE_SCHOOL"
   | "NURSERY"
   | "CHARITY"
-  | "CLUB";
+  | "CLUB"
+  | "ACE_LEARNING_CENTRE"
+  | "PUBLIC_LEARNING_CENTRE";
 
 export const VERTICAL_LABELS: Record<AdminVertical, string> = {
   CHURCH: "Church",
@@ -479,6 +487,8 @@ export const VERTICAL_LABELS: Record<AdminVertical, string> = {
   STATE_SCHOOL: "State School",
   NURSERY: "Nursery",
   CHARITY: "Charity",
+  ACE_LEARNING_CENTRE: "ACE Learning Centre",
+  PUBLIC_LEARNING_CENTRE: "Public Learning Centre",
   CLUB: "Club",
 };
 
@@ -815,6 +825,31 @@ export async function createStudentSubject(
   );
   if (!response.ok) throw await studentSubjectsRequestError(response);
   return response.json() as Promise<AdminStudentSubjectPlacement>;
+}
+
+export type EndAdminStudentSubjectInput = {
+  endsOn: string;
+  reason: string;
+};
+
+export async function endStudentSubject(
+  childId: string,
+  enrollmentId: string,
+  input: EndAdminStudentSubjectInput,
+): Promise<void> {
+  if (isUsingMockApi())
+    throw new Error("Subject placements are not available in mock mode.");
+  const response = await fetch(
+    `${API_BASE_URL}/ace/students/${encodeURIComponent(childId)}/subjects/${encodeURIComponent(enrollmentId)}`,
+    {
+      method: "DELETE",
+      headers: buildAuthHeaders(),
+      credentials: "include",
+      cache: "no-store",
+      body: JSON.stringify(input),
+    },
+  );
+  if (!response.ok) throw await studentSubjectsRequestError(response);
 }
 
 /** Academic calendars are scoped to the authenticated user's active site. */
@@ -1181,6 +1216,13 @@ export type AdminBehaviourPolicyResponse = {
   } | null;
 };
 
+export type AdminCreateBehaviourCategoryInput = {
+  name: string;
+  type: AdminBehaviourType;
+  visibility: AdminBehaviourVisibility;
+  expectedCategoryVersion: number;
+};
+
 export type AdminBehaviourEntry = {
   id: string;
   childId: string;
@@ -1350,6 +1392,18 @@ export async function fetchBehaviourPolicy(): Promise<AdminBehaviourPolicyRespon
   }
   return behaviourRequest<AdminBehaviourPolicyResponse>(
     "/ace/behaviour/policy",
+  );
+}
+
+export function createBehaviourCategory(
+  input: AdminCreateBehaviourCategoryInput,
+): Promise<AdminBehaviourPolicyResponse> {
+  if (isUsingMockApi()) {
+    throw new Error("Behaviour categories are not available in mock mode.");
+  }
+  return behaviourRequest<AdminBehaviourPolicyResponse>(
+    "/ace/behaviour/policy/categories",
+    { method: "POST", body: JSON.stringify(input) },
   );
 }
 

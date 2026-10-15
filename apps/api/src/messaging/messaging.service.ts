@@ -14,6 +14,14 @@ import {
   encodeConversationCursor,
 } from "./messaging-cursor";
 import {
+  decodeMessageHistoryCursor,
+  encodeMessageHistoryCursor,
+} from "./message-history-cursor";
+import {
+  deliveryStatesForMessages,
+  type PersistedDeliveryState,
+} from "./message-delivery-state";
+import {
   assertMessagingActor,
   requireCurrentStaff,
   STAFF_CONVERSATION_KINDS,
@@ -160,11 +168,25 @@ export class MessagingService {
       });
       if (!conversation) throw new NotFoundException("Conversation not found");
 
+      let before: number | undefined;
+      if (query.cursor) {
+        try {
+          before = decodeMessageHistoryCursor(
+            query.cursor,
+            actor.tenantId,
+            actor.userId,
+            conversationId,
+          );
+        } catch {
+          throw new BadRequestException("Invalid message cursor");
+        }
+      }
+
       const rows = await tx.message.findMany({
         where: {
           tenantId: actor.tenantId,
           conversationId,
-          ...(query.before ? { sequence: { lt: query.before } } : {}),
+          ...(before ? { sequence: { lt: before } } : {}),
         },
         select: {
           id: true,
@@ -182,9 +204,9 @@ export class MessagingService {
         take: limit + 1,
       });
       const page = rows.slice(0, limit);
+      const outgoing = page.filter((row) => row.sender.userId === actor.userId);
       const recipient =
-        conversation.kind === "STAFF_DIRECT" &&
-        page.some((row) => row.sender.userId === actor.userId)
+        conversation.kind === "STAFF_DIRECT" && outgoing.length > 0
           ? await tx.messageParticipant.findFirst({
               where: {
                 tenantId: actor.tenantId,
@@ -205,17 +227,17 @@ export class MessagingService {
                   },
                 },
               },
-              select: {
-                readCursors: {
-                  where: { tenantId: actor.tenantId, conversationId },
-                  select: { lastReadSequence: true },
-                  take: 1,
-                },
-              },
+              select: { id: true },
             })
           : null;
-      const recipientReadSequence =
-        recipient?.readCursors[0]?.lastReadSequence ?? 0;
+      const deliveryStates = recipient
+        ? await deliveryStatesForMessages(
+            tx,
+            actor.tenantId,
+            conversationId,
+            outgoing,
+          )
+        : new Map<string, PersistedDeliveryState>();
       return {
         items: page.map((row) => ({
           id: row.id,
@@ -231,11 +253,22 @@ export class MessagingService {
           },
           recipientRead:
             recipient && row.sender.userId === actor.userId
-              ? row.sequence <= recipientReadSequence
+              ? deliveryStates.get(row.id) === "read"
+              : null,
+          deliveryState:
+            recipient && row.sender.userId === actor.userId
+              ? (deliveryStates.get(row.id) ?? "sent")
               : null,
         })),
-        nextBefore:
-          rows.length > limit ? (page.at(-1)?.sequence ?? null) : null,
+        nextCursor:
+          rows.length > limit && page.length > 0
+            ? encodeMessageHistoryCursor(
+                page[page.length - 1].sequence,
+                actor.tenantId,
+                actor.userId,
+                conversationId,
+              )
+            : null,
       };
     });
   }

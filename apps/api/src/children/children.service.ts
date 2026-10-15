@@ -1,11 +1,14 @@
 import {
   Injectable,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Inject,
   Optional,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
+import { isEncryptedField } from "@pathway/util";
 import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
 import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
@@ -436,7 +439,13 @@ export class ChildrenService {
     // Ensure child exists and capture its tenant for checks
     const current = await prisma.child.findFirst({
       where: { id, tenantId },
-      select: { id: true, tenantId: true, guardians: { select: { id: true } } },
+      select: {
+        id: true,
+        tenantId: true,
+        allergies: true,
+        updatedAt: true,
+        guardians: { select: { id: true } },
+      },
     });
     if (!current) throw new NotFoundException("Child not found");
 
@@ -447,6 +456,22 @@ export class ChildrenService {
       if (!isSiteAdmin) {
         input = { ...input, guardianIds: undefined };
       }
+    }
+
+    if (
+      input.allergies !== undefined &&
+      input.allergies !== current.allergies
+    ) {
+      if (isEncryptedField(current.allergies.trim()))
+        throw new ServiceUnavailableException({
+          code: "MEDICAL_INFORMATION_UNAVAILABLE",
+          message:
+            "Medical information could not be read. Retry or ask an administrator to restore access before saving.",
+        });
+      if (isEncryptedField(input.allergies.trim()))
+        throw new BadRequestException(
+          "Encrypted medical values cannot be submitted as clinical text",
+        );
     }
 
     // If group provided, ensure it belongs to the same tenant
@@ -480,35 +505,61 @@ export class ChildrenService {
       }
     }
 
-    return prisma.child.update({
-      where: { id },
-      data: {
-        ...(input.firstName ? { firstName: input.firstName.trim() } : {}),
-        ...(input.lastName ? { lastName: input.lastName.trim() } : {}),
-        ...(input.preferredName !== undefined
-          ? { preferredName: input.preferredName }
-          : {}),
-        ...(input.photoKey !== undefined ? { photoKey: input.photoKey } : {}),
-        ...(input.photoConsent !== undefined
-          ? { photoConsent: input.photoConsent }
-          : {}),
-        ...(input.allergies !== undefined
-          ? { allergies: input.allergies }
-          : {}),
-        ...(input.disabilities !== undefined
-          ? { disabilities: input.disabilities }
-          : {}),
-        ...(input.groupId !== undefined
-          ? input.groupId
-            ? { group: { connect: { id: input.groupId } } }
-            : { group: { disconnect: true } }
-          : {}),
-        ...(guardiansSet !== undefined
-          ? { guardians: { set: guardiansSet } }
-          : {}),
-      },
-      select: childSelect,
-    });
+    return prisma.child
+      .update({
+        where: {
+          id,
+          tenantId,
+          ...(input.allergies !== undefined
+            ? { updatedAt: current.updatedAt }
+            : {}),
+        },
+        data: {
+          ...(input.firstName ? { firstName: input.firstName.trim() } : {}),
+          ...(input.lastName ? { lastName: input.lastName.trim() } : {}),
+          ...(input.preferredName !== undefined
+            ? { preferredName: input.preferredName }
+            : {}),
+          ...(input.photoKey !== undefined ? { photoKey: input.photoKey } : {}),
+          ...(input.photoConsent !== undefined
+            ? { photoConsent: input.photoConsent }
+            : {}),
+          ...(input.allergies !== undefined
+            ? {
+                allergies: input.allergies,
+                ...(input.allergies !== current.allergies
+                  ? { allergiesConfirmedAt: null }
+                  : {}),
+              }
+            : {}),
+          ...(input.disabilities !== undefined
+            ? { disabilities: input.disabilities }
+            : {}),
+          ...(input.groupId !== undefined
+            ? input.groupId
+              ? { group: { connect: { id: input.groupId } } }
+              : { group: { disconnect: true } }
+            : {}),
+          ...(guardiansSet !== undefined
+            ? { guardians: { set: guardiansSet } }
+            : {}),
+        },
+        select: childSelect,
+      })
+      .catch((error: unknown) => {
+        if (
+          input.allergies !== undefined &&
+          error &&
+          typeof error === "object" &&
+          "code" in error &&
+          error.code === "P2025"
+        ) {
+          throw new ConflictException(
+            "This child record changed. Reload it before saving.",
+          );
+        }
+        throw error;
+      });
   }
 }
 

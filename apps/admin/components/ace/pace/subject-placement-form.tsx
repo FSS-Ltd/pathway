@@ -17,6 +17,7 @@ export type SubjectPlacementFormProps = {
   success: string | null;
   canRecord: boolean;
   onSave: (input: CreateAdminStudentSubjectInput) => Promise<void>;
+  onEnd?: (placement: AdminStudentSubjectPlacement) => void;
 };
 
 type SubjectPlacementFormValue = {
@@ -52,6 +53,7 @@ export function SubjectPlacementForm({
   success,
   canRecord,
   onSave,
+  onEnd,
 }: SubjectPlacementFormProps) {
   const [form, setForm] = React.useState<SubjectPlacementFormValue>(() =>
     createInitialSubjectPlacementForm(subjects),
@@ -143,6 +145,18 @@ export function SubjectPlacementForm({
                   Starting PACE {placement.startingPace} · Current PACE{" "}
                   {placement.currentPace} · Target PACE {placement.targetPace}
                 </p>
+                {canRecord && onEnd ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={isSaving}
+                    className="mt-2"
+                    onClick={() => onEnd(placement)}
+                  >
+                    Unassign subject
+                  </Button>
+                ) : null}
               </li>
             ))}
           </ul>

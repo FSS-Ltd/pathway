@@ -67,6 +67,7 @@ describe("configurator checkout payload", () => {
         contactEmail: "avery@example.com",
         password: "secure-passphrase",
         sector: "SCHOOL",
+        vertical: "INDEPENDENT_SCHOOL",
         successUrl: "https://example.com/buy/thanks",
         cancelUrl: "https://example.com/buy/cancelled",
       },
@@ -92,6 +93,7 @@ describe("configurator checkout payload", () => {
         contactEmail: "avery@example.com",
         password: "secure-passphrase",
         sector: "CHURCH",
+        vertical: "CHURCH",
         successUrl: "https://example.com/buy/thanks",
         cancelUrl: "https://example.com/buy/cancelled",
       },
@@ -115,6 +117,7 @@ describe("configurator checkout payload", () => {
         contactEmail: "avery@example.com",
         password: "secure-passphrase",
         sector: "SCHOOL",
+        vertical: "INDEPENDENT_SCHOOL",
         successUrl: "https://example.com/buy/thanks",
         cancelUrl: "https://example.com/buy/cancelled",
       },
@@ -141,6 +144,7 @@ describe("configurator checkout payload", () => {
         contactEmail: "avery@example.com",
         password: "secure-passphrase",
         sector: "CHARITY",
+        vertical: "CHARITY",
         successUrl: "https://example.com/buy/thanks",
         cancelUrl: "https://example.com/buy/cancelled",
       },
@@ -149,8 +153,14 @@ describe("configurator checkout payload", () => {
     expect(buildCheckoutPayload(state, organisation)).toEqual(expectedPayload);
   });
 
-  it("maps all seven institutional verticals into the legacy sector union", () => {
-    const expectedSectors = new Set(["CHURCH", "CLUB", "SCHOOL", "CHARITY"]);
+  it("maps all institutional verticals into their actual sectors", () => {
+    const expectedSectors = new Set([
+      "CHURCH",
+      "CLUB",
+      "SCHOOL",
+      "CHARITY",
+      "LEARNING_CENTRE",
+    ]);
 
     for (const { value } of VERTICAL_OPTIONS) {
       if (value === "HOME_EDUCATION") continue;
@@ -282,11 +292,10 @@ describe("configurator checkout and rollout source contracts", () => {
     expect(summary).not.toContain("status-error");
   });
 
-  it("does not expose legacy checkout on the institutional estimator", () => {
+  it("uses the mapped institutional checkout rather than legacy checkout", () => {
     const configurePage = readSource("app/configure/page.tsx");
-    expect(configurePage).toContain(
-      "New-plan checkout is currently unavailable.",
-    );
+    expect(configurePage).toContain("startPublicInstitutionalCheckout");
+    expect(configurePage).toContain("idempotencyKey:");
     expect(configurePage).not.toContain("createCheckoutSession");
     expect(configurePage).not.toContain("buildCheckoutPayload");
   });

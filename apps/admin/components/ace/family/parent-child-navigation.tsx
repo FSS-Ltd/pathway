@@ -12,10 +12,15 @@ import { useSession, type SessionStatus } from "@/lib/use-session-compat";
 
 type ChildSection = Extract<
   FamilySection,
-  "ace-summary" | "attendance" | "sessions" | "subject-timetable"
+  | "parent-summary"
+  | "ace-summary"
+  | "attendance"
+  | "sessions"
+  | "subject-timetable"
 >;
 
 const sectionRoutes: Record<ChildSection, string> = {
+  "parent-summary": "overview",
   "ace-summary": "summary",
   attendance: "attendance",
   sessions: "timetable",
@@ -23,6 +28,7 @@ const sectionRoutes: Record<ChildSection, string> = {
 };
 
 const sectionLabels: Record<ChildSection, string> = {
+  "parent-summary": "overview",
   "ace-summary": "overview",
   attendance: "attendance",
   sessions: "sessions",
@@ -33,6 +39,8 @@ export function childSectionForRoute(
   route: string | null,
 ): ChildSection | null {
   switch (route) {
+    case "overview":
+      return "parent-summary";
     case "summary":
       return "ace-summary";
     case "attendance":
@@ -47,6 +55,9 @@ export function childSectionForRoute(
 }
 
 function childHref(context: FamilyContext, section: ChildSection): string {
+  if (section === "parent-summary") {
+    return `/family/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/overview`;
+  }
   return `/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/${sectionRoutes[section]}`;
 }
 

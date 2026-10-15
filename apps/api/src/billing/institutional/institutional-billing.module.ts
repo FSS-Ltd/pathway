@@ -12,6 +12,10 @@ import {
   loadBillingProviderConfig,
 } from "../billing-provider.config";
 import { InstitutionalQuoteService } from "./institutional-quote.service";
+import { BillingPricingService } from "../pricing.service";
+import { InstitutionalPriceResolver } from "./institutional-price-resolver";
+import { InstitutionalPublicCheckoutController } from "./institutional-public-checkout.controller";
+import { InstitutionalPublicCheckoutService } from "./institutional-public-checkout.service";
 
 @Module({
   imports: [AuthModule, EnrolmentsModule],
@@ -19,12 +23,16 @@ import { InstitutionalQuoteService } from "./institutional-quote.service";
     InstitutionalBillingController,
     InstitutionalCatalogueController,
     InstitutionalBillingInternalController,
+    InstitutionalPublicCheckoutController,
   ],
   providers: [
     InstitutionalQuoteService,
     InstitutionalCensusService,
     InstitutionalCheckoutService,
     InstitutionalOperationService,
+    BillingPricingService,
+    InstitutionalPriceResolver,
+    InstitutionalPublicCheckoutService,
     { provide: BILLING_PROVIDER_CONFIG, useFactory: loadBillingProviderConfig },
   ],
   exports: [InstitutionalQuoteService, InstitutionalCensusService],

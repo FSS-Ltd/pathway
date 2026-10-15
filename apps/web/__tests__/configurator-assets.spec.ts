@@ -86,6 +86,8 @@ describe("configurator imagery and motion contract", () => {
       "/configurator/verticals/nursery.png",
       "/configurator/verticals/charity.png",
       "/configurator/verticals/club.png",
+      "/configurator/verticals/ace-school.png",
+      "/configurator/verticals/state-school.png",
     ]);
     expect(["100", "200", "1000"].map(storageImagePath)).toEqual([
       "/configurator/storage/storage-100gb.png",
@@ -205,12 +207,20 @@ describe("configurator imagery and motion contract", () => {
       join(process.cwd(), "app/configure/page.tsx"),
       "utf8",
     );
-    expect(page.indexOf('aria-labelledby="plan-title"')).toBeLessThan(
-      page.indexOf('aria-labelledby="estimate-title"'),
+    const breakdown = readFileSync(
+      join(
+        process.cwd(),
+        "components/configurator/institutional-breakdown.tsx",
+      ),
+      "utf8",
     );
+    expect(page.indexOf("<InstitutionalPlanStep")).toBeLessThan(
+      page.indexOf("<InstitutionalBreakdown"),
+    );
+    expect(page).toContain("grid-cols-[minmax(0,1fr)]");
     expect(page).toContain("lg:grid-cols-");
     expect(page).toContain("lg:sticky");
-    expect(page).toContain('aria-live="polite"');
+    expect(breakdown).toContain('aria-live="polite"');
   });
 
   it("uses stable bottom slots for compact and staggered foreground scenes", () => {

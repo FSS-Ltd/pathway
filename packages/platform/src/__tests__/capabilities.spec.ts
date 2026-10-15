@@ -9,7 +9,11 @@ jest.mock("@pathway/db", () => ({
 }));
 
 import { getOrgCapabilities, orgHasCapability } from "../capabilities";
-import { MODULE_CAPABILITIES } from "../capability-maps";
+import {
+  FINANCE_SERVICING_CAPABILITIES,
+  MODULE_CAPABILITIES,
+  VERTICAL_CAPABILITIES,
+} from "../capability-maps";
 
 describe("getOrgCapabilities", () => {
   beforeEach(() => {
@@ -19,7 +23,9 @@ describe("getOrgCapabilities", () => {
   it("includes core Learning even when there is no vertical or module grant", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([]);
-    expect(await getOrgCapabilities("org-1")).toEqual(MODULE_CAPABILITIES.LEARNING);
+    expect(await getOrgCapabilities("org-1")).toEqual(
+      MODULE_CAPABILITIES.LEARNING,
+    );
   });
 
   it("returns the vertical's capabilities when only a vertical is set", async () => {
@@ -44,28 +50,63 @@ describe("getOrgCapabilities", () => {
     );
   });
 
-  it("queries only ACTIVE modules", async () => {
+  it("queries active modules and Finance history for servicing access", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([]);
     await getOrgCapabilities("org-1");
     expect(orgModuleFindMany).toHaveBeenCalledWith({
-      where: { orgId: "org-1", status: "ACTIVE" },
+      where: {
+        orgId: "org-1",
+        OR: [{ status: "ACTIVE" }, { module: "FINANCE" }],
+      },
     });
   });
 
-  it("excludes an ACTIVE module whose expiresAt is in the past", async () => {
+  it("limits an expired Finance module to servicing capabilities", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([
-      { module: "FINANCE", expiresAt: new Date(Date.now() - 1_000_000) },
+      {
+        module: "FINANCE",
+        status: "ACTIVE",
+        expiresAt: new Date(Date.now() - 1_000_000),
+      },
     ]);
-    expect(await getOrgCapabilities("org-1")).toEqual(MODULE_CAPABILITIES.LEARNING);
+    const capabilities = await getOrgCapabilities("org-1");
+    expect(capabilities).toEqual(
+      expect.arrayContaining([
+        ...MODULE_CAPABILITIES.LEARNING,
+        ...FINANCE_SERVICING_CAPABILITIES,
+      ]),
+    );
+    expect(capabilities).not.toContain("finance.invoices");
+    expect(capabilities).not.toContain("finance.invoices.manage");
+  });
+
+  it("limits a cancelled Finance module to servicing capabilities", async () => {
+    orgVerticalFindUnique.mockResolvedValueOnce(null);
+    orgModuleFindMany.mockResolvedValueOnce([
+      { module: "FINANCE", status: "CANCELLED", expiresAt: new Date() },
+    ]);
+    const capabilities = await getOrgCapabilities("org-1");
+    expect(capabilities).toEqual(
+      expect.arrayContaining([
+        ...MODULE_CAPABILITIES.LEARNING,
+        ...FINANCE_SERVICING_CAPABILITIES,
+      ]),
+    );
+    expect(capabilities).not.toContain("finance.invoices");
+    expect(capabilities).not.toContain("finance.invoices.manage");
   });
 
   it("returns a deduped union of vertical + active module capabilities", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce({ vertical: "CHURCH" });
     orgModuleFindMany.mockResolvedValueOnce([
-      { module: "FINANCE", expiresAt: null },
-      { module: "EVENTS", expiresAt: new Date(Date.now() + 1_000_000) },
+      { module: "FINANCE", status: "ACTIVE", expiresAt: null },
+      {
+        module: "EVENTS",
+        status: "ACTIVE",
+        expiresAt: new Date(Date.now() + 1_000_000),
+      },
     ]);
     const caps = await getOrgCapabilities("org-1");
     expect(new Set(caps).size).toBe(caps.length);
@@ -97,7 +138,10 @@ describe("getOrgCapabilities", () => {
       where: { orgId: "org-operational" },
     });
     expect(reader.orgModule.findMany).toHaveBeenCalledWith({
-      where: { orgId: "org-operational", status: "ACTIVE" },
+      where: {
+        orgId: "org-operational",
+        OR: [{ status: "ACTIVE" }, { module: "FINANCE" }],
+      },
     });
     expect(orgVerticalFindUnique).not.toHaveBeenCalled();
     expect(orgModuleFindMany).not.toHaveBeenCalled();
@@ -119,5 +163,38 @@ describe("orgHasCapability", () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
     orgModuleFindMany.mockResolvedValueOnce([]);
     expect(await orgHasCapability("org-1", "finance.invoices")).toBe(false);
+  });
+});
+
+describe("institutional compliance entitlements", () => {
+  it("includes institutional compliance without granting it to Home", () => {
+    for (const [vertical, capabilities] of Object.entries(
+      VERTICAL_CAPABILITIES,
+    )) {
+      for (const permission of [
+        "compliance.checks.read",
+        "compliance.tracker.read",
+        "compliance.tracker.manage",
+        "compliance.checks.manage",
+        "compliance.medical.read",
+        "compliance.medical.manage",
+        "compliance.agreements.read",
+        "compliance.agreements.manage",
+      ]) {
+        expect((capabilities as readonly string[]).includes(permission)).toBe(
+          vertical !== "HOME_EDUCATION",
+        );
+      }
+    }
+    for (const capabilities of Object.values(MODULE_CAPABILITIES)) {
+      expect(capabilities).not.toContain("compliance.checks.read");
+      expect(capabilities).not.toContain("compliance.tracker.read");
+      expect(capabilities).not.toContain("compliance.tracker.manage");
+      expect(capabilities).not.toContain("compliance.checks.manage");
+      expect(capabilities).not.toContain("compliance.medical.read");
+      expect(capabilities).not.toContain("compliance.medical.manage");
+      expect(capabilities).not.toContain("compliance.agreements.read");
+      expect(capabilities).not.toContain("compliance.agreements.manage");
+    }
   });
 });

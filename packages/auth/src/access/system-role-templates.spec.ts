@@ -27,6 +27,18 @@ const CORE_PERMISSIONS = [
 ];
 
 describe("ACE system role templates", () => {
+  it("grants category creation to Organisation Head by default only", () => {
+    expect(SYSTEM_ROLE_TEMPLATES.organisationHead.permissions).toContain(
+      "ace.behaviour.categories.create",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.siteLead.permissions).not.toContain(
+      "ace.behaviour.categories.create",
+    );
+    expect(SYSTEM_ROLE_TEMPLATES.staff.permissions).not.toContain(
+      "ace.behaviour.categories.create",
+    );
+  });
+
   it("defines the approved protected template scopes and permission mappings", () => {
     expect(SYSTEM_ROLE_TEMPLATES).toEqual({
       organisationHead: {
@@ -34,6 +46,14 @@ describe("ACE system role templates", () => {
         scope: "organisation",
         protected: true,
         permissions: [
+          "compliance.checks.read",
+          "compliance.tracker.read",
+          "compliance.tracker.manage",
+          "compliance.checks.manage",
+          "compliance.medical.read",
+          "compliance.medical.manage",
+          "compliance.agreements.read",
+          "compliance.agreements.manage",
           "platform.access.roles.read",
           "platform.access.roles.manage",
           "platform.access.permissions.read",
@@ -76,6 +96,7 @@ describe("ACE system role templates", () => {
           "ace.behaviour.read",
           "ace.behaviour.record",
           "ace.behaviour.correct",
+          "ace.behaviour.categories.create",
           "ace.behaviour.policy.manage",
           "ace.reports.read",
           "ace.reports.review",
@@ -99,6 +120,14 @@ describe("ACE system role templates", () => {
         scope: "site",
         protected: true,
         permissions: [
+          "compliance.checks.read",
+          "compliance.tracker.read",
+          "compliance.tracker.manage",
+          "compliance.checks.manage",
+          "compliance.medical.read",
+          "compliance.medical.manage",
+          "compliance.agreements.read",
+          "compliance.agreements.manage",
           "attendance.read",
           "attendance.manage",
           "ace.attendance.export",
@@ -188,6 +217,11 @@ describe("ACE system role templates", () => {
         scope: "site",
         protected: true,
         permissions: [
+          "compliance.checks.read",
+          "compliance.tracker.read",
+          "compliance.tracker.manage",
+          "compliance.checks.manage",
+          "compliance.medical.read",
           "safeguarding.concerns.record",
           "safeguarding.concerns.read",
           "safeguarding.concerns.manage",
@@ -201,6 +235,13 @@ describe("ACE system role templates", () => {
         scope: "organisation",
         protected: true,
         permissions: [
+          "finance.invoices.read",
+          "finance.invoices.manage",
+          "finance.payments.read",
+          "finance.payments.manage",
+          "finance.reports.read",
+          "finance.statements.read",
+          "finance.exports.create",
           "finance.invoices",
           "finance.payments",
           "finance.reports",
@@ -208,6 +249,37 @@ describe("ACE system role templates", () => {
           "finance.family_invoices.manage",
           "finance.family_payments.record",
           "finance.family_reports.read",
+        ],
+      },
+      financeAdministrator: {
+        name: "Finance Administrator",
+        scope: "organisation",
+        protected: true,
+        permissions: [
+          "finance.invoices.read",
+          "finance.invoices.manage",
+          "finance.payments.read",
+          "finance.payments.manage",
+          "finance.reports.read",
+          "finance.statements.read",
+          "finance.exports.create",
+          "finance.payer_access.manage",
+          "finance.approvals.review",
+          "finance.invoices",
+          "finance.payments",
+          "finance.reports",
+        ],
+      },
+      financeApprover: {
+        name: "Finance Approver",
+        scope: "organisation",
+        protected: true,
+        permissions: [
+          "finance.invoices.read",
+          "finance.payments.read",
+          "finance.reports.read",
+          "finance.statements.read",
+          "finance.approvals.review",
         ],
       },
       parent: {
@@ -220,6 +292,8 @@ describe("ACE system role templates", () => {
           "messaging.messages.read",
           "messaging.messages.send",
           "finance.family_invoices.read",
+          "finance.family_payments.pay",
+          "finance.family_statements.read",
           "ace.parent.progress.read",
           "ace.parent.notices.read",
           "ace.faith.read",
@@ -290,10 +364,10 @@ describe("ACE system role templates", () => {
     );
   });
 
-  it("gives every template except financeOperator at least one core (vertical-independent) permission", () => {
+  it("gives each non-Finance template at least one core (vertical-independent) permission", () => {
     const coreSet = new Set(CORE_PERMISSIONS);
     for (const [key, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
-      if (key === "financeOperator") continue;
+      if (key.startsWith("finance")) continue;
       const hasCore = template.permissions.some((permission) =>
         coreSet.has(permission),
       );
@@ -322,6 +396,58 @@ describe("ACE system role templates", () => {
       const permissions = SYSTEM_ROLE_TEMPLATES[key].permissions;
       for (const forbidden of siteOrOrgOnlyCore) {
         expect(permissions).not.toContain(forbidden);
+      }
+    }
+  });
+});
+
+describe("institutional compliance role defaults", () => {
+  it("limits personnel access to administrators and safeguarding leads", () => {
+    for (const [name, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
+      const allowed = [
+        "organisationHead",
+        "siteLead",
+        "safeguardingLead",
+      ].includes(name);
+      for (const permission of [
+        "compliance.checks.read",
+        "compliance.tracker.read",
+        "compliance.tracker.manage",
+        "compliance.checks.manage",
+      ]) {
+        expect(
+          (template.permissions as readonly string[]).includes(permission),
+        ).toBe(allowed);
+      }
+    }
+  });
+});
+
+describe("medical information role defaults", () => {
+  it("allows administrators to manage and safeguarding leads only to read", () => {
+    for (const [name, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
+      const permissions: readonly string[] = template.permissions;
+      expect(permissions.includes("compliance.medical.read")).toBe(
+        ["organisationHead", "siteLead", "safeguardingLead"].includes(name),
+      );
+      expect(permissions.includes("compliance.medical.manage")).toBe(
+        ["organisationHead", "siteLead"].includes(name),
+      );
+    }
+  });
+});
+
+describe("agreement role defaults", () => {
+  it("reserves general agreement access for administrators", () => {
+    for (const [name, template] of Object.entries(SYSTEM_ROLE_TEMPLATES)) {
+      const permissions: readonly string[] = template.permissions;
+      for (const permission of [
+        "compliance.agreements.read",
+        "compliance.agreements.manage",
+      ]) {
+        expect(permissions.includes(permission)).toBe(
+          ["organisationHead", "siteLead"].includes(name),
+        );
       }
     }
   });

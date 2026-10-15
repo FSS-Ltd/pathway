@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import { Injectable } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import {
@@ -20,7 +21,7 @@ export class AceNoticeTargetsService {
   async list(query: NoticeTargetQuery, actor: NoticeActor) {
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       const site = await requireSiteNoticeStaffAccess(tx, actor);
-      if (site.vertical !== "ACE_SCHOOL") {
+      if (!isAceVertical(site.vertical)) {
         return { available: false, items: [] };
       }
       const { scope, search, selectedId } = query;

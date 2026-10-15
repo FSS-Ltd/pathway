@@ -11,7 +11,9 @@ export type Vertical =
   | "NURSERY"
   | "CHARITY"
   | "CLUB"
-  | "HOME_EDUCATION";
+  | "HOME_EDUCATION"
+  | "ACE_LEARNING_CENTRE"
+  | "PUBLIC_LEARNING_CENTRE";
 
 export const VERTICAL_LABELS: Record<Vertical, string> = {
   CHURCH: "Church",
@@ -22,6 +24,8 @@ export const VERTICAL_LABELS: Record<Vertical, string> = {
   CHARITY: "Charity",
   CLUB: "Club",
   HOME_EDUCATION: "Home Education",
+  ACE_LEARNING_CENTRE: "ACE Learning Centre",
+  PUBLIC_LEARNING_CENTRE: "Public Learning Centre",
 };
 
 export const VERTICAL_OPTIONS: { value: Vertical; label: string }[] = (
@@ -29,5 +33,8 @@ export const VERTICAL_OPTIONS: { value: Vertical; label: string }[] = (
 ).map((value) => ({ value, label: VERTICAL_LABELS[value] }));
 
 export function isVertical(value: unknown): value is Vertical {
-  return typeof value === "string" && value in VERTICAL_LABELS;
+  return (
+    typeof value === "string" &&
+    Object.prototype.hasOwnProperty.call(VERTICAL_LABELS, value)
+  );
 }

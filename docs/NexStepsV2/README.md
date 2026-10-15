@@ -13,6 +13,11 @@ Every phase doc in this set was grounded against the actual repo, not written fr
 
 ---
 
+## Compliance and Learning Centres
+
+See the [Compliance delivery plan](compliance/README.md) for the approved institutional
+tracker scope, Learning Centre types, research coverage and gated delivery record.
+
 ## How to read this package
 
 | # | Document | What it answers |

@@ -17,6 +17,7 @@ import { ChildDetailsEditor } from "./child-details-editor";
 import { ChildGuardianSection } from "./child-guardian-section";
 import { ChildAttendanceSection } from "./child-attendance-section";
 import { ChildRegistrationSection } from "./child-registration-section";
+import { ChildPaceSection } from "./child-pace-section";
 import { useChildProfileAccess } from "./use-child-profile-access";
 import { useChildProfile } from "./use-child-profile";
 
@@ -33,6 +34,9 @@ export function ChildProfileWorkspace({ childId }: { childId: string }) {
       : []),
     ...(access.canViewAttendance
       ? [{ id: "attendance" as const, label: "Attendance" }]
+      : []),
+    ...(access.canViewPace
+      ? [{ id: "pace" as const, label: "Subjects & PACEs" }]
       : []),
   ];
   const activeTab = tabs.some((tab) => tab.id === selectedTab)
@@ -159,6 +163,12 @@ export function ChildProfileWorkspace({ childId }: { childId: string }) {
               <ChildAttendanceSection
                 childId={childId}
                 canExport={access.isAdmin}
+              />
+            ) : null}
+            {activeTab === "pace" && access.canViewPace ? (
+              <ChildPaceSection
+                childId={childId}
+                canRecord={access.canRecordPace}
               />
             ) : null}
             {/* Finance and Child Merit Market join here after their own entitlement and data modules ship. */}

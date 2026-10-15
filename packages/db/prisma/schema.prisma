@@ -110,6 +110,29 @@ enum SubscriptionStatus {
   INCOMPLETE
 }
 
+enum FinanceCurrency {
+  GBP
+}
+
+enum FinanceInvoiceStatus {
+  DRAFT
+  IN_REVIEW
+  ISSUED
+  VOID
+}
+
+enum FinanceReceiptStatus {
+  PROCESSING
+  CONFIRMED
+  FAILED
+}
+
+enum FinanceReceiptSource {
+  MANUAL_TRANSFER
+  STRIPE_CARD
+  STRIPE_BACS
+}
+
 enum PendingOrderStatus {
   PENDING
   COMPLETED
@@ -162,6 +185,10 @@ enum AuditAction {
 }
 
 enum AuditEntityType {
+  COMPLIANCE_TRACKER
+  CHILD_MEDICAL
+  COMPLIANCE_PERSONNEL
+  COMPLIANCE_AGREEMENT
   CONCERN
   CHILD_NOTE
   ORG_ROLE
@@ -200,6 +227,7 @@ enum ChildGuardianContactType {
 // Selected once at initial plan purchase; drives which features are visible to the org.
 // Keep in sync with SectorId in apps/web/content/sectors.ts and Sector in packages/types.
 enum OrgSector {
+  LEARNING_CENTRE
   CHURCH
   CLUB
   SCHOOL
@@ -210,6 +238,8 @@ enum OrgSector {
 // Superset of OrgSector — SCHOOL splits into three verticals. Not yet consumed by any
 // application code; PR 1.2 adds the OrgVertical/OrgModule models that reference these.
 enum Vertical {
+  ACE_LEARNING_CENTRE
+  PUBLIC_LEARNING_CENTRE
   CHURCH
   INDEPENDENT_SCHOOL
   ACE_SCHOOL
@@ -263,6 +293,7 @@ enum AccessTagKey {
   SENSITIVE_NOTE_VIEWER       @map("sensitive-note-viewer")
   BEHAVIOUR_VIEWER            @map("behaviour-viewer")
   BEHAVIOUR_CORRECTOR         @map("behaviour-corrector")
+  BEHAVIOUR_CATEGORY_CREATOR  @map("behaviour-category-creator")
   STUDENT_DRILLTHROUGH_VIEWER @map("student-drillthrough-viewer")
   PACE_FULL_ACCESS            @map("pace-full-access")
   SUPERVISOR_ALL_STUDENTS     @map("supervisor-all-students")
@@ -939,6 +970,16 @@ enum HandoverLogStatus {
 
 // NEW: Org (Suite) — business/billing owner; may contain multiple Tenants (sites)
 model Org {
+  complianceProfiles ComplianceSiteProfile[]
+  complianceProfileRevisions ComplianceProfileRevision[]
+  complianceAttestations ComplianceAttestation[]
+  complianceEvidence ComplianceEvidence[]
+  compliancePersonnelRecords CompliancePersonnelRecord[]
+  agreementDocuments ComplianceAgreementDocument[]
+  agreementVersions ComplianceAgreementVersion[]
+  agreementAssignments ComplianceAgreementAssignment[]
+  agreementAcceptances ComplianceAgreementAcceptance[]
+  compliancePersonnelRevisions CompliancePersonnelRevision[]
   id                  String                   @id @default(uuid())
   name                String
   slug                String                   @unique
@@ -983,6 +1024,7 @@ model Org {
   roleAssignments     UserRoleAssignment[]
   accessTagGrants     AccessTagGrant[]
   accessTagExclusions AccessTagExclusion[]
+  financeProfiles     FinanceProfile[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -992,6 +1034,16 @@ model Org {
 // maps directly to this model. Future migrations may introduce a dedicated `Site`
 // wrapper but the tenant id remains the canonical RLS key.
 model Tenant {
+  complianceProfiles ComplianceSiteProfile[]
+  complianceProfileRevisions ComplianceProfileRevision[]
+  complianceAttestations ComplianceAttestation[]
+  complianceEvidence ComplianceEvidence[]
+  compliancePersonnelRecords CompliancePersonnelRecord[]
+  agreementDocuments ComplianceAgreementDocument[]
+  agreementVersions ComplianceAgreementVersion[]
+  agreementAssignments ComplianceAgreementAssignment[]
+  agreementAcceptances ComplianceAgreementAcceptance[]
+  compliancePersonnelRevisions CompliancePersonnelRevision[]
   id       String  @id @default(uuid())
   name     String
   slug     String  @unique
@@ -1071,6 +1123,7 @@ model Tenant {
   studentIdentityLinks   StudentIdentityLink[]
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites  FamilyIdentityInvite[]
+  financeProfile        FinanceProfile?
   aceTermReports         AceTermReport[]
   aceReportCompilations  AceReportCompilation[]
   aceReportDrafts        AceReportDraft[]
@@ -1107,6 +1160,7 @@ model Tenant {
   messages                           Message[]
   messageParticipantReadCursors      MessageParticipantReadCursor[]
   messageDeliveries                  MessageDelivery[]
+  messageEmailPreferences            MessageEmailPreference[]
   messageAttachments                 MessageAttachment[]
   aceNotices                         AceNotice[]
   aceNoticeAudienceMembers           AceNoticeAudienceMember[]
@@ -1174,6 +1228,20 @@ model UserOrgRole {
 }
 
 model User {
+  complianceProfilesUpdated ComplianceSiteProfile[]
+  complianceProfilesRecorded ComplianceProfileRevision[]
+  complianceAttestationsCreated ComplianceAttestation[]
+  complianceEvidenceCreated ComplianceEvidence[]
+  complianceSubjects CompliancePersonnelRecord[] @relation("ComplianceSubject")
+  complianceCreated CompliancePersonnelRecord[] @relation("ComplianceCreated")
+  complianceUpdated CompliancePersonnelRecord[] @relation("ComplianceUpdated")
+  complianceVerified CompliancePersonnelRecord[] @relation("ComplianceVerified")
+  complianceRevisions CompliancePersonnelRevision[]
+  agreementDocumentsCreated ComplianceAgreementDocument[]
+  agreementVersionsCreated ComplianceAgreementVersion[]
+  agreementAssignmentsReceived ComplianceAgreementAssignment[] @relation("AgreementRecipient")
+  agreementAssignmentsCreated ComplianceAgreementAssignment[] @relation("AgreementAssigner")
+  agreementAcceptancesRecorded ComplianceAgreementAcceptance[]
   id                String    @id @default(uuid())
   email             String?   @unique
   name              String?
@@ -1220,6 +1288,9 @@ model User {
   staffActivities                   StaffActivity[]
   identities                        UserIdentity[]
   guardianIdentities                GuardianIdentity[]
+  financePayerGrants                FinancePayerGrant[]                 @relation("FinancePayerGrantPayer")
+  financePayerGrantsIssued          FinancePayerGrant[]                 @relation("FinancePayerGrantGrantedBy")
+  financePayerGrantsRevoked         FinancePayerGrant[]                 @relation("FinancePayerGrantRevokedBy")
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
@@ -1297,6 +1368,7 @@ model User {
   aceCommunityModerationActions   AceCommunityModerationAction[]   @relation("AceCommunityModerationActionModerator")
   createdMessageConversations       MessageConversation[]          @relation("MessageConversationCreatedBy")
   messageParticipants               MessageParticipant[]           @relation("MessageParticipantUser")
+  messageEmailPreferences           MessageEmailPreference[]
   createdAceNotices                 AceNotice[]                    @relation("AceNoticeCreatedBy")
   scheduledAceNotices               AceNotice[]                    @relation("AceNoticeScheduledBy")
   aceNoticeAudienceMemberships      AceNoticeAudienceMember[]      @relation("AceNoticeAudienceRecipient")
@@ -1659,8 +1731,9 @@ model ChildRegistrationSubmission {
   @@index([tenantId, childId, submittedAt])
 }
 
-// allergies/additionalNeedsNotes/gpName/gpPhone/specialNeedsOther/notes are encrypted
-// at rest — see packages/db/src/pii-encryption.ts. dateOfBirth is NOT yet encrypted
+// Child medical content is encrypted at rest (including medicalConditions and
+// medicationAtSite); see the full field list in packages/db/src/pii-encryption.ts.
+// dateOfBirth is NOT yet encrypted
 // (would require a DateTime -> String column change; tracked as a follow-up).
 model Child {
   id                         String                      @id @default(uuid())
@@ -1669,6 +1742,9 @@ model Child {
   preferredName              String?
   dateOfBirth                DateTime?
   allergies                  String                      @default("unknown")
+  allergiesConfirmedAt       DateTime?
+  medicalConditions          String?
+  medicationAtSite           String?
   additionalNeedsNotes       String?
   // Safeguarding-relevant info from public signup
   schoolName                 String?
@@ -2064,6 +2140,7 @@ model MessageParticipant {
   guardianIdentityId String?
   joinedAt           DateTime               @default(now())
   removedAt          DateTime?
+  mutedAt            DateTime?
 
   tenant           Tenant                         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   conversation     MessageConversation            @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
@@ -2072,6 +2149,7 @@ model MessageParticipant {
   sentMessages     Message[]
   readCursors      MessageParticipantReadCursor[]
   deliveries       MessageDelivery[]
+  emailDeliveries  MessageEmailDelivery[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, conversationId, userId])
@@ -2089,11 +2167,12 @@ model Message {
   bodyEncrypted       String   @db.Text
   createdAt           DateTime @default(now())
 
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  conversation MessageConversation @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  sender       MessageParticipant  @relation(fields: [senderParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict)
-  deliveries   MessageDelivery[]
-  attachments  MessageAttachment[]
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  conversation    MessageConversation    @relation(fields: [conversationId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  sender          MessageParticipant     @relation(fields: [senderParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  deliveries      MessageDelivery[]
+  emailDeliveries MessageEmailDelivery[]
+  attachments     MessageAttachment[]
 
   @@unique([id, tenantId])
   @@unique([tenantId, conversationId, sequence])
@@ -2137,6 +2216,40 @@ model MessageDelivery {
   @@unique([id, tenantId])
   @@unique([tenantId, messageId, recipientParticipantId])
   @@index([tenantId, recipientParticipantId, status, createdAt])
+}
+
+model MessageEmailPreference {
+  id              String   @id @default(uuid())
+  tenantId        String
+  userId          String
+  enabled         Boolean  @default(false)
+  quietHoursStart String?  @db.VarChar(5)
+  quietHoursEnd   String?  @db.VarChar(5)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, map: "MessageEmailPreference_tenant_fkey")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict, map: "MessageEmailPreference_user_fkey")
+
+  @@unique([tenantId, userId])
+}
+
+model MessageEmailDelivery {
+  id                     String    @id @default(uuid())
+  tenantId               String
+  messageId              String
+  recipientParticipantId String
+  status                 String    @default("CLAIMED") @db.VarChar(16)
+  providerId             String?
+  failureCategory        String?   @db.VarChar(64)
+  claimedAt              DateTime  @default(now())
+  sentAt                 DateTime?
+
+  message              Message            @relation(fields: [messageId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MessageEmailDelivery_message_fkey")
+  recipientParticipant MessageParticipant @relation(fields: [recipientParticipantId, tenantId], references: [id, tenantId], onDelete: Restrict, map: "MessageEmailDelivery_participant_fkey")
+
+  @@unique([tenantId, messageId, recipientParticipantId])
+  @@index([tenantId, status, claimedAt])
 }
 
 model MessageAttachment {
@@ -4219,6 +4332,7 @@ model IdentityWebhookEvent {
 // for the RLS/CHECK-constraint treatment this schema does not model.
 
 model Jurisdiction {
+  complianceProfiles ComplianceSiteProfile[]
   id                   String                    @id @default(uuid())
   countryCode          String                    @db.Char(2) // ISO 3166-1 alpha-2
   subdivisionCode      String? // ISO 3166-2, null at COUNTRY level
@@ -4393,4 +4507,414 @@ model Correspondence {
   @@unique([id, tenantId])
   @@index([tenantId, status, responseDueAt])
   @@index([tenantId, childId])
+}
+
+enum ComplianceRecordKind {
+  BACKGROUND_CHECK
+  SAFEGUARDING_TRAINING
+  FIRST_AID
+  QUALIFICATION
+  OTHER_TRAINING
+}
+
+enum ComplianceCheckScheme {
+  DBS
+  PVG
+  ACCESSNI
+  LOCAL
+}
+
+enum ComplianceRecordStatus {
+  PENDING
+  RECORDED
+  VERIFIED
+}
+
+// All free text is encrypted through pii-encryption.ts. Dates are review metadata,
+// not certificate expiry dates. Archiving retains the immutable revision history.
+model CompliancePersonnelRecord {
+  id                String                        @id @default(uuid())
+  orgId             String
+  tenantId          String
+  subjectName       String
+  subjectUserId     String?
+  roleDescription   String
+  kind              ComplianceRecordKind
+  scheme            ComplianceCheckScheme?
+  title             String
+  provider          String?
+  reference         String?
+  completedOn       DateTime?                     @db.Date
+  reviewDueOn       DateTime?                     @db.Date
+  status            ComplianceRecordStatus        @default(PENDING)
+  notes             String?
+  verificationNotes String?
+  version           Int                           @default(1)
+  verifiedAt        DateTime?
+  verifiedByUserId  String?
+  archivedAt        DateTime?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+  createdByUserId   String
+  updatedByUserId   String
+  org               Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant            Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  subject           User?                         @relation("ComplianceSubject", fields: [subjectUserId], references: [id], onDelete: Restrict)
+  createdBy         User                          @relation("ComplianceCreated", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedBy         User                          @relation("ComplianceUpdated", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  verifiedBy        User?                         @relation("ComplianceVerified", fields: [verifiedByUserId], references: [id], onDelete: Restrict)
+  revisions         CompliancePersonnelRevision[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, archivedAt, createdAt, id])
+  @@index([tenantId, orgId, reviewDueOn])
+  @@index([subjectUserId])
+}
+
+model CompliancePersonnelRevision {
+  id          String                    @id @default(uuid())
+  orgId       String
+  tenantId    String
+  recordId    String
+  version     Int
+  actorUserId String
+  createdAt   DateTime                  @default(now())
+  snapshot    Json
+  org         Org                       @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant      Tenant                    @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  record      CompliancePersonnelRecord @relation(fields: [recordId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor       User                      @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([recordId, version])
+  @@index([tenantId, orgId, recordId, version])
+}
+
+enum ComplianceAgreementAcceptanceMethod {
+  ACKNOWLEDGED
+  RECORDED_SIGNED_COPY
+}
+
+model ComplianceAgreementDocument {
+  id              String                       @id @default(uuid())
+  tenantId        String
+  orgId           String
+  latestVersion   Int                          @default(1)
+  createdAt       DateTime                     @default(now())
+  createdByUserId String
+  createdBy       User                         @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  versions        ComplianceAgreementVersion[]
+  org             Org                          @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant          Tenant                       @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, createdAt, id])
+}
+
+model ComplianceAgreementVersion {
+  id                 String                          @id @default(uuid())
+  tenantId           String
+  orgId              String
+  documentId         String
+  version            Int
+  title              String
+  contentText        String
+  originalStorageKey String?
+  originalFileName   String?
+  originalSha256     String?
+  createdAt          DateTime                        @default(now())
+  createdByUserId    String
+  createdBy          User                            @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  document           ComplianceAgreementDocument     @relation(fields: [documentId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  assignments        ComplianceAgreementAssignment[]
+  org                Org                             @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant             Tenant                          @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([documentId, version])
+  @@index([tenantId, orgId, documentId, version])
+}
+
+model ComplianceAgreementAssignment {
+  id               String                         @id @default(uuid())
+  tenantId         String
+  orgId            String
+  versionId        String
+  recipientUserId  String
+  assignedAt       DateTime                       @default(now())
+  assignedByUserId String
+  adultConfirmedAt DateTime
+  supersededAt     DateTime?
+  version          ComplianceAgreementVersion     @relation(fields: [versionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  recipient        User                           @relation("AgreementRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+  assignedBy       User                           @relation("AgreementAssigner", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  acceptance       ComplianceAgreementAcceptance?
+  org              Org                            @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant           Tenant                         @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([versionId, recipientUserId])
+  @@index([tenantId, orgId, recipientUserId, assignedAt, id])
+  @@index([tenantId, orgId, assignedAt, id])
+}
+
+model ComplianceAgreementAcceptance {
+  id               String                              @id @default(uuid())
+  tenantId         String
+  orgId            String
+  assignmentId     String                              @unique
+  method           ComplianceAgreementAcceptanceMethod
+  typedName        String
+  recordedAt       DateTime                            @default(now())
+  recordedByUserId String
+  signedOn         DateTime?                           @db.Date
+  signedStorageKey String?
+  signedFileName   String?
+  signedSha256     String?
+  assignment       ComplianceAgreementAssignment       @relation(fields: [assignmentId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  recordedBy       User                                @relation(fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  org              Org                                 @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant           Tenant                              @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([assignmentId, tenantId, orgId])
+  @@index([tenantId, orgId, recordedAt, id])
+}
+
+enum ComplianceAttestationStatus {
+  COMPLETE
+  NOT_STARTED
+  NOT_APPLICABLE
+}
+
+model ComplianceSiteProfile {
+  id              String                      @id @default(uuid())
+  tenantId        String                      @unique
+  orgId           String
+  jurisdictionId  String?
+  version         Int
+  profileJson     String
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  updatedByUserId String
+  tenant          Tenant                      @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org             Org                         @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  jurisdiction    Jurisdiction?               @relation(fields: [jurisdictionId], references: [id], onDelete: Restrict)
+  updatedBy       User                        @relation(fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  revisions       ComplianceProfileRevision[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([orgId, tenantId])
+}
+
+model ComplianceProfileRevision {
+  id              String                  @id @default(uuid())
+  tenantId        String
+  orgId           String
+  profileId       String
+  version         Int
+  profileJson     String
+  createdAt       DateTime                @default(now())
+  createdByUserId String
+  profile         ComplianceSiteProfile   @relation(fields: [profileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant          Tenant                  @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org             Org                     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdBy       User                    @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  attestations    ComplianceAttestation[]
+
+  @@unique([profileId, version, tenantId, orgId])
+  @@index([tenantId, orgId, version])
+}
+
+model ComplianceAttestation {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  orgId               String
+  profileId           String
+  profileVersion      Int
+  requirementId       String
+  requirementVersion  Int
+  revision            Int
+  requirementJson     String
+  status              ComplianceAttestationStatus
+  notes               String
+  notApplicableReason String?
+  reviewDueAt         DateTime?
+  createdAt           DateTime                    @default(now())
+  createdByUserId     String
+  profileRevision     ComplianceProfileRevision   @relation(fields: [profileId, profileVersion, tenantId, orgId], references: [profileId, version, tenantId, orgId], onDelete: Restrict)
+  tenant              Tenant                      @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                 Org                         @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdBy           User                        @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, requirementId, revision])
+  @@index([tenantId, orgId, requirementId, id])
+}
+
+model ComplianceEvidence {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  orgId              String
+  requirementId      String
+  requirementVersion Int
+  title              String
+  notes              String
+  fileName           String
+  storageKey         String
+  sha256             String
+  createdAt          DateTime  @default(now())
+  createdByUserId    String
+  archivedAt         DateTime?
+  tenant             Tenant    @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                Org       @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  createdBy          User      @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, orgId, requirementId, id])
+}
+
+model FinanceProfile {
+  id              String                        @id @default(uuid())
+  orgId           String
+  tenantId        String
+  legalEntityName String
+  currency        FinanceCurrency               @default(GBP)
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  org             Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tenant          Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  invoiceSequence FinanceInvoiceNumberSequence?
+  invoices        FinanceInvoice[]
+  receipts        FinanceReceipt[]
+  payerAccounts   FinancePayerAccount[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, orgId])
+  @@index([orgId, tenantId])
+}
+
+model FinancePayerAccount {
+  id               String              @id @default(uuid())
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  displayName      String
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  financeProfile   FinanceProfile      @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  grants           FinancePayerGrant[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([financeProfileId, displayName])
+  @@index([tenantId, orgId, createdAt])
+}
+
+model FinancePayerGrant {
+  id                    String              @id @default(uuid())
+  financePayerAccountId String
+  tenantId              String
+  orgId                 String
+  payerUserId           String
+  grantedByUserId       String
+  revokedByUserId       String?
+  grantedAt             DateTime            @default(now())
+  revokedAt             DateTime?
+  payerAccount          FinancePayerAccount @relation(fields: [financePayerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payer                 User                @relation("FinancePayerGrantPayer", fields: [payerUserId], references: [id], onDelete: Restrict)
+  grantedBy             User                @relation("FinancePayerGrantGrantedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+  revokedBy             User?               @relation("FinancePayerGrantRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, financePayerAccountId, payerUserId, revokedAt])
+  @@index([payerUserId, tenantId, orgId, revokedAt])
+}
+
+model FinanceInvoiceNumberSequence {
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  lastIssuedNumber BigInt         @default(0)
+  updatedAt        DateTime       @updatedAt
+  financeProfile   FinanceProfile @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@id([financeProfileId, tenantId, orgId])
+  @@index([tenantId, orgId])
+}
+
+model FinanceInvoice {
+  id               String                     @id @default(uuid())
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  invoiceNumber    BigInt?
+  status           FinanceInvoiceStatus       @default(DRAFT)
+  currency         FinanceCurrency            @default(GBP)
+  subtotalMinor    BigInt                     @default(0)
+  taxMinor         BigInt                     @default(0)
+  totalMinor       BigInt                     @default(0)
+  issuedAt         DateTime?
+  dueAt            DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  financeProfile   FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  lines            FinanceInvoiceLine[]
+  allocations      FinanceReceiptAllocation[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, status, dueAt])
+  @@index([financeProfileId, status, createdAt])
+}
+
+model FinanceInvoiceLine {
+  id                 String         @id @default(uuid())
+  invoiceId          String
+  tenantId           String
+  orgId              String
+  lineOrder          Int
+  description        String
+  quantity           Decimal        @db.Decimal(12, 3)
+  unitAmountMinor    BigInt
+  taxRateBasisPoints Int            @default(0)
+  netAmountMinor     BigInt
+  taxAmountMinor     BigInt
+  totalMinor         BigInt
+  createdAt          DateTime       @default(now())
+  invoice            FinanceInvoice @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@unique([invoiceId, lineOrder])
+  @@index([tenantId, orgId, invoiceId])
+}
+
+model FinanceReceipt {
+  id               String                     @id @default(uuid())
+  financeProfileId String
+  tenantId         String
+  orgId            String
+  amountMinor      BigInt
+  currency         FinanceCurrency            @default(GBP)
+  source           FinanceReceiptSource
+  status           FinanceReceiptStatus       @default(PROCESSING)
+  confirmedAt      DateTime?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  financeProfile   FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  allocations      FinanceReceiptAllocation[]
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, status, confirmedAt])
+  @@index([financeProfileId, createdAt])
+}
+
+model FinanceReceiptAllocation {
+  id          String         @id @default(uuid())
+  receiptId   String
+  invoiceId   String
+  tenantId    String
+  orgId       String
+  amountMinor BigInt
+  createdAt   DateTime       @default(now())
+  receipt     FinanceReceipt @relation(fields: [receiptId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice     FinanceInvoice @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@index([tenantId, receiptId, createdAt])
+  @@index([tenantId, invoiceId, createdAt])
 }

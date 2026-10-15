@@ -1,3 +1,4 @@
+import { isAceVertical } from "@pathway/types";
 import { NotFoundException } from "@nestjs/common";
 import { prisma, type Prisma } from "@pathway/db";
 
@@ -37,7 +38,7 @@ export async function requireAceVolunteerSite(siteId: string) {
       },
     },
   });
-  if (site?.org.orgVertical?.vertical !== "ACE_SCHOOL") {
+  if (!site || !isAceVertical(site.org.orgVertical?.vertical)) {
     throw new NotFoundException("School volunteering not found");
   }
   return site;

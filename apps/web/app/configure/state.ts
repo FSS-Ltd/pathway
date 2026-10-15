@@ -7,7 +7,13 @@ import {
   type WebModule,
 } from "../../lib/module-catalog";
 
-export type OrgType = "SCHOOL" | "CHURCH" | "CHARITY" | "CLUB" | "NURSERY";
+export type OrgType =
+  | "SCHOOL"
+  | "CHURCH"
+  | "CHARITY"
+  | "CLUB"
+  | "NURSERY"
+  | "LEARNING_CENTRE";
 
 export type ConfiguratorStep =
   | "plan"
@@ -35,6 +41,7 @@ const VERTICALS_BY_ORG_TYPE: Record<OrgType, Vertical[]> = {
   CHARITY: ["CHARITY"],
   CLUB: ["CLUB"],
   NURSERY: ["NURSERY"],
+  LEARNING_CENTRE: ["ACE_LEARNING_CENTRE", "PUBLIC_LEARNING_CENTRE"],
 };
 
 const PROGRESS_STEPS_WITH_VERTICAL: ConfiguratorStep[] = [
@@ -71,7 +78,7 @@ export function progressStepsForOrgType(
   orgType: OrgType | null,
 ): ConfiguratorStep[] {
   return [
-    ...(orgType === "SCHOOL" || orgType === null
+    ...(orgType === null || verticalsForOrgType(orgType).length > 1
       ? PROGRESS_STEPS_WITH_VERTICAL
       : PROGRESS_STEPS_WITHOUT_VERTICAL),
   ];
@@ -130,7 +137,12 @@ export function firstIncompleteStep(
   if (state.step === "plan") return "plan";
   if (!state.orgType) return "org-type";
   if (state.step === "org-type") return "org-type";
-  if (state.orgType === "SCHOOL" && !state.vertical) return "vertical";
+  if (
+    state.orgType !== null &&
+    verticalsForOrgType(state.orgType).length > 1 &&
+    !state.vertical
+  )
+    return "vertical";
   return state.step;
 }
 
@@ -143,7 +155,8 @@ export function nextStep(state: ConfiguratorState): ConfiguratorState {
       return state.planCode ? { ...state, step: "org-type" } : state;
     case "org-type":
       if (!state.orgType) return state;
-      return state.orgType === "SCHOOL"
+      return state.orgType !== null &&
+        verticalsForOrgType(state.orgType).length > 1
         ? { ...state, step: "vertical" }
         : { ...state, step: "included" };
     case "vertical":
@@ -173,7 +186,11 @@ export function prevStep(state: ConfiguratorState): ConfiguratorState {
     case "included":
       return {
         ...state,
-        step: state.orgType === "SCHOOL" ? "vertical" : "org-type",
+        step:
+          state.orgType !== null &&
+          verticalsForOrgType(state.orgType).length > 1
+            ? "vertical"
+            : "org-type",
       };
     case "modules":
       return { ...state, step: "included" };

@@ -24,9 +24,12 @@ Object.defineProperty(globalThis, "navigator", {
 const nativeFetch = globalThis.fetch;
 let failPeople = true;
 let failBadgeOnce = true;
-let excluded = false;
+let badgeState: "inherit" | "enabled" | "excluded" = "inherit";
+let badgeRevision = "";
+let conflictOnNextBadge = false;
 let roleAdded = false;
 const badgeRequestIds: string[] = [];
+const badgeExpectedRevisions: string[] = [];
 const session: SessionContextValue = {
   data: { accessToken: "test", user: { id: "user-1", name: "Admin" } },
   status: "authenticated",
@@ -178,19 +181,24 @@ async function run(): Promise<void> {
             allowedScopes: ["site"],
             roleCoverage: [{ roleId: "role-1", coverage: "full" }],
             editableScopes: ["site"],
-            selected: !excluded,
-            effectiveCoverage: excluded ? "none" : "full",
+            selected: badgeState !== "excluded",
+            effectiveCoverage: badgeState === "excluded" ? "none" : "full",
             sourceRoleIds: ["role-1"],
-            directGrants: [],
-            exclusions: excluded
-              ? [{ id: "exclusion-1", tenantId: "site-1" }]
-              : [],
-            blockingTags: excluded ? ["attendance-recorder"] : [],
+            directGrants:
+              badgeState === "enabled"
+                ? [{ id: "grant-1", tenantId: "site-1", expiresAt: null }]
+                : [],
+            exclusions:
+              badgeState === "excluded"
+                ? [{ id: "exclusion-1", tenantId: "site-1" }]
+                : [],
+            blockingTags:
+              badgeState === "excluded" ? ["attendance-recorder"] : [],
             revisions: {
               organisation: "",
-              site: excluded ? "e:exclusion-1" : "",
+              site: badgeRevision,
             },
-            revision: excluded ? "e:exclusion-1" : "",
+            revision: badgeRevision,
           },
         ],
         assignments: [
@@ -224,6 +232,22 @@ async function run(): Promise<void> {
       init?.method === "PUT"
     ) {
       badgeRequestIds.push(new Headers(init.headers).get("x-request-id") ?? "");
+      const input = JSON.parse(String(init.body)) as {
+        state: "enabled" | "excluded" | "inherit";
+        expectedRevision: string;
+      };
+      badgeExpectedRevisions.push(input.expectedRevision);
+      if (conflictOnNextBadge) {
+        conflictOnNextBadge = false;
+        badgeRevision = "external-1";
+        return response(
+          {
+            code: "BADGE_STATE_CONFLICT",
+            message: "Access changed. Retry with the current revision.",
+          },
+          409,
+        );
+      }
       if (failBadgeOnce) {
         failBadgeOnce = false;
         return response(
@@ -231,8 +255,17 @@ async function run(): Promise<void> {
           503,
         );
       }
-      excluded = true;
-      return response({ state: "excluded", revision: "e:exclusion-1" });
+      badgeState = input.state;
+      badgeRevision =
+        badgeState === "excluded"
+          ? "e:exclusion-1"
+          : badgeState === "enabled"
+            ? "g:grant-1"
+            : "";
+      return response({
+        state: input.state,
+        revision: badgeRevision,
+      });
     }
     if (path === "/access/assignments" && init?.method === "POST") {
       roleAdded = true;
@@ -279,10 +312,25 @@ async function run(): Promise<void> {
     ).find((button) => button.textContent?.trim() === "Badges");
     assert.ok(badgesTab);
     await act(async () => badgesTab.click());
-    assert.match(container.textContent ?? "", /Included/);
-    const exclude = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent?.trim() === "excluded",
+    const badge = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Attendance recorder: included"]',
     );
+    assert.ok(badge);
+    assert.equal(badge.getAttribute("aria-pressed"), "true");
+    const details = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Details about Attendance recorder"]',
+    );
+    assert.ok(details);
+    await act(async () => details.click());
+    assert.match(
+      container.querySelector('[role="tooltip"]')?.textContent ?? "",
+      /Mark attendance/,
+    );
+    assert.match(
+      container.querySelector('[role="tooltip"]')?.textContent ?? "",
+      /inherited/,
+    );
+    const exclude = badge;
     assert.ok(exclude);
     await act(async () => exclude.click());
     assert.match(container.textContent ?? "", /Exclude Attendance recorder/);
@@ -303,6 +351,55 @@ async function run(): Promise<void> {
     assert.equal(badgeRequestIds.length, 2);
     assert.ok(badgeRequestIds[0]);
     assert.equal(badgeRequestIds[0], badgeRequestIds[1]);
+    const excludedBadge = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Attendance recorder: no access"]',
+    );
+    assert.ok(excludedBadge);
+    assert.equal(excludedBadge.getAttribute("aria-pressed"), "false");
+    await act(async () => excludedBadge.click());
+    await settle();
+    assert.equal(badgeState, "enabled");
+    assert.equal(
+      container
+        .querySelector('button[aria-label="Attendance recorder: included"]')
+        ?.getAttribute("aria-pressed"),
+      "true",
+    );
+    const defaults = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.trim() === "Use role defaults");
+    assert.ok(defaults);
+    await act(async () => defaults.click());
+    await settle();
+    assert.equal(
+      container
+        .querySelector('button[aria-label="Attendance recorder: included"]')
+        ?.getAttribute("aria-pressed"),
+      "true",
+    );
+    conflictOnNextBadge = true;
+    const selectedBadge = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Attendance recorder: included"]',
+    );
+    assert.ok(selectedBadge);
+    await act(async () => selectedBadge.click());
+    const confirmAfterConflict = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.trim() === "Exclude badge");
+    assert.ok(confirmAfterConflict);
+    await act(async () => confirmAfterConflict.click());
+    await settle();
+    assert.match(container.textContent ?? "", /Access changed/);
+    assert.doesNotMatch(container.textContent ?? "", /Saved/);
+    const conflictRetry = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.trim() === "Retry");
+    assert.ok(conflictRetry);
+    await act(async () => conflictRetry.click());
+    await settle();
+    assert.equal(badgeState, "excluded");
+    assert.notEqual(badgeRequestIds.at(-1), badgeRequestIds.at(-2));
+    assert.equal(badgeExpectedRevisions.at(-1), "external-1");
     assert.match(container.textContent ?? "", /Selected person/);
     assert.equal(badgesTab.getAttribute("aria-selected"), "true");
     const rolesTab = Array.from(

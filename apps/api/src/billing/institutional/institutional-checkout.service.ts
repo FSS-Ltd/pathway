@@ -15,7 +15,10 @@ import {
 } from "@pathway/db";
 import {
   INSTITUTIONAL_PLANS,
+  INSTITUTIONAL_MAPPED_PRICING_VERSION,
   INSTITUTIONAL_PRICING_VERSION,
+  isMappedInstitutionalPlanCode,
+  mappedInstitutionalSelectionPlanCode,
 } from "@pathway/pricing";
 import Stripe from "stripe";
 import { EnrolmentRollService } from "../../enrolments/enrolment-roll.service";
@@ -34,6 +37,8 @@ import {
   validateInstitutionalStripePrice,
 } from "./institutional-stripe-prices";
 import { localDateAt } from "./institutional-time";
+import { institutionalStripeKey } from "./institutional-provider-guard";
+import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
 
 @Injectable()
 export class InstitutionalCheckoutService {
@@ -44,17 +49,7 @@ export class InstitutionalCheckoutService {
   ) {}
 
   private stripe(): Stripe {
-    if (
-      process.env.INSTITUTIONAL_CHECKOUT_ENABLED !== "true" ||
-      process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED !== "true" ||
-      this.config.activeProvider !== "STRIPE_TEST" ||
-      !this.config.stripe.secretKey?.startsWith("sk_test_")
-    ) {
-      throw new ServiceUnavailableException({
-        code: "INSTITUTIONAL_CHECKOUT_DISABLED",
-      });
-    }
-    return new Stripe(this.config.stripe.secretKey, {
+    return new Stripe(institutionalStripeKey(this.config, "CHECKOUT"), {
       apiVersion: "2023-10-16",
     });
   }
@@ -75,9 +70,12 @@ export class InstitutionalCheckoutService {
       snapshot.status !== InstitutionalSnapshotStatus.PRICED ||
       !snapshot.expiresAt ||
       snapshot.expiresAt <= now ||
-      snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION ||
-      snapshot.policy.pricingVersion !== snapshot.pricingVersion ||
-      !isInstitutionalPlanCode(snapshot.planCode)
+      (snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION &&
+        snapshot.pricingVersion !== INSTITUTIONAL_MAPPED_PRICING_VERSION) ||
+      (snapshot.pricingVersion === INSTITUTIONAL_PRICING_VERSION &&
+        snapshot.policy.pricingVersion !== snapshot.pricingVersion) ||
+      (!isInstitutionalPlanCode(snapshot.planCode) &&
+        !isMappedInstitutionalPlanCode(snapshot.planCode))
     ) {
       throw new ConflictException({ code: "QUOTE_CHANGED" });
     }
@@ -86,7 +84,10 @@ export class InstitutionalCheckoutService {
       select: { id: true },
     });
     if (superseding) throw new ConflictException({ code: "QUOTE_CHANGED" });
-    validateInstitutionalSelection(snapshot.planCode, {
+    const selectionPlan = isInstitutionalPlanCode(snapshot.planCode)
+      ? snapshot.planCode
+      : mappedInstitutionalSelectionPlanCode(snapshot.planCode);
+    validateInstitutionalSelection(selectionPlan, {
       includedModules: snapshot.includedModules,
       paidModules: snapshot.paidModules,
     });
@@ -180,10 +181,18 @@ export class InstitutionalCheckoutService {
       });
       if (!tenant)
         throw new ConflictException({ code: "ORGANISATION_SITE_REQUIRED" });
-      if (!isInstitutionalPlanCode(snapshot.planCode)) {
+      if (
+        !isInstitutionalPlanCode(snapshot.planCode) &&
+        !isMappedInstitutionalPlanCode(snapshot.planCode)
+      ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-      const plan = INSTITUTIONAL_PLANS[snapshot.planCode];
+      const plan =
+        INSTITUTIONAL_PLANS[
+          isInstitutionalPlanCode(snapshot.planCode)
+            ? snapshot.planCode
+            : mappedInstitutionalSelectionPlanCode(snapshot.planCode)
+        ];
       const order = await tx.pendingOrder.create({
         data: {
           orgId,
@@ -217,8 +226,39 @@ export class InstitutionalCheckoutService {
         return { checkoutUrl: session.url, pendingOrderId: order.id };
       throw new ConflictException({ code: "CHECKOUT_EXPIRED" });
     }
-    const successUrl = this.config.stripe.successUrlDefault;
-    const cancelUrl = this.config.stripe.cancelUrlDefault;
+    const adminUrl = process.env.ADMIN_URL?.trim();
+    const mappedCheckout =
+      snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION;
+    let adminOrigin: URL | null = null;
+    if (mappedCheckout) {
+      try {
+        adminOrigin = new URL(adminUrl ?? "");
+        if (
+          adminOrigin.protocol !== "https:" &&
+          !(
+            adminOrigin.protocol === "http:" &&
+            adminOrigin.hostname === "localhost"
+          )
+        )
+          throw new Error("Invalid admin checkout return URL");
+      } catch {
+        throw new ServiceUnavailableException({
+          code: "CHECKOUT_URLS_MISSING",
+        });
+      }
+    }
+    const successUrl = adminOrigin
+      ? new URL(
+          "/billing/institutional?checkout=pending",
+          adminOrigin,
+        ).toString()
+      : this.config.stripe.successUrlDefault;
+    const cancelUrl = adminOrigin
+      ? new URL(
+          "/billing/institutional?checkout=cancelled",
+          adminOrigin,
+        ).toString()
+      : this.config.stripe.cancelUrlDefault;
     if (!successUrl || !cancelUrl) {
       throw new ServiceUnavailableException({ code: "CHECKOUT_URLS_MISSING" });
     }
@@ -229,19 +269,26 @@ export class InstitutionalCheckoutService {
       throw new ServiceUnavailableException({ code: "PRICE_NOT_CONFIGURED" });
     }
     for (const item of lineItems) {
-      const spec = INSTITUTIONAL_STRIPE_PRICE_SPECS.find(
-        (entry) => priceMap[entry.code] === item.price,
-      );
-      if (!spec) {
-        throw new ServiceUnavailableException({ code: "PRICE_NOT_CONFIGURED" });
-      }
       try {
         const providerPrice = await stripe.prices.retrieve(item.price);
-        const productId =
-          typeof providerPrice.product === "string"
-            ? providerPrice.product
-            : providerPrice.product.id;
-        validateInstitutionalStripePrice(providerPrice, productId, spec);
+        if (snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
+          validateFrozenStripePrice(
+            providerPrice,
+            snapshot,
+            item.price,
+            this.config.activeProvider === "STRIPE",
+          );
+        } else {
+          const spec = INSTITUTIONAL_STRIPE_PRICE_SPECS.find(
+            (entry) => priceMap[entry.code] === item.price,
+          );
+          if (!spec) throw new Error("PRICE_NOT_CONFIGURED");
+          const productId =
+            typeof providerPrice.product === "string"
+              ? providerPrice.product
+              : providerPrice.product.id;
+          validateInstitutionalStripePrice(providerPrice, productId, spec);
+        }
       } catch {
         throw new ServiceUnavailableException({ code: "PRICE_NOT_CONFIGURED" });
       }

@@ -62,7 +62,14 @@ export async function resolveSchoolNoticeAudience(
 ): Promise<NoticeRecipient[]> {
   assertSchoolAudienceChoice(audience, target);
   const vertical = await tx.tenant.findFirst({
-    where: { id: tenantId, org: { orgVertical: { vertical: "ACE_SCHOOL" } } },
+    where: {
+      id: tenantId,
+      org: {
+        orgVertical: {
+          vertical: { in: ["ACE_SCHOOL", "ACE_LEARNING_CENTRE"] },
+        },
+      },
+    },
     select: { id: true, timezone: true },
   });
   if (!vertical) {

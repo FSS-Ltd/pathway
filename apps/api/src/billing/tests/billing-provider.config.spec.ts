@@ -33,7 +33,7 @@ describe("billing provider config", () => {
     process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
     // Simulates value that was double-encoded: outer single quotes, inner \" and \n
     process.env.STRIPE_PRICE_MAP =
-      "'{\\n \"STARTER_MONTHLY\":\"price_starter_m\",\\n \"GROWTH_MONTHLY\":\"price_growth_m\"\\n}'";
+      '\'{\\n "STARTER_MONTHLY":"price_starter_m",\\n "GROWTH_MONTHLY":"price_growth_m"\\n}\'';
     const config = loadBillingProviderConfig();
     expect(config.activeProvider).toBe("STRIPE");
     expect(config.stripe.priceMap?.STARTER_MONTHLY).toBe("price_starter_m");
@@ -68,7 +68,8 @@ describe("billing provider config", () => {
     const config = loadBillingProviderConfig();
     expect(config.stripe.priceMap?.STARTER_MONTHLY).toBe("price_starter_m");
     expect(
-      (config.stripe.priceMap as Record<string, string> | undefined)?.SMS_1000_MONTHLY,
+      (config.stripe.priceMap as Record<string, string> | undefined)
+        ?.SMS_1000_MONTHLY,
     ).toBeUndefined();
   });
 
@@ -83,7 +84,9 @@ describe("billing provider config", () => {
     });
     const config = loadBillingProviderConfig();
     expect(config.stripe.priceMap?.STARTER_MONTHLY).toBe("price_starter_m");
-    const priceMap = config.stripe.priceMap as Record<string, string> | undefined;
+    const priceMap = config.stripe.priceMap as
+      | Record<string, string>
+      | undefined;
     expect(priceMap?.AV30_BLOCK_25_MONTHLY).toBeUndefined();
     expect(priceMap?.AV30_BLOCK_50_YEARLY).toBeUndefined();
   });
@@ -98,9 +101,13 @@ describe("billing provider config", () => {
       PROFESSIONAL_149_MONTHLY: "price_pro149_m",
     });
     const config = loadBillingProviderConfig();
-    expect(config.stripe.priceMap?.STARTER_49_MONTHLY).toBe("price_starter49_m");
+    expect(config.stripe.priceMap?.STARTER_49_MONTHLY).toBe(
+      "price_starter49_m",
+    );
     expect(config.stripe.priceMap?.GROWTH_99_MONTHLY).toBe("price_growth99_m");
-    expect(config.stripe.priceMap?.PROFESSIONAL_149_MONTHLY).toBe("price_pro149_m");
+    expect(config.stripe.priceMap?.PROFESSIONAL_149_MONTHLY).toBe(
+      "price_pro149_m",
+    );
   });
 
   it("Phase 3 PR 3.1: accepts module price codes in STRIPE_PRICE_MAP", () => {
@@ -115,7 +122,9 @@ describe("billing provider config", () => {
     const config = loadBillingProviderConfig();
 
     expect(config.stripe.priceMap?.MODULE_FINANCE_MONTHLY).toBe("price_fin_m");
-    expect(config.stripe.priceMap?.MODULE_AI_WORKSPACE_YEARLY).toBe("price_ai_y");
+    expect(config.stripe.priceMap?.MODULE_AI_WORKSPACE_YEARLY).toBe(
+      "price_ai_y",
+    );
   });
 
   it("accepts Learning module price codes in STRIPE_PRICE_MAP", () => {
@@ -129,8 +138,24 @@ describe("billing provider config", () => {
 
     const config = loadBillingProviderConfig();
 
-    expect(config.stripe.priceMap?.MODULE_LEARNING_MONTHLY).toBe("price_learning_m");
-    expect(config.stripe.priceMap?.MODULE_LEARNING_YEARLY).toBe("price_learning_y");
+    expect(config.stripe.priceMap?.MODULE_LEARNING_MONTHLY).toBe(
+      "price_learning_m",
+    );
+    expect(config.stripe.priceMap?.MODULE_LEARNING_YEARLY).toBe(
+      "price_learning_y",
+    );
+  });
+
+  it("accepts monthly and annual institutional pupil bands", () => {
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      INSTITUTIONAL_CHILD_UP_TO_100_MONTHLY: "price_pupilmonth",
+      INSTITUTIONAL_CHILD_UP_TO_100_YEARLY: "price_pupilyear",
+      INSTITUTIONAL_CHILD_101_TO_250_MONTHLY: "price_uppermonth",
+      INSTITUTIONAL_CHILD_101_TO_250_YEARLY: "price_upperyear",
+    });
+    const map = loadBillingProviderConfig().stripe.priceMap;
+    expect(map?.INSTITUTIONAL_CHILD_UP_TO_100_YEARLY).toBe("price_pupilyear");
+    expect(map?.INSTITUTIONAL_CHILD_101_TO_250_YEARLY).toBe("price_upperyear");
   });
 
   it("Phase 3 PR 3.1: filters unknown module price codes from STRIPE_PRICE_MAP", () => {
@@ -143,7 +168,9 @@ describe("billing provider config", () => {
     });
 
     const config = loadBillingProviderConfig();
-    const priceMap = config.stripe.priceMap as Record<string, string> | undefined;
+    const priceMap = config.stripe.priceMap as
+      | Record<string, string>
+      | undefined;
 
     expect(priceMap?.MODULE_FINANCE_MONTHLY).toBe("price_fin_m");
     expect(priceMap?.MODULE_NOT_A_REAL_ONE_MONTHLY).toBeUndefined();
@@ -178,7 +205,9 @@ describe("billing provider config", () => {
     });
 
     const config = loadBillingProviderConfig();
-    const priceMap = config.stripe.priceMap as Record<string, string> | undefined;
+    const priceMap = config.stripe.priceMap as
+      | Record<string, string>
+      | undefined;
 
     expect(priceMap?.MODULE_LEARNING_MONTHLY).toBe("price_learning_m");
     expect(priceMap?.MODULE_LEARNING_QUARTERLY).toBeUndefined();

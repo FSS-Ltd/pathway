@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { explainRepresentativeOverlapProbe } from "./overlap-index-fixture";
 import { prisma, runTransaction } from "@pathway/db";
 import { AccessCacheService } from "../access-cache.service";
 import { AssignmentsService } from "../assignments.service";
@@ -276,29 +277,11 @@ describe("assignment overlap integration", () => {
   it("uses the migration-owned partial index for the overlap identity probe", async () => {
     if (!isDatabaseAvailable()) return;
 
-    const plan = await prisma.$transaction(async (tx) => {
-      await tx.$executeRawUnsafe("SET LOCAL enable_seqscan = off");
-      return tx.$queryRawUnsafe<Array<Record<string, unknown>>>(
-        `EXPLAIN (FORMAT JSON)
-         SELECT 1
-         FROM app."UserRoleAssignment"
-         WHERE "orgId" = $1
-           AND "tenantId" = $2::text
-           AND "userId" = $3
-           AND "roleDefinitionId" = $4
-           AND "revokedAt" IS NULL
-           AND "startsAt" < $5::timestamp
-           AND $6::timestamp < COALESCE("expiresAt", 'infinity'::timestamp)
-         ORDER BY "orgId", "tenantId", "userId", "roleDefinitionId", "startsAt", "expiresAt"
-         LIMIT 1`,
-        ORG_ID,
-        SITE_ID,
-        assigneeUserId,
-        siteRoleDefinitionId,
-        new Date("2060-01-01T10:00:00.000Z"),
-        new Date("2060-01-01T09:00:00.000Z"),
-      );
-    });
+    const plan = await explainRepresentativeOverlapProbe(
+      ORG_ID,
+      SITE_ID,
+      actorUserId,
+    );
 
     expect(JSON.stringify(plan)).toContain(
       "UserRoleAssignment_unrevoked_overlap_idx",
@@ -383,10 +366,10 @@ describe("assignment overlap integration", () => {
       startsAt: new Date("2032-02-01T09:00:00.000Z"),
       expiresAt: new Date("2032-02-01T11:00:00.000Z"),
     };
-    const [existing] = await service.assign(
-      [command],
-      { ...actor, requestId: `org-overlap-existing-${randomUUID()}` },
-    );
+    const [existing] = await service.assign([command], {
+      ...actor,
+      requestId: `org-overlap-existing-${randomUUID()}`,
+    });
 
     await expect(
       service.assign(
@@ -431,13 +414,14 @@ describe("assignment overlap integration", () => {
       }),
     ]);
     const fulfilled = results.filter(
-      (result): result is PromiseFulfilledResult<
+      (
+        result,
+      ): result is PromiseFulfilledResult<
         Awaited<ReturnType<AssignmentsService["assign"]>>
       > => result.status === "fulfilled",
     );
     const rejected = results.filter(
-      (result): result is PromiseRejectedResult =>
-        result.status === "rejected",
+      (result): result is PromiseRejectedResult => result.status === "rejected",
     );
 
     expect(fulfilled).toHaveLength(1);
@@ -451,10 +435,10 @@ describe("assignment overlap integration", () => {
       requestId: `concurrent-revoke-${randomUUID()}`,
     });
 
-    const [reassigned] = await service.assign(
-      [concurrentCommand],
-      { ...actor, requestId: `reassigned-${randomUUID()}` },
-    );
+    const [reassigned] = await service.assign([concurrentCommand], {
+      ...actor,
+      requestId: `reassigned-${randomUUID()}`,
+    });
     expect(reassigned.id).not.toBe(assignmentId);
   });
 
@@ -484,22 +468,24 @@ describe("assignment overlap integration", () => {
       }),
     ]);
     const fulfilled = results.filter(
-      (result): result is PromiseFulfilledResult<
+      (
+        result,
+      ): result is PromiseFulfilledResult<
         Awaited<ReturnType<AssignmentsService["assign"]>>
       > => result.status === "fulfilled",
     );
     const rejected = results.filter(
-      (result): result is PromiseRejectedResult =>
-        result.status === "rejected",
+      (result): result is PromiseRejectedResult => result.status === "rejected",
     );
 
     expect(fulfilled).toHaveLength(1);
-    expect(fulfilled[0].value.map((assignment) => assignment.roleDefinitionId))
-      .toEqual(
-        results[0].status === "fulfilled"
-          ? [siteRoleDefinitionId, organisationRoleDefinitionId]
-          : [organisationRoleDefinitionId, siteRoleDefinitionId],
-      );
+    expect(
+      fulfilled[0].value.map((assignment) => assignment.roleDefinitionId),
+    ).toEqual(
+      results[0].status === "fulfilled"
+        ? [siteRoleDefinitionId, organisationRoleDefinitionId]
+        : [organisationRoleDefinitionId, siteRoleDefinitionId],
+    );
     expect(rejected).toHaveLength(1);
     expect(rejected[0].reason).toMatchObject({
       response: { statusCode: 409, code: "ASSIGNMENT_OVERLAP" },

@@ -30,3 +30,14 @@ export const createStudentSubjectSchema = z
 export type CreateStudentSubjectDto = z.infer<
   typeof createStudentSubjectSchema
 >;
+
+export const endStudentSubjectSchema = z
+  .object({
+    endsOn: z
+      .string()
+      .refine(isDateOnly, "Use a valid date in YYYY-MM-DD format"),
+    reason: z.string().trim().min(1).max(1_000),
+  })
+  .strict();
+
+export type EndStudentSubjectDto = z.infer<typeof endStudentSubjectSchema>;

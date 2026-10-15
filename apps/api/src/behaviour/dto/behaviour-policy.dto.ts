@@ -87,6 +87,19 @@ export const updateBehaviourPolicySchema = z
     });
   });
 
+export const createBehaviourCategorySchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    type: z.enum(["MERIT", "DEMERIT", "GENERAL"]),
+    visibility: z.enum(["GENERAL", "SENSITIVE"]).default("GENERAL"),
+    expectedCategoryVersion: nonNegativeVersion,
+  })
+  .strict();
+
+export type CreateBehaviourCategoryDto = z.infer<
+  typeof createBehaviourCategorySchema
+>;
+
 export type UpdateBehaviourPolicyDto = z.infer<
   typeof updateBehaviourPolicySchema
 >;

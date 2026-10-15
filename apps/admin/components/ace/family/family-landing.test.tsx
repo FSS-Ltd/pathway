@@ -59,8 +59,9 @@ async function run() {
                     mode === "legacy"
                       ? undefined
                       : mode === "partial"
-                        ? ["attendance", "notices"]
+                        ? ["parent-summary", "attendance", "notices"]
                         : [
+                            "parent-summary",
                             "ace-summary",
                             "attendance",
                             "sessions",
@@ -80,8 +81,9 @@ async function run() {
                     mode === "legacy"
                       ? undefined
                       : mode === "partial"
-                        ? ["attendance", "notices"]
+                        ? ["parent-summary", "attendance", "notices"]
                         : [
+                            "parent-summary",
                             "ace-summary",
                             "attendance",
                             "sessions",
@@ -214,6 +216,15 @@ async function run() {
       ),
     );
     assert.equal(container.querySelectorAll('a[href$="/messages"]').length, 0);
+    assert.deepEqual(
+      Array.from(container.querySelectorAll('a[href$="/overview"]')).map(
+        (anchor) => anchor.getAttribute("href"),
+      ),
+      [
+        "/family/sites/school-one/children/child-one/overview",
+        "/family/sites/school-one/children/child-three/overview",
+      ],
+    );
     assert.equal(
       container.querySelectorAll('a[href$="/volunteering"]').length,
       0,

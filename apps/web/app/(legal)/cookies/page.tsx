@@ -17,7 +17,7 @@ export default function CookiesPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-8 px-4 py-16 md:py-24">
       <div className="flex flex-col gap-4">
         <h1 className="text-4xl font-bold text-pw-text">Cookie Policy</h1>
-        <p className="text-sm text-pw-text-muted">Last updated: {new Date().toLocaleDateString()}</p>
+        <p className="text-sm text-pw-text-muted">Last updated: 15 October 2026</p>
       </div>
 
       {/* Summary cards */}
@@ -206,7 +206,7 @@ export default function CookiesPage() {
           <LegalList>
             <li>
               <strong>Email:</strong>{" "}
-              <a href="mailto:privacy@nexsteps.dev">privacy@nexsteps.dev</a>
+              <a href="mailto:privacy@faithfulsoftware.dev">privacy@faithfulsoftware.dev</a>
             </li>
           </LegalList>
         </div>

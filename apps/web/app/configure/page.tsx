@@ -3,234 +3,509 @@
 import React from "react";
 import Link from "next/link";
 import {
-  INSTITUTIONAL_PLANS,
-  type InstitutionalPlanCode,
-  type InstitutionalQuoteResult,
+  isMappedInstitutionalPlanCode,
+  type InstitutionalMappedQuote,
 } from "@pathway/pricing";
-import { estimateInstitutionalPrice } from "../../lib/institutional-estimate-client";
+import { isVertical, type Vertical } from "@pathway/types";
+import { ConfiguratorStage } from "../../components/configurator/stage";
+import { InstitutionalBreakdown } from "../../components/configurator/institutional-breakdown";
+import {
+  estimateInstitutionalPrice,
+  fetchInstitutionalCatalogue,
+  startPublicInstitutionalCheckout,
+  type InstitutionalCatalogue,
+} from "../../lib/institutional-estimate-client";
+import { OrgTypeStep } from "./steps/org-type";
+import { VerticalStep } from "./steps/vertical";
+import { IncludedStep } from "./steps/included";
+import { InstitutionalPlanStep } from "./steps/institutional-plan";
+import { InstitutionalPupilsStep } from "./steps/institutional-pupils";
+import {
+  InstitutionalModulesStep,
+  InstitutionalStorageStep,
+} from "./steps/institutional-options";
+import {
+  EMPTY_ACCOUNT_DETAILS,
+  InstitutionalSummaryStep,
+  type InstitutionalAccountDetails,
+} from "./steps/institutional-summary";
+import {
+  enrolledCount,
+  INITIAL_CONFIGURATION,
+  nextStep,
+  previousStep,
+  STEP_LABELS,
+  stepsFor,
+  type InstitutionalConfiguration,
+  type InstitutionalStep,
+} from "./institutional-flow";
+import {
+  verticalsForOrgType,
+  INITIAL_CONFIGURATOR_STATE,
+  type ConfiguratorStep,
+} from "./state";
 
-const plans = Object.values(INSTITUTIONAL_PLANS);
-const money = (pence: number) =>
-  new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
-    pence / 100,
-  );
+const STORAGE_KEY = "nexsteps-institutional-configuration";
+const STAGE_STEPS: Record<InstitutionalStep, ConfiguratorStep> = {
+  plan: "plan",
+  organisation: "org-type",
+  setting: "vertical",
+  pupils: "included",
+  included: "included",
+  modules: "modules",
+  storage: "storage",
+  summary: "summary",
+};
+
+function restoredConfiguration(
+  value: unknown,
+): InstitutionalConfiguration | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const saved = value as Record<string, unknown>;
+  if (
+    typeof saved.planCode !== "string" ||
+    !isMappedInstitutionalPlanCode(saved.planCode) ||
+    (saved.orgType !== null &&
+      ![
+        "SCHOOL",
+        "CHURCH",
+        "CHARITY",
+        "CLUB",
+        "NURSERY",
+        "LEARNING_CENTRE",
+      ].includes(String(saved.orgType))) ||
+    typeof saved.countInput !== "string" ||
+    !["none", "100", "200", "1000"].includes(String(saved.storageChoice))
+  )
+    return null;
+  const setting =
+    isVertical(saved.setting) && saved.setting !== "HOME_EDUCATION"
+      ? saved.setting
+      : null;
+  const configuration: InstitutionalConfiguration = {
+    ...INITIAL_CONFIGURATION,
+    planCode: saved.planCode,
+    orgType: saved.orgType as InstitutionalConfiguration["orgType"],
+    setting,
+    countInput: saved.countInput,
+    declarationAccepted: saved.declarationAccepted === true,
+    storageChoice:
+      saved.storageChoice as InstitutionalConfiguration["storageChoice"],
+  };
+  if (
+    (setting !== null &&
+      (!configuration.orgType ||
+        !verticalsForOrgType(configuration.orgType).includes(setting))) ||
+    (setting === null &&
+      configuration.orgType !== null &&
+      verticalsForOrgType(configuration.orgType).length === 1)
+  )
+    return null;
+  configuration.step = stepsFor(configuration.orgType).includes(
+    saved.step as InstitutionalStep,
+  )
+    ? (saved.step as InstitutionalStep)
+    : "plan";
+  const steps = stepsFor(configuration.orgType);
+  const restoredIndex = steps.indexOf(configuration.step);
+  if (
+    configuration.orgType === null &&
+    restoredIndex > steps.indexOf("organisation")
+  ) {
+    configuration.step = "organisation";
+  } else if (
+    configuration.orgType !== null &&
+    verticalsForOrgType(configuration.orgType).length > 1 &&
+    setting === null &&
+    restoredIndex > steps.indexOf("setting")
+  ) {
+    configuration.step = "setting";
+  } else if (
+    (enrolledCount(configuration.countInput) === null ||
+      !configuration.declarationAccepted) &&
+    restoredIndex > steps.indexOf("pupils")
+  ) {
+    configuration.step = "pupils";
+  }
+  return configuration;
+}
 
 export default function ConfigurePage() {
-  const [planCode, setPlanCode] = React.useState<InstitutionalPlanCode>(
-    "INSTITUTIONAL_STARTER_MONTHLY",
+  const [configuration, setConfiguration] = React.useState(
+    INITIAL_CONFIGURATION,
   );
-  const [countInput, setCountInput] = React.useState("25");
-  const [estimate, setEstimate] =
-    React.useState<InstitutionalQuoteResult | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [pending, setPending] = React.useState(false);
-  const count = Number(countInput);
-  const validCount =
-    countInput.trim() !== "" && Number.isSafeInteger(count) && count >= 0;
+  const [details, setDetails] = React.useState<InstitutionalAccountDetails>(
+    EMPTY_ACCOUNT_DETAILS,
+  );
+  const [catalogue, setCatalogue] =
+    React.useState<InstitutionalCatalogue | null>(null);
+  const [catalogueError, setCatalogueError] = React.useState<string | null>(
+    null,
+  );
+  const [quote, setQuote] = React.useState<InstitutionalMappedQuote | null>(
+    null,
+  );
+  const [priceError, setPriceError] = React.useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
+  const [navigationError, setNavigationError] = React.useState<string | null>(
+    null,
+  );
+  const [loadingCatalogue, setLoadingCatalogue] = React.useState(true);
+  const [loadingPrice, setLoadingPrice] = React.useState(false);
+  const [checkoutPending, setCheckoutPending] = React.useState(false);
+  const [configurationRestored, setConfigurationRestored] =
+    React.useState(false);
+  const [retry, setRetry] = React.useState(0);
+  const checkoutKey = React.useRef<string | null>(null);
+  const checkoutInFlight = React.useRef(false);
 
   React.useEffect(() => {
-    if (!validCount) {
-      setEstimate(null);
-      setError("Enter a whole number of enrolled children, including zero.");
+    try {
+      const saved = window.sessionStorage.getItem(STORAGE_KEY);
+      if (saved)
+        setConfiguration(
+          restoredConfiguration(JSON.parse(saved)) ?? INITIAL_CONFIGURATION,
+        );
+    } catch {
+      // Ignore inaccessible or malformed browser storage.
+    }
+    setConfigurationRestored(true);
+  }, []);
+  React.useEffect(() => {
+    if (!configurationRestored) return;
+    try {
+      window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(configuration));
+    } catch {
+      // Browser storage is optional; account credentials are never persisted.
+    }
+  }, [configuration, configurationRestored]);
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setLoadingCatalogue(true);
+    void fetchInstitutionalCatalogue(controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setCatalogue(result);
+          setCatalogueError(null);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setCatalogueError("Plan prices are unavailable. Please retry.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingCatalogue(false);
+      });
+    return () => controller.abort();
+  }, [retry]);
+
+  const count = enrolledCount(configuration.countInput);
+  React.useEffect(() => {
+    if (count === null) {
+      setQuote(null);
+      setPriceError(null);
       return;
     }
     const controller = new AbortController();
-    setPending(true);
-    setError(null);
-    void estimateInstitutionalPrice(planCode, count, controller.signal)
+    setLoadingPrice(true);
+    setPriceError(null);
+    setQuote(null);
+    void estimateInstitutionalPrice(
+      configuration.planCode,
+      count,
+      configuration.storageChoice,
+      controller.signal,
+    )
       .then((result) => {
-        if (!controller.signal.aborted) setEstimate(result);
+        if (!controller.signal.aborted) setQuote(result);
       })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setEstimate(null);
-          setError("The estimate is unavailable. Please try again.");
-        }
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted)
+          setPriceError(
+            error instanceof Error
+              ? error.message
+              : "Pricing is unavailable. Please retry.",
+          );
       })
       .finally(() => {
-        if (!controller.signal.aborted) setPending(false);
+        if (!controller.signal.aborted) setLoadingPrice(false);
       });
     return () => controller.abort();
-  }, [planCode, count, validCount]);
+  }, [configuration.planCode, configuration.storageChoice, count, retry]);
 
-  const chosen = INSTITUTIONAL_PLANS[planCode];
-  const band = (component: "CHILDREN_UP_TO_100" | "CHILDREN_101_TO_250") =>
-    estimate?.kind === "priced"
-      ? (estimate.lines.find((line) => line.component === component)
-          ?.subtotalPence ?? 0)
-      : 0;
+  const update = (patch: Partial<InstitutionalConfiguration>) => {
+    checkoutKey.current = null;
+    setNavigationError(null);
+    setCheckoutError(null);
+    setConfiguration((current) => ({ ...current, ...patch }));
+  };
+  const onNext = () => {
+    const step = configuration.step;
+    const plan = catalogue?.plans.find(
+      (item) => item.planCode === configuration.planCode,
+    );
+    if (step === "plan" && !plan?.available)
+      setNavigationError(
+        "This plan price is unavailable. Please retry or choose another plan.",
+      );
+    else if (step === "organisation" && !configuration.orgType)
+      setNavigationError("Choose your organisation type.");
+    else if (step === "setting" && !configuration.setting)
+      setNavigationError("Choose your setting.");
+    else if (
+      step === "pupils" &&
+      (count === null || !configuration.declarationAccepted)
+    )
+      setNavigationError(
+        "Enter your enrolled pupil count and confirm your declaration.",
+      );
+    else if (step === "storage" && (loadingPrice || quote?.kind !== "priced"))
+      setNavigationError(
+        "Wait for an available price before reviewing your purchase.",
+      );
+    else {
+      setNavigationError(null);
+      setConfiguration((current) => ({ ...current, step: nextStep(current) }));
+    }
+  };
+  const onCheckout = async () => {
+    if (
+      checkoutInFlight.current ||
+      quote?.kind !== "priced" ||
+      count === null ||
+      !configuration.setting ||
+      !configuration.declarationAccepted
+    )
+      return;
+    checkoutInFlight.current = true;
+    setCheckoutPending(true);
+    setCheckoutError(null);
+    checkoutKey.current ??= crypto.randomUUID();
+    try {
+      const session = await startPublicInstitutionalCheckout({
+        planCode: configuration.planCode,
+        enrolledChildren: count,
+        declarationAccepted: true,
+        setting: configuration.setting,
+        storageChoice: configuration.storageChoice,
+        includedModules: [],
+        paidModules: [],
+        idempotencyKey: checkoutKey.current,
+        org: {
+          orgName: details.orgName,
+          contactName: details.contactName,
+          contactEmail: details.contactEmail,
+          password: details.password,
+        },
+      });
+      window.location.assign(session.checkoutUrl);
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error
+          ? error.message
+          : "Checkout could not be started. Please retry.",
+      );
+    } finally {
+      checkoutInFlight.current = false;
+      setCheckoutPending(false);
+    }
+  };
+
+  const stageState = {
+    ...INITIAL_CONFIGURATOR_STATE,
+    step: STAGE_STEPS[configuration.step],
+    orgType: configuration.orgType,
+    vertical: configuration.setting as Vertical | null,
+    selectedIncludedModules: ["LEARNING" as const],
+    frequency: configuration.planCode.endsWith("_YEARLY")
+      ? ("yearly" as const)
+      : ("monthly" as const),
+    storageChoice: configuration.storageChoice,
+  };
+  const selectedPlan = catalogue?.plans.find(
+    (item) => item.planCode === configuration.planCode,
+  );
+  const steps = stepsFor(configuration.orgType);
 
   return (
-    <div className="bg-shell px-4 py-8 text-text-primary sm:px-6 sm:py-12">
-      <div className="mx-auto max-w-5xl space-y-6">
+    <main className="bg-shell px-4 py-8 text-text-primary sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-7xl space-y-8">
         <header className="max-w-3xl space-y-3">
           <p className="text-sm font-semibold uppercase tracking-wide text-accent-strong">
-            Nexsteps for organisations
+            Configure Nexsteps
           </p>
           <h1 className="font-heading text-3xl font-bold sm:text-4xl">
-            Pricing for every child you serve.
+            Build a workspace for every pupil you serve.
           </h1>
           <p className="text-base leading-relaxed text-text-muted">
-            One monthly plan for churches, charities, clubs, schools and
-            nurseries. Count each enrolled child once across your organisation’s
-            permitted sites. Parents, staff, volunteers and adult participants
-            are not counted.
+            Choose your plan, setting, enrolled pupil count and storage. You’ll
+            see the amount due before moving to secure payment.
           </p>
         </header>
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr),minmax(300px,0.7fr)]">
-          <section
-            aria-labelledby="plan-title"
-            className="space-y-6 rounded-2xl border border-border-subtle bg-surface p-5 shadow-soft sm:p-7"
-          >
-            <div>
-              <h2 id="plan-title" className="font-heading text-xl font-bold">
-                Choose your plan
-              </h2>
-              <p className="mt-1 text-sm text-text-muted">
-                Your child count stays the same when you compare plans.
-              </p>
-            </div>
-            <fieldset className="grid gap-3 sm:grid-cols-3">
-              <legend className="sr-only">Monthly plan</legend>
-              {plans.map((plan) => (
-                <label
-                  key={plan.code}
-                  className={`cursor-pointer rounded-xl border p-4 transition-colors focus-within:ring-2 focus-within:ring-accent-primary ${planCode === plan.code ? "border-accent-primary bg-accent-primary/5" : "border-border-subtle hover:border-accent-primary"}`}
-                >
-                  <input
-                    type="radio"
-                    name="institutional-plan"
-                    value={plan.code}
-                    checked={planCode === plan.code}
-                    onChange={() => setPlanCode(plan.code)}
-                    className="sr-only"
-                  />
-                  <span className="block text-base font-semibold capitalize">
-                    {plan.tier}
-                  </span>
-                  <span className="mt-1 block text-xl font-bold">
-                    {money(plan.basePence)}
-                    <span className="text-sm font-normal text-text-muted">
-                      {" "}
-                      / month
-                    </span>
-                  </span>
-                  <span className="mt-2 block text-xs text-text-muted">
-                    Includes {plan.includedChildren} children ·{" "}
-                    {plan.includedSites}{" "}
-                    {plan.includedSites === 1 ? "site" : "sites"} ·{" "}
-                    {plan.includedModuleSlots} optional module{" "}
-                    {plan.includedModuleSlots === 1 ? "place" : "places"}
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-            <div>
-              <label
-                htmlFor="enrolled-children"
-                className="block text-sm font-semibold"
-              >
-                Enrolled children
-              </label>
-              <p id="enrolled-help" className="mt-1 text-sm text-text-muted">
-                Count distinct children on your continuing roll, whether or not
-                they attended today.
-              </p>
-              <input
-                id="enrolled-children"
-                aria-describedby="enrolled-help"
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="1"
-                value={countInput}
-                onChange={(event) => setCountInput(event.target.value)}
-                className="mt-3 w-full max-w-48 rounded-lg border border-border-subtle bg-surface px-3 py-2 text-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
-              />
-            </div>
-            <div className="rounded-xl border border-border-subtle bg-muted/40 p-4">
-              <h3 className="text-sm font-semibold">Optional modules</h3>
-              <p className="mt-1 text-sm text-text-muted">
-                No optional modules are ready to offer yet. Your plan’s module
-                places will become available when modules are released. Learning
-                is part of the core platform.
-              </p>
-            </div>
-          </section>
-          <aside
-            aria-labelledby="estimate-title"
-            className="h-fit rounded-2xl border border-border-subtle bg-surface p-5 shadow-card sm:p-7 lg:sticky lg:top-24"
-          >
-            <h2 id="estimate-title" className="font-heading text-xl font-bold">
-              Monthly estimate
-            </h2>
-            <p className="mt-1 text-sm text-text-muted capitalize">
-              {chosen.tier} · enrolled children
-            </p>
-            <div
-              aria-live="polite"
-              aria-atomic="true"
-              className="mt-6 min-h-28"
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-7 lg:grid-cols-[minmax(0,1fr),minmax(340px,0.78fr)]">
+          <div className="min-w-0 space-y-6">
+            <nav
+              aria-label="Configuration progress"
+              className="overflow-x-auto"
             >
-              {error ? (
-                <p role="alert" className="text-sm text-status-danger">
-                  {error}
-                </p>
-              ) : pending ? (
-                <p className="text-sm text-text-muted">Updating estimate…</p>
-              ) : estimate?.kind === "contact_sales" ? (
+              <ol className="flex min-w-max gap-2 pb-2 text-xs sm:flex-wrap sm:text-sm">
+                {steps.map((step, index) => (
+                  <li
+                    key={step}
+                    aria-current={
+                      configuration.step === step ? "step" : undefined
+                    }
+                    className={`rounded-full px-3 py-1.5 ${configuration.step === step ? "bg-accent-primary text-accent-foreground" : "bg-surface text-text-muted"}`}
+                  >
+                    {index + 1}. {STEP_LABELS[step]}
+                  </li>
+                ))}
+              </ol>
+            </nav>
+            <div className="rounded-2xl border border-border-subtle bg-surface p-5 shadow-soft sm:p-7">
+              {loadingCatalogue ? (
+                <p role="status">Loading plans…</p>
+              ) : catalogueError ? (
                 <div className="space-y-3">
-                  <p className="text-lg font-semibold">Custom quote required</p>
-                  <p className="text-sm text-text-muted">
-                    For more than 250 children, we’ll agree a price with your
-                    organisation.
+                  <p role="alert" className="text-sm text-status-danger">
+                    {catalogueError}
                   </p>
+                  <button
+                    type="button"
+                    onClick={() => setRetry((value) => value + 1)}
+                    className="text-sm font-semibold text-accent-strong underline"
+                  >
+                    Retry plans
+                  </button>
                 </div>
-              ) : estimate ? (
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between gap-4">
-                    <span>Base · includes {estimate.includedChildren}</span>
-                    <span>
-                      {money(
-                        estimate.lines.find((line) => line.component === "BASE")
-                          ?.subtotalPence ?? 0,
-                      )}
-                    </span>
+              ) : catalogue ? (
+                <>
+                  {configuration.step === "plan" && (
+                    <InstitutionalPlanStep
+                      catalogue={catalogue}
+                      selected={configuration.planCode}
+                      onSelect={(planCode) => update({ planCode })}
+                    />
+                  )}
+                  {configuration.step === "organisation" && (
+                    <OrgTypeStep
+                      orgType={configuration.orgType}
+                      onSelect={(orgType) =>
+                        update({
+                          orgType,
+                          setting:
+                            orgType === "SCHOOL" ||
+                            orgType === "LEARNING_CENTRE"
+                              ? null
+                              : orgType,
+                        })
+                      }
+                    />
+                  )}
+                  {configuration.step === "setting" && (
+                    <VerticalStep
+                      orgType={configuration.orgType ?? "SCHOOL"}
+                      vertical={configuration.setting as Vertical | null}
+                      onSelect={(setting) =>
+                        update({
+                          setting:
+                            setting as InstitutionalConfiguration["setting"],
+                        })
+                      }
+                    />
+                  )}
+                  {configuration.step === "pupils" && (
+                    <InstitutionalPupilsStep
+                      countInput={configuration.countInput}
+                      declarationAccepted={configuration.declarationAccepted}
+                      onCountChange={(countInput) => update({ countInput })}
+                      onDeclarationChange={(declarationAccepted) =>
+                        update({ declarationAccepted })
+                      }
+                    />
+                  )}
+                  {configuration.step === "included" &&
+                    configuration.setting && (
+                      <IncludedStep
+                        vertical={configuration.setting as Vertical}
+                      />
+                    )}
+                  {configuration.step === "modules" && (
+                    <InstitutionalModulesStep />
+                  )}
+                  {configuration.step === "storage" && (
+                    <InstitutionalStorageStep
+                      choice={configuration.storageChoice}
+                      onSelect={(storageChoice) => update({ storageChoice })}
+                    />
+                  )}
+                  {configuration.step === "summary" && (
+                    <InstitutionalSummaryStep
+                      configuration={configuration}
+                      quote={quote}
+                      details={details}
+                      onDetailsChange={(value) => {
+                        checkoutKey.current = null;
+                        setDetails(value);
+                      }}
+                      onCheckout={onCheckout}
+                      pending={checkoutPending}
+                      error={checkoutError}
+                    />
+                  )}
+                  {navigationError && (
+                    <p role="alert" className="mt-4 text-sm text-status-danger">
+                      {navigationError}
+                    </p>
+                  )}
+                  <div className="mt-8 flex flex-wrap justify-between gap-4 border-t border-border-subtle pt-5">
+                    <button
+                      type="button"
+                      disabled={configuration.step === "plan"}
+                      onClick={() =>
+                        update({ step: previousStep(configuration) })
+                      }
+                      className="rounded-lg border border-border-subtle px-4 py-2 text-sm font-semibold disabled:opacity-50"
+                    >
+                      Back
+                    </button>
+                    {configuration.step !== "summary" && (
+                      <button
+                        type="button"
+                        onClick={onNext}
+                        className="rounded-lg bg-accent-primary px-4 py-2 text-sm font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+                      >
+                        Continue
+                      </button>
+                    )}
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <span>Additional children to 100 · £1 each</span>
-                    <span>{money(band("CHILDREN_UP_TO_100"))}</span>
-                  </div>
-                  <div className="flex justify-between gap-4">
-                    <span>Children 101–250 · 75p each</span>
-                    <span>{money(band("CHILDREN_101_TO_250"))}</span>
-                  </div>
-                  <div className="border-t border-border-subtle pt-3">
-                    <div className="flex justify-between gap-4 text-lg font-bold">
-                      <span>Estimated monthly total</span>
-                      <span>{money(estimate.subtotalPence)}</span>
-                    </div>
-                  </div>
-                </div>
+                </>
               ) : null}
             </div>
-            <p className="mt-4 text-xs leading-relaxed text-text-muted">
-              The base fee applies even with zero children. This estimate is not
-              a quote or a charge. Final billing uses an accepted count and the
-              census before renewal.
-            </p>
+          </div>
+          <aside className="min-w-0 space-y-5 lg:sticky lg:top-24 lg:self-start">
+            <ConfiguratorStage
+              state={stageState}
+              planLabel={
+                selectedPlan?.tier ? `Nexsteps ${selectedPlan.tier}` : undefined
+              }
+            />
+            <InstitutionalBreakdown
+              quote={quote}
+              loading={loadingPrice}
+              error={priceError}
+              onRetry={() => setRetry((value) => value + 1)}
+            />
             <Link
               href="/demo"
-              className="mt-6 inline-flex w-full justify-center rounded-lg bg-accent-primary px-4 py-3 text-sm font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2"
+              className="block text-center text-sm font-semibold text-accent-strong underline"
             >
-              Talk to our team
+              Need a tailored quote?
             </Link>
-            <p className="mt-3 text-center text-xs text-text-muted">
-              New-plan checkout is currently unavailable.
-            </p>
           </aside>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

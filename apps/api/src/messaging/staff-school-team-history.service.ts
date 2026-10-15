@@ -1,7 +1,15 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { MessageQuery } from "./dto/messaging-query.dto";
 import { assertMessagingActor, type MessagingActor } from "./messaging-access";
+import {
+  decodeMessageHistoryCursor,
+  encodeMessageHistoryCursor,
+} from "./message-history-cursor";
 import {
   requireStaffSchoolTeamAccess,
   staffSchoolTeamConversationScope,
@@ -33,11 +41,25 @@ export class StaffSchoolTeamHistoryService {
         throw new NotFoundException("Messages not found");
       }
 
+      let before: number | undefined;
+      if (query.cursor) {
+        try {
+          before = decodeMessageHistoryCursor(
+            query.cursor,
+            actor.tenantId,
+            actor.userId,
+            conversationId,
+          );
+        } catch {
+          throw new BadRequestException("Invalid message cursor");
+        }
+      }
+
       const rows = await tx.message.findMany({
         where: {
           tenantId: actor.tenantId,
           conversationId: conversation.id,
-          ...(query.before ? { sequence: { lt: query.before } } : {}),
+          ...(before ? { sequence: { lt: before } } : {}),
         },
         select: {
           id: true,
@@ -69,9 +91,18 @@ export class StaffSchoolTeamHistoryService {
               row.sender.user.name?.trim() ||
               (row.sender.kind === "GUARDIAN" ? "Parent" : "School team"),
           },
+          // This group thread does not expose guardian read receipts to staff.
+          deliveryState: null,
         })),
-        nextBefore:
-          rows.length > limit ? (page.at(-1)?.sequence ?? null) : null,
+        nextCursor:
+          rows.length > limit && page.length > 0
+            ? encodeMessageHistoryCursor(
+                page[page.length - 1].sequence,
+                actor.tenantId,
+                actor.userId,
+                conversationId,
+              )
+            : null,
       };
     });
   }

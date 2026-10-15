@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Button } from "@pathway/ui";
 import { useAdminContext } from "@/lib/admin-context";
 import { NoAccessCard } from "@/components/no-access-card";
 import { BehaviourForm } from "@/components/ace/behaviour/behaviour-form";
@@ -8,6 +9,7 @@ import { BehaviourBatchForm } from "@/components/ace/behaviour/behaviour-batch-f
 import { BehaviourRecentWorkspace } from "@/components/ace/behaviour/behaviour-recent-workspace";
 import { BehaviourStageReview } from "@/components/ace/behaviour/behaviour-stage-review";
 import { BehaviourTrends } from "@/components/ace/behaviour/behaviour-trends";
+import { CreateCategoryDialog } from "@/components/ace/behaviour/create-category-dialog";
 import {
   BehaviourWorkspaceTabs,
   type BehaviourWorkspaceTab,
@@ -15,6 +17,7 @@ import {
 import { isValidIanaTimeZone } from "@/components/ace/behaviour/behaviour-time";
 import {
   createDemeritOverride,
+  createBehaviourCategory,
   fetchBehaviourPolicy,
   fetchBehaviourReviewRequests,
   fetchBehaviourReviewFact,
@@ -23,6 +26,7 @@ import {
   recordBehaviour,
   recordBehaviourBatch,
   type AdminBehaviourCategory,
+  type AdminBehaviourPolicyResponse,
 } from "@/lib/api-client";
 import { useAdminAccess } from "@/lib/use-admin-access";
 import { requestFailure } from "@/lib/request-error";
@@ -41,6 +45,10 @@ export default function BehaviourPage() {
     permissions,
     "ace.behaviour.policy.manage",
   );
+  const canCreateCategory = hasFreshPermission(
+    permissions,
+    "ace.behaviour.categories.create",
+  );
   const permissionKey = permissions?.slice().sort().join("|") ?? "none";
   const [children, setChildren] = React.useState<
     Array<{ id: string; fullName: string }>
@@ -48,6 +56,9 @@ export default function BehaviourPage() {
   const [categories, setCategories] = React.useState<AdminBehaviourCategory[]>(
     [],
   );
+  const [categoryVersion, setCategoryVersion] = React.useState(0);
+  const [categoryDialogOpen, setCategoryDialogOpen] = React.useState(false);
+  const categoryTriggerRef = React.useRef<HTMLButtonElement>(null);
   const [loadedSiteId, setLoadedSiteId] = React.useState<string | null>(null);
   const [tab, setTab] = React.useState<BehaviourWorkspaceTab>("record");
   const [entryMode, setEntryMode] = React.useState<"single" | "batch">(
@@ -61,6 +72,7 @@ export default function BehaviourPage() {
         )
       : null;
   const activeSiteId = activeSite?.id ?? null;
+  const activeSiteIdRef = React.useRef(activeSiteId);
   const siteTimeZone = activeSite?.timezone ?? null;
   const siteReady = Boolean(activeSiteId && loadedSiteId === activeSiteId);
   const siteChildren = siteReady ? children : [];
@@ -69,12 +81,17 @@ export default function BehaviourPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [refreshKey, setRefreshKey] = React.useState(0);
 
+  React.useEffect(() => {
+    activeSiteIdRef.current = activeSiteId;
+  }, [activeSiteId]);
+
   const load = React.useCallback(async () => {
     const request = ++loadId.current;
     setIsLoading(true);
     setError(null);
     setChildren([]);
     setCategories([]);
+    setCategoryVersion(0);
     setLoadedSiteId(null);
     try {
       if (!siteTimeZone || !isValidIanaTimeZone(siteTimeZone)) {
@@ -91,6 +108,7 @@ export default function BehaviourPage() {
           .map((child) => ({ id: child.id, fullName: child.fullName })),
       );
       setCategories(policy.categories);
+      setCategoryVersion(policy.categoryVersion);
       setLoadedSiteId(activeSiteId);
       setRefreshKey((current) => current + 1);
     } catch (cause) {
@@ -108,6 +126,8 @@ export default function BehaviourPage() {
       loadId.current += 1;
       setChildren([]);
       setCategories([]);
+      setCategoryVersion(0);
+      setCategoryDialogOpen(false);
       setLoadedSiteId(null);
       return;
     }
@@ -116,6 +136,26 @@ export default function BehaviourPage() {
       loadId.current += 1;
     };
   }, [canRead, isLoadingAccess, load]);
+
+  const closeCategoryDialog = () => {
+    setCategoryDialogOpen(false);
+    queueMicrotask(() => categoryTriggerRef.current?.focus());
+  };
+  const refreshCategoryChoices = async (siteId: string | null) => {
+    const policy = await fetchBehaviourPolicy();
+    if (activeSiteIdRef.current !== siteId) return;
+    setCategories(policy.categories);
+    setCategoryVersion(policy.categoryVersion);
+  };
+  const categoryCreated = (
+    policy: AdminBehaviourPolicyResponse,
+    siteId: string | null,
+  ) => {
+    if (activeSiteIdRef.current !== siteId) return;
+    setCategories(policy.categories);
+    setCategoryVersion(policy.categoryVersion);
+    closeCategoryDialog();
+  };
 
   if (isLoadingAccess) return null;
   if (!canRead) {
@@ -142,12 +182,37 @@ export default function BehaviourPage() {
             workspace.
           </p>
         </div>
-        {activeSite ? (
-          <span className="rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-text-muted">
-            {activeSite.name}
-          </span>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {activeSite ? (
+            <span className="rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs font-medium text-text-muted">
+              {activeSite.name}
+            </span>
+          ) : null}
+          {canCreateCategory && (
+            <Button
+              ref={categoryTriggerRef}
+              type="button"
+              size="sm"
+              disabled={!siteReady || isLoading}
+              onClick={() => setCategoryDialogOpen(true)}
+            >
+              New category
+            </Button>
+          )}
+        </div>
       </header>
+
+      {categoryDialogOpen && canCreateCategory && siteReady && (
+        <CreateCategoryDialog
+          key={activeSiteId}
+          categoryVersion={categoryVersion}
+          canSensitive={canSensitive}
+          onSave={createBehaviourCategory}
+          onCreated={(policy) => categoryCreated(policy, activeSiteId)}
+          onConflict={() => refreshCategoryChoices(activeSiteId)}
+          onClose={closeCategoryDialog}
+        />
+      )}
 
       <BehaviourWorkspaceTabs value={tab} onChange={setTab} />
 

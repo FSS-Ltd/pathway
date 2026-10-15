@@ -1,3 +1,4 @@
+import { ComplianceModule } from "./compliance/compliance.module";
 import { Module } from "@nestjs/common";
 import { CommonModule } from "./common/common.module";
 import { OrgsModule } from "./orgs/orgs.module";
@@ -53,10 +54,12 @@ import { BlogModule } from "./blog/blog.module";
 import { HandoverModule } from "./handover/handover.module";
 import { GuestPassModule } from "./guest-pass/guest-pass.module";
 import { AccessControlModule } from "./access-control/access-control.module";
+import { FinanceAccessModule } from "./finance/access/finance-access.module";
 
 @Module({
   imports: [
     CommonModule,
+    ComplianceModule,
     HealthModule,
     AuthModule,
     MailerModule,
@@ -86,6 +89,7 @@ import { AccessControlModule } from "./access-control/access-control.module";
     OrgsModule,
     PlatformModule,
     AccessControlModule,
+    FinanceAccessModule,
     BillingModule,
     InstitutionalBillingModule,
     AceSettingsModule,

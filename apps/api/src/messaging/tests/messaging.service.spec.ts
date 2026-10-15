@@ -13,6 +13,10 @@ import {
   readCursorSchema,
 } from "../dto/messaging-query.dto";
 import { encodeConversationCursor } from "../messaging-cursor";
+import {
+  decodeMessageHistoryCursor,
+  encodeMessageHistoryCursor,
+} from "../message-history-cursor";
 import { MessagingService } from "../messaging.service";
 
 jest.mock("@pathway/db", () => ({
@@ -48,7 +52,12 @@ function setup() {
     messageParticipant: {
       findFirst: jest.fn().mockResolvedValue({ id: "participant-a" }),
     },
+    messageDelivery: { findMany: jest.fn().mockResolvedValue([]) },
+    messageParticipantReadCursor: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     $queryRaw: jest.fn().mockResolvedValue([{ lastReadSequence: 2 }]),
+    $executeRaw: jest.fn().mockResolvedValue(0),
   };
   jest
     .mocked(withTenantRlsContext)
@@ -86,13 +95,13 @@ describe("staff messaging service", () => {
     expect(conversationQuerySchema.safeParse({ limit: "51" }).success).toBe(
       false,
     );
-    expect(messageQuerySchema.safeParse({ before: "0" }).success).toBe(false);
-    expect(messageQuerySchema.safeParse({ before: "2147483648" }).success).toBe(
-      false,
-    );
+    expect(messageQuerySchema.safeParse({ cursor: "" }).success).toBe(false);
     expect(
-      messageQuerySchema.safeParse({ limit: "2", before: "10" }).data,
-    ).toEqual({ limit: 2, before: 10 });
+      messageQuerySchema.safeParse({ cursor: "x".repeat(513) }).success,
+    ).toBe(false);
+    expect(
+      messageQuerySchema.safeParse({ limit: "2", cursor: "opaque" }).data,
+    ).toEqual({ limit: 2, cursor: "opaque" });
     expect(readCursorSchema.safeParse({ sequence: 0 }).success).toBe(false);
     expect(readCursorSchema.safeParse({ sequence: 2.5 }).success).toBe(false);
     expect(readCursorSchema.safeParse({ sequence: 2 }).success).toBe(true);
@@ -269,9 +278,15 @@ describe("staff messaging service", () => {
       { id: "message-1", sequence: 1 },
     ]);
 
+    const cursor = encodeMessageHistoryCursor(
+      3,
+      actor.tenantId,
+      actor.userId,
+      "conversation-a",
+    );
     const result = await service.listStaffMessages(actor, "conversation-a", {
       limit: 1,
-      before: 3,
+      cursor,
     });
 
     expect(result.items).toEqual([
@@ -282,9 +297,17 @@ describe("staff messaging service", () => {
         createdAt: time.toISOString(),
         sender: { id: "staff-b", displayName: "Bob" },
         recipientRead: null,
+        deliveryState: null,
       },
     ]);
-    expect(result.nextBefore).toBe(2);
+    expect(
+      decodeMessageHistoryCursor(
+        result.nextCursor!,
+        actor.tenantId,
+        actor.userId,
+        "conversation-a",
+      ),
+    ).toBe(2);
     expect(tx.message.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -303,9 +326,17 @@ describe("staff messaging service", () => {
       id: "conversation-a",
       kind: "STAFF_DIRECT",
     });
-    tx.messageParticipant.findFirst.mockResolvedValue({
-      readCursors: [{ lastReadSequence: 2 }],
-    });
+    tx.messageParticipant.findFirst.mockResolvedValue({ id: "recipient-b" });
+    tx.messageDelivery.findMany.mockResolvedValue(
+      ["new", "read"].map((messageId) => ({
+        messageId,
+        recipientParticipantId: "recipient-b",
+        status: "PENDING",
+      })),
+    );
+    tx.messageParticipantReadCursor.findMany.mockResolvedValue([
+      { participantId: "recipient-b", lastReadSequence: 2 },
+    ]);
     tx.message.findMany.mockResolvedValue(
       [
         { id: "new", sequence: 3, senderId: "staff-a" },
@@ -330,6 +361,11 @@ describe("staff messaging service", () => {
       true,
       null,
     ]);
+    expect(result.items.map((item) => item.deliveryState)).toEqual([
+      "sent",
+      "read",
+      null,
+    ]);
     expect(tx.messageParticipant.findFirst).toHaveBeenCalledWith({
       where: {
         tenantId: actor.tenantId,
@@ -348,16 +384,7 @@ describe("staff messaging service", () => {
           studentIdentities: { none: { tenantId: actor.tenantId } },
         },
       },
-      select: {
-        readCursors: {
-          where: {
-            tenantId: actor.tenantId,
-            conversationId: "conversation-a",
-          },
-          select: { lastReadSequence: true },
-          take: 1,
-        },
-      },
+      select: { id: true },
     });
 
     tx.messageParticipant.findFirst.mockResolvedValue(null);
@@ -411,5 +438,6 @@ describe("staff messaging service", () => {
       }),
     );
     expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
   });
 });

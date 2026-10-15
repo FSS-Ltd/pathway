@@ -31,6 +31,17 @@ const quoteSchema = z.object({
   declaredChildren: z.number().int().nonnegative().optional(),
   declarationAccepted: z.boolean().optional(),
 });
+const mappedQuoteSchema = quoteSchema.extend({
+  planCode: z.enum([
+    "INSTITUTIONAL_STARTER_MONTHLY",
+    "INSTITUTIONAL_STARTER_YEARLY",
+    "INSTITUTIONAL_GROWTH_MONTHLY",
+    "INSTITUTIONAL_GROWTH_YEARLY",
+    "INSTITUTIONAL_PROFESSIONAL_MONTHLY",
+    "INSTITUTIONAL_PROFESSIONAL_YEARLY",
+  ]),
+  storageChoice: z.enum(["none", "100", "200", "1000"]).default("none"),
+});
 const acceptSchema = z.object({
   snapshotId: z.string().uuid(),
   idempotencyKey: z.string().min(8).max(128),
@@ -85,6 +96,20 @@ export class InstitutionalBillingController {
       orgId,
       actorId,
       parseBody(quoteSchema, body),
+    );
+  }
+
+  @Post("quotes/v2")
+  async createMappedQuote(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Body() body: unknown,
+  ) {
+    const actorId = await this.authorize(orgId, req);
+    return this.quotes.createMappedQuote(
+      orgId,
+      actorId,
+      parseBody(mappedQuoteSchema, body),
     );
   }
 

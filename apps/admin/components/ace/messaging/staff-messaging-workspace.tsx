@@ -8,6 +8,7 @@ import { useStaffMessaging } from "./use-staff-messaging";
 import { ConversationList } from "./conversation-list";
 import { ConversationDetail } from "./conversation-detail";
 import { NewStaffConversation } from "./new-staff-conversation";
+import { MessageEmailSettings } from "./message-email-settings";
 
 export function StaffMessagingWorkspace({
   currentUserId,
@@ -89,6 +90,9 @@ function StaffConversationPane({
   const schoolTeam = channel === "school-team";
   const messaging = useStaffMessaging(currentUserId, channel);
   const [composing, setComposing] = React.useState(false);
+  const detailHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const listHeadingRef = React.useRef<HTMLHeadingElement>(null);
+  const returningToList = React.useRef(false);
   React.useEffect(
     () => setComposing(false),
     [messaging.siteRevision, canCreate],
@@ -96,9 +100,29 @@ function StaffConversationPane({
   const selected = messaging.conversations.find(
     (conversation) => conversation.id === messaging.selectedId,
   );
+  React.useEffect(() => {
+    const focusDetail = Boolean(selected && !composing);
+    const focusList = !messaging.selectedId && returningToList.current;
+    if (!focusDetail && !focusList) return;
+    if (focusList) returningToList.current = false;
+
+    // Let the activating button finish its native focus action first.
+    const timeout = window.setTimeout(() => {
+      if (focusDetail) detailHeadingRef.current?.focus();
+      if (focusList) listHeadingRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [selected?.id, messaging.selectedId, composing]);
 
   return (
     <>
+      <MessageEmailSettings
+        key={messaging.siteRevision}
+        path="/ace/messages/notifications"
+        conversationId={
+          messaging.threadAccessLost ? null : messaging.selectedId
+        }
+      />
       <div className="grid h-[min(75dvh,50rem)] min-h-[28rem] overflow-hidden rounded-3xl border border-border-subtle bg-surface shadow-card md:grid-cols-[minmax(17rem,21rem)_minmax(0,1fr)]">
         <section
           aria-label="Conversations"
@@ -118,7 +142,11 @@ function StaffConversationPane({
           ) : (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-5 py-4">
-                <h2 className="font-heading text-lg font-semibold text-text-primary">
+                <h2
+                  ref={listHeadingRef}
+                  tabIndex={-1}
+                  className="rounded-sm font-heading text-lg font-semibold text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+                >
                   {schoolTeam ? "School Team" : "Conversations"}
                 </h2>
                 {!schoolTeam && canCreate ? (
@@ -176,7 +204,11 @@ function StaffConversationPane({
               currentUserId={currentUserId}
               canSend={canSend}
               messaging={messaging}
-              onBack={() => messaging.select(null)}
+              headingRef={detailHeadingRef}
+              onBack={() => {
+                returningToList.current = true;
+                messaging.select(null);
+              }}
               contextLabel={schoolTeam ? "Parent conversation" : undefined}
               composerId={
                 schoolTeam ? "school-team-message-draft" : "staff-message-draft"

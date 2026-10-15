@@ -4,12 +4,16 @@ import * as React from "react";
 import { Button } from "@pathway/ui";
 import type { StaffConversation, StaffMessage } from "@/lib/ace-messaging-api";
 import { ConversationAvatar } from "./conversation-avatar";
+import type { MessageRealtimeStatus } from "./use-message-realtime";
 
 export type MessageDetailState = {
+  realtimeStatus: MessageRealtimeStatus;
   messages: StaffMessage[];
-  nextBefore: number | null;
+  nextMessageCursor: string | null;
   threadLoading: boolean;
   threadError: string | null;
+  threadAccessLost: boolean;
+  sendAccessLost: boolean;
   threadMoreLoading: boolean;
   draft: string;
   sending: boolean;
@@ -29,6 +33,7 @@ export function ConversationDetail({
   canSend,
   messaging,
   onBack,
+  headingRef,
   composerId = "staff-message-draft",
   contextLabel,
 }: {
@@ -37,6 +42,7 @@ export function ConversationDetail({
   canSend: boolean;
   messaging: MessageDetailState;
   onBack?: () => void;
+  headingRef?: React.Ref<HTMLHeadingElement>;
   composerId?: string;
   contextLabel?: string;
 }) {
@@ -61,7 +67,11 @@ export function ConversationDetail({
         ) : null}
         <ConversationAvatar title={conversation.title} />
         <div className="min-w-0">
-          <h2 className="truncate font-heading text-lg font-semibold text-text-primary">
+          <h2
+            ref={headingRef}
+            tabIndex={headingRef ? -1 : undefined}
+            className="truncate rounded-sm font-heading text-lg font-semibold text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-strong"
+          >
             {conversation.title}
           </h2>
           <p className="text-xs text-text-muted">
@@ -72,6 +82,22 @@ export function ConversationDetail({
                   ? "Your school team"
                   : "Direct staff conversation")}
           </p>
+          {!messaging.threadAccessLost ? (
+            <p
+              className="mt-1 flex items-center gap-1.5 text-xs text-text-muted"
+              role="status"
+            >
+              <span
+                aria-hidden="true"
+                className={`h-1.5 w-1.5 rounded-full ${messaging.realtimeStatus === "live" ? "bg-status-success" : "bg-status-warning"}`}
+              />
+              {messaging.realtimeStatus === "live"
+                ? "Live updates"
+                : messaging.realtimeStatus === "connecting"
+                  ? "Connecting updates…"
+                  : "Refreshing automatically"}
+            </p>
+          ) : null}
         </div>
       </header>
 
@@ -79,7 +105,27 @@ export function ConversationDetail({
         className="min-h-0 flex-1 overflow-y-auto bg-shell/70 px-4 pb-6 sm:px-8"
         aria-label="Messages"
       >
-        {messaging.nextBefore ? (
+        {messaging.threadAccessLost ? (
+          <div role="alert" className="mx-auto max-w-md py-12 text-center">
+            <h3 className="font-heading text-lg font-semibold text-text-primary">
+              Conversation unavailable
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-text-muted">
+              Your access may have changed. Check with your school if this
+              continues.
+            </p>
+            <Button
+              type="button"
+              variant="secondary"
+              className="mt-4"
+              onClick={messaging.retryThread}
+              disabled={messaging.threadLoading}
+            >
+              {messaging.threadLoading ? "Checking…" : "Try again"}
+            </Button>
+          </div>
+        ) : null}
+        {!messaging.threadAccessLost && messaging.nextMessageCursor ? (
           <div className="mb-5 text-center">
             <Button
               type="button"
@@ -96,7 +142,7 @@ export function ConversationDetail({
             Loading messages…
           </p>
         ) : null}
-        {messaging.threadError ? (
+        {!messaging.threadAccessLost && messaging.threadError ? (
           <div className="mb-4 flex items-center justify-center gap-3">
             <p role="alert" className="text-sm text-status-danger">
               {messaging.threadError}
@@ -110,7 +156,8 @@ export function ConversationDetail({
             </Button>
           </div>
         ) : null}
-        {!messaging.threadLoading &&
+        {!messaging.threadAccessLost &&
+        !messaging.threadLoading &&
         !messaging.threadError &&
         messaging.messages.length === 0 ? (
           <p
@@ -122,18 +169,22 @@ export function ConversationDetail({
               : "No messages yet."}
           </p>
         ) : null}
-        <MessageList
-          messages={messaging.messages}
-          currentUserId={currentUserId}
-        />
+        {!messaging.threadAccessLost ? (
+          <MessageList
+            messages={messaging.messages}
+            currentUserId={currentUserId}
+          />
+        ) : null}
         <div ref={endRef} />
       </div>
 
-      <MessageComposer
-        canSend={canSend}
-        messaging={messaging}
-        composerId={composerId}
-      />
+      {!messaging.threadAccessLost ? (
+        <MessageComposer
+          canSend={canSend && !messaging.sendAccessLost}
+          messaging={messaging}
+          composerId={composerId}
+        />
+      ) : null}
     </>
   );
 }
@@ -147,8 +198,7 @@ function MessageList({
 }) {
   const latestOutgoingId = messages.reduce<string | null>(
     (latest, message) =>
-      message.sender.id === currentUserId &&
-      typeof message.recipientRead === "boolean"
+      message.sender.id === currentUserId && message.deliveryState !== null
         ? message.id
         : latest,
     null,
@@ -226,7 +276,11 @@ function MessageList({
                 </div>
                 {message.id === latestOutgoingId ? (
                   <p className="mt-1 text-right text-xs text-text-muted">
-                    {message.recipientRead ? "Read" : "Sent"}
+                    {message.deliveryState === "read"
+                      ? "Read"
+                      : message.deliveryState === "delivered"
+                        ? "Delivered"
+                        : "Sent"}
                   </p>
                 ) : null}
               </div>
@@ -250,8 +304,9 @@ function MessageComposer({
   if (!canSend) {
     return (
       <p className="border-t border-border-subtle bg-surface px-5 py-4 text-sm text-text-muted">
-        You can read this conversation, but you do not have permission to send
-        messages.
+        {messaging.sendAccessLost
+          ? "Sending access has changed. You can still read this conversation. Refresh the page if your school restores sending access."
+          : "You can read this conversation, but you do not have permission to send messages."}
       </p>
     );
   }

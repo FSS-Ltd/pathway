@@ -25,6 +25,8 @@ const today = new Date(
 const yesterday = new Date(today.getTime() - 86_400_000);
 const route = (site: string, child: string) =>
   `/ace/family/sites/${site}/children/${child}/summary`;
+const overviewRoute = (site: string, child: string) =>
+  `/family/sites/${site}/children/${child}/overview`;
 
 describe("ACE family read facade", () => {
   let app: INestApplication | undefined;
@@ -247,6 +249,39 @@ describe("ACE family read facade", () => {
         (item: { childId: string }) => item.childId === endedChildId,
       )?.sections,
     ).not.toContain("ace-summary");
+  });
+
+  it("scopes the general overview to full linked guardians without exposing restricted sections", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const response = await request(server)
+      .get(overviewRoute(siteId, childId))
+      .set("Authorization", guardianAuthorization);
+    expect(response.status).toBe(200);
+    expect(response.body.identity).toMatchObject({
+      id: childId,
+      firstName: "Ari",
+      lastName: "Alpha",
+    });
+    expect(response.body.sections.attendance).toMatchObject({
+      status: "ready",
+      data: { absent: 1 },
+    });
+    expect(response.body.tabs).toEqual(["overview", "attendance"]);
+    expect(response.body.actions).toEqual([]);
+    expect(JSON.stringify(response.body)).not.toContain("absenceReason");
+
+    for (const [authorization, site, child] of [
+      [limitedAuthorization, siteId, childId],
+      [unrelatedAuthorization, siteId, childId],
+      [staffAuthorization, siteId, childId],
+      [guardianAuthorization, otherSiteId, otherChildId],
+    ]) {
+      const denied = await request(server)
+        .get(overviewRoute(site, child))
+        .set("Authorization", authorization);
+      expect(denied.status).toBe(404);
+    }
   });
 
   it("denies limited, unrelated, ended-enrolment, supplied-child, and anonymous reads", async () => {

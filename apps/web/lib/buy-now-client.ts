@@ -1,3 +1,4 @@
+import type { InstitutionalVertical } from "@pathway/types";
 /**
  * Client for the public Buy Now API surface.
  *
@@ -13,13 +14,19 @@ import type { WebModule } from "./module-catalog";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
-export type Sector = "CHURCH" | "CLUB" | "SCHOOL" | "CHARITY";
+export type Sector =
+  | "CHURCH"
+  | "CLUB"
+  | "SCHOOL"
+  | "CHARITY"
+  | "LEARNING_CENTRE";
 
 export const SECTOR_OPTIONS: { value: Sector; label: string }[] = [
   { value: "CHURCH", label: "Church" },
   { value: "CLUB", label: "Club" },
   { value: "SCHOOL", label: "School" },
   { value: "CHARITY", label: "Charity" },
+  { value: "LEARNING_CENTRE", label: "Learning Centre" },
 ];
 
 export type PlanPreviewResponse = {
@@ -66,6 +73,7 @@ export type BuyNowCheckoutPayload = {
   contactEmail: string;
   password: string;
   sector: Sector;
+  vertical?: InstitutionalVertical;
   successUrl?: string;
   cancelUrl?: string;
 };
@@ -146,6 +154,7 @@ export async function createCheckoutSession(
       contactEmail: payload.contactEmail,
       password: payload.password,
       sector: payload.sector,
+      vertical: payload.vertical,
     },
     successUrl: payload.successUrl,
     cancelUrl: payload.cancelUrl,

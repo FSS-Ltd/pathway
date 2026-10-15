@@ -10,8 +10,25 @@ import type { Prisma, PrismaClient } from "@prisma/client";
  * which is out of scope for this pass.
  */
 const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
+  ComplianceSiteProfile: ["profileJson"],
+  ComplianceProfileRevision: ["profileJson"],
+  ComplianceAttestation: ["notes", "notApplicableReason"],
+  ComplianceEvidence: ["title", "notes", "fileName"],
+  ComplianceAgreementVersion: ["title", "contentText", "originalFileName"],
+  ComplianceAgreementAcceptance: ["typedName", "signedFileName"],
+  CompliancePersonnelRecord: [
+    "subjectName",
+    "roleDescription",
+    "title",
+    "provider",
+    "reference",
+    "notes",
+    "verificationNotes",
+  ],
   Child: [
     "allergies",
+    "medicalConditions",
+    "medicationAtSite",
     "additionalNeedsNotes",
     "gpName",
     "gpPhone",
@@ -42,6 +59,7 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
  * during the buy-now checkout flow.
  */
 const ENCRYPTED_JSON_FIELDS: Record<string, readonly string[]> = {
+  CompliancePersonnelRevision: ["snapshot"],
   PendingOrder: ["pendingOrgDetails"],
   ChildRegistrationSubmission: ["payload"],
 };

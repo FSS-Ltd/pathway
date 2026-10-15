@@ -3,87 +3,298 @@
 import React from "react";
 import Link from "next/link";
 import { useSession } from "@/lib/use-session-compat";
-import { Card, Button } from "@pathway/ui";
+import { Button, Card } from "@pathway/ui";
 import {
-  INSTITUTIONAL_PLANS,
-  type InstitutionalPlanCode,
+  isMappedInstitutionalPlanCode,
+  type InstitutionalMappedPlanCode,
+  type InstitutionalMappedQuote,
+  type InstitutionalStorageChoice,
 } from "@pathway/pricing";
 import {
   acceptInstitutionalQuote,
+  checkoutInstitutionalQuote,
   createInstitutionalQuote,
+  estimateInstitutionalQuote,
+  fetchInstitutionalCatalogue,
   fetchInstitutionalSummary,
+  type InstitutionalCatalogue,
   type InstitutionalQuote,
   type InstitutionalSummary,
 } from "../../../lib/institutional-billing-client";
+import { InstitutionalSummaryCards } from "../../../components/billing/institutional-summary";
 import {
-  InstitutionalSummaryCards,
-  money,
-  date,
-} from "../../../components/billing/institutional-summary";
+  BillingReviewStep,
+  BillingRunningTotal,
+} from "../../../components/billing/institutional-configurator-review";
+import {
+  BILLING_STEPS,
+  BILLING_STEP_LABELS,
+  BillingModulesStep,
+  BillingPlanStep,
+  BillingPupilsStep,
+  BillingStorageStep,
+  type BillingStep,
+} from "../../../components/billing/institutional-configurator-steps";
+
+const STORAGE_KEY_PREFIX = "nexsteps-institutional-billing:";
+
+function savedSelection(
+  userId: string,
+  orgId: string,
+): {
+  planCode: InstitutionalMappedPlanCode;
+  storageChoice: InstitutionalStorageChoice;
+  declaredCount: string;
+  declarationAccepted: boolean;
+} | null {
+  try {
+    const raw = window.sessionStorage.getItem(
+      `${STORAGE_KEY_PREFIX}${userId}:${orgId}`,
+    );
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value))
+      return null;
+    const record = value as Record<string, unknown>;
+    if (
+      typeof record.planCode !== "string" ||
+      !isMappedInstitutionalPlanCode(record.planCode)
+    )
+      return null;
+    if (
+      record.storageChoice !== "none" &&
+      record.storageChoice !== "100" &&
+      record.storageChoice !== "200" &&
+      record.storageChoice !== "1000"
+    )
+      return null;
+    if (typeof record.declaredCount !== "string") return null;
+    return {
+      planCode: record.planCode,
+      storageChoice: record.storageChoice,
+      declaredCount: record.declaredCount,
+      declarationAccepted: record.declarationAccepted === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function selectedCount(
+  summary: InstitutionalSummary,
+  declared: string,
+): number | null {
+  if (summary.currentPaid) {
+    return summary.countSource === "VERIFIED" && summary.liveForecast
+      ? summary.liveForecast.enrolledChildren
+      : null;
+  }
+  if (declared.trim() === "") return null;
+  const count = Number(declared);
+  return Number.isSafeInteger(count) && count >= 0 ? count : null;
+}
+
+function currentStorageChoice(
+  summary: InstitutionalSummary,
+): InstitutionalStorageChoice {
+  const storageLine = summary.currentPaid?.lines.find(
+    (line) => line.component === "STORAGE",
+  );
+  const priceCode =
+    storageLine && "priceCode" in storageLine
+      ? storageLine.priceCode
+      : undefined;
+  if (priceCode?.startsWith("STORAGE_100GB_")) return "100";
+  if (priceCode?.startsWith("STORAGE_200GB_")) return "200";
+  if (priceCode?.startsWith("STORAGE_1TB_")) return "1000";
+  return "none";
+}
 
 export default function InstitutionalBillingPage() {
   const { data: session, status } = useSession();
+  const userId = session?.user.id;
   const [summary, setSummary] = React.useState<InstitutionalSummary | null>(
     null,
   );
-  const [planCode, setPlanCode] = React.useState<InstitutionalPlanCode>(
+  const [catalogue, setCatalogue] =
+    React.useState<InstitutionalCatalogue | null>(null);
+  const [step, setStep] = React.useState<BillingStep>("plan");
+  const [planCode, setPlanCode] = React.useState<InstitutionalMappedPlanCode>(
     "INSTITUTIONAL_STARTER_MONTHLY",
   );
+  const [storageChoice, setStorageChoice] =
+    React.useState<InstitutionalStorageChoice>("none");
+  const [declaredCount, setDeclaredCount] = React.useState("");
+  const [declarationAccepted, setDeclarationAccepted] = React.useState(false);
+  const [estimate, setEstimate] =
+    React.useState<InstitutionalMappedQuote | null>(null);
   const [quote, setQuote] = React.useState<InstitutionalQuote | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [pricingPending, setPricingPending] = React.useState(false);
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [priceError, setPriceError] = React.useState<string | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
+  const [checkoutPendingConfirmation, setCheckoutPendingConfirmation] =
+    React.useState(false);
+  const [retry, setRetry] = React.useState(0);
+  const [selectionReady, setSelectionReady] = React.useState(false);
+  const requestRef = React.useRef(0);
   const keyRef = React.useRef<{ quoteId: string; key: string } | null>(null);
-  const previewRequestRef = React.useRef(0);
-  const hasCurrentOptionalModules = Boolean(
-    summary?.currentPaid &&
-    (summary.currentPaid.includedModules.length ||
-      summary.currentPaid.paidModules.length),
-  );
 
   const reload = React.useCallback(async () => {
     setError(null);
     try {
-      const result = await fetchInstitutionalSummary();
-      setSummary(result);
-      if (result.scheduledChange) setPlanCode(result.scheduledChange.planCode);
-      else if (result.currentPaid) setPlanCode(result.currentPaid.planCode);
+      const [nextSummary, nextCatalogue] = await Promise.all([
+        fetchInstitutionalSummary(),
+        fetchInstitutionalCatalogue(),
+      ]);
+      setSummary(nextSummary);
+      setCatalogue(nextCatalogue);
+      const saved =
+        userId && nextSummary.orgId
+          ? savedSelection(userId, nextSummary.orgId)
+          : null;
+      setPlanCode(
+        saved?.planCode ??
+          nextSummary.scheduledChange?.planCode ??
+          nextSummary.currentPaid?.planCode ??
+          "INSTITUTIONAL_STARTER_MONTHLY",
+      );
+      setStorageChoice(
+        saved?.storageChoice ?? currentStorageChoice(nextSummary),
+      );
+      setDeclaredCount(
+        !nextSummary.currentPaid ? (saved?.declaredCount ?? "") : "",
+      );
+      setDeclarationAccepted(
+        !nextSummary.currentPaid && saved?.declarationAccepted === true,
+      );
+      setSelectionReady(true);
     } catch {
       setError(
-        "Billing information could not be loaded. Check your billing access and try again.",
+        "Billing information is unavailable. Check your access and retry.",
       );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   React.useEffect(() => {
     if (status === "authenticated" && session) void reload();
   }, [status, session, reload]);
 
-  const preview = async () => {
-    const requestId = ++previewRequestRef.current;
-    setPending(true);
+  React.useEffect(() => {
+    if (!selectionReady || !userId || !summary?.orgId) return;
+    try {
+      window.sessionStorage.setItem(
+        `${STORAGE_KEY_PREFIX}${userId}:${summary.orgId}`,
+        JSON.stringify({
+          planCode,
+          storageChoice,
+          declaredCount,
+          declarationAccepted,
+        }),
+      );
+    } catch {
+      // Storage is optional; the server validates each submitted quote.
+    }
+  }, [
+    userId,
+    summary,
+    selectionReady,
+    planCode,
+    storageChoice,
+    declaredCount,
+    declarationAccepted,
+  ]);
+
+  React.useEffect(() => {
+    const checkout = new URLSearchParams(window.location.search).get(
+      "checkout",
+    );
+    if (checkout === "cancelled")
+      setNotice(
+        "Payment was cancelled. Your choices are still here for review.",
+      );
+    if (checkout === "pending") {
+      setCheckoutPendingConfirmation(true);
+      setNotice(
+        "Payment is being confirmed. Your workspace will activate after Stripe confirms payment.",
+      );
+    }
+  }, []);
+
+  const count = summary ? selectedCount(summary, declaredCount) : null;
+  React.useEffect(() => {
+    const request = ++requestRef.current;
+    if (count === null) {
+      setEstimate(null);
+      setPriceError(null);
+      return;
+    }
+    setPricingPending(true);
+    setPriceError(null);
+    void estimateInstitutionalQuote(planCode, count, storageChoice)
+      .then((result) => {
+        if (request === requestRef.current) setEstimate(result);
+      })
+      .catch(() => {
+        if (request === requestRef.current) {
+          setEstimate(null);
+          setPriceError(
+            "A selected price is unavailable. Retry or choose another option.",
+          );
+        }
+      })
+      .finally(() => {
+        if (request === requestRef.current) setPricingPending(false);
+      });
+  }, [planCode, storageChoice, count, retry]);
+
+  const changeSelection = (change: () => void) => {
+    requestRef.current += 1;
+    setQuote(null);
+    setEstimate(null);
     setError(null);
     setNotice(null);
+    keyRef.current = null;
+    change();
+  };
+
+  const preview = async () => {
+    if (
+      !summary ||
+      count === null ||
+      estimate?.kind !== "priced" ||
+      pricingPending
+    )
+      return;
+    setPending(true);
+    setError(null);
     setQuote(null);
     try {
-      const result = await createInstitutionalQuote(planCode);
-      if (requestId === previewRequestRef.current) setQuote(result);
-    } catch {
-      if (requestId === previewRequestRef.current) {
+      const result = await createInstitutionalQuote(
+        planCode,
+        storageChoice,
+        summary.currentPaid ? undefined : count,
+      );
+      setQuote(result);
+      if (result.status !== "PRICED")
         setError(
-          "A confirmed enrolment roll is required before a plan change can be priced. Please confirm the roll or contact support.",
+          "This pupil count needs a tailored quote. Contact support to continue.",
         );
-      }
+    } catch {
+      setError(
+        "The quote could not be created. A confirmed roll or available Stripe price may be required. Retry after checking your details.",
+      );
     } finally {
-      if (requestId === previewRequestRef.current) setPending(false);
+      setPending(false);
     }
   };
 
   const accept = async () => {
-    if (!quote) return;
+    if (!quote || quote.status !== "PRICED" || !summary) return;
     setPending(true);
     setError(null);
     const key =
@@ -93,14 +304,19 @@ export default function InstitutionalBillingPage() {
     keyRef.current = { quoteId: quote.id, key };
     try {
       await acceptInstitutionalQuote(quote.id, key);
-      setQuote(null);
-      setNotice(
-        "Your choice has been recorded for an eligible renewal. Your current paid plan is unchanged.",
-      );
-      await reload();
+      if (summary.currentPaid) {
+        setNotice(
+          "Your change is scheduled for the next eligible renewal. Current access and charges remain in place until then.",
+        );
+        setQuote(null);
+        await reload();
+      } else {
+        const checkout = await checkoutInstitutionalQuote(quote.id, key);
+        window.location.assign(checkout.checkoutUrl);
+      }
     } catch {
       setError(
-        "This quote may have expired or the enrolment roll changed. Review a fresh quote before accepting.",
+        "The quote expired, changed, or checkout is unavailable. Request a fresh quote before continuing.",
       );
       setQuote(null);
     } finally {
@@ -108,7 +324,7 @@ export default function InstitutionalBillingPage() {
     }
   };
 
-  if (status === "unauthenticated") {
+  if (status === "unauthenticated")
     return (
       <Card title="Sign in required">
         <p className="text-sm text-text-muted">
@@ -119,15 +335,13 @@ export default function InstitutionalBillingPage() {
         </Link>
       </Card>
     );
-  }
-  if (status !== "authenticated" || loading) {
+  if (status !== "authenticated" || loading)
     return (
       <p role="status" className="text-sm text-text-muted">
         Loading billing…
       </p>
     );
-  }
-  if (error && !summary) {
+  if (!summary || !catalogue)
     return (
       <Card title="Billing unavailable">
         <p role="alert" className="text-sm text-status-danger">
@@ -138,108 +352,135 @@ export default function InstitutionalBillingPage() {
         </Button>
       </Card>
     );
-  }
+
+  const planAvailable =
+    catalogue.plans.find((plan) => plan.planCode === planCode)?.available ===
+    true;
+  const stepIndex = BILLING_STEPS.indexOf(step);
+  const canReview =
+    count !== null &&
+    (!checkoutPendingConfirmation || Boolean(summary.currentPaid)) &&
+    (summary.currentPaid || declarationAccepted) &&
+    estimate?.kind === "priced" &&
+    !pricingPending &&
+    !priceError;
 
   return (
     <main className="space-y-6">
       <header className="space-y-2">
         <Link
           href="/billing"
-          className="text-sm font-semibold text-accent-strong underline-offset-2 hover:underline"
+          className="text-sm font-semibold text-accent-strong hover:underline"
         >
           ← Billing overview
         </Link>
         <h1 className="font-heading text-2xl font-bold text-text-primary sm:text-3xl">
-          Enrolled-child billing
+          Configure institutional billing
         </h1>
         <p className="text-sm text-text-muted">
-          A clear view of what is paid now, what the confirmed roll suggests,
-          and what has been frozen for renewal.
+          Review the confirmed roll, choose your plan and storage, then accept a
+          Stripe-backed quote.
         </p>
       </header>
-      {summary ? <InstitutionalSummaryCards summary={summary} /> : null}
-      {summary?.currentPaid ? (
-        <Card title="Review a plan change">
-          <div className="space-y-4">
-            <p className="text-sm text-text-muted">
-              Plan and module changes take effect at an eligible renewal without
-              proration. Optional modules are not yet ready for new selection.
-              Your current access stays in place until the paid period changes.
-            </p>
-            <label htmlFor="next-plan" className="block text-sm font-semibold">
-              Next plan
-            </label>
-            <select
-              id="next-plan"
-              value={planCode}
-              onChange={(event) => {
-                previewRequestRef.current += 1;
-                setPending(false);
-                setPlanCode(event.target.value as InstitutionalPlanCode);
-                setQuote(null);
-              }}
-              className="w-full max-w-sm rounded-lg border border-border-subtle bg-surface p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+      <InstitutionalSummaryCards summary={summary} />
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr),minmax(280px,0.65fr)]">
+        <div className="min-w-0">
+          <Card title="Your configuration">
+            <nav
+              aria-label="Billing configuration progress"
+              className="mb-6 overflow-x-auto"
             >
-              {Object.values(INSTITUTIONAL_PLANS).map((plan) => (
-                <option key={plan.code} value={plan.code}>
-                  {plan.tier} · {money(plan.basePence)} base / month ·{" "}
-                  {plan.includedChildren} included
-                </option>
-              ))}
-            </select>
-            {hasCurrentOptionalModules ? (
-              <p className="text-sm text-text-muted">
-                Your current optional modules need a separate billing review
-                before this plan can change. They will not be silently removed.
-              </p>
-            ) : null}
-            <div>
-              <Button
-                size="sm"
-                disabled={pending || hasCurrentOptionalModules}
-                onClick={() => void preview()}
-              >
-                {pending ? "Checking…" : "Review authoritative quote"}
-              </Button>
-            </div>
-            {quote ? (
-              <div
-                aria-live="polite"
-                className="space-y-3 rounded-lg border border-border-subtle p-4"
-              >
-                <p className="text-sm">
-                  {INSTITUTIONAL_PLANS[quote.planCode].tier} quote:{" "}
-                  {quote.status === "PRICED"
-                    ? `${money(quote.subtotalPence)} / month for ${quote.enrolledChildren} enrolled children`
-                    : "Custom quote required"}
-                </p>
-                <p className="text-xs text-text-muted">
-                  Expires {date(quote.expiresAt)}. No charge is made today.
-                </p>
-                {quote.status === "PRICED" ? (
-                  <Button
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => void accept()}
+              <ol className="flex min-w-max gap-2 pb-2 text-xs sm:flex-wrap">
+                {BILLING_STEPS.map((item, index) => (
+                  <li
+                    key={item}
+                    aria-current={step === item ? "step" : undefined}
+                    className={`rounded-full px-3 py-1.5 ${step === item ? "bg-accent-primary text-accent-foreground" : "bg-surface text-text-muted"}`}
                   >
-                    Accept change
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
-            {notice ? (
-              <p role="status" className="text-sm text-status-success">
-                {notice}
-              </p>
-            ) : null}
-            {error ? (
-              <p role="alert" className="text-sm text-status-danger">
+                    {index + 1}. {BILLING_STEP_LABELS[item]}
+                  </li>
+                ))}
+              </ol>
+            </nav>
+            {step === "plan" && (
+              <BillingPlanStep
+                catalogue={catalogue}
+                selected={planCode}
+                onSelect={(value) => changeSelection(() => setPlanCode(value))}
+              />
+            )}
+            {step === "pupils" && (
+              <BillingPupilsStep
+                summary={summary}
+                declaredCount={declaredCount}
+                onDeclaredCount={(value) =>
+                  changeSelection(() => setDeclaredCount(value))
+                }
+              />
+            )}
+            {step === "modules" && <BillingModulesStep summary={summary} />}
+            {step === "storage" && (
+              <BillingStorageStep
+                choice={storageChoice}
+                onSelect={(value) =>
+                  changeSelection(() => setStorageChoice(value))
+                }
+              />
+            )}
+            {step === "review" && (
+              <BillingReviewStep
+                summary={summary}
+                quote={quote}
+                estimate={estimate}
+                declarationAccepted={declarationAccepted}
+                onDeclarationChange={setDeclarationAccepted}
+                pending={pending}
+                canReview={Boolean(canReview)}
+                onPreview={() => void preview()}
+                onAccept={() => void accept()}
+              />
+            )}
+            {error && (
+              <p role="alert" className="mt-4 text-sm text-status-danger">
                 {error}
               </p>
-            ) : null}
-          </div>
-        </Card>
-      ) : null}
+            )}
+            {notice && (
+              <p role="status" className="mt-4 text-sm text-status-success">
+                {notice}
+              </p>
+            )}
+            <div className="mt-6 flex justify-between border-t border-border-subtle pt-4">
+              <Button
+                size="sm"
+                disabled={stepIndex === 0}
+                onClick={() => setStep(BILLING_STEPS[stepIndex - 1])}
+              >
+                Back
+              </Button>
+              {step !== "review" && (
+                <Button
+                  size="sm"
+                  disabled={step === "plan" && !planAvailable}
+                  onClick={() => setStep(BILLING_STEPS[stepIndex + 1])}
+                >
+                  Continue
+                </Button>
+              )}
+            </div>
+          </Card>
+        </div>
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <BillingRunningTotal
+            summary={summary}
+            quote={quote}
+            estimate={estimate}
+            priceError={priceError}
+            pricingPending={pricingPending}
+            onRetry={() => setRetry((value) => value + 1)}
+          />
+        </aside>
+      </div>
     </main>
   );
 }

@@ -1,4 +1,5 @@
 export type FamilySection =
+  | "parent-summary"
   | "ace-summary"
   | "student-summary"
   | "attendance"
@@ -19,7 +20,7 @@ export function parentSectionsForSite(
   hasStudentIdentity: boolean,
   isAceSchool: boolean,
 ): FamilySection[] {
-  const sections = [...CHILD_SECTIONS];
+  const sections: FamilySection[] = ["parent-summary", ...CHILD_SECTIONS];
   if (!hasStudentIdentity) {
     if (activePermissions.has("ace.parent.notices.read")) {
       sections.push("notices");

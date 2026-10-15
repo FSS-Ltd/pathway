@@ -1,5 +1,6 @@
 import { isUsingMockApi } from "./api-client";
 import { request, type StaffMessage } from "./ace-messaging-api";
+import type { MessageRealtimeSubscription } from "@pathway/platform";
 
 export type ParentConversation = {
   id: string;
@@ -15,6 +16,18 @@ export type ParentRecipient = { id: string; displayName: string };
 
 const pathForSite = (siteId: string) =>
   `/ace/parent/sites/${encodeURIComponent(siteId)}/messages/conversations`;
+
+export async function issueParentRealtimeToken(
+  siteId: string,
+  conversationId: string,
+  signal?: AbortSignal,
+): Promise<MessageRealtimeSubscription> {
+  requireLiveMessaging();
+  return request(
+    `${pathForSite(siteId)}/${encodeURIComponent(conversationId)}/realtime-token`,
+    { method: "POST", signal },
+  );
+}
 
 function requireLiveMessaging(): void {
   if (isUsingMockApi()) {
@@ -61,11 +74,11 @@ export async function openParentConversation(
 export async function fetchParentMessages(
   siteId: string,
   conversationId: string,
-  input: { before?: number; signal?: AbortSignal } = {},
-): Promise<{ items: ParentMessage[]; nextBefore: number | null }> {
+  input: { cursor?: string; signal?: AbortSignal } = {},
+): Promise<{ items: ParentMessage[]; nextCursor: string | null }> {
   requireLiveMessaging();
   const query = new URLSearchParams({ limit: "50" });
-  if (input.before) query.set("before", String(input.before));
+  if (input.cursor) query.set("cursor", input.cursor);
   return request(
     `${pathForSite(siteId)}/${encodeURIComponent(conversationId)}/messages?${query}`,
     { signal: input.signal },

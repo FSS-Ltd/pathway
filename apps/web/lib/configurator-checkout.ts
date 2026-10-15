@@ -28,6 +28,9 @@ export function verticalToSector(vertical: Vertical): Sector {
     case "STATE_SCHOOL":
     case "NURSERY":
       return "SCHOOL";
+    case "ACE_LEARNING_CENTRE":
+    case "PUBLIC_LEARNING_CENTRE":
+      return "LEARNING_CENTRE";
     case "HOME_EDUCATION":
       // NexSteps Home has its own onboarding (docs/NexStepsV2/07-nexsteps-home.md)
       // and is never selectable through this institutional configurator.
@@ -58,6 +61,7 @@ export function buildCheckoutPayload(
     contactEmail: organisation.workEmail,
     password: organisation.password,
     sector: verticalToSector(state.vertical),
+    vertical: state.vertical === "HOME_EDUCATION" ? undefined : state.vertical,
     successUrl: organisation.successUrl,
     cancelUrl: organisation.cancelUrl,
   };

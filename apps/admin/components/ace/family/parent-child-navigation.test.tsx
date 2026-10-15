@@ -29,7 +29,13 @@ const contexts = [
     siteName: "Alpha School",
     childId: "child-one",
     childName: "Ari Alpha",
-    sections: ["ace-summary", "attendance", "sessions", "subject-timetable"],
+    sections: [
+      "parent-summary",
+      "ace-summary",
+      "attendance",
+      "sessions",
+      "subject-timetable",
+    ],
   },
   {
     kind: "parent",
@@ -37,7 +43,12 @@ const contexts = [
     siteName: "Alpha School",
     childId: "child-two",
     childName: "Bea Alpha",
-    sections: ["ace-summary", "attendance", "subject-timetable"],
+    sections: [
+      "parent-summary",
+      "ace-summary",
+      "attendance",
+      "subject-timetable",
+    ],
   },
   {
     kind: "parent",
@@ -45,7 +56,7 @@ const contexts = [
     siteName: "Alpha School",
     childId: "child-three",
     childName: "Cia Alpha",
-    sections: ["attendance"],
+    sections: ["parent-summary", "attendance"],
   },
   {
     kind: "parent",
@@ -53,7 +64,7 @@ const contexts = [
     siteName: "Bravo School",
     childId: "child-four",
     childName: "Dan Bravo",
-    sections: ["ace-summary", "attendance"],
+    sections: ["parent-summary", "ace-summary", "attendance"],
   },
   {
     kind: "student",
@@ -66,6 +77,7 @@ const contexts = [
 ];
 
 async function run() {
+  assert.equal(childSectionForRoute("overview"), "parent-summary");
   assert.equal(childSectionForRoute("summary"), "ace-summary");
   assert.equal(childSectionForRoute("attendance"), "attendance");
   assert.equal(childSectionForRoute("timetable"), "sessions");
@@ -98,7 +110,12 @@ async function run() {
 
   const render = async (
     childId: string,
-    section: "ace-summary" | "attendance" | "sessions" | "subject-timetable",
+    section:
+      | "parent-summary"
+      | "ace-summary"
+      | "attendance"
+      | "sessions"
+      | "subject-timetable",
     key: string,
     status: "authenticated" | "unauthenticated" = "authenticated",
   ) => {
@@ -116,6 +133,18 @@ async function run() {
   };
 
   try {
+    await render("child-one", "parent-summary", "generic-overview");
+    assert.deepEqual(
+      Array.from(container.querySelectorAll("nav a")).map((link) =>
+        link.getAttribute("href"),
+      ),
+      [
+        "/family/sites/school-one/children/child-one/overview",
+        "/family/sites/school-one/children/child-two/overview",
+        "/family/sites/school-one/children/child-three/overview",
+      ],
+    );
+
     await render("child-one", "ace-summary", "summary");
     assert.match(container.textContent ?? "", /Ari Alpha at Alpha School/);
     assert.equal(

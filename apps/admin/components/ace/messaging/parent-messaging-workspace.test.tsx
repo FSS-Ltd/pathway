@@ -60,10 +60,16 @@ async function run(): Promise<void> {
   let sendAttempts = 0;
   let cursorSaved = false;
   let openCount = 0;
+  let threadReads = 0;
+  let denyThread = false;
+  let denySend = false;
 
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
+    if (url.pathname.endsWith("/realtime-token")) {
+      return jsonResponse({ message: "Live updates unavailable" }, 503);
+    }
     assert.equal(
       new Headers(init?.headers).get("Authorization"),
       "Bearer parent-token",
@@ -101,6 +107,7 @@ async function run(): Promise<void> {
       };
       assert.equal(body.body, "Please call me");
       sentRequestIds.push(body.clientRequestId);
+      if (denySend) return jsonResponse({ message: "access changed" }, 403);
       return sendAttempts === 1
         ? jsonResponse({ message: "temporary error" }, 500)
         : jsonResponse({
@@ -112,6 +119,8 @@ async function run(): Promise<void> {
           });
     }
     if (url.pathname.endsWith("/messages")) {
+      threadReads += 1;
+      if (denyThread) return jsonResponse({ message: "access changed" }, 403);
       return jsonResponse({
         items: url.pathname.includes("/site-one/")
           ? [
@@ -124,7 +133,7 @@ async function run(): Promise<void> {
               },
             ]
           : [],
-        nextBefore: null,
+        nextCursor: null,
       });
     }
     return jsonResponse({
@@ -197,6 +206,56 @@ async function run(): Promise<void> {
       /Please call me/,
     );
     assert.match(container.querySelector("ol")?.textContent ?? "", /Sent/);
+
+    denyThread = true;
+    await act(async () => window.dispatchEvent(new dom.window.Event("focus")));
+    assert.match(container.textContent ?? "", /Conversation unavailable/);
+    assert.doesNotMatch(
+      container.textContent ?? "",
+      /Live updates|Connecting updates|Refreshing automatically/,
+    );
+    const readsAfterDenial = threadReads;
+    await act(async () => window.dispatchEvent(new dom.window.Event("focus")));
+    assert.equal(threadReads, readsAfterDenial);
+    assert.doesNotMatch(
+      container.querySelector("ol")?.textContent ?? "",
+      /Hello from school/,
+    );
+    assert.equal(container.querySelector("textarea"), null);
+
+    denyThread = false;
+    const retryThread = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent?.trim() === "Try again",
+    );
+    assert.ok(retryThread);
+    await act(async () => retryThread.click());
+    assert.match(container.textContent ?? "", /Hello from school/);
+    const restoredDraft = container.querySelector("textarea");
+    const restoredForm = container.querySelector("form");
+    assert.ok(restoredDraft && restoredForm);
+
+    denySend = true;
+    await changeValue(restoredDraft, "Please call me");
+    await act(async () =>
+      restoredForm.dispatchEvent(
+        new dom.window.Event("submit", { bubbles: true, cancelable: true }),
+      ),
+    );
+    assert.match(container.textContent ?? "", /Conversation unavailable/);
+    assert.equal(container.querySelector("textarea"), null);
+    assert.doesNotMatch(
+      container.querySelector("ol")?.textContent ?? "",
+      /Hello from school/,
+    );
+
+    const retryReadAfterDeniedSend = Array.from(
+      container.querySelectorAll("button"),
+    ).find((button) => button.textContent?.trim() === "Try again");
+    assert.ok(retryReadAfterDeniedSend);
+    await act(async () => retryReadAfterDeniedSend.click());
+    assert.match(container.textContent ?? "", /Hello from school/);
+    assert.match(container.textContent ?? "", /Sending access has changed/);
+    assert.equal(container.querySelector("textarea"), null);
 
     await act(async () =>
       root.render(

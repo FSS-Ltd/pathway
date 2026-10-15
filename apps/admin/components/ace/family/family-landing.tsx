@@ -24,6 +24,7 @@ function contextHref(
 }
 
 const childLinks = [
+  { section: "parent-summary", label: "Overview" },
   { section: "ace-summary", label: "Overview" },
   { section: "student-summary", label: "Overview" },
   { section: "attendance", label: "Attendance" },
@@ -93,18 +94,25 @@ function ContextList({
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {childLinks
-                  .filter(({ section }) => context.sections.includes(section))
+                  .filter(
+                    ({ section }) =>
+                      context.sections.includes(section) &&
+                      (section !== "parent-summary" ||
+                        !context.sections.includes("ace-summary")),
+                  )
                   .map(({ section, label }) => (
                     <SectionLink
                       key={section}
                       href={
-                        section === "ace-summary"
-                          ? `/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/summary`
-                          : section === "student-summary"
-                            ? `/ace/student/sites/${encodeURIComponent(context.siteId)}/summary`
-                            : section === "subject-timetable"
-                              ? familyTimetableHref(context, "subjects")
-                              : contextHref(context, section)
+                        section === "parent-summary"
+                          ? `/family/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/overview`
+                          : section === "ace-summary"
+                            ? `/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/summary`
+                            : section === "student-summary"
+                              ? `/ace/student/sites/${encodeURIComponent(context.siteId)}/summary`
+                              : section === "subject-timetable"
+                                ? familyTimetableHref(context, "subjects")
+                                : contextHref(context, section)
                       }
                       label={label}
                       contextLabel={`for ${context.childName} at ${context.siteName}`}
@@ -211,7 +219,7 @@ export function FamilyLandingView({
   return (
     <main className="space-y-8">
       <header className="space-y-2">
-        <p className="text-sm font-medium text-accent-strong">ACE / Family</p>
+        <p className="text-sm font-medium text-accent-strong">Family</p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
           Your family
         </h1>

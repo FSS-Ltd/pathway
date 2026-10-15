@@ -27,6 +27,7 @@ import {
 } from "./providers/provider.factory";
 import { BILLING_WEBHOOK_PROVIDER } from "./billing-webhook.provider";
 import { InstitutionalWebhookService } from "./institutional/institutional-webhook.service";
+import { InstitutionalPublicActivationService } from "./institutional/institutional-public-activation.service";
 
 @Module({
   imports: [PathwayAuthModule, CommonModule, AuthModule],
@@ -47,6 +48,7 @@ import { InstitutionalWebhookService } from "./institutional/institutional-webho
     BillingPricingService,
     ModuleChangeService,
     InstitutionalWebhookService,
+    InstitutionalPublicActivationService,
     {
       provide: BILLING_PROVIDER_CONFIG,
       useFactory: () => loadBillingProviderConfig(),

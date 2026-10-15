@@ -49,6 +49,26 @@ describe("ChildrenService", () => {
     count.mockResolvedValue(10);
   });
 
+  it("guards legacy allergy saves against concurrent changes", async () => {
+    const updatedAt = new Date("2026-10-15T10:00:00.000Z");
+    findFirst.mockResolvedValueOnce({
+      id: "child-a",
+      tenantId,
+      allergies: "none",
+      updatedAt,
+      guardians: [],
+    });
+    update.mockRejectedValueOnce({ code: "P2025" });
+    await expect(
+      svc.update("child-a", { allergies: "none" }, tenantId),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "child-a", tenantId, updatedAt },
+      }),
+    );
+  });
+
   it("requires an active, reviewed relationship for guardian child detail access", async () => {
     guardianRelationshipFindFirst.mockResolvedValueOnce(null);
     await expect(

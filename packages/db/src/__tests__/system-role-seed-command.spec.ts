@@ -15,6 +15,7 @@ const REPOSITORY_ROOT = path.resolve(__dirname, "../../../..");
 const APPROVED_GRANTS = {
   "Organisation Head": [
     "ace.attendance.export",
+    "ace.behaviour.categories.create",
     "ace.behaviour.correct",
     "ace.behaviour.policy.manage",
     "ace.behaviour.read",
@@ -44,6 +45,14 @@ const APPROVED_GRANTS = {
     "attendance.manage",
     "attendance.read",
     "classes.manage",
+    "compliance.agreements.manage",
+    "compliance.agreements.read",
+    "compliance.checks.manage",
+    "compliance.checks.read",
+    "compliance.medical.manage",
+    "compliance.medical.read",
+    "compliance.tracker.manage",
+    "compliance.tracker.read",
     "messaging.conversations.create",
     "messaging.conversations.read",
     "messaging.messages.read",
@@ -99,6 +108,14 @@ const APPROVED_GRANTS = {
     "attendance.manage",
     "attendance.read",
     "classes.manage",
+    "compliance.agreements.manage",
+    "compliance.agreements.read",
+    "compliance.checks.manage",
+    "compliance.checks.read",
+    "compliance.medical.manage",
+    "compliance.medical.read",
+    "compliance.tracker.manage",
+    "compliance.tracker.read",
     "messaging.conversations.create",
     "messaging.conversations.read",
     "messaging.messages.read",
@@ -145,12 +162,19 @@ const APPROVED_GRANTS = {
   "Safeguarding Lead": [
     "ace.behaviour.read",
     "attendance.read",
+    "compliance.checks.manage",
+    "compliance.checks.read",
+    "compliance.medical.read",
+    "compliance.tracker.manage",
+    "compliance.tracker.read",
     "notices.read",
     "safeguarding.concerns.manage",
     "safeguarding.concerns.read",
     "safeguarding.concerns.record",
   ],
+  "Finance Administrator": [],
   "Finance Operator": [],
+  "Finance Approver": [],
   Parent: [
     "ace.faith.read",
     "ace.faith.reflect",
@@ -334,7 +358,7 @@ describeIfSeedProof("system-role seed command orchestration", () => {
     const rolesAfterFirstRun = await selectRoleState();
     const systemRoles = rolesAfterFirstRun.filter(({ isSystem }) => isSystem);
 
-    expect(rolesAfterFirstRun).toHaveLength(8);
+    expect(rolesAfterFirstRun).toHaveLength(10);
     expect(
       rolesAfterFirstRun.filter(({ name }) => name === "Organisation Head"),
     ).toHaveLength(2);
@@ -343,7 +367,7 @@ describeIfSeedProof("system-role seed command orchestration", () => {
       isSystem: false,
       version: 7,
     });
-    expect(systemRoles).toHaveLength(7);
+    expect(systemRoles).toHaveLength(9);
     for (const role of systemRoles) {
       expect(role).toMatchObject({
         isActive: true,
