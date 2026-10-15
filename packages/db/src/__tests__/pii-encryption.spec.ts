@@ -49,6 +49,31 @@ beforeAll(() => {
 });
 
 describe("withPiiEncryption", () => {
+  it.each([
+    [
+      "ComplianceAgreementVersion",
+      {
+        title: "Staff agreement",
+        contentText: "Private terms",
+        originalFileName: "staff.pdf",
+      },
+    ],
+    [
+      "ComplianceAgreementAcceptance",
+      { typedName: "Test Recipient", signedFileName: "signed.pdf" },
+    ],
+  ])("encrypts all sensitive fields of %s", async (model, fields) => {
+    const { fakeClient, invoke } = makeFakeClient();
+    withPiiEncryption(fakeClient);
+    const result = await invoke(model, "create", { data: fields }, (args) => {
+      const data = (args as { data: Record<string, unknown> }).data;
+      for (const value of Object.values(data))
+        expect(isEncryptedField(value as string)).toBe(true);
+      return data;
+    });
+    expect(result).toEqual(fields);
+  });
+
   it("encrypts medical details while preserving unknown and confirmation metadata", async () => {
     const { fakeClient, invoke } = makeFakeClient();
     withPiiEncryption(fakeClient);

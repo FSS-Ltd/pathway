@@ -3,20 +3,20 @@
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
 Updated: 2026-10-15. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
-## Current step: 1.4
+## Current step: 1.5
 
-**State: implementation in progress; not complete.** Steps 1.1–1.3 are merged.
+**State: locally verified; PR/CI/merge pending; not complete.** Steps 1.1–1.4 are merged.
 No country pack is published.
 
-| Evidence               | Value                                                                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Scope                  | Medical Information, existing child health editing integration and access-boundary tests                                 |
-| Branch                 | `feature/compliance-medical-information`                                                                                 |
-| Verified starting base | `64ba6eecca4f625118578706df8d7d10f6aa3ebb`                                                                               |
-| Predecessor            | [PR #627](https://github.com/FSS-Ltd/pathway/pull/627), host-confirmed merged 2026-10-13T21:59:16Z; rechecked 2026-10-15 |
-| PR / revision / CI     | Not raised; local implementation and verification required first                                                         |
-| Merge state            | Unmerged; no completion claim                                                                                            |
-| Next permitted action  | Implement and verify 1.4, raise its PR, verify latest CI and merge before 1.5                                            |
+| Evidence               | Value                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| Scope                  | Versioned User Agreements, adult assignments, acknowledgements, signed copies and historical acceptance |
+| Branch                 | `feature/compliance-user-agreements`                                                                    |
+| Verified starting base | `c4bbe0317ae4ee988785394788313fc1b7e2dc5b`                                                              |
+| Predecessor            | [PR #628](https://github.com/FSS-Ltd/pathway/pull/628), host-confirmed merged 2026-10-15T09:19:13Z      |
+| PR / revision / CI     | Not raised; local verification required first                                                           |
+| Merge state            | Unmerged; no completion claim                                                                           |
+| Next permitted action  | Implement and verify 1.5, raise its PR, verify latest CI and merge before 1.6                           |
 
 ## Step 1.1 verification and merge
 
@@ -72,7 +72,7 @@ catalogue is changed. Required repository CI remains a merge gate.
 
 ## Subsequent steps
 
-Steps 1.5–1.6 and 2.01–2.31 are **planned, not started**, as specified in
+Steps 1.6 and 2.01–2.31 are **planned, not started**, as specified in
 DELIVERY.md and jurisdictions.csv. Before starting each, refresh the host evidence
 for its predecessor and record the merged base. UI rollout and production
 deployment remain separate from documentation and require their own authorization.
@@ -412,3 +412,120 @@ button measures 7.13:1 text contrast in the rendered browser fixture. The final
 diff and all 38 changed/new feature files were inspected; generated logs and local
 browser artifacts are excluded. Proceed to PR, current-revision CI and verified
 merge; step 1.4 is not yet complete.
+
+### Step 1.4 PR and host gate
+
+[PR #628](https://github.com/FSS-Ltd/pathway/pull/628) was raised after local
+verification and all commit hooks passed. Head
+`0a8a2ada2d1c434fbf0b1385a4b30129a279b2e0` is under test in
+[CI run 38709637926](https://github.com/FSS-Ltd/pathway/actions/runs/38709637926)
+and [CodeQL run 38709633997](https://github.com/FSS-Ltd/pathway/actions/runs/38709633997).
+No merge has occurred; step 1.5 remains unstarted.
+
+The host unit/type/lint job passed. Its checkout log confirms tested merge
+`68a0dd0ec175d5b3bcb865e3b70ab619481a6bd8` (head `0a8a2ada…` into base
+`64ba6eec…`). All three CodeQL results passed. The four database/integration jobs
+are pending; these partial results do not satisfy the merge gate.
+
+### Step 1.4 final host evidence and 1.5 start
+
+GitHub confirms PR #628 MERGED at 2026-10-15T09:19:13Z, merge commit
+`c4bbe0317ae4ee988785394788313fc1b7e2dc5b`. All eight current-revision checks
+passed for head `0a8a2ada2d1c434fbf0b1385a4b30129a279b2e0`. Unit and integration
+checkout logs both verified test-merge `68a0dd0ec175d5b3bcb865e3b70ab619481a6bd8`.
+CI run 38709637926 passed all five jobs; CodeQL run 38709633997 and aggregate
+CodeQL passed. Host integration results include 94 suites / 581 tests plus the
+separate 13-test database proof. Step 1.4 is complete; earlier pending entries
+are superseded by this evidence. Step 1.5 starts from the refreshed merged base.
+
+## Step 1.5 implementation and verification
+
+Contract and operational boundaries: [AGREEMENTS-DESIGN.md](AGREEMENTS-DESIGN.md).
+Versioned documents, explicit adult assignments, own acknowledgements and recorded
+signed PDFs use the active site. Four additive models retain immutable history,
+forced RLS, restrictive composite foreign keys and encrypted sensitive fields.
+Document locking serializes publication, assignment and acceptance. No guardian
+consent, trip permission, email or production deployment behavior is changed.
+
+Verification on 2026-10-15 (final CI/merge evidence still pending):
+
+- `pnpm typecheck` and `pnpm lint`: all 16 workspace tasks passed. Explicit changed
+  admin app/components/lib ESLint passed; API lint/type checks also passed.
+- Admin full unit suite passed; focused agreement tests cover access, retries,
+  escaped content, stale-context abort, conflicts, exact-version acknowledgement,
+  history and paged recipient search (including empty filtered pages).
+- DB units: 66 passed; platform: 187 passed; auth: 15 passed. Ordinary opt-in
+  skips are exercised separately where applicable (DB 33, platform 5).
+- Prisma validate/generate passed. All 143 migrations applied to disposable
+  databases. Protected role-seed proof: 3 suites / 13 tests passed on port 55441.
+- Initial focused API/SQL integration: 2 suites / 8 scenarios passed. Full suite
+  additionally includes permission revocation during upload and Home exclusion;
+  final result recorded below when available.
+- Web/admin/API builds passed. Admin was rebuilt after responsive fixes.
+- Actual components inspected in a browser at 1440×1000 and 390×844, including
+  keyboard acknowledgement, document/version forms, ordinary/read-only access,
+  conflict draft retention, empty and error/retry states, and 200% text. Fixed
+  fieldset/legend sizing after the enlarged-text check detected horizontal overflow;
+  reinspection passes. Synthetic browser records exercise real components; real
+  authenticated AppModule/HTTP/database tests verify persistence and access.
+  A live Clerk-authenticated browser session and external storage credentials were
+  not used; file transfers are mocked at the existing storage adapter in integration.
+- Independent whole-branch review found a PDF signature ASCII-decoding edge case.
+  Exact byte comparison and a high-bit regression fixture fix it; narrow re-review
+  found no outstanding issues. Full PDF parsing/antivirus is not claimed.
+- Docker Desktop was stopped and the main disposable container was absent. Started
+  Docker and recreated only that test container. The first permission smoke run
+  correctly failed on its new empty database; migrations were then applied before
+  rerunning. No production or unrelated databases were modified.
+
+Local logs use `/tmp/compliance-1.5-*`; data-agent logs use
+`/tmp/agreements-*`. Browser captures are under `/tmp/compliance-agreements-preview`.
+These local artifacts supplement this ledger; they are not committed credentials
+or production records. PR creation remains gated on all applicable local checks.
+
+Initial full integration run: 94 suites / 588 tests passed, with 3 failures across
+97 suites / 591 tests. Agreement upload revocation returned 503 instead of 403;
+agreement history publication returned 404 instead of 201; existing preferences
+update returned 501 instead of 200. Investigation and rerun are required before
+PR creation. Final full API units passed: 218 suites / 1,541 tests. Permission
+smoke passed after schema preparation: 9 tests; application registry drift: zero.
+
+Commands for step 1.5 (repository pnpm 9.7 via Corepack):
+
+- `corepack pnpm typecheck`; `corepack pnpm lint`.
+- `corepack pnpm --filter @pathway/admin test:unit`.
+- `corepack pnpm --filter @pathway/api test:unit --runInBand`.
+- `corepack pnpm --filter @pathway/api test:integration --runInBand` with
+  `E2E_USE_GLOBAL_SETUP=true`, the disposable 55439 database, explicit RLS roles
+  and `E2E_ALLOW_RESET=false`.
+- `corepack pnpm --filter @pathway/admin exec eslint app/admin-navigation.ts
+app/admin-shell.tsx app/compliance/agreements components/compliance/agreements
+lib/agreements-client.ts`.
+- `corepack pnpm --filter @pathway/api lint`; `corepack pnpm --filter @pathway/api typecheck`.
+- `corepack pnpm --filter @pathway/admin build`, `--filter @pathway/web build`,
+  `--filter @pathway/api build` (public API URL and synthetic Clerk build key).
+- `corepack pnpm db:deploy`; `corepack pnpm permission-definitions:check`.
+- `corepack pnpm --filter @pathway/platform test:unit -- permission-definition-database.integration`
+  with the opt-in flag/token and separate disposable permission database.
+- Protected seed proof uses the three existing `system-role-seed-test-database`,
+  `seed-system-roles` and `system-role-seed-command` suites with explicit 55441
+  disposable identity, opt-in flags and provisioning token; no production URL.
+
+### Step 1.5 final local result
+
+The isolated full rerun passed **97 suites / 591 tests**. The upload-revocation
+fixture was corrected to supply the existing required `revokedById`; the API
+then rejects post-upload access loss with 403 and commits no document. Focused
+agreements/transfers/preferences rerun passed 3 suites / 16 tests. The publication
+404 and preferences 501 did not reproduce; no speculative production changes were
+made. The subsequent complete rerun is green and supersedes the initial failure.
+
+Final API units: **218 suites / 1,541 tests**. All builds, workspace checks, explicit
+admin lint, permission smoke (9), protected seed proof (13), and zero-drift
+registry verification passed. Final API build also passed after the PDF fix.
+Prettier checked all 46 changed TS/TSX/JSON/Markdown files; Prisma schema and SQL
+migration were inspected separately, alongside all changed files and final diff.
+Browser checks additionally confirmed disabled pending-save controls, loading,
+success and refresh persistence. Generated logs and local screenshots are excluded
+from the PR. No outstanding review finding. Proceed to PR and host CI; step 1.5
+remains unmerged and is not yet complete.

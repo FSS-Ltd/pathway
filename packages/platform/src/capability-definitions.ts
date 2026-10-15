@@ -447,6 +447,20 @@ export const CAPABILITY_DEFINITIONS = {
     "protected",
     false,
   ),
+  "compliance.agreements.read": defineCapability(
+    "View user agreements",
+    "View institutional user agreements for the active site",
+    "site",
+    "protected",
+    false,
+  ),
+  "compliance.agreements.manage": defineCapability(
+    "Manage user agreements",
+    "Manage institutional user agreements for the active site",
+    "site",
+    "protected",
+    false,
+  ),
   "compliance.medical.read": defineCapability(
     "View medical information",
     "View sensitive child medical information for the active site",
