@@ -36,6 +36,17 @@ export const trackerProfileInput = z
         "OTHER",
       ])
       .nullable(),
+    schoolCategory: z
+      .enum(["MAINTAINED", "ACADEMY", "INDEPENDENT", "NOT_SCHOOL"])
+      .nullable()
+      .optional(),
+    englandSchoolMedicalDutiesApply: flag.optional(),
+    personalDataController: flag.optional(),
+    employsStaff: flag.optional(),
+    controlsPremises: flag.optional(),
+    foodBusiness: flag.optional(),
+    operatesVehicles: flag.optional(),
+    eyfsApplies: flag.optional(),
     fundingStatus: z.enum(["PUBLIC", "PRIVATE", "MIXED"]).nullable(),
     minimumAge: z.number().int().min(0).max(100).nullable(),
     maximumAge: z.number().int().min(0).max(100).nullable(),
@@ -51,6 +62,19 @@ export const trackerProfileInput = z
   })
   .strict()
   .superRefine((value, ctx) => {
+    if (
+      value.schoolCategory != null &&
+      ((value.providerCategory === "INDEPENDENT_SCHOOL" &&
+        value.schoolCategory !== "INDEPENDENT") ||
+        (value.providerCategory === "STATE_SCHOOL" &&
+          !["MAINTAINED", "ACADEMY"].includes(value.schoolCategory)))
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["schoolCategory"],
+        message:
+          "School category must match the registered provider category. Review the saved school category or explicitly clear it to unknown.",
+      });
     if (
       value.minimumAge !== null &&
       value.maximumAge !== null &&
@@ -72,6 +96,33 @@ export const trackerProfileInput = z
         message: "Choose a type in the selected sector",
       });
   });
+const additionalProfileDefaults = {
+  schoolCategory: null,
+  englandSchoolMedicalDutiesApply: null,
+  personalDataController: null,
+  employsStaff: null,
+  controlsPremises: null,
+  foodBusiness: null,
+  operatesVehicles: null,
+  eyfsApplies: null,
+};
+
+/** Preserve omitted additive facts on legacy writes; explicit null clears them. */
+export function normalizeTrackerProfile(
+  input: unknown,
+  current?: z.infer<typeof trackerProfileInput>,
+): z.infer<typeof trackerProfileInput> {
+  const parsed = parseTracker(trackerProfileInput, input);
+  const supplied = Object.fromEntries(
+    Object.entries(parsed).filter(([, value]) => value !== undefined),
+  );
+  return parseTracker(trackerProfileInput, {
+    ...additionalProfileDefaults,
+    ...current,
+    ...supplied,
+  });
+}
+
 export const trackerProfileUpdate = z
   .object({
     expectedVersion: z.number().int().min(0),

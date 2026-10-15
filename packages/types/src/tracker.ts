@@ -27,6 +27,19 @@ export interface TrackerProfileInput {
     | "OUT_OF_SCHOOL"
     | "OTHER"
     | null;
+  schoolCategory?:
+    | "MAINTAINED"
+    | "ACADEMY"
+    | "INDEPENDENT"
+    | "NOT_SCHOOL"
+    | null;
+  englandSchoolMedicalDutiesApply?: boolean | null;
+  personalDataController?: boolean | null;
+  employsStaff?: boolean | null;
+  controlsPremises?: boolean | null;
+  foodBusiness?: boolean | null;
+  operatesVehicles?: boolean | null;
+  eyfsApplies?: boolean | null;
   fundingStatus: "PUBLIC" | "PRIVATE" | "MIXED" | null;
   minimumAge: number | null;
   maximumAge: number | null;
@@ -149,6 +162,7 @@ export type TrackerCoverageStatus =
   | "IN_REVIEW"
   | "REVIEWED"
   | "PUBLISHED"
+  | "PARTIALLY_PUBLISHED"
   | "REVIEWED_NO_REQUIREMENTS"
   | "STALE"
   | "UNAVAILABLE"

@@ -7,7 +7,7 @@ import {
   type TrackerRequirement,
   type TrackerEvidence,
 } from "@pathway/types";
-import { trackerProfileInput } from "./tracker.dto";
+import { normalizeTrackerProfile } from "./tracker.dto";
 const requirementSnapshotSchema: z.ZodType<TrackerRequirement> = z.object({
   id: z.string(),
   version: z.number().int().positive(),
@@ -48,7 +48,7 @@ export function serializeTrackerProfile(
   row: Prisma.ComplianceSiteProfileGetPayload<Record<string, never>>,
 ): TrackerProfile {
   return {
-    profile: trackerProfileInput.parse(JSON.parse(row.profileJson)),
+    profile: normalizeTrackerProfile(JSON.parse(row.profileJson)),
     version: row.version,
     updatedAt: row.updatedAt.toISOString(),
   };

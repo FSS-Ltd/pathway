@@ -6,6 +6,9 @@ import {
   SECTOR_OPTIONS,
 } from "@pathway/types";
 import type { TrackerProfileInput, TrackerJurisdiction } from "@pathway/types";
+import { Choice, words } from "./profile-choice";
+export { words } from "./profile-choice";
+import { ProfileFacts } from "./profile-facts";
 import { fieldClass } from "../agreements/shared";
 export const emptyProfile: TrackerProfileInput = {
   jurisdictionId: null,
@@ -27,48 +30,6 @@ export const emptyProfile: TrackerProfileInput = {
   ace: null,
   icce: null,
 };
-export function words(value: string): string {
-  return value
-    .toLowerCase()
-    .split("_")
-    .map((word) =>
-      word === "ace" || word === "icce"
-        ? word.toUpperCase()
-        : word.charAt(0).toUpperCase() + word.slice(1),
-    )
-    .join(" ");
-}
-function Choice<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T | null;
-  options: readonly T[];
-  onChange: (value: T | null) => void;
-}) {
-  return (
-    <label className="block min-w-0">
-      {label}
-      <select
-        className={fieldClass}
-        value={value ?? ""}
-        onChange={(e) =>
-          onChange(options.find((option) => option === e.target.value) ?? null)
-        }
-      >
-        <option value="">Unknown</option>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {words(option)}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 export function ProfileFields({
   value,
   setValue,
@@ -190,6 +151,11 @@ export function ProfileFields({
         value={value.provisionPattern}
         options={["FULL_TIME", "PART_TIME", "MIXED"]}
         onChange={(v) => set("provisionPattern", v)}
+      />
+      <ProfileFacts
+        value={value}
+        setValue={setValue}
+        jurisdictions={jurisdictions}
       />
       {activities.map((key) => (
         <label key={key} className="block min-w-0">

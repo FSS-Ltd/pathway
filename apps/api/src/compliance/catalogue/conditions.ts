@@ -9,6 +9,7 @@ const stringField = z.enum([
   "sector",
   "vertical",
   "providerCategory",
+  "schoolCategory",
   "fundingStatus",
   "provisionPattern",
 ]);
@@ -25,10 +26,18 @@ const allowedValues: Partial<
     "OUT_OF_SCHOOL",
     "OTHER",
   ],
+  schoolCategory: ["MAINTAINED", "ACADEMY", "INDEPENDENT", "NOT_SCHOOL"],
   fundingStatus: ["PUBLIC", "PRIVATE", "MIXED"],
   provisionPattern: ["FULL_TIME", "PART_TIME", "MIXED"],
 };
 const booleanField = z.enum([
+  "englandSchoolMedicalDutiesApply",
+  "personalDataController",
+  "employsStaff",
+  "controlsPremises",
+  "foodBusiness",
+  "operatesVehicles",
+  "eyfsApplies",
   "childcare",
   "charitable",
   "food",

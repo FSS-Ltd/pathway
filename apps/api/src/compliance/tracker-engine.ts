@@ -283,7 +283,8 @@ export function buildTrackerChecklist(
                 c.jurisdiction === r.jurisdiction &&
                 c.sector === sector &&
                 c.topic === r.topic &&
-                c.status === "PUBLISHED" &&
+                (c.status === "PUBLISHED" ||
+                  c.status === "PARTIALLY_PUBLISHED") &&
                 c.review !== null &&
                 c.review.verifiedAt <= day(now) &&
                 c.review.reviewDueAt >= day(now) &&

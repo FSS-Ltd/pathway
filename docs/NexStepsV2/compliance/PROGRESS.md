@@ -3,20 +3,21 @@
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
 Updated: 2026-10-15. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
-## Current step: medical encrypted-value correction
+## Current step: 2.01 — England
 
-**State: medical correction in progress; not complete.** Steps 1.1–1.6 are merged. England research is preserved; its runtime pack is not published.
-No country pack is published.
+**State: bounded England core in verification; step 2.01 not complete.** Steps
+1.1–1.6 and the medical correction are merged. Catalogue 1.1.0 on this branch has
+62 sources, 68 actions and 48 explicitly partial cells; it is not merged or deployed.
 
 | Evidence               | Value                                                                                              |
 | ---------------------- | -------------------------------------------------------------------------------------------------- |
-| Scope                  | Unreadable medical fields, overwrite prevention and truthful live evidence                         |
-| Branch                 | `fix/compliance-medical-ciphertext`                                                                |
-| Verified starting base | `47d698d053df8d91696fec7e330d837e28f93c2b`                                                         |
-| Predecessor            | [PR #631](https://github.com/FSS-Ltd/pathway/pull/631), host-confirmed merged 2026-10-15T11:18:42Z |
-| PR / revision / CI     | Not raised; local fix verification in progress                                                     |
+| Scope                  | England national requirements, applicability fixtures and explicit regional/sector coverage        |
+| Branch                 | `feature/compliance-england-pack`                                                                  |
+| Verified starting base | `7a2a8222af04b9a5e46461f0ee32c9bb91f78a20`                                                         |
+| Predecessor            | [PR #633](https://github.com/FSS-Ltd/pathway/pull/633), host-confirmed merged 2026-10-15T11:57:54Z |
+| PR / revision / CI     | Not raised; bounded national core and source/applicability/profile verification in progress        |
 | Merge state            | Unmerged; no completion claim                                                                      |
-| Next permitted action  | Verify and deliver this correction; resume the preserved England research afterward                |
+| Next permitted action  | Complete and verify England pack; no Wales implementation before its verified merge                |
 
 ## Step 1.1 verification and merge
 
@@ -734,3 +735,93 @@ revision `bda05e0a580158d6841c15bca8cd8d7be33727cd` passed local verification.
 Current-revision host CI and merge remain required. Live Clerk/production key
 compatibility and clinical recovery are not verified; no production action is
 authorized or claimed by this fix branch.
+
+### Medical correction verified merge
+
+GitHub confirms PR #633 MERGED at 2026-10-15T11:57:54Z, merge commit
+`7a2a8222af04b9a5e46461f0ee32c9bb91f78a20`. All eight checks passed on final
+head `85402031264bc1ed9fc57ce3340d1e55bfedb137`: CI run 38729669557 and CodeQL
+run 38729663827. Both unit and integration checkout logs confirm tested merge
+`cccd5e20607b93a57fac56cf8fb5e53d10f24e06`. Host API units passed 222 suites /
+1,573 tests; integration passed 100 suites / 614 tests, plus two suites / 13
+single-connection tests. No blocking host reviews were reported. This completes
+the source correction's delivery gate, not production deployment or clinical
+recovery. User separately authorised deploying the verified medical fix. Read-only Vercel inspection found both production aliases already serving READY CLI deployments of the exact merged revision; no duplicate deployment was triggered.
+
+England resumed from the refreshed merged base. Research notes identify precise
+classification and operational facts missing from the initial profile; additive
+unknown-by-default facts will support applicability without inferring legal status
+from ACE, screen choice, funding labels or billing details.
+
+### Production medical correction verification
+
+User authorised production release of the verified medical fix. Vercel confirmed
+`api.nexsteps.dev` serves `dpl_RPYKpxQ59QWf5NwLZBC4mmwitwJR` (READY
+2026-10-15T12:02:44.365Z) and `app.nexsteps.dev` serves
+`dpl_6CC3AQJqmbxAPDKgXVqe4wNmxRdG` (READY 12:02:32.945Z). Both existing
+production deployments report exact merged commit `7a2a8222af04b9a5e46461f0ee32c9bb91f78a20`,
+so no duplicate deployment was created. Unfinished England changes are not in that
+revision. Public API `/health` returned 200/ok; `/health/ready` is not an existing
+route (404). Direct unauthenticated admin fetch returned 403, while the signed-in
+browser loaded Medical Information successfully. It shows unavailable allergy
+states and the recovery warning, without ciphertext. Original clinical text remains
+unrecovered. Error/fatal grouped-log scans for both deployment IDs in the preceding
+15 minutes returned no entries; this is a bounded observation, not a guarantee.
+No encryption keys or stored clinical values were changed.
+
+### England core implementation and verification in progress
+
+The eight-topic national core contains 62 source records and 68 actions, with
+48 `PARTIALLY_PUBLISHED` England cells and 1,440 other cells still `NOT_REVIEWED`.
+Partial cells continue to count as gaps. They expose only individually published
+requirements whose source/requirement reviews remain current. Regional and
+specialist gaps remain explicit; this is not the completed 2.01 deliverable.
+
+Added unknown-by-default operational facts, source `effective.currentAsOf` without
+inventing commencement, backward-compatible normalized/no-op profile saves, and
+English-only UI questions. Focused source/engine/applicability/fact suites passed
+74 tests. Before those passes, one new partial-coverage test assumed the first
+coverage row was safeguarding and one previous nursery test assumed an empty
+production catalogue; corrected those assertions to check their actual topic and
+the now-published national core, preserving actual legal classification. The first
+unit invocation used a nonexistent config; reran with `jest.projects.config.ts`
+and `--selectProjects unit`. No checks were waived.
+
+New real HTTP/SQL profile tests passed (two cases) including legacy JSON reads,
+unchanged saves/revision counts and explicit fact persistence; existing tracker
+HTTP tests also passed before the final additive fact. Full integration is running
+on disposable local DB 55439. Source review corrected an unverified Royal Assent
+publication date, governance source selection, school predicate reuse, and privacy
+complaint statutory timing. Full final review, builds and delivery remain pending.
+
+### England core final local verification
+
+Full final integration passed **101 suites / 617 tests** on the corrected legacy
+write implementation (`test:integration --runInBand`, disposable DB 55439).
+A preceding run had 99 passing suites and two unexpected failures in existing
+notice/child HTTP tests: `Parse Error: Expected HTTP/` and an unexpected 404 on
+child creation. The unchanged tests passed in isolation (two suites / 16 tests),
+then the full unchanged revision passed in isolation. No assertion or timeout was
+weakened and no root cause is claimed for the earlier failures.
+
+Workspace typecheck and lint passed 16 tasks each; admin `test:unit` passed with
+the new profile-fact regression wired into both test scripts. API, admin and web
+production builds passed using synthetic public build configuration. Prisma
+validation passed; permission-definition drift check returned zero against the
+explicit disposable database URL. Its first invocation lacked DATABASE_URL and
+was rerun with the required local configuration.
+
+Independent source/engine review is clean after correcting independent-school
+pupil-first-aid selection for legacy profiles. Independent backend review is clean
+after preserving enriched facts on old-client saves, allowing explicit null and
+rejecting contradictory merged classifications as 400. Focused backend verification
+passed 21 units and 11 HTTP/SQL tests. Actual profile UI inspection passed desktop,
+390px mobile, 200% text, keyboard choices, unknown/no distinctions, English child
+regions, French exclusion, funding/status independence, inherited read-only controls
+and partial/regional-gap presentation. Parent inspected mobile evidence in
+`/tmp/compliance-england-profile-preview/`. Browser and preview server were closed.
+
+Source closure research for the remaining England national topics continues in
+separate temporary notes. It is not included as reviewed runtime content by default.
+Step 2.01 remains incomplete; no Wales work has started. Commit hooks, final format/
+diff review, PR and host gate remain to be recorded.
