@@ -3,6 +3,7 @@ import type {
   ComplianceMedicalPage,
   ComplianceMedicalUpdate,
 } from "@pathway/types";
+import { readableMedicalRecord } from "./medical-read";
 import { apiFetch, API_BASE_URL } from "./api-client";
 import { apiErrorFromResponse } from "./api-transport";
 async function request<T>(
@@ -25,17 +26,36 @@ async function request<T>(
   return response.json();
 }
 export const complianceMedicalClient = {
-  list: (
+  list: async (
     signal: AbortSignal,
     cursor?: string,
-  ): Promise<ComplianceMedicalPage> =>
-    request(cursor ? `?cursor=${encodeURIComponent(cursor)}` : "", signal),
-  get: (id: string, signal: AbortSignal): Promise<ComplianceMedicalRecord> =>
-    request(`/${encodeURIComponent(id)}`, signal),
-  save: (
+  ): Promise<ComplianceMedicalPage> => {
+    const page = await request<ComplianceMedicalPage>(
+      cursor ? `?cursor=${encodeURIComponent(cursor)}` : "",
+      signal,
+    );
+    return { ...page, items: page.items.map(readableMedicalRecord) };
+  },
+  get: async (
+    id: string,
+    signal: AbortSignal,
+  ): Promise<ComplianceMedicalRecord> =>
+    readableMedicalRecord(
+      await request<ComplianceMedicalRecord>(
+        `/${encodeURIComponent(id)}`,
+        signal,
+      ),
+    ),
+  save: async (
     id: string,
     input: ComplianceMedicalUpdate,
     signal: AbortSignal,
   ): Promise<ComplianceMedicalRecord> =>
-    request(`/${encodeURIComponent(id)}`, signal, input),
+    readableMedicalRecord(
+      await request<ComplianceMedicalRecord>(
+        `/${encodeURIComponent(id)}`,
+        signal,
+        input,
+      ),
+    ),
 };

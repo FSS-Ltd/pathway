@@ -1,5 +1,10 @@
 import type { Prisma } from "@pathway/db";
-import type { ComplianceMedicalRecord, MedicalField } from "@pathway/types";
+import { isEncryptedField } from "@pathway/util";
+import type {
+  ComplianceMedicalRecord,
+  MedicalField,
+  WritableMedicalField,
+} from "@pathway/types";
 
 export const medicalSelect = {
   id: true,
@@ -21,6 +26,8 @@ export function medicalField(
   confirmed: boolean,
 ): MedicalField {
   const details = value?.trim();
+  if (details && isEncryptedField(details))
+    return { status: "UNAVAILABLE", details: null };
   if (!details || details.toLowerCase() === "unknown")
     return { status: "UNKNOWN", details: null };
   if (details.toLowerCase() === "none")
@@ -28,7 +35,9 @@ export function medicalField(
   return { status: "RECORDED", details };
 }
 
-export function medicalStorageValue(field: MedicalField): string | null {
+export function medicalStorageValue(
+  field: WritableMedicalField,
+): string | null {
   return field.status === "RECORDED"
     ? field.details
     : field.status === "NONE"

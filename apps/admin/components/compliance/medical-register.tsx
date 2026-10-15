@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@pathway/ui";
 import type { ComplianceMedicalPage } from "@pathway/types";
 import { complianceMedicalClient } from "@/lib/compliance-medical-client";
+import { hasUnavailableMedical } from "@/lib/medical-read";
 import { MedicalSummary } from "./medical-fields";
 export function MedicalRegister({ canManage }: { canManage: boolean }) {
   const [page, setPage] = React.useState<ComplianceMedicalPage | null>(null);
@@ -58,6 +59,22 @@ export function MedicalRegister({ canManage }: { canManage: boolean }) {
             onClick={() => void load()}
           >
             Retry medical information
+          </Button>
+        </div>
+      )}
+      {page?.items.some(hasUnavailableMedical) && (
+        <div role="alert" className="space-y-3">
+          <p>
+            Some medical information could not be read. Do not treat it as no
+            medical needs. Retry; if it remains unavailable, ask an
+            administrator to restore access.
+          </p>
+          <Button
+            className="min-h-11 h-auto whitespace-normal py-2 text-text-primary"
+            disabled={busy}
+            onClick={() => void load()}
+          >
+            Retry unavailable information
           </Button>
         </div>
       )}

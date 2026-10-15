@@ -7,6 +7,8 @@ import type {
 } from "@pathway/types";
 import { setApiTokenGetter } from "@/lib/api-transport";
 import { MedicalRegister } from "./medical-register";
+import { medicalText } from "./medical-fields";
+import { readableMedicalValues } from "@/lib/medical-read";
 import { MedicalEditor } from "./medical-editor";
 import { resolveAdminNavItems } from "@/app/admin-navigation";
 import { resolveOrgUi } from "@/lib/org-ui";
@@ -80,6 +82,17 @@ assert.equal(
   )?.group,
   "Compliance",
 );
+assert.equal(
+  medicalText({ status: "UNAVAILABLE", details: null }),
+  "Unavailable — information could not be read",
+);
+assert.deepEqual(
+  readableMedicalValues({
+    ...record,
+    allergies: { status: "RECORDED", details: "v1:malformed" },
+  }).allergies,
+  { status: "UNAVAILABLE", details: null },
+);
 async function run() {
   const { createRoot } = await import("react-dom/client");
   const container = document.createElement("div");
@@ -90,6 +103,14 @@ async function run() {
   let conflict = true;
   let detailReads = 0;
   let empty = false;
+  let unavailable = false;
+  const unreadable: ComplianceMedicalRecord = {
+    ...record,
+    allergies: {
+      status: "RECORDED",
+      details: "v1:wrong-key:test-authentication:encrypted-medical-value",
+    },
+  };
   const signals: AbortSignal[] = [];
   const writes: ComplianceMedicalUpdate[] = [];
   const response = (body: unknown, status = 200) =>
@@ -116,14 +137,16 @@ async function run() {
           });
     }
     if (url.pathname.endsWith("child-one"))
-      return response(detailReads++ ? latest : record);
+      return response(
+        unavailable ? unreadable : detailReads++ ? latest : record,
+      );
     if (failList) return response({}, 503);
     return response({
       items: empty
         ? []
         : [
             {
-              ...record,
+              ...(unavailable ? unreadable : record),
               id: url.searchParams.has("cursor") ? "child-two" : "child-one",
             },
           ],
@@ -199,6 +222,77 @@ async function run() {
     );
     await settle();
     assert.equal(container.querySelector("form"), null);
+    empty = false;
+    unavailable = true;
+    await act(async () =>
+      root.render(<MedicalRegister key="unavailable-register" canManage />),
+    );
+    await settle();
+    assert.match(
+      container.textContent ?? "",
+      /Unavailable — information could not be read/,
+    );
+    assert.equal(
+      container.innerHTML.includes("v1:"),
+      false,
+      "ciphertext not rendered by register",
+    );
+    await act(async () =>
+      root.render(
+        <MedicalEditor
+          key="unavailable-editor"
+          childId="child-one"
+          canManage
+        />,
+      ),
+    );
+    await settle();
+    assert.equal(
+      container.innerHTML.includes("v1:"),
+      false,
+      "ciphertext not rendered by editor",
+    );
+    const writeCount = writes.length;
+    await click("Save medical information");
+    assert.equal(
+      writes.length,
+      writeCount,
+      "unreadable record cannot be overwritten",
+    );
+    assert.ok(
+      container.querySelector('button[type="submit"]')?.matches(":disabled"),
+    );
+    unavailable = false;
+    await click("Retry unavailable information");
+    assert.equal(
+      container.querySelector('button[type="submit"]')?.matches(":disabled"),
+      false,
+    );
+    assert.match(container.textContent ?? "", /Allergies/);
+    conflict = true;
+    await click("Save medical information");
+    unavailable = true;
+    await click("Load latest information");
+    assert.equal(
+      container.querySelector("textarea")?.value,
+      "Updated instructions",
+      "draft survives unavailable conflict read",
+    );
+    const keep = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Keep draft against latest version",
+    );
+    assert.ok(
+      keep?.disabled,
+      "unavailable latest revision cannot be accepted for overwrite",
+    );
+    assert.equal(container.innerHTML.includes("v1:"), false);
+    unavailable = false;
+    await click("Retry unavailable information");
+    await click("Keep draft against latest version");
+    assert.equal(
+      container.querySelector("textarea")?.value,
+      "Updated instructions",
+    );
     await act(async () => root.unmount());
     assert.ok(
       signals.every((signal) => signal.aborted),

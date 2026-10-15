@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isEncryptedField } from "@pathway/util";
 
 const medicalFieldSchema = z.discriminatedUnion("status", [
   z.object({ status: z.literal("UNKNOWN"), details: z.null() }).strict(),
@@ -11,6 +12,10 @@ const medicalFieldSchema = z.discriminatedUnion("status", [
         .trim()
         .min(1)
         .max(5000)
+        .refine(
+          (value) => !isEncryptedField(value),
+          "Encrypted medical values cannot be submitted as clinical text",
+        )
         .refine(
           (value) => !/^(none|unknown)$/i.test(value),
           "Choose None or Unknown instead",

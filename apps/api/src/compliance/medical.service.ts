@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { withTenantRlsContext, type Prisma } from "@pathway/db";
 import type {
@@ -154,6 +155,19 @@ export class MedicalService {
   ): Promise<ComplianceMedicalRecord> {
     return this.run(actor, true, async (tx) => {
       const current = await this.find(tx, id, actor);
+      const existing = serializeMedicalRecord(current);
+      if (
+        [
+          existing.allergies,
+          existing.medicalConditions,
+          existing.medicationAtSite,
+        ].some((field) => field.status === "UNAVAILABLE")
+      )
+        throw new ServiceUnavailableException({
+          code: "MEDICAL_INFORMATION_UNAVAILABLE",
+          message:
+            "Medical information could not be read. Retry or ask an administrator to restore access before saving.",
+        });
       const expected = new Date(input.expectedUpdatedAt);
       if (current.updatedAt.getTime() !== expected.getTime())
         throw new ConflictException(
