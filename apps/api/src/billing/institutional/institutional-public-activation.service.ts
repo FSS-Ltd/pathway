@@ -55,6 +55,7 @@ export class InstitutionalPublicActivationService {
     orderId: string,
     orgId: string,
     tenantId: string,
+    effectiveAt?: Date,
   ): Promise<void> {
     await prisma.$transaction(async (tx) => {
       await applyTenantContext(tx, tenantId, orgId);
@@ -155,7 +156,7 @@ export class InstitutionalPublicActivationService {
           acceptedAmountPence: frozen.quote.subtotalPence,
           effectiveAt:
             frozen.quote.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
-              ? null
+              ? (effectiveAt ?? order.createdAt)
               : order.createdAt,
           acceptedAt: order.createdAt,
         },

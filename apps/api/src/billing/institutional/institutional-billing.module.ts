@@ -19,6 +19,8 @@ import { BillingPricingService } from "../pricing.service";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
 import { InstitutionalPublicCheckoutController } from "./institutional-public-checkout.controller";
 import { InstitutionalPublicCheckoutService } from "./institutional-public-checkout.service";
+import { InstitutionalAddonTrialsController } from "./institutional-addon-trials.controller";
+import { DeclaredCapacityAddonTrialsService } from "./declared-capacity-addon-trials.service";
 
 @Module({
   imports: [AuthModule, EnrolmentsModule],
@@ -27,6 +29,7 @@ import { InstitutionalPublicCheckoutService } from "./institutional-public-check
     InstitutionalCatalogueController,
     InstitutionalBillingInternalController,
     InstitutionalPublicCheckoutController,
+    InstitutionalAddonTrialsController,
   ],
   providers: [
     InstitutionalQuoteService,
@@ -39,6 +42,7 @@ import { InstitutionalPublicCheckoutService } from "./institutional-public-check
     BillingPricingService,
     InstitutionalPriceResolver,
     InstitutionalPublicCheckoutService,
+    DeclaredCapacityAddonTrialsService,
     { provide: BILLING_PROVIDER_CONFIG, useFactory: loadBillingProviderConfig },
   ],
   exports: [InstitutionalQuoteService, InstitutionalCensusService],

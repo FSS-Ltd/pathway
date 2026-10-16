@@ -296,6 +296,7 @@ export class BillingWebhookController {
             pendingOrder.id,
             created.orgId,
             created.tenantId,
+            event.periodStart ?? undefined,
           );
         }
 
@@ -325,6 +326,7 @@ export class BillingWebhookController {
             pendingOrder.id,
             pendingOrder.orgId,
             pendingOrder.tenantId,
+            event.periodStart ?? undefined,
           );
         }
       }

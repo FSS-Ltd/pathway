@@ -24,6 +24,7 @@ import {
   Module,
   ModuleGrantSource,
   ModuleStatus,
+  InstitutionalAddonTrialStatus,
   SubscriptionStatus,
   PendingOrderStatus,
 } from "@pathway/db";
@@ -39,6 +40,7 @@ const prismaMock: {
     updateMany: jest.Mock;
   };
   institutionalBillingSnapshot: { findFirst: jest.Mock };
+  institutionalAddonTrial: { createMany: jest.Mock };
   institutionalQuoteAcceptance: { updateMany: jest.Mock };
   institutionalBillingPolicy: { updateMany: jest.Mock; findUnique: jest.Mock };
   enrolmentRollConfirmation: { findFirst: jest.Mock };
@@ -78,6 +80,7 @@ const prismaMock: {
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
   institutionalBillingSnapshot: { findFirst: jest.fn() },
+  institutionalAddonTrial: { createMany: jest.fn() },
   institutionalQuoteAcceptance: { updateMany: jest.fn() },
   institutionalBillingPolicy: { updateMany: jest.fn(), findUnique: jest.fn() },
   enrolmentRollConfirmation: { findFirst: jest.fn() },
@@ -1292,6 +1295,7 @@ describe("BillingWebhookController", () => {
       ...baseEvent,
       kind: "invoice.paid",
       pendingOrderId: "declared_capacity_order",
+      occurredAt: createdAt,
       invoice: {
         id: "in_declared_capacity",
         status: "paid",
@@ -1382,6 +1386,17 @@ describe("BillingWebhookController", () => {
 
     await controller.handleWebhook({ dummy: true }, "test-signature");
 
+    expect(prismaMock.institutionalAddonTrial.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          orgId: baseEvent.orgId,
+          module: Module.LEARNING,
+          status: InstitutionalAddonTrialStatus.SELECTED,
+          selectedAt: paidEvent.occurredAt,
+        }),
+      ],
+      skipDuplicates: true,
+    });
     expect(prismaMock.moduleGrant.upsert.mock.calls).toHaveLength(1);
     expect(prismaMock.moduleGrant.upsert.mock.calls[0][0].create).toMatchObject(
       {

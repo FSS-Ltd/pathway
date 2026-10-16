@@ -282,7 +282,6 @@ export class InstitutionalCheckoutService {
           selectedModules: [
             ...snapshot.includedModules,
             ...snapshot.paidModules,
-            ...snapshot.selectedTrialModules,
           ],
           flags: {
             purchaseKind: "institutional",

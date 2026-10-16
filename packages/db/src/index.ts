@@ -242,6 +242,8 @@ export {
   Module,
   ModuleStatus,
   ModuleGrantSource,
+  InstitutionalAddonTrialStatus,
+  InstitutionalAddonInterval,
   ModuleChangeStatus,
   ReportBundleStatus,
   RoleScope,
