@@ -96,6 +96,7 @@ export default function HeaderNav() {
     },
     { label: "Reporting", href: "/features/reporting" },
     { label: "Homeschool", href: "/homeschool" },
+    { label: "About", href: "/about" },
     { label: "Pricing", href: configuratorRolloutHref("/pricing") },
     {
       label: "Toolkit",

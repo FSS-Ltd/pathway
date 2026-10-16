@@ -38,6 +38,7 @@ const footerSections: FooterSection[] = [
   {
     title: "Resources",
     links: [
+      { label: "About", href: "/about" },
       { label: "Blog", href: "/blog" },
       { label: "Security", href: "/security" },
       { label: "Book a demo", href: "/demo" },
