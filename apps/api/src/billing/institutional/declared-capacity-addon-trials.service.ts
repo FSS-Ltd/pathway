@@ -26,16 +26,21 @@ import { isDeclaredCapacityAddonTrialReady } from "./declared-capacity-stripe-pr
 import {
   DECLARED_CAPACITY_ADDON_MODULES,
   isDeclaredCapacityAddonModule,
+  type DeclaredCapacityAddonModule,
 } from "./declared-capacity-addons";
 import { addonTrialExpiresAt } from "./declared-capacity-addon-trial-policy";
+import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
 import { withInstitutionalOrgLock } from "./institutional-quote.service";
 import { refreshEffectiveOrgModules } from "../module-grants";
+import { DeclaredCapacityAddonTrialExpiryService } from "./declared-capacity-addon-trial-expiry.service";
 
 @Injectable()
 export class DeclaredCapacityAddonTrialsService {
   constructor(
     @Inject(InstitutionalPriceResolver)
     private readonly prices: InstitutionalPriceResolver,
+    @Inject(DeclaredCapacityAddonTrialExpiryService)
+    private readonly expiry: DeclaredCapacityAddonTrialExpiryService,
   ) {}
 
   async list(orgId: string, now = new Date()) {
@@ -264,6 +269,137 @@ export class DeclaredCapacityAddonTrialsService {
     });
   }
 
+  async decide(
+    orgId: string,
+    actorUserId: string,
+    module: Module,
+    wantsPurchase: boolean,
+    now = new Date(),
+  ) {
+    this.assertTrialModule(module);
+    await this.expiry.expireDueForOrg(orgId, now);
+    return withInstitutionalOrgLock(orgId, async (tx) => {
+      const trial = await tx.institutionalAddonTrial.findUnique({
+        where: { orgId_module: { orgId, module } },
+      });
+      if (
+        !trial ||
+        trial.status === InstitutionalAddonTrialStatus.SELECTED ||
+        trial.activatedAt === null ||
+        trial.expiresAt === null ||
+        trial.expiresAt > now
+      ) {
+        throw new ConflictException({ code: "ADDON_TRIAL_NOT_EXPIRED" });
+      }
+      if (trial.status === InstitutionalAddonTrialStatus.CONVERTED) {
+        throw new ConflictException({ code: "ADDON_TRIAL_ALREADY_CONVERTED" });
+      }
+      if (wantsPurchase) {
+        if (trial.status === InstitutionalAddonTrialStatus.DECLINED) {
+          throw new ConflictException({
+            code: "ADDON_TRIAL_DECISION_RECORDED",
+          });
+        }
+        if (trial.decisionActorUserId) return trial;
+        return tx.institutionalAddonTrial.update({
+          where: { id: trial.id },
+          data: { decisionActorUserId: actorUserId, decidedAt: now },
+        });
+      }
+      if (trial.status === InstitutionalAddonTrialStatus.DECLINED) return trial;
+      if (trial.decisionActorUserId) {
+        throw new ConflictException({ code: "ADDON_TRIAL_DECISION_RECORDED" });
+      }
+      return tx.institutionalAddonTrial.update({
+        where: { id: trial.id },
+        data: {
+          status: InstitutionalAddonTrialStatus.DECLINED,
+          decisionActorUserId: actorUserId,
+          decidedAt: now,
+        },
+      });
+    });
+  }
+
+  async priceReview(orgId: string, module: Module, now = new Date()) {
+    this.assertTrialModule(module);
+    assertDeclaredCapacityBillingEnabled();
+    await withInstitutionalOrgLock(orgId, async (tx) => {
+      await this.currentPlan(tx, orgId);
+      const existing = await tx.institutionalAddonTrial.findUnique({
+        where: { orgId_module: { orgId, module } },
+      });
+      if (
+        !existing ||
+        existing.status !== InstitutionalAddonTrialStatus.EXPIRED ||
+        !existing.expiresAt ||
+        existing.expiresAt > now ||
+        !existing.decisionActorUserId ||
+        !existing.decidedAt
+      ) {
+        throw new ConflictException({
+          code: "ADDON_TRIAL_PURCHASE_CONSENT_REQUIRED",
+        });
+      }
+    });
+    try {
+      const prices = await this.prices.resolve();
+      this.assertTrialModuleConfigured(module, prices);
+      const monthlyCode = `MODULE_${module}_MONTHLY` as const;
+      const yearlyCode = `MODULE_${module}_YEARLY` as const;
+      const monthly = prices[monthlyCode];
+      const yearly = prices[yearlyCode];
+      if (!monthly || !yearly) {
+        throw new ServiceUnavailableException({
+          code: "ADDON_PRICE_NOT_CONFIGURED",
+        });
+      }
+      return {
+        module,
+        currency: "GBP" as const,
+        monthly: { amountPence: monthly.unitAmountPence },
+        yearly: { amountPence: yearly.unitAmountPence },
+      };
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new ServiceUnavailableException({
+        code: "ADDON_PRICE_NOT_CONFIGURED",
+      });
+    }
+  }
+
+  async checkoutContext(orgId: string, module: Module, now = new Date()) {
+    assertDeclaredCapacityBillingEnabled();
+    return withInstitutionalOrgLock(orgId, async (tx) => {
+      const { quote } = await this.currentPlan(tx, orgId);
+      const trial = await tx.institutionalAddonTrial.findUnique({
+        where: { orgId_module: { orgId, module } },
+      });
+      if (
+        !trial ||
+        trial.status !== InstitutionalAddonTrialStatus.EXPIRED ||
+        !trial.expiresAt ||
+        trial.expiresAt > now ||
+        !trial.decisionActorUserId ||
+        !trial.decidedAt
+      ) {
+        throw new ConflictException({
+          code: "ADDON_TRIAL_PURCHASE_CONSENT_REQUIRED",
+        });
+      }
+      const org = await tx.org.findUnique({
+        where: { id: orgId },
+        select: { stripeCustomerId: true },
+      });
+      if (!org?.stripeCustomerId) {
+        throw new ConflictException({
+          code: "ADDON_BILLING_CUSTOMER_REQUIRED",
+        });
+      }
+      return { trial, stripeCustomerId: org.stripeCustomerId, quote };
+    });
+  }
+
   private findTrial(orgId: string, module: Module) {
     return withOrgRlsContext(orgId, (tx) =>
       tx.institutionalAddonTrial.findUnique({
@@ -280,7 +416,11 @@ export class DeclaredCapacityAddonTrialsService {
       }),
       tx.institutionalBillingPolicy.findUnique({ where: { orgId } }),
       tx.subscription.findFirst({
-        where: { orgId, status: SubscriptionStatus.ACTIVE },
+        where: {
+          orgId,
+          status: SubscriptionStatus.ACTIVE,
+          planCode: { startsWith: "DECLARED_CAPACITY_" },
+        },
         orderBy: { createdAt: "desc" },
         select: {
           planCode: true,
@@ -335,7 +475,9 @@ export class DeclaredCapacityAddonTrialsService {
     }
   }
 
-  private assertTrialModule(module: Module): void {
+  private assertTrialModule(
+    module: Module,
+  ): asserts module is DeclaredCapacityAddonModule {
     if (!isDeclaredCapacityAddonModule(module)) {
       throw new BadRequestException({
         code: "ADDON_MODULE_NOT_TRIAL_ELIGIBLE",

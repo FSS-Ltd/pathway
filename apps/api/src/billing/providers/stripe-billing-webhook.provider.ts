@@ -153,6 +153,7 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       planCode,
       providerCustomerId: customerId,
       status: SubscriptionStatus.ACTIVE,
+      ...addonTrialMetadata(session.metadata),
     };
   }
 
@@ -194,6 +195,7 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
         ? new Date(sub.current_period_end * 1000)
         : null,
       cancelAtPeriodEnd: sub.cancel_at_period_end ?? null,
+      ...addonTrialMetadata(sub.metadata),
     };
   }
 
@@ -223,6 +225,8 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       pendingOrderId,
       providerCheckoutId: metadata?.providerCheckoutId ?? null,
       providerCustomerId: customerId,
+      ...(metadata?.planCode ? { planCode: metadata.planCode } : {}),
+      ...addonTrialMetadata(metadata),
       periodStart: subscriptionLine?.period?.start
         ? new Date(subscriptionLine.period.start * 1000)
         : null,
@@ -250,6 +254,8 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       orgId: metadata?.orgId ?? "",
       subscriptionId: subId,
       pendingOrderId: metadata?.pendingOrderId ?? null,
+      ...(metadata?.planCode ? { planCode: metadata.planCode } : {}),
+      ...addonTrialMetadata(metadata),
       periodStart: subscriptionLine?.period?.start
         ? new Date(subscriptionLine.period.start * 1000)
         : null,
@@ -303,8 +309,9 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       typeof invoice.subscription === "string"
         ? invoice.subscription
         : (invoice.subscription?.id ?? "");
-    const orgId = invoice.metadata?.orgId ?? "";
-    const pendingOrderId = invoice.metadata?.pendingOrderId ?? null;
+    const metadata = invoice.subscription_details?.metadata ?? invoice.metadata;
+    const orgId = metadata?.orgId ?? "";
+    const pendingOrderId = metadata?.pendingOrderId ?? null;
     const subscriptionLine = this.subscriptionLine(invoice, subId);
     const customerId =
       typeof invoice.customer === "string"
@@ -318,8 +325,10 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
       orgId,
       subscriptionId: subId,
       pendingOrderId,
-      providerCheckoutId: invoice.metadata?.providerCheckoutId ?? null,
+      providerCheckoutId: metadata?.providerCheckoutId ?? null,
       providerCustomerId: customerId,
+      ...(metadata?.planCode ? { planCode: metadata.planCode } : {}),
+      ...addonTrialMetadata(metadata),
       status: SubscriptionStatus.PAST_DUE,
       periodStart: subscriptionLine?.period?.start
         ? new Date(subscriptionLine.period.start * 1000)
@@ -329,6 +338,22 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
         : null,
     };
   }
+}
+
+function addonTrialMetadata(
+  metadata: Stripe.Metadata | null | undefined,
+): Pick<
+  ParsedBillingWebhookEvent,
+  "addonTrialId" | "addonModule" | "addonInterval"
+> {
+  if (!metadata) return {};
+  return {
+    ...(metadata.addonTrialId ? { addonTrialId: metadata.addonTrialId } : {}),
+    ...(metadata.addonModule ? { addonModule: metadata.addonModule } : {}),
+    ...(metadata.addonInterval
+      ? { addonInterval: metadata.addonInterval }
+      : {}),
+  };
 }
 
 const mapStripeStatus = (

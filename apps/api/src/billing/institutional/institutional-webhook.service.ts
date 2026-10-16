@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import {
   applyTenantContext,
   prisma,
@@ -35,6 +35,7 @@ import { invoiceMatchesSnapshot } from "./institutional-invoice-match";
 import { capacityUpgradeInvoiceMatches } from "./institutional-capacity-invoice";
 import { quoteWasAcceptedForCheckout } from "./institutional-quote-freshness";
 import { parsePublicInstitutionalOrder } from "./institutional-public-order";
+import { DeclaredCapacityAddonTrialWebhookService } from "./declared-capacity-addon-trial-webhook.service";
 import {
   reconcileSubscriptionModuleGrants,
   updateSubscriptionGrantPeriod,
@@ -100,9 +101,18 @@ export class InstitutionalWebhookService {
     private readonly provider: BillingWebhookProvider,
     @Inject(BILLING_PROVIDER_CONFIG)
     private readonly billingConfig: BillingProviderConfig,
+    @Optional()
+    @Inject(DeclaredCapacityAddonTrialWebhookService)
+    private readonly addonTrialWebhook?: DeclaredCapacityAddonTrialWebhookService,
   ) {}
 
   async handle(event: ParsedBillingWebhookEvent): Promise<boolean> {
+    if (
+      this.addonTrialWebhook &&
+      (await this.addonTrialWebhook.handle(event))
+    ) {
+      return true;
+    }
     if (
       ![
         "subscription.created",

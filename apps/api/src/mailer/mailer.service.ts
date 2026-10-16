@@ -117,6 +117,13 @@ export type SendBehaviourNotificationParams = {
   idempotencyKey: string;
 };
 
+export type SendAddonTrialExpiryEmailParams = {
+  to: string;
+  organisationName: string;
+  moduleName: string;
+  trialId: string;
+};
+
 /** Params for admin feedback / feature-request submissions, sent to the support inbox. */
 export type SendFeedbackEmailParams = {
   category: "bug" | "feature-request" | "other";
@@ -190,6 +197,42 @@ export class MailerService {
 
   isMessageEmailAvailable(): boolean {
     return this.isEnabled && this.resend !== null;
+  }
+
+  isAddonTrialExpiryEmailAvailable(): boolean {
+    return this.isEnabled && this.resend !== null;
+  }
+
+  async sendAddonTrialExpiryEmail(
+    params: SendAddonTrialExpiryEmailParams,
+  ): Promise<void> {
+    if (!this.resend) throw new Error("Addon trial email provider unavailable");
+    const organisationName = escapeHtml(params.organisationName);
+    const moduleName = escapeHtml(params.moduleName);
+    const subject = `${params.moduleName} trial has ended`;
+    const text =
+      `The ${params.moduleName} trial for ${params.organisationName} has ended. ` +
+      "Sign in to NexSteps and open Billing to review the feature and choose whether to purchase it. " +
+      "Your subscription will not be charged unless an authorised billing admin confirms checkout.";
+    const html =
+      `<p>The ${moduleName} trial for ${organisationName} has ended.</p>` +
+      "<p>Sign in to NexSteps and open Billing to review the feature and choose whether to purchase it.</p>" +
+      "<p>Your subscription will not be charged unless an authorised billing admin confirms checkout.</p>";
+    const result = await this.resend.emails.send(
+      {
+        from: this.fromAddress,
+        to: params.to,
+        subject,
+        text,
+        html,
+      },
+      {
+        idempotencyKey: `institutional-addon-trial-expiry:${params.trialId}`,
+      },
+    );
+    if (result.error || !result.data?.id) {
+      throw new Error("Resend rejected institutional add-on expiry email");
+    }
   }
 
   async sendMessageNotification(to: string, deliveryId: string): Promise<string> {

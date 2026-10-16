@@ -18,9 +18,12 @@ import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { IndependentTransaction } from "../../common/database/independent-transaction.decorator";
 import { InstitutionalQuoteService } from "./institutional-quote.service";
 import { DeclaredCapacityAddonTrialsService } from "./declared-capacity-addon-trials.service";
+import { DeclaredCapacityAddonCheckoutService } from "./declared-capacity-addon-checkout.service";
 
 const moduleSchema = z.nativeEnum(Module);
 const selectSchema = z.object({ module: moduleSchema });
+const decisionSchema = z.object({ wantsPurchase: z.boolean() });
+const checkoutSchema = z.object({ interval: z.enum(["MONTHLY", "YEARLY"]) });
 
 function parseModule(value: unknown): Module {
   const parsed = moduleSchema.safeParse(value);
@@ -39,6 +42,8 @@ export class InstitutionalAddonTrialsController {
     private readonly quotes: InstitutionalQuoteService,
     @Inject(DeclaredCapacityAddonTrialsService)
     private readonly trials: DeclaredCapacityAddonTrialsService,
+    @Inject(DeclaredCapacityAddonCheckoutService)
+    private readonly checkout: DeclaredCapacityAddonCheckoutService,
   ) {}
 
   private async authorize(
@@ -96,5 +101,60 @@ export class InstitutionalAddonTrialsController {
   ) {
     const actorUserId = await this.authorize(orgId, req);
     return this.trials.activate(orgId, actorUserId, parseModule(module));
+  }
+
+  @Post(":module/decision")
+  async decide(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Param("module") module: string,
+    @Body() body: unknown,
+  ) {
+    const actorUserId = await this.authorize(orgId, req);
+    const parsed = decisionSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: "INVALID_REQUEST",
+        details: parsed.error.flatten(),
+      });
+    }
+    return this.trials.decide(
+      orgId,
+      actorUserId,
+      parseModule(module),
+      parsed.data.wantsPurchase,
+    );
+  }
+
+  @Get(":module/price-review")
+  async priceReview(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Param("module") module: string,
+  ) {
+    await this.authorize(orgId, req);
+    return this.trials.priceReview(orgId, parseModule(module));
+  }
+
+  @Post(":module/checkout")
+  async startCheckout(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Param("module") module: string,
+    @Body() body: unknown,
+  ) {
+    await this.authorize(orgId, req);
+    const parsed = checkoutSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: "INVALID_REQUEST",
+        details: parsed.error.flatten(),
+      });
+    }
+    return this.checkout.startCheckout(
+      orgId,
+      parseModule(module),
+      parsed.data.interval,
+    );
   }
 }
