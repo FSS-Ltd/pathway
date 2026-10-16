@@ -1,4 +1,20 @@
-import type { DeclaredCapacityInterval } from "@pathway/pricing";
+import {
+  DECLARED_CAPACITY_BASE_MONTHLY_PENCE,
+  DECLARED_CAPACITY_BASE_YEARLY_PENCE,
+  DECLARED_CAPACITY_CHILD_MONTHLY_PENCE,
+  DECLARED_CAPACITY_CHILD_YEARLY_PENCE,
+  type DeclaredCapacityInterval,
+} from "@pathway/pricing";
+
+const GBP_WHOLE_POUNDS = new Intl.NumberFormat("en-GB", {
+  style: "currency",
+  currency: "GBP",
+  maximumFractionDigits: 0,
+});
+
+function money(pence: number): string {
+  return GBP_WHOLE_POUNDS.format(pence / 100);
+}
 
 export function DeclaredCapacityPeriodStep({
   interval,
@@ -39,8 +55,8 @@ export function DeclaredCapacityPeriodStep({
             </span>
             <span className="mt-1 block text-sm text-text-muted">
               {value === "month"
-                ? "£74 base per month + £1 per child per month."
-                : "£740 base per year + £10 per child per year, paid upfront."}
+                ? `${money(DECLARED_CAPACITY_BASE_MONTHLY_PENCE)} base per month + ${money(DECLARED_CAPACITY_CHILD_MONTHLY_PENCE)} per child per month.`
+                : `${money(DECLARED_CAPACITY_BASE_YEARLY_PENCE)} base per year + ${money(DECLARED_CAPACITY_CHILD_YEARLY_PENCE)} per child per year, paid upfront.`}
             </span>
           </button>
         ))}
