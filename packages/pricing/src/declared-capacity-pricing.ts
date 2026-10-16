@@ -56,10 +56,53 @@ export type DeclaredCapacityQuoteInput = Readonly<{
 
 export type DeclaredCapacityQuoteLine = Readonly<{
   component: "BASE" | "DECLARED_CAPACITY";
+  priceCode:
+    | "DECLARED_CAPACITY_BASE_MONTHLY"
+    | "DECLARED_CAPACITY_BASE_YEARLY"
+    | "DECLARED_CAPACITY_CHILD_MONTHLY"
+    | "DECLARED_CAPACITY_CHILD_YEARLY";
   quantity: number;
   unitAmountPence: number;
   subtotalPence: number;
 }>;
+
+export type DeclaredCapacityPlanCode =
+  | "DECLARED_CAPACITY_STARTER_MONTHLY"
+  | "DECLARED_CAPACITY_STARTER_YEARLY"
+  | "DECLARED_CAPACITY_GROWTH_MONTHLY"
+  | "DECLARED_CAPACITY_GROWTH_YEARLY"
+  | "DECLARED_CAPACITY_PROFESSIONAL_MONTHLY"
+  | "DECLARED_CAPACITY_PROFESSIONAL_YEARLY";
+
+export const DECLARED_CAPACITY_PLAN_CODES: readonly DeclaredCapacityPlanCode[] =
+  [
+    "DECLARED_CAPACITY_STARTER_MONTHLY",
+    "DECLARED_CAPACITY_STARTER_YEARLY",
+    "DECLARED_CAPACITY_GROWTH_MONTHLY",
+    "DECLARED_CAPACITY_GROWTH_YEARLY",
+    "DECLARED_CAPACITY_PROFESSIONAL_MONTHLY",
+    "DECLARED_CAPACITY_PROFESSIONAL_YEARLY",
+  ];
+const declaredCapacityPlanCodeSet: ReadonlySet<string> = new Set(
+  DECLARED_CAPACITY_PLAN_CODES,
+);
+
+export const DECLARED_CAPACITY_PRICE_CODES = [
+  "DECLARED_CAPACITY_BASE_MONTHLY",
+  "DECLARED_CAPACITY_BASE_YEARLY",
+  "DECLARED_CAPACITY_CHILD_MONTHLY",
+  "DECLARED_CAPACITY_CHILD_YEARLY",
+] as const;
+export type DeclaredCapacityPriceCode =
+  (typeof DECLARED_CAPACITY_PRICE_CODES)[number];
+export type DeclaredCapacityResolvedPrices = Readonly<
+  Partial<
+    Record<
+      DeclaredCapacityPriceCode,
+      { priceId: string; unitAmountPence: number }
+    >
+  >
+>;
 
 type DeclaredCapacityQuoteBase = Readonly<{
   pricingVersion: typeof DECLARED_CAPACITY_PRICING_VERSION;
@@ -126,6 +169,45 @@ function capacityUnitAmountPence(interval: DeclaredCapacityInterval): number {
   return interval === "year" ? 1_000 : 100;
 }
 
+export function isDeclaredCapacityPlanCode(
+  value: string,
+): value is DeclaredCapacityPlanCode {
+  return declaredCapacityPlanCodeSet.has(value);
+}
+
+const planCodesByTierAndInterval: Readonly<
+  Record<
+    Exclude<DeclaredCapacityTier, "enterprise">,
+    Record<DeclaredCapacityInterval, DeclaredCapacityPlanCode>
+  >
+> = {
+  starter: {
+    month: "DECLARED_CAPACITY_STARTER_MONTHLY",
+    year: "DECLARED_CAPACITY_STARTER_YEARLY",
+  },
+  growth: {
+    month: "DECLARED_CAPACITY_GROWTH_MONTHLY",
+    year: "DECLARED_CAPACITY_GROWTH_YEARLY",
+  },
+  professional: {
+    month: "DECLARED_CAPACITY_PROFESSIONAL_MONTHLY",
+    year: "DECLARED_CAPACITY_PROFESSIONAL_YEARLY",
+  },
+};
+
+export function declaredCapacityPlanCode(
+  tier: Exclude<DeclaredCapacityTier, "enterprise">,
+  interval: DeclaredCapacityInterval,
+): DeclaredCapacityPlanCode {
+  return planCodesByTierAndInterval[tier][interval];
+}
+
+export function declaredCapacityIntervalFromPlanCode(
+  planCode: DeclaredCapacityPlanCode,
+): DeclaredCapacityInterval {
+  return planCode.endsWith("_YEARLY") ? "year" : "month";
+}
+
 export function calculateDeclaredCapacityQuote(
   input: DeclaredCapacityQuoteInput,
 ): DeclaredCapacityQuoteResult {
@@ -160,12 +242,20 @@ export function calculateDeclaredCapacityQuote(
   const lines: readonly DeclaredCapacityQuoteLine[] = [
     {
       component: "BASE",
+      priceCode:
+        input.interval === "year"
+          ? "DECLARED_CAPACITY_BASE_YEARLY"
+          : "DECLARED_CAPACITY_BASE_MONTHLY",
       quantity: 1,
       unitAmountPence: baseAmountPence,
       subtotalPence: baseAmountPence,
     },
     {
       component: "DECLARED_CAPACITY",
+      priceCode:
+        input.interval === "year"
+          ? "DECLARED_CAPACITY_CHILD_YEARLY"
+          : "DECLARED_CAPACITY_CHILD_MONTHLY",
       quantity: input.declaredCapacity,
       unitAmountPence: capacityAmountPence,
       subtotalPence: input.declaredCapacity * capacityAmountPence,

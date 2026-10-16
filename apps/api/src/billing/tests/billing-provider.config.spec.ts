@@ -158,6 +158,25 @@ describe("billing provider config", () => {
     expect(map?.INSTITUTIONAL_CHILD_101_TO_250_YEARLY).toBe("price_upperyear");
   });
 
+  it("accepts the declared-capacity base and child price codes", () => {
+    process.env.STRIPE_PRICE_MAP = JSON.stringify({
+      DECLARED_CAPACITY_BASE_MONTHLY: "price_capacitybasem",
+      DECLARED_CAPACITY_BASE_YEARLY: "price_capacitybasey",
+      DECLARED_CAPACITY_CHILD_MONTHLY: "price_capacitychildm",
+      DECLARED_CAPACITY_CHILD_YEARLY: "price_capacitychildy",
+      DECLARED_CAPACITY_UNKNOWN: "price_unknown",
+    });
+
+    const map = loadBillingProviderConfig().stripe.priceMap;
+    expect(map?.DECLARED_CAPACITY_BASE_MONTHLY).toBe("price_capacitybasem");
+    expect(map?.DECLARED_CAPACITY_BASE_YEARLY).toBe("price_capacitybasey");
+    expect(map?.DECLARED_CAPACITY_CHILD_MONTHLY).toBe("price_capacitychildm");
+    expect(map?.DECLARED_CAPACITY_CHILD_YEARLY).toBe("price_capacitychildy");
+    expect(
+      (map as Record<string, string> | undefined)?.DECLARED_CAPACITY_UNKNOWN,
+    ).toBeUndefined();
+  });
+
   it("Phase 3 PR 3.1: filters unknown module price codes from STRIPE_PRICE_MAP", () => {
     process.env.BILLING_PROVIDER = "STRIPE";
     process.env.STRIPE_SECRET_KEY = "sk_test";

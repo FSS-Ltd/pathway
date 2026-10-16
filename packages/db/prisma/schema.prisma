@@ -4104,14 +4104,17 @@ model Subscription {
   updatedAt         DateTime           @updatedAt
   currentInstitutionalSnapshotId String?
   nextInstitutionalSnapshotId String?
+  pendingInstitutionalSnapshotId String?
   currentInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalCurrentSubscription", fields: [currentInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
   nextInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalNextSubscription", fields: [nextInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  pendingInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalPendingSubscription", fields: [pendingInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
   institutionalSnapshots InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSubscription")
   institutionalOperations InstitutionalBillingOperation[]
 
   @@index([orgId])
   @@index([status])
   @@index([planCode])
+  @@index([pendingInstitutionalSnapshotId, orgId])
   @@unique([id, orgId])
 }
 
@@ -4204,6 +4207,9 @@ model InstitutionalBillingPolicy {
   pricingVersion    String
   timezone          String
   declaredChildren  Int?
+  declaredCapacity  Int?
+  scheduledCapacityDecrease Int?
+  scheduledCapacityEffectiveAt DateTime?
   declaredAt        DateTime?
   declaredByUserId  String?
   reviewReason      String?
@@ -4215,6 +4221,7 @@ model InstitutionalBillingPolicy {
 
   @@unique([id, orgId])
   @@index([reviewReason])
+  @@index([scheduledCapacityEffectiveAt])
 }
 
 model InstitutionalBillingSnapshot {
@@ -4228,17 +4235,23 @@ model InstitutionalBillingSnapshot {
   pricingVersion        String
   countSource           InstitutionalCountSource?
   enrolledChildren      Int?
+  declaredCapacity      Int?
   includedChildren      Int?
   includedModules       Module[] @default([])
   paidModules           Module[] @default([])
+  selectedTrialModules Module[] @default([])
   lines                 Json?
   subtotalPence         Int?
+  amountDueNowPence     Int?
+  prorationDate         DateTime?
+  prorationLines        Json?
   sourceConfirmationId  String?
   sourceRevisionCutoff  DateTime?
   censusCutoffAt        DateTime?
   effectiveAt           DateTime?
   expiresAt             DateTime?
   supersedesId          String?
+  sourceSnapshotId      String?
   createdAt             DateTime @default(now())
   org                   Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
   policy                InstitutionalBillingPolicy @relation(fields: [policyId, orgId], references: [id, orgId], onDelete: Restrict)
@@ -4246,11 +4259,14 @@ model InstitutionalBillingSnapshot {
   sourceConfirmation    EnrolmentRollConfirmation? @relation(fields: [sourceConfirmationId, orgId], references: [id, orgId], onDelete: Restrict)
   supersedes            InstitutionalBillingSnapshot? @relation("InstitutionalSnapshotSupersession", fields: [supersedesId, orgId], references: [id, orgId], onDelete: Restrict)
   supersededBy          InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSupersession")
+  sourceSnapshot       InstitutionalBillingSnapshot? @relation("InstitutionalSnapshotSource", fields: [sourceSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
+  derivedSnapshots     InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSource")
   acceptance            InstitutionalQuoteAcceptance?
   pendingOrders         PendingOrder[]
   operations            InstitutionalBillingOperation[]
   currentSubscriptions  Subscription[] @relation("InstitutionalCurrentSubscription")
   nextSubscriptions     Subscription[] @relation("InstitutionalNextSubscription")
+  pendingSubscriptions Subscription[] @relation("InstitutionalPendingSubscription")
 
   @@index([orgId, kind, createdAt])
   @@index([orgId, effectiveAt])
@@ -4258,6 +4274,7 @@ model InstitutionalBillingSnapshot {
   @@index([subscriptionId, kind, createdAt])
   @@unique([subscriptionId, kind, effectiveAt], map: "InstitutionalCensus_subscription_kind_effective_key")
   @@unique([id, orgId])
+  @@index([sourceSnapshotId, orgId])
 }
 
 model InstitutionalQuoteAcceptance {
@@ -4266,6 +4283,8 @@ model InstitutionalQuoteAcceptance {
   snapshotId     String   @unique
   actorUserId    String
   idempotencyKey String
+  acceptedAmountPence Int?
+  effectiveAt DateTime?
   acceptedAt     DateTime @default(now())
   org            Org      @relation(fields: [orgId], references: [id], onDelete: Restrict)
   snapshot       InstitutionalBillingSnapshot @relation(fields: [snapshotId, orgId], references: [id, orgId], onDelete: Restrict)

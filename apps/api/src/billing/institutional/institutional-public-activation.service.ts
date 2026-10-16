@@ -8,6 +8,7 @@ import {
   prisma,
   type Prisma,
 } from "@pathway/db";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 import type { ParsedBillingWebhookEvent } from "../billing-webhook.provider";
 import {
   parsePublicInstitutionalOrder,
@@ -87,6 +88,18 @@ export class InstitutionalPublicActivationService {
       if (!actor || !tenant) {
         throw new Error("Institutional account is incomplete.");
       }
+      const declaredCapacity =
+        frozen.quote.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+          ? frozen.quote.declaredCapacity
+          : null;
+      const enrolledChildren =
+        frozen.quote.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+          ? null
+          : frozen.quote.enrolledChildren;
+      const includedModules =
+        frozen.purchaseKind === "institutional_public"
+          ? frozen.includedModules
+          : [];
       await tx.orgVertical.upsert({
         where: { orgId },
         create: { orgId, vertical: frozen.setting },
@@ -97,7 +110,8 @@ export class InstitutionalPublicActivationService {
           orgId,
           pricingVersion: frozen.quote.pricingVersion,
           timezone: tenant.timezone ?? "Europe/London",
-          declaredChildren: frozen.quote.enrolledChildren,
+          declaredChildren: enrolledChildren,
+          declaredCapacity,
           declaredAt: order.createdAt,
           declaredByUserId: actor.id,
         },
@@ -110,13 +124,25 @@ export class InstitutionalPublicActivationService {
           status: InstitutionalSnapshotStatus.PRICED,
           planCode: frozen.quote.planCode,
           pricingVersion: frozen.quote.pricingVersion,
-          countSource: InstitutionalCountSource.DECLARED,
-          enrolledChildren: frozen.quote.enrolledChildren,
-          includedChildren: frozen.quote.includedChildren,
-          includedModules: frozen.includedModules,
+          countSource:
+            declaredCapacity === null
+              ? InstitutionalCountSource.DECLARED
+              : null,
+          enrolledChildren,
+          declaredCapacity,
+          includedChildren:
+            frozen.quote.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+              ? null
+              : frozen.quote.includedChildren,
+          includedModules,
           paidModules: frozen.paidModules,
+          selectedTrialModules:
+            frozen.purchaseKind === "institutional_declared_capacity_public"
+              ? frozen.trialModules
+              : [],
           lines: frozen.quote.lines,
           subtotalPence: frozen.quote.subtotalPence,
+          amountDueNowPence: frozen.quote.subtotalPence,
           expiresAt: new Date(order.createdAt.getTime() + QUOTE_VALIDITY_MS),
         },
       });
@@ -126,6 +152,11 @@ export class InstitutionalPublicActivationService {
           snapshotId: snapshot.id,
           actorUserId: actor.id,
           idempotencyKey: order.institutionalCheckoutKey ?? order.id,
+          acceptedAmountPence: frozen.quote.subtotalPence,
+          effectiveAt:
+            frozen.quote.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+              ? null
+              : order.createdAt,
           acceptedAt: order.createdAt,
         },
       });

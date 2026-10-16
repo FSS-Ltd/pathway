@@ -27,6 +27,7 @@ import {
   SubscriptionStatus,
   PendingOrderStatus,
 } from "@pathway/db";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 
 const prismaMock: {
   billingEvent: { findFirst: jest.Mock; create: jest.Mock };
@@ -38,6 +39,7 @@ const prismaMock: {
     updateMany: jest.Mock;
   };
   institutionalBillingSnapshot: { findFirst: jest.Mock };
+  institutionalQuoteAcceptance: { updateMany: jest.Mock };
   institutionalBillingPolicy: { updateMany: jest.Mock; findUnique: jest.Mock };
   enrolmentRollConfirmation: { findFirst: jest.Mock };
   enrolmentRevision: { findFirst: jest.Mock };
@@ -76,6 +78,7 @@ const prismaMock: {
     updateMany: jest.fn().mockResolvedValue({ count: 1 }),
   },
   institutionalBillingSnapshot: { findFirst: jest.fn() },
+  institutionalQuoteAcceptance: { updateMany: jest.fn() },
   institutionalBillingPolicy: { updateMany: jest.fn(), findUnique: jest.fn() },
   enrolmentRollConfirmation: { findFirst: jest.fn() },
   enrolmentRevision: { findFirst: jest.fn() },
@@ -1281,6 +1284,116 @@ describe("BillingWebhookController", () => {
       where: { id: baseEvent.orgId },
       data: { stripeCustomerId: "cus_institutional" },
     });
+  });
+
+  it("does not activate a declared-capacity trial module before its trial starts", async () => {
+    const createdAt = new Date("2030-01-01T00:00:00Z");
+    const paidEvent: ParsedBillingWebhookEvent = {
+      ...baseEvent,
+      kind: "invoice.paid",
+      pendingOrderId: "declared_capacity_order",
+      invoice: {
+        id: "in_declared_capacity",
+        status: "paid",
+        currency: "gbp",
+        linesComplete: true,
+        lines: [
+          {
+            priceId: "price_capacitybase",
+            quantity: 1,
+            amountPence: 7_400,
+          },
+          {
+            priceId: "price_capacityfinance",
+            quantity: 1,
+            amountPence: 2_000,
+          },
+        ],
+      },
+    };
+    const pendingOrder = {
+      id: "declared_capacity_order",
+      orgId: baseEvent.orgId,
+      tenantId: "tenant_1",
+      planCode: "DECLARED_CAPACITY_STARTER_MONTHLY",
+      institutionalSnapshotId: "declared_capacity_snapshot",
+      institutionalCheckoutKey: "declared-capacity-checkout",
+      createdAt,
+      status: PendingOrderStatus.PENDING,
+    };
+    prismaMock.pendingOrder.findUnique.mockResolvedValue(pendingOrder);
+    prismaMock.subscription.findUnique.mockResolvedValue(null);
+    prismaMock.institutionalBillingSnapshot.findFirst.mockResolvedValue({
+      id: pendingOrder.institutionalSnapshotId,
+      orgId: baseEvent.orgId,
+      kind: "QUOTE",
+      status: "PRICED",
+      planCode: pendingOrder.planCode,
+      pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+      declaredCapacity: 0,
+      countSource: null,
+      enrolledChildren: null,
+      subtotalPence: 9_400,
+      includedModules: [],
+      paidModules: [Module.FINANCE],
+      selectedTrialModules: [Module.LEARNING],
+      lines: [
+        {
+          component: "BASE",
+          priceCode: "DECLARED_CAPACITY_BASE_MONTHLY",
+          priceId: "price_capacitybase",
+          currency: "GBP",
+          quantity: 1,
+          unitAmountPence: 7_400,
+          subtotalPence: 7_400,
+        },
+        {
+          component: "DECLARED_CAPACITY",
+          priceCode: "DECLARED_CAPACITY_CHILD_MONTHLY",
+          priceId: "price_capacitychild",
+          currency: "GBP",
+          quantity: 0,
+          unitAmountPence: 100,
+          subtotalPence: 0,
+        },
+        {
+          component: "ADDON",
+          priceCode: "MODULE_FINANCE_MONTHLY",
+          priceId: "price_capacityfinance",
+          currency: "GBP",
+          quantity: 1,
+          unitAmountPence: 2_000,
+          subtotalPence: 2_000,
+        },
+      ],
+      createdAt: new Date(createdAt.getTime() - 60_000),
+      expiresAt: new Date(createdAt.getTime() + 14 * 60_000),
+      acceptance: {
+        id: "declared_capacity_acceptance",
+        acceptedAt: new Date(createdAt.getTime() - 30_000),
+        effectiveAt: null,
+      },
+    });
+    prismaMock.institutionalBillingPolicy.findUnique.mockResolvedValue({
+      scheduledCapacityDecrease: null,
+      scheduledCapacityEffectiveAt: null,
+    });
+    (provider.verifyAndParse as jest.Mock).mockResolvedValue(paidEvent);
+
+    await controller.handleWebhook({ dummy: true }, "test-signature");
+
+    expect(prismaMock.moduleGrant.upsert.mock.calls).toHaveLength(1);
+    expect(prismaMock.moduleGrant.upsert.mock.calls[0][0].create).toMatchObject(
+      {
+        module: Module.FINANCE,
+        source: ModuleGrantSource.PAID_ADDON,
+      },
+    );
+    expect(
+      prismaMock.moduleGrant.upsert.mock.calls.some(
+        ([args]) => args.create.module === Module.LEARNING,
+      ),
+    ).toBe(false);
   });
 
   it("activates a payment after quote expiry when Checkout began while it was valid", async () => {

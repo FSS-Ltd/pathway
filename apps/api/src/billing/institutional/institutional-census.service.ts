@@ -14,6 +14,12 @@ import {
   withOrgRlsContext,
 } from "@pathway/db";
 import {
+  calculateDeclaredCapacityQuote,
+  declaredCapacityIntervalFromPlanCode,
+  declaredCapacityPlanCode,
+  isDeclaredCapacityPlanCode,
+  DECLARED_CAPACITY_PLAN_CODES,
+  DECLARED_CAPACITY_PRICING_VERSION,
   calculateInstitutionalQuote,
   INSTITUTIONAL_MAPPED_PLAN_CODES,
   INSTITUTIONAL_MAPPED_PRICING_VERSION,
@@ -29,11 +35,13 @@ import {
 import { isInstitutionalPlanCode } from "./institutional-selection";
 import { censusCutoffFor, localDateAt } from "./institutional-time";
 import { quoteFromFrozenInstitutionalPrices } from "./institutional-frozen-pricing";
+import { quoteDeclaredCapacityWithFrozenPrices } from "./declared-capacity-stripe-pricing";
 
 function institutionalPlanCode(value: string): string {
   if (
     !isInstitutionalPlanCode(value) &&
-    !isMappedInstitutionalPlanCode(value)
+    !isMappedInstitutionalPlanCode(value) &&
+    !isDeclaredCapacityPlanCode(value)
   ) {
     throw new ConflictException({ code: "SCHOOL_PRICING_NOT_AVAILABLE" });
   }
@@ -66,11 +74,13 @@ export class InstitutionalCensusService {
           status: true,
           periodEnd: true,
           nextInstitutionalSnapshotId: true,
+          pendingInstitutionalSnapshotId: true,
           currentInstitutionalSnapshot: {
             select: {
               createdAt: true,
               pricingVersion: true,
               planCode: true,
+              declaredCapacity: true,
               enrolledChildren: true,
               subtotalPence: true,
               lines: true,
@@ -108,6 +118,9 @@ export class InstitutionalCensusService {
           orgId: current.orgId,
           subscriptionId: current.id,
           kind: InstitutionalSnapshotKind.QUOTE,
+          ...(current.pendingInstitutionalSnapshotId
+            ? { id: { not: current.pendingInstitutionalSnapshotId } }
+            : {}),
           acceptance: { is: { acceptedAt: { lte: cutoffAt } } },
           createdAt: {
             gt: current.currentInstitutionalSnapshot?.createdAt ?? new Date(0),
@@ -138,6 +151,8 @@ export class InstitutionalCensusService {
           ).enrolledCount
         : null;
       let priced = null;
+      let declaredCapacity: number | null = null;
+      let declaredCapacityReviewRequired = false;
       if (
         count !== null &&
         pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION &&
@@ -161,18 +176,92 @@ export class InstitutionalCensusService {
           enrolledChildren: count,
           pricingVersion: INSTITUTIONAL_PRICING_VERSION,
         });
+      } else if (
+        pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+        priceTemplate &&
+        isDeclaredCapacityPlanCode(priceTemplate.planCode)
+      ) {
+        const scheduledTargetCapacity =
+          acceptedChange?.declaredCapacity ??
+          (policy.scheduledCapacityDecrease !== null &&
+          policy.scheduledCapacityEffectiveAt !== null &&
+          policy.scheduledCapacityEffectiveAt <= current.periodEnd
+            ? policy.scheduledCapacityDecrease
+            : null);
+        const requiresVerifiedRoll =
+          scheduledTargetCapacity !== null &&
+          policy.declaredCapacity !== null &&
+          scheduledTargetCapacity < policy.declaredCapacity;
+        const targetCapacity =
+          requiresVerifiedRoll && count === null
+            ? policy.declaredCapacity
+            : (scheduledTargetCapacity ?? policy.declaredCapacity);
+        if (targetCapacity !== null) {
+          try {
+            const interval = declaredCapacityIntervalFromPlanCode(
+              priceTemplate.planCode,
+            );
+            const quote = quoteDeclaredCapacityWithFrozenPrices(
+              { declaredCapacity: targetCapacity, interval },
+              priceTemplate.lines,
+              priceTemplate.paidModules,
+            );
+            const estimate = calculateDeclaredCapacityQuote({
+              declaredCapacity: targetCapacity,
+              interval,
+            });
+            if (
+              quote.kind === "priced" &&
+              estimate.kind === "priced" &&
+              declaredCapacityPlanCode(estimate.tier, interval) ===
+                quote.planCode &&
+              (count === null || targetCapacity >= count) &&
+              (await tx.tenant.count({ where: { orgId: current.orgId } })) <=
+                quote.siteAllowance
+            ) {
+              priced = {
+                kind: "priced" as const,
+                declaredCapacity: targetCapacity,
+                includedChildren: null,
+                planCode: quote.planCode,
+                lines: quote.lines,
+                subtotalPence: quote.subtotalPence,
+              };
+              declaredCapacity = targetCapacity;
+            } else if (
+              quote.kind === "priced" &&
+              count !== null &&
+              targetCapacity < count
+            ) {
+              declaredCapacityReviewRequired = true;
+            } else if (quote.kind === "contact_sales") {
+              priced = quote;
+            }
+          } catch (error) {
+            this.logger.warn(
+              `Declared-capacity renewal price review required for subscription ${current.id}: ${error instanceof Error ? error.message : "invalid snapshot"}`,
+            );
+          }
+        }
       }
       const status =
-        priced?.kind === "priced"
+        priced?.kind === "priced" && !declaredCapacityReviewRequired
           ? InstitutionalSnapshotStatus.PRICED
           : InstitutionalSnapshotStatus.REVIEW_REQUIRED;
-      const reviewReason = !confirmation
-        ? "ROLL_UNVERIFIED"
-        : priced?.kind === "contact_sales"
-          ? "OVER_250_CHILDREN"
-          : !priced
-            ? "PRICING_REVIEW_REQUIRED"
-            : null;
+      const isPriced = status === InstitutionalSnapshotStatus.PRICED;
+      const reviewReason =
+        !confirmation && pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION
+          ? "ROLL_UNVERIFIED"
+          : declaredCapacityReviewRequired
+            ? "DECLARED_CAPACITY_REVIEW_REQUIRED"
+            : priced?.kind === "contact_sales"
+              ? "OVER_250_CHILDREN"
+              : pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+                  declaredCapacity === null
+                ? "DECLARED_CAPACITY_REVIEW_REQUIRED"
+                : !priced
+                  ? "PRICING_REVIEW_REQUIRED"
+                  : null;
       const snapshot = await tx.institutionalBillingSnapshot.create({
         data: {
           orgId: current.orgId,
@@ -180,12 +269,20 @@ export class InstitutionalCensusService {
           subscriptionId: current.id,
           kind: InstitutionalSnapshotKind.CENSUS,
           status,
-          planCode: renewalPlanCode,
+          planCode:
+            pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+            priced?.kind === "priced" &&
+            "planCode" in priced
+              ? priced.planCode
+              : renewalPlanCode,
           pricingVersion,
           countSource: confirmation ? InstitutionalCountSource.VERIFIED : null,
           enrolledChildren: count,
+          declaredCapacity: isPriced ? declaredCapacity : null,
           includedChildren:
-            priced?.kind === "priced" ? priced.includedChildren : null,
+            isPriced && priced?.kind === "priced"
+              ? priced.includedChildren
+              : null,
           includedModules:
             acceptedChange?.includedModules ??
             current.currentInstitutionalSnapshot?.includedModules ??
@@ -194,9 +291,9 @@ export class InstitutionalCensusService {
             acceptedChange?.paidModules ??
             current.currentInstitutionalSnapshot?.paidModules ??
             [],
-          lines: priced?.kind === "priced" ? priced.lines : [],
+          lines: isPriced && priced?.kind === "priced" ? priced.lines : [],
           subtotalPence:
-            priced?.kind === "priced" ? priced.subtotalPence : null,
+            isPriced && priced?.kind === "priced" ? priced.subtotalPence : null,
           sourceConfirmationId: confirmation?.id,
           sourceRevisionCutoff: confirmation?.revisionCutoff,
           censusCutoffAt: cutoffAt,
@@ -227,6 +324,7 @@ export class InstitutionalCensusService {
             in: [
               ...Object.keys(INSTITUTIONAL_PLANS),
               ...INSTITUTIONAL_MAPPED_PLAN_CODES,
+              ...DECLARED_CAPACITY_PLAN_CODES,
             ],
           },
           status: {
@@ -241,6 +339,7 @@ export class InstitutionalCensusService {
         include: {
           currentInstitutionalSnapshot: true,
           nextInstitutionalSnapshot: true,
+          pendingInstitutionalSnapshot: true,
         },
       });
       const planCode = subscription
@@ -252,6 +351,9 @@ export class InstitutionalCensusService {
               orgId,
               subscriptionId: subscription.id,
               kind: InstitutionalSnapshotKind.QUOTE,
+              ...(subscription.pendingInstitutionalSnapshotId
+                ? { id: { not: subscription.pendingInstitutionalSnapshotId } }
+                : {}),
               acceptance: { isNot: null },
               createdAt: {
                 gt:
@@ -281,10 +383,17 @@ export class InstitutionalCensusService {
             ? null
             : (policy?.declaredChildren ?? null);
       let forecast = null;
-      if (planCode && forecastCount !== null) {
-        const template =
-          acceptedChange ?? subscription?.currentInstitutionalSnapshot;
-        if (template?.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
+      const template =
+        acceptedChange ?? subscription?.currentInstitutionalSnapshot;
+      const declaredCapacityForecast =
+        template?.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+        template.declaredCapacity !== null &&
+        isDeclaredCapacityPlanCode(template.planCode);
+      if (planCode && (forecastCount !== null || declaredCapacityForecast)) {
+        if (
+          forecastCount !== null &&
+          template?.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION
+        ) {
           try {
             forecast = quoteFromFrozenInstitutionalPrices(
               template,
@@ -296,12 +405,50 @@ export class InstitutionalCensusService {
             );
             forecast = null;
           }
-        } else if (isInstitutionalPlanCode(planCode)) {
+        } else if (
+          forecastCount !== null &&
+          isInstitutionalPlanCode(planCode)
+        ) {
           forecast = calculateInstitutionalQuote({
             planCode,
             enrolledChildren: forecastCount,
             pricingVersion: INSTITUTIONAL_PRICING_VERSION,
           });
+        } else if (
+          template?.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+          template.declaredCapacity !== null &&
+          isDeclaredCapacityPlanCode(template.planCode)
+        ) {
+          const targetCapacity =
+            acceptedChange?.declaredCapacity ??
+            (policy?.scheduledCapacityDecrease !== null &&
+            policy?.scheduledCapacityDecrease !== undefined &&
+            policy.scheduledCapacityEffectiveAt !== null &&
+            subscription?.periodEnd &&
+            policy.scheduledCapacityEffectiveAt <= subscription.periodEnd
+              ? policy.scheduledCapacityDecrease
+              : template.declaredCapacity);
+          try {
+            const quote = quoteDeclaredCapacityWithFrozenPrices(
+              {
+                declaredCapacity: targetCapacity,
+                interval: declaredCapacityIntervalFromPlanCode(
+                  template.planCode,
+                ),
+              },
+              template.lines,
+              template.paidModules,
+            );
+            forecast =
+              quote.kind === "priced"
+                ? { ...quote, activeEnrolledChildren: forecastCount }
+                : quote;
+          } catch (error) {
+            this.logger.warn(
+              `Declared-capacity forecast review required for subscription ${subscription?.id}: ${error instanceof Error ? error.message : "invalid snapshot"}`,
+            );
+            forecast = null;
+          }
         }
       }
       return {
@@ -311,6 +458,9 @@ export class InstitutionalCensusService {
               planCode,
               periodStart: subscription.periodStart,
               periodEnd: subscription.periodEnd,
+              declaredCapacity:
+                subscription.currentInstitutionalSnapshot?.declaredCapacity ??
+                null,
               enrolledChildren:
                 subscription.currentInstitutionalSnapshot?.enrolledChildren ??
                 null,
@@ -334,6 +484,8 @@ export class InstitutionalCensusService {
           ? {
               planCode: subscription.nextInstitutionalSnapshot.planCode,
               status: subscription.nextInstitutionalSnapshot.status,
+              declaredCapacity:
+                subscription.nextInstitutionalSnapshot.declaredCapacity,
               enrolledChildren:
                 subscription.nextInstitutionalSnapshot.enrolledChildren,
               includedChildren:
@@ -351,6 +503,7 @@ export class InstitutionalCensusService {
         scheduledChange: acceptedChange
           ? {
               planCode: acceptedChange.planCode,
+              declaredCapacity: acceptedChange.declaredCapacity,
               includedModules: acceptedChange.includedModules,
               paidModules: acceptedChange.paidModules,
               acceptedAt: acceptedChange.acceptance?.acceptedAt ?? null,
@@ -361,6 +514,26 @@ export class InstitutionalCensusService {
                   censusCutoffFor(subscription.periodEnd)
                   ? subscription.periodEnd
                   : null,
+            }
+          : policy?.scheduledCapacityDecrease !== null &&
+              policy?.scheduledCapacityDecrease !== undefined
+            ? {
+                planCode: null,
+                declaredCapacity: policy.scheduledCapacityDecrease,
+                includedModules: [],
+                paidModules: [],
+                acceptedAt: null,
+                effectiveAt: policy.scheduledCapacityEffectiveAt,
+              }
+            : null,
+        pendingCapacityChange: subscription?.pendingInstitutionalSnapshot
+          ? {
+              snapshotId: subscription.pendingInstitutionalSnapshot.id,
+              declaredCapacity:
+                subscription.pendingInstitutionalSnapshot.declaredCapacity,
+              amountDueNowPence:
+                subscription.pendingInstitutionalSnapshot.amountDueNowPence,
+              status: subscription.pendingInstitutionalSnapshot.status,
             }
           : null,
         nextCutoffAt: subscription

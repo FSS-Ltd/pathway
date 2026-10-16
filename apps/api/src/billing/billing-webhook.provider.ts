@@ -29,11 +29,13 @@ export type ParsedBillingWebhookEvent = {
     id: string;
     status: "draft" | "paid" | "other";
     currency: string;
+    amountDuePence?: number;
     linesComplete: boolean;
     lines: Array<{
       priceId: string | null;
       quantity: number | null;
       amountPence: number;
+      proration?: boolean;
     }>;
   };
   entitlements?: {

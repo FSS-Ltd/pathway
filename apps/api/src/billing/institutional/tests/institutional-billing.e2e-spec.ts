@@ -4,11 +4,13 @@ import { Test } from "@nestjs/testing";
 import type { INestApplication } from "@nestjs/common";
 import {
   BillingProvider,
+  InstitutionalSnapshotKind,
   InstitutionalSnapshotStatus,
   prisma,
   SubscriptionStatus,
   withTenantRlsContext,
 } from "@pathway/db";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 import { AppModule } from "../../../app.module";
 import { requireDatabase, seedE2eAuthUser } from "../../../../test-helpers.e2e";
 import { EnrolmentIdentitiesService } from "../../../enrolments/enrolment-identities.service";
@@ -113,6 +115,115 @@ describe("institutional quotes and census (e2e)", () => {
       enrolledChildren: 100,
       subtotalPence: 12400,
     });
+  });
+
+  it("freezes declared-capacity renewals without requiring a confirmed roll", async () => {
+    if (!app) return;
+    const renewalOrgId = randomUUID();
+    const renewalTenantId = randomUUID();
+    await prisma.org.create({
+      data: {
+        id: renewalOrgId,
+        name: "Declared capacity renewal",
+        slug: `declared-renewal-${renewalOrgId}`,
+        planCode: "starter",
+      },
+    });
+    await prisma.tenant.create({
+      data: {
+        id: renewalTenantId,
+        orgId: renewalOrgId,
+        name: "Main site",
+        slug: `declared-renewal-${renewalTenantId}`,
+        timezone: "Europe/London",
+      },
+    });
+
+    const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1_000);
+    const policy = await prisma.institutionalBillingPolicy.create({
+      data: {
+        orgId: renewalOrgId,
+        pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+        timezone: "Europe/London",
+        declaredCapacity: 74,
+        scheduledCapacityDecrease: 50,
+        scheduledCapacityEffectiveAt: periodEnd,
+      },
+    });
+    const subscription = await prisma.subscription.create({
+      data: {
+        orgId: renewalOrgId,
+        provider: BillingProvider.STRIPE,
+        providerSubId: `sub_declared_${randomUUID()}`,
+        planCode: "DECLARED_CAPACITY_STARTER_MONTHLY",
+        status: SubscriptionStatus.ACTIVE,
+        periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1_000),
+        periodEnd,
+      },
+    });
+    const currentSnapshot = await prisma.institutionalBillingSnapshot.create({
+      data: {
+        orgId: renewalOrgId,
+        policyId: policy.id,
+        subscriptionId: subscription.id,
+        kind: InstitutionalSnapshotKind.QUOTE,
+        status: InstitutionalSnapshotStatus.PRICED,
+        planCode: subscription.planCode,
+        pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+        declaredCapacity: 74,
+        includedModules: [],
+        paidModules: [],
+        subtotalPence: 14_800,
+        expiresAt: new Date(periodEnd.getTime() - 60 * 60 * 1_000),
+        lines: [
+          {
+            component: "BASE",
+            priceCode: "DECLARED_CAPACITY_BASE_MONTHLY",
+            priceId: "price_v2base",
+            currency: "GBP",
+            quantity: 1,
+            unitAmountPence: 7_400,
+            subtotalPence: 7_400,
+          },
+          {
+            component: "DECLARED_CAPACITY",
+            priceCode: "DECLARED_CAPACITY_CHILD_MONTHLY",
+            priceId: "price_v2child",
+            currency: "GBP",
+            quantity: 74,
+            unitAmountPence: 100,
+            subtotalPence: 7_400,
+          },
+        ],
+      },
+    });
+    await prisma.subscription.update({
+      where: { id: subscription.id },
+      data: { currentInstitutionalSnapshotId: currentSnapshot.id },
+    });
+
+    const result = await census.freezeNext(
+      subscription.id,
+      new Date(censusCutoffFor(periodEnd).getTime() + 1),
+    );
+
+    expect(result.kind).toBe("frozen");
+    if (result.kind !== "frozen") throw new Error("Expected frozen census");
+    expect(result.snapshot).toMatchObject({
+      status: InstitutionalSnapshotStatus.PRICED,
+      pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+      declaredCapacity: 74,
+      enrolledChildren: null,
+      subtotalPence: 14_800,
+      planCode: "DECLARED_CAPACITY_STARTER_MONTHLY",
+    });
+    expect(
+      (
+        await prisma.institutionalBillingPolicy.findUniqueOrThrow({
+          where: { orgId: renewalOrgId },
+        })
+      ).scheduledCapacityDecrease,
+    ).toBe(50);
   });
 
   it("requires an accepted declaration, preserves zero as base-fee billing, and rejects stale quotes", async () => {

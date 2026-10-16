@@ -270,11 +270,13 @@ export class StripeBillingWebhookProvider implements BillingWebhookProvider {
           ? invoice.status
           : "other",
       currency: invoice.currency,
+      amountDuePence: invoice.amount_due,
       linesComplete: !invoice.lines.has_more,
       lines: invoice.lines.data.map((line) => ({
         priceId: line.price?.id ?? null,
         quantity: line.quantity ?? null,
         amountPence: line.amount,
+        proration: line.proration,
       })),
     };
   }

@@ -10,6 +10,11 @@ import {
   Module,
 } from "@pathway/db";
 import {
+  calculateDeclaredCapacityQuote,
+  declaredCapacityIntervalFromPlanCode,
+  declaredCapacityPlanCode,
+  isDeclaredCapacityPlanCode,
+  DECLARED_CAPACITY_PRICING_VERSION,
   INSTITUTIONAL_PLANS,
   isMappedInstitutionalPlanCode,
   mappedInstitutionalSelectionPlanCode,
@@ -26,12 +31,64 @@ import {
 import { censusCutoffFor } from "./institutional-time";
 import { isInstitutionalPlanCode } from "./institutional-selection";
 import { invoiceMatchesSnapshot } from "./institutional-invoice-match";
+import { capacityUpgradeInvoiceMatches } from "./institutional-capacity-invoice";
 import { quoteWasAcceptedForCheckout } from "./institutional-quote-freshness";
 import { parsePublicInstitutionalOrder } from "./institutional-public-order";
 import {
   reconcileSubscriptionModuleGrants,
   updateSubscriptionGrantPeriod,
 } from "../module-grants";
+
+function entitlementPlanForSnapshot(snapshot: {
+  planCode: string;
+  pricingVersion: string;
+  declaredCapacity: number | null;
+}): { planCode: string; maxSites: number; billingMetric: string } {
+  if (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
+    if (
+      snapshot.declaredCapacity === null ||
+      !isDeclaredCapacityPlanCode(snapshot.planCode)
+    ) {
+      throw new Error("Institutional declared-capacity snapshot is invalid.");
+    }
+    const interval = declaredCapacityIntervalFromPlanCode(snapshot.planCode);
+    const quote = calculateDeclaredCapacityQuote({
+      declaredCapacity: snapshot.declaredCapacity,
+      interval,
+    });
+    if (
+      quote.kind !== "priced" ||
+      declaredCapacityPlanCode(quote.tier, interval) !== snapshot.planCode
+    ) {
+      throw new Error("Institutional declared-capacity snapshot is invalid.");
+    }
+    return {
+      planCode: snapshot.planCode,
+      maxSites: quote.siteAllowance,
+      billingMetric: "DECLARED_CAPACITY",
+    };
+  }
+  if (isInstitutionalPlanCode(snapshot.planCode)) {
+    const plan = INSTITUTIONAL_PLANS[snapshot.planCode];
+    return {
+      planCode: plan.code,
+      maxSites: plan.includedSites,
+      billingMetric: plan.billingMetric,
+    };
+  }
+  if (isMappedInstitutionalPlanCode(snapshot.planCode)) {
+    const plan =
+      INSTITUTIONAL_PLANS[
+        mappedInstitutionalSelectionPlanCode(snapshot.planCode)
+      ];
+    return {
+      planCode: snapshot.planCode,
+      maxSites: plan.includedSites,
+      billingMetric: plan.billingMetric,
+    };
+  }
+  throw new Error("Institutional snapshot plan is invalid.");
+}
 
 @Injectable()
 export class InstitutionalWebhookService {
@@ -69,7 +126,8 @@ export class InstitutionalWebhookService {
     if (
       !pendingOrder?.institutionalSnapshotId &&
       !subscription?.currentInstitutionalSnapshotId &&
-      !subscription?.nextInstitutionalSnapshotId
+      !subscription?.nextInstitutionalSnapshotId &&
+      !subscription?.pendingInstitutionalSnapshotId
     ) {
       return false;
     }
@@ -97,6 +155,7 @@ export class InstitutionalWebhookService {
       return true;
     }
     if (event.kind === "invoice.payment_failed") {
+      if (subscription?.pendingInstitutionalSnapshotId) return true;
       if (
         subscription &&
         event.periodStart &&
@@ -119,13 +178,16 @@ export class InstitutionalWebhookService {
     }
 
     const snapshotId =
-      pendingOrder && pendingOrder.status !== PendingOrderStatus.COMPLETED
-        ? pendingOrder.institutionalSnapshotId
-        : event.periodStart &&
-            subscription?.nextInstitutionalSnapshotId &&
-            subscription.periodEnd <= event.periodStart
-          ? subscription.nextInstitutionalSnapshotId
-          : subscription?.currentInstitutionalSnapshotId;
+      subscription?.pendingInstitutionalSnapshotId &&
+      (event.kind === "invoice.draft" || event.kind === "invoice.paid")
+        ? subscription.pendingInstitutionalSnapshotId
+        : pendingOrder && pendingOrder.status !== PendingOrderStatus.COMPLETED
+          ? pendingOrder.institutionalSnapshotId
+          : event.periodStart &&
+              subscription?.nextInstitutionalSnapshotId &&
+              subscription.periodEnd <= event.periodStart
+            ? subscription.nextInstitutionalSnapshotId
+            : subscription?.currentInstitutionalSnapshotId;
     const snapshot = snapshotId
       ? await prisma.institutionalBillingSnapshot.findFirst({
           where: { id: snapshotId, orgId: event.orgId },
@@ -149,6 +211,9 @@ export class InstitutionalWebhookService {
         event.periodStart !== undefined &&
         snapshot.effectiveAt.getTime() === event.periodStart.getTime());
     const priceMap = { ...this.billingConfig.stripe.priceMap };
+    const isPendingCapacityChange =
+      !!snapshot &&
+      subscription?.pendingInstitutionalSnapshotId === snapshot.id;
     const matches =
       snapshot &&
       accepted &&
@@ -156,12 +221,15 @@ export class InstitutionalWebhookService {
       effectivePeriod &&
       event.periodStart &&
       event.periodEnd &&
-      invoiceMatchesSnapshot(
-        event,
-        snapshot,
-        priceMap,
-        !!pendingOrder && pendingOrder.status !== PendingOrderStatus.COMPLETED,
-      );
+      (isPendingCapacityChange
+        ? capacityUpgradeInvoiceMatches(event, snapshot)
+        : invoiceMatchesSnapshot(
+            event,
+            snapshot,
+            priceMap,
+            !!pendingOrder &&
+              pendingOrder.status !== PendingOrderStatus.COMPLETED,
+          ));
     if (!matches) {
       await prisma.institutionalBillingPolicy.updateMany({
         where: { orgId: event.orgId },
@@ -207,24 +275,22 @@ export class InstitutionalWebhookService {
       if (current?.periodStart && current.periodStart > event.periodStart!)
         return;
       if (
+        snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+        snapshot.subscriptionId &&
+        current?.pendingInstitutionalSnapshotId !== snapshot.id &&
+        current?.currentInstitutionalSnapshotId !== snapshot.id &&
+        current?.nextInstitutionalSnapshotId !== snapshot.id
+      ) {
+        throw new Error("Institutional capacity payment is no longer pending.");
+      }
+      if (
         current?.periodStart?.getTime() === event.periodStart!.getTime() &&
         current.currentInstitutionalSnapshotId === snapshot.id &&
         current.status === SubscriptionStatus.ACTIVE
       ) {
         return;
       }
-      if (
-        !isInstitutionalPlanCode(snapshot.planCode) &&
-        !isMappedInstitutionalPlanCode(snapshot.planCode)
-      ) {
-        throw new Error("Institutional snapshot plan is invalid.");
-      }
-      const plan =
-        INSTITUTIONAL_PLANS[
-          isInstitutionalPlanCode(snapshot.planCode)
-            ? snapshot.planCode
-            : mappedInstitutionalSelectionPlanCode(snapshot.planCode)
-        ];
+      const entitlementPlan = entitlementPlanForSnapshot(snapshot);
       const paid = await tx.subscription.upsert({
         where: { providerSubId: event.subscriptionId },
         update: {
@@ -235,6 +301,10 @@ export class InstitutionalWebhookService {
           currentInstitutionalSnapshotId: snapshot.id,
           nextInstitutionalSnapshotId:
             current?.nextInstitutionalSnapshotId === snapshot.id
+              ? null
+              : undefined,
+          pendingInstitutionalSnapshotId:
+            current?.pendingInstitutionalSnapshotId === snapshot.id
               ? null
               : undefined,
         },
@@ -289,14 +359,14 @@ export class InstitutionalWebhookService {
       await tx.orgEntitlementSnapshot.create({
         data: {
           orgId: event.orgId,
-          maxSites: plan.includedSites,
+          maxSites: entitlementPlan.maxSites,
           av30Included: previousEntitlement?.av30Included ?? 0,
           leaderSeatsIncluded: previousEntitlement?.leaderSeatsIncluded ?? 0,
           storageGbIncluded: previousEntitlement?.storageGbIncluded ?? 0,
           flagsJson: {
             ...priorFlags,
-            planCode: plan.code,
-            billingMetric: plan.billingMetric,
+            planCode: entitlementPlan.planCode,
+            billingMetric: entitlementPlan.billingMetric,
             institutionalSnapshotId: snapshot.id,
           },
           source: "institutional_invoice",
@@ -306,14 +376,16 @@ export class InstitutionalWebhookService {
         pendingOrder?.institutionalSnapshotId === snapshot.id &&
         pendingOrder.status !== PendingOrderStatus.COMPLETED
       ) {
+        const includedModules =
+          snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+            ? snapshot.includedModules
+            : [Module.LEARNING, ...snapshot.includedModules];
         await reconcileSubscriptionModuleGrants(
           tx,
           event.orgId,
           event.subscriptionId,
           {
-            included: [
-              ...new Set([Module.LEARNING, ...snapshot.includedModules]),
-            ],
+            included: [...new Set(includedModules)],
             paid: snapshot.paidModules,
           },
           event.periodEnd!,
@@ -326,10 +398,60 @@ export class InstitutionalWebhookService {
           event.periodEnd!,
         );
       }
+      if (
+        snapshot.kind === InstitutionalSnapshotKind.QUOTE &&
+        snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+        snapshot.acceptance?.effectiveAt === null
+      ) {
+        await tx.institutionalQuoteAcceptance.updateMany({
+          where: {
+            orgId: event.orgId,
+            snapshotId: snapshot.id,
+            effectiveAt: null,
+          },
+          data: { effectiveAt: event.occurredAt ?? new Date() },
+        });
+      }
       await tx.institutionalBillingPolicy.updateMany({
         where: { orgId: event.orgId, reviewReason: "INVOICE_MISMATCH" },
         data: { reviewReason: null },
       });
+      if (
+        snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+        snapshot.declaredCapacity !== null
+      ) {
+        const policy = await tx.institutionalBillingPolicy.findUnique({
+          where: { orgId: event.orgId },
+          select: {
+            scheduledCapacityDecrease: true,
+            scheduledCapacityEffectiveAt: true,
+          },
+        });
+        const scheduledDecreaseApplied =
+          policy?.scheduledCapacityDecrease === snapshot.declaredCapacity;
+        const carryScheduledDecrease =
+          policy?.scheduledCapacityDecrease !== null &&
+          policy?.scheduledCapacityDecrease !== undefined &&
+          !scheduledDecreaseApplied;
+        await tx.institutionalBillingPolicy.updateMany({
+          where: { orgId: event.orgId },
+          data: {
+            declaredCapacity: snapshot.declaredCapacity,
+            declaredAt: new Date(),
+            scheduledCapacityDecrease: scheduledDecreaseApplied
+              ? null
+              : (policy?.scheduledCapacityDecrease ?? null),
+            scheduledCapacityEffectiveAt: scheduledDecreaseApplied
+              ? null
+              : carryScheduledDecrease
+                ? policy?.scheduledCapacityEffectiveAt &&
+                  policy.scheduledCapacityEffectiveAt > event.periodEnd!
+                  ? policy.scheduledCapacityEffectiveAt
+                  : event.periodEnd!
+                : null,
+          },
+        });
+      }
       await tx.institutionalBillingOperation.upsert({
         where: {
           orgId_idempotencyKey: {

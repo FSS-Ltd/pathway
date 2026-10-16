@@ -5,6 +5,9 @@ import { InstitutionalBillingController } from "./institutional-billing.controll
 import { InstitutionalCatalogueController } from "./institutional-catalogue.controller";
 import { InstitutionalCensusService } from "./institutional-census.service";
 import { InstitutionalCheckoutService } from "./institutional-checkout.service";
+import { InstitutionalCapacityService } from "./institutional-capacity.service";
+import { InstitutionalCapacityQuoteService } from "./institutional-capacity-quote.service";
+import { InstitutionalCapacityAcceptanceService } from "./institutional-capacity-acceptance.service";
 import { InstitutionalBillingInternalController } from "./institutional-internal.controller";
 import { InstitutionalOperationService } from "./institutional-operation.service";
 import {
@@ -29,6 +32,9 @@ import { InstitutionalPublicCheckoutService } from "./institutional-public-check
     InstitutionalQuoteService,
     InstitutionalCensusService,
     InstitutionalCheckoutService,
+    InstitutionalCapacityService,
+    InstitutionalCapacityQuoteService,
+    InstitutionalCapacityAcceptanceService,
     InstitutionalOperationService,
     BillingPricingService,
     InstitutionalPriceResolver,

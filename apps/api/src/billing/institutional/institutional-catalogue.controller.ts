@@ -8,6 +8,9 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  calculateDeclaredCapacityQuote,
+  DECLARED_CAPACITY_PLANS,
+  DECLARED_CAPACITY_PRICING_VERSION,
   calculateMappedInstitutionalQuote,
   calculateInstitutionalQuote,
   INSTITUTIONAL_MAPPED_PLAN_CODES,
@@ -19,6 +22,7 @@ import {
 } from "@pathway/pricing";
 import { z } from "zod";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
+import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
 
 const estimateSchema = z.object({
   planCode: z.enum([
@@ -40,6 +44,11 @@ const mappedEstimateSchema = z.object({
   ]),
   enrolledChildren: z.number().int().nonnegative().safe(),
   storageChoice: z.enum(["none", "100", "200", "1000"]).default("none"),
+});
+
+const declaredCapacityEstimateSchema = z.object({
+  declaredCapacity: z.number().int().nonnegative().safe(),
+  interval: z.enum(["month", "year"]),
 });
 
 @Controller("billing/institutional/catalogue")
@@ -136,5 +145,33 @@ export class InstitutionalCatalogueController {
       }
       throw error;
     }
+  }
+
+  @Get("declared-capacity")
+  declaredCapacityCatalogue() {
+    assertDeclaredCapacityBillingEnabled();
+    return {
+      pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+      currency: "GBP" as const,
+      intervals: ["month", "year"] as const,
+      plans: Object.values(DECLARED_CAPACITY_PLANS),
+      enterprise: {
+        minimumCapacity: 251,
+        contactPath: "/demo?plan=enterprise",
+      },
+    };
+  }
+
+  @Post("declared-capacity/estimate")
+  estimateDeclaredCapacity(@Body() body: unknown) {
+    assertDeclaredCapacityBillingEnabled();
+    const parsed = declaredCapacityEstimateSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: "INVALID_ESTIMATE",
+        details: parsed.error.flatten(),
+      });
+    }
+    return calculateDeclaredCapacityQuote(parsed.data);
   }
 }
