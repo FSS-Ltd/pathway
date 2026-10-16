@@ -110,6 +110,11 @@ export function DeclaredCapacityPricePanel({
               Free trials are not charged at checkout and never convert
               automatically.
             </p>
+            <p className="text-xs text-text-muted">
+              {estimate.pricesIncludeVat
+                ? "Prices include VAT. The total shown is the amount due at checkout."
+                : "VAT-inclusive checkout is not available yet."}
+            </p>
             {estimate.trialModules.length > 0 ? (
               <p className="text-xs text-text-muted">
                 Selected for later activation:{" "}

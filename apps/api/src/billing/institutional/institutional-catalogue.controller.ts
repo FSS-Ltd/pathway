@@ -23,7 +23,10 @@ import {
 import { Module } from "@pathway/db";
 import { z } from "zod";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
-import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
+import {
+  assertDeclaredCapacityBillingEnabled,
+  isDeclaredCapacityVatEnabled,
+} from "./declared-capacity-gate";
 import {
   DECLARED_CAPACITY_ADDON_MODULES,
   declaredCapacityAddonPriceCode,
@@ -167,6 +170,7 @@ export class InstitutionalCatalogueController {
     return {
       pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
       currency: "GBP" as const,
+      pricesIncludeVat: isDeclaredCapacityVatEnabled(),
       intervals: ["month", "year"] as const,
       plans: Object.values(DECLARED_CAPACITY_PLANS),
       enterprise: {
@@ -210,9 +214,12 @@ export class InstitutionalCatalogueController {
       declaredCapacity: parsed.data.declaredCapacity,
       interval: parsed.data.interval,
     });
-    if (formulaQuote.kind === "contact_sales") return formulaQuote;
+    const pricesIncludeVat = isDeclaredCapacityVatEnabled();
+    if (formulaQuote.kind === "contact_sales") {
+      return { ...formulaQuote, pricesIncludeVat };
+    }
     try {
-      return quoteDeclaredCapacityWithStripePrices(
+      const quote = quoteDeclaredCapacityWithStripePrices(
         parsed.data,
         await this.mappedPrices.resolve(),
         {
@@ -220,6 +227,7 @@ export class InstitutionalCatalogueController {
           trialModules: parsed.data.trialModules,
         },
       );
+      return { ...quote, pricesIncludeVat };
     } catch (error) {
       if (error instanceof DeclaredCapacityStripePriceError) {
         throw new ServiceUnavailableException({

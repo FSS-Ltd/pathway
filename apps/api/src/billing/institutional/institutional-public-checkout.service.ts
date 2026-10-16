@@ -17,6 +17,7 @@ import {
   calculateDeclaredCapacityQuote,
   DECLARED_CAPACITY_PLANS,
   calculateMappedInstitutionalQuote,
+  DECLARED_CAPACITY_PRICING_VERSION,
   INSTITUTIONAL_PLANS,
   InstitutionalMappedPriceError,
   mappedInstitutionalSelectionPlanCode,
@@ -32,7 +33,11 @@ import { validateInstitutionalSelection } from "./institutional-selection";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
 import { institutionalStripeKey } from "./institutional-provider-guard";
 import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
-import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
+import {
+  assertDeclaredCapacityBillingEnabled,
+  assertDeclaredCapacityTaxRegistration,
+  declaredCapacityCheckoutTaxOptions,
+} from "./declared-capacity-gate";
 import {
   DeclaredCapacityStripePriceError,
   quoteDeclaredCapacityWithStripePrices,
@@ -251,9 +256,18 @@ export class InstitutionalPublicCheckoutService {
 
   async checkoutDeclaredCapacity(input: PublicDeclaredCapacityCheckoutInput) {
     assertDeclaredCapacityBillingEnabled();
+    const taxOptions = declaredCapacityCheckoutTaxOptions(
+      DECLARED_CAPACITY_PRICING_VERSION,
+    );
     const stripe = new Stripe(institutionalStripeKey(this.config, "CHECKOUT"), {
       apiVersion: "2023-10-16",
     });
+    await assertDeclaredCapacityTaxRegistration(
+      async () =>
+        (await stripe.tax.registrations.list({ status: "active", limit: 100 }))
+          .data,
+      this.config.activeProvider === "STRIPE",
+    );
     if (!input.declarationAccepted) {
       throw new BadRequestException({ code: "DECLARATION_NOT_ACCEPTED" });
     }
@@ -412,6 +426,7 @@ export class InstitutionalPublicCheckoutService {
         line_items: frozen.quote.lines
           .filter((line) => line.quantity > 0)
           .map((line) => ({ price: line.priceId, quantity: line.quantity })),
+        ...taxOptions,
         metadata,
         subscription_data: { metadata },
       },

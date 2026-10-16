@@ -10,6 +10,7 @@ import {
   Module,
   withOrgRlsContext,
 } from "@pathway/db";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 import Stripe from "stripe";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
 import { DeclaredCapacityAddonTrialsService } from "./declared-capacity-addon-trials.service";
@@ -24,7 +25,11 @@ import {
 } from "../billing-provider.config";
 import { institutionalStripeKey } from "./institutional-provider-guard";
 import { withInstitutionalOrgLock } from "./institutional-quote.service";
-import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
+import {
+  assertDeclaredCapacityBillingEnabled,
+  assertDeclaredCapacityTaxRegistration,
+  declaredCapacityCheckoutTaxOptions,
+} from "./declared-capacity-gate";
 
 type PaidInterval = "MONTHLY" | "YEARLY";
 
@@ -55,6 +60,7 @@ function validateProviderPrice(
     price.livemode !== expectLivemode ||
     price.currency !== "gbp" ||
     price.unit_amount !== expected.unitAmountPence ||
+    price.tax_behavior !== "inclusive" ||
     recurring.interval !== expectedInterval ||
     recurring.interval_count !== 1 ||
     recurring.usage_type !== "licensed"
@@ -89,6 +95,9 @@ export class DeclaredCapacityAddonCheckoutService {
     now = new Date(),
   ): Promise<{ checkoutUrl: string; trialId: string }> {
     assertDeclaredCapacityBillingEnabled();
+    const taxOptions = declaredCapacityCheckoutTaxOptions(
+      DECLARED_CAPACITY_PRICING_VERSION,
+    );
     if (!isDeclaredCapacityAddonModule(module)) {
       throw new ConflictException({ code: "ADDON_MODULE_NOT_TRIAL_ELIGIBLE" });
     }
@@ -124,6 +133,12 @@ export class DeclaredCapacityAddonCheckoutService {
       });
     }
     const stripe = this.stripe();
+    await assertDeclaredCapacityTaxRegistration(
+      async () =>
+        (await stripe.tax.registrations.list({ status: "active", limit: 100 }))
+          .data,
+      this.config.activeProvider === "STRIPE",
+    );
     let providerPrice: Stripe.Price;
     try {
       providerPrice = await stripe.prices.retrieve(configuredPrice.priceId);
@@ -185,6 +200,7 @@ export class DeclaredCapacityAddonCheckoutService {
             adminOrigin,
           ).toString(),
           line_items: [{ price: providerPrice.id, quantity: 1 }],
+          ...taxOptions,
           metadata,
           subscription_data: { metadata },
         },

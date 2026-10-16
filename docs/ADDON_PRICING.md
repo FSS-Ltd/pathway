@@ -159,16 +159,16 @@ authorize creating its Stripe Product or Price.
 
 ## Decision log
 
-| Date       | Decision                                                                                                                                                   | Owner                |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| 2026-10-16 | Finance add-on approved at £29/month or £290/year. Keep it unavailable until delivery and matching monthly/yearly Stripe prices are configured.            | Product owner        |
-| 2026-10-11 | Growth includes three customer-selected eligible modules and Professional includes six; preserve the historical fixed bundles for existing subscriptions.  | Product owner        |
-| 2026-10-15 | `DECLARED_CAPACITY_V2` has no paid-module inclusions; its 2/3/4 trial slots require a delivered module and approved, configured monthly and annual prices. | Product owner        |
-| 2026-07-25 | Storage monthly prices set to £1.49 / £2.49 / £5.99 for 100GB / 200GB / 1TB. Annual prices remain unconfirmed.                                             | Product owner        |
-| 2026-07-25 | Learning launch recommendation changed from £29/month to £19/month, pending commercial approval.                                                           | Product / Commercial |
-| 2026-07-25 | Operations bundle proposed: select any four eligible operations modules for £39/month or £390/year; Learning and AI Workspace excluded.                    | Product / Commercial |
-| 2026-07-25 | ACE-originated pricing proposed: global Clubs at £12/month (included for the Clubs sector) and ACE-only Child Merit Market at £19/month.                   | Product / Commercial |
-| 2026-07-25 | All Included bundle proposed: every non-AI module plus 1TB storage for £79/month or £790/year.                                                             | Product / Commercial |
+| Date       | Decision                                                                                                                                                       | Owner                |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 2026-10-16 | Finance add-on approved at £29/month and £290/year; live and test monthly/yearly Prices are mapped. Keep trial availability gated until delivery is confirmed. | Product owner        |
+| 2026-10-11 | Growth includes three customer-selected eligible modules and Professional includes six; preserve the historical fixed bundles for existing subscriptions.      | Product owner        |
+| 2026-10-15 | `DECLARED_CAPACITY_V2` has no paid-module inclusions; its 2/3/4 trial slots require a delivered module and approved, configured monthly and annual prices.     | Product owner        |
+| 2026-07-25 | Storage monthly prices set to £1.49 / £2.49 / £5.99 for 100GB / 200GB / 1TB. Annual prices remain unconfirmed.                                                 | Product owner        |
+| 2026-07-25 | Learning launch recommendation changed from £29/month to £19/month, pending commercial approval.                                                               | Product / Commercial |
+| 2026-07-25 | Operations bundle proposed: select any four eligible operations modules for £39/month or £390/year; Learning and AI Workspace excluded.                        | Product / Commercial |
+| 2026-07-25 | ACE-originated pricing proposed: global Clubs at £12/month (included for the Clubs sector) and ACE-only Child Merit Market at £19/month.                       | Product / Commercial |
+| 2026-07-25 | All Included bundle proposed: every non-AI module plus 1TB storage for £79/month or £790/year.                                                                 | Product / Commercial |
 
 ## Vertical inclusions
 

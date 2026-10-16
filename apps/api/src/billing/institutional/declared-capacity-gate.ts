@@ -1,4 +1,5 @@
 import { ServiceUnavailableException } from "@nestjs/common";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 
 export function assertDeclaredCapacityBillingEnabled(): void {
   if (process.env.DECLARED_CAPACITY_BILLING_ENABLED !== "true") {
@@ -6,4 +7,57 @@ export function assertDeclaredCapacityBillingEnabled(): void {
       code: "DECLARED_CAPACITY_BILLING_UNAVAILABLE",
     });
   }
+}
+
+export function isDeclaredCapacityVatEnabled(): boolean {
+  return process.env.DECLARED_CAPACITY_VAT_ENABLED === "true";
+}
+
+export function assertDeclaredCapacityVatEnabled(): void {
+  if (!isDeclaredCapacityVatEnabled()) {
+    throw new ServiceUnavailableException({
+      code: "DECLARED_CAPACITY_VAT_UNAVAILABLE",
+    });
+  }
+}
+
+export async function assertDeclaredCapacityTaxRegistration(
+  loadActiveRegistrations: () => Promise<
+    ReadonlyArray<
+      Readonly<{ status: string; country: string; livemode: boolean }>
+    >
+  >,
+  live: boolean,
+): Promise<void> {
+  assertDeclaredCapacityVatEnabled();
+
+  try {
+    const registrations = await loadActiveRegistrations();
+    if (
+      !registrations.some(
+        (registration) =>
+          registration.status === "active" &&
+          registration.country === "GB" &&
+          registration.livemode === live,
+      )
+    ) {
+      throw new ServiceUnavailableException({
+        code: "DECLARED_CAPACITY_VAT_UNAVAILABLE",
+      });
+    }
+  } catch (error) {
+    if (error instanceof ServiceUnavailableException) throw error;
+    throw new ServiceUnavailableException({
+      code: "DECLARED_CAPACITY_VAT_UNAVAILABLE",
+    });
+  }
+}
+
+export function declaredCapacityCheckoutTaxOptions(pricingVersion: string): {
+  automatic_tax?: { enabled: true };
+} {
+  if (pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION) return {};
+
+  assertDeclaredCapacityVatEnabled();
+  return { automatic_tax: { enabled: true } };
 }

@@ -44,7 +44,12 @@ import {
 import { localDateAt } from "./institutional-time";
 import { institutionalStripeKey } from "./institutional-provider-guard";
 import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
-import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
+import {
+  assertDeclaredCapacityBillingEnabled,
+  assertDeclaredCapacityTaxRegistration,
+  assertDeclaredCapacityVatEnabled,
+  declaredCapacityCheckoutTaxOptions,
+} from "./declared-capacity-gate";
 
 @Injectable()
 export class InstitutionalCheckoutService {
@@ -72,6 +77,7 @@ export class InstitutionalCheckoutService {
     });
     if (snapshot?.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
       assertDeclaredCapacityBillingEnabled();
+      assertDeclaredCapacityVatEnabled();
       const org = await tx.org.findUnique({
         where: { id: orgId },
         select: { isMasterOrg: true },
@@ -299,6 +305,18 @@ export class InstitutionalCheckoutService {
       return { order, snapshot };
     });
     const { order, snapshot } = prepared;
+    if (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
+      await assertDeclaredCapacityTaxRegistration(
+        async () =>
+          (
+            await stripe.tax.registrations.list({
+              status: "active",
+              limit: 100,
+            })
+          ).data,
+        this.config.activeProvider === "STRIPE",
+      );
+    }
     if (order.providerCheckoutId) {
       const session = await stripe.checkout.sessions.retrieve(
         order.providerCheckoutId,
@@ -392,6 +410,7 @@ export class InstitutionalCheckoutService {
         success_url: successUrl,
         cancel_url: cancelUrl,
         line_items: lineItems,
+        ...declaredCapacityCheckoutTaxOptions(snapshot.pricingVersion),
         metadata,
         subscription_data: { metadata },
       },

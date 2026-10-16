@@ -1,6 +1,13 @@
 jest.mock("stripe", () => ({
   __esModule: true,
   default: jest.fn(() => ({
+    tax: {
+      registrations: {
+        list: async () => ({
+          data: [{ status: "active", country: "GB", livemode: false }],
+        }),
+      },
+    },
     prices: {
       retrieve: async (priceId: string) => {
         const yearly = priceId.endsWith("year");
@@ -15,12 +22,19 @@ jest.mock("stripe", () => ({
             interval_count: 1,
             usage_type: "licensed",
           },
+          tax_behavior: "inclusive",
         };
       },
     },
     checkout: {
       sessions: {
-        create: async (input: { line_items: { price: string }[] }) => {
+        create: async (input: {
+          line_items: { price: string }[];
+          automatic_tax?: { enabled: boolean };
+        }) => {
+          if (input.automatic_tax?.enabled !== true) {
+            throw new Error("DECLARED_CAPACITY_AUTOMATIC_TAX_REQUIRED");
+          }
           const id = `cs_${input.line_items[0]?.price ?? "missing"}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
           return {
             id,
@@ -72,6 +86,7 @@ describe("institutional add-on trials (e2e)", () => {
   const oldApproved = process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES;
   const oldDelivered = process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES;
   const oldBillingEnabled = process.env.DECLARED_CAPACITY_BILLING_ENABLED;
+  const oldVatEnabled = process.env.DECLARED_CAPACITY_VAT_ENABLED;
   const oldProviderWrites = process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED;
   const oldCheckoutEnabled = process.env.INSTITUTIONAL_CHECKOUT_ENABLED;
   const oldAdminUrl = process.env.ADMIN_URL;
@@ -95,6 +110,7 @@ describe("institutional add-on trials (e2e)", () => {
       "EVENTS,TRANSPORT,MEALS,FINANCE";
     process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES =
       "EVENTS,TRANSPORT,MEALS,FINANCE";
+    process.env.DECLARED_CAPACITY_VAT_ENABLED = "true";
     process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED = "true";
     process.env.INSTITUTIONAL_CHECKOUT_ENABLED = "true";
     process.env.ADMIN_URL = "https://admin.example.test";
@@ -219,6 +235,11 @@ describe("institutional add-on trials (e2e)", () => {
       delete process.env.DECLARED_CAPACITY_BILLING_ENABLED;
     } else {
       process.env.DECLARED_CAPACITY_BILLING_ENABLED = oldBillingEnabled;
+    }
+    if (oldVatEnabled === undefined) {
+      delete process.env.DECLARED_CAPACITY_VAT_ENABLED;
+    } else {
+      process.env.DECLARED_CAPACITY_VAT_ENABLED = oldVatEnabled;
     }
     if (oldProviderWrites === undefined) {
       delete process.env.INSTITUTIONAL_PROVIDER_WRITES_ENABLED;
