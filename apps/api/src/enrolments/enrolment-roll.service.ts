@@ -20,6 +20,11 @@ import {
   validatePeriods,
   type EnrolmentPeriod,
 } from "./enrolment-periods";
+import {
+  DECLARED_CAPACITY_PRICING_VERSION,
+  isDeclaredCapacityPlanCode,
+} from "@pathway/pricing";
+import { assertDeclaredCapacityForEnrolment } from "./declared-capacity-enforcement";
 
 async function lockOrg(
   tx: Prisma.TransactionClient,
@@ -83,6 +88,31 @@ export class EnrolmentRollService {
     return prisma.$transaction(async (tx) => {
       await applyTenantContext(tx, "", orgId);
       const recordedAt = await lockOrg(tx, orgId);
+      const org = await tx.org.findUnique({
+        where: { id: orgId },
+        select: {
+          isMasterOrg: true,
+          institutionalBillingPolicy: {
+            select: {
+              pricingVersion: true,
+              timezone: true,
+              declaredCapacity: true,
+              scheduledCapacityDecrease: true,
+              scheduledCapacityEffectiveAt: true,
+            },
+          },
+          subscriptions: {
+            where: { planCode: { not: { startsWith: "ADD_ON:" } } },
+            orderBy: [{ periodEnd: "desc" }],
+            take: 1,
+            select: { planCode: true },
+          },
+        },
+      });
+      const policy = org?.institutionalBillingPolicy;
+      const isDeclaredCapacityOrg =
+        policy?.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION ||
+        isDeclaredCapacityPlanCode(org?.subscriptions[0]?.planCode ?? "");
       const identity = await tx.orgChildIdentity.findFirst({
         where: { id: identityId, orgId, siteLinks: { some: {} } },
         select: { id: true },
@@ -114,6 +144,30 @@ export class EnrolmentRollService {
           action === "leave"
             ? leaveChild(periods, date)
             : admitChild(periods, date);
+      }
+      if (
+        org &&
+        !org.isMasterOrg &&
+        isDeclaredCapacityOrg &&
+        action !== "leave"
+      ) {
+        if (
+          !policy ||
+          policy.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION
+        ) {
+          throw new ConflictException({
+            code: "DECLARED_CAPACITY_UNCONFIGURED",
+            route: "/billing/institutional",
+            message:
+              "Declared capacity is not configured for this organisation.",
+          });
+        }
+        const revisions = await tx.enrolmentRevision.findMany({
+          where: { orgId },
+          orderBy: [{ identityId: "asc" }, { version: "desc" }],
+          select: { identityId: true, periods: true },
+        });
+        assertDeclaredCapacityForEnrolment(identityId, next, policy, revisions);
       }
       const revision = await tx.enrolmentRevision.create({
         data: {

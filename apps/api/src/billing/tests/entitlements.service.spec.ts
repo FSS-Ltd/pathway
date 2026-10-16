@@ -146,6 +146,40 @@ describe("EntitlementsService", () => {
     expect(result.currentAv30).toBe(100);
   });
 
+  it("returns no AV30, child-profile, or staff-seat limit for declared capacity", async () => {
+    prismaMock.subscription.findFirst.mockResolvedValue({
+      id: "sub_declared_capacity",
+      orgId,
+      provider: BillingProvider.STRIPE,
+      planCode: "DECLARED_CAPACITY_STARTER_MONTHLY",
+      status: SubscriptionStatus.ACTIVE,
+      periodStart: new Date("2026-10-01T00:00:00Z"),
+      periodEnd: new Date("2026-11-01T00:00:00Z"),
+      cancelAtPeriodEnd: false,
+    });
+    prismaMock.orgEntitlementSnapshot.findFirst.mockResolvedValue({
+      maxSites: 1,
+      av30Included: 0,
+      storageGbIncluded: 0,
+      leaderSeatsIncluded: 0,
+      flagsJson: { maxChildrenIncluded: 50 },
+      source: "institutional_invoice",
+    });
+    prismaMock.usageCounters.findFirst.mockResolvedValue({
+      av30: 100,
+      storageGb: 0,
+      smsMonth: 0,
+      calculatedAt: new Date("2026-10-11T00:00:00Z"),
+    });
+
+    const result = await service.resolve(orgId);
+
+    expect(result.av30Cap).toBeNull();
+    expect(result.maxChildren).toBeNull();
+    expect(result.leaderSeatsIncluded).toBeNull();
+    expect(result.maxSites).toBe(1);
+  });
+
   it("uses plan catalogue when snapshot is missing", async () => {
     const subscription = {
       id: "sub_cancel",

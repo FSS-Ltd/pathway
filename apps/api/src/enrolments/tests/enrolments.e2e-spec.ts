@@ -1,8 +1,9 @@
 import request from "supertest";
 import { randomUUID } from "node:crypto";
 import { Test } from "@nestjs/testing";
-import type { INestApplication } from "@nestjs/common";
+import { ConflictException, type INestApplication } from "@nestjs/common";
 import { prisma, withTenantRlsContext } from "@pathway/db";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 import { AppModule } from "../../app.module";
 import { requireDatabase, seedE2eAuthUser } from "../../../test-helpers.e2e";
 import { EnrolmentIdentitiesService } from "../enrolment-identities.service";
@@ -332,6 +333,183 @@ describe("continuing enrolment (e2e)", () => {
     ).toBe(1);
   });
 
+  it("enforces capacity across sites and excludes guests and departed children", async () => {
+    if (!app) return;
+    const fixture = await createDeclaredCapacityFixture(1);
+    const today = localDate(new Date());
+    const tomorrow = addDays(today, 1);
+
+    await expect(
+      identities.createIdentity(
+        fixture.orgId,
+        fixture.siteOneId,
+        `guest-${fixture.orgId}`,
+        fixture.guestChildId,
+      ),
+    ).rejects.toThrow("Child profile not found at this site.");
+
+    await roll.recordChange(
+      fixture.orgId,
+      fixture.identityOneId,
+      actorId,
+      "admit",
+      today,
+      undefined,
+      "Confirmed admission",
+    );
+    expect((await roll.roll(fixture.orgId, today)).enrolledCount).toBe(1);
+
+    const blocked = await roll
+      .recordChange(
+        fixture.orgId,
+        fixture.identityTwoId,
+        actorId,
+        "admit",
+        today,
+        undefined,
+        "Confirmed admission",
+      )
+      .then(() => null)
+      .catch((error: unknown) => error);
+    expect(blocked).toBeInstanceOf(ConflictException);
+    expect(
+      blocked instanceof ConflictException ? blocked.getResponse() : null,
+    ).toMatchObject({
+      code: "DECLARED_CAPACITY_REACHED",
+      route: "/billing/institutional",
+    });
+
+    await roll.recordChange(
+      fixture.orgId,
+      fixture.identityOneId,
+      actorId,
+      "leave",
+      tomorrow,
+      undefined,
+      "Confirmed departure",
+    );
+    await roll.recordChange(
+      fixture.orgId,
+      fixture.identityTwoId,
+      actorId,
+      "admit",
+      tomorrow,
+      undefined,
+      "Confirmed admission",
+    );
+    expect((await roll.roll(fixture.orgId, tomorrow)).enrolledCount).toBe(1);
+
+    const reactivation = await roll
+      .recordChange(
+        fixture.orgId,
+        fixture.identityOneId,
+        actorId,
+        "reenrol",
+        tomorrow,
+        undefined,
+        "Returned to the roll",
+      )
+      .then(() => null)
+      .catch((error: unknown) => error);
+    expect(reactivation).toBeInstanceOf(ConflictException);
+    expect((await roll.roll(fixture.orgId, tomorrow)).enrolledCount).toBe(1);
+  });
+
+  it("serializes concurrent admissions so the hard capacity cannot be exceeded", async () => {
+    if (!app) return;
+    const fixture = await createDeclaredCapacityFixture(1);
+    const today = localDate(new Date());
+    const attempts = await Promise.allSettled([
+      roll.recordChange(
+        fixture.orgId,
+        fixture.identityOneId,
+        actorId,
+        "admit",
+        today,
+        undefined,
+        "Concurrent admission",
+      ),
+      roll.recordChange(
+        fixture.orgId,
+        fixture.identityTwoId,
+        actorId,
+        "admit",
+        today,
+        undefined,
+        "Concurrent admission",
+      ),
+    ]);
+
+    expect(
+      attempts.filter((attempt) => attempt.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      attempts.filter((attempt) => attempt.status === "rejected"),
+    ).toHaveLength(1);
+    expect((await roll.roll(fixture.orgId, today)).enrolledCount).toBe(1);
+  });
+
+  it("applies a scheduled capacity decrease to future admissions", async () => {
+    if (!app) return;
+    const fixture = await createDeclaredCapacityFixture(2);
+    const today = localDate(new Date());
+    const effectiveOn = addDays(today, 1);
+    await prisma.institutionalBillingPolicy.update({
+      where: { orgId: fixture.orgId },
+      data: {
+        scheduledCapacityDecrease: 1,
+        scheduledCapacityEffectiveAt: new Date(`${effectiveOn}T00:00:00.000Z`),
+      },
+    });
+    await roll.recordChange(
+      fixture.orgId,
+      fixture.identityOneId,
+      actorId,
+      "admit",
+      today,
+      undefined,
+      "Current admission",
+    );
+
+    const blocked = await roll
+      .recordChange(
+        fixture.orgId,
+        fixture.identityTwoId,
+        actorId,
+        "admit",
+        effectiveOn,
+        undefined,
+        "Admission after scheduled decrease",
+      )
+      .then(() => null)
+      .catch((error: unknown) => error);
+
+    expect(blocked).toBeInstanceOf(ConflictException);
+    expect((await roll.roll(fixture.orgId, effectiveOn)).enrolledCount).toBe(1);
+  });
+
+  it("keeps the master organisation exempt from declared capacity", async () => {
+    if (!app) return;
+    const fixture = await createDeclaredCapacityFixture(0);
+    const today = localDate(new Date());
+    await prisma.org.update({
+      where: { id: fixture.orgId },
+      data: { isMasterOrg: true },
+    });
+
+    await roll.recordChange(
+      fixture.orgId,
+      fixture.identityOneId,
+      actorId,
+      "admit",
+      today,
+      undefined,
+      "Master organisation exemption",
+    );
+
+    expect((await roll.roll(fixture.orgId, today)).enrolledCount).toBe(1);
+  });
+
   it("hides another organisation's identities and site links under a restricted database role", async () => {
     if (!app || !process.env.E2E_RLS_ROLE) return;
     const role = process.env.E2E_RLS_ROLE;
@@ -351,4 +529,111 @@ describe("continuing enrolment (e2e)", () => {
       expect(links.every((row) => row.orgId === orgId)).toBe(true);
     });
   });
+
+  async function createDeclaredCapacityFixture(capacity: number) {
+    const fixtureOrgId = randomUUID();
+    const siteOneId = randomUUID();
+    const siteTwoId = randomUUID();
+    const prefix = `capacity-${fixtureOrgId}`;
+    await prisma.org.create({
+      data: {
+        id: fixtureOrgId,
+        name: "Declared capacity e2e",
+        slug: prefix,
+        planCode: "DECLARED_CAPACITY_STARTER_MONTHLY",
+      },
+    });
+    await prisma.tenant.createMany({
+      data: [
+        {
+          id: siteOneId,
+          orgId: fixtureOrgId,
+          name: "First capacity site",
+          slug: `${prefix}-one`,
+        },
+        {
+          id: siteTwoId,
+          orgId: fixtureOrgId,
+          name: "Second capacity site",
+          slug: `${prefix}-two`,
+        },
+      ],
+    });
+    await prisma.institutionalBillingPolicy.create({
+      data: {
+        orgId: fixtureOrgId,
+        pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+        timezone: "Europe/London",
+        declaredCapacity: capacity,
+      },
+    });
+
+    const child = async (siteId: string, name: string, isGuest = false) =>
+      withTenantRlsContext(siteId, fixtureOrgId, (tx) =>
+        tx.child.create({
+          data: {
+            tenantId: siteId,
+            firstName: name,
+            lastName: "Capacity",
+            isGuest,
+            ...(isGuest
+              ? { guestExpiresAt: new Date(Date.now() + 60_000) }
+              : {}),
+          },
+          select: { id: true },
+        }),
+      );
+
+    const [siteOneChild, siteTwoChild, identityTwoChild, guestChild] =
+      await Promise.all([
+        child(siteOneId, "First"),
+        child(siteTwoId, "First site transfer"),
+        child(siteOneId, "Second"),
+        child(siteOneId, "Visitor", true),
+      ]);
+    const identityOne = await identities.createIdentity(
+      fixtureOrgId,
+      siteOneId,
+      `first-${fixtureOrgId}`,
+      siteOneChild.id,
+    );
+    await identities.linkProfile(
+      fixtureOrgId,
+      siteTwoId,
+      identityOne.id,
+      siteTwoChild.id,
+    );
+    const identityTwo = await identities.createIdentity(
+      fixtureOrgId,
+      siteOneId,
+      `second-${fixtureOrgId}`,
+      identityTwoChild.id,
+    );
+
+    return {
+      orgId: fixtureOrgId,
+      siteOneId,
+      identityOneId: identityOne.id,
+      identityTwoId: identityTwo.id,
+      guestChildId: guestChild.id,
+    };
+  }
 });
+
+function localDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: "year" | "month" | "day") =>
+    parts.find((value) => value.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function addDays(date: string, days: number): string {
+  const next = new Date(`${date}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString().slice(0, 10);
+}

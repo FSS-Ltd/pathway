@@ -9,7 +9,10 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@pathway/db";
 import { isEncryptedField } from "@pathway/util";
-import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
+import {
+  INSTITUTIONAL_PLANS,
+  isDeclaredCapacityPlanCode,
+} from "@pathway/pricing";
 import { CreateChildDto } from "./dto/create-child.dto";
 import { UpdateChildDto } from "./dto/update-child.dto";
 import { getPlanDefinition } from "../billing/billing-plans";
@@ -307,7 +310,8 @@ export class ChildrenService {
 
     if (
       latestSubscription &&
-      Object.hasOwn(INSTITUTIONAL_PLANS, latestSubscription.planCode)
+      (Object.hasOwn(INSTITUTIONAL_PLANS, latestSubscription.planCode) ||
+        isDeclaredCapacityPlanCode(latestSubscription.planCode))
     ) {
       return null;
     }
