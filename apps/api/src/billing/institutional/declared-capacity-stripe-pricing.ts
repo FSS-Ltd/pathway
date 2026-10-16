@@ -77,6 +77,27 @@ export function isDeclaredCapacityAddonTrialReady(
   }
 }
 
+export function isDeclaredCapacityAddonPaidReady(
+  module: Module,
+  interval: DeclaredCapacityQuoteInput["interval"],
+  prices: DeclaredCapacityStripeResolvedPrices,
+): boolean {
+  try {
+    return (
+      validateAddonSelection([module], prices, interval, false).length === 1
+    );
+  } catch (error) {
+    if (error instanceof DeclaredCapacityStripePriceError) return false;
+    if (
+      error instanceof Error &&
+      error.message === "INVALID_DECLARED_CAPACITY_ADDON_SELECTION"
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export class DeclaredCapacityStripePriceError extends Error {
   constructor(
     readonly priceCode:

@@ -58,6 +58,7 @@ export type BillingProviderConfig = {
   activeProvider: ActiveBillingProvider;
   stripe: {
     secretKey?: string;
+    publishableKey?: string;
     webhookSecretSnapshot?: string;
     webhookSecretThin?: string;
     priceMap?: StripePriceMap;
@@ -129,6 +130,11 @@ const ALLOWED_PRICE_CODES: Set<PriceCode> = new Set([
   "MODULE_LEARNING_MONTHLY",
   "MODULE_LEARNING_YEARLY",
 ]);
+
+function stripePublishableKeyFromEnv(): string | undefined {
+  const key = process.env.STRIPE_PUBLISHABLE_KEY?.trim();
+  return key && /^pk_(test|live)_[A-Za-z0-9]+$/.test(key) ? key : undefined;
+}
 
 type ParsePriceMapResult = {
   map?: StripePriceMap;
@@ -280,6 +286,7 @@ export function loadBillingProviderConfig(): BillingProviderConfig {
   const priceMapResult = parsePriceMap(priceMapRaw);
   const stripeConfig = {
     secretKey,
+    publishableKey: stripePublishableKeyFromEnv(),
     webhookSecretSnapshot,
     webhookSecretThin: process.env.STRIPE_WEBHOOK_SECRET_THIN,
     priceMap: priceMapResult.map,

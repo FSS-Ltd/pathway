@@ -336,6 +336,11 @@ describe("institutional add-on trials (e2e)", () => {
       expiresAt: null,
     });
     expect(
+      (await trials.list(orgId, selectedAt)).trials.find(
+        ({ module }) => module === Module.EVENTS,
+      ),
+    ).toMatchObject({ decisionRecorded: false });
+    expect(
       await prisma.orgModule.findUnique({
         where: { orgId_module: { orgId, module: Module.EVENTS } },
       }),
@@ -537,6 +542,21 @@ describe("institutional add-on trials (e2e)", () => {
     await trials.decide(orgId, actorUserId, Module.EVENTS, true, expiredAt);
     await trials.decide(orgId, actorUserId, Module.MEALS, true, expiredAt);
     await trials.decide(orgId, actorUserId, Module.TRANSPORT, false, expiredAt);
+    const listedAfterDecision = await trials.list(orgId, expiredAt);
+    expect(
+      listedAfterDecision.trials.find(({ module }) => module === Module.EVENTS),
+    ).toMatchObject({
+      status: InstitutionalAddonTrialStatus.EXPIRED,
+      decisionRecorded: true,
+    });
+    expect(
+      listedAfterDecision.trials.find(
+        ({ module }) => module === Module.TRANSPORT,
+      ),
+    ).toMatchObject({
+      status: InstitutionalAddonTrialStatus.DECLINED,
+      decisionRecorded: true,
+    });
     const decision = await withOrgRlsContext(orgId, (tx) =>
       tx.institutionalAddonTrial.findUnique({
         where: { id: transportTrial!.id },

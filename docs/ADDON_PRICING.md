@@ -52,22 +52,25 @@ configurator, excluding AI Workspace, storage, and usage/capacity packs.
 
 ### Module pricing
 
-The modules below are the planned purchasable modules. The initial prices are
-recommendations based on the July 2026 market review and the current feature
-descriptions; they are not approved Stripe prices yet.
+The modules below are the planned purchasable modules. Prices marked Proposed
+are recommendations based on the July 2026 market review and current feature
+descriptions; they are not approved Stripe prices yet. Finance has a separate
+approved price decision recorded below. Approval alone does not make a module
+available: its delivered status, both approved interval prices, and matching
+Stripe price configuration are also required.
 
-| Code                 | Module             | Current scope                                                                | Recommended monthly | Recommended annual | Status                                              |
-| -------------------- | ------------------ | ---------------------------------------------------------------------------- | ------------------: | -----------------: | --------------------------------------------------- |
-| `FINANCE`            | Finance            | Invoices, payments and financial reporting                                   |                 £15 |               £150 | Proposed                                            |
-| `EVENTS`             | Events             | Services, sessions and event sign-ups                                        |                  £9 |                £90 | Proposed                                            |
-| `TRANSPORT`          | Transport          | Routes, vehicles and passenger lists                                         |                 £15 |               £150 | Proposed                                            |
-| `MEALS`              | Meals              | Menus, dietary needs and meal counts                                         |                 £12 |               £120 | Proposed                                            |
-| `ASSET_MANAGEMENT`   | Asset Management   | Equipment and resource tracking                                              |                  £9 |                £90 | Proposed                                            |
-| `HR`                 | HR                 | Staff records, roles and onboarding                                          |                 £15 |               £150 | Proposed                                            |
-| `CLUBS`              | Clubs              | Club sign-ups, rosters, sessions, attendance, notices, and scoped club leads |                 £12 |               £120 | Proposed; included for the Clubs sector             |
-| `AI_WORKSPACE`       | AI Workspace       | Drafting, summaries and admin assistance                                     |            £15 base |          £150 base | Proposed — define included users and fair use first |
-| `ADVANCED_REPORTING` | Advanced Reporting | Cross-platform analytics, trends and exports                                 |                 £10 |               £100 | Proposed                                            |
-| `LEARNING`           | Learning           | Learning logs, evidence and progress reports                                 |                 £19 |               £190 | Proposed                                            |
+| Code                 | Module             | Current scope                                                                | Monthly price | Annual price | Status                                              |
+| -------------------- | ------------------ | ---------------------------------------------------------------------------- | ------------: | -----------: | --------------------------------------------------- |
+| `FINANCE`            | Finance            | Invoices, payments and financial reporting                                   |           £29 |         £290 | **Approved**                                        |
+| `EVENTS`             | Events             | Services, sessions and event sign-ups                                        |            £9 |          £90 | Proposed                                            |
+| `TRANSPORT`          | Transport          | Routes, vehicles and passenger lists                                         |           £15 |         £150 | Proposed                                            |
+| `MEALS`              | Meals              | Menus, dietary needs and meal counts                                         |           £12 |         £120 | Proposed                                            |
+| `ASSET_MANAGEMENT`   | Asset Management   | Equipment and resource tracking                                              |            £9 |          £90 | Proposed                                            |
+| `HR`                 | HR                 | Staff records, roles and onboarding                                          |           £15 |         £150 | Proposed                                            |
+| `CLUBS`              | Clubs              | Club sign-ups, rosters, sessions, attendance, notices, and scoped club leads |           £12 |         £120 | Proposed; included for the Clubs sector             |
+| `AI_WORKSPACE`       | AI Workspace       | Drafting, summaries and admin assistance                                     |      £15 base |    £150 base | Proposed — define included users and fair use first |
+| `ADVANCED_REPORTING` | Advanced Reporting | Cross-platform analytics, trends and exports                                 |           £10 |         £100 | Proposed                                            |
+| `LEARNING`           | Learning           | Learning logs, evidence and progress reports                                 |           £19 |         £190 | Proposed                                            |
 
 ## ACE-originated add-ons
 
@@ -158,6 +161,7 @@ authorize creating its Stripe Product or Price.
 
 | Date       | Decision                                                                                                                                                   | Owner                |
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 2026-10-16 | Finance add-on approved at £29/month or £290/year. Keep it unavailable until delivery and matching monthly/yearly Stripe prices are configured.            | Product owner        |
 | 2026-10-11 | Growth includes three customer-selected eligible modules and Professional includes six; preserve the historical fixed bundles for existing subscriptions.  | Product owner        |
 | 2026-10-15 | `DECLARED_CAPACITY_V2` has no paid-module inclusions; its 2/3/4 trial slots require a delivered module and approved, configured monthly and annual prices. | Product owner        |
 | 2026-07-25 | Storage monthly prices set to £1.49 / £2.49 / £5.99 for 100GB / 200GB / 1TB. Annual prices remain unconfirmed.                                             | Product owner        |

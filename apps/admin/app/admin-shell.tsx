@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useSession } from "@/lib/use-session-compat";
 import { Menu, X, LifeBuoy } from "lucide-react";
 import { APP_VERSION } from "@pathway/util/version";
+import { isDeclaredCapacityV2ConfiguratorEnabled } from "@pathway/pricing";
 import { TopBarActions } from "@/components/topbar-actions";
 import { SidebarNav, TopBar, type SidebarNavProps } from "@pathway/ui";
 import { useAdminAccess } from "@/lib/use-admin-access";
@@ -16,6 +17,8 @@ import { useOrgUi } from "@/lib/use-org-ui";
 import { orgLabel } from "@/lib/org-ui";
 import { cn } from "@pathway/ui";
 import { resolveAdminNavItems } from "./admin-navigation";
+import { canAccessBilling } from "@/lib/access";
+import { DeclaredCapacityTrialNotices } from "@/components/billing/declared-capacity-trial-notices";
 
 const getDevRuntimeState = () => {
   // Check if we have any API URL configured (supports both old and new env var names)
@@ -333,6 +336,15 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({
               </button>
             }
             rightSlot={<TopBarActions />}
+          />
+          <DeclaredCapacityTrialNotices
+            enabled={
+              isDeclaredCapacityV2ConfiguratorEnabled(
+                process.env.NEXT_PUBLIC_DECLARED_CAPACITY_V2_CONFIGURATOR,
+              ) &&
+              canAccessBilling(role) &&
+              !currentOrgIsMasterOrg
+            }
           />
           <main className="min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
             <div className="mx-auto w-full max-w-[100rem] min-w-0 space-y-4">

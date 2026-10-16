@@ -5,11 +5,13 @@ import Link from "next/link";
 import { useSession } from "@/lib/use-session-compat";
 import { Button, Card } from "@pathway/ui";
 import {
+  isDeclaredCapacityV2ConfiguratorEnabled,
   isMappedInstitutionalPlanCode,
   type InstitutionalMappedPlanCode,
   type InstitutionalMappedQuote,
   type InstitutionalStorageChoice,
 } from "@pathway/pricing";
+import { DeclaredCapacityBilling } from "../../../components/billing/declared-capacity-billing";
 import {
   acceptInstitutionalQuote,
   checkoutInstitutionalQuote,
@@ -110,7 +112,7 @@ function currentStorageChoice(
   return "none";
 }
 
-export default function InstitutionalBillingPage() {
+function LegacyInstitutionalBillingPage() {
   const { data: session, status } = useSession();
   const userId = session?.user.id;
   const [summary, setSummary] = React.useState<InstitutionalSummary | null>(
@@ -482,5 +484,15 @@ export default function InstitutionalBillingPage() {
         </aside>
       </div>
     </main>
+  );
+}
+
+export default function InstitutionalBillingPage() {
+  return isDeclaredCapacityV2ConfiguratorEnabled(
+    process.env.NEXT_PUBLIC_DECLARED_CAPACITY_V2_CONFIGURATOR,
+  ) ? (
+    <DeclaredCapacityBilling />
+  ) : (
+    <LegacyInstitutionalBillingPage />
   );
 }

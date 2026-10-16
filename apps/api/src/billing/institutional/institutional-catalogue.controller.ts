@@ -20,9 +20,20 @@ import {
   InstitutionalMappedPriceError,
   mappedInstitutionalPlanDetails,
 } from "@pathway/pricing";
+import { Module } from "@pathway/db";
 import { z } from "zod";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
 import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
+import {
+  DECLARED_CAPACITY_ADDON_MODULES,
+  declaredCapacityAddonPriceCode,
+} from "./declared-capacity-addons";
+import {
+  DeclaredCapacityStripePriceError,
+  isDeclaredCapacityAddonPaidReady,
+  isDeclaredCapacityAddonTrialReady,
+  quoteDeclaredCapacityWithStripePrices,
+} from "./declared-capacity-stripe-pricing";
 
 const estimateSchema = z.object({
   planCode: z.enum([
@@ -49,6 +60,8 @@ const mappedEstimateSchema = z.object({
 const declaredCapacityEstimateSchema = z.object({
   declaredCapacity: z.number().int().nonnegative().safe(),
   interval: z.enum(["month", "year"]),
+  payNowModules: z.array(z.nativeEnum(Module)).default([]),
+  trialModules: z.array(z.nativeEnum(Module)).default([]),
 });
 
 @Controller("billing/institutional/catalogue")
@@ -148,8 +161,9 @@ export class InstitutionalCatalogueController {
   }
 
   @Get("declared-capacity")
-  declaredCapacityCatalogue() {
+  async declaredCapacityCatalogue() {
     assertDeclaredCapacityBillingEnabled();
+    const prices = await this.mappedPrices.resolve();
     return {
       pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
       currency: "GBP" as const,
@@ -159,11 +173,31 @@ export class InstitutionalCatalogueController {
         minimumCapacity: 251,
         contactPath: "/demo?plan=enterprise",
       },
+      addonOptions: DECLARED_CAPACITY_ADDON_MODULES.map((module) => ({
+        module,
+        trialAvailable: isDeclaredCapacityAddonTrialReady(module, prices),
+        monthlyPricePence: isDeclaredCapacityAddonPaidReady(
+          module,
+          "month",
+          prices,
+        )
+          ? (prices[declaredCapacityAddonPriceCode(module, "month")]
+              ?.unitAmountPence ?? null)
+          : null,
+        yearlyPricePence: isDeclaredCapacityAddonPaidReady(
+          module,
+          "year",
+          prices,
+        )
+          ? (prices[declaredCapacityAddonPriceCode(module, "year")]
+              ?.unitAmountPence ?? null)
+          : null,
+      })),
     };
   }
 
   @Post("declared-capacity/estimate")
-  estimateDeclaredCapacity(@Body() body: unknown) {
+  async estimateDeclaredCapacity(@Body() body: unknown) {
     assertDeclaredCapacityBillingEnabled();
     const parsed = declaredCapacityEstimateSchema.safeParse(body);
     if (!parsed.success) {
@@ -172,6 +206,37 @@ export class InstitutionalCatalogueController {
         details: parsed.error.flatten(),
       });
     }
-    return calculateDeclaredCapacityQuote(parsed.data);
+    const formulaQuote = calculateDeclaredCapacityQuote({
+      declaredCapacity: parsed.data.declaredCapacity,
+      interval: parsed.data.interval,
+    });
+    if (formulaQuote.kind === "contact_sales") return formulaQuote;
+    try {
+      return quoteDeclaredCapacityWithStripePrices(
+        parsed.data,
+        await this.mappedPrices.resolve(),
+        {
+          paidModules: parsed.data.payNowModules,
+          trialModules: parsed.data.trialModules,
+        },
+      );
+    } catch (error) {
+      if (error instanceof DeclaredCapacityStripePriceError) {
+        throw new ServiceUnavailableException({
+          code: "INSTITUTIONAL_PRICE_UNAVAILABLE",
+          priceCode: error.priceCode,
+          retryable: true,
+        });
+      }
+      if (
+        error instanceof Error &&
+        error.message === "INVALID_DECLARED_CAPACITY_ADDON_SELECTION"
+      ) {
+        throw new BadRequestException({
+          code: "INVALID_DECLARED_CAPACITY_ADDON_SELECTION",
+        });
+      }
+      throw error;
+    }
   }
 }

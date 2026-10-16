@@ -7,6 +7,10 @@ import { InstitutionalCatalogueController } from "../institutional-catalogue.con
 describe("public institutional estimate", () => {
   const originalDeclaredCapacityFlag =
     process.env.DECLARED_CAPACITY_BILLING_ENABLED;
+  const originalDeliveredAddons =
+    process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES;
+  const originalApprovedAddons =
+    process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES;
   const mappedPrices = {
     resolve: async () => ({
       STARTER_49_MONTHLY: { priceId: "price_base", unitAmountPence: 5700 },
@@ -27,6 +31,34 @@ describe("public institutional estimate", () => {
         priceId: "price_yearupperchild",
         unitAmountPence: 812,
       },
+      DECLARED_CAPACITY_BASE_MONTHLY: {
+        priceId: "price_DcBaseMonthly",
+        unitAmountPence: 7_400,
+      },
+      DECLARED_CAPACITY_BASE_YEARLY: {
+        priceId: "price_DcBaseYearly",
+        unitAmountPence: 74_000,
+      },
+      DECLARED_CAPACITY_CHILD_MONTHLY: {
+        priceId: "price_DcChildMonthly",
+        unitAmountPence: 100,
+      },
+      DECLARED_CAPACITY_CHILD_YEARLY: {
+        priceId: "price_DcChildYearly",
+        unitAmountPence: 1_000,
+      },
+      MODULE_FINANCE_MONTHLY: {
+        priceId: "price_FinanceMonthly",
+        unitAmountPence: 1_500,
+      },
+      MODULE_FINANCE_YEARLY: {
+        priceId: "price_FinanceYearly",
+        unitAmountPence: 15_000,
+      },
+      MODULE_EVENTS_MONTHLY: {
+        priceId: "price_EventsMonthly",
+        unitAmountPence: 900,
+      },
     }),
   };
   const controller = new InstitutionalCatalogueController(mappedPrices);
@@ -37,6 +69,18 @@ describe("public institutional estimate", () => {
     } else {
       process.env.DECLARED_CAPACITY_BILLING_ENABLED =
         originalDeclaredCapacityFlag;
+    }
+    if (originalDeliveredAddons === undefined) {
+      delete process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES;
+    } else {
+      process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES =
+        originalDeliveredAddons;
+    }
+    if (originalApprovedAddons === undefined) {
+      delete process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES;
+    } else {
+      process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES =
+        originalApprovedAddons;
     }
   });
 
@@ -111,38 +155,100 @@ describe("public institutional estimate", () => {
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it("keeps declared-capacity estimates unavailable until cutover", () => {
+  it("keeps declared-capacity estimates unavailable until cutover", async () => {
     delete process.env.DECLARED_CAPACITY_BILLING_ENABLED;
-    expect(() =>
+    await expect(
       controller.estimateDeclaredCapacity({
         declaredCapacity: 74,
         interval: "month",
       }),
-    ).toThrow(ServiceUnavailableException);
+    ).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it("returns server-derived declared-capacity prices when enabled", () => {
+  it("returns server-derived declared-capacity prices when enabled", async () => {
     process.env.DECLARED_CAPACITY_BILLING_ENABLED = "true";
-    expect(
+    await expect(
       controller.estimateDeclaredCapacity({
         declaredCapacity: 74,
         interval: "month",
       }),
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       pricingVersion: "DECLARED_CAPACITY_V2",
       tier: "starter",
-      totalPence: 14_800,
+      subtotalPence: 14_800,
       siteAllowance: 1,
     });
-    expect(
+    await expect(
       controller.estimateDeclaredCapacity({
         declaredCapacity: 251,
         interval: "year",
       }),
-    ).toMatchObject({
+    ).resolves.toMatchObject({
       kind: "contact_sales",
       tier: "enterprise",
       contactPath: "/demo?plan=enterprise",
+    });
+  });
+
+  it("lists only delivered modules with approved prices as trial options", async () => {
+    process.env.DECLARED_CAPACITY_BILLING_ENABLED = "true";
+    process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES = "FINANCE,EVENTS";
+    process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES = "FINANCE,EVENTS";
+
+    const catalogue = await controller.declaredCapacityCatalogue();
+
+    expect(catalogue.addonOptions).toEqual(
+      expect.arrayContaining([
+        {
+          module: "FINANCE",
+          trialAvailable: true,
+          monthlyPricePence: 1_500,
+          yearlyPricePence: 15_000,
+        },
+        {
+          module: "EVENTS",
+          trialAvailable: false,
+          monthlyPricePence: 900,
+          yearlyPricePence: null,
+        },
+      ]),
+    );
+    expect(catalogue.addonOptions).toHaveLength(8);
+  });
+
+  it("keeps free trial interest out of the total and prices explicit pay-now modules", async () => {
+    process.env.DECLARED_CAPACITY_BILLING_ENABLED = "true";
+    process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES = "FINANCE";
+    process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES = "FINANCE";
+
+    await expect(
+      controller.estimateDeclaredCapacity({
+        declaredCapacity: 74,
+        interval: "month",
+        trialModules: ["FINANCE"],
+      }),
+    ).resolves.toMatchObject({
+      subtotalPence: 14_800,
+      trialModules: ["FINANCE"],
+      lines: expect.not.arrayContaining([
+        expect.objectContaining({ component: "ADDON" }),
+      ]),
+    });
+    await expect(
+      controller.estimateDeclaredCapacity({
+        declaredCapacity: 74,
+        interval: "month",
+        payNowModules: ["FINANCE"],
+      }),
+    ).resolves.toMatchObject({
+      subtotalPence: 16_300,
+      paidModules: ["FINANCE"],
+      lines: expect.arrayContaining([
+        expect.objectContaining({
+          component: "ADDON",
+          subtotalPence: 1_500,
+        }),
+      ]),
     });
   });
 });

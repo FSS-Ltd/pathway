@@ -109,6 +109,7 @@ export class DeclaredCapacityAddonTrialsService {
         selectedAt: trial.selectedAt,
         activatedAt: trial.activatedAt,
         expiresAt: trial.expiresAt,
+        decisionRecorded: trial.decisionActorUserId !== null,
       })),
     };
   }

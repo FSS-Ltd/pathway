@@ -74,6 +74,82 @@ export type InstitutionalCatalogue = {
   }[];
 };
 
+export type DeclaredCapacityBillingSummary = {
+  orgId: string;
+  currentPaid: {
+    planCode: string;
+    periodStart: string;
+    periodEnd: string;
+    declaredCapacity: number | null;
+    subtotalPence: number | null;
+    status: string;
+  } | null;
+  scheduledChange: {
+    declaredCapacity: number | null;
+    acceptedAt: string | null;
+    effectiveAt: string | null;
+  } | null;
+  pendingCapacityChange: {
+    snapshotId: string;
+    declaredCapacity: number | null;
+    amountDueNowPence: number | null;
+    status: string;
+  } | null;
+};
+
+export type DeclaredCapacityCapacityQuote = {
+  id: string;
+  declaredCapacity: number;
+  planCode: string;
+  subtotalPence: number;
+  amountDueNowPence: number | null;
+  expiresAt: string;
+  lines: {
+    component: "BASE" | "DECLARED_CAPACITY" | "ADDON";
+    priceCode: string;
+    quantity: number;
+    unitAmountPence: number;
+    subtotalPence: number;
+  }[];
+};
+
+export type CapacityQuoteAcceptance =
+  | { kind: "scheduled_decrease"; acceptance: { effectiveAt: string | null } }
+  | { kind: "active" }
+  | {
+      kind: "payment_pending";
+      snapshotId: string;
+      amountDueNowPence: number;
+      paymentIntentClientSecret: string | null;
+      publishableKey: string | null;
+    };
+
+export type DeclaredCapacityAddonTrial = {
+  module: string;
+  status: "SELECTED" | "ACTIVE" | "EXPIRED" | "DECLINED" | "CONVERTED";
+  selectedAt: string;
+  activatedAt: string | null;
+  expiresAt: string | null;
+  decisionRecorded: boolean;
+};
+
+export type DeclaredCapacityAddonTrials = {
+  declaredCapacity: number;
+  trialSlotLimit: number;
+  consumedSlots: number;
+  pendingSelections: number;
+  remainingSlots: number;
+  availableModules: string[];
+  trials: DeclaredCapacityAddonTrial[];
+};
+
+export type DeclaredCapacityAddonPriceReview = {
+  module: string;
+  currency: "GBP";
+  monthly: { amountPence: number };
+  yearly: { amountPence: number };
+};
+
 async function read<T>(response: Response): Promise<T> {
   if (!response.ok) {
     throw await apiErrorFromResponse(
@@ -89,6 +165,130 @@ export async function fetchInstitutionalSummary(): Promise<InstitutionalSummary>
     await apiFetch(`${API_BASE_URL}/billing/institutional/summary`, {
       cache: "no-store",
     }),
+  );
+}
+
+export async function fetchDeclaredCapacityBillingSummary(): Promise<DeclaredCapacityBillingSummary> {
+  return read<DeclaredCapacityBillingSummary>(
+    await apiFetch(`${API_BASE_URL}/billing/institutional/summary`, {
+      cache: "no-store",
+    }),
+  );
+}
+
+export async function createDeclaredCapacityCapacityQuote(
+  declaredCapacity: number,
+): Promise<DeclaredCapacityCapacityQuote> {
+  return read<DeclaredCapacityCapacityQuote>(
+    await apiFetch(`${API_BASE_URL}/billing/institutional/capacity/quotes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ declaredCapacity }),
+    }),
+  );
+}
+
+export async function acceptDeclaredCapacityCapacityQuote(
+  snapshotId: string,
+  idempotencyKey: string,
+): Promise<CapacityQuoteAcceptance> {
+  return read<CapacityQuoteAcceptance>(
+    await apiFetch(
+      `${API_BASE_URL}/billing/institutional/capacity/quotes/accept`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snapshotId, idempotencyKey }),
+      },
+    ),
+  );
+}
+
+export async function fetchDeclaredCapacityAddonTrials(): Promise<DeclaredCapacityAddonTrials> {
+  return read<DeclaredCapacityAddonTrials>(
+    await apiFetch(`${API_BASE_URL}/billing/institutional/addons/trials`, {
+      cache: "no-store",
+    }),
+  );
+}
+
+export async function selectDeclaredCapacityAddonTrial(
+  module: string,
+): Promise<void> {
+  await read<unknown>(
+    await apiFetch(
+      `${API_BASE_URL}/billing/institutional/addons/trials/select`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ module }),
+      },
+    ),
+  );
+}
+
+export async function removeDeclaredCapacityAddonTrialSelection(
+  module: string,
+): Promise<void> {
+  await read<unknown>(
+    await apiFetch(
+      `${API_BASE_URL}/billing/institutional/addons/trials/${encodeURIComponent(module)}`,
+      { method: "DELETE" },
+    ),
+  );
+}
+
+export async function activateDeclaredCapacityAddonTrial(
+  module: string,
+): Promise<void> {
+  await read<unknown>(
+    await apiFetch(
+      `${API_BASE_URL}/billing/institutional/addons/trials/${encodeURIComponent(module)}/activate`,
+      { method: "POST" },
+    ),
+  );
+}
+
+export async function decideDeclaredCapacityAddonTrial(
+  module: string,
+  wantsPurchase: boolean,
+): Promise<void> {
+  await read<unknown>(
+    await apiFetch(
+      `${API_BASE_URL}/billing/institutional/addons/trials/${encodeURIComponent(module)}/decision`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wantsPurchase }),
+      },
+    ),
+  );
+}
+
+export async function fetchDeclaredCapacityAddonPriceReview(
+  module: string,
+): Promise<DeclaredCapacityAddonPriceReview> {
+  return read<DeclaredCapacityAddonPriceReview>(
+    await apiFetch(
+      `${API_BASE_URL}/billing/institutional/addons/trials/${encodeURIComponent(module)}/price-review`,
+      { cache: "no-store" },
+    ),
+  );
+}
+
+export async function startDeclaredCapacityAddonCheckout(
+  module: string,
+  interval: "MONTHLY" | "YEARLY",
+): Promise<{ checkoutUrl: string; trialId: string }> {
+  return read<{ checkoutUrl: string; trialId: string }>(
+    await apiFetch(
+      `${API_BASE_URL}/billing/institutional/addons/trials/${encodeURIComponent(module)}/checkout`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ interval }),
+      },
+    ),
   );
 }
 

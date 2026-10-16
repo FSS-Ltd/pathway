@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import {
+  isDeclaredCapacityV2ConfiguratorEnabled,
   isMappedInstitutionalPlanCode,
   type InstitutionalMappedQuote,
 } from "@pathway/pricing";
@@ -44,6 +45,7 @@ import {
   INITIAL_CONFIGURATOR_STATE,
   type ConfiguratorStep,
 } from "./state";
+import { DeclaredCapacityConfigurator } from "./declared-capacity-configurator";
 
 const STORAGE_KEY = "nexsteps-institutional-configuration";
 const STAGE_STEPS: Record<InstitutionalStep, ConfiguratorStep> = {
@@ -130,7 +132,7 @@ function restoredConfiguration(
   return configuration;
 }
 
-export default function ConfigurePage() {
+function LegacyConfigurePage() {
   const [configuration, setConfiguration] = React.useState(
     INITIAL_CONFIGURATION,
   );
@@ -507,5 +509,15 @@ export default function ConfigurePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function ConfigurePage() {
+  return isDeclaredCapacityV2ConfiguratorEnabled(
+    process.env.NEXT_PUBLIC_DECLARED_CAPACITY_V2_CONFIGURATOR,
+  ) ? (
+    <DeclaredCapacityConfigurator />
+  ) : (
+    <LegacyConfigurePage />
   );
 }
