@@ -21,9 +21,14 @@ export type FinanceCommandType =
   | "APPROVE_CREDIT_NOTE"
   | "REQUEST_CREDIT_CHANGES"
   | "ISSUE_CREDIT_NOTE"
-  | "VOID_CREDIT_NOTE";
+  | "VOID_CREDIT_NOTE"
+  | "ALLOCATE_RECEIPT"
+  | "REVERSE_ALLOCATION";
 
-export type FinanceCommandResourceType = "INVOICE" | "CREDIT_NOTE";
+export type FinanceCommandResourceType =
+  | "INVOICE"
+  | "CREDIT_NOTE"
+  | "ALLOCATION";
 
 export interface FinanceCommandResult<T> {
   resourceId: string;

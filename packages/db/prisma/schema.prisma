@@ -163,11 +163,14 @@ enum FinanceCommandType {
   REQUEST_CREDIT_CHANGES
   ISSUE_CREDIT_NOTE
   VOID_CREDIT_NOTE
+  ALLOCATE_RECEIPT
+  REVERSE_ALLOCATION
 }
 
 enum FinanceCommandResourceType {
   INVOICE
   CREDIT_NOTE
+  ALLOCATION
 }
 
 enum FinanceReceiptStatus {
@@ -1349,6 +1352,8 @@ model User {
   financeCreditNotesVoided            FinanceCreditNote[]                  @relation("FinanceCreditNoteVoidedBy")
   financeCreditNoteEvents            FinanceCreditNoteEvent[]             @relation("FinanceCreditNoteEventActor")
   financeCommands                    FinanceCommandReceipt[]               @relation("FinanceCommandActor")
+  financeReceiptAllocationsCreated    FinanceReceiptAllocation[]            @relation("FinanceReceiptAllocationActor")
+  financeReceiptAllocationReversals   FinanceReceiptAllocationReversal[]    @relation("FinanceReceiptAllocationReversalActor")
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
@@ -4881,6 +4886,7 @@ model FinancePayerAccount {
   financeProfile   FinanceProfile      @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
   grants           FinancePayerGrant[]
   invoices         FinanceInvoice[]
+  receipts         FinanceReceipt[]
 
   @@unique([id, tenantId, orgId])
   @@index([financeProfileId, displayName])
@@ -5109,34 +5115,59 @@ model FinanceCommandReceipt {
 model FinanceReceipt {
   id               String                     @id @default(uuid())
   financeProfileId String
+  payerAccountId   String?
   tenantId         String
   orgId            String
   amountMinor      BigInt
   currency         FinanceCurrency            @default(GBP)
   source           FinanceReceiptSource
+  sourceReference  String?                    @db.VarChar(255)
   status           FinanceReceiptStatus       @default(PROCESSING)
   confirmedAt      DateTime?
   createdAt        DateTime                   @default(now())
   updatedAt        DateTime                   @updatedAt
   financeProfile   FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount     FinancePayerAccount?       @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
   allocations      FinanceReceiptAllocation[]
 
   @@unique([id, tenantId, orgId])
+  @@unique([financeProfileId, source, sourceReference])
   @@index([tenantId, status, confirmedAt])
+  @@index([tenantId, orgId, payerAccountId, confirmedAt])
   @@index([financeProfileId, createdAt])
 }
 
 model FinanceReceiptAllocation {
-  id          String         @id @default(uuid())
-  receiptId   String
-  invoiceId   String
-  tenantId    String
-  orgId       String
-  amountMinor BigInt
-  createdAt   DateTime       @default(now())
-  receipt     FinanceReceipt @relation(fields: [receiptId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
-  invoice     FinanceInvoice @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  id              String                                  @id @default(uuid())
+  receiptId       String
+  invoiceId       String
+  tenantId        String
+  orgId           String
+  amountMinor     BigInt
+  createdByUserId String?
+  createdAt       DateTime                                @default(now())
+  receipt         FinanceReceipt                         @relation(fields: [receiptId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice         FinanceInvoice                         @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  createdBy       User?                                   @relation("FinanceReceiptAllocationActor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reversals       FinanceReceiptAllocationReversal[]
 
+  @@unique([id, tenantId, orgId])
   @@index([tenantId, receiptId, createdAt])
-  @@index([tenantId, invoiceId, createdAt])
+  @@index([tenantId, orgId, invoiceId, createdAt])
+}
+
+model FinanceReceiptAllocationReversal {
+  id             String                   @id @default(uuid())
+  allocationId   String
+  tenantId       String
+  orgId          String
+  actorUserId    String
+  amountMinor    BigInt
+  reason         String
+  createdAt      DateTime                 @default(now())
+  allocation     FinanceReceiptAllocation @relation(fields: [allocationId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor          User                     @relation("FinanceReceiptAllocationReversalActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, allocationId, createdAt])
 }

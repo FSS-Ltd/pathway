@@ -1,4 +1,5 @@
 import { Prisma } from "@pathway/db";
+import type { FinanceInvoiceBalance } from "./finance-balance.service";
 
 export const financeInvoiceInclude = {
   payerAccount: { select: { id: true, displayName: true } },
@@ -37,7 +38,10 @@ export type FinanceCreditNoteRecord = Prisma.FinanceCreditNoteGetPayload<{
   include: typeof financeCreditNoteInclude;
 }>;
 
-export function toFinanceInvoiceView(record: FinanceInvoiceRecord) {
+export function toFinanceInvoiceView(
+  record: FinanceInvoiceRecord,
+  balance: FinanceInvoiceBalance,
+) {
   return {
     id: record.id,
     financeProfileId: record.financeProfileId,
@@ -54,6 +58,7 @@ export function toFinanceInvoiceView(record: FinanceInvoiceRecord) {
     subtotalMinor: record.subtotalMinor.toString(),
     taxMinor: record.taxMinor.toString(),
     totalMinor: record.totalMinor.toString(),
+    balance,
     issuedAt: record.issuedAt?.toISOString() ?? null,
     dueDate: record.dueAt ? dateOnly(record.dueAt) : null,
     approvedAt: record.approvedAt?.toISOString() ?? null,

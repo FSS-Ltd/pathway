@@ -8,14 +8,23 @@ import { FinanceCreditNoteService } from "./finance-credit-note.service";
 import { FinanceCommandService } from "./finance-command.service";
 import { FinanceInvoiceController } from "./finance-invoice.controller";
 import { FinanceInvoiceService } from "./finance-invoice.service";
+import { FinanceBalanceService } from "./finance-balance.service";
+import { FinanceReceiptController } from "./finance-receipt.controller";
+import { FinanceReceiptService } from "./finance-receipt.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule, FinanceAccessModule],
-  controllers: [FinanceInvoiceController, FinanceCreditNoteController],
+  controllers: [
+    FinanceInvoiceController,
+    FinanceCreditNoteController,
+    FinanceReceiptController,
+  ],
   providers: [
+    FinanceBalanceService,
     FinanceCommandService,
     FinanceInvoiceService,
     FinanceCreditNoteService,
+    FinanceReceiptService,
   ],
 })
 export class FinanceModule {}
