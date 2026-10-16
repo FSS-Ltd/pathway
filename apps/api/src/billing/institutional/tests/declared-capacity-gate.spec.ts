@@ -1,5 +1,6 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import {
+  assertDeclaredCapacityAutomaticTaxEnabled,
   assertDeclaredCapacityTaxRegistration,
   declaredCapacityCheckoutTaxOptions,
   isDeclaredCapacityVatEnabled,
@@ -16,18 +17,31 @@ describe("declared-capacity VAT readiness", () => {
     }
   });
 
-  it("keeps V2 checkout fail-closed until VAT readiness is explicit", () => {
+  it("leaves VAT collection off without blocking checkout before registration", async () => {
     delete process.env.DECLARED_CAPACITY_VAT_ENABLED;
 
     expect(isDeclaredCapacityVatEnabled()).toBe(false);
     expect(() =>
-      declaredCapacityCheckoutTaxOptions("DECLARED_CAPACITY_V2"),
-    ).toThrow(ServiceUnavailableException);
+      assertDeclaredCapacityAutomaticTaxEnabled(false),
+    ).not.toThrow();
+    expect(declaredCapacityCheckoutTaxOptions("DECLARED_CAPACITY_V2")).toEqual(
+      {},
+    );
+    const loadActiveRegistrations = jest.fn(async () => []);
+
+    await expect(
+      assertDeclaredCapacityTaxRegistration(loadActiveRegistrations, true),
+    ).resolves.toBeUndefined();
+    expect(loadActiveRegistrations).not.toHaveBeenCalled();
   });
 
-  it("enables automatic tax only for VAT-ready V2 checkout", () => {
+  it("enables automatic tax only when VAT collection is enabled", () => {
     process.env.DECLARED_CAPACITY_VAT_ENABLED = "true";
 
+    expect(() => assertDeclaredCapacityAutomaticTaxEnabled(true)).not.toThrow();
+    expect(() => assertDeclaredCapacityAutomaticTaxEnabled(false)).toThrow(
+      ServiceUnavailableException,
+    );
     expect(declaredCapacityCheckoutTaxOptions("DECLARED_CAPACITY_V2")).toEqual({
       automatic_tax: { enabled: true },
     });
@@ -36,7 +50,7 @@ describe("declared-capacity VAT readiness", () => {
     );
   });
 
-  it("requires an active UK tax registration for the expected provider mode", async () => {
+  it("requires an active UK tax registration when VAT collection is enabled", async () => {
     process.env.DECLARED_CAPACITY_VAT_ENABLED = "true";
     const loadActiveRegistrations = jest.fn(async () => [
       { status: "active", country: "GB", livemode: true },

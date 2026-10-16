@@ -112,8 +112,8 @@ export function DeclaredCapacityPricePanel({
             </p>
             <p className="text-xs text-text-muted">
               {estimate.pricesIncludeVat
-                ? "Prices include VAT. The total shown is the amount due at checkout."
-                : "VAT-inclusive checkout is not available yet."}
+                ? "VAT is included in this price. The total shown is the amount due at checkout."
+                : "VAT is not currently charged. If VAT registration becomes required, VAT will be included within this price."}
             </p>
             {estimate.trialModules.length > 0 ? (
               <p className="text-xs text-text-muted">

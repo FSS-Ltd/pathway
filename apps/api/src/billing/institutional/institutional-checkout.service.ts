@@ -47,7 +47,6 @@ import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
 import {
   assertDeclaredCapacityBillingEnabled,
   assertDeclaredCapacityTaxRegistration,
-  assertDeclaredCapacityVatEnabled,
   declaredCapacityCheckoutTaxOptions,
 } from "./declared-capacity-gate";
 
@@ -77,7 +76,6 @@ export class InstitutionalCheckoutService {
     });
     if (snapshot?.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
       assertDeclaredCapacityBillingEnabled();
-      assertDeclaredCapacityVatEnabled();
       const org = await tx.org.findUnique({
         where: { id: orgId },
         select: { isMasterOrg: true },

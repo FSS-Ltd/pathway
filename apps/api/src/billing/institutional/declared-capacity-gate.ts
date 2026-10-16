@@ -13,8 +13,10 @@ export function isDeclaredCapacityVatEnabled(): boolean {
   return process.env.DECLARED_CAPACITY_VAT_ENABLED === "true";
 }
 
-export function assertDeclaredCapacityVatEnabled(): void {
-  if (!isDeclaredCapacityVatEnabled()) {
+export function assertDeclaredCapacityAutomaticTaxEnabled(
+  automaticTaxEnabled: boolean,
+): void {
+  if (isDeclaredCapacityVatEnabled() && !automaticTaxEnabled) {
     throw new ServiceUnavailableException({
       code: "DECLARED_CAPACITY_VAT_UNAVAILABLE",
     });
@@ -29,7 +31,7 @@ export async function assertDeclaredCapacityTaxRegistration(
   >,
   live: boolean,
 ): Promise<void> {
-  assertDeclaredCapacityVatEnabled();
+  if (!isDeclaredCapacityVatEnabled()) return;
 
   try {
     const registrations = await loadActiveRegistrations();
@@ -56,8 +58,11 @@ export async function assertDeclaredCapacityTaxRegistration(
 export function declaredCapacityCheckoutTaxOptions(pricingVersion: string): {
   automatic_tax?: { enabled: true };
 } {
-  if (pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION) return {};
-
-  assertDeclaredCapacityVatEnabled();
+  if (
+    pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION ||
+    !isDeclaredCapacityVatEnabled()
+  ) {
+    return {};
+  }
   return { automatic_tax: { enabled: true } };
 }

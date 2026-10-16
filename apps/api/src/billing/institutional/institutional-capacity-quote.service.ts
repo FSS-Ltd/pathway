@@ -25,8 +25,8 @@ import {
 } from "../billing-provider.config";
 import {
   assertDeclaredCapacityBillingEnabled,
+  assertDeclaredCapacityAutomaticTaxEnabled,
   assertDeclaredCapacityTaxRegistration,
-  assertDeclaredCapacityVatEnabled,
 } from "./declared-capacity-gate";
 import { quoteDeclaredCapacityWithFrozenPrices } from "./declared-capacity-stripe-pricing";
 import { institutionalStripeKey } from "./institutional-provider-guard";
@@ -192,7 +192,6 @@ export class InstitutionalCapacityQuoteService {
       amountPence: number;
     }> = [];
     if (declaredCapacity > context.policyCapacity) {
-      assertDeclaredCapacityVatEnabled();
       const stripe = this.stripe();
       await assertDeclaredCapacityTaxRegistration(
         async () =>
@@ -207,11 +206,9 @@ export class InstitutionalCapacityQuoteService {
       const providerSubscription = await stripe.subscriptions.retrieve(
         context.providerSubscriptionId,
       );
-      if (providerSubscription.automatic_tax?.enabled !== true) {
-        throw new ServiceUnavailableException({
-          code: "DECLARED_CAPACITY_VAT_UNAVAILABLE",
-        });
-      }
+      assertDeclaredCapacityAutomaticTaxEnabled(
+        providerSubscription.automatic_tax?.enabled === true,
+      );
       const currentItems = stripeItemsForSnapshot(
         context.currentSnapshot,
         this.config.stripe.priceMap ?? {},
