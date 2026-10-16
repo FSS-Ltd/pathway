@@ -89,11 +89,6 @@ export function DeclaredCapacityBilling() {
     currentCapacity !== null,
   );
   const requestedCapacity = validCapacity(capacityInput);
-  const vatUnavailableIncrease =
-    currentCapacity !== null &&
-    requestedCapacity !== null &&
-    requestedCapacity > currentCapacity &&
-    summary?.pricesIncludeVat !== true;
 
   const previewCapacityChange = async () => {
     if (
@@ -213,7 +208,7 @@ export function DeclaredCapacityBilling() {
           <p className="mt-2 max-w-3xl text-sm text-text-muted">
             {summary.pricesIncludeVat
               ? "Displayed prices include VAT. Checkout confirms the final amount."
-              : "VAT-inclusive billing is not active yet. New subscriptions and capacity increases are paused."}
+              : "VAT is not currently charged. If VAT registration becomes required, VAT will be included within this price."}
           </p>
         ) : null}
       </header>
@@ -361,8 +356,7 @@ export function DeclaredCapacityBilling() {
                 disabled={
                   pending ||
                   requestedCapacity === null ||
-                  requestedCapacity === currentCapacity ||
-                  vatUnavailableIncrease
+                  requestedCapacity === currentCapacity
                 }
                 onClick={() => void previewCapacityChange()}
               >
@@ -406,11 +400,7 @@ export function DeclaredCapacityBilling() {
                 </p>
                 <Button
                   size="sm"
-                  disabled={
-                    pending ||
-                    (quote.declaredCapacity > currentCapacity &&
-                      summary?.pricesIncludeVat !== true)
-                  }
+                  disabled={pending}
                   onClick={() => void acceptCapacityChange()}
                   className="mt-4"
                 >
