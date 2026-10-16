@@ -7,6 +7,7 @@ import {
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { FinanceAccessService } from "./access/finance-access.service";
 import type { FinanceAccessScope } from "./access/finance-access.reader";
+import { FinanceBalanceService } from "./finance-balance.service";
 import type {
   FinanceInvoiceDraftInput,
   FinanceInvoiceListQuery,
@@ -39,33 +40,42 @@ export class FinanceInvoiceService {
     private readonly financeAccess: FinanceAccessService,
     @Inject(FinanceCommandService)
     private readonly commands: FinanceCommandService,
+    @Inject(FinanceBalanceService)
+    private readonly balances: FinanceBalanceService,
   ) {}
 
   async list(actor: FinanceInvoiceActor, query: FinanceInvoiceListQuery) {
     await this.financeAccess.assertStaffAction(actor, "READ_RECORDS");
-    const invoices = await withTenantRlsContext(
-      actor.tenantId,
-      actor.orgId,
-      (tx) =>
-        tx.financeInvoice.findMany({
-          where: {
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-            status: query.status,
-          },
-          include: financeInvoiceInclude,
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          take: query.limit,
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      const invoices = await tx.financeInvoice.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          orgId: actor.orgId,
+          status: query.status,
+        },
+        include: financeInvoiceInclude,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: query.limit,
+      });
+      const balances = await this.balances.forInvoices(tx, actor, invoices);
+      return {
+        items: invoices.map((invoice) => {
+          const balance = balances.get(invoice.id);
+          if (!balance) {
+            throw new Error("Finance invoice balance projection is missing");
+          }
+          return toFinanceInvoiceView(invoice, balance);
         }),
-    );
-    return { items: invoices.map(toFinanceInvoiceView) };
+      };
+    });
   }
 
   async get(actor: FinanceInvoiceActor, invoiceId: string) {
     await this.financeAccess.assertStaffAction(actor, "READ_RECORDS");
-    const invoice = await this.findInvoice(actor, invoiceId);
-    if (!invoice) throw new NotFoundException("Finance invoice not found");
-    return toFinanceInvoiceView(invoice);
+    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
+      const invoice = await this.requireInvoice(tx, actor, invoiceId);
+      return this.toInvoiceView(tx, actor, invoice);
+    });
   }
 
   async createDraft(
@@ -134,7 +144,10 @@ export class FinanceInvoiceService {
         });
         await this.recordEvent(tx, actor, invoice.id, "CREATED");
         const record = await this.requireInvoice(tx, actor, invoice.id);
-        return { resourceId: invoice.id, value: toFinanceInvoiceView(record) };
+        return {
+          resourceId: invoice.id,
+          value: await this.toInvoiceView(tx, actor, record),
+        };
       },
       replay: (tx, invoiceId) => this.loadInvoiceView(tx, actor, invoiceId),
     });
@@ -202,7 +215,10 @@ export class FinanceInvoiceService {
         });
         await this.recordEvent(tx, actor, invoiceId, "UPDATED");
         const record = await this.requireInvoice(tx, actor, invoiceId);
-        return { resourceId: invoiceId, value: toFinanceInvoiceView(record) };
+        return {
+          resourceId: invoiceId,
+          value: await this.toInvoiceView(tx, actor, record),
+        };
       },
       replay: (tx, resourceId) => this.loadInvoiceView(tx, actor, resourceId),
     });
@@ -244,7 +260,10 @@ export class FinanceInvoiceService {
         });
         await this.recordEvent(tx, actor, invoiceId, "SUBMITTED_FOR_REVIEW");
         const record = await this.requireInvoice(tx, actor, invoiceId);
-        return { resourceId: invoiceId, value: toFinanceInvoiceView(record) };
+        return {
+          resourceId: invoiceId,
+          value: await this.toInvoiceView(tx, actor, record),
+        };
       },
       replay: (tx, resourceId) => this.loadInvoiceView(tx, actor, resourceId),
     });
@@ -282,7 +301,10 @@ export class FinanceInvoiceService {
         });
         await this.recordEvent(tx, actor, invoiceId, "APPROVED");
         const record = await this.requireInvoice(tx, actor, invoiceId);
-        return { resourceId: invoiceId, value: toFinanceInvoiceView(record) };
+        return {
+          resourceId: invoiceId,
+          value: await this.toInvoiceView(tx, actor, record),
+        };
       },
       replay: (tx, resourceId) => this.loadInvoiceView(tx, actor, resourceId),
     });
@@ -333,7 +355,10 @@ export class FinanceInvoiceService {
           input.reason,
         );
         const record = await this.requireInvoice(tx, actor, invoiceId);
-        return { resourceId: invoiceId, value: toFinanceInvoiceView(record) };
+        return {
+          resourceId: invoiceId,
+          value: await this.toInvoiceView(tx, actor, record),
+        };
       },
       replay: (tx, resourceId) => this.loadInvoiceView(tx, actor, resourceId),
     });
@@ -406,7 +431,10 @@ export class FinanceInvoiceService {
         });
         await this.recordEvent(tx, actor, invoiceId, "ISSUED");
         const record = await this.requireInvoice(tx, actor, invoiceId);
-        return { resourceId: invoiceId, value: toFinanceInvoiceView(record) };
+        return {
+          resourceId: invoiceId,
+          value: await this.toInvoiceView(tx, actor, record),
+        };
       },
       replay: (tx, resourceId) => this.loadInvoiceView(tx, actor, resourceId),
     });
@@ -476,16 +504,13 @@ export class FinanceInvoiceService {
         });
         await this.recordEvent(tx, actor, invoiceId, "VOIDED", input.reason);
         const record = await this.requireInvoice(tx, actor, invoiceId);
-        return { resourceId: invoiceId, value: toFinanceInvoiceView(record) };
+        return {
+          resourceId: invoiceId,
+          value: await this.toInvoiceView(tx, actor, record),
+        };
       },
       replay: (tx, resourceId) => this.loadInvoiceView(tx, actor, resourceId),
     });
-  }
-
-  private async findInvoice(actor: FinanceInvoiceActor, invoiceId: string) {
-    return withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
-      this.requireInvoiceOrNull(tx, actor, invoiceId),
-    );
   }
 
   private async requireInvoice(
@@ -519,7 +544,20 @@ export class FinanceInvoiceService {
     invoiceId: string,
   ) {
     const record = await this.requireInvoice(tx, actor, invoiceId);
-    return toFinanceInvoiceView(record);
+    return this.toInvoiceView(tx, actor, record);
+  }
+
+  private async toInvoiceView(
+    tx: Prisma.TransactionClient,
+    actor: FinanceInvoiceActor,
+    record: FinanceInvoiceRecord,
+  ) {
+    const balances = await this.balances.forInvoices(tx, actor, [record]);
+    const balance = balances.get(record.id);
+    if (!balance) {
+      throw new Error("Finance invoice balance projection is missing");
+    }
+    return toFinanceInvoiceView(record, balance);
   }
 
   private recordEvent(

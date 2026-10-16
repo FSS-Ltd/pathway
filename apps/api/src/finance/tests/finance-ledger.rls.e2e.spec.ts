@@ -23,6 +23,7 @@ const financeTables = [
   "FinanceInvoiceEvent",
   "FinanceReceipt",
   "FinanceReceiptAllocation",
+  "FinanceReceiptAllocationReversal",
   "FinancePayerAccount",
   "FinancePayerGrant",
   "FinanceCreditNote",

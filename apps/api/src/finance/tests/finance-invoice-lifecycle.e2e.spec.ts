@@ -5,6 +5,7 @@ import { requireDatabase } from "../../../test-helpers.e2e";
 import { FinanceAccessService } from "../access/finance-access.service";
 import { FinanceCommandService } from "../finance-command.service";
 import { FinanceCreditNoteService } from "../finance-credit-note.service";
+import { FinanceBalanceService } from "../finance-balance.service";
 import { FinanceInvoiceService } from "../finance-invoice.service";
 
 function requiredFixture(name: string): string {
@@ -47,7 +48,11 @@ describe("Finance invoice and credit lifecycle", () => {
       ),
     } as unknown as FinanceAccessService;
     const commands = new FinanceCommandService();
-    const invoices = new FinanceInvoiceService(access, commands);
+    const invoices = new FinanceInvoiceService(
+      access,
+      commands,
+      new FinanceBalanceService(),
+    );
     const creditNotes = new FinanceCreditNoteService(access, commands);
     const creator = { tenantId, orgId, userId: creatorId };
     const reviewer = { tenantId, orgId, userId: reviewerId };
@@ -66,13 +71,20 @@ describe("Finance invoice and credit lifecycle", () => {
             },
           ],
         });
-        const profile = await tx.financeProfile.create({
-          data: {
-            tenantId,
-            orgId,
-            legalEntityName: "Finance lifecycle test school",
-          },
+        let profile = await tx.financeProfile.findUnique({
+          where: { tenantId_orgId: { tenantId, orgId } },
+          select: { id: true, legalEntityName: true },
         });
+        if (!profile) {
+          profile = await tx.financeProfile.create({
+            data: {
+              tenantId,
+              orgId,
+              legalEntityName: "Finance lifecycle test school",
+            },
+            select: { id: true, legalEntityName: true },
+          });
+        }
         const payer = await tx.financePayerAccount.create({
           data: {
             financeProfileId: profile.id,
@@ -174,14 +186,29 @@ describe("Finance invoice and credit lifecycle", () => {
           draft.id,
           `invoice-approve-${randomUUID()}`,
         );
+        const numberSequence = await tx.financeInvoiceNumberSequence.findUnique(
+          {
+            where: {
+              financeProfileId_tenantId_orgId: {
+                financeProfileId: profile.id,
+                tenantId,
+                orgId,
+              },
+            },
+            select: { lastIssuedNumber: true },
+          },
+        );
+        const expectedInvoiceNumber = (
+          (numberSequence?.lastIssuedNumber ?? 0n) + 1n
+        ).toString();
         const issueKey = `invoice-issue-${randomUUID()}`;
         const issued = await invoices.issue(creator, draft.id, issueKey);
         const replayedIssue = await invoices.issue(creator, draft.id, issueKey);
         expect(issued.status).toBe("ISSUED");
-        expect(issued.invoiceNumber).toBe("1");
+        expect(issued.invoiceNumber).toBe(expectedInvoiceNumber);
         expect(issued.payerNameSnapshot).toBe(payer.displayName);
         expect(issued.legalEntityNameSnapshot).toBe(profile.legalEntityName);
-        expect(replayedIssue.invoiceNumber).toBe("1");
+        expect(replayedIssue.invoiceNumber).toBe(expectedInvoiceNumber);
 
         const creditInput = {
           reason: "One week of sessions cancelled",
