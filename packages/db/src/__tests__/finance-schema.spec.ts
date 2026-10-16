@@ -28,6 +28,7 @@ describe("Finance schema contract", () => {
       "model FinanceInvoiceEvent",
       "model FinanceReceipt",
       "model FinanceReceiptAllocation",
+      "model FinanceReceiptAllocationReversal",
       "model FinancePayerAccount",
       "model FinancePayerGrant",
       "model FinanceCreditNoteNumberSequence",
@@ -48,7 +49,14 @@ describe("Finance schema contract", () => {
     expect(/taxMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/totalMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/amountMinor\s+BigInt/.test(schema)).toBe(true);
-    expect(financeMigrations).toHaveLength(6);
+    expect(financeMigrations.length).toBeGreaterThanOrEqual(6);
+    for (const migration of [
+      "20261024000000_finance_receipt_allocation",
+      "20261025000000_finance_receipt_evidence_guard",
+      "20261026000000_finance_receipt_confirmation_transition",
+    ]) {
+      expect(financeMigrations).toContain(migration);
+    }
 
     for (const financeMigration of financeMigrations) {
       const migration = readFileSync(
@@ -85,6 +93,7 @@ describe("Finance schema contract", () => {
       "FinanceInvoiceEvent",
       "FinanceReceipt",
       "FinanceReceiptAllocation",
+      "FinanceReceiptAllocationReversal",
       "FinancePayerAccount",
       "FinancePayerGrant",
       "FinanceCreditNote",

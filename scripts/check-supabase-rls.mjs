@@ -43,6 +43,7 @@ const REQUIRED_RLS_TABLES = [
   "FinanceInvoiceEvent",
   "FinanceReceipt",
   "FinanceReceiptAllocation",
+  "FinanceReceiptAllocationReversal",
   "FinancePayerAccount",
   "FinancePayerGrant",
   "FinanceCreditNote",
