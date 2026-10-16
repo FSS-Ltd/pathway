@@ -1,6 +1,7 @@
 import { Module } from "@pathway/db";
 import {
   DeclaredCapacityStripePriceError,
+  isDeclaredCapacityAddonTrialReady,
   quoteDeclaredCapacityWithStripePrices,
 } from "../declared-capacity-stripe-pricing";
 
@@ -106,6 +107,18 @@ describe("declared-capacity Stripe quotes", () => {
         { trialModules: [Module.FINANCE] },
       ),
     ).toThrow(DeclaredCapacityStripePriceError);
+  });
+
+  it("checks approved add-on prices independently from the base subscription prices", () => {
+    process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES = "FINANCE";
+    process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES = "FINANCE";
+
+    expect(
+      isDeclaredCapacityAddonTrialReady(Module.FINANCE, {
+        MODULE_FINANCE_MONTHLY: prices.MODULE_FINANCE_MONTHLY,
+        MODULE_FINANCE_YEARLY: prices.MODULE_FINANCE_YEARLY,
+      }),
+    ).toBe(true);
   });
 
   it("allows an approved pay-now module at the selected interval when the other interval is unavailable", () => {

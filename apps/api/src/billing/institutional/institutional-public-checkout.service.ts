@@ -354,10 +354,7 @@ export class InstitutionalPublicCheckoutService {
           id: orderId,
           planCode: quote.planCode,
           maxSites: plan.siteAllowance,
-          selectedModules: [
-            ...selection.paidModules,
-            ...selection.trialModules,
-          ],
+          selectedModules: selection.paidModules,
           flags: {
             purchaseKind: "institutional_declared_capacity_public",
             quote,

@@ -7,7 +7,7 @@ type GrantSelection = {
   paid: readonly Module[];
 };
 
-async function refreshEffectiveModules(
+export async function refreshEffectiveOrgModules(
   tx: GrantClient,
   orgId: string,
   modules: ReadonlySet<Module>,
@@ -40,10 +40,19 @@ async function refreshEffectiveModules(
           Math.max(...active.map((grant) => grant.expiresAt!.getTime())),
         );
     const subscriptionGrant = active.find(
-      (grant) => grant.source !== ModuleGrantSource.MANUAL,
+      (grant) =>
+        grant.source === ModuleGrantSource.PLAN ||
+        grant.source === ModuleGrantSource.PAID_ADDON,
+    );
+    const hasTrialGrant = active.some(
+      (grant) => grant.source === ModuleGrantSource.TRIAL,
     );
     const metadata = {
-      billingSource: subscriptionGrant ? "subscription" : "manual",
+      billingSource: subscriptionGrant
+        ? "subscription"
+        : hasTrialGrant
+          ? "trial"
+          : "manual",
       grantSources: active.map(({ source, sourceId }) => ({
         source,
         sourceId,
@@ -135,7 +144,7 @@ export async function reconcileSubscriptionModuleGrants(
     }
   }
 
-  await refreshEffectiveModules(tx, orgId, affected);
+  await refreshEffectiveOrgModules(tx, orgId, affected);
 }
 
 export async function updateSubscriptionGrantPeriod(
@@ -154,7 +163,7 @@ export async function updateSubscriptionGrantPeriod(
       ...(expiresAt ? { expiresAt } : { status: ModuleStatus.CANCELLED }),
     },
   });
-  await refreshEffectiveModules(
+  await refreshEffectiveOrgModules(
     tx,
     orgId,
     new Set(grants.map(({ module }) => module)),
@@ -178,5 +187,5 @@ export async function cancelPaidSourceGrants(
     },
     data: { status: ModuleStatus.CANCELLED },
   });
-  await refreshEffectiveModules(tx, orgId, new Set(modules));
+  await refreshEffectiveOrgModules(tx, orgId, new Set(modules));
 }

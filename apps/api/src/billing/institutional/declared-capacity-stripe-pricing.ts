@@ -50,13 +50,32 @@ export type DeclaredCapacityStripeQuote = Readonly<{
   subtotalPence: number;
 }>;
 
-type ResolvedPrices = DeclaredCapacityResolvedPrices &
-  Partial<
-    Record<
-      DeclaredCapacityAddonPriceCode,
-      { priceId: string; unitAmountPence: number }
-    >
-  >;
+export type DeclaredCapacityStripeResolvedPrices =
+  DeclaredCapacityResolvedPrices &
+    Partial<
+      Record<
+        DeclaredCapacityAddonPriceCode,
+        { priceId: string; unitAmountPence: number }
+      >
+    >;
+
+export function isDeclaredCapacityAddonTrialReady(
+  module: Module,
+  prices: DeclaredCapacityStripeResolvedPrices,
+): boolean {
+  try {
+    return validateAddonSelection([module], prices, "month", true).length === 1;
+  } catch (error) {
+    if (error instanceof DeclaredCapacityStripePriceError) return false;
+    if (
+      error instanceof Error &&
+      error.message === "INVALID_DECLARED_CAPACITY_ADDON_SELECTION"
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
 
 export class DeclaredCapacityStripePriceError extends Error {
   constructor(
@@ -81,7 +100,7 @@ const frozenDeclaredLineSchema = z.object({
 
 export function quoteDeclaredCapacityWithStripePrices(
   input: DeclaredCapacityQuoteInput,
-  prices: ResolvedPrices,
+  prices: DeclaredCapacityStripeResolvedPrices,
   selections: Readonly<{
     paidModules?: readonly Module[];
     trialModules?: readonly Module[];
@@ -291,7 +310,7 @@ export function quoteDeclaredCapacityWithFrozenPrices(
 
 function validateAddonSelection(
   selected: readonly Module[],
-  prices: ResolvedPrices,
+  prices: DeclaredCapacityStripeResolvedPrices,
   interval: DeclaredCapacityQuoteInput["interval"],
   requireBothIntervals: boolean,
 ): DeclaredCapacityAddonModule[] {

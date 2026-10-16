@@ -323,7 +323,21 @@ enum ModuleStatus {
 enum ModuleGrantSource {
   PLAN
   PAID_ADDON
+  TRIAL
   MANUAL
+}
+
+enum InstitutionalAddonTrialStatus {
+  SELECTED
+  ACTIVE
+  EXPIRED
+  DECLINED
+  CONVERTED
+}
+
+enum InstitutionalAddonInterval {
+  MONTHLY
+  YEARLY
 }
 
 enum ModuleChangeStatus {
@@ -1071,6 +1085,7 @@ model Org {
   institutionalBillingSnapshots InstitutionalBillingSnapshot[]
   institutionalQuoteAcceptances InstitutionalQuoteAcceptance[]
   institutionalBillingOperations InstitutionalBillingOperation[]
+  institutionalAddonTrials InstitutionalAddonTrial[]
   roleDefinitions     OrgRoleDefinition[]
   roleRevisions       OrgRoleRevision[]
   roleAssignments     UserRoleAssignment[]
@@ -1334,6 +1349,8 @@ model User {
   rollConfirmations                 EnrolmentRollConfirmation[] @relation("EnrolmentRollConfirmer")
   institutionalDeclarations        InstitutionalBillingPolicy[] @relation("InstitutionalDeclarationActor")
   institutionalQuoteAcceptances    InstitutionalQuoteAcceptance[] @relation("InstitutionalQuoteAcceptanceActor")
+  addonTrialDecisions               InstitutionalAddonTrial[]     @relation("InstitutionalAddonTrialDecisionActor")
+  addonTrialActivations              InstitutionalAddonTrial[]     @relation("InstitutionalAddonTrialActivationActor")
   swapRequestsFrom                  SwapRequest[]               @relation("SwapFromUser")
   swapRequestsTo                    SwapRequest[]               @relation("SwapToUser")
   orgRoles                          UserOrgRole[]
@@ -4115,12 +4132,40 @@ model Subscription {
   pendingInstitutionalSnapshot InstitutionalBillingSnapshot? @relation("InstitutionalPendingSubscription", fields: [pendingInstitutionalSnapshotId, orgId], references: [id, orgId], onDelete: Restrict)
   institutionalSnapshots InstitutionalBillingSnapshot[] @relation("InstitutionalSnapshotSubscription")
   institutionalOperations InstitutionalBillingOperation[]
+  addonTrials InstitutionalAddonTrial[] @relation("InstitutionalAddonTrialPaidSubscription")
 
   @@index([orgId])
   @@index([status])
   @@index([planCode])
   @@index([pendingInstitutionalSnapshotId, orgId])
   @@unique([id, orgId])
+}
+
+model InstitutionalAddonTrial {
+  id                    String                        @id @default(uuid())
+  orgId                 String
+  module                Module
+  status                InstitutionalAddonTrialStatus @default(SELECTED)
+  selectedAt            DateTime                      @default(now())
+  activatedAt           DateTime?
+  expiresAt             DateTime?
+  expiryEmailQueuedAt   DateTime?
+  expiryEmailSentAt     DateTime?
+  activatedByUserId     String?
+  decisionActorUserId   String?
+  decidedAt             DateTime?
+  chosenPaidInterval    InstitutionalAddonInterval?
+  paidSubscriptionId    String?
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  org                   Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  activatedBy           User?                         @relation("InstitutionalAddonTrialActivationActor", fields: [activatedByUserId], references: [id], onDelete: Restrict)
+  decisionActor         User?                         @relation("InstitutionalAddonTrialDecisionActor", fields: [decisionActorUserId], references: [id], onDelete: Restrict)
+  paidSubscription      Subscription?                 @relation("InstitutionalAddonTrialPaidSubscription", fields: [paidSubscriptionId, orgId], references: [id, orgId], onDelete: Restrict)
+
+  @@unique([orgId, module])
+  @@index([orgId, status, expiresAt])
+  @@index([status, expiresAt])
 }
 
 model OrgEntitlementSnapshot {

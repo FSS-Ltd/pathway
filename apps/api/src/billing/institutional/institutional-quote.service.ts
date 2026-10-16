@@ -701,10 +701,7 @@ export class InstitutionalQuoteService {
           idempotencyKey,
           acceptedAmountPence:
             snapshot.amountDueNowPence ?? snapshot.subtotalPence,
-          effectiveAt:
-            snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
-              ? null
-              : (snapshot.effectiveAt ?? now),
+          effectiveAt: snapshot.effectiveAt ?? now,
           acceptedAt: now,
         },
       });

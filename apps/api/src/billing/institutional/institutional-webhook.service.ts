@@ -3,6 +3,7 @@ import {
   applyTenantContext,
   prisma,
   PendingOrderStatus,
+  InstitutionalAddonTrialStatus,
   SubscriptionStatus,
   InstitutionalBillingOperationKind,
   InstitutionalBillingOperationStatus,
@@ -390,6 +391,17 @@ export class InstitutionalWebhookService {
           },
           event.periodEnd!,
         );
+        if (snapshot.selectedTrialModules.length > 0) {
+          await tx.institutionalAddonTrial.createMany({
+            data: snapshot.selectedTrialModules.map((module) => ({
+              orgId: event.orgId,
+              module,
+              status: InstitutionalAddonTrialStatus.SELECTED,
+              selectedAt: event.occurredAt ?? new Date(),
+            })),
+            skipDuplicates: true,
+          });
+        }
       } else {
         await updateSubscriptionGrantPeriod(
           tx,
@@ -397,20 +409,6 @@ export class InstitutionalWebhookService {
           event.subscriptionId,
           event.periodEnd!,
         );
-      }
-      if (
-        snapshot.kind === InstitutionalSnapshotKind.QUOTE &&
-        snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
-        snapshot.acceptance?.effectiveAt === null
-      ) {
-        await tx.institutionalQuoteAcceptance.updateMany({
-          where: {
-            orgId: event.orgId,
-            snapshotId: snapshot.id,
-            effectiveAt: null,
-          },
-          data: { effectiveAt: event.occurredAt ?? new Date() },
-        });
       }
       await tx.institutionalBillingPolicy.updateMany({
         where: { orgId: event.orgId, reviewReason: "INVOICE_MISMATCH" },
