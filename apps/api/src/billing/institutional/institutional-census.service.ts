@@ -36,6 +36,7 @@ import { isInstitutionalPlanCode } from "./institutional-selection";
 import { censusCutoffFor, localDateAt } from "./institutional-time";
 import { quoteFromFrozenInstitutionalPrices } from "./institutional-frozen-pricing";
 import { quoteDeclaredCapacityWithFrozenPrices } from "./declared-capacity-stripe-pricing";
+import { isDeclaredCapacityVatEnabled } from "./declared-capacity-gate";
 
 function institutionalPlanCode(value: string): string {
   if (
@@ -453,6 +454,7 @@ export class InstitutionalCensusService {
       }
       return {
         orgId,
+        pricesIncludeVat: isDeclaredCapacityVatEnabled(),
         currentPaid: subscription
           ? {
               planCode,

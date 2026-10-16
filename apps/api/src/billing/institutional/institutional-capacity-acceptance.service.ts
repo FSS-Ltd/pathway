@@ -3,6 +3,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import {
   AuditAction,
@@ -23,7 +24,11 @@ import {
   BILLING_PROVIDER_CONFIG,
   type BillingProviderConfig,
 } from "../billing-provider.config";
-import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
+import {
+  assertDeclaredCapacityBillingEnabled,
+  assertDeclaredCapacityTaxRegistration,
+  assertDeclaredCapacityVatEnabled,
+} from "./declared-capacity-gate";
 import { institutionalStripeKey } from "./institutional-provider-guard";
 import { stripeItemsForSnapshot } from "./institutional-stripe-line-items";
 import { censusCutoffFor, localDateAt } from "./institutional-time";
@@ -132,6 +137,7 @@ export class InstitutionalCapacityAcceptanceService {
         }
         const isDecrease =
           snapshot.declaredCapacity < snapshot.policy.declaredCapacity;
+        if (!isDecrease) assertDeclaredCapacityVatEnabled();
         if (isDecrease) {
           const confirmation = await tx.enrolmentRollConfirmation.findFirst({
             where: { orgId },
@@ -289,6 +295,17 @@ export class InstitutionalCapacityAcceptanceService {
     const providerSubscription = await stripe.subscriptions.retrieve(
       current.providerSubId,
     );
+    await assertDeclaredCapacityTaxRegistration(
+      async () =>
+        (await stripe.tax.registrations.list({ status: "active", limit: 100 }))
+          .data,
+      this.config.activeProvider === "STRIPE",
+    );
+    if (providerSubscription.automatic_tax?.enabled !== true) {
+      throw new ServiceUnavailableException({
+        code: "DECLARED_CAPACITY_VAT_UNAVAILABLE",
+      });
+    }
     const currentItems = stripeItemsForSnapshot(
       current.currentInstitutionalSnapshot,
       this.config.stripe.priceMap ?? {},

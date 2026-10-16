@@ -40,6 +40,7 @@ export type DeclaredCapacityAddonOption = {
 export type DeclaredCapacityCatalogue = {
   pricingVersion: "DECLARED_CAPACITY_V2";
   currency: "GBP";
+  pricesIncludeVat: boolean;
   intervals: readonly ["month", "year"];
   plans: {
     tier: "starter" | "growth" | "professional";
@@ -69,6 +70,7 @@ export type DeclaredCapacityEstimate =
       declaredCapacity: number;
       interval: DeclaredCapacityInterval;
       currency: "GBP";
+      pricesIncludeVat: boolean;
       siteAllowance: number;
       trialModuleSlots: number;
       includedPaidModules: readonly never[];
@@ -83,6 +85,7 @@ export type DeclaredCapacityEstimate =
       tier: "enterprise";
       declaredCapacity: number;
       interval: DeclaredCapacityInterval;
+      pricesIncludeVat: boolean;
       siteAllowance: null;
       contactPath: "/demo?plan=enterprise";
     };

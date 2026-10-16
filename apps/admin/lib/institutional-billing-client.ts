@@ -76,6 +76,7 @@ export type InstitutionalCatalogue = {
 
 export type DeclaredCapacityBillingSummary = {
   orgId: string;
+  pricesIncludeVat: boolean;
   currentPaid: {
     planCode: string;
     periodStart: string;

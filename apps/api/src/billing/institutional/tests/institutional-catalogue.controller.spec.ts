@@ -7,6 +7,7 @@ import { InstitutionalCatalogueController } from "../institutional-catalogue.con
 describe("public institutional estimate", () => {
   const originalDeclaredCapacityFlag =
     process.env.DECLARED_CAPACITY_BILLING_ENABLED;
+  const originalVatFlag = process.env.DECLARED_CAPACITY_VAT_ENABLED;
   const originalDeliveredAddons =
     process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES;
   const originalApprovedAddons =
@@ -49,11 +50,11 @@ describe("public institutional estimate", () => {
       },
       MODULE_FINANCE_MONTHLY: {
         priceId: "price_FinanceMonthly",
-        unitAmountPence: 1_500,
+        unitAmountPence: 2_900,
       },
       MODULE_FINANCE_YEARLY: {
         priceId: "price_FinanceYearly",
-        unitAmountPence: 15_000,
+        unitAmountPence: 29_000,
       },
       MODULE_EVENTS_MONTHLY: {
         priceId: "price_EventsMonthly",
@@ -81,6 +82,11 @@ describe("public institutional estimate", () => {
     } else {
       process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES =
         originalApprovedAddons;
+    }
+    if (originalVatFlag === undefined) {
+      delete process.env.DECLARED_CAPACITY_VAT_ENABLED;
+    } else {
+      process.env.DECLARED_CAPACITY_VAT_ENABLED = originalVatFlag;
     }
   });
 
@@ -167,6 +173,7 @@ describe("public institutional estimate", () => {
 
   it("returns server-derived declared-capacity prices when enabled", async () => {
     process.env.DECLARED_CAPACITY_BILLING_ENABLED = "true";
+    delete process.env.DECLARED_CAPACITY_VAT_ENABLED;
     await expect(
       controller.estimateDeclaredCapacity({
         declaredCapacity: 74,
@@ -177,6 +184,7 @@ describe("public institutional estimate", () => {
       tier: "starter",
       subtotalPence: 14_800,
       siteAllowance: 1,
+      pricesIncludeVat: false,
     });
     await expect(
       controller.estimateDeclaredCapacity({
@@ -187,7 +195,23 @@ describe("public institutional estimate", () => {
       kind: "contact_sales",
       tier: "enterprise",
       contactPath: "/demo?plan=enterprise",
+      pricesIncludeVat: false,
     });
+  });
+
+  it("marks declared-capacity prices VAT-inclusive only when tax is ready", async () => {
+    process.env.DECLARED_CAPACITY_BILLING_ENABLED = "true";
+    process.env.DECLARED_CAPACITY_VAT_ENABLED = "true";
+
+    await expect(
+      controller.estimateDeclaredCapacity({
+        declaredCapacity: 74,
+        interval: "month",
+      }),
+    ).resolves.toMatchObject({ pricesIncludeVat: true });
+    await expect(controller.declaredCapacityCatalogue()).resolves.toMatchObject(
+      { pricesIncludeVat: true },
+    );
   });
 
   it("lists only delivered modules with approved prices as trial options", async () => {
@@ -202,8 +226,8 @@ describe("public institutional estimate", () => {
         {
           module: "FINANCE",
           trialAvailable: true,
-          monthlyPricePence: 1_500,
-          yearlyPricePence: 15_000,
+          monthlyPricePence: 2_900,
+          yearlyPricePence: 29_000,
         },
         {
           module: "EVENTS",
@@ -241,12 +265,12 @@ describe("public institutional estimate", () => {
         payNowModules: ["FINANCE"],
       }),
     ).resolves.toMatchObject({
-      subtotalPence: 16_300,
+      subtotalPence: 17_700,
       paidModules: ["FINANCE"],
       lines: expect.arrayContaining([
         expect.objectContaining({
           component: "ADDON",
-          subtotalPence: 1_500,
+          subtotalPence: 2_900,
         }),
       ]),
     });

@@ -1,4 +1,5 @@
 import { validateFrozenStripePrice } from "../institutional-frozen-stripe-price";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 
 const snapshot = {
   planCode: "INSTITUTIONAL_STARTER_YEARLY",
@@ -13,6 +14,7 @@ const price = {
   livemode: true,
   currency: "gbp",
   unit_amount: 1000,
+  tax_behavior: "exclusive",
   recurring: { interval: "year", interval_count: 1, usage_type: "licensed" },
 };
 
@@ -46,5 +48,31 @@ describe("frozen institutional checkout Price validation", () => {
         true,
       ),
     ).toThrow();
+  });
+
+  it("requires tax-inclusive Stripe prices for declared-capacity snapshots", () => {
+    const declaredCapacitySnapshot = {
+      ...snapshot,
+      planCode: "DECLARED_CAPACITY_STARTER_YEARLY",
+      pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+    };
+    const taxInclusivePrice = { ...price, tax_behavior: "inclusive" };
+
+    expect(() =>
+      validateFrozenStripePrice(
+        taxInclusivePrice,
+        declaredCapacitySnapshot,
+        "price_accepted",
+        true,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateFrozenStripePrice(
+        price,
+        declaredCapacitySnapshot,
+        "price_accepted",
+        true,
+      ),
+    ).toThrow("INSTITUTIONAL_PRICE_CHANGED");
   });
 });

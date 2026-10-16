@@ -151,6 +151,13 @@ export function DeclaredCapacitySummaryStep({
             browser. Free add-on trials do not start until activation and do not
             convert into paid access automatically.
           </p>
+          {estimate?.kind === "priced" ? (
+            <p className="text-xs text-text-muted">
+              {estimate.pricesIncludeVat
+                ? "Prices include VAT. The total shown is the amount due at checkout."
+                : "Checkout is unavailable until VAT-inclusive pricing is ready."}
+            </p>
+          ) : null}
           {priceError ? (
             <p
               role="alert"
@@ -169,7 +176,11 @@ export function DeclaredCapacitySummaryStep({
           ) : null}
           <button
             type="submit"
-            disabled={pending || estimate?.kind !== "priced"}
+            disabled={
+              pending ||
+              estimate?.kind !== "priced" ||
+              !estimate.pricesIncludeVat
+            }
             aria-busy={pending}
             className="rounded-lg bg-accent-primary px-5 py-3 text-sm font-semibold text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >

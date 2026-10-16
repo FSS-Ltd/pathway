@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DECLARED_CAPACITY_PRICING_VERSION } from "@pathway/pricing";
 
 const lineSchema = z.object({
   priceId: z.string(),
@@ -12,6 +13,7 @@ type ProviderPrice = Readonly<{
   livemode: boolean;
   currency: string;
   unit_amount: number | null;
+  tax_behavior?: string | null;
   recurring: null | {
     interval: string;
     interval_count: number;
@@ -22,7 +24,7 @@ type ProviderPrice = Readonly<{
 /** Check the accepted, frozen quote rather than a mutable price map. */
 export function validateFrozenStripePrice(
   price: ProviderPrice,
-  snapshot: { planCode: string; lines: unknown },
+  snapshot: { planCode: string; pricingVersion?: string; lines: unknown },
   priceId: string,
   live: boolean,
 ): void {
@@ -37,6 +39,8 @@ export function validateFrozenStripePrice(
     !price.active ||
     price.livemode !== live ||
     price.currency !== "gbp" ||
+    (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+      price.tax_behavior !== "inclusive") ||
     price.unit_amount !== line.unitAmountPence ||
     price.recurring?.interval !== interval ||
     price.recurring.interval_count !== 1 ||
