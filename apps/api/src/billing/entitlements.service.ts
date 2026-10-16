@@ -1,7 +1,10 @@
 import { Inject, Injectable, Optional } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { prisma, SubscriptionStatus, BillingProvider } from "@pathway/db";
-import { INSTITUTIONAL_PLANS } from "@pathway/pricing";
+import {
+  INSTITUTIONAL_PLANS,
+  isDeclaredCapacityPlanCode,
+} from "@pathway/pricing";
 import { getPlanDefinition } from "./billing-plans";
 import { ADD_ON_SUBSCRIPTION_PLAN_PREFIX } from "./subscription-plan-code";
 import { isInstitutionalPlanCode } from "./institutional/institutional-selection";
@@ -116,23 +119,32 @@ export class EntitlementsService {
       subscription && isInstitutionalPlanCode(subscription.planCode)
         ? INSTITUTIONAL_PLANS[subscription.planCode]
         : null;
-    const av30Cap = institutionalPlan
-      ? null
-      : snapshot?.av30Included ?? planDefinition?.av30Included ?? null;
-    const maxChildren = institutionalPlan
-      ? null
-      : maxChildrenFromSnapshot ??
-        (snapshot ? null : planDefinition?.maxChildrenIncluded ?? null);
+    const declaredCapacityPlan =
+      subscription && isDeclaredCapacityPlanCode(subscription.planCode);
+    const av30Cap =
+      institutionalPlan || declaredCapacityPlan
+        ? null
+        : (snapshot?.av30Included ?? planDefinition?.av30Included ?? null);
+    const maxChildren =
+      institutionalPlan || declaredCapacityPlan
+        ? null
+        : (maxChildrenFromSnapshot ??
+          (snapshot ? null : (planDefinition?.maxChildrenIncluded ?? null)));
     const storageGbCap =
       snapshot?.storageGbIncluded ?? planDefinition?.storageGbIncluded ?? null;
     const smsMessagesCap =
       smsMessagesCapFromSnapshot ??
-      (snapshot ? null : planDefinition?.smsMessagesIncluded ?? null);
-    const leaderSeatsIncluded =
-      snapshot?.leaderSeatsIncluded ??
-      planDefinition?.leaderSeatsIncluded ??
+      (snapshot ? null : (planDefinition?.smsMessagesIncluded ?? null));
+    const leaderSeatsIncluded = declaredCapacityPlan
+      ? null
+      : (snapshot?.leaderSeatsIncluded ??
+        planDefinition?.leaderSeatsIncluded ??
+        null);
+    const maxSites =
+      institutionalPlan?.includedSites ??
+      snapshot?.maxSites ??
+      planDefinition?.maxSitesIncluded ??
       null;
-    const maxSites = institutionalPlan?.includedSites ?? snapshot?.maxSites ?? planDefinition?.maxSitesIncluded ?? null;
 
     const flags = snapshot
       ? flagsFromSnapshot
@@ -145,7 +157,7 @@ export class EntitlementsService {
         : null;
 
     const source = snapshot
-      ? snapshot.source ?? "snapshot"
+      ? (snapshot.source ?? "snapshot")
       : planDefinition
         ? "plan_catalogue"
         : "fallback";
@@ -188,9 +200,7 @@ export class EntitlementsService {
   }
 }
 
-const toRecord = (
-  value: unknown,
-): Record<string, unknown> | null => {
+const toRecord = (value: unknown): Record<string, unknown> | null => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
 };

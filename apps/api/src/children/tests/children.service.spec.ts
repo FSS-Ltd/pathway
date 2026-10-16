@@ -290,6 +290,22 @@ describe("ChildrenService", () => {
       ).resolves.toHaveProperty("id", "c_new");
       expect(count).not.toHaveBeenCalled();
     });
+
+    it("does not use child-profile count as declared enrolled capacity", async () => {
+      tFindUnique.mockResolvedValueOnce({ id: tenantId, orgId: "org_1" });
+      snapshotFindFirst.mockResolvedValueOnce({
+        flagsJson: { maxChildrenIncluded: 50 },
+      });
+      subscriptionFindFirst.mockResolvedValueOnce({
+        planCode: "DECLARED_CAPACITY_STARTER_MONTHLY",
+      });
+      create.mockResolvedValueOnce({ id: "c_new", tenantId });
+
+      await expect(
+        svc.create({ ...baseDto }, tenantId),
+      ).resolves.toHaveProperty("id", "c_new");
+      expect(count).not.toHaveBeenCalled();
+    });
   });
 
   describe("update", () => {
