@@ -391,9 +391,10 @@ export class InstitutionalWebhookService {
           },
           event.periodEnd!,
         );
-        if (snapshot.selectedTrialModules.length > 0) {
+        const selectedTrialModules = snapshot.selectedTrialModules ?? [];
+        if (selectedTrialModules.length > 0) {
           await tx.institutionalAddonTrial.createMany({
-            data: snapshot.selectedTrialModules.map((module) => ({
+            data: selectedTrialModules.map((module) => ({
               orgId: event.orgId,
               module,
               status: InstitutionalAddonTrialStatus.SELECTED,
