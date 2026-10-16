@@ -22,6 +22,14 @@ export const publicPages = [
     priority: 1,
   },
   {
+    path: "/about",
+    title: "Why I Started Nexsteps",
+    description:
+      "Jean-Fidele shares how children’s ministry, homeschooling and a church learning centre shaped Nexsteps and its mission for families and Christian schools.",
+    changeFrequency: "yearly",
+    priority: 0.6,
+  },
+  {
     path: "/schools",
     title: "School Operations Software for Teams and Families",
     description:
