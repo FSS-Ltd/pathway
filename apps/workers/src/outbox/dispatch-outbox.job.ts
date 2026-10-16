@@ -60,6 +60,7 @@ export class DispatchOutboxJob {
   constructor(
     private readonly client: OutboxDispatchClient,
     private readonly dispatcher: OutboxDispatcher,
+    private readonly eventTypes?: readonly string[],
   ) {}
 
   async run(
@@ -71,7 +72,9 @@ export class DispatchOutboxJob {
       const claimed = await this.client.runForOrg(orgId, async (events) => {
         const candidates = await events.findMany({
           where: {
-            eventType: { not: "ace.message.sent" },
+            eventType: this.eventTypes
+              ? { in: [...this.eventTypes] }
+              : { not: "ace.message.sent" },
             OR: [
               { status: "PENDING", nextAttemptAt: { lte: now } },
               { status: "PROCESSING", claimedAt: { lte: leaseCutoff } },
@@ -147,8 +150,9 @@ export class DispatchOutboxJob {
 
 export function createDispatchOutboxJob(
   dispatcher: OutboxDispatcher,
+  eventTypes?: readonly string[],
 ): DispatchOutboxJob {
-  return new DispatchOutboxJob(productionClient, dispatcher);
+  return new DispatchOutboxJob(productionClient, dispatcher, eventTypes);
 }
 
 /**

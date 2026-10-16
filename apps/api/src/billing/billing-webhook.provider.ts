@@ -21,6 +21,9 @@ export type ParsedBillingWebhookEvent = {
   providerCheckoutId?: string | null;
   providerCustomerId?: string | null;
   planCode?: string | null;
+  addonTrialId?: string | null;
+  addonModule?: string | null;
+  addonInterval?: string | null;
   status?: SubscriptionStatus | null;
   periodStart?: Date | null;
   periodEnd?: Date | null;

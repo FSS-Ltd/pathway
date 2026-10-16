@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../../auth/auth.module";
+import { MailerModule } from "../../mailer/mailer.module";
+import { OutboxModule } from "../../common/outbox/outbox.module";
 import { EnrolmentsModule } from "../../enrolments/enrolments.module";
 import { InstitutionalBillingController } from "./institutional-billing.controller";
 import { InstitutionalCatalogueController } from "./institutional-catalogue.controller";
@@ -21,9 +23,12 @@ import { InstitutionalPublicCheckoutController } from "./institutional-public-ch
 import { InstitutionalPublicCheckoutService } from "./institutional-public-checkout.service";
 import { InstitutionalAddonTrialsController } from "./institutional-addon-trials.controller";
 import { DeclaredCapacityAddonTrialsService } from "./declared-capacity-addon-trials.service";
+import { DeclaredCapacityAddonCheckoutService } from "./declared-capacity-addon-checkout.service";
+import { DeclaredCapacityAddonTrialWebhookService } from "./declared-capacity-addon-trial-webhook.service";
+import { DeclaredCapacityAddonTrialExpiryService } from "./declared-capacity-addon-trial-expiry.service";
 
 @Module({
-  imports: [AuthModule, EnrolmentsModule],
+  imports: [AuthModule, EnrolmentsModule, MailerModule, OutboxModule],
   controllers: [
     InstitutionalBillingController,
     InstitutionalCatalogueController,
@@ -43,8 +48,15 @@ import { DeclaredCapacityAddonTrialsService } from "./declared-capacity-addon-tr
     InstitutionalPriceResolver,
     InstitutionalPublicCheckoutService,
     DeclaredCapacityAddonTrialsService,
+    DeclaredCapacityAddonCheckoutService,
+    DeclaredCapacityAddonTrialWebhookService,
+    DeclaredCapacityAddonTrialExpiryService,
     { provide: BILLING_PROVIDER_CONFIG, useFactory: loadBillingProviderConfig },
   ],
-  exports: [InstitutionalQuoteService, InstitutionalCensusService],
+  exports: [
+    InstitutionalQuoteService,
+    InstitutionalCensusService,
+    DeclaredCapacityAddonTrialWebhookService,
+  ],
 })
 export class InstitutionalBillingModule {}

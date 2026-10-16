@@ -108,6 +108,38 @@ describe("DispatchOutboxJob", () => {
     );
   });
 
+  it("can isolate one event type for a dedicated scheduled dispatcher", async () => {
+    const expiryEvent = {
+      ...event,
+      aggregateType: "institutional_addon_trial",
+      aggregateId: "trial-1",
+      eventType: "institutional.addon_trial.expired",
+      payload: { orgId: "org-1", trialId: "trial-1" },
+      idempotencyKey: "institutional-addon-trial-expiry:trial-1",
+    };
+    const outboxEvent = {
+      findMany: jest.fn().mockResolvedValue([expiryEvent]),
+      updateMany: jest.fn().mockResolvedValueOnce({ count: 1 }),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+    const dispatcher: jest.Mocked<OutboxDispatcher> = {
+      dispatch: jest.fn().mockResolvedValue(undefined),
+    };
+
+    await new DispatchOutboxJob(createClient(outboxEvent), dispatcher, [
+      "institutional.addon_trial.expired",
+    ]).run();
+
+    expect(outboxEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          eventType: { in: ["institutional.addon_trial.expired"] },
+        }),
+      }),
+    );
+    expect(dispatcher.dispatch).toHaveBeenCalledTimes(1);
+  });
+
   it("preserves trusted behaviour tenant and organisation scope in the consumer intent", async () => {
     const behaviourEvent = {
       ...event,

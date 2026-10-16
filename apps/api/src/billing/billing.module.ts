@@ -28,9 +28,15 @@ import {
 import { BILLING_WEBHOOK_PROVIDER } from "./billing-webhook.provider";
 import { InstitutionalWebhookService } from "./institutional/institutional-webhook.service";
 import { InstitutionalPublicActivationService } from "./institutional/institutional-public-activation.service";
+import { InstitutionalBillingModule } from "./institutional/institutional-billing.module";
 
 @Module({
-  imports: [PathwayAuthModule, CommonModule, AuthModule],
+  imports: [
+    PathwayAuthModule,
+    CommonModule,
+    AuthModule,
+    InstitutionalBillingModule,
+  ],
   controllers: [
     BillingController,
     BillingWebhookController,

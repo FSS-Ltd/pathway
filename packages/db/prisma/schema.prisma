@@ -4156,6 +4156,8 @@ model InstitutionalAddonTrial {
   decidedAt             DateTime?
   chosenPaidInterval    InstitutionalAddonInterval?
   paidSubscriptionId    String?
+  paidCheckoutSessionId String?                      @unique
+  paidCheckoutAttempt   Int                           @default(0)
   createdAt             DateTime                      @default(now())
   updatedAt             DateTime                      @updatedAt
   org                   Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)

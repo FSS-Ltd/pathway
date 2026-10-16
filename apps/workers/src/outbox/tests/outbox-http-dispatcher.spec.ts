@@ -1,6 +1,7 @@
 import {
   HttpOutboxDispatcher,
   loadBehaviourOutboxEndpoint,
+  loadInstitutionalAddonTrialOutboxEndpoint,
 } from "../outbox-http-dispatcher";
 
 describe("HttpOutboxDispatcher", () => {
@@ -97,6 +98,40 @@ describe("HttpOutboxDispatcher", () => {
     );
   });
 
+  it("routes add-on trial expiry events to the authenticated billing API", async () => {
+    const endpoint = loadInstitutionalAddonTrialOutboxEndpoint({
+      BILLING_INTERNAL_API_URL: "https://api.example.test",
+      INTERNAL_AUTH_SECRET: "internal-secret",
+    });
+    const dispatcher = new HttpOutboxDispatcher({
+      genericUrl: "https://dispatch.example.test/events",
+      genericToken: "dispatch-token",
+      institutionalAddonTrials: endpoint,
+    });
+    const intent = {
+      aggregateType: "institutional_addon_trial",
+      aggregateId: "trial-1",
+      eventType: "institutional.addon_trial.expired",
+      payload: { orgId: "org-1", trialId: "trial-1" },
+      idempotencyKey: "institutional-addon-trial-expiry:trial-1",
+    };
+
+    await dispatcher.dispatch(intent);
+
+    expect(endpoint?.url).toBe(
+      "https://api.example.test/billing/institutional/internal/addons/expiry-email",
+    );
+    expect(fetchMock).toHaveBeenCalledWith(endpoint?.url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": intent.idempotencyKey,
+        "x-pathway-internal-secret": "internal-secret",
+      },
+      body: JSON.stringify(intent),
+    });
+  });
+
   it("rejects insecure or non-behaviour API endpoints before dispatch", () => {
     expect(() =>
       loadBehaviourOutboxEndpoint({
@@ -137,5 +172,19 @@ describe("HttpOutboxDispatcher", () => {
       }),
     ).rejects.toThrow("Behaviour outbox dispatch is not configured");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("requires an HTTPS internal billing endpoint for trial expiry delivery", () => {
+    expect(() =>
+      loadInstitutionalAddonTrialOutboxEndpoint({
+        BILLING_INTERNAL_API_URL: "http://api.example.test",
+        INTERNAL_AUTH_SECRET: "internal-secret",
+      }),
+    ).toThrow("BILLING_INTERNAL_API_URL must use HTTPS or local HTTP");
+    expect(() =>
+      loadInstitutionalAddonTrialOutboxEndpoint({
+        BILLING_INTERNAL_API_URL: "https://api.example.test",
+      }),
+    ).toThrow("INTERNAL_AUTH_SECRET is required for add-on trial dispatch");
   });
 });
