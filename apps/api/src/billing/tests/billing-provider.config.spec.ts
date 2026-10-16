@@ -27,6 +27,23 @@ describe("billing provider config", () => {
     expect(config.stripe.webhookSecretSnapshot).toBe("whsec_snapshot");
   });
 
+  it("loads the public Stripe key for authenticated capacity payment confirmation", () => {
+    process.env.BILLING_PROVIDER = "STRIPE";
+    process.env.STRIPE_SECRET_KEY = "sk_test";
+    process.env.STRIPE_WEBHOOK_SECRET_SNAPSHOT = "whsec_snapshot";
+    process.env.STRIPE_PUBLISHABLE_KEY = "pk_test_public";
+
+    expect(loadBillingProviderConfig().stripe.publishableKey).toBe(
+      "pk_test_public",
+    );
+  });
+
+  it("does not expose a value that is not a Stripe publishable key", () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = "sk_test_secret_value";
+
+    expect(loadBillingProviderConfig().stripe.publishableKey).toBeUndefined();
+  });
+
   it("parses STRIPE_PRICE_MAP when stored as single-quoted escaped JSON (e.g. GitHub Secrets)", () => {
     process.env.BILLING_PROVIDER = "STRIPE";
     process.env.STRIPE_SECRET_KEY = "sk_test";

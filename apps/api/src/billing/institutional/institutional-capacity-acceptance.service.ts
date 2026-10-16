@@ -275,6 +275,7 @@ export class InstitutionalCapacityAcceptanceService {
     snapshotId: string;
     amountDueNowPence: number;
     paymentIntentClientSecret: string | null;
+    publishableKey: string | null;
   }> {
     if (
       !current.currentInstitutionalSnapshot ||
@@ -323,6 +324,9 @@ export class InstitutionalCapacityAcceptanceService {
       snapshotId: snapshot.id,
       amountDueNowPence: snapshot.amountDueNowPence,
       paymentIntentClientSecret: paymentIntent?.client_secret ?? null,
+      publishableKey: paymentIntent?.client_secret
+        ? (this.config.stripe.publishableKey ?? null)
+        : null,
     };
   }
 }

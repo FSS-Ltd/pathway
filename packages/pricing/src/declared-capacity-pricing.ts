@@ -12,6 +12,10 @@ export type DeclaredCapacityTier =
 type SelfServiceTier = Exclude<DeclaredCapacityTier, "enterprise">;
 const NO_INCLUDED_PAID_MODULES: readonly never[] = Object.freeze([]);
 export const DECLARED_CAPACITY_MAX_SELF_SERVICE_CAPACITY = 250;
+export const DECLARED_CAPACITY_BASE_MONTHLY_PENCE = 7_400;
+export const DECLARED_CAPACITY_CHILD_MONTHLY_PENCE = 100;
+export const DECLARED_CAPACITY_BASE_YEARLY_PENCE = 74_000;
+export const DECLARED_CAPACITY_CHILD_YEARLY_PENCE = 1_000;
 
 type SelfServicePlan = Readonly<{
   tier: SelfServiceTier;
@@ -162,11 +166,15 @@ function tierForCapacity(capacity: number): DeclaredCapacityTier {
 }
 
 function baseUnitAmountPence(interval: DeclaredCapacityInterval): number {
-  return interval === "year" ? 74_000 : 7_400;
+  return interval === "year"
+    ? DECLARED_CAPACITY_BASE_YEARLY_PENCE
+    : DECLARED_CAPACITY_BASE_MONTHLY_PENCE;
 }
 
 function capacityUnitAmountPence(interval: DeclaredCapacityInterval): number {
-  return interval === "year" ? 1_000 : 100;
+  return interval === "year"
+    ? DECLARED_CAPACITY_CHILD_YEARLY_PENCE
+    : DECLARED_CAPACITY_CHILD_MONTHLY_PENCE;
 }
 
 export function isDeclaredCapacityPlanCode(
