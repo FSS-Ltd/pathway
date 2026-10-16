@@ -7,19 +7,28 @@ describe("public institutional checkout settings", () => {
   const checkout = jest
     .fn()
     .mockResolvedValue({ checkoutUrl: "https://checkout.example.test" });
+  const checkoutDeclaredCapacity = jest
+    .fn()
+    .mockResolvedValue({ checkoutUrl: "https://checkout.example.test" });
   let controller: InstitutionalPublicCheckoutController;
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [InstitutionalPublicCheckoutController],
       providers: [
-        { provide: InstitutionalPublicCheckoutService, useValue: { checkout } },
+        {
+          provide: InstitutionalPublicCheckoutService,
+          useValue: { checkout, checkoutDeclaredCapacity },
+        },
       ],
     }).compile();
     controller = module.get(InstitutionalPublicCheckoutController);
   });
 
-  beforeEach(() => checkout.mockClear());
+  beforeEach(() => {
+    checkout.mockClear();
+    checkoutDeclaredCapacity.mockClear();
+  });
 
   const request = (setting: string) => ({
     planCode: "INSTITUTIONAL_STARTER_MONTHLY",
@@ -58,5 +67,33 @@ describe("public institutional checkout settings", () => {
       BadRequestException,
     );
     expect(checkout).not.toHaveBeenCalled();
+  });
+
+  it("requires the public declared-capacity checkout amount to be confirmed", async () => {
+    const request = {
+      declaredCapacity: 75,
+      interval: "month",
+      expectedTotalPence: 14_900,
+      declarationAccepted: true,
+      setting: "NURSERY",
+      payNowModules: [],
+      trialModules: [],
+      idempotencyKey: "declared-capacity-checkout",
+      org: {
+        orgName: "Example organisation",
+        contactName: "Example contact",
+        contactEmail: "contact@example.test",
+        password: "safe-test-password",
+      },
+    };
+    await controller.checkoutDeclaredCapacity(request);
+    expect(checkoutDeclaredCapacity).toHaveBeenCalledWith(request);
+
+    expect(() =>
+      controller.checkoutDeclaredCapacity({
+        ...request,
+        expectedTotalPence: undefined,
+      }),
+    ).toThrow(BadRequestException);
   });
 });

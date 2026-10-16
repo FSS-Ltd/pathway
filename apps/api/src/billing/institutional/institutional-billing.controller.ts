@@ -17,6 +17,7 @@ import { AuthUserGuard } from "../../auth/auth-user.guard";
 import { IndependentTransaction } from "../../common/database/independent-transaction.decorator";
 import { InstitutionalCensusService } from "./institutional-census.service";
 import { InstitutionalCheckoutService } from "./institutional-checkout.service";
+import { InstitutionalCapacityService } from "./institutional-capacity.service";
 import { InstitutionalQuoteService } from "./institutional-quote.service";
 
 const planCodeSchema = z.enum([
@@ -42,11 +43,20 @@ const mappedQuoteSchema = quoteSchema.extend({
   ]),
   storageChoice: z.enum(["none", "100", "200", "1000"]).default("none"),
 });
+const declaredCapacityQuoteSchema = z.object({
+  declaredCapacity: z.number().int().nonnegative().safe(),
+  interval: z.enum(["month", "year"]),
+  payNowModules: z.array(z.nativeEnum(Module)).default([]),
+  trialModules: z.array(z.nativeEnum(Module)).default([]),
+});
 const acceptSchema = z.object({
   snapshotId: z.string().uuid(),
   idempotencyKey: z.string().min(8).max(128),
 });
 const checkoutSchema = acceptSchema;
+const capacityQuoteSchema = z.object({
+  declaredCapacity: z.number().int().nonnegative().safe(),
+});
 
 function parseBody<TSchema extends z.ZodTypeAny>(
   schema: TSchema,
@@ -73,6 +83,8 @@ export class InstitutionalBillingController {
     private readonly census: InstitutionalCensusService,
     @Inject(InstitutionalCheckoutService)
     private readonly checkoutService: InstitutionalCheckoutService,
+    @Inject(InstitutionalCapacityService)
+    private readonly capacityService: InstitutionalCapacityService,
   ) {}
 
   private async authorize(
@@ -113,6 +125,20 @@ export class InstitutionalBillingController {
     );
   }
 
+  @Post("quotes/declared-capacity")
+  async createDeclaredCapacityQuote(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Body() body: unknown,
+  ) {
+    const actorId = await this.authorize(orgId, req);
+    return this.quotes.createDeclaredCapacityQuote(
+      orgId,
+      actorId,
+      parseBody(declaredCapacityQuoteSchema, body),
+    );
+  }
+
   @Post("quotes/accept")
   async acceptQuote(
     @CurrentOrg("orgId") orgId: string,
@@ -149,6 +175,37 @@ export class InstitutionalBillingController {
     const input = parseBody(checkoutSchema, body);
     return this.checkoutService.checkout(
       orgId,
+      input.snapshotId,
+      input.idempotencyKey,
+    );
+  }
+
+  @Post("capacity/quotes")
+  async createCapacityQuote(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Body() body: unknown,
+  ) {
+    const actorId = await this.authorize(orgId, req);
+    const input = parseBody(capacityQuoteSchema, body);
+    return this.capacityService.createQuote(
+      orgId,
+      actorId,
+      input.declaredCapacity,
+    );
+  }
+
+  @Post("capacity/quotes/accept")
+  async acceptCapacityQuote(
+    @CurrentOrg("orgId") orgId: string,
+    @Req() req: { authUserId?: string },
+    @Body() body: unknown,
+  ) {
+    const actorId = await this.authorize(orgId, req);
+    const input = parseBody(acceptSchema, body);
+    return this.capacityService.acceptQuote(
+      orgId,
+      actorId,
       input.snapshotId,
       input.idempotencyKey,
     );

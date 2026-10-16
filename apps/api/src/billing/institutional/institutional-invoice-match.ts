@@ -3,7 +3,11 @@ import type { ParsedBillingWebhookEvent } from "../billing-webhook.provider";
 import { INSTITUTIONAL_STRIPE_PRICE_SPECS } from "./institutional-stripe-prices";
 import { stripeItemsForSnapshot } from "./institutional-stripe-line-items";
 import { quoteFromFrozenInstitutionalPrices } from "./institutional-frozen-pricing";
-import { INSTITUTIONAL_MAPPED_PRICING_VERSION } from "@pathway/pricing";
+import {
+  DECLARED_CAPACITY_PRICING_VERSION,
+  INSTITUTIONAL_MAPPED_PRICING_VERSION,
+} from "@pathway/pricing";
+import { z } from "zod";
 
 export function invoiceMatchesSnapshot(
   event: ParsedBillingWebhookEvent,
@@ -21,7 +25,8 @@ export function invoiceMatchesSnapshot(
     invoice.status !== (event.kind === "invoice.draft" ? "draft" : "paid") ||
     snapshot.status !== InstitutionalSnapshotStatus.PRICED ||
     snapshot.subtotalPence === null ||
-    snapshot.paidModules.length !== 0
+    (snapshot.paidModules.length !== 0 &&
+      snapshot.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION)
   ) {
     return false;
   }
@@ -39,6 +44,14 @@ export function invoiceMatchesSnapshot(
             snapshot.enrolledChildren,
           )
         : null;
+    const frozenDeclaredLines = z
+      .array(
+        z.object({
+          priceId: z.string().regex(/^price_[A-Za-z0-9]+$/),
+          unitAmountPence: z.number().int().positive().safe(),
+        }),
+      )
+      .safeParse(snapshot.lines);
     const frozenAmounts =
       frozenQuote?.kind === "priced"
         ? new Map(
@@ -47,7 +60,15 @@ export function invoiceMatchesSnapshot(
               line.unitAmountPence,
             ]),
           )
-        : null;
+        : snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+            frozenDeclaredLines.success
+          ? new Map(
+              frozenDeclaredLines.data.map((line) => [
+                line.priceId,
+                line.unitAmountPence,
+              ]),
+            )
+          : null;
     const knownInstitutionalIds = new Set(
       INSTITUTIONAL_STRIPE_PRICE_SPECS.map(
         (spec) => priceMap[spec.code],

@@ -23,7 +23,10 @@ import { stripeItemsForSnapshot } from "./institutional-stripe-line-items";
 import { scheduleInstitutionalRenewal } from "./institutional-subscription-schedule";
 import { institutionalStripeKey } from "./institutional-provider-guard";
 import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
-import { INSTITUTIONAL_MAPPED_PRICING_VERSION } from "@pathway/pricing";
+import {
+  DECLARED_CAPACITY_PRICING_VERSION,
+  INSTITUTIONAL_MAPPED_PRICING_VERSION,
+} from "@pathway/pricing";
 
 @Injectable()
 export class InstitutionalOperationService {
@@ -200,7 +203,10 @@ export class InstitutionalOperationService {
       snapshot,
       this.config.stripe.priceMap ?? {},
     );
-    if (snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
+    if (
+      snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION ||
+      snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+    ) {
       for (const item of mapped) {
         try {
           validateFrozenStripePrice(

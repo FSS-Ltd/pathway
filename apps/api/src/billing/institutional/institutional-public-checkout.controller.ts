@@ -34,6 +34,23 @@ const checkoutSchema = z.object({
   }),
 });
 
+const declaredCapacityCheckoutSchema = z.object({
+  declaredCapacity: z.number().int().nonnegative().safe(),
+  interval: z.enum(["month", "year"]),
+  expectedTotalPence: z.number().int().nonnegative().safe(),
+  declarationAccepted: z.literal(true),
+  setting: z.enum(INSTITUTIONAL_VERTICALS),
+  payNowModules: z.array(z.nativeEnum(Module)).default([]),
+  trialModules: z.array(z.nativeEnum(Module)).default([]),
+  idempotencyKey: z.string().min(8).max(128),
+  org: z.object({
+    orgName: z.string().trim().min(2).max(120),
+    contactName: z.string().trim().min(2).max(120),
+    contactEmail: z.string().email().max(254),
+    password: z.string().min(8).max(200),
+  }),
+});
+
 @Controller("billing/institutional/public")
 export class InstitutionalPublicCheckoutController {
   constructor(
@@ -51,5 +68,17 @@ export class InstitutionalPublicCheckoutController {
       });
     }
     return this.checkoutService.checkout(parsed.data);
+  }
+
+  @Post("declared-capacity/checkout")
+  checkoutDeclaredCapacity(@Body() body: unknown) {
+    const parsed = declaredCapacityCheckoutSchema.safeParse(body);
+    if (!parsed.success) {
+      throw new BadRequestException({
+        code: "INVALID_REQUEST",
+        details: parsed.error.flatten(),
+      });
+    }
+    return this.checkoutService.checkoutDeclaredCapacity(parsed.data);
   }
 }

@@ -5,7 +5,7 @@ import {
 } from "../institutional-stripe-prices";
 
 describe("institutional Stripe price catalogue", () => {
-  it("defines exactly the three bases and two child bands", () => {
+  it("defines legacy plans and the declared-capacity base and child prices", () => {
     expect(
       INSTITUTIONAL_STRIPE_PRICE_SPECS.map(({ code, unitAmountPence }) => [
         code,
@@ -17,6 +17,10 @@ describe("institutional Stripe price catalogue", () => {
       ["INSTITUTIONAL_PROFESSIONAL_MONTHLY", 14_900],
       ["INSTITUTIONAL_CHILD_UP_TO_100_MONTHLY", 100],
       ["INSTITUTIONAL_CHILD_101_TO_250_MONTHLY", 75],
+      ["DECLARED_CAPACITY_BASE_MONTHLY", 7_400],
+      ["DECLARED_CAPACITY_BASE_YEARLY", 74_000],
+      ["DECLARED_CAPACITY_CHILD_MONTHLY", 100],
+      ["DECLARED_CAPACITY_CHILD_YEARLY", 1_000],
     ]);
   });
 

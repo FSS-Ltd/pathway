@@ -5,6 +5,8 @@ import {
 import { InstitutionalCatalogueController } from "../institutional-catalogue.controller";
 
 describe("public institutional estimate", () => {
+  const originalDeclaredCapacityFlag =
+    process.env.DECLARED_CAPACITY_BILLING_ENABLED;
   const mappedPrices = {
     resolve: async () => ({
       STARTER_49_MONTHLY: { priceId: "price_base", unitAmountPence: 5700 },
@@ -28,6 +30,15 @@ describe("public institutional estimate", () => {
     }),
   };
   const controller = new InstitutionalCatalogueController(mappedPrices);
+
+  afterAll(() => {
+    if (originalDeclaredCapacityFlag === undefined) {
+      delete process.env.DECLARED_CAPACITY_BILLING_ENABLED;
+    } else {
+      process.env.DECLARED_CAPACITY_BILLING_ENABLED =
+        originalDeclaredCapacityFlag;
+    }
+  });
 
   it("lists the three monthly plans without enabling checkout", () => {
     const catalogue = controller.catalogue();
@@ -98,5 +109,40 @@ describe("public institutional estimate", () => {
         storageChoice: "none",
       }),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it("keeps declared-capacity estimates unavailable until cutover", () => {
+    delete process.env.DECLARED_CAPACITY_BILLING_ENABLED;
+    expect(() =>
+      controller.estimateDeclaredCapacity({
+        declaredCapacity: 74,
+        interval: "month",
+      }),
+    ).toThrow(ServiceUnavailableException);
+  });
+
+  it("returns server-derived declared-capacity prices when enabled", () => {
+    process.env.DECLARED_CAPACITY_BILLING_ENABLED = "true";
+    expect(
+      controller.estimateDeclaredCapacity({
+        declaredCapacity: 74,
+        interval: "month",
+      }),
+    ).toMatchObject({
+      pricingVersion: "DECLARED_CAPACITY_V2",
+      tier: "starter",
+      totalPence: 14_800,
+      siteAllowance: 1,
+    });
+    expect(
+      controller.estimateDeclaredCapacity({
+        declaredCapacity: 251,
+        interval: "year",
+      }),
+    ).toMatchObject({
+      kind: "contact_sales",
+      tier: "enterprise",
+      contactPath: "/demo?plan=enterprise",
+    });
   });
 });

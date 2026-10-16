@@ -4,21 +4,46 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import {
+  DECLARED_CAPACITY_PRICE_CODES,
+  type DeclaredCapacityPriceCode,
   INSTITUTIONAL_MAPPED_PRICE_CODES,
   type InstitutionalMappedPriceCode,
-  type InstitutionalResolvedPrices,
 } from "@pathway/pricing";
+import {
+  DECLARED_CAPACITY_ADDON_MODULES,
+  declaredCapacityAddonPriceCode,
+  type DeclaredCapacityAddonPriceCode,
+} from "./declared-capacity-addons";
 import {
   BILLING_PROVIDER_CONFIG,
   type BillingProviderConfig,
 } from "../billing-provider.config";
 import { BillingPricingService, type BillingPrice } from "../pricing.service";
 
-const priceCodes: ReadonlySet<string> = new Set(
-  INSTITUTIONAL_MAPPED_PRICE_CODES,
-);
+type InstitutionalResolvedPrices = Partial<
+  Record<
+    | InstitutionalMappedPriceCode
+    | DeclaredCapacityPriceCode
+    | DeclaredCapacityAddonPriceCode,
+    { priceId: string; unitAmountPence: number }
+  >
+>;
 
-function isMappedPriceCode(code: string): code is InstitutionalMappedPriceCode {
+const priceCodes: ReadonlySet<string> = new Set([
+  ...INSTITUTIONAL_MAPPED_PRICE_CODES,
+  ...DECLARED_CAPACITY_PRICE_CODES,
+  ...DECLARED_CAPACITY_ADDON_MODULES.flatMap((module) => [
+    declaredCapacityAddonPriceCode(module, "month"),
+    declaredCapacityAddonPriceCode(module, "year"),
+  ]),
+]);
+
+function isMappedPriceCode(
+  code: string,
+): code is
+  | InstitutionalMappedPriceCode
+  | DeclaredCapacityPriceCode
+  | DeclaredCapacityAddonPriceCode {
   return priceCodes.has(code);
 }
 
@@ -26,12 +51,7 @@ export function resolveInstitutionalPrices(
   prices: readonly BillingPrice[],
   expectedLivemode: boolean,
 ): InstitutionalResolvedPrices {
-  const resolved: Partial<
-    Record<
-      InstitutionalMappedPriceCode,
-      { priceId: string; unitAmountPence: number }
-    >
-  > = {};
+  const resolved: InstitutionalResolvedPrices = {};
   for (const price of prices) {
     if (!isMappedPriceCode(price.code)) continue;
     const interval = price.code.endsWith("_YEARLY") ? "year" : "month";

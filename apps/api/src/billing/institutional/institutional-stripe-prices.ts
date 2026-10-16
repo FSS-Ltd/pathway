@@ -1,17 +1,21 @@
 import {
+  DECLARED_CAPACITY_PRICE_CODES,
   INSTITUTIONAL_CHILD_PRICE_CODES,
   INSTITUTIONAL_PLANS,
+  type DeclaredCapacityPriceCode,
   type InstitutionalPlanCode,
 } from "@pathway/pricing";
 
 export type InstitutionalStripePriceCode =
   | InstitutionalPlanCode
-  | (typeof INSTITUTIONAL_CHILD_PRICE_CODES)[keyof typeof INSTITUTIONAL_CHILD_PRICE_CODES];
+  | (typeof INSTITUTIONAL_CHILD_PRICE_CODES)[keyof typeof INSTITUTIONAL_CHILD_PRICE_CODES]
+  | DeclaredCapacityPriceCode;
 
 export type InstitutionalStripePriceSpec = Readonly<{
   code: InstitutionalStripePriceCode;
   productName: string;
   unitAmountPence: number;
+  interval: "month" | "year";
 }>;
 
 export const INSTITUTIONAL_STRIPE_PRICE_SPECS: readonly InstitutionalStripePriceSpec[] =
@@ -21,28 +25,57 @@ export const INSTITUTIONAL_STRIPE_PRICE_SPECS: readonly InstitutionalStripePrice
       productName: "NexSteps Starter",
       unitAmountPence:
         INSTITUTIONAL_PLANS.INSTITUTIONAL_STARTER_MONTHLY.basePence,
+      interval: "month",
     },
     {
       code: "INSTITUTIONAL_GROWTH_MONTHLY",
       productName: "NexSteps Growth",
       unitAmountPence:
         INSTITUTIONAL_PLANS.INSTITUTIONAL_GROWTH_MONTHLY.basePence,
+      interval: "month",
     },
     {
       code: "INSTITUTIONAL_PROFESSIONAL_MONTHLY",
       productName: "NexSteps Professional",
       unitAmountPence:
         INSTITUTIONAL_PLANS.INSTITUTIONAL_PROFESSIONAL_MONTHLY.basePence,
+      interval: "month",
     },
     {
       code: INSTITUTIONAL_CHILD_PRICE_CODES.upTo100,
       productName: "NexSteps additional enrolled children (to 100)",
       unitAmountPence: 100,
+      interval: "month",
     },
     {
       code: INSTITUTIONAL_CHILD_PRICE_CODES.from101To250,
       productName: "NexSteps additional enrolled children (101–250)",
       unitAmountPence: 75,
+      interval: "month",
+    },
+    {
+      code: DECLARED_CAPACITY_PRICE_CODES[0],
+      productName: "NexSteps declared-capacity subscription base (monthly)",
+      unitAmountPence: 7_400,
+      interval: "month",
+    },
+    {
+      code: DECLARED_CAPACITY_PRICE_CODES[1],
+      productName: "NexSteps declared-capacity subscription base (annual)",
+      unitAmountPence: 74_000,
+      interval: "year",
+    },
+    {
+      code: DECLARED_CAPACITY_PRICE_CODES[2],
+      productName: "NexSteps declared-capacity child (monthly)",
+      unitAmountPence: 100,
+      interval: "month",
+    },
+    {
+      code: DECLARED_CAPACITY_PRICE_CODES[3],
+      productName: "NexSteps declared-capacity child (annual)",
+      unitAmountPence: 1_000,
+      interval: "year",
     },
   ];
 
@@ -72,7 +105,7 @@ export function validateInstitutionalStripePrice(
     actualProductId !== productId ||
     price.currency !== "gbp" ||
     price.unit_amount !== spec.unitAmountPence ||
-    price.recurring?.interval !== "month" ||
+    price.recurring?.interval !== spec.interval ||
     price.recurring.interval_count !== 1 ||
     price.recurring.usage_type !== "licensed"
   ) {

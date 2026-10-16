@@ -59,12 +59,20 @@ for (const expected of expectedQuotes) {
     assert.deepEqual(quote.lines, [
       {
         component: "BASE",
+        priceCode:
+          interval === "month"
+            ? "DECLARED_CAPACITY_BASE_MONTHLY"
+            : "DECLARED_CAPACITY_BASE_YEARLY",
         quantity: 1,
         unitAmountPence: expectedBasePence,
         subtotalPence: expectedBasePence,
       },
       {
         component: "DECLARED_CAPACITY",
+        priceCode:
+          interval === "month"
+            ? "DECLARED_CAPACITY_CHILD_MONTHLY"
+            : "DECLARED_CAPACITY_CHILD_YEARLY",
         quantity: expected.capacity,
         unitAmountPence: expectedCapacityUnitPence,
         subtotalPence: expected.capacity * expectedCapacityUnitPence,

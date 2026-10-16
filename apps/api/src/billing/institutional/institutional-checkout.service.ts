@@ -14,6 +14,11 @@ import {
   type Prisma,
 } from "@pathway/db";
 import {
+  calculateDeclaredCapacityQuote,
+  declaredCapacityIntervalFromPlanCode,
+  declaredCapacityPlanCode,
+  DECLARED_CAPACITY_PRICING_VERSION,
+  isDeclaredCapacityPlanCode,
   INSTITUTIONAL_PLANS,
   INSTITUTIONAL_MAPPED_PRICING_VERSION,
   INSTITUTIONAL_PRICING_VERSION,
@@ -39,6 +44,7 @@ import {
 import { localDateAt } from "./institutional-time";
 import { institutionalStripeKey } from "./institutional-provider-guard";
 import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
+import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
 
 @Injectable()
 export class InstitutionalCheckoutService {
@@ -64,6 +70,16 @@ export class InstitutionalCheckoutService {
       where: { id: snapshotId, orgId, kind: InstitutionalSnapshotKind.QUOTE },
       include: { acceptance: true, policy: true },
     });
+    if (snapshot?.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
+      assertDeclaredCapacityBillingEnabled();
+      const org = await tx.org.findUnique({
+        where: { id: orgId },
+        select: { isMasterOrg: true },
+      });
+      if (org?.isMasterOrg) {
+        throw new ConflictException({ code: "MASTER_ORG_EXEMPT" });
+      }
+    }
     if (
       !snapshot ||
       !snapshot.acceptance ||
@@ -71,10 +87,17 @@ export class InstitutionalCheckoutService {
       !snapshot.expiresAt ||
       snapshot.expiresAt <= now ||
       (snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION &&
-        snapshot.pricingVersion !== INSTITUTIONAL_MAPPED_PRICING_VERSION) ||
+        snapshot.pricingVersion !== INSTITUTIONAL_MAPPED_PRICING_VERSION &&
+        snapshot.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION) ||
       (snapshot.pricingVersion === INSTITUTIONAL_PRICING_VERSION &&
         snapshot.policy.pricingVersion !== snapshot.pricingVersion) ||
-      (!isInstitutionalPlanCode(snapshot.planCode) &&
+      (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+        (snapshot.policy.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION ||
+          snapshot.countSource !== null ||
+          snapshot.declaredCapacity === null ||
+          !isDeclaredCapacityPlanCode(snapshot.planCode))) ||
+      (snapshot.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION &&
+        !isInstitutionalPlanCode(snapshot.planCode) &&
         !isMappedInstitutionalPlanCode(snapshot.planCode))
     ) {
       throw new ConflictException({ code: "QUOTE_CHANGED" });
@@ -84,14 +107,48 @@ export class InstitutionalCheckoutService {
       select: { id: true },
     });
     if (superseding) throw new ConflictException({ code: "QUOTE_CHANGED" });
-    const selectionPlan = isInstitutionalPlanCode(snapshot.planCode)
-      ? snapshot.planCode
-      : mappedInstitutionalSelectionPlanCode(snapshot.planCode);
-    validateInstitutionalSelection(selectionPlan, {
-      includedModules: snapshot.includedModules,
-      paidModules: snapshot.paidModules,
-    });
-    if (snapshot.countSource === InstitutionalCountSource.DECLARED) {
+    if (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
+      if (!isDeclaredCapacityPlanCode(snapshot.planCode)) {
+        throw new ConflictException({ code: "QUOTE_CHANGED" });
+      }
+      try {
+        stripeItemsForSnapshot(snapshot, {});
+      } catch {
+        throw new ConflictException({ code: "QUOTE_CHANGED" });
+      }
+      const interval = declaredCapacityIntervalFromPlanCode(snapshot.planCode);
+      if (snapshot.declaredCapacity === null) {
+        throw new ConflictException({ code: "QUOTE_CHANGED" });
+      }
+      const quote = calculateDeclaredCapacityQuote({
+        declaredCapacity: snapshot.declaredCapacity,
+        interval,
+      });
+      if (
+        quote.kind !== "priced" ||
+        declaredCapacityPlanCode(quote.tier, interval) !== snapshot.planCode ||
+        snapshot.policy.declaredCapacity !== null
+      ) {
+        throw new ConflictException({ code: "QUOTE_CHANGED" });
+      }
+    } else {
+      const selectionPlan = isInstitutionalPlanCode(snapshot.planCode)
+        ? snapshot.planCode
+        : isMappedInstitutionalPlanCode(snapshot.planCode)
+          ? mappedInstitutionalSelectionPlanCode(snapshot.planCode)
+          : null;
+      if (!selectionPlan) {
+        throw new ConflictException({ code: "QUOTE_CHANGED" });
+      }
+      validateInstitutionalSelection(selectionPlan, {
+        includedModules: snapshot.includedModules,
+        paidModules: snapshot.paidModules,
+      });
+    }
+    if (
+      snapshot.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION &&
+      snapshot.countSource === InstitutionalCountSource.DECLARED
+    ) {
       const confirmation = await tx.enrolmentRollConfirmation.findFirst({
         where: { orgId },
         select: { id: true },
@@ -102,7 +159,10 @@ export class InstitutionalCheckoutService {
       ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-    } else if (snapshot.countSource === InstitutionalCountSource.VERIFIED) {
+    } else if (
+      snapshot.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION &&
+      snapshot.countSource === InstitutionalCountSource.VERIFIED
+    ) {
       const confirmation = await tx.enrolmentRollConfirmation.findFirst({
         where: { orgId },
         orderBy: [{ revisionCutoff: "desc" }, { id: "desc" }],
@@ -119,7 +179,7 @@ export class InstitutionalCheckoutService {
       if (current.enrolledCount !== snapshot.enrolledChildren) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-    } else {
+    } else if (snapshot.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION) {
       throw new ConflictException({ code: "QUOTE_CHANGED" });
     }
     return snapshot;
@@ -181,27 +241,48 @@ export class InstitutionalCheckoutService {
       });
       if (!tenant)
         throw new ConflictException({ code: "ORGANISATION_SITE_REQUIRED" });
-      if (
-        !isInstitutionalPlanCode(snapshot.planCode) &&
-        !isMappedInstitutionalPlanCode(snapshot.planCode)
-      ) {
+      let maxSites: number;
+      if (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
+        if (
+          !isDeclaredCapacityPlanCode(snapshot.planCode) ||
+          snapshot.declaredCapacity === null
+        ) {
+          throw new ConflictException({ code: "QUOTE_CHANGED" });
+        }
+        const quote = calculateDeclaredCapacityQuote({
+          declaredCapacity: snapshot.declaredCapacity,
+          interval: declaredCapacityIntervalFromPlanCode(snapshot.planCode),
+        });
+        if (quote.kind !== "priced") {
+          throw new ConflictException({ code: "CONTACT_SALES_REQUIRED" });
+        }
+        maxSites = quote.siteAllowance;
+      } else if (isInstitutionalPlanCode(snapshot.planCode)) {
+        maxSites = INSTITUTIONAL_PLANS[snapshot.planCode].includedSites;
+      } else if (isMappedInstitutionalPlanCode(snapshot.planCode)) {
+        maxSites =
+          INSTITUTIONAL_PLANS[
+            mappedInstitutionalSelectionPlanCode(snapshot.planCode)
+          ].includedSites;
+      } else {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-      const plan =
-        INSTITUTIONAL_PLANS[
-          isInstitutionalPlanCode(snapshot.planCode)
-            ? snapshot.planCode
-            : mappedInstitutionalSelectionPlanCode(snapshot.planCode)
-        ];
+      if (
+        snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
+        (await tx.tenant.count({ where: { orgId } })) > maxSites
+      ) {
+        throw new ConflictException({ code: "CAPACITY_BELOW_SITE_ALLOWANCE" });
+      }
       const order = await tx.pendingOrder.create({
         data: {
           orgId,
           tenantId: tenant.id,
           planCode: snapshot.planCode,
-          maxSites: plan.includedSites,
+          maxSites,
           selectedModules: [
             ...snapshot.includedModules,
             ...snapshot.paidModules,
+            ...snapshot.selectedTrialModules,
           ],
           flags: {
             purchaseKind: "institutional",
@@ -209,6 +290,7 @@ export class InstitutionalCheckoutService {
               includedModules: snapshot.includedModules,
               paidModules: snapshot.paidModules,
             },
+            selectedTrialModules: snapshot.selectedTrialModules,
           },
           provider: BillingProvider.STRIPE,
           institutionalSnapshotId: snapshot.id,
@@ -229,8 +311,10 @@ export class InstitutionalCheckoutService {
     const adminUrl = process.env.ADMIN_URL?.trim();
     const mappedCheckout =
       snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION;
+    const declaredCapacityCheckout =
+      snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION;
     let adminOrigin: URL | null = null;
-    if (mappedCheckout) {
+    if (mappedCheckout || declaredCapacityCheckout) {
       try {
         adminOrigin = new URL(adminUrl ?? "");
         if (
@@ -271,7 +355,10 @@ export class InstitutionalCheckoutService {
     for (const item of lineItems) {
       try {
         const providerPrice = await stripe.prices.retrieve(item.price);
-        if (snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION) {
+        if (
+          snapshot.pricingVersion === INSTITUTIONAL_MAPPED_PRICING_VERSION ||
+          snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+        ) {
           validateFrozenStripePrice(
             providerPrice,
             snapshot,

@@ -1,5 +1,8 @@
 import {
+  calculateDeclaredCapacityQuote,
   calculateMappedInstitutionalQuote,
+  declaredCapacityPlanCode,
+  DECLARED_CAPACITY_PRICING_VERSION,
   INSTITUTIONAL_MAPPED_PRICING_VERSION,
   INSTITUTIONAL_PRICING_VERSION,
 } from "@pathway/pricing";
@@ -22,6 +25,45 @@ const starter = {
 };
 
 describe("institutional Stripe line items", () => {
+  it("uses the frozen declared-capacity monthly and yearly lines", () => {
+    for (const [declaredCapacity, interval, expectedPlan, expectedAmount] of [
+      [0, "month", "DECLARED_CAPACITY_STARTER_MONTHLY", 7_400],
+      [75, "month", "DECLARED_CAPACITY_GROWTH_MONTHLY", 14_900],
+      [150, "year", "DECLARED_CAPACITY_PROFESSIONAL_YEARLY", 224_000],
+    ] as const) {
+      const quote = calculateDeclaredCapacityQuote({
+        declaredCapacity,
+        interval,
+      });
+      expect(quote.kind).toBe("priced");
+      if (quote.kind !== "priced") continue;
+      const snapshot = {
+        planCode: declaredCapacityPlanCode(quote.tier, interval),
+        pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+        enrolledChildren: null,
+        declaredCapacity,
+        subtotalPence: quote.totalPence,
+        includedModules: [],
+        paidModules: [],
+        lines: quote.lines.map((line) => ({
+          ...line,
+          priceId: `price_${line.priceCode.toLowerCase().replaceAll("_", "")}`,
+          currency: "GBP" as const,
+        })),
+      };
+      expect(snapshot.planCode).toBe(expectedPlan);
+      expect(snapshot.subtotalPence).toBe(expectedAmount);
+      expect(stripeItemsForSnapshot(snapshot, {})).toEqual(
+        quote.lines
+          .filter((line) => line.quantity > 0)
+          .map((line) => ({
+            price: `price_${line.priceCode.toLowerCase().replaceAll("_", "")}`,
+            quantity: line.quantity,
+          })),
+      );
+    }
+  });
+
   it("uses accepted V2 Price IDs and amounts after the map changes", () => {
     const quote = calculateMappedInstitutionalQuote({
       planCode: "INSTITUTIONAL_STARTER_MONTHLY",

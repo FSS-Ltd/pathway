@@ -14,6 +14,7 @@ import {
   InstitutionalCountSource,
   InstitutionalSnapshotKind,
   InstitutionalSnapshotStatus,
+  Module,
   OrgRole,
   Prisma,
   prisma,
@@ -21,6 +22,13 @@ import {
   Vertical,
   withOrgRlsContext,
 } from "@pathway/db";
+import {
+  calculateDeclaredCapacityQuote,
+  declaredCapacityPlanCode,
+  DECLARED_CAPACITY_PRICING_VERSION,
+  isDeclaredCapacityPlanCode,
+  type DeclaredCapacityInterval,
+} from "@pathway/pricing";
 import {
   calculateInstitutionalQuote,
   calculateMappedInstitutionalQuote,
@@ -47,6 +55,12 @@ import {
   QUOTE_VALIDITY_MS,
 } from "./institutional-time";
 import { InstitutionalPriceResolver } from "./institutional-price-resolver";
+import { assertDeclaredCapacityBillingEnabled } from "./declared-capacity-gate";
+import {
+  DeclaredCapacityStripePriceError,
+  quoteDeclaredCapacityWithStripePrices,
+} from "./declared-capacity-stripe-pricing";
+import { stripeItemsForSnapshot } from "./institutional-stripe-line-items";
 
 export type CreateInstitutionalQuoteInput = InstitutionalModuleSelection & {
   planCode: InstitutionalPlanCode;
@@ -61,6 +75,13 @@ export type CreateMappedInstitutionalQuoteInput =
     declaredChildren?: number;
     declarationAccepted?: boolean;
   };
+
+export type CreateDeclaredCapacityQuoteInput = Readonly<{
+  declaredCapacity: number;
+  interval: DeclaredCapacityInterval;
+  payNowModules: Module[];
+  trialModules: Module[];
+}>;
 
 export async function withInstitutionalOrgLock<T>(
   orgId: string,
@@ -349,6 +370,139 @@ export class InstitutionalQuoteService {
     return this.createQuote(orgId, actorUserId, input, now);
   }
 
+  async createDeclaredCapacityQuote(
+    orgId: string,
+    actorUserId: string,
+    input: CreateDeclaredCapacityQuoteInput,
+    now = new Date(),
+  ) {
+    assertDeclaredCapacityBillingEnabled();
+    const estimate = calculateDeclaredCapacityQuote({
+      declaredCapacity: input.declaredCapacity,
+      interval: input.interval,
+    });
+    if (estimate.kind === "contact_sales") return estimate;
+
+    let quote;
+    try {
+      quote = quoteDeclaredCapacityWithStripePrices(
+        {
+          declaredCapacity: input.declaredCapacity,
+          interval: input.interval,
+        },
+        await this.mappedPrices.resolve(),
+        {
+          paidModules: input.payNowModules,
+          trialModules: input.trialModules,
+        },
+      );
+    } catch (error) {
+      if (error instanceof DeclaredCapacityStripePriceError) {
+        throw new ServiceUnavailableException({
+          code: "INSTITUTIONAL_PRICE_UNAVAILABLE",
+          priceCode: error.priceCode,
+          retryable: true,
+        });
+      }
+      throw error;
+    }
+    if (quote.kind !== "priced") return quote;
+
+    return withInstitutionalOrgLock(orgId, async (tx) => {
+      const [org, activeSubscription, siteCount] = await Promise.all([
+        tx.org.findUnique({
+          where: { id: orgId },
+          select: { isMasterOrg: true },
+        }),
+        tx.subscription.findFirst({
+          where: {
+            orgId,
+            status: {
+              in: [
+                SubscriptionStatus.ACTIVE,
+                SubscriptionStatus.PAST_DUE,
+                SubscriptionStatus.TRIALING,
+              ],
+            },
+          },
+          select: { id: true },
+        }),
+        tx.tenant.count({ where: { orgId } }),
+      ]);
+      if (org?.isMasterOrg) {
+        throw new ConflictException({ code: "MASTER_ORG_EXEMPT" });
+      }
+      if (activeSubscription) {
+        throw new ConflictException({ code: "CAPACITY_CHANGE_QUOTE_REQUIRED" });
+      }
+      if (siteCount > quote.siteAllowance) {
+        throw new ConflictException({ code: "CAPACITY_BELOW_SITE_ALLOWANCE" });
+      }
+      const site = await tx.tenant.findFirst({
+        where: { orgId },
+        orderBy: { createdAt: "asc" },
+        select: { timezone: true },
+      });
+      const policy = await tx.institutionalBillingPolicy.upsert({
+        where: { orgId },
+        create: {
+          orgId,
+          pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+          timezone: assertTimezone(site?.timezone ?? "Europe/London"),
+        },
+        update: {},
+      });
+      if (policy.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION) {
+        throw new ConflictException({ code: "PRICING_VERSION_CONFLICT" });
+      }
+      if (!isDeclaredCapacityPlanCode(quote.planCode)) {
+        throw new Error("Invalid declared-capacity plan code.");
+      }
+      const previous = await tx.institutionalBillingSnapshot.findFirst({
+        where: {
+          orgId,
+          kind: InstitutionalSnapshotKind.QUOTE,
+          supersededBy: { none: {} },
+        },
+        select: { id: true },
+      });
+      const snapshot = await tx.institutionalBillingSnapshot.create({
+        data: {
+          orgId,
+          policyId: policy.id,
+          kind: InstitutionalSnapshotKind.QUOTE,
+          status: InstitutionalSnapshotStatus.PRICED,
+          planCode: quote.planCode,
+          pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+          declaredCapacity: input.declaredCapacity,
+          paidModules: [...quote.paidModules],
+          selectedTrialModules: [...quote.trialModules],
+          lines: quote.lines,
+          subtotalPence: quote.subtotalPence,
+          amountDueNowPence: quote.subtotalPence,
+          expiresAt: new Date(now.getTime() + QUOTE_VALIDITY_MS),
+          supersedesId: previous?.id,
+        },
+      });
+      await tx.auditEvent.create({
+        data: {
+          orgId,
+          actorUserId,
+          entityType: AuditEntityType.BILLING_QUOTE,
+          entityId: snapshot.id,
+          action: AuditAction.CREATED,
+          metadata: {
+            pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+            declaredCapacity: input.declaredCapacity,
+            interval: input.interval,
+            amountPence: quote.subtotalPence,
+          },
+        },
+      });
+      return snapshot;
+    });
+  }
+
   async acceptQuote(
     orgId: string,
     actorUserId: string,
@@ -368,12 +522,32 @@ export class InstitutionalQuoteService {
         if (previousAcceptance.snapshotId !== snapshotId) {
           throw new ConflictException({ code: "IDEMPOTENCY_CONFLICT" });
         }
+        const acceptedSnapshot =
+          await tx.institutionalBillingSnapshot.findFirst({
+            where: { id: snapshotId, orgId },
+            select: { pricingVersion: true },
+          });
+        if (
+          acceptedSnapshot?.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+        ) {
+          assertDeclaredCapacityBillingEnabled();
+        }
         return previousAcceptance;
       }
       const snapshot = await tx.institutionalBillingSnapshot.findFirst({
         where: { id: snapshotId, orgId, kind: InstitutionalSnapshotKind.QUOTE },
       });
       if (!snapshot) throw new NotFoundException("Quote not found.");
+      if (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION) {
+        assertDeclaredCapacityBillingEnabled();
+        const org = await tx.org.findUnique({
+          where: { id: orgId },
+          select: { isMasterOrg: true },
+        });
+        if (org?.isMasterOrg) {
+          throw new ConflictException({ code: "MASTER_ORG_EXEMPT" });
+        }
+      }
       const existingAcceptance =
         await tx.institutionalQuoteAcceptance.findUnique({
           where: { snapshotId },
@@ -395,34 +569,85 @@ export class InstitutionalQuoteService {
       if (
         supersedingQuote ||
         (snapshot.pricingVersion !== INSTITUTIONAL_PRICING_VERSION &&
-          snapshot.pricingVersion !== INSTITUTIONAL_MAPPED_PRICING_VERSION)
+          snapshot.pricingVersion !== INSTITUTIONAL_MAPPED_PRICING_VERSION &&
+          snapshot.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION)
       ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-      if (
-        !isInstitutionalPlanCode(snapshot.planCode) &&
-        !isMappedInstitutionalPlanCode(snapshot.planCode)
-      ) {
-        throw new ConflictException({ code: "QUOTE_CHANGED" });
+      const declaredCapacityQuote =
+        snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION;
+      if (declaredCapacityQuote) {
+        if (
+          !isDeclaredCapacityPlanCode(snapshot.planCode) ||
+          snapshot.declaredCapacity === null
+        ) {
+          throw new ConflictException({ code: "QUOTE_CHANGED" });
+        }
+        const interval = snapshot.planCode.endsWith("_YEARLY")
+          ? "year"
+          : "month";
+        const calculated = calculateDeclaredCapacityQuote({
+          declaredCapacity: snapshot.declaredCapacity,
+          interval,
+        });
+        if (
+          calculated.kind !== "priced" ||
+          declaredCapacityPlanCode(calculated.tier, interval) !==
+            snapshot.planCode
+        ) {
+          throw new ConflictException({ code: "QUOTE_CHANGED" });
+        }
+        try {
+          stripeItemsForSnapshot(snapshot, {});
+        } catch {
+          throw new ConflictException({ code: "QUOTE_CHANGED" });
+        }
+      } else {
+        if (
+          !isInstitutionalPlanCode(snapshot.planCode) &&
+          !isMappedInstitutionalPlanCode(snapshot.planCode)
+        ) {
+          throw new ConflictException({ code: "QUOTE_CHANGED" });
+        }
+        const selectionPlan = isInstitutionalPlanCode(snapshot.planCode)
+          ? snapshot.planCode
+          : mappedInstitutionalSelectionPlanCode(snapshot.planCode);
+        validateInstitutionalSelection(selectionPlan, {
+          includedModules: snapshot.includedModules,
+          paidModules: snapshot.paidModules,
+        });
       }
-      const selectionPlan = isInstitutionalPlanCode(snapshot.planCode)
-        ? snapshot.planCode
-        : mappedInstitutionalSelectionPlanCode(snapshot.planCode);
-      validateInstitutionalSelection(selectionPlan, {
-        includedModules: snapshot.includedModules,
-        paidModules: snapshot.paidModules,
-      });
       const policy = await tx.institutionalBillingPolicy.findUnique({
         where: { orgId },
       });
       if (
         !policy ||
         (snapshot.pricingVersion === INSTITUTIONAL_PRICING_VERSION &&
-          policy.pricingVersion !== snapshot.pricingVersion)
+          policy.pricingVersion !== snapshot.pricingVersion) ||
+        (declaredCapacityQuote &&
+          (policy.pricingVersion !== DECLARED_CAPACITY_PRICING_VERSION ||
+            policy.declaredCapacity !== null))
       ) {
         throw new ConflictException({ code: "QUOTE_CHANGED" });
       }
-      if (snapshot.countSource === InstitutionalCountSource.DECLARED) {
+      if (declaredCapacityQuote) {
+        const existingSubscription = await tx.subscription.findFirst({
+          where: {
+            orgId,
+            status: {
+              in: [
+                SubscriptionStatus.ACTIVE,
+                SubscriptionStatus.PAST_DUE,
+                SubscriptionStatus.TRIALING,
+              ],
+            },
+          },
+          select: { id: true },
+        });
+        if (existingSubscription) {
+          throw new ConflictException({ code: "QUOTE_CHANGED" });
+        }
+      } else if (snapshot.countSource === InstitutionalCountSource.DECLARED) {
         const confirmedRoll = await tx.enrolmentRollConfirmation.findFirst({
           where: { orgId },
           select: { id: true },
@@ -474,6 +699,12 @@ export class InstitutionalQuoteService {
           snapshotId,
           actorUserId,
           idempotencyKey,
+          acceptedAmountPence:
+            snapshot.amountDueNowPence ?? snapshot.subtotalPence,
+          effectiveAt:
+            snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION
+              ? null
+              : (snapshot.effectiveAt ?? now),
           acceptedAt: now,
         },
       });
