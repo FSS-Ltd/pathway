@@ -1,23 +1,23 @@
 # Compliance delivery progress
 
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
-Updated: 2026-10-15. Base repository: `FSS-Ltd/pathway`; branch: `master`.
+Updated: 2026-10-17. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
 ## Current step: 2.01 — England
 
 **State: bounded England core in verification; step 2.01 not complete.** Steps
-1.1–1.6 and the medical correction are merged. Catalogue 1.1.0 on this branch has
-62 sources, 68 actions and 48 explicitly partial cells; it is not merged or deployed.
+1.1–1.6 and the medical correction are merged. Catalogue 1.2.0 on this branch has
+154 sources, 106 current actions (108 retained requirement revisions) and 48 explicitly partial cells; it is not merged or deployed.
 
-| Evidence               | Value                                                                                              |
-| ---------------------- | -------------------------------------------------------------------------------------------------- |
-| Scope                  | England national requirements, applicability fixtures and explicit regional/sector coverage        |
-| Branch                 | `feature/compliance-england-pack`                                                                  |
-| Verified starting base | `7a2a8222af04b9a5e46461f0ee32c9bb91f78a20`                                                         |
-| Predecessor            | [PR #633](https://github.com/FSS-Ltd/pathway/pull/633), host-confirmed merged 2026-10-15T11:57:54Z |
-| PR / revision / CI     | Not raised; bounded national core and source/applicability/profile verification in progress        |
-| Merge state            | Unmerged; no completion claim                                                                      |
-| Next permitted action  | Complete and verify England pack; no Wales implementation before its verified merge                |
+| Evidence               | Value                                                                                                                                                                      |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scope                  | England national requirements, applicability fixtures and explicit regional/sector coverage                                                                                |
+| Branch                 | `feature/compliance-england-detail`                                                                                                                                        |
+| Verified starting base | `113d336783eb2f9effa3c28621ebf3831dcf86fd`                                                                                                                                 |
+| Predecessor            | [PR #634](https://github.com/FSS-Ltd/pathway/pull/634), all eight checks passed; user merged 2026-10-15T21:27:46Z at `75ab1d116eeed1667e2710ee6e372f5d507d4cab`            |
+| PR / revision / CI     | Follow-up PR not raised; preserved additions are being verified against current master                                                                                     |
+| Merge state            | Local follow-up unmerged; source/core PR #634 is merged                                                                                                                    |
+| Next permitted action  | Verify and raise England detail PR; obtain production release approval before its merge, which automatically deploys. No Wales implementation while England remains gated. |
 
 ## Step 1.1 verification and merge
 
@@ -825,3 +825,235 @@ Source closure research for the remaining England national topics continues in
 separate temporary notes. It is not included as reviewed runtime content by default.
 Step 2.01 remains incomplete; no Wales work has started. Commit hooks, final format/
 diff review, PR and host gate remain to be recorded.
+
+### England draft delivery and continued source closure
+
+Commit hooks passed the complete API unit suite: **226 suites / 1,630 tests**,
+workers **45 tests** and auth **15 tests**. Formatting and final diff checks passed
+before opening [draft PR #634](https://github.com/FSS-Ltd/pathway/pull/634), initial
+head `2b56417a2b1c8c0d01c631a5f74bcd2710edc8e5`. CI run 38738185579 and CodeQL
+38738180108 started on that revision. Generated path-only Turbo logs were restored;
+no unrelated checkout changes were included. Draft publication does not satisfy
+the step gate or authorise Wales.
+
+Further reviewed England source work is being integrated on the same step/PR:
+maintained/academy governance, SEND/admissions, advanced privacy, premises/activity
+routes and childcare-register/funded-entitlement assessments. Root's three childcare
+applicability tests failed for absent rows, then passed after implementation. These
+remain assessment recommendations where actual register parts or local agreements
+are necessary. New content requires final review and renewed checks before push.
+
+### England source additions and independent corrections
+
+Assembled catalogue now validates **119 sources / 98 actions**, including 12
+state-school, 7 advanced privacy, 10 premises/activity and 2 childcare-route actions,
+with the superseded generic curriculum assessment removed to avoid duplication.
+Existing transport/boarding rows were strengthened with actual operator routes,
+residential standards and the precise greater-than-295-days definition; no new
+profile facts were introduced. All 48 coverage cells remain partial.
+
+Independent review found and corrected overly narrow PECR and private-fostering
+conditions: neither can depend solely on controller status or boarding/trips. A
+further transfer review found processor-initiated transfers also need the assessment;
+that correction passed focused re-review after making the transfer assessment independent of controller status. Scope assessments retain supported no-activity
+conclusions in evidence and never certify unreviewed specialist/local requirements.
+Integrated five-suite check passed 48 tests before the final transfer correction;
+API typecheck and lint passed. Final expanded checks, PR update and host gate remain
+pending.
+
+### Expanded verification: messaging failure investigation
+
+Expanded integration initially passed 100 suites / 616 tests and failed one existing
+family-messaging case, `requires cron auth and consumes a message outbox event once`:
+expected `sent: 1`, received `0`. Its unchanged suite then passed all 15 tests in
+isolation. A full isolated rerun is in progress; the failed run is retained.
+Read-only tracing found a possible DB/host-clock boundary: default outbox due time
+and discovery use database time while claiming compares host time. A measured
+62 ms midpoint difference with 155 ms call duration does not prove clock skew was
+the cause. No messaging assertions, timeouts or code were weakened or changed.
+
+Initial PR revision `2b56417a2b1c8c0d01c631a5f74bcd2710edc8e5` now has all eight
+applicable host checks successful (CI 38738185579 / CodeQL 38738180108). These are
+not evidence for the expanded unpushed revision. Expanded API typecheck, lint,
+build and focused formatting passed; API units, final integration and new-head CI
+remain required. One unused curriculum-overview source was removed after replacing
+the generic action, leaving **119 sources / 98 actions**.
+
+The Node 21 full rerun passed messaging but failed two existing family-subject-
+timetable tests (`socket hang up` and unexpected 404), ending 100 suites / 615 tests
+passed with two failures. Local runtime was Node 21.7.0 while all CI jobs configure
+Node 20. An installed Node 20.20.2 runtime and pnpm 9.7.0 were verified and are being
+used for the next full run. No causation is inferred from the runtime difference.
+
+Further read-only current-step research is prepared in temporary school-detail,
+record-specific-rights and common-operations notes. It is not published catalogue
+content. National procedural detail and unreviewed site/regional/provider terms
+remain visible gaps; Wales remains prohibited until the agreed England gate.
+
+### CI-matching local result and production release boundary
+
+With Node 20.20.2 and pnpm 9.7.0, full integration passed **101 suites / 617 tests**
+for the 119-source / 98-action assembly. Earlier Node 21 failures remain recorded;
+this successful run does not establish their root cause. Additional researched
+common incident/equality and school/record procedures are being verified separately
+before the final expanded PR update.
+
+Read-only inspection identified `.github/workflows/deploy.yml` lines 3–6: a push
+to master triggers the production deployment workflow, including migrations and
+web/admin/API jobs. The approved plan keeps production deployment a separate
+authorised action. User's latest release approval covers medical PR #633 only.
+Therefore raising/updating and checking England PR #634 is authorised, but merging
+it would also release the England revision and needs explicit release approval
+after the concrete current PR is verified. Do not disable the workflow or merge
+with an intention to cancel deployment afterward. Wales and other build steps
+remain gated.
+
+### 17 October resume: published core preserved and detail release versioned
+
+Host confirms user merged PR #634 at 2026-10-15T21:27:46Z, merge commit
+`75ab1d116eeed1667e2710ee6e372f5d507d4cab`. All eight checks passed on head
+`2b56417a2b1c8c0d01c631a5f74bcd2710edc8e5`. Unpublished local additions were
+preserved in stash `9dea53c56e1d843f4d99c9684aab980a28927e0d` and a patch backup,
+then safely applied to `feature/compliance-england-detail` from current master
+`113d336783eb2f9effa3c28621ebf3831dcf86fd`. No unrelated original-checkout edits
+were touched. Frozen-lockfile dependency installation succeeded and regenerated
+the Prisma client for master's existing schema; no lockfile or migration changed.
+
+Because the original catalogue is now published, its v1.1 modules remain unchanged.
+The follow-up is catalogue 1.2.0, released no earlier than 17 October: 154 sources,
+106 current actions and 108 retained requirement revisions. Transport and boarding
+material updates use version 2 and preserve version 1 for prior attestations; new
+actions start at the new release date. The original general curriculum assessment
+is retained rather than deleted from published history. This supersedes the earlier
+unreleased draft's proposed removal. All 48 England cells remain explicitly partial.
+Release/history regressions failed before versioning and then passed four cases;
+an additional manual-attestation regression is now included in final verification.
+Independent source reviews are clean; new release integration review is running.
+
+Earlier interrupted type/build/applicability commands had no completed results and
+are not counted as passes. All affected checks will be rerun on the refreshed base.
+
+### 17 October: Overview & Tracker visual revision
+
+User requested a modern layout and liquid-glass progress bar. The current England
+follow-up also replaces the native visible meter with a layered teal glass rail,
+while retaining a native progress element for assistive technology. Zero completed
+shows zero fill; an empty denominator shows "No applicable items" without a meter.
+A compact overview keeps applicability, coverage, overdue, renewal and evidence
+indicators separate. Topic navigation replaces the long stacked checklist, with
+all topic panels retained so unsaved confirmation notes survive switching topics.
+Compact expandable rows preserve confirmation, evidence and history behavior.
+No backend completion, permission or legal applicability rules changed for the UI.
+
+Passed: admin `test:unit`, targeted admin ESLint (including changed components and
+test-style helper), all changed-file Prettier checks, API typecheck/lint/build and
+release/history regressions (four suites / 43 tests). Independent integrated UI
+review caught small-label contrast; it now uses the existing darker text token.
+Independent release review confirmed the immutable v1.1 catalogue and stale prior
+confirmations after material v1.2 updates.
+
+Actual browser inspection used the real workspace/components with a synthetic
+England catalogue/profile in a local preview; no production or medical data.
+Inspected desktop 1440px, mobile 390px, 200% text, native Enter expansion and
+Tab/Enter topic selection. Expanded mobile content has document width 390px and
+no overflowing elements. Reduced-motion fill transition is 0s. Synthetic 0%, 40%
+and 100% states match native progress values; empty totals have no meter or NaN.
+Mobile spacing was corrected after visual inspection found overly narrow text
+columns at 200%. Screenshots were viewed, not only generated. Existing runtime
+regressions cover failed refresh/retry, stale mutations, save conflicts, read-only
+access, N/A validation and restricted medical links. The preview is isolated from
+the signed-in shell; no new production release is authorised by this UI request.
+
+Final admin build and compliance-suite checks remain pending. A duplicate admin
+typecheck and initial expanded unit run were stopped to reduce local memory
+contention, and are not counted as passes. They will be run sequentially as needed.
+No follow-up PR has been raised yet; England remains partial and Wales is gated.
+
+Final compliance units on the refreshed base passed **22 suites / 184 tests**.
+Admin production compilation and built-in type validation passed; prerender then
+failed because the command omitted documented `NEXT_PUBLIC_API_URL` build-time
+configuration. This is not a passing build. Rerun uses the documented local URL
+and synthetic Clerk publishable key after the integration run. Forced-colors
+inspection also confirmed a visible fill/border and no mobile overflow.
+
+Refreshed-base full integration finished **106 suites / 633 tests passed**, with
+one unchanged attendance-export assertion failing (107 suites / 634 tests total).
+It expected three audit rows and observed the two lead-user rows but not the final
+staff-user export row. Export/audit source awaits the insert; root cause is not
+established. All eight compliance integration suites passed, including tracker,
+profile, evidence, agreements/transfers, medical and unavailable-medical tests.
+The failing attendance suite is being isolated; no code/assertion/timing was changed.
+Prisma validation and permission registry drift check passed (zero drift). The
+first registry command lacked DATABASE_URL; rerun explicitly used the disposable
+local test database. No production database was accessed.
+
+The isolated attendance rerun did not establish the original audit failure's
+cause: under heavy host memory pressure both tests and cleanup exceeded 30s,
+and existing 15s database transactions expired (observed 16.6s and 38.5s elapsed).
+The failed process was stopped after its failure summary because requests were
+still pending. Do not increase timeouts or weaken assertions. A further isolated
+and full run must wait for sufficient local capacity. Final targeted overview,
+checklist-browser and tracker runtime tests passed after all UI edits.
+
+Admin production build now passes with documented local API URL and a synthetic
+Clerk publishable key: compilation, type validation and all 64 pages succeeded.
+Existing Browserslist/webpack-cache and Supabase Node 20 deprecation warnings are
+retained; no dependency upgrades were introduced into this scoped change.
+
+Attendance isolation passed both tests after local contention eased (201ms and
+57ms request scenarios). The next full run passed **105 suites / 632 tests**,
+failed two of 107 suites / 634 tests: unchanged unavailable-medical export returned
+404 instead of 200; unchanged ACE daily-operations setup returned 501 instead of 200. Attendance passed in that full run. These differing failures remain unresolved;
+do not describe full integration as green. Independent read-only diagnosis and
+two-suite isolation are underway. The current step may only be raised as a draft
+with these explicit verification gaps; no next country or production release.
+
+Both medical/dashboard suites now pass isolated (**2 suites / 9 tests**) without
+changes. This does not establish why the earlier full run failed. Independent
+review found a concrete attendance response/commit race: the controller sends
+CSV within the outer TenantRlsInterceptor transaction; its service joins that
+transaction, so the immediate audit query can run before the outer commit. The
+controller/interceptor/database files are unchanged from the base. A future
+focused transaction-boundary fix should preserve the assertion. Medical 404 and
+behaviour 501 remain unexplained; neither route/service references the catalogue.
+Do not call these unexplained results proven baseline flakes.
+
+A temporary pnpm wrapper only adds `--runInBand` to the pre-commit API unit
+command to avoid launching many memory-heavy Jest workers. The pre-commit hook
+and every test remain enabled; no checks or assertions are bypassed. The current
+step will be published as a draft while the full integration gate remains failing.
+
+### Draft PR 657: verification blocker transaction correction
+
+Draft https://github.com/FSS-Ltd/pathway/pull/657 was raised on code revision
+`e29122bfc4a8ad1a2dbb65d1934700ca6b05f5a9`. Pre-commit passed workspace lint
+(16 tasks), API units (245 suites / 1,772 tests), workers (12 / 51) and auth
+(3 / 15). Initial CodeQL checks passed; CI remains in progress. This does not
+satisfy the current-step merge gate.
+
+A third full integration run again reproduced only the missing attendance audit
+row (106 / 107 suites, 633 / 634 tests passed). To resolve this concrete gate
+blocker within the current step, the export handler now uses the existing
+method-level `IndependentTransaction` mechanism. Auth/permission guards remain;
+the service still opens its own tenant/org-scoped transaction, validates dated
+band/membership scope and writes its audit atomically. Its promise now resolves
+after commit, before the controller sends CSV. Other attendance handlers retain
+the request transaction. No broad interceptor or timeout changes were made.
+
+Deterministic transaction-ownership regression failed before the fix and passes
+afterward (four interceptor unit tests). Export integration passes three cases:
+immediate committed audit plus permission/revocation/site/band boundaries, audit
+failure sends no student CSV/download header and leaves no new audit, and invalid
+range/unauthorised site rejection. The original immediate-audit assertion remains
+unchanged. A full integration run against this fix is in progress. Independent
+security/transaction review found no blocker; exact final diff review is pending.
+
+Final three-file export fix review found no blocker. Full integration after the
+fix passed attendance, medical and dashboard suites; overall **105 suites / 633
+tests passed**, with two of 107 suites / 635 tests failing on `socket hang up`
+in tracker permission boundaries and subject-timetable Head API. Neither produced
+a failed domain assertion. These transport failures remain an explicit local
+verification limitation; do not claim local full integration passed. No client
+retries, sleeps or raised timeouts were introduced. Fresh host CI will verify the
+updated revision in its isolated database environment; no result on the initial
+head counts for the forthcoming fix commit.

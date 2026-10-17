@@ -6,6 +6,7 @@ import { ExecutionContextHost } from "@nestjs/core/helpers/execution-context-hos
 import { firstValueFrom, of } from "rxjs";
 import { AccessTagsController } from "../../access-control/access-tags.controller";
 import { AssignmentsController } from "../../access-control/assignments.controller";
+import { DailyAttendanceController } from "../../attendance/daily-attendance.controller";
 import { PaceInventoryCommandsController } from "../../pace/pace-inventory-commands.controller";
 import {
   IndependentTransaction,
@@ -58,6 +59,22 @@ describe("TenantRlsInterceptor", () => {
       expect(Reflect.getMetadata(INDEPENDENT_TRANSACTION, controller)).toBe(
         true,
       );
+    }
+  });
+
+  it("lets only the attendance export service commit before its HTTP response", () => {
+    const reflector = new Reflector();
+    for (const [handler, expected] of [
+      [DailyAttendanceController.prototype.export, true],
+      [DailyAttendanceController.prototype.list, undefined],
+      [DailyAttendanceController.prototype.save, undefined],
+    ] as const) {
+      expect(
+        reflector.getAllAndOverride(INDEPENDENT_TRANSACTION, [
+          handler,
+          DailyAttendanceController,
+        ]),
+      ).toBe(expected);
     }
   });
 

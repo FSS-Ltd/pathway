@@ -8,7 +8,7 @@ import {
   requirementSnapshot,
   getCurrentRequirement,
 } from "./tracker-engine";
-const now = new Date("2026-10-16T12:00:00Z");
+const now = new Date("2026-10-18T12:00:00Z");
 const review = {
   reviewer: "Test reviewer",
   verifiedAt: "2026-10-15",

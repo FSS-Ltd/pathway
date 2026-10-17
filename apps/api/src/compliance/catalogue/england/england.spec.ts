@@ -3,7 +3,7 @@ import { TRACKER_CATALOGUE } from "..";
 import { trackerProfileInput } from "../../tracker.dto";
 import { buildTrackerChecklist } from "../../tracker-engine";
 import { testProfile } from "../../tests/tracker-fixture";
-const now = new Date("2026-10-16T12:00:00Z");
+const now = new Date("2026-10-18T12:00:00Z");
 const location = { countryCode: "GB", subdivisionCode: "GB-ENG" };
 function checklist(
   changes: Partial<TrackerProfileInput> = {},

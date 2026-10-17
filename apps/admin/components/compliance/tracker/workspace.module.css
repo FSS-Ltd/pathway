@@ -1,0 +1,213 @@
+.workspace {
+  min-width: 0;
+  display: grid;
+  gap: 1.5rem;
+  color: rgb(var(--pw-text-primary));
+}
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  padding: 0.25rem 0;
+}
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.65rem;
+  color: rgb(var(--pw-text-muted));
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.title {
+  font-family: var(--font-heading);
+  font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+.description {
+  margin-top: 0.6rem;
+  max-width: 43rem;
+  color: rgb(var(--pw-text-muted));
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+.refresh {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgb(var(--pw-border-subtle));
+  border-radius: 0.85rem;
+  background: rgb(var(--pw-bg-surface) / 0.85);
+  color: rgb(var(--pw-text-primary));
+  font-size: 0.85rem;
+  font-weight: 700;
+  box-shadow: 0 2px 4px rgb(var(--pw-text-primary) / 0.025);
+}
+.refresh:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.refresh svg {
+  flex-shrink: 0;
+}
+.body {
+  min-width: 0;
+  display: grid;
+  gap: 1.5rem;
+}
+.coverage {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgb(var(--pw-status-warn) / 0.2);
+  border-radius: 1rem;
+  background: rgb(var(--pw-status-warn) / 0.045);
+}
+.coverageIcon {
+  flex-shrink: 0;
+  margin-top: 0.12rem;
+  color: #95600d;
+}
+.coverageContent {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.coverageContent h2 {
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+.coverageContent > p {
+  margin-top: 0.2rem;
+  font-size: 0.8125rem;
+  color: rgb(var(--pw-text-muted));
+  line-height: 1.6;
+}
+.coverageDetails {
+  margin-top: 0.45rem;
+}
+.coverageDetails > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: fit-content;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  list-style: none;
+}
+.coverageDetails > summary::-webkit-details-marker {
+  display: none;
+}
+.coverageDetails > summary svg {
+  flex-shrink: 0;
+}
+.coverageDetails[open] > summary svg {
+  transform: rotate(180deg);
+}
+.coverageDetails ul {
+  display: grid;
+  gap: 1rem;
+  padding-top: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.coverageDetails li {
+  border-top: 1px solid rgb(var(--pw-status-warn) / 0.15);
+  padding-top: 0.75rem;
+}
+.coverageDetails li span {
+  display: block;
+  color: rgb(var(--pw-text-muted));
+}
+.profile > details {
+  border-radius: 1rem;
+  box-shadow: 0 2px 6px rgb(var(--pw-text-primary) / 0.02);
+}
+.support {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+.supportCard {
+  min-width: 0;
+  padding: 1.5rem;
+  border: 1px solid rgb(var(--pw-border-subtle));
+  border-radius: 1.15rem;
+  background: rgb(var(--pw-bg-surface));
+  overflow-wrap: anywhere;
+}
+.supportHeading {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.supportHeading svg {
+  color: rgb(var(--pw-text-muted));
+  flex-shrink: 0;
+}
+.supportCard h2 {
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 800;
+}
+.supportDescription {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.65;
+  color: rgb(var(--pw-text-muted));
+}
+.signalList {
+  display: grid;
+  margin-top: 1rem;
+}
+.signalList li {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem 0;
+  border-top: 1px solid rgb(var(--pw-border-subtle));
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.signalList h3 {
+  font-weight: 800;
+}
+.signalList p,
+.signalList small {
+  color: rgb(var(--pw-text-muted));
+}
+.signalList a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  justify-self: start;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .support {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .supportCard {
+    padding: 1.1rem;
+  }
+  .coverage {
+    padding: 1rem;
+  }
+}
+@media (forced-colors: active) {
+  .refresh,
+  .coverage,
+  .supportCard {
+    border-color: CanvasText;
+  }
+}

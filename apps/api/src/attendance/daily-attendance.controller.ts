@@ -16,6 +16,7 @@ import type { Response } from "express";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { RequirePermission } from "../access-control/require-permission.decorator";
 import { isDateOnly } from "../ace-settings/dto/academic-calendar.dto";
+import { IndependentTransaction } from "../common/database/independent-transaction.decorator";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { DailyAttendanceService } from "./daily-attendance.service";
 import { DailyAttendanceExportService } from "./daily-attendance-export.service";
@@ -58,6 +59,7 @@ export class DailyAttendanceController {
   }
 
   @Get("export")
+  @IndependentTransaction()
   @RequirePermission("ace.attendance.export")
   @Header("Content-Type", "text/csv; charset=utf-8")
   async export(
