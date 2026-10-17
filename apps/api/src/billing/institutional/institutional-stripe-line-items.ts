@@ -1,7 +1,5 @@
 import {
-  calculateDeclaredCapacityQuote,
   declaredCapacityIntervalFromPlanCode,
-  declaredCapacityPlanCode,
   isDeclaredCapacityPlanCode,
   DECLARED_CAPACITY_PRICING_VERSION,
   calculateInstitutionalQuote,
@@ -9,11 +7,7 @@ import {
   INSTITUTIONAL_MAPPED_PRICING_VERSION,
   INSTITUTIONAL_PRICING_VERSION,
 } from "@pathway/pricing";
-import { z } from "zod";
-import {
-  declaredCapacityAddonPriceCode,
-  isDeclaredCapacityAddonModule,
-} from "./declared-capacity-addons";
+import { quoteDeclaredCapacityWithFrozenPrices } from "./declared-capacity-stripe-pricing";
 import { quoteFromFrozenInstitutionalPrices } from "./institutional-frozen-pricing";
 import { isInstitutionalPlanCode } from "./institutional-selection";
 import { institutionalStripePriceId } from "./institutional-stripe-prices";
@@ -28,16 +22,6 @@ export type PricedInstitutionalSnapshot = Readonly<{
   paidModules: readonly string[];
   lines?: unknown;
 }>;
-
-const declaredCapacityLineSchema = z.object({
-  component: z.enum(["BASE", "DECLARED_CAPACITY", "ADDON"]),
-  priceCode: z.string(),
-  priceId: z.string().regex(/^price_[A-Za-z0-9]+$/),
-  currency: z.literal("GBP"),
-  quantity: z.number().int().nonnegative().safe(),
-  unitAmountPence: z.number().int().positive().safe(),
-  subtotalPence: z.number().int().nonnegative().safe(),
-});
 
 export type InstitutionalStripeItem = Readonly<{
   price: string;
@@ -59,64 +43,21 @@ export function stripeItemsForSnapshot(
       throw new Error("INVALID_INSTITUTIONAL_SNAPSHOT");
     }
     const interval = declaredCapacityIntervalFromPlanCode(snapshot.planCode);
-    const quote = calculateDeclaredCapacityQuote({
-      declaredCapacity: snapshot.declaredCapacity,
-      interval,
-    });
+    const frozenQuote = quoteDeclaredCapacityWithFrozenPrices(
+      { declaredCapacity: snapshot.declaredCapacity, interval },
+      snapshot.lines,
+      snapshot.paidModules,
+    );
     if (
-      quote.kind !== "priced" ||
-      declaredCapacityPlanCode(quote.tier, interval) !== snapshot.planCode
+      frozenQuote.kind !== "priced" ||
+      frozenQuote.planCode !== snapshot.planCode ||
+      frozenQuote.subtotalPence !== snapshot.subtotalPence ||
+      new Set(frozenQuote.lines.map((line) => line.priceId)).size !==
+        frozenQuote.lines.length
     ) {
       throw new Error("INVALID_INSTITUTIONAL_SNAPSHOT");
     }
-    const frozenLines = z
-      .array(declaredCapacityLineSchema)
-      .safeParse(snapshot.lines);
-    if (
-      !frozenLines.success ||
-      frozenLines.data.length !==
-        quote.lines.length + snapshot.paidModules.length ||
-      new Set(
-        frozenLines.data
-          .filter((line) => line.quantity > 0)
-          .map((line) => line.priceId),
-      ).size !== frozenLines.data.filter((line) => line.quantity > 0).length ||
-      new Set(frozenLines.data.map((line) => line.priceCode)).size !==
-        frozenLines.data.length ||
-      new Set(snapshot.paidModules).size !== snapshot.paidModules.length ||
-      frozenLines.data.some(
-        (line) =>
-          !Number.isSafeInteger(line.quantity * line.unitAmountPence) ||
-          line.subtotalPence !== line.quantity * line.unitAmountPence,
-      ) ||
-      quote.lines.some((expected, index) => {
-        const frozen = frozenLines.data[index];
-        return (
-          frozen.component !== expected.component ||
-          frozen.priceCode !== expected.priceCode ||
-          frozen.quantity !== expected.quantity ||
-          frozen.unitAmountPence !== expected.unitAmountPence ||
-          frozen.subtotalPence !== expected.subtotalPence
-        );
-      }) ||
-      !snapshot.paidModules.every((module) => {
-        if (!isDeclaredCapacityAddonModule(module)) return false;
-        return frozenLines.data.some(
-          (line) =>
-            line.component === "ADDON" &&
-            line.priceCode ===
-              declaredCapacityAddonPriceCode(module, interval) &&
-            line.quantity === 1,
-        );
-      }) ||
-      frozenLines.data.filter((line) => line.component === "ADDON").length !==
-        snapshot.paidModules.length ||
-      frozenLines.data.reduce((sum, line) => sum + line.subtotalPence, 0) !==
-        snapshot.subtotalPence
-    ) {
-      throw new Error("INVALID_INSTITUTIONAL_SNAPSHOT");
-    }
-    return frozenLines.data
+    return frozenQuote.lines
       .filter((line) => line.quantity > 0)
       .map((line) => ({ price: line.priceId, quantity: line.quantity }));
   }

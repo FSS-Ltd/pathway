@@ -75,10 +75,24 @@ export function InstitutionalModulesStep() {
 export function InstitutionalStorageStep({
   choice,
   onSelect,
+  priceOptions,
+  interval,
 }: {
   choice: InstitutionalStorageChoice;
   onSelect: (choice: InstitutionalStorageChoice) => void;
+  priceOptions?: readonly {
+    choice: InstitutionalStorageChoice;
+    monthlyPricePence: number | null;
+    yearlyPricePence: number | null;
+  }[];
+  interval?: "month" | "year";
 }) {
+  const money = (pence: number) =>
+    new Intl.NumberFormat("en-GB", {
+      style: "currency",
+      currency: "GBP",
+    }).format(pence / 100);
+
   return (
     <section aria-labelledby="configurator-step-title" className="space-y-5">
       <div>
@@ -89,23 +103,55 @@ export function InstitutionalStorageStep({
           Storage
         </h2>
         <p className="mt-2 text-text-muted">
-          Choose any extra space your team needs. The mapped Stripe price
-          appears in your running total when you select an option.
+          Choose any extra space your team needs. Storage is billed with your
+          selected subscription period.
         </p>
       </div>
       <SelectionCardGroup className="grid gap-3">
-        {STORAGE.map((option) => (
-          <SelectionCard
-            key={option.choice}
-            isSelected={choice === option.choice}
-            onClick={() => onSelect(option.choice)}
-          >
-            <span className="block font-semibold">{option.label}</span>
-            <span className="mt-1 block text-sm text-text-muted">
-              {option.description}
-            </span>
-          </SelectionCard>
-        ))}
+        {STORAGE.map((option) => {
+          const label =
+            priceOptions && option.choice === "none"
+              ? "No additional storage"
+              : option.label;
+          const description =
+            priceOptions && option.choice === "none"
+              ? "Continue without an extra storage package."
+              : option.description;
+          const mappedPrice = priceOptions?.find(
+            (price) => price.choice === option.choice,
+          );
+          const amount =
+            interval === "year"
+              ? mappedPrice?.yearlyPricePence
+              : mappedPrice?.monthlyPricePence;
+          const unavailable =
+            option.choice !== "none" &&
+            priceOptions !== undefined &&
+            amount == null;
+
+          return (
+            <SelectionCard
+              key={option.choice}
+              isSelected={choice === option.choice}
+              isDisabled={unavailable}
+              onClick={() => onSelect(option.choice)}
+            >
+              <span className="block font-semibold">{label}</span>
+              <span className="mt-1 block text-sm text-text-muted">
+                {description}
+              </span>
+              {priceOptions ? (
+                <span className="mt-2 block text-sm font-semibold">
+                  {option.choice === "none"
+                    ? "No extra charge"
+                    : amount == null
+                      ? "Unavailable for this billing period"
+                      : `${money(amount)} per ${interval === "year" ? "year" : "month"}`}
+                </span>
+              ) : null}
+            </SelectionCard>
+          );
+        })}
       </SelectionCardGroup>
     </section>
   );

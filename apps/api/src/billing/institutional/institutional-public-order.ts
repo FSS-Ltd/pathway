@@ -61,13 +61,14 @@ const declaredCapacityQuoteSchema = z.object({
   tier: z.enum(["starter", "growth", "professional"]),
   declaredCapacity: z.number().int().nonnegative().safe(),
   interval: z.enum(["month", "year"]),
+  storageChoice: z.enum(["none", "100", "200", "1000"]).default("none"),
   currency: z.literal("GBP"),
   siteAllowance: z.number().int().positive(),
   trialModuleSlots: z.number().int().nonnegative(),
   includedPaidModules: z.array(z.never()),
   lines: z.array(
     z.object({
-      component: z.enum(["BASE", "DECLARED_CAPACITY", "ADDON"]),
+      component: z.enum(["BASE", "DECLARED_CAPACITY", "ADDON", "STORAGE"]),
       priceCode: z.string(),
       priceId: z.string().regex(/^price_[A-Za-z0-9]+$/),
       currency: z.literal("GBP"),

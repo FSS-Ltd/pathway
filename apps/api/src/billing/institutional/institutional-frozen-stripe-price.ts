@@ -27,6 +27,7 @@ export function validateFrozenStripePrice(
   snapshot: { planCode: string; pricingVersion?: string; lines: unknown },
   priceId: string,
   live: boolean,
+  requireInclusiveTaxBehavior = true,
 ): void {
   const parsed = z.array(lineSchema).safeParse(snapshot.lines);
   const line = parsed.success
@@ -40,7 +41,10 @@ export function validateFrozenStripePrice(
     price.livemode !== live ||
     price.currency !== "gbp" ||
     (snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION &&
-      price.tax_behavior !== "inclusive") ||
+      (requireInclusiveTaxBehavior
+        ? price.tax_behavior !== "inclusive"
+        : price.tax_behavior !== "inclusive" &&
+          price.tax_behavior !== "unspecified")) ||
     price.unit_amount !== line.unitAmountPence ||
     price.recurring?.interval !== interval ||
     price.recurring.interval_count !== 1 ||

@@ -7,6 +7,7 @@ import {
   INSTITUTIONAL_PRICING_VERSION,
 } from "@pathway/pricing";
 import { stripeItemsForSnapshot } from "../institutional-stripe-line-items";
+import { quoteDeclaredCapacityWithStripePrices } from "../declared-capacity-stripe-pricing";
 
 const priceMap = {
   INSTITUTIONAL_STARTER_MONTHLY: "price_starter",
@@ -105,6 +106,56 @@ describe("institutional Stripe line items", () => {
         {},
       ),
     ).toThrow("INVALID_INSTITUTIONAL_SNAPSHOT");
+  });
+
+  it("retains a selected storage Price in frozen declared-capacity renewals", () => {
+    const quote = quoteDeclaredCapacityWithStripePrices(
+      { declaredCapacity: 1, interval: "month" },
+      {
+        DECLARED_CAPACITY_BASE_MONTHLY: {
+          priceId: "price_capacitybase",
+          unitAmountPence: 7_400,
+        },
+        DECLARED_CAPACITY_CHILD_MONTHLY: {
+          priceId: "price_capacitychild",
+          unitAmountPence: 100,
+        },
+        DECLARED_CAPACITY_BASE_YEARLY: {
+          priceId: "price_capacitybaseyear",
+          unitAmountPence: 74_000,
+        },
+        DECLARED_CAPACITY_CHILD_YEARLY: {
+          priceId: "price_capacitychildyear",
+          unitAmountPence: 1_000,
+        },
+        STORAGE_100GB_MONTHLY: {
+          priceId: "price_storage100",
+          unitAmountPence: 149,
+        },
+      },
+      { storageChoice: "100" },
+    );
+    if (quote.kind !== "priced") throw new Error("Expected priced quote");
+
+    expect(
+      stripeItemsForSnapshot(
+        {
+          planCode: quote.planCode,
+          pricingVersion: DECLARED_CAPACITY_PRICING_VERSION,
+          enrolledChildren: null,
+          declaredCapacity: quote.declaredCapacity,
+          subtotalPence: quote.subtotalPence,
+          includedModules: [],
+          paidModules: [],
+          lines: quote.lines,
+        },
+        {},
+      ),
+    ).toEqual([
+      { price: "price_capacitybase", quantity: 1 },
+      { price: "price_capacitychild", quantity: 1 },
+      { price: "price_storage100", quantity: 1 },
+    ]);
   });
 
   it("keeps the base charge when the count is zero", () => {

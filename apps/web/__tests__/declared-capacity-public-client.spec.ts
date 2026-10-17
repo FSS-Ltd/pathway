@@ -1,6 +1,7 @@
 import {
   startPublicDeclaredCapacityCheckout,
   estimateDeclaredCapacityPrice,
+  fetchDeclaredCapacityCatalogue,
 } from "../lib/institutional-estimate-client";
 import { isDeclaredCapacityV2ConfiguratorEnabled } from "@pathway/pricing";
 
@@ -10,6 +11,7 @@ const checkout = {
   expectedTotalPence: 14_800,
   declarationAccepted: true as const,
   setting: "INDEPENDENT_SCHOOL" as const,
+  storageChoice: "100" as const,
   payNowModules: [],
   trialModules: ["FINANCE" as const],
   idempotencyKey: "declared-capacity-checkout",
@@ -26,14 +28,20 @@ describe("declared-capacity public billing client", () => {
 
   it("requests an estimate with selected trial modules without setting an activation time", async () => {
     const fetchMock = jest.spyOn(global, "fetch").mockResolvedValueOnce(
-      new Response(JSON.stringify({ kind: "priced", subtotalPence: 14_800 }), {
-        status: 200,
-      }),
+      new Response(
+        JSON.stringify({
+          kind: "priced",
+          storageChoice: "100",
+          subtotalPence: 14_949,
+        }),
+        { status: 200 },
+      ),
     );
 
     await estimateDeclaredCapacityPrice(74, "month", {
       payNowModules: [],
       trialModules: ["FINANCE"],
+      storageChoice: "100",
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -47,8 +55,37 @@ describe("declared-capacity public billing client", () => {
           interval: "month",
           payNowModules: [],
           trialModules: ["FINANCE"],
+          storageChoice: "100",
         }),
       }),
+    );
+  });
+
+  it("rejects an estimate when the server did not confirm the selected storage", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ kind: "priced", subtotalPence: 14_800 }), {
+        status: 200,
+      }),
+    );
+
+    await expect(
+      estimateDeclaredCapacityPrice(74, "month", {
+        payNowModules: [],
+        trialModules: [],
+        storageChoice: "100",
+      }),
+    ).rejects.toThrow("Storage pricing is unavailable");
+  });
+
+  it("rejects an older catalogue response without storage prices", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValueOnce(
+      new Response(JSON.stringify({ pricingVersion: "DECLARED_CAPACITY_V2" }), {
+        status: 200,
+      }),
+    );
+
+    await expect(fetchDeclaredCapacityCatalogue()).rejects.toThrow(
+      "Storage pricing is unavailable",
     );
   });
 

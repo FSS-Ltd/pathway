@@ -1,6 +1,8 @@
 import {
   calculateDeclaredCapacityQuote,
   declaredCapacityPlanCode,
+  type InstitutionalStorageChoice,
+  type InstitutionalMappedPriceCode,
   type DeclaredCapacityPriceCode,
   type DeclaredCapacityQuoteInput,
   type DeclaredCapacityQuoteLine,
@@ -20,6 +22,19 @@ import {
 
 export type DeclaredCapacityStripeLine = DeclaredCapacityQuoteLine &
   Readonly<{ priceId: string; currency: "GBP" }>;
+type DeclaredCapacityStoragePriceCode = Extract<
+  InstitutionalMappedPriceCode,
+  `STORAGE_${string}`
+>;
+type DeclaredCapacityStorageStripeLine = Readonly<{
+  component: "STORAGE";
+  priceCode: DeclaredCapacityStoragePriceCode;
+  priceId: string;
+  currency: "GBP";
+  quantity: 1;
+  unitAmountPence: number;
+  subtotalPence: number;
+}>;
 type DeclaredCapacityAddonStripeLine = Readonly<{
   component: "ADDON";
   priceCode: DeclaredCapacityAddonPriceCode;
@@ -37,12 +52,14 @@ export type DeclaredCapacityStripeQuote = Readonly<{
   tier: Exclude<DeclaredCapacityTier, "enterprise">;
   declaredCapacity: number;
   interval: "month" | "year";
+  storageChoice: InstitutionalStorageChoice;
   currency: "GBP";
   siteAllowance: number;
   trialModuleSlots: number;
   includedPaidModules: readonly never[];
   lines: readonly (
     | DeclaredCapacityStripeLine
+    | DeclaredCapacityStorageStripeLine
     | DeclaredCapacityAddonStripeLine
   )[];
   paidModules: readonly DeclaredCapacityAddonModule[];
@@ -54,10 +71,51 @@ export type DeclaredCapacityStripeResolvedPrices =
   DeclaredCapacityResolvedPrices &
     Partial<
       Record<
-        DeclaredCapacityAddonPriceCode,
+        DeclaredCapacityAddonPriceCode | InstitutionalMappedPriceCode,
         { priceId: string; unitAmountPence: number }
       >
     >;
+
+const storagePriceCodes = {
+  "100": { month: "STORAGE_100GB_MONTHLY", year: "STORAGE_100GB_YEARLY" },
+  "200": { month: "STORAGE_200GB_MONTHLY", year: "STORAGE_200GB_YEARLY" },
+  "1000": { month: "STORAGE_1TB_MONTHLY", year: "STORAGE_1TB_YEARLY" },
+} as const satisfies Record<
+  Exclude<InstitutionalStorageChoice, "none">,
+  Record<"month" | "year", DeclaredCapacityStoragePriceCode>
+>;
+
+export function declaredCapacityStoragePriceCode(
+  choice: InstitutionalStorageChoice,
+  interval: "month" | "year",
+): DeclaredCapacityStoragePriceCode | null {
+  return choice === "none" ? null : storagePriceCodes[choice][interval];
+}
+
+export function declaredCapacityStorageGb(
+  choice: InstitutionalStorageChoice,
+): number | null {
+  return choice === "none" ? null : Number(choice);
+}
+
+export function declaredCapacityStorageOptions(
+  prices: DeclaredCapacityStripeResolvedPrices,
+) {
+  const priceFor = (
+    choice: InstitutionalStorageChoice,
+    interval: "month" | "year",
+  ): number | null => {
+    const priceCode = declaredCapacityStoragePriceCode(choice, interval);
+    return priceCode === null
+      ? 0
+      : (prices[priceCode]?.unitAmountPence ?? null);
+  };
+  return (["none", "100", "200", "1000"] as const).map((choice) => ({
+    choice,
+    monthlyPricePence: priceFor(choice, "month"),
+    yearlyPricePence: priceFor(choice, "year"),
+  }));
+}
 
 export function isDeclaredCapacityAddonTrialReady(
   module: Module,
@@ -102,7 +160,8 @@ export class DeclaredCapacityStripePriceError extends Error {
   constructor(
     readonly priceCode:
       | DeclaredCapacityPriceCode
-      | DeclaredCapacityAddonPriceCode,
+      | DeclaredCapacityAddonPriceCode
+      | DeclaredCapacityStoragePriceCode,
   ) {
     super(`MISSING_OR_INVALID_DECLARED_CAPACITY_PRICE:${priceCode}`);
     this.name = "DeclaredCapacityStripePriceError";
@@ -110,7 +169,7 @@ export class DeclaredCapacityStripePriceError extends Error {
 }
 
 const frozenDeclaredLineSchema = z.object({
-  component: z.enum(["BASE", "DECLARED_CAPACITY", "ADDON"]),
+  component: z.enum(["BASE", "DECLARED_CAPACITY", "ADDON", "STORAGE"]),
   priceCode: z.string(),
   priceId: z.string().regex(/^price_[A-Za-z0-9]+$/),
   currency: z.literal("GBP"),
@@ -125,6 +184,7 @@ export function quoteDeclaredCapacityWithStripePrices(
   selections: Readonly<{
     paidModules?: readonly Module[];
     trialModules?: readonly Module[];
+    storageChoice?: InstitutionalStorageChoice;
   }> = {},
 ): DeclaredCapacityStripeQuote | { kind: "contact_sales" } {
   const quote = calculateDeclaredCapacityQuote(input);
@@ -142,6 +202,7 @@ export function quoteDeclaredCapacityWithStripePrices(
     input.interval,
     true,
   );
+  const storageChoice = selections.storageChoice ?? "none";
   const allSelected = [...paidModules, ...trialModules];
   if (
     new Set(allSelected).size !== allSelected.length ||
@@ -151,7 +212,9 @@ export function quoteDeclaredCapacityWithStripePrices(
   }
 
   const lines: Array<
-    DeclaredCapacityStripeLine | DeclaredCapacityAddonStripeLine
+    | DeclaredCapacityStripeLine
+    | DeclaredCapacityStorageStripeLine
+    | DeclaredCapacityAddonStripeLine
   > = quote.lines.map((line): DeclaredCapacityStripeLine => {
     const price = prices[line.priceCode];
     if (
@@ -163,23 +226,45 @@ export function quoteDeclaredCapacityWithStripePrices(
     }
     return { ...line, priceId: price.priceId, currency: "GBP" };
   });
-  const selectedPriceIds = new Set(
-    lines.filter((line) => line.quantity > 0).map((line) => line.priceId),
-  );
-  if (
-    selectedPriceIds.size !== lines.filter((line) => line.quantity > 0).length
-  ) {
+  const selectedPriceIds = new Set(lines.map((line) => line.priceId));
+  if (selectedPriceIds.size !== lines.length) {
     const duplicate = lines.find(
       (line, index, all) =>
-        line.quantity > 0 &&
-        all.findIndex(
-          (candidate) =>
-            candidate.quantity > 0 && candidate.priceId === line.priceId,
-        ) !== index,
+        all.findIndex((candidate) => candidate.priceId === line.priceId) !==
+        index,
     );
     throw new DeclaredCapacityStripePriceError(
       duplicate?.priceCode ?? "DECLARED_CAPACITY_BASE_MONTHLY",
     );
+  }
+
+  const storagePriceCode = declaredCapacityStoragePriceCode(
+    storageChoice,
+    input.interval,
+  );
+  if (storagePriceCode) {
+    const price = prices[storagePriceCode];
+    if (
+      !price ||
+      !Number.isSafeInteger(price.unitAmountPence) ||
+      price.unitAmountPence <= 0 ||
+      !/^price_[A-Za-z0-9]+$/.test(price.priceId)
+    ) {
+      throw new DeclaredCapacityStripePriceError(storagePriceCode);
+    }
+    if (selectedPriceIds.has(price.priceId)) {
+      throw new DeclaredCapacityStripePriceError(storagePriceCode);
+    }
+    selectedPriceIds.add(price.priceId);
+    lines.push({
+      component: "STORAGE",
+      priceCode: storagePriceCode,
+      priceId: price.priceId,
+      currency: "GBP",
+      quantity: 1,
+      unitAmountPence: price.unitAmountPence,
+      subtotalPence: price.unitAmountPence,
+    });
   }
 
   for (const module of paidModules) {
@@ -219,6 +304,7 @@ export function quoteDeclaredCapacityWithStripePrices(
   return {
     ...quote,
     planCode: declaredCapacityPlanCode(quote.tier, input.interval),
+    storageChoice,
     lines,
     paidModules,
     trialModules,
@@ -253,12 +339,16 @@ export function quoteDeclaredCapacityWithFrozenPrices(
   }
 
   const lines: Array<
-    DeclaredCapacityStripeLine | DeclaredCapacityAddonStripeLine
+    | DeclaredCapacityStripeLine
+    | DeclaredCapacityStorageStripeLine
+    | DeclaredCapacityAddonStripeLine
   > = quote.lines.map((line) => {
     const frozen = byPriceCode.get(line.priceCode);
     if (
       !frozen ||
       frozen.component !== line.component ||
+      frozen.quantity !== line.quantity ||
+      frozen.subtotalPence !== line.subtotalPence ||
       frozen.unitAmountPence !== line.unitAmountPence
     ) {
       throw new Error("INVALID_FROZEN_DECLARED_CAPACITY_PRICE");
@@ -269,6 +359,49 @@ export function quoteDeclaredCapacityWithFrozenPrices(
       currency: "GBP",
     };
   });
+
+  const frozenStorage = parsed.data.filter(
+    (line) => line.component === "STORAGE",
+  );
+  if (frozenStorage.length > 1) {
+    throw new Error("INVALID_FROZEN_DECLARED_CAPACITY_PRICE");
+  }
+  let storageChoice: InstitutionalStorageChoice = "none";
+  if (frozenStorage.length === 1) {
+    const frozen = frozenStorage[0];
+    const selected = (
+      Object.keys(storagePriceCodes) as Array<
+        Exclude<InstitutionalStorageChoice, "none">
+      >
+    ).find(
+      (choice) =>
+        storagePriceCodes[choice][input.interval] === frozen.priceCode,
+    );
+    if (
+      !selected ||
+      frozen.quantity !== 1 ||
+      frozen.subtotalPence !== frozen.unitAmountPence
+    ) {
+      throw new Error("INVALID_FROZEN_DECLARED_CAPACITY_PRICE");
+    }
+    storageChoice = selected;
+    const priceCode = declaredCapacityStoragePriceCode(
+      storageChoice,
+      input.interval,
+    );
+    if (!priceCode) {
+      throw new Error("INVALID_FROZEN_DECLARED_CAPACITY_PRICE");
+    }
+    lines.push({
+      component: "STORAGE",
+      priceCode,
+      priceId: frozen.priceId,
+      currency: "GBP",
+      quantity: 1,
+      unitAmountPence: frozen.unitAmountPence,
+      subtotalPence: frozen.unitAmountPence,
+    });
+  }
 
   const selectedAddons = new Set<string>();
   const validatedPaidModules: DeclaredCapacityAddonModule[] = [];
@@ -301,7 +434,8 @@ export function quoteDeclaredCapacityWithFrozenPrices(
   }
 
   if (
-    parsed.data.length !== quote.lines.length + paidModules.length ||
+    parsed.data.length !==
+      quote.lines.length + paidModules.length + frozenStorage.length ||
     parsed.data.filter((line) => line.component === "ADDON").length !==
       paidModules.length
   ) {
@@ -322,6 +456,7 @@ export function quoteDeclaredCapacityWithFrozenPrices(
   return {
     ...quote,
     planCode: declaredCapacityPlanCode(quote.tier, input.interval),
+    storageChoice,
     lines,
     paidModules: validatedPaidModules,
     trialModules: [],
