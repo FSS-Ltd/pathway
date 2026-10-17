@@ -107,9 +107,9 @@ async function run(): Promise<void> {
     return button;
   };
   const panel = (label: string): HTMLElement => {
-    const result = host.querySelector<HTMLElement>(
-      `section[aria-label="${label}"]`,
-    );
+    const result = [
+      ...host.querySelectorAll<HTMLElement>('[role="tabpanel"]'),
+    ].find((value) => value.querySelector("h3")?.textContent === label);
     assert.ok(result, `Topic panel ${label} is available`);
     return result;
   };
@@ -117,8 +117,16 @@ async function run(): Promise<void> {
   try {
     await render();
     assert.equal(
-      panel("Premises Safety").querySelectorAll("details").length,
+      panel("Premises Safety").querySelectorAll(":scope > div > details")
+        .length,
       3,
+    );
+    assert.equal(
+      panel("Premises Safety").querySelectorAll(
+        ":scope > div:not([hidden]) > details",
+      ).length,
+      1,
+      "only one action is visible",
     );
     assert.match(
       panel("Premises Safety").textContent ?? "",
@@ -131,7 +139,9 @@ async function run(): Promise<void> {
     assert.match(panel("Premises Safety").textContent ?? "", /Unresolved/);
     assert.match(panel("Premises Safety").textContent ?? "", /Not applicable/);
     assert.equal(panel("Safeguarding").hidden, true);
-    const details = panel("Premises Safety").querySelector("details");
+    const details = panel("Premises Safety").querySelector<HTMLDetailsElement>(
+      ":scope > div:not([hidden]) > details",
+    );
     assert.ok(details);
     await act(async () => {
       details.open = true;
@@ -150,23 +160,26 @@ async function run(): Promise<void> {
       notes.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
     });
     assert.equal(
-      topicButton("Premises Safety").getAttribute("aria-pressed"),
+      topicButton("Premises Safety").getAttribute("aria-selected"),
       "true",
     );
     assert.match(topicButton("Premises Safety").textContent ?? "", /3$/);
 
     await act(async () => topicButton("Safeguarding").click());
     assert.equal(
-      topicButton("Safeguarding").getAttribute("aria-pressed"),
+      topicButton("Safeguarding").getAttribute("aria-selected"),
       "true",
     );
     assert.equal(
-      topicButton("Premises Safety").getAttribute("aria-pressed"),
+      topicButton("Premises Safety").getAttribute("aria-selected"),
       "false",
     );
     assert.equal(panel("Safeguarding").hidden, false);
     assert.equal(panel("Premises Safety").hidden, true);
-    assert.equal(panel("Safeguarding").querySelectorAll("details").length, 1);
+    assert.equal(
+      panel("Safeguarding").querySelectorAll(":scope > div > details").length,
+      1,
+    );
     await act(async () => topicButton("Premises Safety").click());
     assert.equal(panel("Premises Safety").hidden, false);
     assert.equal(
@@ -177,7 +190,7 @@ async function run(): Promise<void> {
     await act(async () => topicButton("Safeguarding").click());
     await render();
     assert.equal(
-      topicButton("Safeguarding").getAttribute("aria-pressed"),
+      topicButton("Safeguarding").getAttribute("aria-selected"),
       "true",
     );
 
@@ -188,7 +201,8 @@ async function run(): Promise<void> {
       /Review data records/,
     );
     assert.equal(
-      panel("Privacy Records").querySelectorAll("details").length,
+      panel("Privacy Records").querySelectorAll(":scope > div > details")
+        .length,
       1,
     );
 
@@ -198,7 +212,7 @@ async function run(): Promise<void> {
       /No published actions are available for this topic/,
     );
     assert.equal(
-      topicButton("Activities").getAttribute("aria-pressed"),
+      topicButton("Activities").getAttribute("aria-selected"),
       "true",
     );
     await render([], []);

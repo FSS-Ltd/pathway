@@ -10,6 +10,10 @@ import {
 } from "./tracker-record";
 import { trackerLocation } from "./tracker-location";
 import { buildTrackerChecklist } from "./tracker-engine";
+import {
+  applyOrganisationFacts,
+  trackerOrganisationFacts,
+} from "./tracker-organisation";
 export async function readTrackerChecklist(
   tx: Prisma.TransactionClient,
   actor: ComplianceActor,
@@ -18,6 +22,19 @@ export async function readTrackerChecklist(
   const scope = trackerScope(actor);
   const row = await tx.complianceSiteProfile.findFirst({ where: scope });
   const profile = row ? serializeTrackerProfile(row) : null;
+  const organisationFacts = await trackerOrganisationFacts(tx, actor.orgId);
+  const effectiveProfile = profile
+    ? {
+        ...profile,
+        profile: applyOrganisationFacts(profile.profile, organisationFacts),
+      }
+    : null;
+  const profileNeedsSync = Boolean(
+    profile &&
+    (profile.profile.sector !== effectiveProfile?.profile.sector ||
+      profile.profile.vertical !== effectiveProfile?.profile.vertical ||
+      profile.profile.ace !== effectiveProfile?.profile.ace),
+  );
   const requirementIds = [...new Set(catalogue.requirements.map((r) => r.id))];
   const latest = await tx.complianceAttestation.groupBy({
     by: ["requirementId"],
@@ -44,9 +61,11 @@ export async function readTrackerChecklist(
     },
     _count: { id: true },
   });
-  return buildTrackerChecklist({
+  const checklist = buildTrackerChecklist({
     catalogue,
-    profile,
+    profile: effectiveProfile,
+    sectorOverride: organisationFacts.sector,
+    forceStale: profileNeedsSync,
     location: await trackerLocation(
       tx,
       profile?.profile.jurisdictionId ?? null,
@@ -60,6 +79,12 @@ export async function readTrackerChecklist(
     ),
     now: new Date(),
   });
+  return {
+    ...checklist,
+    profile,
+    organisationFacts,
+    profileNeedsSync,
+  };
 }
 export function requireApplicableItem(
   checklist: TrackerChecklist,

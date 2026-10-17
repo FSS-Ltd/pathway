@@ -5,7 +5,11 @@ import {
   institutionalSector,
   SECTOR_OPTIONS,
 } from "@pathway/types";
-import type { TrackerProfileInput, TrackerJurisdiction } from "@pathway/types";
+import type {
+  TrackerProfileInput,
+  TrackerJurisdiction,
+  TrackerChecklist,
+} from "@pathway/types";
 import { Choice, words } from "./profile-choice";
 export { words } from "./profile-choice";
 import { ProfileFacts } from "./profile-facts";
@@ -34,10 +38,12 @@ export function ProfileFields({
   value,
   setValue,
   jurisdictions,
+  organisationFacts,
 }: {
   value: TrackerProfileInput;
   setValue: (value: TrackerProfileInput) => void;
   jurisdictions: TrackerJurisdiction[];
+  organisationFacts?: TrackerChecklist["organisationFacts"];
 }) {
   function set<K extends keyof TrackerProfileInput>(
     key: K,
@@ -87,26 +93,40 @@ export function ProfileFields({
           />
         </label>
       ))}
-      <Choice
-        label="Sector"
-        value={value.sector}
-        options={SECTOR_OPTIONS.map((o) => o.value)}
-        onChange={(sector) => setValue({ ...value, sector, vertical: null })}
-      />
-      <Choice
-        label="Product type"
-        value={value.vertical}
-        options={INSTITUTIONAL_VERTICALS.filter(
-          (v) => !value.sector || institutionalSector(v) === value.sector,
-        )}
-        onChange={(vertical) =>
-          setValue({
-            ...value,
-            vertical,
-            sector: vertical ? institutionalSector(vertical) : value.sector,
-          })
-        }
-      />
+      {organisationFacts?.sector ? (
+        <p className="text-sm">
+          <strong>Sector:</strong> {words(organisationFacts.sector)} · from
+          organisation settings
+        </p>
+      ) : (
+        <Choice
+          label="Sector"
+          value={value.sector}
+          options={SECTOR_OPTIONS.map((o) => o.value)}
+          onChange={(sector) => setValue({ ...value, sector, vertical: null })}
+        />
+      )}
+      {organisationFacts?.vertical ? (
+        <p className="text-sm">
+          <strong>Product type:</strong> {words(organisationFacts.vertical)} ·
+          from organisation settings
+        </p>
+      ) : (
+        <Choice
+          label="Product type"
+          value={value.vertical}
+          options={INSTITUTIONAL_VERTICALS.filter(
+            (v) => !value.sector || institutionalSector(v) === value.sector,
+          )}
+          onChange={(vertical) =>
+            setValue({
+              ...value,
+              vertical,
+              sector: vertical ? institutionalSector(vertical) : value.sector,
+            })
+          }
+        />
+      )}
       <Choice
         label="Actual provider category"
         value={value.providerCategory}
@@ -157,29 +177,39 @@ export function ProfileFields({
         setValue={setValue}
         jurisdictions={jurisdictions}
       />
-      {activities.map((key) => (
-        <label key={key} className="block min-w-0">
-          {key === "ace"
-            ? "ACE participation"
-            : key === "icce"
-              ? "Offers ICCE qualifications"
-              : words(key)}
-          <select
-            className={fieldClass}
-            value={value[key] === null ? "unknown" : String(value[key])}
-            onChange={(e) =>
-              set(
-                key,
-                e.target.value === "unknown" ? null : e.target.value === "true",
-              )
-            }
-          >
-            <option value="unknown">Unknown</option>
-            <option value="true">Yes</option>
-            <option value="false">No</option>
-          </select>
-        </label>
-      ))}
+      {activities
+        .filter((key) => key !== "ace" || organisationFacts?.ace !== true)
+        .map((key) => (
+          <label key={key} className="block min-w-0">
+            {key === "ace"
+              ? "ACE participation"
+              : key === "icce"
+                ? "Offers ICCE qualifications"
+                : words(key)}
+            <select
+              className={fieldClass}
+              value={value[key] === null ? "unknown" : String(value[key])}
+              onChange={(e) =>
+                set(
+                  key,
+                  e.target.value === "unknown"
+                    ? null
+                    : e.target.value === "true",
+                )
+              }
+            >
+              <option value="unknown">Unknown</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </label>
+        ))}
+      {organisationFacts?.ace === true && (
+        <p className="text-sm sm:col-span-2">
+          <strong>ACE participation:</strong> Yes · from the organisation
+          product type
+        </p>
+      )}
     </div>
   );
 }

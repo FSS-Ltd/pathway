@@ -16,6 +16,10 @@ import {
 import { trackerLocation, trackerJurisdictionSelect } from "./tracker-location";
 import { normalizeTrackerProfile } from "./tracker.dto";
 import { serializeTrackerProfile } from "./tracker-record";
+import {
+  applyOrganisationFacts,
+  trackerOrganisationFacts,
+} from "./tracker-organisation";
 @Injectable()
 export class TrackerProfileService {
   constructor(
@@ -55,9 +59,10 @@ export class TrackerProfileService {
           "The site profile changed. Reload before saving your draft.",
         );
       const currentProfile = current ? serializeTrackerProfile(current) : null;
-      const profile = normalizeTrackerProfile(
-        input.profile,
-        currentProfile?.profile,
+      const facts = await trackerOrganisationFacts(tx, actor.orgId);
+      const profile = applyOrganisationFacts(
+        normalizeTrackerProfile(input.profile, currentProfile?.profile),
+        facts,
       );
       await trackerLocation(tx, profile.jurisdictionId);
       if (current && isDeepStrictEqual(currentProfile?.profile, profile)) {

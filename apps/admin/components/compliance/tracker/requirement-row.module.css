@@ -119,6 +119,20 @@
 .body :is(input, textarea) {
   box-sizing: border-box;
 }
+.more {
+  padding-top: 0.9rem;
+  border-top: 1px solid rgb(var(--pw-border-subtle));
+}
+.more > summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 700;
+  list-style-position: inside;
+}
+.more > summary:focus-visible {
+  outline: 2px solid rgb(var(--pw-accent-strong));
+  outline-offset: 3px;
+}
 
 @media (hover: hover) {
   .summary:hover {

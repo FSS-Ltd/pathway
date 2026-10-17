@@ -138,6 +138,7 @@ export interface TrackerAttestation extends Omit<
 export interface TrackerChecklistItem {
   requirement: TrackerRequirement;
   applicability: TrackerApplicability;
+  applicabilityReason?: string;
   attestation: TrackerAttestation | null;
   completed: boolean;
   stale: boolean;
@@ -177,6 +178,12 @@ export interface TrackerCoverage {
 }
 export interface TrackerChecklist {
   profile: TrackerProfile | null;
+  organisationFacts?: {
+    sector: Sector | null;
+    vertical: InstitutionalVertical | null;
+    ace: true | null;
+  };
+  profileNeedsSync?: boolean;
   items: TrackerChecklistItem[];
   progress: TrackerProgress;
   categories: TrackerCategoryProgress[];
