@@ -375,6 +375,63 @@ describe("Site tracker persistence and permission boundaries", () => {
     catalogueProvider.catalogue = trackerFixture();
     await save();
   });
+  it("persists a published Welsh confirmation after reload and isolates it from another site", async () => {
+    if (!app) return;
+    catalogueProvider.catalogue = TRACKER_CATALOGUE;
+    try {
+      const profile = await save({
+        ...testProfile,
+        jurisdictionId: "a0000000-0000-4000-8000-000000000003",
+        localAuthority: "Cardiff",
+        icce: false,
+      });
+      const service = app.get(TrackerService);
+      const before = await service.checklist(actor);
+      expect(before.items.length).toBeGreaterThan(0);
+      expect(
+        before.items.every((item) => /^(wal|wls)/.test(item.requirement.id)),
+      ).toBe(true);
+      expect(before.coverageGaps).toBe(8);
+      await request(app.getHttpServer())
+        .post("/compliance/tracker/attestations")
+        .set("Authorization", manager)
+        .send({
+          requirementId: "wal.independent-registration",
+          requirementVersion: 1,
+          profileVersion: profile.version,
+          expectedRevision: 0,
+          status: "COMPLETE",
+          notes: "Synthetic Welsh registration evidence reviewed",
+          notApplicableReason: null,
+          reviewDueAt: null,
+        })
+        .expect(201);
+      const reloaded = await service.checklist(actor);
+      expect(
+        reloaded.items.find(
+          (item) => item.requirement.id === "wal.independent-registration",
+        ),
+      ).toMatchObject({ completed: true });
+      expect(reloaded.progress.completed).toBe(before.progress.completed + 1);
+      await request(app.getHttpServer())
+        .get(
+          "/compliance/tracker/history?requirementId=wal.independent-registration",
+        )
+        .set("Authorization", other)
+        .expect(200)
+        .expect((response) => expect(response.body.items).toEqual([]));
+      await request(app.getHttpServer())
+        .get(
+          "/compliance/tracker/history?requirementId=wal.independent-registration",
+        )
+        .set("Authorization", foreign)
+        .expect(200)
+        .expect((response) => expect(response.body.items).toEqual([]));
+    } finally {
+      catalogueProvider.catalogue = trackerFixture();
+      await save();
+    }
+  });
   it("enforces read/manage, cross-site, cross-org and scoped cursor boundaries", async () => {
     if (!app) return;
     const server = app.getHttpServer();

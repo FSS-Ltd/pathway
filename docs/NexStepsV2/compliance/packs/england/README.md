@@ -1,9 +1,9 @@
 # England pack: reviewed national core
 
-Step **2.01 remains in progress**. This branch prepares catalogue **1.2.0** with
+Step **2.01 remains partially published**. The merged release contains catalogue **1.2.0** with
 **154 reviewed source records and 106 current actions** across eight topics and all six
 institutional research sectors. It is not a complete England pack or legal
-certification. The initial v1.1 core passed its gate and was merged in PR #634. This v1.2 follow-up is unmerged and has not passed its own gate.
+certification. The initial v1.1 core passed its gate and was merged in PR #634. The v1.2 follow-up passed all eight CI checks, merged in PR #657 and was deployed and checked live on 17 October 2026.
 
 ## Publication and coverage
 
@@ -24,10 +24,11 @@ local safeguarding arrangements and permissions, and actual ACE institutional
 agreements. No list of all council policies has
 been reviewed. Region entry alone does not establish reviewed local coverage.
 
-A merged bounded-release PR would establish only that release's delivery gate;
-it must not be recorded as completion of the entire jurisdiction step. Wales
-implementation must wait for the agreed England predecessor gate and completion
-of its required scope. Remaining country packs are not scaffolded here.
+The merged bounded release establishes its own delivery gate, not completion of
+the entire jurisdiction scope. The user explicitly requested progression to the
+remaining packs after the verified #657 release. Wales proceeds next while these
+England local and specialist gaps remain visible; neither jurisdiction coverage
+nor the overall project is declared complete.
 
 ## Actual provision and unknown facts
 
@@ -83,8 +84,7 @@ Prisma/permission checks, API/admin/web builds and independent source/backend/UI
 review passed. An earlier run had two existing HTTP failures; unchanged focused and
 full isolated reruns passed, with the earlier results retained in the ledger.
 Commit hooks passed 226 API suites / 1,630 tests for the initial core.
-The expanded catalogue requires renewed final verification and current-head host
-CI/merge before delivery; initial host CI cannot stand in for the expanded revision. See the project
+The expanded catalogue passed current-head host CI and merged in PR #657. See the project
 [progress ledger](../../PROGRESS.md) for exact commands and current results.
 
 ## Published history and renewed confirmation
