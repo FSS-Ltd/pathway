@@ -97,7 +97,7 @@ describe("module catalogue", () => {
     const { modulePrices } = mergeBillingPrices([
       {
         code: "MODULE_FINANCE_MONTHLY",
-        unitAmount: 1900,
+        unitAmount: 2900,
         interval: "month",
       },
     ]);
@@ -111,14 +111,14 @@ describe("module catalogue", () => {
     );
 
     expect(modulePrices.MODULE_FINANCE_MONTHLY).toEqual({
-      amountMajor: 19,
+      amountMajor: 29,
       label: "Finance module",
       stripePriceId: "",
     });
-    expect(totals.totalMajor).toBe(68);
+    expect(totals.totalMajor).toBe(78);
     expect(totals.lines).toContainEqual({
       label: "Finance module",
-      amountMajor: 19,
+      amountMajor: 29,
     });
   });
 
@@ -189,12 +189,12 @@ describe("module catalogue", () => {
       },
       {
         modulePrices: {
-          MODULE_FINANCE_MONTHLY: { amountMajor: 19, label: "Finance" },
+          MODULE_FINANCE_MONTHLY: { amountMajor: 29, label: "Finance" },
         },
       },
     );
 
-    expect(totals.totalMajor).toBe(68);
+    expect(totals.totalMajor).toBe(78);
   });
 
   it("does not use published module fallbacks in configurator totals", () => {

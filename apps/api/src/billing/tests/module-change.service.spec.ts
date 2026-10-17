@@ -133,7 +133,7 @@ describe("module change service", () => {
       ...subscription,
       id: "sub_addon",
       current_period_end: renewal + 7 * 24 * 60 * 60,
-      items: { data: [{ price: { id: "price_finance", unit_amount: 1900 }, quantity: 1 }] },
+      items: { data: [{ price: { id: "price_finance", unit_amount: 2900 }, quantity: 1 }] },
     } as unknown as Stripe.Subscription;
 
     const preview = await service(addon).preview("org_1", {

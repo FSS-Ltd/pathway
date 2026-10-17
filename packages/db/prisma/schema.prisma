@@ -206,6 +206,13 @@ enum FinanceBankTransferChangeStatus {
   REJECTED
 }
 
+enum FinanceStripeConnectionStatus {
+  CONNECTING
+  READY
+  RESTRICTED
+  DISCONNECTED
+}
+
 enum PendingOrderStatus {
   PENDING
   COMPLETED
@@ -1113,6 +1120,7 @@ model Org {
   accessTagGrants     AccessTagGrant[]
   accessTagExclusions AccessTagExclusion[]
   financeProfiles     FinanceProfile[]
+  financeStripeConnections       FinanceStripeConnection[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -1212,6 +1220,7 @@ model Tenant {
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites  FamilyIdentityInvite[]
   financeProfile        FinanceProfile?
+  financeStripeConnections              FinanceStripeConnection[]
   aceTermReports         AceTermReport[]
   aceReportCompilations  AceReportCompilation[]
   aceReportDrafts        AceReportDraft[]
@@ -1397,6 +1406,8 @@ model User {
   financeManualReceiptRequestsCreated      FinanceManualReceiptRequest[]       @relation("FinanceManualReceiptRequester")
   financeManualReceiptRequestsDecided      FinanceManualReceiptRequest[]       @relation("FinanceManualReceiptDecider")
   financeTransferNotices                   FinanceTransferNotice[]             @relation("FinanceTransferNoticePayer")
+  financeStripeConnectionsRequested        FinanceStripeConnection[]           @relation("FinanceStripeConnectionRequester")
+  financeStripeConnectionsDisconnected     FinanceStripeConnection[]           @relation("FinanceStripeConnectionDisconnector")
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
@@ -4945,10 +4956,34 @@ model FinanceProfile {
   bankTransferChanges   FinanceBankTransferChange[]
   manualReceiptRequests FinanceManualReceiptRequest[]
   transferNotices       FinanceTransferNotice[]
+  stripeConnections     FinanceStripeConnection[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
   @@index([orgId, tenantId])
+}
+
+model FinanceStripeConnection {
+  id                   String                        @id @default(uuid())
+  financeProfileId     String
+  tenantId             String
+  orgId                String
+  stripeAccountId      String?                       @unique
+  status               FinanceStripeConnectionStatus @default(CONNECTING)
+  livemode             Boolean                       @default(false)
+  requestedByUserId    String
+  disconnectedByUserId String?
+  disconnectedAt       DateTime?
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  financeProfile       FinanceProfile                @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant               Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                  Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  requestedBy          User                          @relation("FinanceStripeConnectionRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  disconnectedBy       User?                         @relation("FinanceStripeConnectionDisconnector", fields: [disconnectedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, status])
 }
 
 model FinancePayerAccount {

@@ -3,7 +3,6 @@ import {
   configuredModulesForState,
   firstIncompleteStep,
   includedModuleLimitForState,
-  includedModulesForState,
   INITIAL_CONFIGURATOR_STATE,
   nextStep,
   prevStep,
@@ -31,7 +30,8 @@ const ORG_VERTICALS: Record<OrgType, Vertical[]> = {
 const PRICES = {
   MODULE_LEARNING_MONTHLY: { amountMajor: 29 },
   MODULE_LEARNING_YEARLY: { amountMajor: 290 },
-  MODULE_FINANCE_MONTHLY: { amountMajor: 19 },
+  MODULE_FINANCE_MONTHLY: { amountMajor: 29 },
+  MODULE_FINANCE_YEARLY: { amountMajor: 290 },
   MODULE_EVENTS_MONTHLY: { amountMajor: 12 },
   MODULE_TRANSPORT_MONTHLY: { amountMajor: 15 },
   MODULE_MEALS_MONTHLY: { amountMajor: 18 },
@@ -297,7 +297,7 @@ describe("configurator state", () => {
 
     const starter = selectPlan(yearly, "STARTER_49_YEARLY", {
       ...PRICES,
-      MODULE_FINANCE_YEARLY: { amountMajor: 190 },
+      MODULE_FINANCE_YEARLY: { amountMajor: 290 },
       MODULE_EVENTS_YEARLY: { amountMajor: 120 },
       MODULE_ADVANCED_REPORTING_YEARLY: { amountMajor: 270 },
       MODULE_ASSET_MANAGEMENT_YEARLY: { amountMajor: 220 },

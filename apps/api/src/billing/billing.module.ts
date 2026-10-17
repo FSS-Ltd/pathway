@@ -74,6 +74,7 @@ import { InstitutionalBillingModule } from "./institutional/institutional-billin
   ],
   exports: [
     BillingService,
+    BILLING_PROVIDER_CONFIG,
     EntitlementsService,
     EntitlementsEnforcementService,
     BILLING_WEBHOOK_PROVIDER,
