@@ -50,6 +50,7 @@ const ENCRYPTED_STRING_FIELDS: Record<string, readonly string[]> = {
   Message: ["bodyEncrypted"],
   Correspondence: ["notes"],
   HouseholdRequirement: ["notes"],
+  FinanceBankTransferChange: ["accountHolderName", "sortCode", "accountNumber"],
 };
 
 /**

@@ -73,11 +73,12 @@ export class FinanceAccessService {
     scope: FinanceAccessScope,
     requesterUserId: string,
     approverUserId: string,
+    action: FinanceStaffAction = "REVIEW_INVOICE",
   ): Promise<void> {
     if (!isIndependentFinanceApproval(requesterUserId, approverUserId)) {
       throw new ForbiddenException("Independent Finance approval required");
     }
-    await this.assertStaffAction(scope, "REVIEW_INVOICE");
+    await this.assertStaffAction(scope, action);
     await this.assertApprovalPermission(scope, approverUserId);
   }
 
