@@ -11,6 +11,10 @@ import { FinanceInvoiceService } from "./finance-invoice.service";
 import { FinanceBalanceService } from "./finance-balance.service";
 import { FinanceReceiptController } from "./finance-receipt.controller";
 import { FinanceReceiptService } from "./finance-receipt.service";
+import { FinanceBankTransferController } from "./finance-bank-transfer.controller";
+import { FinanceBankTransferService } from "./finance-bank-transfer.service";
+import { FinanceManualReceiptController } from "./finance-manual-receipt.controller";
+import { FinanceManualReceiptService } from "./finance-manual-receipt.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule, FinanceAccessModule],
@@ -18,6 +22,8 @@ import { FinanceReceiptService } from "./finance-receipt.service";
     FinanceInvoiceController,
     FinanceCreditNoteController,
     FinanceReceiptController,
+    FinanceBankTransferController,
+    FinanceManualReceiptController,
   ],
   providers: [
     FinanceBalanceService,
@@ -25,6 +31,8 @@ import { FinanceReceiptService } from "./finance-receipt.service";
     FinanceInvoiceService,
     FinanceCreditNoteService,
     FinanceReceiptService,
+    FinanceBankTransferService,
+    FinanceManualReceiptService,
   ],
 })
 export class FinanceModule {}

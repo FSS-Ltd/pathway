@@ -149,6 +149,21 @@ describe("FinanceAccessService", () => {
     });
   });
 
+  it("allows an independent reviewer to confirm an in-flight payment in servicing mode", async () => {
+    reader.findModule.mockResolvedValue({
+      status: ModuleStatus.CANCELLED,
+      expiresAt: null,
+    });
+    await expect(
+      Reflect.apply(service.authorizeIndependentFinanceApproval, service, [
+        scope,
+        "staff-a",
+        "staff-b",
+        "RECORD_IN_FLIGHT_PAYMENT",
+      ]),
+    ).resolves.toBeUndefined();
+  });
+
   it("continues servicing an existing receipt regardless of entitlement", async () => {
     reader.hasReceipt.mockResolvedValue(true);
     await expect(

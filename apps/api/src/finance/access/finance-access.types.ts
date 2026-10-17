@@ -20,6 +20,7 @@ export type FinanceStaffAction =
   | "RECORD_IN_FLIGHT_PAYMENT"
   | "RECORD_RECEIPT"
   | "ALLOCATE_RECEIPT"
+  | "MANAGE_BANK_TRANSFER_DETAILS"
   | "RECONCILE"
   | "REFUND"
   | "HANDLE_DISPUTE"
@@ -34,6 +35,7 @@ export type FinanceStaffAction =
 export type FinancePayerAction =
   | "READ_ACCOUNT"
   | "DOWNLOAD_DOCUMENT"
+  | "DECLARE_TRANSFER"
   | "SETTLE_ISSUED_INVOICE";
 
 export type FinancePermissionKey = Extract<PermissionKey, `finance.${string}`>;

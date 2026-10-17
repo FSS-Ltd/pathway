@@ -165,12 +165,21 @@ enum FinanceCommandType {
   VOID_CREDIT_NOTE
   ALLOCATE_RECEIPT
   REVERSE_ALLOCATION
+  CREATE_MANUAL_RECEIPT_REQUEST
+  APPROVE_MANUAL_RECEIPT_REQUEST
+  REJECT_MANUAL_RECEIPT_REQUEST
+  SUBMIT_TRANSFER_NOTICE
+  APPROVE_BANK_TRANSFER_CHANGE
+  REJECT_BANK_TRANSFER_CHANGE
 }
 
 enum FinanceCommandResourceType {
   INVOICE
   CREDIT_NOTE
   ALLOCATION
+  MANUAL_RECEIPT_REQUEST
+  TRANSFER_NOTICE
+  BANK_TRANSFER_CHANGE
 }
 
 enum FinanceReceiptStatus {
@@ -183,6 +192,18 @@ enum FinanceReceiptSource {
   MANUAL_TRANSFER
   STRIPE_CARD
   STRIPE_BACS
+}
+
+enum FinanceManualReceiptRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum FinanceBankTransferChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum PendingOrderStatus {
@@ -1371,6 +1392,11 @@ model User {
   financeCommands                    FinanceCommandReceipt[]               @relation("FinanceCommandActor")
   financeReceiptAllocationsCreated    FinanceReceiptAllocation[]            @relation("FinanceReceiptAllocationActor")
   financeReceiptAllocationReversals   FinanceReceiptAllocationReversal[]    @relation("FinanceReceiptAllocationReversalActor")
+  financeBankTransferChangesRequested      FinanceBankTransferChange[]         @relation("FinanceBankTransferChangeRequester")
+  financeBankTransferChangesDecided        FinanceBankTransferChange[]         @relation("FinanceBankTransferChangeDecider")
+  financeManualReceiptRequestsCreated      FinanceManualReceiptRequest[]       @relation("FinanceManualReceiptRequester")
+  financeManualReceiptRequestsDecided      FinanceManualReceiptRequest[]       @relation("FinanceManualReceiptDecider")
+  financeTransferNotices                   FinanceTransferNotice[]             @relation("FinanceTransferNoticePayer")
   studentIdentities                 StudentIdentity[]
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
@@ -4916,6 +4942,9 @@ model FinanceProfile {
   receipts           FinanceReceipt[]
   payerAccounts      FinancePayerAccount[]
   creditNotes        FinanceCreditNote[]
+  bankTransferChanges   FinanceBankTransferChange[]
+  manualReceiptRequests FinanceManualReceiptRequest[]
+  transferNotices       FinanceTransferNotice[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
@@ -4934,6 +4963,8 @@ model FinancePayerAccount {
   grants           FinancePayerGrant[]
   invoices         FinanceInvoice[]
   receipts         FinanceReceipt[]
+  manualReceiptRequests FinanceManualReceiptRequest[]
+  transferNotices       FinanceTransferNotice[]
 
   @@unique([id, tenantId, orgId])
   @@index([financeProfileId, displayName])
@@ -5017,6 +5048,7 @@ model FinanceInvoice {
   allocations             FinanceReceiptAllocation[]
   events                  FinanceInvoiceEvent[]
   creditNotes             FinanceCreditNote[]
+  transferNotices         FinanceTransferNotice[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, invoiceNumber])
@@ -5176,12 +5208,98 @@ model FinanceReceipt {
   financeProfile   FinanceProfile             @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
   payerAccount     FinancePayerAccount?       @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
   allocations      FinanceReceiptAllocation[]
+  manualReceiptRequest FinanceManualReceiptRequest?
 
   @@unique([id, tenantId, orgId])
   @@unique([financeProfileId, source, sourceReference])
   @@index([tenantId, status, confirmedAt])
   @@index([tenantId, orgId, payerAccountId, confirmedAt])
   @@index([financeProfileId, createdAt])
+}
+
+model FinanceBankTransferChange {
+  id                String                          @id @default(uuid())
+  financeProfileId  String
+  tenantId          String
+  orgId             String
+  requestedByUserId String
+  decidedByUserId   String?
+  idempotencyKey    String                          @db.VarChar(128)
+  accountHolderName String                          @db.VarChar(1024)
+  sortCode          String                          @db.VarChar(1024)
+  accountNumber     String                          @db.VarChar(1024)
+  reason            String
+  status            FinanceBankTransferChangeStatus @default(PENDING)
+  decisionReason    String?
+  decidedAt         DateTime?
+  createdAt         DateTime                        @default(now())
+  financeProfile    FinanceProfile                  @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  requestedBy       User                            @relation("FinanceBankTransferChangeRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  decidedBy         User?                           @relation("FinanceBankTransferChangeDecider", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, orgId, requestedByUserId, idempotencyKey])
+  @@index([tenantId, orgId, financeProfileId, status, createdAt])
+}
+
+model FinanceManualReceiptRequest {
+  id                       String                            @id @default(uuid())
+  financeProfileId         String
+  payerAccountId           String
+  transferNoticeId         String?
+  receiptId                String?
+  tenantId                 String
+  orgId                    String
+  requestedByUserId        String
+  decidedByUserId          String?
+  bankTransactionReference String                            @db.VarChar(255)
+  amountMinor              BigInt
+  currency                 FinanceCurrency                   @default(GBP)
+  receivedAt               DateTime
+  requestReason            String
+  status                   FinanceManualReceiptRequestStatus @default(PENDING)
+  decisionReason           String?
+  decidedAt                DateTime?
+  createdAt                DateTime                          @default(now())
+  updatedAt                DateTime                          @updatedAt
+  financeProfile           FinanceProfile                    @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount             FinancePayerAccount               @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  transferNotice           FinanceTransferNotice?            @relation(fields: [transferNoticeId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  receipt                  FinanceReceipt?                   @relation(fields: [receiptId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  requestedBy              User                              @relation("FinanceManualReceiptRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  decidedBy                User?                             @relation("FinanceManualReceiptDecider", fields: [decidedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([transferNoticeId, tenantId, orgId])
+  @@unique([receiptId, tenantId, orgId])
+  @@unique([financeProfileId, bankTransactionReference])
+  @@index([tenantId, orgId, status, createdAt])
+  @@index([tenantId, orgId, payerAccountId, receivedAt])
+}
+
+model FinanceTransferNotice {
+  id                    String                       @id @default(uuid())
+  financeProfileId      String
+  payerAccountId        String
+  invoiceId             String
+  tenantId              String
+  orgId                 String
+  payerUserId           String
+  idempotencyKey        String                       @db.VarChar(128)
+  invoiceNumber         BigInt
+  amountMinor           BigInt
+  declaredTransferredAt DateTime
+  createdAt             DateTime                     @default(now())
+  financeProfile        FinanceProfile               @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount          FinancePayerAccount          @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice               FinanceInvoice               @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payer                 User                         @relation("FinanceTransferNoticePayer", fields: [payerUserId], references: [id], onDelete: Restrict)
+  manualReceiptRequest  FinanceManualReceiptRequest?
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, orgId, payerUserId, idempotencyKey])
+  @@index([tenantId, orgId, payerAccountId, createdAt])
+  @@index([tenantId, orgId, invoiceId, createdAt])
 }
 
 model FinanceReceiptAllocation {

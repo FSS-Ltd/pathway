@@ -79,6 +79,14 @@ describe("withPiiEncryption", () => {
       "ComplianceAgreementAcceptance",
       { typedName: "Test Recipient", signedFileName: "signed.pdf" },
     ],
+    [
+      "FinanceBankTransferChange",
+      {
+        accountHolderName: "NexSteps School",
+        sortCode: "123456",
+        accountNumber: "00123456",
+      },
+    ],
   ])("encrypts all sensitive fields of %s", async (model, fields) => {
     const { fakeClient, invoke } = makeFakeClient();
     withPiiEncryption(fakeClient);

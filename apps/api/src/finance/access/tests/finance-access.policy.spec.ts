@@ -5,6 +5,10 @@ import {
   isIndependentFinanceApproval,
   resolveFinanceAccessMode,
 } from "../finance-access.policy";
+import type {
+  FinancePayerAction,
+  FinanceStaffAction,
+} from "../finance-access.types";
 
 describe("Finance access policy", () => {
   const now = new Date("2026-10-15T12:00:00.000Z");
@@ -96,6 +100,27 @@ describe("Finance access policy", () => {
     expect(
       canPerformFinancePayerAction("SERVICING_ONLY", "SETTLE_ISSUED_INVOICE"),
     ).toBe(true);
+  });
+
+  it("allows transfer notices for issued invoices in active and servicing modes", () => {
+    const action = "DECLARE_TRANSFER" as FinancePayerAction;
+    expect(canPerformFinancePayerAction("ACTIVE", action)).toBe(true);
+    expect(canPerformFinancePayerAction("SERVICING_ONLY", action)).toBe(true);
+    expect(canPerformFinancePayerAction("LOCKED", action)).toBe(false);
+  });
+
+  it("allows manual receipt servicing but restricts bank destination changes to active mode", () => {
+    const manageBankDetails =
+      "MANAGE_BANK_TRANSFER_DETAILS" as FinanceStaffAction;
+    expect(
+      canPerformFinanceStaffAction(
+        "SERVICING_ONLY",
+        "RECORD_IN_FLIGHT_PAYMENT",
+      ),
+    ).toBe(true);
+    expect(
+      canPerformFinanceStaffAction("SERVICING_ONLY", manageBankDetails),
+    ).toBe(false);
   });
 
   it("requires the approval actor to be distinct and present", () => {
