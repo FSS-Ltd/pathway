@@ -3,7 +3,7 @@
 **Status:** User-authorized initial launch with VAT collection off. NexSteps is
 not VAT-registered yet. V2 checkout may run at the configured total without
 collecting VAT; when registration becomes required, VAT will be included within
-that same price. **Checked:** 2026-10-16.
+that same price. **Checked:** 2026-10-17.
 
 This runbook covers the `DECLARED_CAPACITY_V2` institutional subscription and
 the eight trial-eligible modules. It does not change existing `ENROLLED_CHILDREN_V1`
@@ -25,14 +25,14 @@ approved monthly and annual Prices are both mapped.
 
 ## Readiness evidence
 
-| Area                   | Evidence on 2026-10-16                                                                                                                 | Status                                        |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| V2 API gate            | `GET https://api.nexsteps.dev/billing/institutional/catalogue/declared-capacity` returned `503 DECLARED_CAPACITY_BILLING_UNAVAILABLE`. | Off; no V2 quote or checkout is available     |
-| Public configurator    | `https://www.nexsteps.dev/configure` returned HTTP 200; the V2 flag remains off and the legacy configurator is served.                 | No V2 customer flow exposed                   |
-| Production price map   | `/billing/prices` returned 24 entries, including six active V2 base/child and Finance codes at the approved amounts.                   | Mapped; amounts and modes verified            |
-| Stripe Tax             | Stripe live and test modes each returned zero active tax registrations.                                                                | VAT collection unavailable                    |
-| Provider test journey  | No complete V2 checkout or tax calculation journey has been run; the user authorized initial live pricing with this gap recorded.      | Incomplete; monitor and verify live lifecycle |
-| Existing subscriptions | A read-only audit on 2026-10-16 recorded four `incomplete_expired` subscriptions and zero non-terminal subscriptions.                  | Recheck immediately before cutover            |
+| Area                   | Evidence                                                                                                                                              | Status                                                   |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| V2 API gate            | On 2026-10-16, `GET https://api.nexsteps.dev/billing/institutional/catalogue/declared-capacity` returned `503 DECLARED_CAPACITY_BILLING_UNAVAILABLE`. | Off on 2026-10-16; no V2 quote or checkout was available |
+| Public configurator    | `https://www.nexsteps.dev/configure` and the V2 API catalogue returned HTTP 200 after the authorized 2026-10-17 cutover.                              | V2 customer flow available                               |
+| Production price map   | On 2026-10-16, `/billing/prices` returned 24 entries, including six active V2 base/child and Finance codes at the approved amounts.                   | Mapped; amounts and modes verified                       |
+| Stripe Tax             | Stripe live and test modes each returned zero active tax registrations.                                                                               | VAT collection unavailable                               |
+| Provider test journey  | No complete V2 checkout or tax calculation journey has been run; the user authorized initial live pricing with this gap recorded.                     | Incomplete; monitor and verify live lifecycle            |
+| Existing subscriptions | A read-only audit on 2026-10-16 recorded four `incomplete_expired` subscriptions and zero non-terminal subscriptions.                                 | No V1 subscriptions repriced                             |
 
 The production price map retains legacy fixed-price and enrolled-child codes
 for historical subscriptions and now includes the V2 base/child Prices plus
@@ -96,11 +96,12 @@ Complete and record each item for the applicable launch stage:
    that no customer will be silently repriced. Check alerts and logs for quote
    mismatch, checkout failure, webhook failure, expiry lag, email delivery
    failure, and duplicate delivery. Verify billing-contact fallback behavior.
-6. **Stage the authorized initial production cutover.** Enable
-   `DECLARED_CAPACITY_BILLING_ENABLED` and
-   `NEXT_PUBLIC_DECLARED_CAPACITY_V2_CONFIGURATOR`; keep
-   `DECLARED_CAPACITY_VAT_ENABLED=false` until registration. Smoke-check public
-   and authenticated flows and verify current totals. When registration is
+6. **Initial production cutover (completed 2026-10-17).** The user authorized
+   the V2 launch. The production billing and configurator switches are enabled;
+   `DECLARED_CAPACITY_VAT_ENABLED=false` remains in place because NexSteps is
+   not registered yet. Production health, public configurator, catalogue and
+   monthly/yearly estimates were checked after deployment. This confirms the
+   quote path, not a completed payment lifecycle. When registration is
    required, update active V2 subscriptions to automatic tax, then enable the
    VAT flag only after active live and test GB registrations and provider
    checks pass. A merged PR alone does not perform or prove either cutover.
@@ -143,8 +144,12 @@ legacy buyer flow remains available. Keep webhook reconciliation enabled for
 any V2 sessions already created, reconcile those sessions, and do not disable
 global Stripe webhook processing as part of the V2 rollback.
 
-V2 base, child, and Finance Prices are configured and mapped in live and test
-mode. The production V2 billing gate and public configurator remain off until
-the authorized deployment and flag update are completed. Stripe has no active
-VAT registration, so launch must keep VAT collection off. No V2 checkout or
-subscription has been created.
+V2 base, child, Finance, and storage Prices are mapped. On 2026-10-17 the
+authorized production cutover enabled the V2 billing gate and public
+configurator. Production health, the configurator, and the V2 catalogue
+returned HTTP 200; a 74-child estimate with 100GB storage returned £149.49
+monthly and £1,495.99 yearly. No checkout session, payment, or charge was
+created during verification. Stripe has no active VAT registration, so VAT
+collection remains off; the configured prices are intended to include VAT
+within the same amount after registration. A real payment and subscription
+lifecycle remains unverified, and renewal workers remain disabled.
