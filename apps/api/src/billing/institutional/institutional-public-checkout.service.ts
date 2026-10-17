@@ -37,9 +37,11 @@ import {
   assertDeclaredCapacityBillingEnabled,
   assertDeclaredCapacityTaxRegistration,
   declaredCapacityCheckoutTaxOptions,
+  isDeclaredCapacityVatEnabled,
 } from "./declared-capacity-gate";
 import {
   DeclaredCapacityStripePriceError,
+  declaredCapacityStorageGb,
   quoteDeclaredCapacityWithStripePrices,
 } from "./declared-capacity-stripe-pricing";
 import {
@@ -71,6 +73,7 @@ export type PublicDeclaredCapacityCheckoutInput = {
   expectedTotalPence: number;
   declarationAccepted: true;
   setting: InstitutionalVertical;
+  storageChoice: InstitutionalStorageChoice;
   payNowModules: Module[];
   trialModules: Module[];
   idempotencyKey: string;
@@ -151,6 +154,7 @@ export class InstitutionalPublicCheckoutService {
             quote,
             line.priceId,
             this.config.activeProvider === "STRIPE",
+            isDeclaredCapacityVatEnabled(),
           );
         } catch {
           throw new ServiceUnavailableException({
@@ -282,6 +286,7 @@ export class InstitutionalPublicCheckoutService {
       interval: input.interval,
       expectedTotalPence: input.expectedTotalPence,
       setting: input.setting,
+      storageChoice: input.storageChoice,
       payNowModules: selection.paidModules,
       trialModules: selection.trialModules,
       orgName: input.org.orgName.trim(),
@@ -307,7 +312,7 @@ export class InstitutionalPublicCheckoutService {
             interval: input.interval,
           },
           await this.prices.resolve(),
-          selection,
+          { ...selection, storageChoice: input.storageChoice },
         );
       } catch (error) {
         if (error instanceof DeclaredCapacityStripePriceError) {
@@ -344,6 +349,7 @@ export class InstitutionalPublicCheckoutService {
             quote,
             line.priceId,
             this.config.activeProvider === "STRIPE",
+            isDeclaredCapacityVatEnabled(),
           );
         } catch {
           throw new ServiceUnavailableException({
@@ -368,6 +374,7 @@ export class InstitutionalPublicCheckoutService {
           id: orderId,
           planCode: quote.planCode,
           maxSites: plan.siteAllowance,
+          storageGbCap: declaredCapacityStorageGb(input.storageChoice),
           selectedModules: selection.paidModules,
           flags: {
             purchaseKind: "institutional_declared_capacity_public",

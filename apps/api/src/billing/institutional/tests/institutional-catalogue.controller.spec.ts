@@ -60,6 +60,30 @@ describe("public institutional estimate", () => {
         priceId: "price_EventsMonthly",
         unitAmountPence: 900,
       },
+      STORAGE_100GB_MONTHLY: {
+        priceId: "price_Storage100Monthly",
+        unitAmountPence: 149,
+      },
+      STORAGE_100GB_YEARLY: {
+        priceId: "price_Storage100Yearly",
+        unitAmountPence: 1_599,
+      },
+      STORAGE_200GB_MONTHLY: {
+        priceId: "price_Storage200Monthly",
+        unitAmountPence: 249,
+      },
+      STORAGE_200GB_YEARLY: {
+        priceId: "price_Storage200Yearly",
+        unitAmountPence: 2_499,
+      },
+      STORAGE_1TB_MONTHLY: {
+        priceId: "price_Storage1TBMonthly",
+        unitAmountPence: 599,
+      },
+      STORAGE_1TB_YEARLY: {
+        priceId: "price_Storage1TBYearly",
+        unitAmountPence: 5_999,
+      },
     }),
   };
   const controller = new InstitutionalCatalogueController(mappedPrices);
@@ -196,6 +220,39 @@ describe("public institutional estimate", () => {
       tier: "enterprise",
       contactPath: "/demo?plan=enterprise",
       pricesIncludeVat: false,
+    });
+  });
+
+  it("publishes mapped storage prices and includes the selected pack in the estimate", async () => {
+    process.env.DECLARED_CAPACITY_BILLING_ENABLED = "true";
+
+    await expect(controller.declaredCapacityCatalogue()).resolves.toMatchObject(
+      {
+        storageOptions: [
+          { choice: "none", monthlyPricePence: 0, yearlyPricePence: 0 },
+          { choice: "100", monthlyPricePence: 149, yearlyPricePence: 1_599 },
+          { choice: "200", monthlyPricePence: 249, yearlyPricePence: 2_499 },
+          { choice: "1000", monthlyPricePence: 599, yearlyPricePence: 5_999 },
+        ],
+      },
+    );
+
+    await expect(
+      controller.estimateDeclaredCapacity({
+        declaredCapacity: 74,
+        interval: "month",
+        storageChoice: "100",
+      }),
+    ).resolves.toMatchObject({
+      storageChoice: "100",
+      subtotalPence: 14_949,
+      lines: expect.arrayContaining([
+        expect.objectContaining({
+          component: "STORAGE",
+          priceCode: "STORAGE_100GB_MONTHLY",
+          unitAmountPence: 149,
+        }),
+      ]),
     });
   });
 

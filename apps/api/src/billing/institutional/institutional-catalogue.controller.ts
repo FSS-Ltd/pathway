@@ -33,6 +33,7 @@ import {
 } from "./declared-capacity-addons";
 import {
   DeclaredCapacityStripePriceError,
+  declaredCapacityStorageOptions,
   isDeclaredCapacityAddonPaidReady,
   isDeclaredCapacityAddonTrialReady,
   quoteDeclaredCapacityWithStripePrices,
@@ -63,6 +64,7 @@ const mappedEstimateSchema = z.object({
 const declaredCapacityEstimateSchema = z.object({
   declaredCapacity: z.number().int().nonnegative().safe(),
   interval: z.enum(["month", "year"]),
+  storageChoice: z.enum(["none", "100", "200", "1000"]).default("none"),
   payNowModules: z.array(z.nativeEnum(Module)).default([]),
   trialModules: z.array(z.nativeEnum(Module)).default([]),
 });
@@ -173,6 +175,7 @@ export class InstitutionalCatalogueController {
       pricesIncludeVat: isDeclaredCapacityVatEnabled(),
       intervals: ["month", "year"] as const,
       plans: Object.values(DECLARED_CAPACITY_PLANS),
+      storageOptions: declaredCapacityStorageOptions(prices),
       enterprise: {
         minimumCapacity: 251,
         contactPath: "/demo?plan=enterprise",
@@ -225,6 +228,7 @@ export class InstitutionalCatalogueController {
         {
           paidModules: parsed.data.payNowModules,
           trialModules: parsed.data.trialModules,
+          storageChoice: parsed.data.storageChoice,
         },
       );
       return { ...quote, pricesIncludeVat };

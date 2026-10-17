@@ -48,6 +48,7 @@ import {
   assertDeclaredCapacityBillingEnabled,
   assertDeclaredCapacityTaxRegistration,
   declaredCapacityCheckoutTaxOptions,
+  isDeclaredCapacityVatEnabled,
 } from "./declared-capacity-gate";
 
 @Injectable()
@@ -379,6 +380,7 @@ export class InstitutionalCheckoutService {
             snapshot,
             item.price,
             this.config.activeProvider === "STRIPE",
+            isDeclaredCapacityVatEnabled(),
           );
         } else {
           const spec = INSTITUTIONAL_STRIPE_PRICE_SPECS.find(

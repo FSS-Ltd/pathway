@@ -367,13 +367,21 @@ export class InstitutionalWebhookService {
         !Array.isArray(previousEntitlement.flagsJson)
           ? previousEntitlement.flagsJson
           : {};
+      const firstPaidDeclaredCapacityOrder =
+        pendingOrder?.institutionalSnapshotId === snapshot.id &&
+        pendingOrder.status !== PendingOrderStatus.COMPLETED &&
+        snapshot.pricingVersion === DECLARED_CAPACITY_PRICING_VERSION;
+      const selectedStorageGb = firstPaidDeclaredCapacityOrder
+        ? pendingOrder?.storageGbCap
+        : null;
       await tx.orgEntitlementSnapshot.create({
         data: {
           orgId: event.orgId,
           maxSites: entitlementPlan.maxSites,
           av30Included: previousEntitlement?.av30Included ?? 0,
           leaderSeatsIncluded: previousEntitlement?.leaderSeatsIncluded ?? 0,
-          storageGbIncluded: previousEntitlement?.storageGbIncluded ?? 0,
+          storageGbIncluded:
+            selectedStorageGb ?? previousEntitlement?.storageGbIncluded ?? 0,
           flagsJson: {
             ...priorFlags,
             planCode: entitlementPlan.planCode,

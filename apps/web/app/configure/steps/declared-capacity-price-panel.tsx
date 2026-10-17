@@ -9,10 +9,14 @@ function money(pence: number): string {
   }).format(pence / 100);
 }
 
-const LINE_LABELS: Record<"BASE" | "DECLARED_CAPACITY" | "ADDON", string> = {
+const LINE_LABELS: Record<
+  "BASE" | "DECLARED_CAPACITY" | "ADDON" | "STORAGE",
+  string
+> = {
   BASE: "Base subscription",
   DECLARED_CAPACITY: "Declared child capacity",
   ADDON: "Paid add-on",
+  STORAGE: "Additional storage",
 };
 
 export function DeclaredCapacityPricePanel({

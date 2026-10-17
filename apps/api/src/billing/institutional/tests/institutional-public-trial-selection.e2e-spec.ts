@@ -37,6 +37,10 @@ const addonPrices = {
     priceId: "price_publiceventsyear",
     unitAmountPence: 20_000,
   },
+  STORAGE_100GB_MONTHLY: {
+    priceId: "price_publicstorage100month",
+    unitAmountPence: 149,
+  },
 };
 
 describe("public institutional trial selection (e2e)", () => {
@@ -56,7 +60,7 @@ describe("public institutional trial selection (e2e)", () => {
     }
   });
 
-  it("persists trial interest after base payment without charging or granting the module", async () => {
+  it("persists storage and trial selection after payment without charging or granting the trial", async () => {
     if (!requireDatabase()) return;
     process.env.DECLARED_CAPACITY_APPROVED_ADDON_MODULES = "EVENTS";
     process.env.DECLARED_CAPACITY_DELIVERED_ADDON_MODULES = "EVENTS";
@@ -70,11 +74,20 @@ describe("public institutional trial selection (e2e)", () => {
     const quote = quoteDeclaredCapacityWithStripePrices(
       { declaredCapacity: 10, interval: "month" },
       addonPrices,
-      { trialModules: [Module.EVENTS] },
+      { trialModules: [Module.EVENTS], storageChoice: "100" },
     );
     if (quote.kind !== "priced") throw new Error("Expected a priced quote");
     expect(quote.trialModules).toEqual([Module.EVENTS]);
     expect(quote.lines.every((line) => line.component !== "ADDON")).toBe(true);
+    expect(quote.lines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          component: "STORAGE",
+          priceCode: "STORAGE_100GB_MONTHLY",
+          priceId: "price_publicstorage100month",
+        }),
+      ]),
+    );
 
     await prisma.org.create({
       data: {
@@ -107,6 +120,7 @@ describe("public institutional trial selection (e2e)", () => {
         tenantId,
         planCode: quote.planCode,
         maxSites: quote.siteAllowance,
+        storageGbCap: 100,
         selectedModules: [],
         provider: BillingProvider.STRIPE,
         status: PendingOrderStatus.PENDING,
@@ -174,6 +188,13 @@ describe("public institutional trial selection (e2e)", () => {
     );
     await webhook.handle(event);
     await webhook.handle({ ...event, eventId: `${event.eventId}_replay` });
+
+    await expect(
+      prisma.orgEntitlementSnapshot.findFirst({
+        where: { orgId },
+        orderBy: { createdAt: "desc" },
+      }),
+    ).resolves.toMatchObject({ storageGbIncluded: 100 });
 
     expect(
       await prisma.institutionalAddonTrial.findUnique({

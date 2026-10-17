@@ -77,6 +77,16 @@ export function DeclaredCapacitySummaryStep({
           </dd>
         </div>
         <div>
+          <dt className="text-text-muted">Storage</dt>
+          <dd className="mt-1 font-semibold">
+            {estimate?.kind === "priced" && estimate.storageChoice !== "none"
+              ? estimate.storageChoice === "1000"
+                ? "1TB extra"
+                : `${estimate.storageChoice}GB extra`
+              : "No extra storage"}
+          </dd>
+        </div>
+        <div>
           <dt className="text-text-muted">Setting</dt>
           <dd className="mt-1 font-semibold">
             {setting?.replaceAll("_", " ").toLowerCase() ?? "Not selected"}

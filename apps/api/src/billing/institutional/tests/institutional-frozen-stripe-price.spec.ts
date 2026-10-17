@@ -50,7 +50,7 @@ describe("frozen institutional checkout Price validation", () => {
     ).toThrow();
   });
 
-  it("requires tax-inclusive Stripe prices for declared-capacity snapshots", () => {
+  it("requires tax-inclusive Stripe prices when VAT is enabled", () => {
     const declaredCapacitySnapshot = {
       ...snapshot,
       planCode: "DECLARED_CAPACITY_STARTER_YEARLY",
@@ -72,6 +72,24 @@ describe("frozen institutional checkout Price validation", () => {
         declaredCapacitySnapshot,
         "price_accepted",
         true,
+      ),
+    ).toThrow("INSTITUTIONAL_PRICE_CHANGED");
+    expect(() =>
+      validateFrozenStripePrice(
+        { ...price, tax_behavior: "unspecified" },
+        declaredCapacitySnapshot,
+        "price_accepted",
+        true,
+        false,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateFrozenStripePrice(
+        price,
+        declaredCapacitySnapshot,
+        "price_accepted",
+        true,
+        false,
       ),
     ).toThrow("INSTITUTIONAL_PRICE_CHANGED");
   });

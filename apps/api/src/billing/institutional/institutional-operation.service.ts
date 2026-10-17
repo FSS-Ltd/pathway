@@ -23,6 +23,7 @@ import { stripeItemsForSnapshot } from "./institutional-stripe-line-items";
 import { scheduleInstitutionalRenewal } from "./institutional-subscription-schedule";
 import { institutionalStripeKey } from "./institutional-provider-guard";
 import { validateFrozenStripePrice } from "./institutional-frozen-stripe-price";
+import { isDeclaredCapacityVatEnabled } from "./declared-capacity-gate";
 import {
   DECLARED_CAPACITY_PRICING_VERSION,
   INSTITUTIONAL_MAPPED_PRICING_VERSION,
@@ -214,6 +215,7 @@ export class InstitutionalOperationService {
             snapshot,
             item.price,
             this.config.activeProvider === "STRIPE",
+            isDeclaredCapacityVatEnabled(),
           );
         } catch {
           throw new ConflictException({

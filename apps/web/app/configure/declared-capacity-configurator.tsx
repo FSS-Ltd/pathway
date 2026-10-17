@@ -2,7 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
-import type { DeclaredCapacityInterval } from "@pathway/pricing";
+import type {
+  DeclaredCapacityInterval,
+  InstitutionalStorageChoice,
+} from "@pathway/pricing";
 import { ConfiguratorStage } from "../../components/configurator/stage";
 import { OrgTypeStep } from "./steps/org-type";
 import { VerticalStep } from "./steps/vertical";
@@ -12,6 +15,7 @@ import { DeclaredCapacityCapacityStep } from "./steps/declared-capacity-capacity
 import { DeclaredCapacityPeriodStep } from "./steps/declared-capacity-period-step";
 import { DeclaredCapacityPricePanel } from "./steps/declared-capacity-price-panel";
 import { DeclaredCapacitySummaryStep } from "./steps/declared-capacity-summary";
+import { InstitutionalStorageStep } from "./steps/institutional-options";
 import {
   estimateDeclaredCapacityPrice,
   fetchDeclaredCapacityCatalogue,
@@ -51,6 +55,7 @@ type FlowState = {
   orgType: OrgType | null;
   setting: InstitutionalVertical | null;
   capacityInput: string;
+  storageChoice: InstitutionalStorageChoice;
   declarationAccepted: boolean;
   addonSelection: DeclaredCapacityAddonSelection;
 };
@@ -61,6 +66,7 @@ const INITIAL_FLOW: FlowState = {
   orgType: null,
   setting: null,
   capacityInput: "",
+  storageChoice: "none",
   declarationAccepted: false,
   addonSelection: { trialModules: [], payNowModules: [] },
 };
@@ -200,7 +206,7 @@ export function DeclaredCapacityConfigurator() {
     void estimateDeclaredCapacityPrice(
       capacity,
       flow.interval,
-      flow.addonSelection,
+      { ...flow.addonSelection, storageChoice: flow.storageChoice },
       controller.signal,
     )
       .then((result) => {
@@ -219,7 +225,7 @@ export function DeclaredCapacityConfigurator() {
         if (!controller.signal.aborted) setLoadingPrice(false);
       });
     return () => controller.abort();
-  }, [capacity, flow.interval, flow.addonSelection, retry]);
+  }, [capacity, flow.interval, flow.addonSelection, flow.storageChoice, retry]);
 
   const update = (patch: Partial<FlowState>) => {
     checkoutKey.current = null;
@@ -285,6 +291,7 @@ export function DeclaredCapacityConfigurator() {
         expectedTotalPence: estimate.subtotalPence,
         declarationAccepted: true,
         setting: flow.setting,
+        storageChoice: flow.storageChoice,
         payNowModules: flow.addonSelection.payNowModules,
         trialModules: flow.addonSelection.trialModules,
         idempotencyKey: checkoutKey.current,
@@ -314,7 +321,7 @@ export function DeclaredCapacityConfigurator() {
       flow.interval === "year" ? ("yearly" as const) : ("monthly" as const),
     selectedIncludedModules: [],
     selectedOptionalModules: [],
-    storageChoice: "none" as const,
+    storageChoice: flow.storageChoice,
   };
 
   return (
@@ -436,28 +443,16 @@ export function DeclaredCapacityConfigurator() {
                     />
                   )}
                   {flow.step === "storage" && (
-                    <section
-                      aria-labelledby="configurator-step-title"
-                      className="space-y-5"
-                    >
-                      <div>
-                        <h2
-                          id="configurator-step-title"
-                          className="font-heading text-2xl font-bold"
-                        >
-                          Storage
-                        </h2>
-                        <p className="mt-2 text-text-muted">
-                          Storage and usage packs are outside this offer. You
-                          can review available options with your billing admin
-                          after your workspace is set up.
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-border-subtle bg-surface p-4 text-sm text-text-muted">
-                        No storage or usage pack has been added to this
-                        checkout.
-                      </div>
-                    </section>
+                    <InstitutionalStorageStep
+                      choice={flow.storageChoice}
+                      interval={flow.interval}
+                      priceOptions={catalogue.storageOptions}
+                      onSelect={(storageChoice) => {
+                        setEstimate(null);
+                        setLoadingPrice(true);
+                        update({ storageChoice });
+                      }}
+                    />
                   )}
                   {flow.step === "summary" && (
                     <DeclaredCapacitySummaryStep

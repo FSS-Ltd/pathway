@@ -35,6 +35,30 @@ describe("declared-capacity Stripe quotes", () => {
       priceId: "price_yearfinance",
       unitAmountPence: 20_000,
     },
+    STORAGE_100GB_MONTHLY: {
+      priceId: "price_storage100month",
+      unitAmountPence: 149,
+    },
+    STORAGE_100GB_YEARLY: {
+      priceId: "price_storage100year",
+      unitAmountPence: 1_599,
+    },
+    STORAGE_200GB_MONTHLY: {
+      priceId: "price_storage200month",
+      unitAmountPence: 249,
+    },
+    STORAGE_200GB_YEARLY: {
+      priceId: "price_storage200year",
+      unitAmountPence: 2_499,
+    },
+    STORAGE_1TB_MONTHLY: {
+      priceId: "price_storage1tbmonth",
+      unitAmountPence: 599,
+    },
+    STORAGE_1TB_YEARLY: {
+      priceId: "price_storage1tbyear",
+      unitAmountPence: 5_999,
+    },
   };
 
   afterAll(() => {
@@ -92,6 +116,52 @@ describe("declared-capacity Stripe quotes", () => {
     if (quote.kind !== "priced") return;
     expect(quote.lines).toHaveLength(2);
     expect(quote.lines.map((line) => line.quantity)).toEqual([1, 0]);
+  });
+
+  it.each([
+    ["100", "month", "STORAGE_100GB_MONTHLY", 149, "price_storage100month"],
+    ["200", "year", "STORAGE_200GB_YEARLY", 2_499, "price_storage200year"],
+    ["1000", "month", "STORAGE_1TB_MONTHLY", 599, "price_storage1tbmonth"],
+  ] as const)(
+    "adds the mapped %s GB %s storage Price to the server quote",
+    (storageChoice, interval, priceCode, amountPence, priceId) => {
+      const quote = quoteDeclaredCapacityWithStripePrices(
+        { declaredCapacity: 74, interval },
+        prices,
+        { storageChoice },
+      );
+
+      expect(quote).toMatchObject({
+        kind: "priced",
+        storageChoice,
+        subtotalPence: (interval === "month" ? 14_800 : 148_000) + amountPence,
+      });
+      if (quote.kind !== "priced") return;
+      expect(quote.lines).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            component: "STORAGE",
+            priceCode,
+            priceId,
+            quantity: 1,
+            unitAmountPence: amountPence,
+          }),
+        ]),
+      );
+    },
+  );
+
+  it("fails closed when the selected storage interval has no mapped Stripe Price", () => {
+    const pricesMissingStorageYearly = { ...prices };
+    Reflect.deleteProperty(pricesMissingStorageYearly, "STORAGE_100GB_YEARLY");
+
+    expect(() =>
+      quoteDeclaredCapacityWithStripePrices(
+        { declaredCapacity: 74, interval: "year" },
+        pricesMissingStorageYearly,
+        { storageChoice: "100" },
+      ),
+    ).toThrow(new DeclaredCapacityStripePriceError("STORAGE_100GB_YEARLY"));
   });
 
   it("requires both approved intervals before a module can be selected for a trial", () => {

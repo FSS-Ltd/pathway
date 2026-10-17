@@ -76,6 +76,7 @@ describe("public institutional checkout settings", () => {
       expectedTotalPence: 14_900,
       declarationAccepted: true,
       setting: "NURSERY",
+      storageChoice: "100",
       payNowModules: [],
       trialModules: [],
       idempotencyKey: "declared-capacity-checkout",
@@ -95,5 +96,30 @@ describe("public institutional checkout settings", () => {
         expectedTotalPence: undefined,
       }),
     ).toThrow(BadRequestException);
+  });
+
+  it("defaults older declared-capacity checkout clients to no extra storage", async () => {
+    const requestWithoutStorage = {
+      declaredCapacity: 75,
+      interval: "month",
+      expectedTotalPence: 14_900,
+      declarationAccepted: true,
+      setting: "NURSERY",
+      payNowModules: [],
+      trialModules: [],
+      idempotencyKey: "declared-capacity-checkout-v2",
+      org: {
+        orgName: "Example organisation",
+        contactName: "Example contact",
+        contactEmail: "contact@example.test",
+        password: "safe-test-password",
+      },
+    };
+
+    await controller.checkoutDeclaredCapacity(requestWithoutStorage);
+
+    expect(checkoutDeclaredCapacity).toHaveBeenCalledWith(
+      expect.objectContaining({ storageChoice: "none" }),
+    );
   });
 });

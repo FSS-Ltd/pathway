@@ -40,6 +40,7 @@ const declaredCapacityCheckoutSchema = z.object({
   expectedTotalPence: z.number().int().nonnegative().safe(),
   declarationAccepted: z.literal(true),
   setting: z.enum(INSTITUTIONAL_VERTICALS),
+  storageChoice: z.enum(["none", "100", "200", "1000"]).default("none"),
   payNowModules: z.array(z.nativeEnum(Module)).default([]),
   trialModules: z.array(z.nativeEnum(Module)).default([]),
   idempotencyKey: z.string().min(8).max(128),

@@ -49,12 +49,17 @@ export type DeclaredCapacityCatalogue = {
     trialModuleSlots: number;
     includedPaidModules: readonly never[];
   }[];
+  storageOptions: {
+    choice: InstitutionalStorageChoice;
+    monthlyPricePence: number | null;
+    yearlyPricePence: number | null;
+  }[];
   enterprise: { minimumCapacity: 251; contactPath: "/demo?plan=enterprise" };
   addonOptions: DeclaredCapacityAddonOption[];
 };
 
 export type DeclaredCapacityEstimateLine = {
-  component: "BASE" | "DECLARED_CAPACITY" | "ADDON";
+  component: "BASE" | "DECLARED_CAPACITY" | "ADDON" | "STORAGE";
   priceCode: string;
   quantity: number;
   unitAmountPence: number;
@@ -69,6 +74,7 @@ export type DeclaredCapacityEstimate =
       tier: "starter" | "growth" | "professional";
       declaredCapacity: number;
       interval: DeclaredCapacityInterval;
+      storageChoice: InstitutionalStorageChoice;
       currency: "GBP";
       pricesIncludeVat: boolean;
       siteAllowance: number;
@@ -96,6 +102,7 @@ export type PublicDeclaredCapacityCheckoutInput = {
   expectedTotalPence: number;
   declarationAccepted: true;
   setting: InstitutionalVertical;
+  storageChoice: InstitutionalStorageChoice;
   payNowModules: DeclaredCapacityAddonModule[];
   trialModules: DeclaredCapacityAddonModule[];
   idempotencyKey: string;
@@ -179,7 +186,7 @@ export async function startPublicInstitutionalCheckout(
 export async function fetchDeclaredCapacityCatalogue(
   signal?: AbortSignal,
 ): Promise<DeclaredCapacityCatalogue> {
-  return read<DeclaredCapacityCatalogue>(
+  const catalogue = await read<DeclaredCapacityCatalogue>(
     await fetch(
       `${apiBaseUrl}/billing/institutional/catalogue/declared-capacity`,
       {
@@ -188,6 +195,12 @@ export async function fetchDeclaredCapacityCatalogue(
       },
     ),
   );
+  if (!Array.isArray(catalogue.storageOptions)) {
+    throw new Error(
+      "Storage pricing is unavailable. Please retry in a moment.",
+    );
+  }
+  return catalogue;
 }
 
 export async function estimateDeclaredCapacityPrice(
@@ -195,11 +208,11 @@ export async function estimateDeclaredCapacityPrice(
   interval: DeclaredCapacityInterval,
   selections: Pick<
     PublicDeclaredCapacityCheckoutInput,
-    "payNowModules" | "trialModules"
+    "payNowModules" | "trialModules" | "storageChoice"
   >,
   signal?: AbortSignal,
 ): Promise<DeclaredCapacityEstimate> {
-  return read<DeclaredCapacityEstimate>(
+  const estimate = await read<DeclaredCapacityEstimate>(
     await fetch(
       `${apiBaseUrl}/billing/institutional/catalogue/declared-capacity/estimate`,
       {
@@ -210,6 +223,15 @@ export async function estimateDeclaredCapacityPrice(
       },
     ),
   );
+  if (
+    estimate.kind === "priced" &&
+    estimate.storageChoice !== selections.storageChoice
+  ) {
+    throw new Error(
+      "Storage pricing is unavailable. Please retry in a moment.",
+    );
+  }
+  return estimate;
 }
 
 export async function startPublicDeclaredCapacityCheckout(
