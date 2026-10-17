@@ -274,7 +274,7 @@ export function loadBillingProviderConfig(): BillingProviderConfig {
   // Use test keys and webhook secret when in STRIPE_TEST mode
   const isTestMode = active === "STRIPE_TEST";
   const secretKey = isTestMode
-    ? (process.env.STRIPE_SECRET_KEY_TEST ?? process.env.STRIPE_SECRET_KEY)
+    ? (process.env.TEST_STRIPE_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY_TEST)
     : process.env.STRIPE_SECRET_KEY;
   const webhookSecretSnapshot = isTestMode
     ? process.env.STRIPE_WEBHOOK_SECRET_TEST

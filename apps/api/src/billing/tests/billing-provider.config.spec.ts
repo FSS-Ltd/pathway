@@ -27,6 +27,40 @@ describe("billing provider config", () => {
     expect(config.stripe.webhookSecretSnapshot).toBe("whsec_snapshot");
   });
 
+  it("uses TEST_STRIPE_SECRET_KEY for Stripe test mode", () => {
+    process.env.BILLING_PROVIDER = "STRIPE_TEST";
+    process.env.TEST_STRIPE_SECRET_KEY = "sk_test_explicit";
+    process.env.STRIPE_SECRET_KEY_TEST = "sk_test_legacy";
+    process.env.STRIPE_SECRET_KEY = "sk_live_platform";
+
+    const config = loadBillingProviderConfig();
+
+    expect(config.activeProvider).toBe("STRIPE_TEST");
+    expect(config.stripe.secretKey).toBe("sk_test_explicit");
+  });
+
+  it("supports the legacy STRIPE_SECRET_KEY_TEST name in test mode", () => {
+    process.env.BILLING_PROVIDER = "STRIPE_TEST";
+    delete process.env.TEST_STRIPE_SECRET_KEY;
+    process.env.STRIPE_SECRET_KEY_TEST = "sk_test_legacy";
+    process.env.STRIPE_SECRET_KEY = "sk_live_platform";
+
+    const config = loadBillingProviderConfig();
+
+    expect(config.stripe.secretKey).toBe("sk_test_legacy");
+  });
+
+  it("does not fall back to the live Stripe key in test mode", () => {
+    process.env.BILLING_PROVIDER = "STRIPE_TEST";
+    delete process.env.TEST_STRIPE_SECRET_KEY;
+    delete process.env.STRIPE_SECRET_KEY_TEST;
+    process.env.STRIPE_SECRET_KEY = "sk_live_platform";
+
+    const config = loadBillingProviderConfig();
+
+    expect(config.stripe.secretKey).toBeUndefined();
+  });
+
   it("loads the public Stripe key for authenticated capacity payment confirmation", () => {
     process.env.BILLING_PROVIDER = "STRIPE";
     process.env.STRIPE_SECRET_KEY = "sk_test";

@@ -20,7 +20,7 @@ The Finance sandbox product is already present and has one active monthly recurr
 
 ## Readiness gate
 
-The current sandbox evidence proves the product and prices, but not Connect readiness. The Stripe API connector exposes no Accounts v2 operations, and the local shell has no test-mode Stripe API key. T07 remains incomplete until a disposable school-connected sandbox account can be onboarded, retrieved with active card capability, and verified under tenant-scoped connection state. Do not substitute the deprecated v1 account-type API, change charge models, create live objects, or enable Bacs to work around this gap.
+The current sandbox evidence proves the product and prices, but not Connect readiness. A local test-mode credential was confirmed to belong to the NexSteps Sandbox account (`livemode: false`), then the PR's Accounts v2 account-create request was rejected with `invalid_fields`: Connect must be enabled on Accounts v2 before the requested merchant configuration and responsibilities can be used. Stripe returned no account ID, so no connected test account or onboarding link was created. T07 remains incomplete until Accounts v2 Connect is enabled for the sandbox and a disposable school account can be created, onboarded, retrieved with active card capability, and verified under tenant-scoped connection state. Do not substitute the deprecated v1 account-type API, change charge models, create live objects, or enable Bacs to work around this gap.
 
 ## References
 
