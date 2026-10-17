@@ -9,6 +9,7 @@ import {
   withTenantRlsContext,
 } from "@pathway/db";
 import request from "supertest";
+import * as audit from "../../audit/audit.service";
 import { AccessCacheService } from "../../access-control/access-cache.service";
 import { withSystemRoleFixtureWrites } from "../../access-control/tests/system-role-fixture";
 import { AppModule } from "../../app.module";
@@ -379,6 +380,37 @@ describe("ACE daily attendance export", () => {
           .set("Authorization", staffAuthorization)
       ).status,
     ).toBe(403);
+  });
+
+  it("does not send student CSV or retain an export audit when audit persistence fails", async () => {
+    if (!app) return;
+    const count = () =>
+      withTenantRlsContext(siteId, orgId, (tx) =>
+        tx.auditEvent.count({
+          where: {
+            tenantId: siteId,
+            entityType: "ACE_RECORD",
+            action: "EXPORTED",
+          },
+        }),
+      );
+    const before = await count();
+    const failure = jest
+      .spyOn(audit, "recordAuditEventInTransaction")
+      .mockRejectedValueOnce(new Error("Synthetic export audit failure"));
+    try {
+      const result = await request(app.getHttpServer())
+        .get(`/attendance/daily/export?from=${firstDate}&to=${secondDate}`)
+        .set("Authorization", leadAuthorization)
+        .expect(500);
+      expect(result.headers["content-disposition"]).toBeUndefined();
+      expect(result.headers["content-type"]).not.toContain("text/csv");
+      expect(result.text).not.toContain(childAId);
+      expect(result.text).not.toContain("Synthetic export audit failure");
+      expect(await count()).toBe(before);
+    } finally {
+      failure.mockRestore();
+    }
   });
 
   it("rejects invalid ranges and an unauthorised site switch", async () => {

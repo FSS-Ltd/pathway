@@ -1022,3 +1022,38 @@ A temporary pnpm wrapper only adds `--runInBand` to the pre-commit API unit
 command to avoid launching many memory-heavy Jest workers. The pre-commit hook
 and every test remain enabled; no checks or assertions are bypassed. The current
 step will be published as a draft while the full integration gate remains failing.
+
+### Draft PR 657: verification blocker transaction correction
+
+Draft https://github.com/FSS-Ltd/pathway/pull/657 was raised on code revision
+`e29122bfc4a8ad1a2dbb65d1934700ca6b05f5a9`. Pre-commit passed workspace lint
+(16 tasks), API units (245 suites / 1,772 tests), workers (12 / 51) and auth
+(3 / 15). Initial CodeQL checks passed; CI remains in progress. This does not
+satisfy the current-step merge gate.
+
+A third full integration run again reproduced only the missing attendance audit
+row (106 / 107 suites, 633 / 634 tests passed). To resolve this concrete gate
+blocker within the current step, the export handler now uses the existing
+method-level `IndependentTransaction` mechanism. Auth/permission guards remain;
+the service still opens its own tenant/org-scoped transaction, validates dated
+band/membership scope and writes its audit atomically. Its promise now resolves
+after commit, before the controller sends CSV. Other attendance handlers retain
+the request transaction. No broad interceptor or timeout changes were made.
+
+Deterministic transaction-ownership regression failed before the fix and passes
+afterward (four interceptor unit tests). Export integration passes three cases:
+immediate committed audit plus permission/revocation/site/band boundaries, audit
+failure sends no student CSV/download header and leaves no new audit, and invalid
+range/unauthorised site rejection. The original immediate-audit assertion remains
+unchanged. A full integration run against this fix is in progress. Independent
+security/transaction review found no blocker; exact final diff review is pending.
+
+Final three-file export fix review found no blocker. Full integration after the
+fix passed attendance, medical and dashboard suites; overall **105 suites / 633
+tests passed**, with two of 107 suites / 635 tests failing on `socket hang up`
+in tracker permission boundaries and subject-timetable Head API. Neither produced
+a failed domain assertion. These transport failures remain an explicit local
+verification limitation; do not claim local full integration passed. No client
+retries, sleeps or raised timeouts were introduced. Fresh host CI will verify the
+updated revision in its isolated database environment; no result on the initial
+head counts for the forthcoming fix commit.
