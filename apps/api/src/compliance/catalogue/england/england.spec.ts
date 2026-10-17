@@ -33,23 +33,23 @@ function applicable(changes: Partial<TrackerProfileInput> = {}) {
   );
 }
 describe("England national core applicability", () => {
-  it("publishes only England, preserves every jurisdiction cell and exposes incomplete coverage", () => {
+  it("preserves England coverage and exposes incomplete national coverage", () => {
     expect(TRACKER_CATALOGUE.coverage).toHaveLength(1488);
     expect(
-      TRACKER_CATALOGUE.requirements.every(
-        (item) => item.jurisdiction === "GB-ENG",
+      TRACKER_CATALOGUE.requirements.every((item) =>
+        ["GB-ENG", "GB-WLS"].includes(item.jurisdiction),
       ),
     ).toBe(true);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(48);
+    ).toHaveLength(96);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(1440);
+    ).toHaveLength(1392);
     const result = checklist();
     expect(
       result.coverage.every(
@@ -64,7 +64,10 @@ describe("England national core applicability", () => {
     "does not apply England by fallback in %s",
     (nation) => {
       expect(
-        checklist({}, { countryCode: "GB", subdivisionCode: nation }).items,
+        checklist(
+          {},
+          { countryCode: "GB", subdivisionCode: nation },
+        ).items.filter((item) => item.requirement.id.startsWith("eng")),
       ).toEqual([]);
     },
   );

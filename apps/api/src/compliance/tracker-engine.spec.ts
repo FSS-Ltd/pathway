@@ -128,7 +128,7 @@ function attest(catalogue = fixture()): TrackerAttestation {
   };
 }
 describe("institutional tracker catalogue and engine", () => {
-  it("mirrors every research cell and publishes only the reviewed England core", () => {
+  it("mirrors every research cell and publishes the reviewed national cores", () => {
     const lines = readFileSync(
       resolve(process.cwd(), "../../docs/NexStepsV2/compliance/coverage.csv"),
       "utf8",
@@ -150,8 +150,8 @@ describe("institutional tracker catalogue and engine", () => {
     expect(expected).toHaveLength(1488);
     expect(TRACKER_CATALOGUE.requirements.length).toBeGreaterThan(0);
     expect(
-      TRACKER_CATALOGUE.requirements.every(
-        (item) => item.jurisdiction === "GB-ENG",
+      TRACKER_CATALOGUE.requirements.every((item) =>
+        ["GB-ENG", "GB-WLS"].includes(item.jurisdiction),
       ),
     ).toBe(true);
   });

@@ -3,21 +3,23 @@
 Plan: [README.md](README.md), [DELIVERY.md](DELIVERY.md).
 Updated: 2026-10-17. Base repository: `FSS-Ltd/pathway`; branch: `master`.
 
-## Current step: 2.01 — England
+## Current step: 2.02 Wales — research and implementation
 
-**State: bounded England core in verification; step 2.01 not complete.** Steps
-1.1–1.6 and the medical correction are merged. Catalogue 1.2.0 on this branch has
-154 sources, 106 current actions (108 retained requirement revisions) and 48 explicitly partial cells; it is not merged or deployed.
+**PR #657 is merged, deployed and checked on the live portal.** Catalogue 1.2.0
+contains 154 sources, 106 current actions (108 retained requirement revisions)
+and 48 explicitly partial England cells. Published coverage is not a claim that
+all England local, specialist or provider obligations have been reviewed.
 
-| Evidence               | Value                                                                                                                                                                      |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Scope                  | England national requirements, applicability fixtures and explicit regional/sector coverage                                                                                |
-| Branch                 | `feature/compliance-england-detail`                                                                                                                                        |
-| Verified starting base | `113d336783eb2f9effa3c28621ebf3831dcf86fd`                                                                                                                                 |
-| Predecessor            | [PR #634](https://github.com/FSS-Ltd/pathway/pull/634), all eight checks passed; user merged 2026-10-15T21:27:46Z at `75ab1d116eeed1667e2710ee6e372f5d507d4cab`            |
-| PR / revision / CI     | Follow-up PR not raised; preserved additions are being verified against current master                                                                                     |
-| Merge state            | Local follow-up unmerged; source/core PR #634 is merged                                                                                                                    |
-| Next permitted action  | Verify and raise England detail PR; obtain production release approval before its merge, which automatically deploys. No Wales implementation while England remains gated. |
+| Evidence              | Value                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Scope                 | England national detail and modern Overview & Tracker, plus the verified export audit transaction correction          |
+| PR / code revision    | [PR #657](https://github.com/FSS-Ltd/pathway/pull/657), `0759cd950e54bd87903d7238f9f425191df5e681`                    |
+| CI                    | All eight checks passed; CI 39045945470 and CodeQL 39045942963                                                        |
+| Checked test merge    | `e0112ac91b4d8314950252a0f49fe2ae181c0bd8` against master `52fafdf4f2f57986c93eab1a19009324537e84ad`                  |
+| Host-confirmed merge  | `9337c8450e583d3d59193b068d9cc8f00585cff6`, merged 2026-10-17T15:52:57Z; file tree equals checked test merge          |
+| Release authority     | User explicitly approved merging/deploying #657, live portal verification, then continuing remaining packs            |
+| Production workflow   | [39046994895](https://github.com/FSS-Ltd/pathway/actions/runs/39046994895), all four jobs SUCCESS on the merge commit |
+| Next permitted action | Verify Wales 1.3, raise its PR after local checks; retain England gaps and keep Scotland gated                        |
 
 ## Step 1.1 verification and merge
 
@@ -1057,3 +1059,102 @@ verification limitation; do not claim local full integration passed. No client
 retries, sleeps or raised timeouts were introduced. Fresh host CI will verify the
 updated revision in its isolated database environment; no result on the initial
 head counts for the forthcoming fix commit.
+
+### PR 657 pre-merge host verification (historical)
+
+At the time of this entry, PR #657 was ready for review and not yet merged. All eight host checks
+passed on `0759cd950e54bd87903d7238f9f425191df5e681`:
+[CI 39045945470](https://github.com/FSS-Ltd/pathway/actions/runs/39045945470)
+and [CodeQL 39045942963](https://github.com/FSS-Ltd/pathway/actions/runs/39045942963).
+Completed unit and integration checkout logs confirm test merge
+`e0112ac91b4d8314950252a0f49fe2ae181c0bd8`, whose parents are current master
+`52fafdf4f2f57986c93eab1a19009324537e84ad` and the checked PR head.
+CI full integration passed **108 suites / 636 tests**; separate one-connection
+transaction checks passed **2 suites / 13 tests**. No missing, neutral, skipped or
+pending result is counted as success. No reviews or merge conflicts block the PR.
+
+Final local API typecheck/lint/build, admin/web production builds, formatting,
+explicit admin component/lib lint, Prisma validation and permission registry
+checks passed. Post-fix commit hooks passed API 245 suites / 1,773 tests, workers
+12 / 51 and auth 3 / 15 plus 16 workspace lint tasks. A worker teardown warning
+remains in the otherwise passing worker command. Full local integration transport
+failures remain recorded above; the socket-affected tracker/timetable suites pass
+isolated on the final code (2 suites / 10 tests). No transport cause is claimed.
+
+Additional actual browser inspection checked editable confirmation fields at
+390px/200% text. A simulated failed save showed the accessible error, retained the
+checkbox and notes, left completion at zero, and had no horizontal overflow.
+This uses synthetic local data; it is not a production persistence test.
+A sample-data design preview is available locally on port 4319.
+
+The next permissible action at that time was explicit approval to merge/release PR #657:
+`.github/workflows/deploy.yml` deploys on master pushes, and the approved plan
+requires separate production authorisation. Latest existing release approval was
+for medical PR #633 only. Do not merge or start the next pack before that release
+approval and the current step's host-confirmed merge. This final host-evidence
+entry is retained locally while approval is pending; product code is fully pushed.
+
+### PR 657 authorised merge and production release
+
+User explicitly authorised: merge and deploy #657, check the live portal, then
+continue the remaining compliance packs. Fresh host checks remained all SUCCESS
+on head `0759cd950e54bd87903d7238f9f425191df5e681`; current master/test merge
+were unchanged. GitHub confirms MERGED at 2026-10-17T15:52:57Z, commit
+`9337c8450e583d3d59193b068d9cc8f00585cff6`. Its tree
+`50dbd0d2c21aee8285137d2462bf13642a5f3bdc` equals the checked test merge tree.
+Production workflow 39046994895 started automatically; no duplicate deployment
+was triggered. Migration stage passed, web deployed; API/admin are building.
+Signed-in portal access is available. Live demo profile has no saved operating
+location; do not manufacture a location or attest completion for verification.
+
+### PR 657 production verification complete; Wales begins
+
+Production workflow [39046994895](https://github.com/FSS-Ltd/pathway/actions/runs/39046994895)
+passed migration, web, admin and API jobs on merge `9337c845`. Vercel production
+aliases are READY on that exact revision: admin `dpl_HZDQxFWoCsKnNdA3dEZHEnJK3ssU`,
+API `dpl_4cUYxK8Yf9Bq6YGHuPTTwRftUMAe`, web `dpl_C5WmH2XyDfo6sbVMQR6sfY52eLbr`.
+API `/health` passed with database time. Production API/admin error/fatal log
+aggregates returned no entries for the checked five-minute window.
+
+Actual signed-in live inspection in Dia verified the deployed tracker at desktop
+and 390px responsive width, successful refresh with updated evidence observation
+time, loading/disabled controls recovering, topic selection by keyboard and
+coverage disclosure. Demo profile has no saved operating country/sector: all eight
+topic gaps stay unavailable, no England default or misleading completion meter.
+No site facts, medical records or attestations were changed. Filled glass-meter
+and failed-save scenarios were verified with synthetic local data in the earlier
+record; live persistence was not exercised by creating false compliance records.
+Browser device emulation was restored to desktop afterward.
+
+Vercel API build logs include NodeNext TS2835 import-extension diagnostics despite
+successful deployment. The preceding production API deployment
+`dpl_7htc8Xr6FFPoiczniiENwUHJpbmt` contains the same diagnostics (including England
+operations/shared imports and auth modules), confirming an existing build-adapter
+limitation rather than a new release failure. Local/CI package checks pass; no
+checks were suppressed. Keep this diagnostic limitation visible for follow-up.
+
+The user's latest instruction explicitly requests remaining packs after this
+release. Wales **2.02** starts on `feature/compliance-wales-pack` from the verified
+merge. This supersedes the earlier self-authored instruction to hold Wales for
+exhaustive England detail: reviewed national packs are progressive releases;
+England stays PARTIALLY_PUBLISHED with its local/specialist backlog. Neither the
+England jurisdiction nor the overall compliance project is declared complete.
+Acceptance for Wales: separate Welsh applicability, all six sector/eight topic
+coverage cells, official source metadata, explicit local/specialist gaps,
+immutable published England history, manual completion and tenant boundaries
+retained, focused regression/source review plus applicable package/integration
+checks and current-head CI before merge. Future production release authority
+must be resolved before merging because master pushes deploy automatically.
+
+### Step 2.02 Wales — local implementation in progress
+
+The version 1.3 draft adds 45 Wales-only national actions and 51 reviewed source records. All 48 Welsh sector/topic cells are `PARTIALLY_PUBLISHED` with regional status `IN_REVIEW`. Actual school classification, childcare, employment, food activity, controller role and ICCE participation are evaluated independently. [Wales pack notes](packs/wales/README.md) and [regional inventory](packs/wales/regional-review.md) state the unreviewed local and specialist boundaries. England 1.1/1.2 source, requirement and attestation history is preserved. [PR #659](https://github.com/FSS-Ltd/pathway/pull/659) was raised from `cf07d19dd227fc38b195468302874ea514fda63c`; CI and merge remain pending. Scotland remains gated.
+
+Local verification on 17 October 2026:
+
+- `pnpm --filter @pathway/api test:unit --runInBand`: **250 suites / 1,815 tests passed on the committed revision** in the required commit hook. Before commit, affected catalogue/engine suites passed **15 suites / 138 tests**, and the new combined ACE/ICCE and non-ACE learning-centre acceptance suite passed **2 tests**. Commit hooks also passed 16 workspace lint tasks, 12 worker suites / 51 tests and 3 auth suites / 15 tests; a worker teardown warning did not fail the hook. Host CI still must verify the final PR revision.
+- Disposable-database `pnpm --filter @pathway/api test:integration --runInBand`: **108 suites / 637 tests passed**. The focused tracker suite separately passed **9 tests**, including Welsh attestation persistence and cross-site/organisation isolation.
+- API `typecheck`, `lint` and `build`: passed. Prisma generation and `prisma validate`: passed. Permission-definition registry drift: zero. `prettier --check` and `git diff --check`: passed. The final 51 source URLs returned HTTP 200; key provision and applicability decisions were checked against primary Welsh, UK, regulator and provider material in the pack notes.
+- Admin and web production builds: passed after providing a localhost API URL and a disposable, nonproduction Clerk publishable key. Initial environment-free builds failed on missing configuration, not code. This pack changes no UI files; the previously merged tracker UI was inspected at desktop/mobile and keyboard sizes in the #657 release record.
+
+The final diff was inspected before PR creation; the commit hooks passed and the branch was pushed. The next action is current-head PR CI verification, followed by a host-confirmed merge only with the required release authority. Because master pushes deploy to production, separate authority for the Wales release is still required before merge; approval for #657 was specific to #657. Do not start Scotland before the Wales gate passes.
