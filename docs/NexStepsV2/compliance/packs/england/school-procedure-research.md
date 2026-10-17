@@ -1,0 +1,58 @@
+# England school detail closure — researched 15 October 2026
+
+Read-only research for current step 2.01. No national completeness claim. Draft actions below should be RECOMMENDATION assessments where existing facts cannot resolve legal subtype or responsible body; their embedded operational duties retain their actual statutory/contractual classification. No new profile facts proposed.
+
+## 1. Admission appeals
+
+Primary source: DfE [current School Admission Appeals Code publication](https://www.gov.uk/government/publications/school-admissions-appeals-code) and [2022 Code PDF](https://assets.publishing.service.gov.uk/media/6335a0c88fa8f506931f6d44/School_Admission_Appeals_Code_2022.pdf), statutory basis paragraphs 1–8; 1.1–1.10; 2.1–2.4; decision/record requirements 2.24–2.28; infant-class-size chapter 4. Effective 1 October 2022 for appeals lodged from that date. Earlier appeals retain prior rules. No replacement located in the current official publication.
+
+The Code excludes special schools, alternative provision and standalone 16–19 provision. Academy requirements arise through funding agreements, subject to agreed variations. Ordinary private independent schools do not become Code institutions through the independent-school label. Community/voluntary-controlled appeals normally belong to the LA; foundation/voluntary-aided to their governing body; academies to the trust. Delegation does not remove responsibility. Do not conflate EHCP placement tribunal disputes with this route.
+
+Proposed action: **Identify the applicable admission-appeal route and responsible authority, then maintain independent, trained panels, a clerk, published timetable, notices, records and decisions.** Include the 28 February timetable deadline, at least 20 school days to lodge and 10 school days hearing notice; apply the exact normal-round, in-year, late and sixth-form timetable rather than one universal deadline. Three-member panel baseline; avoid the consultation draft’s two-member rule.
+
+Condition: schoolCategory MAINTAINED or ACADEMY. Evidence: legal subtype, authority/delegation, current agreement variation, timetable, panel eligibility/training, sample anonymised notices/decision/record controls. Unknown subtype means unresolved assessment, not automatic exemption.
+
+## 2. Maintained-school constitution, elections and meetings
+
+Primary legislation verified from current XML:
+
+- [2012/1034 regulation 13](https://www.legislation.gov.uk/uksi/2012/1034/regulation/13/data.xml): minimum seven; at least two parents; head unless resigned; one staff and one LA governor; co-opted staff/head combined limit one third. Foundation/voluntary additional requirements are in regulation 14.
+- [2012/1034 Schedule 1](https://www.legislation.gov.uk/uksi/2012/1034/schedule/1/data.xml): appropriate election authority, contested ballot, postal voting opportunity even if electronic voting also offered, parent notifications and limited appointment fallback with skills requirement. Nursery parents expressly included. Current text includes 2015 and 2017 amendments; do not label all current clauses commenced in 2012.
+- [2013/1624 regulation 14](https://www.legislation.gov.uk/uksi/2013/1624/regulation/14/data.xml): quorum half rounded up of filled membership, majority vote and chair’s casting vote. Vacancies excluded. Alternative participation can be approved; particular decisions retain special procedural conditions.
+- DfE [maintained governance guide](https://www.gov.uk/government/publications/maintained-schools-governance-guide/maintained-schools-governance-guide), current update 15 July 2026, non-statutory reference. Sections 5.1–5.2 distinguish standalone Constitution Regulations from Federation Regulations; instrument of government sets composition; meetings at least three annually. PRUs and FE are outside its direct scope.
+
+Proposed action: **Check the governing body’s legal constitution and instrument, governor eligibility/appointment/election arrangements, vacancies, meeting frequency, quorum, interests and decision records.** For federations use the Federation Regulations, not automatic standalone numerical composition. Maintained nursery remains included. Evidence: current instrument/federation status, membership/terms/eligibility record, election notices/ballots, appointment authority, meeting minutes/attendance and calculated quorum. Keep enhanced governor safeguarding checks linked to existing personnel action.
+
+Condition: schoolCategory MAINTAINED. Statutory duty plus subtype assessment. Use currentAsOf 2026-10-15 and unknown commencement reason for composite amended source until individual amendment dates are separately catalogued. Do not apply these composition/quorum numbers to academies or independent schools.
+
+## 3. Academy governance
+
+Sources: DfE [academy governance guide](https://www.gov.uk/government/publications/academy-trust-governance-guide/academy-trust-governance-guide), sections 2.3, 4.3.3; [model articles publication](https://www.gov.uk/government/publications/academy-model-memorandum-and-articles-of-association); [Academy Trust Handbook 2026](https://www.gov.uk/government/publications/academy-trust-handbook/academy-trust-handbook-2026-effective-from-1-october-2026), effective 1 October 2026.
+
+Proposed bounded addition to existing academy-governance action: **Review the trust’s executed articles, funding agreement and delegation scheme for member/trustee appointments, removals, conflicts, meeting frequency, quorum and local committee powers.** At least three board meetings annually; quorum follows actual articles. Model articles are reference material, not proof of the institution’s adopted constitution. Church/co-operative/UTC variants exist. School-level staff cannot attest to trust arrangements without evidence from the responsible trust. Evidence: executed articles/amendments, appointment register, delegated powers, board minutes and quorum record. Condition ACADEMY, assessment recommendation; contractual/statutory obligations identified within it. Finance remains outside scope. Private independent proprietors are not academy trusts by virtue of incorporation/charitable status.
+
+## 4. Curriculum disapplication — actual legal route, not a blanket SEND exemption
+
+Current Education Act 2002 XML verified:
+
+- [s90](https://www.legislation.gov.uk/ukpga/2002/32/section/90/data.xml): Secretary of State direction for development/experiments, specified duration/modification; application/LA agreement depends on maintained category; reporting conditions may apply.
+- [s91](https://www.legislation.gov.uk/ukpga/2002/32/section/91/data.xml): regulations may specify exceptions; this enabling power itself grants no individual exemption.
+- [s92](https://www.legislation.gov.uk/ukpga/2002/32/section/92/data.xml): actual EHC-plan special educational provision may specify exclusion/modification. Having SEND or an EHC plan alone is insufficient.
+- [s93](https://www.legislation.gov.uk/ukpga/2002/32/section/93/data.xml): temporary headteacher directions only within prescribed circumstances/conditions; statutory maximum must not exceed six months, not an automatic six-month permission.
+- [s94](https://www.legislation.gov.uk/ukpga/2002/32/section/94/data.xml): notification, reasons, alternative educational provision and reintegration or EHC-needs assessment route.
+
+DfE [disapplication guidance](https://www.gov.uk/government/publications/disapplying-aspects-of-the-national-curriculum) is old guidance, useful locator only; do not repeat obsolete statement-of-SEN wording. [2000/2121 temporary-exception regulations](https://www.legislation.gov.uk/uksi/2000/2121/contents) located but their current detailed conditions and amendment chain were NOT fully reviewed in this bounded pass.
+
+Proposed enhancement to maintained-curriculum action: **Record any lawful curriculum modification/disapplication, its exact authority, scope, period, notifications and alternative provision; verify separately whether assessment requirements are affected.** Evidence: actual direction/EHC-plan provision, prescribed-condition review, notification record and review/reintegration date. No pupil-identifiable plan uploaded unnecessarily. Condition MAINTAINED; action remains an assessment of whether an exception is used, not obligation to disapply. Academy current curriculum agreement and private independent standards remain distinct. Existing 2026 Act prospective academy curriculum reform must not be treated as already operative merely because enacted.
+
+## 5. Annual national assessment route — updated sources now available
+
+STA [2027 KS2 ARA](https://www.gov.uk/government/publications/key-stage-2-assessment-and-reporting-arrangements-ara/2027-key-stage-2-assessment-and-reporting-arrangements), sections 4, 5, 8, 12 and 14. Publication updated 12 October 2026; landing-page operational form update 14 October. This is academic year 2026–27, not previous-year 2026 guidance. Maintained KS2 pupils: statutory assessment. Academy participation follows applicable agreement. Independent schools may elect end-KS2 subjects but cannot participate in MTC. PRU pupils on another school’s register remain that school’s responsibility; unregistered PRU pupils have recommended rather than identical statutory participation. Non-maintained special and overseas/home-education routes differ. Annual assessment calendar, participation/non-participation, access arrangements, secure administration, declarations, moderation/monitoring, submissions and parent reporting must follow actual applicable route. Current assessment access/non-participation guidance must be checked separately before an individual decision. The new portal agreement forms open 2 November, not 12 October.
+
+STA [2027 phonics ARA](https://www.gov.uk/government/publications/phonics-screening-check-assessment-and-reporting-arrangements-ara/2027-phonics-screening-check-assessment-and-reporting-arrangements), published 12 October 2026: eligible age/progress group and specified year-2 repeats; academy agreement/stage conditions; maintained nursery pupils reaching six can be included. Independent schools cannot formally administer. Keep optional KS1 tests separate from mandatory phonics; [KS1 collection](https://www.gov.uk/government/collections/national-curriculum-assessments-key-stage-1-tests) confirms end-KS1 tests optional.
+
+Proposed action: **Determine the current assessment and reporting arrangements for actual pupil stages and institution type, then evidence the calendar, participation decisions, administration, moderation, declarations and reporting.** Condition schoolCategory MAINTAINED/ACADEMY or independentSchool; recommendation assessment because broad profile cannot establish cohorts/voluntary participation. Evidence: year-specific route decision, agreement/registration if relevant, responsible assessment lead, secure controls, moderation agreement, deadlines and submissions/reporting proof. Do not infer key stage solely from minimum/maximum ages.
+
+## Residual boundaries
+
+These are bounded national baseline additions, not a complete governance/curriculum code. Federation-specific composition; precise temporary-exception regulations; individual access/non-participation criteria; local religious-education syllabuses; instrument/articles variants; institution-specific agreement departures; appeal factual merits; yearly test schedules and event-driven amendments remain explicit review/evidence work. Actual instrument, agreement, pupil cohort and EHC/direction facts are inherently local evidence, whereas unreviewed national procedural rules should be identified as catalogue gaps. No new UI facts or blanket default exemptions are needed.

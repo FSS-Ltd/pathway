@@ -1,10 +1,12 @@
 "use client";
 import React from "react";
 import type { TrackerChecklistItem } from "@pathway/types";
+import { Check, ChevronDown, Circle, CircleHelp, Minus } from "lucide-react";
 import { EvidencePanel } from "./evidence-panel";
 import { Confirmation } from "./confirmation";
 import { History } from "./history";
 import { words } from "./profile-fields";
+import styles from "./requirement-row.module.css";
 export function RequirementRow({
   item,
   profileVersion,
@@ -15,25 +17,53 @@ export function RequirementRow({
   profileVersion: number;
   canManage: boolean;
   onChange: () => void;
-}) {
+}): React.JSX.Element {
   const [open, setOpen] = React.useState(false);
   const r = item.requirement;
+  const status =
+    item.applicability === "NOT_APPLICABLE"
+      ? "Not applicable"
+      : item.applicability === "UNRESOLVED"
+        ? "Unresolved"
+        : item.attestation?.status === "NOT_APPLICABLE"
+          ? "Recorded not applicable"
+          : item.completed
+            ? "Completed"
+            : "To do";
+  const StatusIcon =
+    status === "Not applicable" || status === "Recorded not applicable"
+      ? Minus
+      : item.applicability === "UNRESOLVED"
+        ? CircleHelp
+        : item.completed
+          ? Check
+          : Circle;
   return (
     <details
-      className="rounded-xl border border-border-subtle bg-surface p-4 sm:p-5"
+      className={styles.row}
+      data-status={status}
       onToggle={(e) => setOpen(e.currentTarget.open)}
     >
-      <summary className="cursor-pointer break-words">
-        <span className="font-semibold">{r.action}</span>
-        <span className="mt-1 block text-sm text-text-muted">
-          {item.completed ? "Completed" : words(item.applicability)}
-          {item.stale ? " · Confirmation needs renewal" : ""}
-          {item.overdue ? " · Review overdue" : ""}
-          {item.evidenceGap ? " · Evidence gap" : ""}
+      <summary className={styles.summary}>
+        <span className={styles.statusIcon} aria-hidden="true">
+          <StatusIcon size={17} />
         </span>
+        <span className={styles.content}>
+          <span className={styles.action}>{r.action}</span>
+          <span className={styles.metadata}>
+            <span className={styles.status}>{status}</span>
+            <span className={styles.obligation}>
+              {words(r.obligationClass)}
+            </span>
+            {item.stale && <span>Confirmation needs renewal</span>}
+            {item.overdue && <span>Review overdue</span>}
+            {item.evidenceGap && <span>Evidence gap</span>}
+          </span>
+        </span>
+        <ChevronDown className={styles.chevron} size={17} aria-hidden="true" />
       </summary>
       {open && (
-        <div className="mt-5 min-w-0 space-y-6">
+        <div className={`${styles.body} space-y-6`}>
           <section className="space-y-2">
             <p>
               {words(r.obligationClass)} · Version {r.version}

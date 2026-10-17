@@ -1,9 +1,9 @@
 # England pack: reviewed national core
 
-Step **2.01 remains in progress**. This branch prepares catalogue **1.1.0** with
-**62 reviewed source records and 68 actions** across eight topics and all six
+Step **2.01 remains in progress**. This branch prepares catalogue **1.2.0** with
+**154 reviewed source records and 106 current actions** across eight topics and all six
 institutional research sectors. It is not a complete England pack or legal
-certification. It has not passed its PR/CI/merge gate and is not deployed.
+certification. The initial v1.1 core passed its gate and was merged in PR #634. This v1.2 follow-up is unmerged and has not passed its own gate.
 
 ## Publication and coverage
 
@@ -15,11 +15,13 @@ expired, withdrawn or future requirements must not remain available for current
 confirmation. Historical records remain retained.
 
 The runtime catalogue's topic-specific gap descriptions are the publication
-boundary. Remaining work includes detailed maintained-school/academy governance,
-admissions, curriculum and SEND routes; childcare register/funding conditions;
-local safeguarding arrangements and permissions; specialist premises/activity
-regimes; advanced privacy/processor/transfer/biometric/online-service duties; and
-actual ACE regional institutional agreements. No list of all council policies has
+boundary. Reviewed additions include maintained/academy governance, curriculum, admissions
+and SEND assessment routes; childcare registers/funded places; advanced privacy;
+and premises/activity responsibilities. Remaining work includes granular school
+constitution/appeal/exemption rules, provider-specific register/funding conditions,
+record-specific education privacy rights, specialist premises/activity regimes,
+local safeguarding arrangements and permissions, and actual ACE institutional
+agreements. No list of all council policies has
 been reviewed. Region entry alone does not establish reviewed local coverage.
 
 A merged bounded-release PR would establish only that release's delivery gate;
@@ -52,7 +54,9 @@ must not be presented as current duties.
 
 See [source-review.md](source-review.md), [education research](education-research.md),
 [safeguarding research](safeguarding-research.md), [privacy research](privacy-research.md)
-and [operations research](operations-research.md). Current official law XML was
+and [operations research](operations-research.md). Further reviewed detail is in
+[state-school research](state-school-research.md), [advanced privacy](privacy-advanced-research.md),
+[operational detail](operational-detail-research.md) and [childcare routes](childcare-routes-research.md). Current official law XML was
 used when the browser reader could not render legislation XHTML. Made/Royal Assent,
 publication, amendment commencement and source-observation dates are distinct.
 
@@ -78,5 +82,15 @@ Final integration passed 101 suites / 617 tests. Workspace type/lint, admin unit
 Prisma/permission checks, API/admin/web builds and independent source/backend/UI
 review passed. An earlier run had two existing HTTP failures; unchanged focused and
 full isolated reruns passed, with the earlier results retained in the ledger.
-Commit-hook API units and current-head host CI/merge remain required before delivery. See the project
+Commit hooks passed 226 API suites / 1,630 tests for the initial core.
+The expanded catalogue requires renewed final verification and current-head host
+CI/merge before delivery; initial host CI cannot stand in for the expanded revision. See the project
 [progress ledger](../../PROGRESS.md) for exact commands and current results.
+
+## Published history and renewed confirmation
+
+Catalogue 1.1 remains unchanged. Version 1.2 retains 108 requirement revisions for
+106 current actions; transport/boarding updates require version-2 confirmation,
+with old confirmations retained as history. New actions are effective from the
+17 October release. Source observation dates remain their actual 15 October
+verification dates. Existing general curriculum-route assessment is retained.

@@ -1,3 +1,4 @@
+import "@/lib/register-test-styles";
 import assert from "node:assert/strict";
 import React, { act } from "react";
 import { JSDOM } from "jsdom";
@@ -189,7 +190,7 @@ async function run() {
     });
   const click = async (text: string) => {
     const button = [...host.querySelectorAll("button")].find(
-      (b) => b.textContent === text,
+      (b) => b.textContent === text || b.getAttribute("aria-label") === text,
     );
     assert.ok(button, text);
     await act(async () => button.click());
