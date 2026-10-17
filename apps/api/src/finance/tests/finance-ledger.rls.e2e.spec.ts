@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { Prisma, prisma, withTenantRlsContext } from "@pathway/db";
+import {
+  applyTenantContext,
+  Prisma,
+  prisma,
+  withTenantRlsContext,
+} from "@pathway/db";
 import { requireDatabase } from "../../../test-helpers.e2e";
 
 const tenantRlsRole = "pathway_e2e_tenant_rls";
@@ -27,6 +32,7 @@ const financeTables = [
   "FinanceBankTransferChange",
   "FinanceManualReceiptRequest",
   "FinanceTransferNotice",
+  "FinanceStripeConnection",
   "FinancePayerAccount",
   "FinancePayerGrant",
   "FinanceCreditNote",
@@ -170,6 +176,91 @@ describe("Finance ledger database foundation", () => {
       await removeProfile(profileB);
       await removeProfile(profileA);
     }
+  });
+
+  it("isolates Stripe collection accounts by tenant under the RLS role", async () => {
+    if (!requireDatabase()) return;
+    if (process.env.E2E_TENANT_RLS_ROLE !== tenantRlsRole) {
+      throw new Error("Finance ledger test requires the tenant RLS role");
+    }
+
+    const userId = randomUUID();
+    const profileAId = randomUUID();
+    const profileBId = randomUUID();
+    const connectionAId = randomUUID();
+    const connectionBId = randomUUID();
+    const rollbackFixture = new Error("rollback Finance Stripe RLS fixture");
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await tx.user.create({
+          data: {
+            id: userId,
+            email: `finance-connect-${userId}@example.test`,
+          },
+        });
+
+        await applyTenantContext(tx, tenantAId, orgId);
+        await tx.financeProfile.create({
+          data: {
+            id: profileAId,
+            tenantId: tenantAId,
+            orgId,
+            legalEntityName: "Finance Stripe test A",
+          },
+        });
+        await tx.financeStripeConnection.create({
+          data: {
+            id: connectionAId,
+            financeProfileId: profileAId,
+            tenantId: tenantAId,
+            orgId,
+            requestedByUserId: userId,
+          },
+        });
+
+        await applyTenantContext(tx, tenantBId, orgId);
+        await tx.financeProfile.create({
+          data: {
+            id: profileBId,
+            tenantId: tenantBId,
+            orgId,
+            legalEntityName: "Finance Stripe test B",
+          },
+        });
+        await tx.financeStripeConnection.create({
+          data: {
+            id: connectionBId,
+            financeProfileId: profileBId,
+            tenantId: tenantBId,
+            orgId,
+            requestedByUserId: userId,
+          },
+        });
+
+        await applyTenantContext(tx, tenantAId, orgId);
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${tenantRlsRole}"`);
+        const visible = await tx.financeStripeConnection.findMany({
+          where: { id: { in: [connectionAId, connectionBId] } },
+          select: { id: true },
+        });
+        expect(visible.map(({ id }) => id)).toEqual([connectionAId]);
+
+        await expect(
+          tx.$executeRaw`
+            INSERT INTO "FinanceStripeConnection" (
+              "id", "financeProfileId", "tenantId", "orgId",
+              "requestedByUserId", "updatedAt"
+            ) VALUES (
+              ${randomUUID()}, ${profileBId}, ${tenantBId}, ${orgId},
+              ${userId}, CURRENT_TIMESTAMP
+            )
+          `,
+        ).rejects.toMatchObject({ code: "P2010", meta: { code: "42501" } });
+
+        throw rollbackFixture;
+      }),
+    ).rejects.toBe(rollbackFixture);
   });
 
   it("isolates payer grants by tenant and rejects forged account scope", async () => {

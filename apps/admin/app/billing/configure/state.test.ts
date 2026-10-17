@@ -16,7 +16,8 @@ import {
 const PRICES: OptionPriceLookup = {
   MODULE_ASSET_MANAGEMENT_MONTHLY: { amountMajor: 29 },
   MODULE_ASSET_MANAGEMENT_YEARLY: { amountMajor: 290 },
-  MODULE_FINANCE_MONTHLY: { amountMajor: 19 },
+  MODULE_FINANCE_MONTHLY: { amountMajor: 29 },
+  MODULE_FINANCE_YEARLY: { amountMajor: 290 },
 };
 
 // --- seeding from the current subscription ---
@@ -34,7 +35,8 @@ const PRICES: OptionPriceLookup = {
   );
   assert.equal(initialStateFromSubscription(null).planCode, null);
   const withModules = initialStateFromSubscription("GROWTH_99_MONTHLY", {
-    included: ["EVENTS"], paid: ["FINANCE"],
+    included: ["EVENTS"],
+    paid: ["FINANCE"],
   });
   assert.deepEqual(withModules.selectedIncludedModules, ["EVENTS"]);
   assert.deepEqual(withModules.selectedOptionalModules, ["FINANCE"]);

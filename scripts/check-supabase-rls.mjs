@@ -47,6 +47,7 @@ const REQUIRED_RLS_TABLES = [
   "FinanceBankTransferChange",
   "FinanceManualReceiptRequest",
   "FinanceTransferNotice",
+  "FinanceStripeConnection",
   "FinancePayerAccount",
   "FinancePayerGrant",
   "FinanceCreditNote",

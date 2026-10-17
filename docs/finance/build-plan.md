@@ -26,7 +26,7 @@ Family collections and SaaS billing use separate account identities, services, i
 
 ## 2. Commercial and entitlement contract
 
-Finance is a paid capability. The catalogue remains the commercial source of truth. It currently lists Finance as **Proposed** at £15 monthly / £150 annually. The user has since specified target standalone Stripe prices of **£29 monthly / £290 annually**. Reconcile the catalogue and Stripe configuration to those target amounts in T07; live checkout remains gated on commercial approval.
+Finance is a paid capability. The catalogue remains the commercial source of truth and records the approved standalone prices at **£29 monthly / £290 annually**. T07 verified the NexSteps sandbox Finance product has active recurring GBP prices at those amounts. Live checkout remains gated on the release and live-account verification process.
 
 Finance access may be granted exactly once through an active standalone Finance add-on, eligible selected plan entitlement, or eligible bundle entitlement. Existing subscriptions retain the included entitlements already granted to them. Growth and Professional selections, the Operations bundle, and the All Included bundle must be resolved from the current catalogue; the included bundle and plan module cannot also be charged as a separate add-on. A catalogue eligibility rule is not itself proof that a customer has purchased or selected Finance.
 

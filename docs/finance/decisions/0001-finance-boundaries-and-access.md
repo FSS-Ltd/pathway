@@ -48,7 +48,7 @@ Prefer existing NestJS, Prisma/Postgres RLS, transactional/outbox work, private 
 
 ### 6. Gate commercial billing and provider methods independently
 
-Finance stays unavailable without an active entitlement. The catalogue currently lists £15/£150 as Proposed; the user has specified £29 monthly / £290 annually as the target standalone Stripe prices. Reconcile the catalogue and Stripe configuration in T07, and do not enable standalone checkout until required commercial approval is in place. Eligible plan/bundle entitlements grant access once with no duplicate add-on item. Use school-scoped direct charges only after sandbox proof; no application fee or shared collection account. Do not launch Bacs until the exact direct-charge method path passes delayed-payment, returns and reconciliation tests.
+Finance stays unavailable without an active entitlement. The approved catalogue price is £29 monthly / £290 annually, and T07 verified those amounts on the NexSteps sandbox Finance product. Eligible plan/bundle entitlements grant access once with no duplicate add-on item. Use school-scoped direct charges only after the exact sandbox account path passes; no application fee or shared collection account. Do not launch Bacs until the exact direct-charge method path passes delayed-payment, returns and reconciliation tests.
 
 **Reason:** A payment architecture decision is not commercial approval or proof of provider capability.
 
@@ -62,7 +62,7 @@ Reuse NexSteps typography, colors, semantic tokens and shared controls. Place am
 
 - T02 must verify the canonical tenant/organisation/legal-entity relationships, numbering scope, RLS policy patterns, transaction isolation and indexes against real schema.
 - T03 access policy decisions are recorded above. T06 and T12 must implement persisted approval requests and action-specific audit evidence.
-- T07 sandbox access is unavailable at T01. Direct-charge integration stays blocked until the compatibility evidence in provider-compatibility.md exists.
+- T07 confirmed the sandbox add-on product and prices. A disposable school-connected account and account-scoped direct-charge path still require sandbox verification before the connection step can pass its provider acceptance gate.
 - Direct-charge Bacs capability is unresolved. Do not pick a replacement payment architecture in code.
 - T11 must confirm the current renderer and private object delivery mechanics and prove digest/cutoff reproducibility.
 - Finance legal/tax document content, retention period and month-end cutoff rules need owner sign-off before the first issued invoice or statement.

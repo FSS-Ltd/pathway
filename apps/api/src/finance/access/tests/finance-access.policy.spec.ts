@@ -123,6 +123,18 @@ describe("Finance access policy", () => {
     ).toBe(false);
   });
 
+  it("restricts Stripe collection-account changes to active Finance mode", () => {
+    expect(
+      canPerformFinanceStaffAction(
+        "SERVICING_ONLY",
+        "MANAGE_COLLECTION_ACCOUNT",
+      ),
+    ).toBe(false);
+    expect(
+      canPerformFinanceStaffAction("ACTIVE", "MANAGE_COLLECTION_ACCOUNT"),
+    ).toBe(true);
+  });
+
   it("requires the approval actor to be distinct and present", () => {
     expect(isIndependentFinanceApproval("staff-a", "staff-b")).toBe(true);
     expect(isIndependentFinanceApproval("staff-a", "staff-a")).toBe(false);

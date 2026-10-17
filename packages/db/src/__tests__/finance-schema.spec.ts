@@ -23,6 +23,7 @@ describe("Finance schema contract", () => {
       "enum FinanceReceiptStatus",
       "enum FinanceManualReceiptRequestStatus",
       "enum FinanceBankTransferChangeStatus",
+      "enum FinanceStripeConnectionStatus",
       "model FinanceProfile",
       "model FinanceInvoiceNumberSequence",
       "model FinanceInvoice",
@@ -34,6 +35,7 @@ describe("Finance schema contract", () => {
       "model FinanceBankTransferChange",
       "model FinanceManualReceiptRequest",
       "model FinanceTransferNotice",
+      "model FinanceStripeConnection",
       "model FinancePayerAccount",
       "model FinancePayerGrant",
       "model FinanceCreditNoteNumberSequence",
@@ -60,6 +62,7 @@ describe("Finance schema contract", () => {
       "20261025000000_finance_receipt_evidence_guard",
       "20261026000000_finance_receipt_confirmation_transition",
       "20261027000000_finance_manual_transfers",
+      "20261028000000_finance_stripe_connections",
     ]) {
       expect(financeMigrations).toContain(migration);
     }
@@ -103,6 +106,7 @@ describe("Finance schema contract", () => {
       "FinanceBankTransferChange",
       "FinanceManualReceiptRequest",
       "FinanceTransferNotice",
+      "FinanceStripeConnection",
       "FinancePayerAccount",
       "FinancePayerGrant",
       "FinanceCreditNote",

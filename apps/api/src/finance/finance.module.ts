@@ -1,4 +1,9 @@
 import { Module } from "@nestjs/common";
+import { BillingModule } from "../billing/billing.module";
+import {
+  BILLING_PROVIDER_CONFIG,
+  type BillingProviderConfig,
+} from "../billing/billing-provider.config";
 import { AccessControlModule } from "../access-control/access-control.module";
 import { AuthModule } from "../auth/auth.module";
 import { CommonModule } from "../common/common.module";
@@ -15,15 +20,33 @@ import { FinanceBankTransferController } from "./finance-bank-transfer.controlle
 import { FinanceBankTransferService } from "./finance-bank-transfer.service";
 import { FinanceManualReceiptController } from "./finance-manual-receipt.controller";
 import { FinanceManualReceiptService } from "./finance-manual-receipt.service";
+import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
+import {
+  FINANCE_STRIPE_CONNECT_CONFIG,
+  loadFinanceStripeConnectConfig,
+} from "./stripe/finance-stripe-connect.config";
+import {
+  DisabledFinanceStripeConnectProvider,
+  FINANCE_STRIPE_CONNECT_PROVIDER,
+  StripeFinanceConnectProvider,
+} from "./stripe/finance-stripe-connect.provider";
+import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connection.service";
 
 @Module({
-  imports: [CommonModule, AuthModule, AccessControlModule, FinanceAccessModule],
+  imports: [
+    BillingModule,
+    CommonModule,
+    AuthModule,
+    AccessControlModule,
+    FinanceAccessModule,
+  ],
   controllers: [
     FinanceInvoiceController,
     FinanceCreditNoteController,
     FinanceReceiptController,
     FinanceBankTransferController,
     FinanceManualReceiptController,
+    FinanceStripeConnectionController,
   ],
   providers: [
     FinanceBalanceService,
@@ -33,6 +56,23 @@ import { FinanceManualReceiptService } from "./finance-manual-receipt.service";
     FinanceReceiptService,
     FinanceBankTransferService,
     FinanceManualReceiptService,
+    FinanceStripeConnectionService,
+    {
+      provide: FINANCE_STRIPE_CONNECT_CONFIG,
+      useFactory: (billing: BillingProviderConfig) =>
+        loadFinanceStripeConnectConfig(billing),
+      inject: [BILLING_PROVIDER_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_CONNECT_PROVIDER,
+      useFactory: (
+        config: ReturnType<typeof loadFinanceStripeConnectConfig>,
+      ) =>
+        config.mode === "disabled"
+          ? new DisabledFinanceStripeConnectProvider()
+          : new StripeFinanceConnectProvider(config),
+      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+    },
   ],
 })
 export class FinanceModule {}
