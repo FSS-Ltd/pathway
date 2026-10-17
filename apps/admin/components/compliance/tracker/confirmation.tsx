@@ -1,6 +1,9 @@
 "use client";
 import React from "react";
-import type { TrackerChecklistItem } from "@pathway/types";
+import type {
+  TrackerChecklistItem,
+  TrackerAttestationStatus,
+} from "@pathway/types";
 import { trackerClient } from "@/lib/tracker-client";
 import {
   Action,
@@ -16,7 +19,7 @@ export function Confirmation({
 }: {
   item: TrackerChecklistItem;
   profileVersion: number;
-  onChange: () => void;
+  onChange: (status: TrackerAttestationStatus) => void;
 }) {
   const [complete, setComplete] = React.useState(item.completed);
   const [na, setNa] = React.useState(
@@ -61,7 +64,7 @@ export function Confirmation({
           );
           if (!signal.aborted) {
             setRevision(saved.revision);
-            onChange();
+            onChange(saved.status);
           }
         }, "Manual confirmation saved.");
       }}
@@ -98,16 +101,23 @@ export function Confirmation({
               <span>Record a permitted not applicable decision</span>
             </label>
             {na && (
-              <label className="block">
-                Not applicable reason
-                <textarea
-                  className={fieldClass}
-                  required
-                  maxLength={2000}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </label>
+              <>
+                <p className="text-sm text-text-muted">
+                  Explain which permitted exception applies. Check with your
+                  local authority or relevant regulator before skipping this
+                  action.
+                </p>
+                <label className="block">
+                  Not applicable reason
+                  <textarea
+                    className={fieldClass}
+                    required
+                    maxLength={2000}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
+                </label>
+              </>
             )}
           </>
         )}

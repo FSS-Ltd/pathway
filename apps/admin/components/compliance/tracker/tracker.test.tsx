@@ -71,6 +71,7 @@ const progress = {
 };
 const checklist: TrackerChecklist = {
   profile: { profile: emptyProfile, version: 1, updatedAt: "2026-10-16" },
+  organisationFacts: { sector: "SCHOOL", vertical: "ACE_SCHOOL", ace: true },
   items: [],
   progress,
   categories: [],
@@ -190,7 +191,8 @@ async function run() {
     });
   const click = async (text: string) => {
     const button = [...host.querySelectorAll("button")].find(
-      (b) => b.textContent === text || b.getAttribute("aria-label") === text,
+      (b) =>
+        b.textContent?.trim() === text || b.getAttribute("aria-label") === text,
     );
     assert.ok(button, text);
     await act(async () => button.click());
@@ -203,10 +205,35 @@ async function run() {
     fail = false;
     await click("Retry tracker");
     assert.match(host.textContent ?? "", /No applicable items/);
-    assert.match(host.textContent ?? "", /Coverage is incomplete/);
+    assert.match(host.textContent ?? "", /Coverage incomplete/);
+    assert.equal(
+      host.querySelector("#tracker-coverage-details")?.hasAttribute("hidden"),
+      true,
+      "coverage starts as a compact alert",
+    );
+    await click("Coverage incomplete");
+    assert.equal(
+      host.querySelector("#tracker-coverage-details")?.hasAttribute("hidden"),
+      false,
+    );
+    await click("Coverage incomplete");
+    await click("Checklist");
+    assert.equal(
+      host
+        .querySelector("#tracker-tab-checklist")
+        ?.getAttribute("aria-selected"),
+      "true",
+    );
+    await click("Overview");
     assert.match(host.textContent ?? "", /Medical · Unknown/);
     assert.equal(host.querySelector('a[href*="medical"]'), null);
     assert.equal(host.querySelector("progress"), null);
+    await click("Site compliance profile");
+    assert.ok(host.querySelector('[aria-label="Site compliance profile"]'));
+    assert.match(
+      host.textContent ?? "",
+      /Sector: School · from organisation settings/,
+    );
     fail = true;
     await click("Refresh tracker and evidence");
     const saveProfile = [...host.querySelectorAll("button")].find(

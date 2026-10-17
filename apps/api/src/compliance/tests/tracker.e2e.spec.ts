@@ -178,6 +178,21 @@ describe("Site tracker persistence and permission boundaries", () => {
       .set("Authorization", reader)
       .expect("Cache-Control", "private, no-store")
       .expect(200);
+    const beforeProfile = await request(server)
+      .get("/compliance/tracker/checklist")
+      .set("Authorization", reader)
+      .expect(200);
+    expect(beforeProfile.body.profile).toBeNull();
+    expect(beforeProfile.body.organisationFacts).toEqual({
+      sector: "SCHOOL",
+      vertical: "ACE_SCHOOL",
+      ace: true,
+    });
+    expect(beforeProfile.body.coverage).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sector: "SCHOOL", jurisdiction: null }),
+      ]),
+    );
     const results = await Promise.all(
       [1, 2].map(() =>
         request(server)
@@ -631,5 +646,37 @@ describe("Site tracker persistence and permission boundaries", () => {
       { requirementId: "retained-50", requirementVersion: 1, action: null },
     ]);
     expect(second.body.nextCursor).toBeNull();
+  });
+  it("requires a new site-profile revision after an organisation type changes", async () => {
+    if (!app) return;
+    const profileService = app.get(TrackerProfileService);
+    const tracker = app.get(TrackerService);
+    const before = await profileService.get(actor);
+    expect(before).not.toBeNull();
+    await prisma.orgVertical.update({
+      where: { orgId },
+      data: { vertical: "STATE_SCHOOL" },
+    });
+    try {
+      const checklist = await tracker.checklist(actor);
+      expect(checklist.organisationFacts?.vertical).toBe("STATE_SCHOOL");
+      expect(checklist.profileNeedsSync).toBe(true);
+      expect(checklist.progress.completed).toBe(0);
+      await expect(tracker.attest(actor, await confirmation())).rejects.toThrow(
+        "Save the site profile",
+      );
+      const saved = await profileService.save(actor, {
+        expectedVersion: before!.version,
+        profile: before!.profile,
+      });
+      expect(saved.version).toBe(before!.version + 1);
+      expect(saved.profile.vertical).toBe("STATE_SCHOOL");
+      expect((await tracker.checklist(actor)).profileNeedsSync).toBe(false);
+    } finally {
+      await prisma.orgVertical.update({
+        where: { orgId },
+        data: { vertical: "ACE_SCHOOL" },
+      });
+    }
   });
 });

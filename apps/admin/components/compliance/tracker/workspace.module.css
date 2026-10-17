@@ -58,59 +58,106 @@
 .refresh svg {
   flex-shrink: 0;
 }
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+.setupNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgb(var(--pw-status-warn) / 0.3);
+  border-radius: 0.875rem;
+  background: rgb(var(--pw-status-warn) / 0.06);
+  font-size: 0.875rem;
+}
+.setupNotice button {
+  font-weight: 700;
+  text-decoration: underline;
+}
+.tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid rgb(var(--pw-border-subtle));
+  border-radius: 0.9rem;
+  background: rgb(var(--pw-bg-muted));
+  overflow-x: auto;
+}
+.tabs button {
+  white-space: nowrap;
+  padding: 0.65rem 0.95rem;
+  border-radius: 0.65rem;
+  color: rgb(var(--pw-text-muted));
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+.tabs button[aria-selected="true"] {
+  background: rgb(var(--pw-bg-surface));
+  color: rgb(var(--pw-text-primary));
+  box-shadow: 0 2px 8px rgb(var(--pw-text-primary) / 0.08);
+}
+.tabs button:focus-visible,
+.coverageToggle:focus-visible,
+.refresh:focus-visible {
+  outline: 2px solid rgb(var(--pw-accent-strong));
+  outline-offset: 2px;
+}
 .body {
   min-width: 0;
   display: grid;
   gap: 1.5rem;
 }
 .coverage {
-  display: flex;
-  gap: 0.75rem;
-  padding: 1rem 1.15rem;
+  position: fixed;
+  z-index: 30;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  width: min(25rem, calc(100vw - 2rem));
   border: 1px solid rgb(var(--pw-status-warn) / 0.2);
   border-radius: 1rem;
-  background: rgb(var(--pw-status-warn) / 0.045);
+  background: rgb(var(--pw-bg-surface));
+  box-shadow: 0 12px 40px rgb(var(--pw-text-primary) / 0.17);
 }
-.coverageIcon {
-  flex-shrink: 0;
-  margin-top: 0.12rem;
+.coverageToggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 0.6rem;
+  padding: 0.8rem 1rem;
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+.coverageToggle span {
+  flex: 1;
+}
+.coverageToggle svg:first-child {
   color: #95600d;
 }
 .coverageContent {
   min-width: 0;
+  max-height: min(26rem, 60vh);
+  overflow-y: auto;
+  padding: 0 1rem 1rem;
   overflow-wrap: anywhere;
 }
-.coverageContent h2 {
-  font-size: 0.875rem;
-  font-weight: 800;
+.coverageContent[hidden] {
+  display: none;
 }
 .coverageContent > p {
-  margin-top: 0.2rem;
   font-size: 0.8125rem;
   color: rgb(var(--pw-text-muted));
   line-height: 1.6;
 }
 .coverageDetails {
   margin-top: 0.45rem;
-}
-.coverageDetails > summary {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  width: fit-content;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 700;
-  list-style: none;
-}
-.coverageDetails > summary::-webkit-details-marker {
-  display: none;
-}
-.coverageDetails > summary svg {
-  flex-shrink: 0;
-}
-.coverageDetails[open] > summary svg {
-  transform: rotate(180deg);
 }
 .coverageDetails ul {
   display: grid;
@@ -127,9 +174,33 @@
   display: block;
   color: rgb(var(--pw-text-muted));
 }
-.profile > details {
-  border-radius: 1rem;
-  box-shadow: 0 2px 6px rgb(var(--pw-text-primary) / 0.02);
+.profileDialog {
+  width: min(48rem, calc(100vw - 2rem));
+  max-height: min(90vh, 60rem);
+  margin: auto;
+  overflow-y: auto;
+  padding: 1.5rem;
+  border: 1px solid rgb(var(--pw-border-subtle));
+  border-radius: 1.15rem;
+  background: rgb(var(--pw-bg-surface));
+  color: rgb(var(--pw-text-primary));
+  box-shadow: 0 20px 60px rgb(var(--pw-text-primary) / 0.2);
+}
+.profileDialog::backdrop {
+  background: rgb(8 18 32 / 0.55);
+}
+.dialogHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  color: rgb(var(--pw-text-muted));
+  font-size: 0.875rem;
+}
+.dialogHeader button {
+  align-self: start;
+  color: rgb(var(--pw-text-primary));
+  font-weight: 700;
 }
 .support {
   display: grid;
@@ -200,14 +271,16 @@
   .supportCard {
     padding: 1.1rem;
   }
-  .coverage {
+  .profileDialog {
     padding: 1rem;
   }
 }
 @media (forced-colors: active) {
   .refresh,
   .coverage,
-  .supportCard {
+  .supportCard,
+  .tabs,
+  .profileDialog {
     border-color: CanvasText;
   }
 }

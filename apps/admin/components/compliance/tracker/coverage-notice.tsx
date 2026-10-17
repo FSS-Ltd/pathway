@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertCircle, ChevronDown } from "lucide-react";
+import { AlertCircle, ChevronDown, X } from "lucide-react";
 import type { TrackerCoverage } from "@pathway/types";
 import { words } from "./profile-fields";
 import styles from "./workspace.module.css";
@@ -9,24 +9,35 @@ export function CoverageNotice({
 }: {
   coverage: TrackerCoverage[];
 }): React.JSX.Element {
+  const [expanded, setExpanded] = React.useState(false);
   return (
     <section aria-label="Coverage limitations" className={styles.coverage}>
-      <AlertCircle
-        size={19}
-        aria-hidden="true"
-        className={styles.coverageIcon}
-      />
-      <div className={styles.coverageContent}>
-        <h2>Coverage is incomplete</h2>
+      <button
+        type="button"
+        className={styles.coverageToggle}
+        aria-expanded={expanded}
+        aria-controls="tracker-coverage-details"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <AlertCircle size={18} aria-hidden="true" />
+        <span>Coverage incomplete</span>
+        {expanded ? (
+          <X size={17} aria-hidden="true" />
+        ) : (
+          <ChevronDown size={17} aria-hidden="true" />
+        )}
+      </button>
+      <div
+        id="tracker-coverage-details"
+        className={styles.coverageContent}
+        hidden={!expanded}
+      >
         <p>
-          Unreviewed areas may have additional obligations. Completion covers
-          applicable published actions.
+          Unreviewed areas may have additional obligations. Checklist completion
+          covers published actions only. Check with your local authority or
+          relevant regulator before relying on this list.
         </p>
-        <details className={styles.coverageDetails}>
-          <summary>
-            Review jurisdiction and topic coverage{" "}
-            <ChevronDown size={15} aria-hidden="true" />
-          </summary>
+        <div className={styles.coverageDetails}>
           <ul>
             {coverage.map((cell, index) => (
               <li key={`${cell.jurisdiction}:${cell.topic}:${index}`}>
@@ -43,7 +54,7 @@ export function CoverageNotice({
               </li>
             ))}
           </ul>
-        </details>
+        </div>
       </div>
     </section>
   );

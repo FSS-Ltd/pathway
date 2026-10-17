@@ -63,6 +63,59 @@ export function evaluateCondition(
           : value <= condition.value);
   return matches ? "APPLICABLE" : "NOT_APPLICABLE";
 }
+function recordedValue(
+  field: string,
+  profile: TrackerProfileInput,
+  location: TrackerLocation,
+): string | number | boolean | null | undefined {
+  if (field === "countryCode" || field === "subdivisionCode")
+    return location[field];
+  return profile[field as keyof TrackerProfileInput];
+}
+
+function factLabel(field: string): string {
+  return field
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replaceAll("_", " ")
+    .toLowerCase();
+}
+
+function displayFact(value: string | number | boolean): string {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return String(value).replaceAll("_", " ").toLowerCase();
+}
+
+function nonApplicabilityReason(
+  condition: Condition,
+  profile: TrackerProfileInput,
+  location: TrackerLocation,
+): string {
+  if ("all" in condition) {
+    const mismatch = condition.all.find(
+      (child) =>
+        evaluateCondition(child, profile, location) === "NOT_APPLICABLE",
+    );
+    return mismatch
+      ? nonApplicabilityReason(mismatch, profile, location)
+      : "The recorded site facts do not meet every condition.";
+  }
+  if ("any" in condition)
+    return condition.any
+      .map((child) => nonApplicabilityReason(child, profile, location))
+      .join("; ");
+  if ("not" in condition)
+    return `This action excludes sites matching the recorded ${"field" in condition.not ? factLabel(condition.not.field) : "provision"}.`;
+  const actual = recordedValue(condition.field, profile, location);
+  if (actual === null || actual === undefined)
+    return "A required site fact is unknown.";
+  const relation =
+    condition.op === "eq"
+      ? "requires"
+      : condition.op === "gte"
+        ? "requires at least"
+        : "requires at most";
+  return `Recorded ${factLabel(condition.field)}: ${displayFact(actual)}; this action ${relation} ${displayFact(condition.value)}.`;
+}
 const day = (now: Date): string => now.toISOString().slice(0, 10);
 function current(
   r: CatalogueRequirement,
@@ -171,6 +224,8 @@ function progress(items: TrackerChecklistItem[]): TrackerProgress {
 export interface TrackerEngineInput {
   catalogue: TrackerCatalogue;
   profile: TrackerProfile | null;
+  sectorOverride?: TrackerProfileInput["sector"];
+  forceStale?: boolean;
   location: TrackerLocation;
   attestations: TrackerAttestation[];
   evidenceCounts: Record<string, number>;
@@ -179,8 +234,16 @@ export interface TrackerEngineInput {
 export function buildTrackerChecklist(
   input: TrackerEngineInput,
 ): TrackerChecklist {
-  const { catalogue, profile, location, attestations, evidenceCounts, now } =
-    input;
+  const {
+    catalogue,
+    profile,
+    location,
+    attestations,
+    evidenceCounts,
+    now,
+    sectorOverride,
+    forceStale,
+  } = input;
   const jurisdiction =
     location.countryCode === "GB"
       ? location.subdivisionCode
@@ -188,7 +251,7 @@ export function buildTrackerChecklist(
   const sector =
     profile?.profile.vertical === "NURSERY"
       ? "NURSERY"
-      : (profile?.profile.sector ?? null);
+      : (sectorOverride ?? profile?.profile.sector ?? null);
   const jurisdictions: (string | null)[] = [
     ...new Set([
       jurisdiction,
@@ -305,7 +368,8 @@ export function buildTrackerChecklist(
             );
           const stale =
             !!attestation &&
-            (attestation.requirementVersion !== r.version ||
+            (forceStale === true ||
+              attestation.requirementVersion !== r.version ||
               attestation.profileVersion !== profile.version);
           const overdue =
             !!attestation?.reviewDueAt &&
@@ -319,6 +383,10 @@ export function buildTrackerChecklist(
           return {
             requirement: requirementSnapshot(r, catalogue),
             applicability,
+            applicabilityReason:
+              applicability === "NOT_APPLICABLE" && r.condition
+                ? nonApplicabilityReason(r.condition, profile.profile, location)
+                : undefined,
             attestation,
             completed:
               applicability === "APPLICABLE" &&

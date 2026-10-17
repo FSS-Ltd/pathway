@@ -63,6 +63,10 @@ export class TrackerService {
         actor,
         this.catalogue.catalogue,
       );
+      if (checklist.profileNeedsSync)
+        throw new ConflictException(
+          "The organisation details changed. Save the site profile before confirming.",
+        );
       const item = requireApplicableItem(
         checklist,
         input.requirementId,

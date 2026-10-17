@@ -128,6 +128,23 @@ function attest(catalogue = fixture()): TrackerAttestation {
   };
 }
 describe("institutional tracker catalogue and engine", () => {
+  it("explains an automatic not-applicable decision using the recorded fact", () => {
+    const result = buildTrackerChecklist({
+      catalogue: fixture(),
+      profile: {
+        ...profile,
+        profile: { ...profile.profile, providerCategory: "STATE_SCHOOL" },
+      },
+      location,
+      attestations: [],
+      evidenceCounts: {},
+      now,
+    });
+    expect(result.items[0]?.applicability).toBe("NOT_APPLICABLE");
+    expect(result.items[0]?.applicabilityReason).toContain(
+      "Recorded provider category: state school",
+    );
+  });
   it("mirrors every research cell and publishes the reviewed national cores", () => {
     const lines = readFileSync(
       resolve(process.cwd(), "../../docs/NexStepsV2/compliance/coverage.csv"),

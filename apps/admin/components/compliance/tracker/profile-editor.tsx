@@ -1,6 +1,10 @@
 "use client";
 import React from "react";
-import type { TrackerProfile, TrackerJurisdiction } from "@pathway/types";
+import type {
+  TrackerProfile,
+  TrackerJurisdiction,
+  TrackerChecklist,
+} from "@pathway/types";
 import { trackerClient } from "@/lib/tracker-client";
 import { Action, Feedback, useAgreementRequest } from "../agreements/shared";
 import { emptyProfile, ProfileFields, words } from "./profile-fields";
@@ -44,34 +48,43 @@ function profileValue(
 }
 export function ProfileEditor({
   initial,
+  organisationFacts,
   jurisdictions,
   canManage,
+  disabled = false,
   onSaved,
 }: {
   initial: TrackerProfile | null;
+  organisationFacts?: TrackerChecklist["organisationFacts"];
   jurisdictions: TrackerJurisdiction[];
   canManage: boolean;
+  disabled?: boolean;
   onSaved: () => void;
 }) {
-  const [draft, setDraft] = React.useState(initial?.profile ?? emptyProfile);
+  const sourced = (profile: typeof emptyProfile) => ({
+    ...profile,
+    sector: organisationFacts?.sector ?? profile.sector,
+    vertical: organisationFacts?.vertical ?? profile.vertical,
+    ace: organisationFacts?.ace ?? profile.ace,
+  });
+  const [draft, setDraft] = React.useState(() =>
+    sourced(initial?.profile ?? emptyProfile),
+  );
   const [version, setVersion] = React.useState(initial?.version ?? 0);
   const [latest, setLatest] = React.useState<TrackerProfile | null>(null);
   const request = useAgreementRequest();
   React.useEffect(() => {
     if (!canManage) {
-      setDraft(initial?.profile ?? emptyProfile);
+      setDraft(sourced(initial?.profile ?? emptyProfile));
       setVersion(initial?.version ?? 0);
     }
-  }, [canManage, initial]);
+  }, [canManage, initial, organisationFacts]);
   return (
-    <details
-      className="rounded-xl border border-border-subtle bg-surface p-4"
-      open={!initial}
-    >
-      <summary className="cursor-pointer font-semibold">
+    <section className="min-w-0">
+      <h2 className="font-heading text-lg font-semibold">
         Site compliance profile{" "}
         {initial ? `· revision ${initial.version}` : "· not yet saved"}
-      </summary>
+      </h2>
       <form
         className="mt-4 space-y-4"
         onSubmit={(e) => {
@@ -96,7 +109,10 @@ export function ProfileEditor({
           }, "Profile saved. Changed details require renewed confirmations.");
         }}
       >
-        <fieldset disabled={!canManage || request.busy} className="min-w-0">
+        <fieldset
+          disabled={!canManage || request.busy || disabled}
+          className="min-w-0"
+        >
           <legend className="mb-3 max-w-full whitespace-normal text-sm text-text-muted">
             Record actual provision. Leave unknown facts unset.
           </legend>
@@ -104,11 +120,12 @@ export function ProfileEditor({
             value={draft}
             setValue={setDraft}
             jurisdictions={jurisdictions}
+            organisationFacts={organisationFacts}
           />
         </fieldset>
         <Feedback {...request} />
         {canManage && (
-          <Action type="submit" disabled={request.busy}>
+          <Action type="submit" disabled={request.busy || disabled}>
             Save profile
           </Action>
         )}
@@ -158,6 +175,6 @@ export function ProfileEditor({
         )}
         {!canManage && <p>You have read-only access to this profile.</p>}
       </form>
-    </details>
+    </section>
   );
 }
