@@ -96,12 +96,14 @@ describe("Stripe Finance Connect provider", () => {
       use_case: {
         type: "account_onboarding",
         account_onboarding: {
-          configurations: ["merchant"],
           return_url: config.returnUrl,
           refresh_url: config.refreshUrl,
         },
       },
     });
+    expect(body).not.toHaveProperty(
+      "use_case.account_onboarding.configurations",
+    );
   });
 
   it("rejects non-Stripe onboarding URLs and provider failures", async () => {

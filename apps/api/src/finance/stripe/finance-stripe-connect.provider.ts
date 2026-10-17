@@ -108,7 +108,6 @@ export class StripeFinanceConnectProvider implements FinanceStripeConnectProvide
         use_case: {
           type: "account_onboarding",
           account_onboarding: {
-            configurations: ["merchant"],
             return_url: this.config.returnUrl,
             refresh_url: this.config.refreshUrl,
           },
