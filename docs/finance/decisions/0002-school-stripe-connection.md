@@ -20,11 +20,12 @@ The Finance sandbox product is already present and has one active monthly recurr
 
 ## Readiness gate
 
-The current sandbox evidence proves the product and prices, but not Connect readiness. A local test-mode credential was confirmed to belong to the NexSteps Sandbox account (`livemode: false`), then the PR's Accounts v2 account-create request was rejected with `invalid_fields`: Connect must be enabled on Accounts v2 before the requested merchant configuration and responsibilities can be used. Stripe returned no account ID, so no connected test account or onboarding link was created. T07 remains incomplete until Accounts v2 Connect is enabled for the sandbox and a disposable school account can be created, onboarded, retrieved with active card capability, and verified under tenant-scoped connection state. Do not substitute the deprecated v1 account-type API, change charge models, create live objects, or enable Bacs to work around this gap.
+The current sandbox evidence proves the product and prices, but not Connect readiness. On 17 October, the exact `TEST_STRIPE_SECRET_KEY` from the user-provided `.env.prod` was confirmed to have an `sk_test_` prefix; `GET /v1/account` returned HTTP 200 and its account ID matched NexSteps Sandbox (the response omitted `livemode`). The PR's exact Accounts v2 account-create request was rejected with HTTP 400 `invalid_fields`: Connect must be enabled on Accounts v2 before the requested merchant configuration and responsibilities can be used. Stripe returned no account ID, so no connected test account or onboarding link was created. T07 remains incomplete until Accounts v2 Connect is enabled for the sandbox and a disposable school account can be created, onboarded, retrieved with active card capability, and verified under tenant-scoped connection state. Do not substitute the deprecated v1 account-type API, change charge models, create live objects, or enable Bacs to work around this gap.
 
 ## References
 
 - [Stripe Accounts v2: create an account](https://docs.stripe.com/api/v2/core/accounts/create)
 - [Stripe Accounts v2: create an account link](https://docs.stripe.com/api/v2/core/account-links/create)
 - [Stripe Accounts v2: retrieve an account](https://docs.stripe.com/api/v2/core/accounts/retrieve)
+- [Stripe API versioning and preview availability](https://docs.stripe.com/api/versioning)
 - [Stripe direct charges](https://docs.stripe.com/connect/direct-charges)
