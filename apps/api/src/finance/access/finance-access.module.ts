@@ -8,18 +8,14 @@ import {
 } from "./finance-access.reader";
 import { FinanceAccessGuard } from "./finance-access.guard";
 import { FinanceAccessService } from "./finance-access.service";
-import { FinancePayerGrantController } from "./finance-payer-grant.controller";
-import { FinancePayerGrantService } from "./finance-payer-grant.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [FinancePayerGrantController],
   providers: [
     FinanceAccessGuard,
     FinanceAccessService,
-    FinancePayerGrantService,
     { provide: FINANCE_ACCESS_READER, useValue: financeAccessReader },
   ],
-  exports: [FinanceAccessGuard, FinanceAccessService, FinancePayerGrantService],
+  exports: [FinanceAccessGuard, FinanceAccessService],
 })
 export class FinanceAccessModule {}

@@ -33,6 +33,7 @@ const financeTables = [
   "FinanceManualReceiptRequest",
   "FinanceTransferNotice",
   "FinanceStripeConnection",
+  "FinanceCheckoutAttempt",
   "FinanceStripeWebhookEvent",
   "FinancePayerAccount",
   "FinancePayerGrant",
@@ -279,7 +280,9 @@ describe("Finance ledger database foundation", () => {
           { tenantId: string; orgId: string }[]
         >`
           SELECT "tenantId", "orgId"
-          FROM app.list_due_finance_stripe_webhook_scopes(CURRENT_TIMESTAMP)
+          FROM app.list_due_finance_stripe_webhook_scopes(
+            CURRENT_TIMESTAMP + INTERVAL '1 second'
+          )
         `;
         expect(dueScopes).toEqual(
           [

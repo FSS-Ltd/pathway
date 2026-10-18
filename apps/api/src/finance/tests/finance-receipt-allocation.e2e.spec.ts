@@ -370,6 +370,78 @@ describe("Finance receipt allocation ledger", () => {
           `,
         ).rejects.toMatchObject({ code: "P2010", meta: { code: "23514" } });
         await tx.$executeRaw`ROLLBACK TO SAVEPOINT finance_receipt_delete_immutable_check`;
+
+        const stripeAccountId = `acct_${randomUUID().replaceAll("-", "")}`;
+        const stripeConnection = await tx.financeStripeConnection.create({
+          data: {
+            financeProfileId: profile.id,
+            tenantId,
+            orgId,
+            stripeAccountId,
+            status: "READY",
+            livemode: false,
+            requestedByUserId: creatorId,
+          },
+        });
+        const payerGrant = await tx.financePayerGrant.create({
+          data: {
+            financePayerAccountId: payer.id,
+            tenantId,
+            orgId,
+            payerUserId: creatorId,
+            grantedByUserId: creatorId,
+          },
+        });
+        await tx.financeCheckoutAttempt.create({
+          data: {
+            financeProfileId: profile.id,
+            stripeConnectionId: stripeConnection.id,
+            payerGrantId: payerGrant.id,
+            invoiceId: invoice.id,
+            tenantId,
+            orgId,
+            stripeAccountId,
+            livemode: false,
+            amountMinor: 200n,
+            status: "OPEN",
+            idempotencyKey: `finance-checkout-${randomUUID()}`,
+            integrationIdentifier: "nexsteps-finance-abcdefgh",
+            stripeCheckoutSessionId: `cs_test_${randomUUID().replaceAll("-", "")}`,
+            checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_reserve",
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          },
+        });
+        await tx.$executeRaw`SAVEPOINT finance_checkout_unresolved_invoice_check`;
+        await expect(
+          tx.$executeRaw`
+            INSERT INTO "FinanceCheckoutAttempt" (
+              "id", "financeProfileId", "stripeConnectionId", "payerGrantId",
+              "invoiceId", "tenantId", "orgId", "stripeAccountId", "livemode",
+              "amountMinor", "idempotencyKey", "integrationIdentifier", "updatedAt"
+            ) VALUES (
+              ${randomUUID()}, ${profile.id}, ${stripeConnection.id}, ${payerGrant.id},
+              ${invoice.id}, ${tenantId}, ${orgId}, ${stripeAccountId}, false,
+              200, ${`finance-checkout-${randomUUID()}`},
+              'nexsteps-finance-abcdefgh', CURRENT_TIMESTAMP
+            )
+          `,
+        ).rejects.toMatchObject({ code: "P2010", meta: { code: "23505" } });
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT finance_checkout_unresolved_invoice_check`;
+        await expect(
+          receipts.allocate(
+            creator,
+            firstReceipt.id,
+            `allocate-pending-checkout-excess-${randomUUID()}`,
+            { invoiceId: invoice.id, amountMinor: "101" },
+          ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        const availableAfterCheckoutReservation = await receipts.allocate(
+          creator,
+          firstReceipt.id,
+          `allocate-pending-checkout-available-${randomUUID()}`,
+          { invoiceId: invoice.id, amountMinor: "100" },
+        );
+        expect(availableAfterCheckoutReservation.amountMinor).toBe("100");
         throw rollbackFixture;
       }),
     ).rejects.toBe(rollbackFixture);

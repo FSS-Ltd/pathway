@@ -1,6 +1,6 @@
 # Finance provider compatibility evidence
 
-**As of:** 15 October 2026.
+**As of:** 18 October 2026.
 
 **Decision:** No live collection is authorised. One-off card collection is planned through Stripe Connect direct charges. The connected school account and account-scoped transaction path must be exercised in T07–T10 before release. Direct-charge Bacs remains blocked pending explicit Stripe compatibility evidence; do not substitute another charge model.
 
@@ -17,6 +17,8 @@ A read-only Stripe response on 15 October 2026 showed test mode (`livemode=false
 ### School connected-account fixture
 
 Read-only v1 and v2 connected-account list responses returned no accounts. No school-like account was available for a Connect-scoped direct-charge test. This is a specific fixture gap, not evidence that direct card charges are incompatible.
+
+On 18 October 2026, a read-only test-mode check found the newly connected school test account still had card payments inactive and onboarding requirements incomplete. It cannot create a Finance card Checkout Session yet. No payment was created. Complete test-account onboarding before claiming provider-backed Checkout verification; do not use live mode for this proof.
 
 ### Bacs Direct Debit
 
@@ -46,7 +48,7 @@ Verify signed webhook ingestion, durable acknowledgement, replay after queue fai
 
 ### T09: Hosted card checkout
 
-Create and recover one hosted card checkout per invoice obligation, including provider timeout and repeated requests. Confirm account-scoped access and no platform fee or cross-school customer reuse.
+Create and recover one hosted card checkout per invoice obligation, including provider timeout and repeated requests. Confirm account-scoped access, no platform fee or cross-school customer reuse, amount refresh after the balance changes, and expiration of an open session when payer access is revoked. Provider-backed creation remains blocked until the school test account's card capability becomes active.
 
 ### T10: Confirmed receipts
 

@@ -24,6 +24,7 @@ describe("Finance schema contract", () => {
       "enum FinanceManualReceiptRequestStatus",
       "enum FinanceBankTransferChangeStatus",
       "enum FinanceStripeConnectionStatus",
+      "enum FinanceCheckoutAttemptStatus",
       "model FinanceProfile",
       "model FinanceInvoiceNumberSequence",
       "model FinanceInvoice",
@@ -36,6 +37,7 @@ describe("Finance schema contract", () => {
       "model FinanceManualReceiptRequest",
       "model FinanceTransferNotice",
       "model FinanceStripeConnection",
+      "model FinanceCheckoutAttempt",
       "model FinancePayerAccount",
       "model FinancePayerGrant",
       "model FinanceCreditNoteNumberSequence",
@@ -56,13 +58,14 @@ describe("Finance schema contract", () => {
     expect(/taxMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/totalMinor\s+BigInt/.test(schema)).toBe(true);
     expect(/amountMinor\s+BigInt/.test(schema)).toBe(true);
-    expect(financeMigrations.length).toBeGreaterThanOrEqual(6);
+    expect(financeMigrations.length).toBeGreaterThanOrEqual(7);
     for (const migration of [
       "20261024000000_finance_receipt_allocation",
       "20261025000000_finance_receipt_evidence_guard",
       "20261026000000_finance_receipt_confirmation_transition",
       "20261027000000_finance_manual_transfers",
       "20261028000000_finance_stripe_connections",
+      "20261030000000_finance_stripe_checkout_attempts",
     ]) {
       expect(financeMigrations).toContain(migration);
     }
@@ -90,6 +93,17 @@ describe("Finance schema contract", () => {
     expect(payerAccessMigration).toContain(
       '"FinancePayerGrant_active_account_user_key"',
     );
+    const checkoutMigration = readFileSync(
+      path.join(
+        migrationDirectory,
+        "20261030000000_finance_stripe_checkout_attempts",
+        "migration.sql",
+      ),
+      "utf8",
+    );
+    expect(checkoutMigration).toContain(
+      '"FinanceCheckoutAttempt_one_unresolved_per_invoice_key"',
+    );
   });
 
   it("includes every Finance table in the strict Supabase RLS gate", () => {
@@ -107,6 +121,7 @@ describe("Finance schema contract", () => {
       "FinanceManualReceiptRequest",
       "FinanceTransferNotice",
       "FinanceStripeConnection",
+      "FinanceCheckoutAttempt",
       "FinancePayerAccount",
       "FinancePayerGrant",
       "FinanceCreditNote",
