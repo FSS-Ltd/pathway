@@ -4,7 +4,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.03,GB-SCT,GB,Scotland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.04,GB-NIR,GB,Northern Ireland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.05,IE,IE,Ireland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
-2.06,AT,AT,Austria,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.06,AT,AT,Austria,IN_REVIEW,Nine Länder identified; childcare building fire youth and local permissions unreviewed
 2.07,BE,BE,Belgium,NOT_REVIEWED,Language communities and regions; local authorities
 2.08,BG,BG,Bulgaria,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.09,HR,HR,Croatia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
