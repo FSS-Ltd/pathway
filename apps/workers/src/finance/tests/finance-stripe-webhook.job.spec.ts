@@ -18,6 +18,7 @@ function setup() {
       .fn()
       .mockResolvedValue([{ tenantId: "tenant-a", orgId: "org-a" }]),
     claim: jest.fn().mockResolvedValue([event]),
+    renew: jest.fn().mockResolvedValue(true),
     complete: jest.fn().mockResolvedValue(true),
     defer: jest.fn().mockResolvedValue(true),
     retry: jest.fn().mockResolvedValue(true),
@@ -41,9 +42,26 @@ describe("FinanceStripeWebhookJob", () => {
     const result = await job.run(new Date("2026-10-18T00:00:00.000Z"));
 
     expect(processor.process).toHaveBeenCalledWith(event);
+    expect(store.renew).toHaveBeenCalledWith(event, expect.any(Date));
     expect(store.complete).toHaveBeenCalledWith(event);
     expect(result).toEqual({
       completed: 1,
+      deferred: 0,
+      retried: 0,
+      deadLettered: 0,
+    });
+  });
+
+  it("skips an event after its claim has been reclaimed", async () => {
+    const { store, processor, job } = setup();
+    store.renew.mockResolvedValue(false);
+
+    const result = await job.run();
+
+    expect(processor.process).not.toHaveBeenCalled();
+    expect(store.complete).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      completed: 0,
       deferred: 0,
       retried: 0,
       deadLettered: 0,

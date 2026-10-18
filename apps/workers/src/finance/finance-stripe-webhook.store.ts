@@ -85,6 +85,22 @@ export class PrismaFinanceStripeWebhookStore implements FinanceStripeWebhookStor
     });
   }
 
+  renew(event: ClaimedFinanceStripeWebhook, claimedAt: Date): Promise<boolean> {
+    return withTenantRlsContext(event.tenantId, event.orgId, async (tx) => {
+      const result = await tx.financeStripeWebhookEvent.updateMany({
+        where: {
+          id: event.id,
+          tenantId: event.tenantId,
+          orgId: event.orgId,
+          status: "PROCESSING",
+          claimToken: event.claimToken,
+        },
+        data: { claimedAt },
+      });
+      return result.count === 1;
+    });
+  }
+
   complete(event: ClaimedFinanceStripeWebhook): Promise<boolean> {
     return this.updateClaim(event, {
       status: "COMPLETED",

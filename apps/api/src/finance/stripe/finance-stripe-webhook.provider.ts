@@ -67,11 +67,30 @@ export class FinanceStripeWebhookProvider {
 
     return {
       eventId: event.id,
-      accountId: typeof event.account === "string" ? event.account : null,
+      accountId:
+        stripeAccountId(event.account) ?? stripeV2ContextAccountId(rawBody),
       eventType: event.type,
       livemode: event.livemode,
       payloadSha256: createHash("sha256").update(rawBody).digest("hex"),
       payloadJson: rawBody.toString("utf8"),
     };
   }
+}
+
+function stripeAccountId(value: unknown): string | null {
+  return typeof value === "string" && value.startsWith("acct_") ? value : null;
+}
+
+function stripeV2ContextAccountId(rawBody: Buffer): string | null {
+  const payload: unknown = JSON.parse(rawBody.toString("utf8"));
+  if (
+    typeof payload !== "object" ||
+    payload === null ||
+    !("object" in payload) ||
+    payload.object !== "v2.core.event" ||
+    !("context" in payload)
+  ) {
+    return null;
+  }
+  return stripeAccountId(payload.context);
 }

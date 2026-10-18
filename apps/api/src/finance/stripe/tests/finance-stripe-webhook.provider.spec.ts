@@ -58,6 +58,49 @@ describe("FinanceStripeWebhookProvider", () => {
     expect(verified.payloadSha256).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("maps Accounts v2 event context to the connected account", () => {
+    const v2AccountId = "acct_finance_v2_unit_002";
+    const v2Body = Buffer.from(
+      JSON.stringify({
+        id: "evt_finance_v2_unit_002",
+        object: "v2.core.event",
+        context: v2AccountId,
+        created: 1_797_000_001,
+        livemode: false,
+        type: "v2.core.account[requirements].updated",
+        related_object: { id: v2AccountId, type: "account" },
+      }),
+    );
+    const provider = new FinanceStripeWebhookProvider(config);
+
+    const verified = provider.verifyAndParse(v2Body, signature(v2Body));
+
+    expect(verified).toMatchObject({
+      eventId: "evt_finance_v2_unit_002",
+      accountId: v2AccountId,
+      eventType: "v2.core.account[requirements].updated",
+    });
+  });
+
+  it("does not treat unrelated v2 contexts as connected-account IDs", () => {
+    const v2Body = Buffer.from(
+      JSON.stringify({
+        id: "evt_finance_v2_unit_003",
+        object: "v2.core.event",
+        context: "context_without_account_id",
+        created: 1_797_000_002,
+        livemode: false,
+        type: "v2.core.account[requirements].updated",
+        related_object: { id: "acct_finance_v2_unit_003", type: "account" },
+      }),
+    );
+    const provider = new FinanceStripeWebhookProvider(config);
+
+    const verified = provider.verifyAndParse(v2Body, signature(v2Body));
+
+    expect(verified.accountId).toBeNull();
+  });
+
   it("rejects a missing raw body instead of reconstructing JSON", () => {
     const provider = new FinanceStripeWebhookProvider(config);
 

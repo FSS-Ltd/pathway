@@ -20,6 +20,7 @@ export interface FinanceStripeWebhookStore {
     claimToken: string,
     limit: number,
   ): Promise<ClaimedFinanceStripeWebhook[]>;
+  renew(event: ClaimedFinanceStripeWebhook, claimedAt: Date): Promise<boolean>;
   complete(event: ClaimedFinanceStripeWebhook): Promise<boolean>;
   defer(event: ClaimedFinanceStripeWebhook): Promise<boolean>;
   retry(
@@ -56,18 +57,20 @@ export class FinanceStripeWebhookJob {
     deadLettered: number;
   }> {
     const result = { completed: 0, deferred: 0, retried: 0, deadLettered: 0 };
-    const reclaimBefore = new Date(now.getTime() - CLAIM_LEASE_MS);
 
     for (const scope of await this.store.findDueScopes(now)) {
+      const claimNow = new Date();
+      const reclaimBefore = new Date(claimNow.getTime() - CLAIM_LEASE_MS);
       const claimed = await this.store.claim(
         scope,
-        now,
+        claimNow,
         reclaimBefore,
         randomUUID(),
         BATCH_SIZE,
       );
       for (const event of claimed) {
         try {
+          if (!(await this.store.renew(event, new Date()))) continue;
           const disposition = await this.processor.process(event);
           const updated =
             disposition === "processed"
