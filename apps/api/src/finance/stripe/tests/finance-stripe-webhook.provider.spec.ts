@@ -68,7 +68,7 @@ describe("FinanceStripeWebhookProvider", () => {
         created: 1_797_000_001,
         livemode: false,
         type: "v2.core.account[requirements].updated",
-        related_object: { id: v2AccountId, type: "account" },
+        related_object: { id: v2AccountId, type: "v2.core.account" },
       }),
     );
     const provider = new FinanceStripeWebhookProvider(config);
@@ -82,6 +82,33 @@ describe("FinanceStripeWebhookProvider", () => {
     });
   });
 
+  it("maps an Accounts v2 thin event related object to the connected account", () => {
+    const v2AccountId = "acct_finance_v2_unit_004";
+    const v2Body = Buffer.from(
+      JSON.stringify({
+        id: "evt_finance_v2_unit_004",
+        object: "v2.core.event",
+        context: null,
+        type: "v2.core.account.updated",
+        livemode: false,
+        related_object: {
+          id: v2AccountId,
+          type: "v2.core.account",
+          url: `/v2/core/accounts/${v2AccountId}`,
+        },
+      }),
+    );
+    const provider = new FinanceStripeWebhookProvider(config);
+
+    const verified = provider.verifyAndParse(v2Body, signature(v2Body));
+
+    expect(verified).toMatchObject({
+      eventId: "evt_finance_v2_unit_004",
+      accountId: v2AccountId,
+      eventType: "v2.core.account.updated",
+    });
+  });
+
   it("does not treat unrelated v2 contexts as connected-account IDs", () => {
     const v2Body = Buffer.from(
       JSON.stringify({
@@ -91,7 +118,10 @@ describe("FinanceStripeWebhookProvider", () => {
         created: 1_797_000_002,
         livemode: false,
         type: "v2.core.account[requirements].updated",
-        related_object: { id: "acct_finance_v2_unit_003", type: "account" },
+        related_object: {
+          id: "acct_finance_v2_unit_003",
+          type: "v2.core.payment_intent",
+        },
       }),
     );
     const provider = new FinanceStripeWebhookProvider(config);

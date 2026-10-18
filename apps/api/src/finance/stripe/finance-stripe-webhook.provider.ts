@@ -67,8 +67,7 @@ export class FinanceStripeWebhookProvider {
 
     return {
       eventId: event.id,
-      accountId:
-        stripeAccountId(event.account) ?? stripeV2ContextAccountId(rawBody),
+      accountId: stripeAccountId(event.account) ?? stripeV2AccountId(rawBody),
       eventType: event.type,
       livemode: event.livemode,
       payloadSha256: createHash("sha256").update(rawBody).digest("hex"),
@@ -81,16 +80,31 @@ function stripeAccountId(value: unknown): string | null {
   return typeof value === "string" && value.startsWith("acct_") ? value : null;
 }
 
-function stripeV2ContextAccountId(rawBody: Buffer): string | null {
+function stripeV2AccountId(rawBody: Buffer): string | null {
   const payload: unknown = JSON.parse(rawBody.toString("utf8"));
   if (
     typeof payload !== "object" ||
     payload === null ||
     !("object" in payload) ||
-    payload.object !== "v2.core.event" ||
-    !("context" in payload)
+    payload.object !== "v2.core.event"
   ) {
     return null;
   }
-  return stripeAccountId(payload.context);
+
+  const contextAccountId =
+    "context" in payload ? stripeAccountId(payload.context) : null;
+  if (contextAccountId) return contextAccountId;
+
+  if (!("related_object" in payload)) return null;
+  const relatedObject = payload.related_object;
+  if (
+    typeof relatedObject !== "object" ||
+    relatedObject === null ||
+    !("type" in relatedObject) ||
+    relatedObject.type !== "v2.core.account" ||
+    !("id" in relatedObject)
+  ) {
+    return null;
+  }
+  return stripeAccountId(relatedObject.id);
 }
