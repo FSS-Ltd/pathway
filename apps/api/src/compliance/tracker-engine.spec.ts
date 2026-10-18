@@ -168,7 +168,7 @@ describe("institutional tracker catalogue and engine", () => {
     expect(TRACKER_CATALOGUE.requirements.length).toBeGreaterThan(0);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
-        ["GB-ENG", "GB-WLS", "GB-SCT", "GB-NIR", "IE", "AT"].includes(
+        ["GB-ENG", "GB-WLS", "GB-SCT", "GB-NIR", "IE", "AT", "BE"].includes(
           item.jurisdiction,
         ),
       ),
