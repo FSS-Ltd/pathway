@@ -37,21 +37,28 @@ describe("England national core applicability", () => {
     expect(TRACKER_CATALOGUE.coverage).toHaveLength(1488);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
-        ["GB-ENG", "GB-WLS", "GB-SCT", "GB-NIR", "IE", "AT", "BE"].includes(
-          item.jurisdiction,
-        ),
+        [
+          "GB-ENG",
+          "GB-WLS",
+          "GB-SCT",
+          "GB-NIR",
+          "IE",
+          "AT",
+          "BE",
+          "BG",
+        ].includes(item.jurisdiction),
       ),
     ).toBe(true);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(336);
+    ).toHaveLength(384);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(1152);
+    ).toHaveLength(1104);
     const result = checklist();
     expect(
       result.coverage.every(
@@ -89,6 +96,11 @@ describe("England national core applicability", () => {
     ).toEqual([]);
     expect(
       checklist({}, { countryCode: "BE", subdivisionCode: "" }).items.filter(
+        (item) => item.requirement.id.startsWith("eng"),
+      ),
+    ).toEqual([]);
+    expect(
+      checklist({}, { countryCode: "BG", subdivisionCode: "" }).items.filter(
         (item) => item.requirement.id.startsWith("eng"),
       ),
     ).toEqual([]);
