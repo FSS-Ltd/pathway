@@ -21,6 +21,8 @@ import { FinanceBankTransferService } from "./finance-bank-transfer.service";
 import { FinanceManualReceiptController } from "./finance-manual-receipt.controller";
 import { FinanceManualReceiptService } from "./finance-manual-receipt.service";
 import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
+import { FinanceStripeWebhookController } from "./stripe/finance-stripe-webhook.controller";
+import { FinanceStripeWebhookInternalController } from "./stripe/finance-stripe-webhook-internal.controller";
 import {
   FINANCE_STRIPE_CONNECT_CONFIG,
   loadFinanceStripeConnectConfig,
@@ -31,6 +33,15 @@ import {
   StripeFinanceConnectProvider,
 } from "./stripe/finance-stripe-connect.provider";
 import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connection.service";
+import {
+  FINANCE_STRIPE_WEBHOOK_CONFIG,
+  loadFinanceStripeWebhookConfig,
+} from "./stripe/finance-stripe-webhook.config";
+import {
+  FinanceStripeWebhookReplayService,
+  FinanceStripeWebhookService,
+  PrismaFinanceStripeWebhookInbox,
+} from "./stripe/finance-stripe-webhook.service";
 
 @Module({
   imports: [
@@ -47,6 +58,8 @@ import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connecti
     FinanceBankTransferController,
     FinanceManualReceiptController,
     FinanceStripeConnectionController,
+    FinanceStripeWebhookController,
+    FinanceStripeWebhookInternalController,
   ],
   providers: [
     FinanceBalanceService,
@@ -57,6 +70,9 @@ import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connecti
     FinanceBankTransferService,
     FinanceManualReceiptService,
     FinanceStripeConnectionService,
+    PrismaFinanceStripeWebhookInbox,
+    FinanceStripeWebhookService,
+    FinanceStripeWebhookReplayService,
     {
       provide: FINANCE_STRIPE_CONNECT_CONFIG,
       useFactory: (billing: BillingProviderConfig) =>
@@ -71,6 +87,11 @@ import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connecti
         config.mode === "disabled"
           ? new DisabledFinanceStripeConnectProvider()
           : new StripeFinanceConnectProvider(config),
+      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_WEBHOOK_CONFIG,
+      useFactory: loadFinanceStripeWebhookConfig,
       inject: [FINANCE_STRIPE_CONNECT_CONFIG],
     },
   ],

@@ -8,6 +8,7 @@ import type { FinanceStripeConnectProvider } from "../finance-stripe-connect.pro
 const mockProfileFindUnique = jest.fn();
 const mockConnectionFindFirst = jest.fn();
 const mockConnectionUpdateMany = jest.fn();
+const mockConnectionRawQuery = jest.fn();
 const mockWithTenantRlsContext = jest.fn();
 const mockKnownRequestErrorClass = class extends Error {
   constructor(
@@ -83,6 +84,7 @@ describe("FinanceStripeConnectionService", () => {
             findFirst: mockConnectionFindFirst,
             updateMany: mockConnectionUpdateMany,
           },
+          $queryRaw: mockConnectionRawQuery,
         } as unknown as Prisma.TransactionClient),
     );
 
@@ -135,6 +137,38 @@ describe("FinanceStripeConnectionService", () => {
         }),
       }),
     );
+  });
+
+  it("refreshes the latest Stripe account state for a webhook under a row lock", async () => {
+    mockConnectionRawQuery.mockResolvedValue([
+      { id: "connection-a", status: "CONNECTING", livemode: false },
+    ]);
+
+    await service.refreshFromWebhook("tenant-a", "org-a", "acct_test_school");
+
+    expect(provider.retrieveAccount).toHaveBeenCalledWith("acct_test_school");
+    expect(mockConnectionUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "connection-a",
+          tenantId: "tenant-a",
+          orgId: "org-a",
+          status: { not: "DISCONNECTED" },
+        }),
+        data: { status: "READY" },
+      }),
+    );
+  });
+
+  it("does not revive a disconnected connection from a delayed webhook", async () => {
+    mockConnectionRawQuery.mockResolvedValue([
+      { id: "connection-a", status: "DISCONNECTED", livemode: false },
+    ]);
+
+    await service.refreshFromWebhook("tenant-a", "org-a", "acct_test_school");
+
+    expect(provider.retrieveAccount).not.toHaveBeenCalled();
+    expect(mockConnectionUpdateMany).not.toHaveBeenCalled();
   });
 
   it("refuses collection-account changes when Finance is in servicing mode", async () => {
