@@ -7,6 +7,7 @@ import {
   FinanceStripeWebhookService,
   type FinanceStripeWebhookInbox,
 } from "../finance-stripe-webhook.service";
+import type { FinanceStripePaymentWebhookService } from "../finance-stripe-payment-webhook.service";
 
 jest.mock("@pathway/db", () => ({
   runTransaction: jest.fn(),
@@ -27,12 +28,24 @@ function signedEvent() {
     api_version: "2026-09-30.endive",
     created: Math.floor(Date.now() / 1_000),
     data: {
-      object: { id: "pi_finance_service_001", object: "payment_intent" },
+      object: {
+        id: "cs_finance_service_001",
+        object: "checkout.session",
+        client_reference_id: "finance-attempt-service-001",
+        amount_total: 2500,
+        currency: "gbp",
+        payment_status: "paid",
+        status: "complete",
+        metadata: {
+          finance_checkout_attempt_id: "finance-attempt-service-001",
+          finance_invoice_id: "finance-invoice-service-001",
+        },
+      },
     },
     livemode: false,
     pending_webhooks: 1,
     request: null,
-    type: "payment_intent.succeeded",
+    type: "checkout.session.completed",
     account: "acct_finance_unit_001",
   });
   const stripe = new Stripe(testConfig.secretKey, { apiVersion: "2023-10-16" });
@@ -81,6 +94,10 @@ describe("FinanceStripeWebhookReplayService", () => {
   const sync = {
     refreshFromWebhook: jest.fn().mockResolvedValue(undefined),
   } as unknown as FinanceStripeConnectionService;
+  const paymentProcess = jest.fn().mockResolvedValue("deferred");
+  const payments = {
+    process: paymentProcess,
+  } as unknown as FinanceStripePaymentWebhookService;
   const config: FinanceStripeWebhookConfig = testConfig;
 
   beforeEach(() => {
@@ -92,6 +109,8 @@ describe("FinanceStripeWebhookReplayService", () => {
             stripeAccountId: "acct_finance_unit_001",
             eventType: "account.updated",
             livemode: false,
+            stripeEventId: "evt_finance_unit_account",
+            payloadJson: {},
           }),
         },
       } as never),
@@ -99,7 +118,11 @@ describe("FinanceStripeWebhookReplayService", () => {
   });
 
   it("refreshes the latest connected-account state under the event tenant", async () => {
-    const service = new FinanceStripeWebhookReplayService(config, sync);
+    const service = new FinanceStripeWebhookReplayService(
+      config,
+      sync,
+      payments,
+    );
 
     await expect(
       service.processClaimedEvent({
@@ -121,7 +144,7 @@ describe("FinanceStripeWebhookReplayService", () => {
     );
   });
 
-  it("defers payment events until the receipt-posting step owns their semantics", async () => {
+  it("defers payment events that have no Finance handler", async () => {
     mockRls.mockImplementationOnce(async (_tenantId, _orgId, callback) =>
       callback({
         financeStripeWebhookEvent: {
@@ -129,11 +152,17 @@ describe("FinanceStripeWebhookReplayService", () => {
             stripeAccountId: "acct_finance_unit_001",
             eventType: "payment_intent.succeeded",
             livemode: false,
+            stripeEventId: "evt_finance_unit_payment",
+            payloadJson: {},
           }),
         },
       } as never),
     );
-    const service = new FinanceStripeWebhookReplayService(config, sync);
+    const service = new FinanceStripeWebhookReplayService(
+      config,
+      sync,
+      payments,
+    );
 
     await expect(
       service.processClaimedEvent({
@@ -144,5 +173,57 @@ describe("FinanceStripeWebhookReplayService", () => {
       }),
     ).resolves.toBe("deferred");
     expect(sync.refreshFromWebhook).not.toHaveBeenCalled();
+    expect(paymentProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripeEventId: "evt_finance_unit_payment",
+        stripeAccountId: "acct_finance_unit_001",
+        eventType: "payment_intent.succeeded",
+      }),
+    );
+  });
+
+  it("routes Checkout Session events to the confirmed receipt handler", async () => {
+    const payload = {
+      id: "evt_finance_checkout_replay",
+      type: "checkout.session.completed",
+      livemode: false,
+      account: "acct_finance_unit_001",
+      data: { object: {} },
+    };
+    mockRls.mockImplementationOnce(async (_tenantId, _orgId, callback) =>
+      callback({
+        financeStripeWebhookEvent: {
+          findFirst: jest.fn().mockResolvedValue({
+            stripeEventId: payload.id,
+            stripeAccountId: "acct_finance_unit_001",
+            eventType: payload.type,
+            livemode: false,
+            payloadJson: payload,
+          }),
+        },
+      } as never),
+    );
+    paymentProcess.mockResolvedValueOnce("processed");
+    const service = new FinanceStripeWebhookReplayService(
+      config,
+      sync,
+      payments,
+    );
+
+    await expect(
+      service.processClaimedEvent({
+        eventId: "row-checkout",
+        tenantId: "tenant-a",
+        orgId: "org-a",
+        claimToken: "claim-checkout",
+      }),
+    ).resolves.toBe("processed");
+    expect(paymentProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripeEventId: payload.id,
+        eventType: payload.type,
+        payloadJson: payload,
+      }),
+    );
   });
 });

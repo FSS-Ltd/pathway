@@ -47,6 +47,7 @@ import {
 } from "./stripe/finance-stripe-checkout.config";
 import { FinanceStripeCheckoutAttemptService } from "./stripe/finance-stripe-checkout-attempt.service";
 import { FinanceStripeCheckoutService } from "./stripe/finance-stripe-checkout.service";
+import { FinanceStripePaymentWebhookService } from "./stripe/finance-stripe-payment-webhook.service";
 import {
   FINANCE_STRIPE_WEBHOOK_CONFIG,
   loadFinanceStripeWebhookConfig,
@@ -89,6 +90,7 @@ import {
     FinanceStripeConnectionService,
     FinanceStripeCheckoutAttemptService,
     FinanceStripeCheckoutService,
+    FinanceStripePaymentWebhookService,
     PrismaFinanceStripeWebhookInbox,
     FinanceStripeWebhookService,
     FinanceStripeWebhookReplayService,

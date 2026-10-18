@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { runTransaction, withTenantRlsContext } from "@pathway/db";
 import { FinanceStripeConnectionService } from "./finance-stripe-connection.service";
+import { FinanceStripePaymentWebhookService } from "./finance-stripe-payment-webhook.service";
 import {
   FINANCE_STRIPE_WEBHOOK_CONFIG,
   type FinanceStripeWebhookConfig,
@@ -108,6 +109,8 @@ export class FinanceStripeWebhookReplayService {
     private readonly config: FinanceStripeWebhookConfig,
     @Inject(FinanceStripeConnectionService)
     private readonly connectionSync: FinanceStripeConnectionService,
+    @Inject(FinanceStripePaymentWebhookService)
+    private readonly payments: FinanceStripePaymentWebhookService,
   ) {}
 
   async processClaimedEvent(
@@ -125,16 +128,18 @@ export class FinanceStripeWebhookReplayService {
             status: "PROCESSING",
             claimToken: input.claimToken,
           },
-          select: { stripeAccountId: true, eventType: true, livemode: true },
+          select: {
+            stripeEventId: true,
+            stripeAccountId: true,
+            eventType: true,
+            livemode: true,
+            payloadJson: true,
+          },
         }),
     );
     if (!event)
       throw new Error("Finance Stripe webhook claim is no longer valid");
 
-    if (!isAccountStatusEvent(event.eventType)) return "deferred";
-    if (!event.stripeAccountId) {
-      throw new Error("Finance Stripe account webhook has no account ID");
-    }
     if (
       this.config.mode === "disabled" ||
       event.livemode !== (this.config.mode === "live")
@@ -142,12 +147,27 @@ export class FinanceStripeWebhookReplayService {
       throw new Error("Finance Stripe webhook mode is no longer configured");
     }
 
-    await this.connectionSync.refreshFromWebhook(
-      input.tenantId,
-      input.orgId,
-      event.stripeAccountId,
-    );
-    return "processed";
+    if (isAccountStatusEvent(event.eventType)) {
+      if (!event.stripeAccountId) {
+        throw new Error("Finance Stripe account webhook has no account ID");
+      }
+      await this.connectionSync.refreshFromWebhook(
+        input.tenantId,
+        input.orgId,
+        event.stripeAccountId,
+      );
+      return "processed";
+    }
+
+    return this.payments.process({
+      stripeEventId: event.stripeEventId,
+      tenantId: input.tenantId,
+      orgId: input.orgId,
+      stripeAccountId: event.stripeAccountId,
+      eventType: event.eventType,
+      livemode: event.livemode,
+      payloadJson: event.payloadJson,
+    });
   }
 }
 
