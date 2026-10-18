@@ -7,7 +7,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.06,AT,AT,Austria,IN_REVIEW,Nine Länder identified; childcare building fire youth and local permissions unreviewed
 2.07,BE,BE,Belgium,IN_REVIEW,Shared national and EU core partial; Flemish French and German-speaking Communities plus regional and local rules remain in review
 2.08,BG,BG,Bulgaria,IN_REVIEW,Shared national and EU core partial; 28 oblast education health and food offices plus municipal permissions remain in review
-2.09,HR,HR,Croatia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.09,HR,HR,Croatia,IN_REVIEW,Shared national and EU core partial; 20 counties and Zagreb city offices plus municipal permissions remain in review
 2.10,CY,CY,Cyprus,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.11,CZ,CZ,Czechia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.12,DK,DK,Denmark,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
