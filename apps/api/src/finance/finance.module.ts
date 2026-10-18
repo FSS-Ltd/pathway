@@ -8,6 +8,8 @@ import { AccessControlModule } from "../access-control/access-control.module";
 import { AuthModule } from "../auth/auth.module";
 import { CommonModule } from "../common/common.module";
 import { FinanceAccessModule } from "./access/finance-access.module";
+import { FinancePayerGrantController } from "./access/finance-payer-grant.controller";
+import { FinancePayerGrantService } from "./access/finance-payer-grant.service";
 import { FinanceCreditNoteController } from "./finance-credit-note.controller";
 import { FinanceCreditNoteService } from "./finance-credit-note.service";
 import { FinanceCommandService } from "./finance-command.service";
@@ -21,6 +23,7 @@ import { FinanceBankTransferService } from "./finance-bank-transfer.service";
 import { FinanceManualReceiptController } from "./finance-manual-receipt.controller";
 import { FinanceManualReceiptService } from "./finance-manual-receipt.service";
 import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
+import { FinanceStripeCheckoutController } from "./finance-stripe-checkout.controller";
 import { FinanceStripeWebhookController } from "./stripe/finance-stripe-webhook.controller";
 import { FinanceStripeWebhookInternalController } from "./stripe/finance-stripe-webhook-internal.controller";
 import {
@@ -33,6 +36,17 @@ import {
   StripeFinanceConnectProvider,
 } from "./stripe/finance-stripe-connect.provider";
 import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connection.service";
+import {
+  DisabledFinanceStripeCheckoutProvider,
+  FINANCE_STRIPE_CHECKOUT_PROVIDER,
+  StripeFinanceCheckoutProvider,
+} from "./stripe/finance-stripe-checkout.provider";
+import {
+  FINANCE_STRIPE_CHECKOUT_CONFIG,
+  loadFinanceStripeCheckoutConfig,
+} from "./stripe/finance-stripe-checkout.config";
+import { FinanceStripeCheckoutAttemptService } from "./stripe/finance-stripe-checkout-attempt.service";
+import { FinanceStripeCheckoutService } from "./stripe/finance-stripe-checkout.service";
 import {
   FINANCE_STRIPE_WEBHOOK_CONFIG,
   loadFinanceStripeWebhookConfig,
@@ -58,6 +72,8 @@ import {
     FinanceBankTransferController,
     FinanceManualReceiptController,
     FinanceStripeConnectionController,
+    FinanceStripeCheckoutController,
+    FinancePayerGrantController,
     FinanceStripeWebhookController,
     FinanceStripeWebhookInternalController,
   ],
@@ -69,7 +85,10 @@ import {
     FinanceReceiptService,
     FinanceBankTransferService,
     FinanceManualReceiptService,
+    FinancePayerGrantService,
     FinanceStripeConnectionService,
+    FinanceStripeCheckoutAttemptService,
+    FinanceStripeCheckoutService,
     PrismaFinanceStripeWebhookInbox,
     FinanceStripeWebhookService,
     FinanceStripeWebhookReplayService,
@@ -88,6 +107,21 @@ import {
           ? new DisabledFinanceStripeConnectProvider()
           : new StripeFinanceConnectProvider(config),
       inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_CHECKOUT_CONFIG,
+      useFactory: loadFinanceStripeCheckoutConfig,
+      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_CHECKOUT_PROVIDER,
+      useFactory: (
+        config: ReturnType<typeof loadFinanceStripeCheckoutConfig>,
+      ) =>
+        config.mode === "disabled"
+          ? new DisabledFinanceStripeCheckoutProvider()
+          : new StripeFinanceCheckoutProvider(config),
+      inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],
     },
     {
       provide: FINANCE_STRIPE_WEBHOOK_CONFIG,

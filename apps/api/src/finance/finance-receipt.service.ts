@@ -147,12 +147,28 @@ export class FinanceReceiptService {
         if (!invoiceBalance) {
           throw new Error("Finance invoice balance projection is unavailable");
         }
-        if (
-          amountMinor > receiptUnapplied ||
-          amountMinor > BigInt(invoiceBalance.outstandingMinor)
-        ) {
+        const activeCheckoutAttempts = await tx.financeCheckoutAttempt.findMany(
+          {
+            where: {
+              invoiceId: invoice.id,
+              tenantId: actor.tenantId,
+              orgId: actor.orgId,
+              status: { in: ["CREATING", "OPEN", "COMPLETED"] },
+            },
+            select: { amountMinor: true },
+          },
+        );
+        const checkoutReserved = activeCheckoutAttempts.reduce(
+          (sum, attempt) => sum + attempt.amountMinor,
+          0n,
+        );
+        const allocatableMinor =
+          BigInt(invoiceBalance.outstandingMinor) > checkoutReserved
+            ? BigInt(invoiceBalance.outstandingMinor) - checkoutReserved
+            : 0n;
+        if (amountMinor > receiptUnapplied || amountMinor > allocatableMinor) {
           throw new ConflictException(
-            "Allocation exceeds the receipt funds or invoice balance",
+            "Allocation exceeds the receipt funds or amount available after pending card payments",
           );
         }
 

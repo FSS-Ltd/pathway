@@ -223,6 +223,15 @@ enum FinanceStripeWebhookEventStatus {
   DEAD_LETTER
 }
 
+enum FinanceCheckoutAttemptStatus {
+  CREATING
+  OPEN
+  COMPLETED
+  PAID
+  EXPIRED
+  FAILED
+}
+
 enum PendingOrderStatus {
   PENDING
   COMPLETED
@@ -1132,6 +1141,7 @@ model Org {
   financeProfiles     FinanceProfile[]
   financeStripeConnections       FinanceStripeConnection[]
   financeStripeWebhookEvents FinanceStripeWebhookEvent[]
+  financeCheckoutAttempts FinanceCheckoutAttempt[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -1233,6 +1243,7 @@ model Tenant {
   financeProfile        FinanceProfile?
   financeStripeConnections              FinanceStripeConnection[]
   financeStripeWebhookEvents             FinanceStripeWebhookEvent[]
+  financeCheckoutAttempts               FinanceCheckoutAttempt[]
   aceTermReports         AceTermReport[]
   aceReportCompilations  AceReportCompilation[]
   aceReportDrafts        AceReportDraft[]
@@ -4969,6 +4980,7 @@ model FinanceProfile {
   manualReceiptRequests FinanceManualReceiptRequest[]
   transferNotices       FinanceTransferNotice[]
   stripeConnections     FinanceStripeConnection[]
+  checkoutAttempts      FinanceCheckoutAttempt[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
@@ -4993,6 +5005,7 @@ model FinanceStripeConnection {
   org                  Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
   requestedBy          User                          @relation("FinanceStripeConnectionRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
   disconnectedBy       User?                         @relation("FinanceStripeConnectionDisconnector", fields: [disconnectedByUserId], references: [id], onDelete: Restrict)
+  checkoutAttempts     FinanceCheckoutAttempt[]
 
   @@unique([id, tenantId, orgId])
   @@index([tenantId, orgId, status])
@@ -5057,10 +5070,44 @@ model FinancePayerGrant {
   payer                 User                @relation("FinancePayerGrantPayer", fields: [payerUserId], references: [id], onDelete: Restrict)
   grantedBy             User                @relation("FinancePayerGrantGrantedBy", fields: [grantedByUserId], references: [id], onDelete: Restrict)
   revokedBy             User?               @relation("FinancePayerGrantRevokedBy", fields: [revokedByUserId], references: [id], onDelete: Restrict)
+  checkoutAttempts      FinanceCheckoutAttempt[]
 
   @@unique([id, tenantId, orgId])
   @@index([tenantId, orgId, financePayerAccountId, payerUserId, revokedAt])
   @@index([payerUserId, tenantId, orgId, revokedAt])
+}
+
+model FinanceCheckoutAttempt {
+  id                       String                        @id @default(uuid())
+  financeProfileId         String
+  stripeConnectionId       String
+  payerGrantId             String
+  invoiceId                String
+  tenantId                 String
+  orgId                    String
+  stripeAccountId          String
+  livemode                 Boolean
+  amountMinor              BigInt
+  currency                 FinanceCurrency               @default(GBP)
+  status                   FinanceCheckoutAttemptStatus  @default(CREATING)
+  idempotencyKey           String                        @unique @db.VarChar(255)
+  integrationIdentifier    String                        @db.VarChar(255)
+  stripeCheckoutSessionId  String?                       @db.VarChar(255)
+  checkoutUrl              String?                       @db.Text
+  expiresAt                DateTime?
+  createdAt                DateTime                      @default(now())
+  updatedAt                DateTime                      @updatedAt
+  financeProfile           FinanceProfile                @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  stripeConnection         FinanceStripeConnection       @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerGrant               FinancePayerGrant             @relation(fields: [payerGrantId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice                  FinanceInvoice                @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant                   Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                      Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([stripeAccountId, stripeCheckoutSessionId])
+  @@index([tenantId, orgId, invoiceId, status, createdAt])
+  @@index([financeProfileId, status, createdAt])
 }
 
 model FinanceInvoiceNumberSequence {
@@ -5118,6 +5165,7 @@ model FinanceInvoice {
   voidedBy                User?                      @relation("FinanceInvoiceVoidedBy", fields: [voidedByUserId], references: [id], onDelete: Restrict)
   lines                   FinanceInvoiceLine[]
   allocations             FinanceReceiptAllocation[]
+  checkoutAttempts        FinanceCheckoutAttempt[]
   events                  FinanceInvoiceEvent[]
   creditNotes             FinanceCreditNote[]
   transferNotices         FinanceTransferNotice[]
