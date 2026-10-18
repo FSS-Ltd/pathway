@@ -37,19 +37,19 @@ describe("England national core applicability", () => {
     expect(TRACKER_CATALOGUE.coverage).toHaveLength(1488);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
-        ["GB-ENG", "GB-WLS", "GB-SCT"].includes(item.jurisdiction),
+        ["GB-ENG", "GB-WLS", "GB-SCT", "GB-NIR"].includes(item.jurisdiction),
       ),
     ).toBe(true);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(144);
+    ).toHaveLength(192);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(1344);
+    ).toHaveLength(1296);
     const result = checklist();
     expect(
       result.coverage.every(

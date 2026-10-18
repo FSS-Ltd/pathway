@@ -92,9 +92,7 @@ describe("Scotland progressive national release", () => {
       ).toBe(true);
     }
     expect(
-      TRACKER_CATALOGUE.requirements.filter(
-        (requirement) => requirement.jurisdiction !== "GB-SCT",
-      ),
+      TRACKER_CATALOGUE.requirements.slice(0, catalogueV13.requirements.length),
     ).toEqual(catalogueV13.requirements);
     expect(
       TRACKER_CATALOGUE.sources.slice(0, catalogueV13.sources.length),
