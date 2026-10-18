@@ -1,6 +1,6 @@
 import { catalogueSchema } from "./schema";
-import { catalogueV17 } from "./v1.7";
-export const TRACKER_CATALOGUE = catalogueSchema.parse(catalogueV17);
+import { catalogueV18 } from "./v1.8";
+export const TRACKER_CATALOGUE = catalogueSchema.parse(catalogueV18);
 export { catalogueSchema } from "./schema";
 export type {
   TrackerCatalogue,
