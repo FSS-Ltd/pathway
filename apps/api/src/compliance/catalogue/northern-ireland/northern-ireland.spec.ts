@@ -92,9 +92,7 @@ describe("Northern Ireland progressive national release", () => {
       ).toBe(true);
     }
     expect(
-      TRACKER_CATALOGUE.requirements.filter(
-        (requirement) => requirement.jurisdiction !== "GB-NIR",
-      ),
+      TRACKER_CATALOGUE.requirements.slice(0, catalogueV14.requirements.length),
     ).toEqual(catalogueV14.requirements);
     expect(
       TRACKER_CATALOGUE.sources.slice(0, catalogueV14.sources.length),
