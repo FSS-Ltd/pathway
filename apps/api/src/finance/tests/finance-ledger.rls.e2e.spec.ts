@@ -33,6 +33,7 @@ const financeTables = [
   "FinanceManualReceiptRequest",
   "FinanceTransferNotice",
   "FinanceStripeConnection",
+  "FinanceStripeWebhookEvent",
   "FinancePayerAccount",
   "FinancePayerGrant",
   "FinanceCreditNote",
@@ -189,6 +190,12 @@ describe("Finance ledger database foundation", () => {
     const profileBId = randomUUID();
     const connectionAId = randomUUID();
     const connectionBId = randomUUID();
+    const stripeAccountAId = `acct_${randomUUID().replaceAll("-", "")}`;
+    const stripeAccountBId = `acct_${randomUUID().replaceAll("-", "")}`;
+    const eventAId = `evt_${randomUUID().replaceAll("-", "")}`;
+    const eventBId = `evt_${randomUUID().replaceAll("-", "")}`;
+    const unmatchedEventId = `evt_${randomUUID().replaceAll("-", "")}`;
+    const payloadSha256 = "a".repeat(64);
     const rollbackFixture = new Error("rollback Finance Stripe RLS fixture");
 
     await expect(
@@ -216,6 +223,7 @@ describe("Finance ledger database foundation", () => {
             tenantId: tenantAId,
             orgId,
             requestedByUserId: userId,
+            stripeAccountId: stripeAccountAId,
           },
         });
 
@@ -235,8 +243,50 @@ describe("Finance ledger database foundation", () => {
             tenantId: tenantBId,
             orgId,
             requestedByUserId: userId,
+            stripeAccountId: stripeAccountBId,
           },
         });
+
+        const captureA = await tx.$queryRaw<{ result: string }[]>`
+          SELECT app.capture_finance_stripe_webhook_event(
+            ${eventAId}, ${stripeAccountAId}, 'account.updated', false,
+            ${payloadSha256}, ${JSON.stringify({ id: eventAId })}::jsonb
+          ) AS result
+        `;
+        const captureDuplicate = await tx.$queryRaw<{ result: string }[]>`
+          SELECT app.capture_finance_stripe_webhook_event(
+            ${eventAId}, ${stripeAccountAId}, 'account.updated', false,
+            ${payloadSha256}, ${JSON.stringify({ id: eventAId })}::jsonb
+          ) AS result
+        `;
+        const captureB = await tx.$queryRaw<{ result: string }[]>`
+          SELECT app.capture_finance_stripe_webhook_event(
+            ${eventBId}, ${stripeAccountBId}, 'payment_intent.succeeded', false,
+            ${payloadSha256}, ${JSON.stringify({ id: eventBId })}::jsonb
+          ) AS result
+        `;
+        const captureUnmatched = await tx.$queryRaw<{ result: string }[]>`
+          SELECT app.capture_finance_stripe_webhook_event(
+            ${unmatchedEventId}, 'acct_unmapped_finance_test', 'payment_intent.succeeded', false,
+            ${payloadSha256}, ${JSON.stringify({ id: unmatchedEventId })}::jsonb
+          ) AS result
+        `;
+        expect(captureA[0]?.result).toBe("accepted");
+        expect(captureDuplicate[0]?.result).toBe("duplicate");
+        expect(captureB[0]?.result).toBe("accepted");
+        expect(captureUnmatched[0]?.result).toBe("unmatched");
+        const dueScopes = await tx.$queryRaw<
+          { tenantId: string; orgId: string }[]
+        >`
+          SELECT "tenantId", "orgId"
+          FROM app.list_due_finance_stripe_webhook_scopes(CURRENT_TIMESTAMP)
+        `;
+        expect(dueScopes).toEqual(
+          [
+            { tenantId: tenantAId, orgId },
+            { tenantId: tenantBId, orgId },
+          ].sort((left, right) => left.tenantId.localeCompare(right.tenantId)),
+        );
 
         await applyTenantContext(tx, tenantAId, orgId);
         await tx.$executeRawUnsafe(`SET LOCAL ROLE "${tenantRlsRole}"`);
@@ -245,6 +295,16 @@ describe("Finance ledger database foundation", () => {
           select: { id: true },
         });
         expect(visible.map(({ id }) => id)).toEqual([connectionAId]);
+        const visibleWebhookEvents =
+          await tx.financeStripeWebhookEvent.findMany({
+            where: {
+              stripeEventId: { in: [eventAId, eventBId, unmatchedEventId] },
+            },
+            select: { stripeEventId: true },
+          });
+        expect(
+          visibleWebhookEvents.map(({ stripeEventId }) => stripeEventId),
+        ).toEqual([eventAId]);
 
         await expect(
           tx.$executeRaw`
@@ -257,10 +317,32 @@ describe("Finance ledger database foundation", () => {
             )
           `,
         ).rejects.toMatchObject({ code: "P2010", meta: { code: "42501" } });
-
         throw rollbackFixture;
       }),
     ).rejects.toBe(rollbackFixture);
+  });
+
+  it("rejects direct cross-tenant Finance webhook event inserts under the RLS role", async () => {
+    if (!requireDatabase()) return;
+    if (process.env.E2E_TENANT_RLS_ROLE !== tenantRlsRole) {
+      throw new Error("Finance webhook test requires the tenant RLS role");
+    }
+
+    await expect(
+      withTenantRlsContext(tenantAId, orgId, async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${tenantRlsRole}"`);
+        await tx.$executeRaw`
+          INSERT INTO "FinanceStripeWebhookEvent" (
+            "id", "stripeEventId", "stripeAccountId", "eventType", "livemode",
+            "payloadSha256", "payloadJson", "status", "tenantId", "orgId"
+          ) VALUES (
+            ${randomUUID()}, ${`evt_${randomUUID().replaceAll("-", "")}`},
+            'acct_finance_scope_forgery', 'account.updated', false,
+            ${"a".repeat(64)}, '{}'::jsonb, 'RECEIVED', ${tenantBId}, ${orgId}
+          )
+        `;
+      }),
+    ).rejects.toMatchObject({ code: "P2010", meta: { code: "42501" } });
   });
 
   it("isolates payer grants by tenant and rejects forged account scope", async () => {

@@ -163,6 +163,51 @@ export class FinanceStripeConnectionService {
     );
   }
 
+  /**
+   * Webhook deliveries can be out of order, so read the current Stripe account
+   * while holding its tenant-scoped row lock instead of applying event data.
+   */
+  async refreshFromWebhook(
+    tenantId: string,
+    orgId: string,
+    accountId: string,
+  ): Promise<void> {
+    const config = this.requireEnabled();
+    await withTenantRlsContext(tenantId, orgId, async (tx) => {
+      const connections = await tx.$queryRaw<
+        {
+          id: string;
+          livemode: boolean;
+          status: "DISCONNECTED" | "CONNECTING" | "READY" | "RESTRICTED";
+        }[]
+      >`
+        SELECT "id", "livemode", "status"
+        FROM "FinanceStripeConnection"
+        WHERE "tenantId" = ${tenantId}
+          AND "orgId" = ${orgId}
+          AND "stripeAccountId" = ${accountId}
+        FOR UPDATE
+      `;
+      const connection = connections[0];
+      if (!connection || connection.status === "DISCONNECTED") return;
+      if (connection.livemode !== (config.mode === "live")) {
+        throw new ConflictException("Finance Stripe connection mode mismatch");
+      }
+
+      const account = await this.provider.retrieveAccount(accountId);
+      this.assertAccountModeAndCountry(account, config.mode);
+      await tx.financeStripeConnection.updateMany({
+        where: {
+          id: connection.id,
+          tenantId,
+          orgId,
+          status: { not: "DISCONNECTED" },
+        },
+        data: { status: financeConnectionStatus(account) },
+      });
+    });
+  }
+
   async disconnect(
     actor: FinanceStripeConnectionActor,
   ): Promise<FinanceStripeConnectionView> {

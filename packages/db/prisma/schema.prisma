@@ -213,6 +213,16 @@ enum FinanceStripeConnectionStatus {
   DISCONNECTED
 }
 
+enum FinanceStripeWebhookEventStatus {
+  RECEIVED
+  PROCESSING
+  RETRY
+  AWAITING_HANDLER
+  COMPLETED
+  UNMATCHED
+  DEAD_LETTER
+}
+
 enum PendingOrderStatus {
   PENDING
   COMPLETED
@@ -1121,6 +1131,7 @@ model Org {
   accessTagExclusions AccessTagExclusion[]
   financeProfiles     FinanceProfile[]
   financeStripeConnections       FinanceStripeConnection[]
+  financeStripeWebhookEvents FinanceStripeWebhookEvent[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
@@ -1221,6 +1232,7 @@ model Tenant {
   familyIdentityInvites  FamilyIdentityInvite[]
   financeProfile        FinanceProfile?
   financeStripeConnections              FinanceStripeConnection[]
+  financeStripeWebhookEvents             FinanceStripeWebhookEvent[]
   aceTermReports         AceTermReport[]
   aceReportCompilations  AceReportCompilation[]
   aceReportDrafts        AceReportDraft[]
@@ -4984,6 +4996,31 @@ model FinanceStripeConnection {
 
   @@unique([id, tenantId, orgId])
   @@index([tenantId, orgId, status])
+}
+
+model FinanceStripeWebhookEvent {
+  id               String                          @id @default(uuid())
+  stripeEventId    String                          @unique
+  stripeAccountId  String?
+  eventType        String
+  livemode         Boolean
+  payloadSha256    String
+  payloadJson      Json
+  status           FinanceStripeWebhookEventStatus @default(RECEIVED)
+  tenantId         String?
+  orgId            String?
+  attempts         Int                             @default(0)
+  nextAttemptAt    DateTime                        @default(now())
+  claimedAt        DateTime?
+  claimToken       String?
+  processedAt      DateTime?
+  lastError        String?
+  receivedAt       DateTime                        @default(now())
+  tenant           Tenant?                         @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org              Org?                            @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, orgId, status, nextAttemptAt])
+  @@index([status, nextAttemptAt, claimedAt])
 }
 
 model FinancePayerAccount {
