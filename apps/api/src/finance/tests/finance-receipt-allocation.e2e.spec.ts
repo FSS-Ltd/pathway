@@ -8,6 +8,7 @@ import { FinanceCreditNoteService } from "../finance-credit-note.service";
 import { FinanceInvoiceService } from "../finance-invoice.service";
 import { FinanceBalanceService } from "../finance-balance.service";
 import { FinanceReceiptService } from "../finance-receipt.service";
+import { FinanceStripePaymentWebhookService } from "../stripe/finance-stripe-payment-webhook.service";
 
 function requiredFixture(name: string): string {
   const value = process.env[name];
@@ -392,8 +393,11 @@ describe("Finance receipt allocation ledger", () => {
             grantedByUserId: creatorId,
           },
         });
+        const checkoutAttemptId = randomUUID();
+        const checkoutSessionId = `cs_test_${randomUUID().replaceAll("-", "")}`;
         await tx.financeCheckoutAttempt.create({
           data: {
+            id: checkoutAttemptId,
             financeProfileId: profile.id,
             stripeConnectionId: stripeConnection.id,
             payerGrantId: payerGrant.id,
@@ -406,7 +410,7 @@ describe("Finance receipt allocation ledger", () => {
             status: "OPEN",
             idempotencyKey: `finance-checkout-${randomUUID()}`,
             integrationIdentifier: "nexsteps-finance-abcdefgh",
-            stripeCheckoutSessionId: `cs_test_${randomUUID().replaceAll("-", "")}`,
+            stripeCheckoutSessionId: checkoutSessionId,
             checkoutUrl: "https://checkout.stripe.com/c/pay/cs_test_reserve",
             expiresAt: new Date(Date.now() + 60 * 60 * 1000),
           },
@@ -442,6 +446,104 @@ describe("Finance receipt allocation ledger", () => {
           { invoiceId: invoice.id, amountMinor: "100" },
         );
         expect(availableAfterCheckoutReservation.amountMinor).toBe("100");
+
+        await tx.financeCheckoutAttempt.updateMany({
+          where: {
+            id: checkoutAttemptId,
+            tenantId,
+            orgId,
+            status: "OPEN",
+          },
+          data: { status: "EXPIRED" },
+        });
+        const paymentWebhook = new FinanceStripePaymentWebhookService(balances);
+        const paidEvent = {
+          id: `evt_${randomUUID().replaceAll("-", "")}`,
+          type: "checkout.session.async_payment_succeeded",
+          created: Math.floor(Date.now() / 1_000),
+          livemode: false,
+          account: stripeAccountId,
+          data: {
+            object: {
+              id: checkoutSessionId,
+              object: "checkout.session",
+              client_reference_id: checkoutAttemptId,
+              amount_total: 200,
+              currency: "gbp",
+              payment_status: "paid",
+              status: "complete",
+              metadata: {
+                finance_checkout_attempt_id: checkoutAttemptId,
+                finance_invoice_id: invoice.id,
+              },
+            },
+          },
+        };
+        await paymentWebhook.process({
+          stripeEventId: paidEvent.id,
+          tenantId,
+          orgId,
+          stripeAccountId,
+          eventType: paidEvent.type,
+          livemode: false,
+          payloadJson: paidEvent,
+        });
+
+        const confirmedReceipt = await tx.financeReceipt.findFirst({
+          where: {
+            financeProfileId: profile.id,
+            source: "STRIPE_CARD",
+            sourceReference: checkoutSessionId,
+            tenantId,
+            orgId,
+          },
+          include: { allocations: true },
+        });
+        expect(confirmedReceipt).toMatchObject({
+          amountMinor: 200n,
+          status: "CONFIRMED",
+          source: "STRIPE_CARD",
+          payerAccountId: payer.id,
+        });
+        expect(confirmedReceipt?.allocations).toHaveLength(1);
+        expect(confirmedReceipt?.allocations[0]?.amountMinor).toBe(200n);
+        expect(
+          (await invoices.get(creator, invoice.id)).balance.outstandingMinor,
+        ).toBe("0");
+        expect(
+          (
+            await tx.financeCheckoutAttempt.findUniqueOrThrow({
+              where: { id: checkoutAttemptId },
+              select: { status: true },
+            })
+          ).status,
+        ).toBe("PAID");
+
+        const duplicateEventId = `evt_${randomUUID().replaceAll("-", "")}`;
+        await paymentWebhook.process({
+          stripeEventId: duplicateEventId,
+          tenantId,
+          orgId,
+          stripeAccountId,
+          eventType: "checkout.session.completed",
+          livemode: false,
+          payloadJson: {
+            ...paidEvent,
+            id: duplicateEventId,
+            type: "checkout.session.completed",
+          },
+        });
+        expect(
+          await tx.financeReceipt.count({
+            where: {
+              financeProfileId: profile.id,
+              source: "STRIPE_CARD",
+              sourceReference: checkoutSessionId,
+              tenantId,
+              orgId,
+            },
+          }),
+        ).toBe(1);
         throw rollbackFixture;
       }),
     ).rejects.toBe(rollbackFixture);

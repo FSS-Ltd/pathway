@@ -1,6 +1,6 @@
 # NexSteps Finance add-on build plan
 
-**Status:** T01–T08 are merged; T09 checkout recovery is in progress. Provider-backed card Checkout awaits an eligible school test account. Direct-charge Bacs remains blocked pending exact-path provider evidence in T13.
+**Status:** T01–T09 are merged; T10 confirmed receipt posting is in progress. Provider-backed card Checkout awaits an eligible school test account. Direct-charge Bacs remains blocked pending exact-path provider evidence in T13.
 
 **Market:** Great Britain, GBP, one finance legal entity and one collection account per tenant for the initial release.
 
