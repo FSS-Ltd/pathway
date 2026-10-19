@@ -229,6 +229,8 @@ describe("Finance manual transfer evidence", () => {
           sortCode: "123456",
           accountNumber: "00123456",
           reference: invoice.invoiceNumber,
+          currency: "GBP",
+          outstandingMinor: "2000",
         });
 
         const requestInput = {
