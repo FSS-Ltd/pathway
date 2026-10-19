@@ -20,9 +20,11 @@ Read-only v1 and v2 connected-account list responses returned no accounts. No sc
 
 On 18 October 2026, a read-only test-mode check found the newly connected school test account still had card payments inactive and onboarding requirements incomplete. It cannot create a Finance card Checkout Session yet. No payment was created. Complete test-account onboarding before claiming provider-backed Checkout verification; do not use live mode for this proof.
 
+On 19 October 2026, a read-only check using the test platform key returned one connected account in GB. Its details were not submitted, requirements were past due, charges and payouts were disabled, and `card_payments` was `inactive`; `bacs_debit_payments` was absent and Bacs display settings were not configured. The response contained no evidence that this account is ready for school collection. Account identifiers and personal details are intentionally omitted.
+
 ### Bacs Direct Debit
 
-[Stripe's Bacs guide](https://docs.stripe.com/payments/bacs-debit) documents delayed confirmation and Connect use through destination charges. It does not document the planned direct-charge Bacs flow. The sandbox response included Bacs display settings but no `bacs_debit_payments` capability. Display settings are not capability or payment evidence. Keep direct-charge Bacs disabled and obtain provider confirmation plus exact-path tests before T13 can pass. Do not silently switch to destination charges.
+[Stripe's Bacs guide](https://docs.stripe.com/payments/bacs-debit) documents delayed confirmation and Connect use through destination charges; when `on_behalf_of` is used, it says to request the connected account's `bacs_debit_payments` capability. Stripe's [direct-charge guide](https://docs.stripe.com/connect/direct-charges) documents account-scoped requests through the `Stripe-Account` header, but does not establish Bacs support for that direct-charge path. The sandbox account has no Bacs capability. Display settings are not capability or payment evidence. Keep direct-charge Bacs disabled and obtain provider confirmation plus exact-path tests before T13 can pass. Do not silently switch to destination charges.
 
 ### NexSteps application version
 
@@ -32,7 +34,7 @@ The repository lockfile resolves Stripe SDK 14.25.0; existing subscription clien
 
 Finance requires one connected account and legal entity per school, with no platform collection, application fee or transfer flow. T07–T10 must demonstrate that the charge, balance transaction, fees and payout belong to the intended school account.
 
-No credentials, account identifiers, service-user numbers, bank details or personal data are stored in this document. No Stripe objects were created or changed, and no payment, mandate, refund or payout was made. Sources were reviewed on the date above; revalidate provider requirements before implementation and release.
+No credentials, account identifiers, service-user numbers, bank details or personal data are stored in this document. The 19 October sandbox checks were read-only; no Stripe objects were created or changed, and no payment, mandate, refund or payout was made. Sources were reviewed on the date above; revalidate provider requirements before implementation and release.
 
 ### School currency selection
 
