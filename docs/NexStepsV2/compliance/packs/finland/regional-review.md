@@ -1,0 +1,5 @@
+# Finland regional and local authority review
+
+Reviewed 2026-10-19. [Statistics Finland's 2026 municipality classification](https://stat.fi/en/luokitukset/kunta/kunta_1_20260101) is the inventory starting point; municipalities and competent local offices must be checked against the actual site. Finland has 19 regions, including autonomous Åland (`FI-01`, [ISO subdivision designation](https://www.iso.org/iso/iso_3166-2_newsletter_ii-3_2011-12-13.pdf)). The [Government of Åland](https://www.aland.ax/en/facts-about-aland) confirms its education autonomy.
+
+The catalogue marks all FI sector/topic cells partial and regional review in progress. It excludes mainland basic-school and ECEC route actions from Åland and leaves them unresolved when subdivision is unknown. An Åland site still needs its own education, childcare, staff, premises and local-authority review. A mainland site still needs municipal licensing or notice, building, fire, health, food, transport and safeguarding contacts as appropriate. The regional cells remain unreviewed until source-backed rules and applicability fixtures are published; a country action does not imply these duties are settled.

@@ -54,6 +54,12 @@ export function evaluateCondition(
       ? location[condition.field]
       : profile[condition.field];
   if (value === null || value === undefined) return "UNRESOLVED";
+  if (
+    (condition.field === "countryCode" ||
+      condition.field === "subdivisionCode") &&
+    value === ""
+  )
+    return "UNRESOLVED";
   const matches =
     condition.op === "eq"
       ? value === condition.value
