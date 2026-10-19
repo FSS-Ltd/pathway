@@ -112,6 +112,54 @@ enum SubscriptionStatus {
 
 enum FinanceCurrency {
   GBP
+  EUR
+  CZK
+  DKK
+  HUF
+  PLN
+  RON
+  SEK
+}
+
+enum FinanceCountry {
+  AT
+  BE
+  BG
+  HR
+  CY
+  CZ
+  DK
+  EE
+  FI
+  FR
+  DE
+  GR
+  HU
+  IE
+  IT
+  LV
+  LT
+  LU
+  MT
+  NL
+  PL
+  PT
+  RO
+  SK
+  SI
+  ES
+  SE
+  GB
+}
+
+enum FinanceStatementKind {
+  ON_DEMAND
+  MONTH_END
+}
+
+enum FinanceStatementStatus {
+  GENERATING
+  READY
 }
 
 enum FinanceInvoiceStatus {
@@ -1139,6 +1187,7 @@ model Org {
   accessTagGrants     AccessTagGrant[]
   accessTagExclusions AccessTagExclusion[]
   financeProfiles     FinanceProfile[]
+  financeStatements              FinanceStatement[]
   financeStripeConnections       FinanceStripeConnection[]
   financeStripeWebhookEvents FinanceStripeWebhookEvent[]
   financeCheckoutAttempts FinanceCheckoutAttempt[]
@@ -1241,6 +1290,7 @@ model Tenant {
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites  FamilyIdentityInvite[]
   financeProfile        FinanceProfile?
+  financeStatements                     FinanceStatement[]
   financeStripeConnections              FinanceStripeConnection[]
   financeStripeWebhookEvents             FinanceStripeWebhookEvent[]
   financeCheckoutAttempts               FinanceCheckoutAttempt[]
@@ -1429,6 +1479,7 @@ model User {
   financeManualReceiptRequestsCreated      FinanceManualReceiptRequest[]       @relation("FinanceManualReceiptRequester")
   financeManualReceiptRequestsDecided      FinanceManualReceiptRequest[]       @relation("FinanceManualReceiptDecider")
   financeTransferNotices                   FinanceTransferNotice[]             @relation("FinanceTransferNoticePayer")
+  financeStatementsRequested               FinanceStatement[]                  @relation("FinanceStatementRequester")
   financeStripeConnectionsRequested        FinanceStripeConnection[]           @relation("FinanceStripeConnectionRequester")
   financeStripeConnectionsDisconnected     FinanceStripeConnection[]           @relation("FinanceStripeConnectionDisconnector")
   studentIdentities                 StudentIdentity[]
@@ -4965,6 +5016,7 @@ model FinanceProfile {
   orgId              String
   tenantId           String
   legalEntityName    String
+  countryCode           FinanceCountry                   @default(GB)
   currency           FinanceCurrency                  @default(GBP)
   createdAt          DateTime                         @default(now())
   updatedAt          DateTime                         @updatedAt
@@ -4981,6 +5033,7 @@ model FinanceProfile {
   transferNotices       FinanceTransferNotice[]
   stripeConnections     FinanceStripeConnection[]
   checkoutAttempts      FinanceCheckoutAttempt[]
+  statements            FinanceStatement[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
@@ -5050,6 +5103,7 @@ model FinancePayerAccount {
   receipts         FinanceReceipt[]
   manualReceiptRequests FinanceManualReceiptRequest[]
   transferNotices       FinanceTransferNotice[]
+  statements            FinanceStatement[]
 
   @@unique([id, tenantId, orgId])
   @@index([financeProfileId, displayName])
@@ -5109,6 +5163,50 @@ model FinanceCheckoutAttempt {
   @@index([tenantId, orgId, invoiceId, status, createdAt])
   @@index([financeProfileId, status, createdAt])
 }
+
+model FinanceStatement {
+  id                     String                 @id @default(uuid())
+  financeProfileId       String
+  payerAccountId         String
+  tenantId               String
+  orgId                  String
+  kind                   FinanceStatementKind
+  status                 FinanceStatementStatus @default(GENERATING)
+  periodStart            DateTime
+  periodEnd              DateTime
+  generatedAt            DateTime
+  ledgerCutoffAt         DateTime
+  projectionVersion      Int                    @default(1)
+  currency               FinanceCurrency        @default(GBP)
+  openingBalanceMinor    BigInt
+  chargesIssuedMinor     BigInt
+  creditsIssuedMinor     BigInt
+  allocatedReceiptsMinor BigInt
+  reversalsMinor         BigInt
+  closingBalanceMinor    BigInt
+  unappliedFundsMinor    BigInt
+  processingFundsMinor   BigInt                 @default(0)
+  snapshot               Json
+  idempotencyKey         String                 @db.VarChar(128)
+  requestHash            String                 @db.VarChar(64)
+  documentStorageKey     String?                @db.Text
+  documentSha256         String?                @db.VarChar(64)
+  documentSizeBytes      Int?
+  readyAt                DateTime?
+  requestedByUserId      String?
+  createdAt              DateTime               @default(now())
+  financeProfile         FinanceProfile         @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount           FinancePayerAccount    @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant                 Tenant                 @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                    Org                    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  requestedBy            User?                  @relation("FinanceStatementRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([tenantId, orgId, idempotencyKey])
+  @@index([tenantId, orgId, payerAccountId, periodStart, periodEnd])
+  @@index([tenantId, orgId, status, createdAt])
+}
+
 
 model FinanceInvoiceNumberSequence {
   financeProfileId String
@@ -5334,6 +5432,7 @@ model FinanceReceipt {
   @@unique([financeProfileId, source, sourceReference])
   @@index([tenantId, status, confirmedAt])
   @@index([tenantId, orgId, payerAccountId, confirmedAt])
+  @@index([tenantId, orgId, payerAccountId, updatedAt])
   @@index([financeProfileId, createdAt])
 }
 

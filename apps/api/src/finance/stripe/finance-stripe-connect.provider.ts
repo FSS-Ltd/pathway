@@ -1,5 +1,6 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
+import type { FinanceCountryCode } from "@pathway/platform";
 import type { FinanceStripeConnectConfig } from "./finance-stripe-connect.config";
 
 const STRIPE_API_VERSION = "2026-09-30.endive";
@@ -45,6 +46,7 @@ export type StripeFinanceAccountLink = {
 export interface FinanceStripeConnectProvider {
   createAccount(input: {
     legalEntityName: string;
+    countryCode: FinanceCountryCode;
     connectionId: string;
     idempotencyKey: string;
   }): Promise<StripeFinanceAccount>;
@@ -66,6 +68,7 @@ export class StripeFinanceConnectProvider implements FinanceStripeConnectProvide
 
   async createAccount(input: {
     legalEntityName: string;
+    countryCode: FinanceCountryCode;
     connectionId: string;
     idempotencyKey: string;
   }): Promise<StripeFinanceAccount> {
@@ -75,7 +78,7 @@ export class StripeFinanceConnectProvider implements FinanceStripeConnectProvide
       body: {
         display_name: input.legalEntityName,
         identity: {
-          country: "gb",
+          country: input.countryCode.toLowerCase(),
           entity_type: "company",
           business_details: { registered_name: input.legalEntityName },
         },

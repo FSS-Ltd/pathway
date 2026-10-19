@@ -6,6 +6,8 @@ import {
   loadBehaviourOutboxEndpoint,
 } from "./outbox-http-dispatcher";
 
+const FINANCE_STATEMENT_NOTICE_EVENT = "finance.statement.notice.requested";
+
 async function main(): Promise<void> {
   const url = process.env.OUTBOX_DISPATCH_URL?.trim();
   if (!url) {
@@ -17,6 +19,8 @@ async function main(): Promise<void> {
       genericToken: process.env.OUTBOX_DISPATCH_TOKEN?.trim(),
       behaviour: loadBehaviourOutboxEndpoint(process.env),
     }),
+    undefined,
+    [FINANCE_STATEMENT_NOTICE_EVENT],
   ).run();
   console.log("[outbox] dispatch complete", result);
 }

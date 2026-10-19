@@ -99,6 +99,7 @@ export class FinanceCreditNoteService {
             invoiceId: invoice.id,
             tenantId: actor.tenantId,
             orgId: actor.orgId,
+            currency: invoice.currency,
             createdByUserId: actor.userId,
             reason: input.reason,
             subtotalMinor: calculated.totals.subtotalMinor,

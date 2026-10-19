@@ -285,6 +285,22 @@ describe("Finance receipt allocation ledger", () => {
         );
         expect(replayedReversal.id).toBe(reversal.id);
         expect(reversal.amountMinor).toBe("300");
+        expect(
+          await balances.accountBalanceAt(
+            tx,
+            creator,
+            payer.id,
+            new Date(new Date(reversal.createdAt).getTime() - 1),
+          ),
+        ).toBe("0");
+        expect(
+          await balances.accountBalanceAt(
+            tx,
+            creator,
+            payer.id,
+            new Date(reversal.createdAt),
+          ),
+        ).toBe("300");
         expect((await invoices.get(creator, invoice.id)).balance).toEqual({
           issuedGrossMinor: "2000",
           issuedCreditsMinor: "500",

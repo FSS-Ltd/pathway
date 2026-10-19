@@ -1,6 +1,7 @@
 import {
   HttpOutboxDispatcher,
   loadBehaviourOutboxEndpoint,
+  loadFinanceStatementNoticeOutboxEndpoint,
   loadInstitutionalAddonTrialOutboxEndpoint,
 } from "../outbox-http-dispatcher";
 
@@ -130,6 +131,75 @@ describe("HttpOutboxDispatcher", () => {
       },
       body: JSON.stringify(intent),
     });
+  });
+
+  it("routes statement notices through the dedicated secure Finance endpoint", async () => {
+    const endpoint = loadFinanceStatementNoticeOutboxEndpoint({
+      FINANCE_STATEMENT_OUTBOX_DISPATCH_URL:
+        "https://api.example.test/internal/outbox/finance/statements/notice",
+      FINANCE_STATEMENT_OUTBOX_SECRET: "finance-secret",
+    });
+    const intent = {
+      aggregateType: "FINANCE_STATEMENT",
+      aggregateId: "04b7d8c4-c891-4af8-9011-d5a403ce3296",
+      eventType: "finance.statement.notice.requested",
+      payload: {},
+      idempotencyKey: "finance-statement-notice:statement:user",
+    };
+    const dispatcher = new HttpOutboxDispatcher({
+      genericUrl: "https://dispatch.example.test/events",
+      genericToken: "dispatch-token",
+      financeStatements: endpoint,
+    });
+
+    await dispatcher.dispatch(intent);
+
+    expect(fetchMock).toHaveBeenCalledWith(endpoint?.url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": intent.idempotencyKey,
+        "x-pathway-internal-secret": "finance-secret",
+      },
+      body: JSON.stringify(intent),
+    });
+  });
+
+  it("does not send statement notices to the generic endpoint when Finance dispatch is not configured", async () => {
+    const dispatcher = new HttpOutboxDispatcher({
+      genericUrl: "https://dispatch.example.test/events",
+    });
+    await expect(
+      dispatcher.dispatch({
+        aggregateType: "FINANCE_STATEMENT",
+        aggregateId: "04b7d8c4-c891-4af8-9011-d5a403ce3296",
+        eventType: "finance.statement.notice.requested",
+        payload: {},
+        idempotencyKey: "finance-statement-notice:statement:user",
+      }),
+    ).rejects.toThrow("Finance statement outbox dispatch is not configured");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a Finance statement endpoint with the wrong path or insecure scheme", () => {
+    expect(() =>
+      loadFinanceStatementNoticeOutboxEndpoint({
+        FINANCE_STATEMENT_OUTBOX_DISPATCH_URL:
+          "http://api.example.test/internal/outbox/finance/statements/notice",
+        FINANCE_STATEMENT_OUTBOX_SECRET: "finance-secret",
+      }),
+    ).toThrow(
+      "FINANCE_STATEMENT_OUTBOX_DISPATCH_URL must target the secure Finance statement notice endpoint",
+    );
+    expect(() =>
+      loadFinanceStatementNoticeOutboxEndpoint({
+        FINANCE_STATEMENT_OUTBOX_DISPATCH_URL:
+          "https://api.example.test/events",
+        FINANCE_STATEMENT_OUTBOX_SECRET: "finance-secret",
+      }),
+    ).toThrow(
+      "FINANCE_STATEMENT_OUTBOX_DISPATCH_URL must target the secure Finance statement notice endpoint",
+    );
   });
 
   it("rejects insecure or non-behaviour API endpoints before dispatch", () => {

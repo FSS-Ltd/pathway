@@ -92,6 +92,14 @@ export class FinanceInvoiceService {
       resourceType: "INVOICE",
       request: input,
       perform: async (tx) => {
+        // Serialize the first Finance record against a concurrent change to
+        // the school's country/currency profile.
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "FinanceProfile"
+          WHERE "tenantId" = ${actor.tenantId}
+            AND "orgId" = ${actor.orgId}
+          FOR SHARE
+        `;
         const profile = await tx.financeProfile.findUnique({
           where: {
             tenantId_orgId: {
@@ -99,7 +107,7 @@ export class FinanceInvoiceService {
               orgId: actor.orgId,
             },
           },
-          select: { id: true },
+          select: { id: true, currency: true },
         });
         if (!profile) throw new NotFoundException("Finance profile not found");
         const payerAccount = await tx.financePayerAccount.findFirst({
@@ -122,6 +130,7 @@ export class FinanceInvoiceService {
             payerAccountId: payerAccount.id,
             tenantId: actor.tenantId,
             orgId: actor.orgId,
+            currency: profile.currency,
             createdByUserId: actor.userId,
             dueAt: toDueDate(input.dueDate),
             subtotalMinor: calculated.totals.subtotalMinor,

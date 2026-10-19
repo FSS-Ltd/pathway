@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { z } from "zod";
+import type { FinanceCurrency } from "@pathway/platform";
 import { FinanceBalanceService } from "../finance-balance.service";
 import { lockInvoice } from "../finance-invoice-operations";
 
@@ -233,13 +234,13 @@ export class FinanceStripePaymentWebhookService {
       financeProfileId: string;
       invoiceId: string;
       amountMinor: bigint;
-      currency: "GBP";
+      currency: FinanceCurrency;
       invoice: {
         id: string;
         financeProfileId: string;
         payerAccountId: string | null;
         status: "DRAFT" | "IN_REVIEW" | "ISSUED" | "VOID";
-        currency: "GBP";
+        currency: FinanceCurrency;
         totalMinor: bigint;
       };
     },
@@ -365,11 +366,15 @@ function assertAttemptMatchesEvent(
     id: string;
     invoiceId: string;
     amountMinor: bigint;
-    currency: "GBP";
+    currency: FinanceCurrency;
     livemode: boolean;
     stripeAccountId: string;
     financeProfileId: string;
-    invoice: { id: string; financeProfileId: string; currency: "GBP" };
+    invoice: {
+      id: string;
+      financeProfileId: string;
+      currency: FinanceCurrency;
+    };
     stripeConnection: { stripeAccountId: string | null; livemode: boolean };
   },
   event: CheckoutSessionEvent,

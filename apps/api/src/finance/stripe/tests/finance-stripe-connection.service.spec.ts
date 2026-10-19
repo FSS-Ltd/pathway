@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException } from "@nestjs/common";
 import type { Prisma } from "@pathway/db";
 import type { FinanceAccessService } from "../../access/finance-access.service";
 import type { FinanceAccessScope } from "../../access/finance-access.reader";
@@ -7,6 +7,7 @@ import type { FinanceStripeConnectProvider } from "../finance-stripe-connect.pro
 
 const mockProfileFindUnique = jest.fn();
 const mockConnectionFindFirst = jest.fn();
+const mockConnectionCreate = jest.fn();
 const mockConnectionUpdateMany = jest.fn();
 const mockConnectionRawQuery = jest.fn();
 const mockWithTenantRlsContext = jest.fn();
@@ -39,13 +40,15 @@ describe("FinanceStripeConnectionService", () => {
     refreshUrl: "https://school.example/refresh",
   };
   const connection: {
+    financeProfileId: "profile-a";
     id: "connection-a";
-    stripeAccountId: "acct_test_school";
+    stripeAccountId: string | null;
     status: "CONNECTING" | "READY" | "RESTRICTED" | "DISCONNECTED";
     livemode: false;
     disconnectedAt: Date | null;
     disconnectedByUserId: string | null;
   } = {
+    financeProfileId: "profile-a",
     id: "connection-a",
     stripeAccountId: "acct_test_school",
     status: "CONNECTING",
@@ -66,7 +69,11 @@ describe("FinanceStripeConnectionService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     currentConnection = { ...connection };
-    mockProfileFindUnique.mockResolvedValue({ id: "profile-a" });
+    mockProfileFindUnique.mockResolvedValue({
+      id: "profile-a",
+      legalEntityName: "NexSteps Test School",
+      countryCode: "GB",
+    });
     mockConnectionFindFirst.mockImplementation(async () => currentConnection);
     mockConnectionUpdateMany.mockImplementation(async ({ data }) => {
       currentConnection = { ...currentConnection, ...data };
@@ -82,6 +89,7 @@ describe("FinanceStripeConnectionService", () => {
           financeProfile: { findUnique: mockProfileFindUnique },
           financeStripeConnection: {
             findFirst: mockConnectionFindFirst,
+            create: mockConnectionCreate,
             updateMany: mockConnectionUpdateMany,
           },
           $queryRaw: mockConnectionRawQuery,
@@ -141,7 +149,12 @@ describe("FinanceStripeConnectionService", () => {
 
   it("refreshes the latest Stripe account state for a webhook under a row lock", async () => {
     mockConnectionRawQuery.mockResolvedValue([
-      { id: "connection-a", status: "CONNECTING", livemode: false },
+      {
+        id: "connection-a",
+        status: "CONNECTING",
+        livemode: false,
+        countryCode: "GB",
+      },
     ]);
 
     await service.refreshFromWebhook("tenant-a", "org-a", "acct_test_school");
@@ -162,7 +175,12 @@ describe("FinanceStripeConnectionService", () => {
 
   it("does not revive a disconnected connection from a delayed webhook", async () => {
     mockConnectionRawQuery.mockResolvedValue([
-      { id: "connection-a", status: "DISCONNECTED", livemode: false },
+      {
+        id: "connection-a",
+        status: "DISCONNECTED",
+        livemode: false,
+        countryCode: "GB",
+      },
     ]);
 
     await service.refreshFromWebhook("tenant-a", "org-a", "acct_test_school");
@@ -179,5 +197,88 @@ describe("FinanceStripeConnectionService", () => {
     await expect(service.refresh(actor)).rejects.toThrow(ForbiddenException);
     expect(provider.retrieveAccount).not.toHaveBeenCalled();
     expect(mockConnectionFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("requires saved school country and currency settings before Stripe onboarding", async () => {
+    mockProfileFindUnique.mockResolvedValue(null);
+
+    await expect(service.createOnboardingLink(actor)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(provider.createAccount).not.toHaveBeenCalled();
+    expect(provider.createOnboardingLink).not.toHaveBeenCalled();
+  });
+
+  it("creates the connected account in the school's saved country", async () => {
+    mockProfileFindUnique.mockResolvedValue({
+      id: "profile-a",
+      legalEntityName: "Dutch School",
+      countryCode: "NL",
+    });
+    currentConnection = { ...currentConnection, stripeAccountId: null };
+    provider.createAccount.mockResolvedValue({
+      id: "acct_test_school",
+      livemode: false,
+      country: "NL",
+      cardPaymentsStatus: "pending",
+    });
+    provider.retrieveAccount.mockResolvedValue({
+      id: "acct_test_school",
+      livemode: false,
+      country: "NL",
+      cardPaymentsStatus: "pending",
+    });
+    provider.createOnboardingLink.mockResolvedValue({
+      url: "https://connect.stripe.com/test-onboarding",
+      expiresAt: "2026-10-19T18:00:00.000Z",
+    });
+
+    await service.createOnboardingLink(actor);
+
+    expect(provider.createAccount).toHaveBeenCalledWith(
+      expect.objectContaining({
+        legalEntityName: "Dutch School",
+        countryCode: "NL",
+      }),
+    );
+  });
+
+  it("locks the Finance profile before creating its first Stripe connection", async () => {
+    mockProfileFindUnique.mockResolvedValue({
+      id: "profile-a",
+      legalEntityName: "Dutch School",
+      countryCode: "NL",
+    });
+    mockConnectionFindFirst.mockResolvedValueOnce(null);
+    mockConnectionRawQuery.mockResolvedValue([{ id: "profile-a" }]);
+    mockConnectionCreate.mockResolvedValue({
+      ...connection,
+      id: "connection-new",
+      financeProfileId: "profile-a",
+      stripeAccountId: null,
+    });
+    provider.createAccount.mockResolvedValue({
+      id: "acct_test_school",
+      livemode: false,
+      country: "NL",
+      cardPaymentsStatus: "pending",
+    });
+    provider.retrieveAccount.mockResolvedValue({
+      id: "acct_test_school",
+      livemode: false,
+      country: "NL",
+      cardPaymentsStatus: "pending",
+    });
+    provider.createOnboardingLink.mockResolvedValue({
+      url: "https://connect.stripe.com/test-onboarding",
+      expiresAt: "2026-10-19T18:00:00.000Z",
+    });
+
+    await service.createOnboardingLink(actor);
+
+    expect(mockConnectionRawQuery).toHaveBeenCalledTimes(1);
+    expect(mockConnectionRawQuery.mock.invocationCallOrder[0]).toBeLessThan(
+      mockConnectionCreate.mock.invocationCallOrder[0],
+    );
   });
 });

@@ -6,7 +6,7 @@ const quantitySchema = z
 
 const amountMinorSchema = z
   .string()
-  .regex(/^(?:0|[1-9]\d*)$/, "Use an integer amount in pence");
+  .regex(/^(?:0|[1-9]\d*)$/, "Use an integer amount in currency minor units");
 
 const dateOnlySchema = z
   .string()

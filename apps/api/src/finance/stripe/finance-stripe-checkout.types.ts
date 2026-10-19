@@ -1,4 +1,5 @@
 import type { FinanceAccessScope } from "../access/finance-access.reader";
+import type { FinanceCurrency } from "@pathway/platform";
 
 export interface FinanceStripeCheckoutActor extends FinanceAccessScope {
   userId: string;
@@ -19,6 +20,7 @@ export type FinanceStripeCheckoutAttemptRecord = {
   invoiceId: string;
   invoiceNumber: bigint;
   amountMinor: bigint;
+  currency: FinanceCurrency;
   idempotencyKey: string;
   integrationIdentifier: string;
   stripeCheckoutSessionId: string | null;

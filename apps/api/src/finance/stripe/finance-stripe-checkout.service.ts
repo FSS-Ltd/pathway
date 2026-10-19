@@ -107,6 +107,7 @@ export class FinanceStripeCheckoutService {
         invoiceId: attempt.invoiceId,
         invoiceNumber: attempt.invoiceNumber.toString(),
         amountMinor: attempt.amountMinor,
+        currency: attempt.currency,
         idempotencyKey: attempt.idempotencyKey,
         integrationIdentifier: attempt.integrationIdentifier,
         expiresAt: financeCheckoutSessionExpiresAt(attempt.createdAt),

@@ -35,6 +35,7 @@ describe("StripeFinanceCheckoutProvider", () => {
       invoiceId: "invoice-1",
       invoiceNumber: "1001",
       amountMinor: 12_500n,
+      currency: "EUR",
       idempotencyKey: "finance-checkout-attempt-1",
       integrationIdentifier: "nexsteps-finance-abcdefgh",
       expiresAt: new Date(1_800_000_000_000),
@@ -53,7 +54,7 @@ describe("StripeFinanceCheckoutProvider", () => {
     });
     const form = new URLSearchParams(String(init.body));
     expect(form.get("mode")).toBe("payment");
-    expect(form.get("line_items[0][price_data][currency]")).toBe("gbp");
+    expect(form.get("line_items[0][price_data][currency]")).toBe("eur");
     expect(form.get("line_items[0][price_data][unit_amount]")).toBe("12500");
     expect(form.get("allowed_payment_method_types[0]")).toBe("card");
     expect(form.get("client_reference_id")).toBe("attempt-1");
@@ -79,6 +80,7 @@ describe("StripeFinanceCheckoutProvider", () => {
         invoiceId: "invoice-1",
         invoiceNumber: "1001",
         amountMinor: 1n,
+        currency: "GBP",
         idempotencyKey: "finance-checkout-attempt-1",
         integrationIdentifier: "nexsteps-finance-abcdefgh",
         expiresAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -104,6 +106,7 @@ describe("StripeFinanceCheckoutProvider", () => {
         invoiceId: "invoice-1",
         invoiceNumber: "1001",
         amountMinor: 1n,
+        currency: "GBP",
         idempotencyKey: "finance-checkout-attempt-1",
         integrationIdentifier: "nexsteps-finance-abcdefgh",
         expiresAt: new Date(1_800_000_000_000),

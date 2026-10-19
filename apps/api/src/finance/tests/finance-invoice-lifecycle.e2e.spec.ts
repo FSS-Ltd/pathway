@@ -81,8 +81,15 @@ describe("Finance invoice and credit lifecycle", () => {
               tenantId,
               orgId,
               legalEntityName: "Finance lifecycle test school",
+              countryCode: "NL",
+              currency: "EUR",
             },
             select: { id: true, legalEntityName: true },
+          });
+        } else {
+          await tx.financeProfile.update({
+            where: { id: profile.id },
+            data: { countryCode: "NL", currency: "EUR" },
           });
         }
         const payer = await tx.financePayerAccount.create({
@@ -118,6 +125,7 @@ describe("Finance invoice and credit lifecycle", () => {
         );
         expect(replayedDraft.id).toBe(draft.id);
         expect(draft.status).toBe("DRAFT");
+        expect(draft.currency).toBe("EUR");
         expect(draft.subtotalMinor).toBe("2000");
         expect(draft.taxMinor).toBe("0");
         expect(draft.totalMinor).toBe("2000");

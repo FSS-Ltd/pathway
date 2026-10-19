@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
+import type { FinanceCurrency } from "@pathway/platform";
 import type { FinanceStripeCheckoutConfig } from "./finance-stripe-checkout.config";
 
 const STRIPE_API_VERSION = "2026-09-30.endive";
@@ -37,6 +38,7 @@ export interface FinanceStripeCheckoutProvider {
     invoiceId: string;
     invoiceNumber: string;
     amountMinor: bigint;
+    currency: FinanceCurrency;
     idempotencyKey: string;
     integrationIdentifier: string;
     expiresAt: Date;
@@ -77,6 +79,7 @@ export class StripeFinanceCheckoutProvider implements FinanceStripeCheckoutProvi
     invoiceId: string;
     invoiceNumber: string;
     amountMinor: bigint;
+    currency: FinanceCurrency;
     idempotencyKey: string;
     integrationIdentifier: string;
     expiresAt: Date;
@@ -111,7 +114,10 @@ export class StripeFinanceCheckoutProvider implements FinanceStripeCheckoutProvi
       Math.floor(input.expiresAt.getTime() / 1000).toString(),
     );
     form.set("allowed_payment_method_types[0]", "card");
-    form.set("line_items[0][price_data][currency]", "gbp");
+    form.set(
+      "line_items[0][price_data][currency]",
+      input.currency.toLowerCase(),
+    );
     form.set("line_items[0][price_data][unit_amount]", amount.toString());
     form.set(
       "line_items[0][price_data][product_data][name]",

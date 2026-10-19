@@ -13,8 +13,8 @@ describe("Stripe Finance Connect provider", () => {
 
   afterEach(() => jest.restoreAllMocks());
 
-  it("requests a GB school merchant account with Stripe-owned fees and losses", async () => {
-    const response = accountResponse("acct_test_school", "pending");
+  it("requests a school merchant account in the saved country with Stripe-owned fees and losses", async () => {
+    const response = accountResponse("acct_test_school", "pending", "NL");
     const fetchMock = jest
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(response);
@@ -22,6 +22,7 @@ describe("Stripe Finance Connect provider", () => {
 
     const account = await provider.createAccount({
       legalEntityName: "NexSteps Test School",
+      countryCode: "NL",
       connectionId: "connection-fixture",
       idempotencyKey: "finance-connect-connection-fixture",
     });
@@ -29,7 +30,7 @@ describe("Stripe Finance Connect provider", () => {
     expect(account).toEqual<StripeFinanceAccount>({
       id: "acct_test_school",
       livemode: false,
-      country: "GB",
+      country: "NL",
       cardPaymentsStatus: "pending",
     });
     const [url, request] = fetchMock.mock.calls[0] ?? [];
@@ -47,7 +48,7 @@ describe("Stripe Finance Connect provider", () => {
     const body: unknown = JSON.parse(request.body);
     expect(body).toMatchObject({
       identity: {
-        country: "gb",
+        country: "nl",
         entity_type: "company",
         business_details: { registered_name: "NexSteps Test School" },
       },
@@ -126,12 +127,16 @@ describe("Stripe Finance Connect provider", () => {
   });
 });
 
-function accountResponse(accountId: string, cardStatus: string): Response {
+function accountResponse(
+  accountId: string,
+  cardStatus: string,
+  countryCode = "GB",
+): Response {
   return new Response(
     JSON.stringify({
       id: accountId,
       livemode: false,
-      identity: { country: "gb" },
+      identity: { country: countryCode.toLowerCase() },
       configuration: {
         merchant: { capabilities: { card_payments: { status: cardStatus } } },
       },

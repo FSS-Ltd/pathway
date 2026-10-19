@@ -1,6 +1,6 @@
 # Finance provider compatibility evidence
 
-**As of:** 18 October 2026.
+**As of:** 19 October 2026.
 
 **Decision:** No live collection is authorised. One-off card collection is planned through Stripe Connect direct charges. The connected school account and account-scoped transaction path must be exercised in T07–T10 before release. Direct-charge Bacs remains blocked pending explicit Stripe compatibility evidence; do not substitute another charge model.
 
@@ -33,6 +33,12 @@ The repository lockfile resolves Stripe SDK 14.25.0; existing subscription clien
 Finance requires one connected account and legal entity per school, with no platform collection, application fee or transfer flow. T07–T10 must demonstrate that the charge, balance transaction, fees and payout belong to the intended school account.
 
 No credentials, account identifiers, service-user numbers, bank details or personal data are stored in this document. No Stripe objects were created or changed, and no payment, mandate, refund or payout was made. Sources were reviewed on the date above; revalidate provider requirements before implementation and release.
+
+### School currency selection
+
+The Finance profile stores the school's legal country and one collection currency. The initial list covers the UK and all 27 EU member states: EUR for the 21 euro-area countries, and CZK, DKK, HUF, PLN, RON or SEK for the six other EU countries. The UI derives currency from country so invoice currency, Stripe Checkout presentment and school onboarding cannot be configured inconsistently. The [European Commission's country list](https://economy-finance.ec.europa.eu/euro/eu-countries-and-euro_en) confirms 21 euro-area members, including Bulgaria from 1 January 2026. Stripe's [supported currency guide](https://docs.stripe.com/currencies) lists all eight currencies for card presentment. Connected-account country eligibility and live card capability still have to be confirmed during onboarding; a currency on the presentment list does not guarantee payout in that currency. Stripe may convert to the school's settlement currency. HUF charges may use two decimal places, while manual HUF payouts must use whole amounts. Sources rechecked on 19 October 2026.
+
+The Finance profile must be saved before Stripe onboarding. This prevents the onboarding endpoint from silently using the database's legacy GBP default for an EU school. Existing profiles created before country selection retain GB/GBP as a migration default; a connected account or any Finance activity locks those settings.
 
 ## Verification assigned to delivery steps
 

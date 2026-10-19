@@ -124,6 +124,16 @@ export type SendAddonTrialExpiryEmailParams = {
   trialId: string;
 };
 
+export type SendFinanceStatementNoticeParams = {
+  to: string;
+  recipientName: string;
+  organisationName: string;
+  periodLabel: string;
+  statementUrl: string;
+  statementId: string;
+  recipientUserId: string;
+};
+
 /** Params for admin feedback / feature-request submissions, sent to the support inbox. */
 export type SendFeedbackEmailParams = {
   category: "bug" | "feature-request" | "other";
@@ -202,6 +212,37 @@ export class MailerService {
   isAddonTrialExpiryEmailAvailable(): boolean {
     return this.isEnabled && this.resend !== null;
   }
+
+  async sendFinanceStatementNotice(
+    params: SendFinanceStatementNoticeParams,
+  ): Promise<void> {
+    if (!this.resend)
+      throw new Error("Finance statement email provider unavailable");
+    const recipientName = escapeHtml(params.recipientName);
+    const organisationName = escapeHtml(params.organisationName);
+    const periodLabel = escapeHtml(params.periodLabel);
+    const statementUrl = escapeHtml(params.statementUrl);
+    const subject = "Your monthly school statement is ready";
+    const text =
+      `A new statement from ${params.organisationName} is ready for ${params.periodLabel}. ` +
+      "Sign in to NexSteps to review it. This email does not include financial details or an attachment.\n" +
+      `Open your statement: ${params.statementUrl}`;
+    const html =
+      `<p>Hello ${recipientName},</p>` +
+      `<p>A new statement from ${organisationName} is ready for ${periodLabel}.</p>` +
+      "<p>Sign in to NexSteps to review it. This email does not include financial details or an attachment.</p>" +
+      `<p><a href="${statementUrl}">Open your statement</a></p>`;
+    const result = await this.resend.emails.send(
+      { from: this.fromAddress, to: params.to, subject, text, html },
+      {
+        idempotencyKey: `finance-statement:${params.statementId}:${params.recipientUserId}`,
+      },
+    );
+    if (result.error || !result.data?.id) {
+      throw new Error("Resend rejected Finance statement notice");
+    }
+  }
+
 
   async sendAddonTrialExpiryEmail(
     params: SendAddonTrialExpiryEmailParams,

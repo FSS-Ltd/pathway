@@ -85,6 +85,15 @@ export class FinanceManualReceiptService {
         if (!payerAccount) {
           throw new NotFoundException("Finance payer account not found");
         }
+        const profile = await tx.financeProfile.findFirst({
+          where: {
+            id: payerAccount.financeProfileId,
+            tenantId: actor.tenantId,
+            orgId: actor.orgId,
+          },
+          select: { currency: true },
+        });
+        if (!profile) throw new NotFoundException("Finance profile not found");
 
         if (input.transferNoticeId) {
           const notice = await tx.financeTransferNotice.findFirst({
@@ -126,6 +135,7 @@ export class FinanceManualReceiptService {
               requestedByUserId: actor.userId,
               bankTransactionReference: reference,
               amountMinor,
+              currency: profile.currency,
               receivedAt,
               requestReason: reason,
             },
@@ -239,6 +249,7 @@ export class FinanceManualReceiptService {
             payerAccountId: true,
             invoiceNumber: true,
             status: true,
+            currency: true,
             totalMinor: true,
           },
         });

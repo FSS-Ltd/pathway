@@ -59,6 +59,8 @@ const PROJECTS = {
       "STRIPE_SECRET_KEY_TEST",
       "STRIPE_WEBHOOK_SECRET_TEST",
       "STRIPE_PRICE_MAP_TEST",
+      "FINANCE_STATEMENT_OUTBOX_SECRET",
+      "FINANCE_STATEMENT_MONTH_END_SECRET",
       "RESEND_WEBHOOK_SECRET",
       // Not read unless the token issuer can't be derived from
       // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY - see token-verifier.ts.

@@ -1,14 +1,10 @@
-import { Body, Controller, Get, Inject, Post, UseGuards } from "@nestjs/common";
+import { Controller, Get, Inject, Post, UseGuards } from "@nestjs/common";
 import { PathwayRequestContext } from "@pathway/auth";
 import { PermissionGuard } from "../access-control/permission.guard";
 import { AuthUserGuard } from "../auth/auth-user.guard";
 import { FinanceAccessGuard } from "./access/finance-access.guard";
 import { RequireFinanceAccess } from "./access/finance-access.decorator";
-import {
-  financeRequestActor,
-  parseFinanceInput,
-} from "./finance-controller-support";
-import { financeStripeConnectionStartSchema } from "./dto/finance-stripe-connection.dto";
+import { financeRequestActor } from "./finance-controller-support";
 import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connection.service";
 
 @Controller("finance/stripe-connection")
@@ -37,10 +33,9 @@ export class FinanceStripeConnectionController {
     action: "MANAGE_COLLECTION_ACCOUNT",
     permission: "finance.payments.manage",
   })
-  createOnboardingLink(@Body() body: unknown) {
+  createOnboardingLink() {
     return this.connections.createOnboardingLink(
       financeRequestActor(this.requestContext),
-      parseFinanceInput(financeStripeConnectionStartSchema, body),
     );
   }
 

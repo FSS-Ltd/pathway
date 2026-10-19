@@ -31,7 +31,7 @@ export type FinanceManualReceiptRequestRecord =
   }>;
 
 export const financeTransferNoticeInclude = {
-  invoice: { select: { id: true, invoiceNumber: true } },
+  invoice: { select: { id: true, invoiceNumber: true, currency: true } },
   payerAccount: { select: { id: true, displayName: true } },
   manualReceiptRequest: {
     select: { id: true, status: true, receiptId: true },
@@ -97,6 +97,7 @@ export function toFinanceTransferNoticeView(
     invoiceId: notice.invoice.id,
     invoiceNumber: notice.invoiceNumber.toString(),
     amountMinor: notice.amountMinor.toString(),
+    currency: notice.invoice.currency,
     declaredTransferredAt: notice.declaredTransferredAt.toISOString(),
     submittedAt: notice.createdAt.toISOString(),
     receiptStatus: "DECLARED_ONLY" as const,

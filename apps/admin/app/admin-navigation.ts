@@ -1,5 +1,5 @@
 import React from "react";
-import { ListChecks } from "lucide-react";
+import { ListChecks, Wallet } from "lucide-react";
 import type { Capability, PermissionKey } from "@pathway/platform";
 import { defaultSidebarItems, type SidebarNavItem } from "@pathway/ui";
 import {
@@ -203,6 +203,19 @@ const navItemsWithAccess: (SidebarNavItem & {
     group: "Compliance",
   },
   { ...defaultSidebarItems[11], access: "billing", group: "Admin" }, // Billing (org admin only)
+  {
+    label: "Finance settings",
+    href: "/finance/settings",
+    icon: React.createElement(Wallet, {
+      "aria-hidden": true,
+      className: "h-5 w-5",
+    }),
+    access: "staff-or-admin",
+    capability: "finance.invoices.read",
+    permission: "finance.payments.manage",
+    additionalPermission: "finance.payments.read",
+    group: "Admin",
+  },
   {
     label: "Blog",
     href: "/admin/blog",
