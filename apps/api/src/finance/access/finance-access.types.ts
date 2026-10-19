@@ -35,6 +35,7 @@ export type FinanceStaffAction =
 
 export type FinancePayerAction =
   | "READ_ACCOUNT"
+  | "READ_STATEMENTS"
   | "DOWNLOAD_DOCUMENT"
   | "DECLARE_TRANSFER"
   | "SETTLE_ISSUED_INVOICE";

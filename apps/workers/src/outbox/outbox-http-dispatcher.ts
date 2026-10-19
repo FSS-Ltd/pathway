@@ -13,11 +13,17 @@ interface InstitutionalAddonTrialOutboxEndpoint {
   secret: string;
 }
 
+interface FinanceStatementNoticeOutboxEndpoint {
+  url: string;
+  secret: string;
+}
+
 interface HttpOutboxDispatcherOptions {
   genericUrl: string;
   genericToken?: string;
   behaviour?: BehaviourOutboxEndpoint;
   institutionalAddonTrials?: InstitutionalAddonTrialOutboxEndpoint;
+  financeStatements?: FinanceStatementNoticeOutboxEndpoint;
 }
 
 type DispatchEnvironment = Record<string, string | undefined>;
@@ -36,15 +42,24 @@ export class HttpOutboxDispatcher implements OutboxDispatcher {
     const addonTrialEndpoint = isAddonTrialExpiry
       ? this.options.institutionalAddonTrials
       : undefined;
+    const isFinanceStatementNotice =
+      intent.eventType === "finance.statement.notice.requested";
+    const financeStatementEndpoint = isFinanceStatementNotice
+      ? this.options.financeStatements
+      : undefined;
     if (isBehaviourNotification && !behaviour) {
       throw new Error("Behaviour outbox dispatch is not configured");
+    }
+    if (isFinanceStatementNotice && !financeStatementEndpoint) {
+      throw new Error("Finance statement outbox dispatch is not configured");
     }
     if (isAddonTrialExpiry && !addonTrialEndpoint) {
       throw new Error(
         "Institutional add-on trial outbox dispatch is not configured",
       );
     }
-    const endpoint = behaviour ?? addonTrialEndpoint;
+    const endpoint =
+      behaviour ?? addonTrialEndpoint ?? financeStatementEndpoint;
     const response = await fetch(endpoint?.url ?? this.options.genericUrl, {
       method: "POST",
       headers: {
@@ -52,6 +67,7 @@ export class HttpOutboxDispatcher implements OutboxDispatcher {
         "idempotency-key": intent.idempotencyKey,
         ...(!isBehaviourNotification &&
         !isAddonTrialExpiry &&
+        !isFinanceStatementNotice &&
         this.options.genericToken
           ? {
               authorization: `Bearer ${this.options.genericToken}`,
@@ -140,6 +156,40 @@ export function loadBehaviourOutboxEndpoint(
   ) {
     throw new Error(
       "BEHAVIOUR_OUTBOX_DISPATCH_URL must target /internal/outbox/behaviour",
+    );
+  }
+  return { url: url.toString(), secret };
+}
+
+export function loadFinanceStatementNoticeOutboxEndpoint(
+  environment: DispatchEnvironment,
+): FinanceStatementNoticeOutboxEndpoint | undefined {
+  const rawUrl = environment.FINANCE_STATEMENT_OUTBOX_DISPATCH_URL?.trim();
+  const secret = environment.FINANCE_STATEMENT_OUTBOX_SECRET?.trim();
+  if (!rawUrl && !secret) return undefined;
+  if (!rawUrl) {
+    throw new Error("FINANCE_STATEMENT_OUTBOX_DISPATCH_URL is required");
+  }
+  if (!secret) throw new Error("FINANCE_STATEMENT_OUTBOX_SECRET is required");
+
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error(
+      "FINANCE_STATEMENT_OUTBOX_DISPATCH_URL must be a valid URL",
+    );
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.pathname !== "/internal/outbox/finance/statements/notice" ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error(
+      "FINANCE_STATEMENT_OUTBOX_DISPATCH_URL must target the secure Finance statement notice endpoint",
     );
   }
   return { url: url.toString(), secret };

@@ -22,6 +22,10 @@ jobs:
       OUTBOX_DISPATCH_TOKEN: ${{ secrets.OUTBOX_DISPATCH_TOKEN }}
       BEHAVIOUR_OUTBOX_DISPATCH_URL: ${{ secrets.BEHAVIOUR_OUTBOX_DISPATCH_URL }}
       BEHAVIOUR_OUTBOX_SECRET: ${{ secrets.BEHAVIOUR_OUTBOX_SECRET }}
+      FINANCE_STATEMENT_MONTH_END_URL: ${{ secrets.FINANCE_STATEMENT_MONTH_END_URL }}
+      FINANCE_STATEMENT_MONTH_END_SECRET: ${{ secrets.FINANCE_STATEMENT_MONTH_END_SECRET }}
+      FINANCE_STATEMENT_OUTBOX_DISPATCH_URL: ${{ secrets.FINANCE_STATEMENT_OUTBOX_DISPATCH_URL }}
+      FINANCE_STATEMENT_OUTBOX_SECRET: ${{ secrets.FINANCE_STATEMENT_OUTBOX_SECRET }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
       SUPABASE_STORAGE_PRIVATE_BUCKET: ${{ secrets.SUPABASE_STORAGE_PRIVATE_BUCKET }}
@@ -94,6 +98,20 @@ jobs:
 
       - name: Dispatch outbox events
         run: pnpm --filter @pathway/workers outbox:dispatch
+
+      - name: Generate closed-month Finance statements
+        if: ${{ env.FINANCE_STATEMENT_MONTH_END_URL != '' && env.FINANCE_STATEMENT_MONTH_END_SECRET != '' }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" && "$(TZ=Europe/London date +%d)" != "01" ]]; then
+            echo "Skipping Finance month-end outside the first London calendar day."
+            exit 0
+          fi
+          pnpm --filter @pathway/workers finance:statements:month-end
+
+      - name: Dispatch Finance statement notices
+        if: ${{ env.FINANCE_STATEMENT_OUTBOX_DISPATCH_URL != '' && env.FINANCE_STATEMENT_OUTBOX_SECRET != '' }}
+        run: pnpm --filter @pathway/workers outbox:dispatch-finance-statements
 
       - name: Run retention
         run: pnpm --filter @pathway/workers retention:run

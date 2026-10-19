@@ -17,6 +17,7 @@ const config: Config = {
   },
   moduleFileExtensions: ["ts", "tsx", "js", "json"],
   moduleNameMapper: {
+    "^@react-pdf/renderer$": "<rootDir>/test-helpers/react-pdf.mock.ts",
     // Map workspace imports like @pathway/db -> ../../packages/db/src/index.ts for tests
     "^@pathway/([^/]+)$": "<rootDir>/../../packages/$1/src/index.ts",
     // Let @prisma/client resolve from node_modules; avoid manual mapping which can break typings/runtime

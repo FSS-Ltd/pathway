@@ -64,7 +64,7 @@ export function noticeAttachmentKey(
 
 /** Private buckets may only receive tenant-isolated classes registered here. */
 export function isPrivateStorageKey(key: string): boolean {
-  return /^tenants\/[^/]+\/(?:children\/[^/]+\/photo\.[^/]+|staff\/[^/]+\/avatar\.[^/]+|lessons\/[^/]+\/resources\/[^/]+|reports\/[^/]+\/bundle\.csv|privacy-exports\/[^/]+\/export\.zip|messages\/[^/]+\/[^/]+|notices\/[^/]+\/[^/]+|(?:agreements|compliance-evidence)\/[0-9a-f-]{36}\/document\.pdf)$/.test(
+  return /^tenants\/[^/]+\/(?:children\/[^/]+\/photo\.[^/]+|staff\/[^/]+\/avatar\.[^/]+|lessons\/[^/]+\/resources\/[^/]+|reports\/[^/]+\/bundle\.csv|privacy-exports\/[^/]+\/export\.zip|messages\/[^/]+\/[^/]+|notices\/[^/]+\/[^/]+|(?:agreements|compliance-evidence)\/[0-9a-f-]{36}\/document\.pdf|finance-statements\/[0-9a-f-]{36}\/[0-9a-f]{64}\.pdf|finance-documents\/[0-9a-f-]{36}\/(?:invoice|credit-note|receipt)\.pdf)$/.test(
     key,
   );
 }
@@ -76,4 +76,20 @@ export function blogAssetKey(sha256: string, mimeType: string): string {
 function sanitizeStorageSegment(value: string): string {
   const sanitized = value.trim().replace(/[^\w.-]/g, "_");
   return sanitized.length > 0 ? sanitized : "resource";
+}
+
+export function financeStatementStorageKey(
+  tenantId: string,
+  statementId: string,
+  sha256: string,
+): string {
+  return `tenants/${tenantId}/finance-statements/${statementId}/${sha256}.pdf`;
+}
+
+export function financeDocumentStorageKey(
+  tenantId: string,
+  kind: "invoice" | "credit-note" | "receipt",
+  documentId: string,
+): string {
+  return `tenants/${tenantId}/finance-documents/${documentId}/${kind}.pdf`;
 }

@@ -48,6 +48,7 @@ export function canPerformFinancePayerAction(
   return (
     mode === "SERVICING_ONLY" &&
     (action === "READ_ACCOUNT" ||
+      action === "READ_STATEMENTS" ||
       action === "DOWNLOAD_DOCUMENT" ||
       action === "DECLARE_TRANSFER" ||
       action === "SETTLE_ISSUED_INVOICE")

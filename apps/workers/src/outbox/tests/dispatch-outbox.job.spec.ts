@@ -97,7 +97,7 @@ describe("DispatchOutboxJob", () => {
     expect(outboxEvent.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          eventType: { not: "ace.message.sent" },
+          eventType: { notIn: ["ace.message.sent"] },
         }),
       }),
     );
@@ -138,6 +138,35 @@ describe("DispatchOutboxJob", () => {
       }),
     );
     expect(dispatcher.dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("can leave an event type for a separately configured dispatcher", async () => {
+    const outboxEvent = {
+      findMany: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn(),
+      update: jest.fn(),
+    };
+    const dispatcher: jest.Mocked<OutboxDispatcher> = {
+      dispatch: jest.fn(),
+    };
+
+    await new DispatchOutboxJob(
+      createClient(outboxEvent),
+      dispatcher,
+      undefined,
+      ["finance.statement.notice.requested"],
+    ).run();
+
+    expect(outboxEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          eventType: {
+            notIn: ["ace.message.sent", "finance.statement.notice.requested"],
+          },
+        }),
+      }),
+    );
+    expect(dispatcher.dispatch).not.toHaveBeenCalled();
   });
 
   it("preserves trusted behaviour tenant and organisation scope in the consumer intent", async () => {

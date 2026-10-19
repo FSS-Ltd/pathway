@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const positiveAmountMinorSchema = z
   .string()
-  .regex(/^[1-9]\d*$/, "Use a positive integer amount in pence");
+  .regex(/^[1-9]\d*$/, "Use a positive integer amount in currency minor units");
 
 export const financeReceiptListQuerySchema = z
   .object({

@@ -34,6 +34,7 @@ const financeTables = [
   "FinanceTransferNotice",
   "FinanceStripeConnection",
   "FinanceCheckoutAttempt",
+  "FinanceStatement",
   "FinanceStripeWebhookEvent",
   "FinancePayerAccount",
   "FinancePayerGrant",
@@ -132,6 +133,30 @@ describe("Finance ledger database foundation", () => {
         forced: true,
       })),
     );
+  });
+
+  it("limits Finance scope discovery to the trusted worker role", async () => {
+    if (!requireDatabase()) return;
+
+    const profile = await createProfile(tenantAId);
+    try {
+      await createPayerAccount(profile, "Statement scope test");
+      const scopes = await prisma.$queryRaw<
+        Array<{ tenantId: string; orgId: string }>
+      >`
+        SELECT "tenantId", "orgId" FROM app.list_finance_statement_scopes()
+      `;
+      expect(scopes).toContainEqual({ tenantId: tenantAId, orgId });
+
+      await withTenantRlsContext(tenantAId, orgId, async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${tenantRlsRole}"`);
+        await expect(
+          tx.$queryRaw`SELECT "tenantId", "orgId" FROM app.list_finance_statement_scopes()`,
+        ).rejects.toMatchObject({ code: "P2010", meta: { code: "42501" } });
+      });
+    } finally {
+      await removeProfile(profile);
+    }
   });
 
   it("hides other-tenant profiles and rejects forged scope under a low-privilege role", async () => {

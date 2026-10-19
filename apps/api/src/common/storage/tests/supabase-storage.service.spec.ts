@@ -1,4 +1,9 @@
 import { SupabaseStorageService } from "../supabase-storage.service";
+import {
+  financeDocumentStorageKey,
+  financeStatementStorageKey,
+  isPrivateStorageKey,
+} from "../storage-key.util";
 
 describe("SupabaseStorageService.getPublicUrl", () => {
   const originalEnv = { ...process.env };
@@ -33,11 +38,49 @@ describe("SupabaseStorageService.getPublicUrl", () => {
 
   it("rejects a private-bucket key outside the registered namespaces", async () => {
     const service = new SupabaseStorageService();
-    await expect(service.uploadObject({
-      bucket: "private",
-      key: "unscoped/secret.pdf",
-      body: Buffer.from("secret"),
-      contentType: "application/pdf",
-    })).rejects.toThrow("Private storage key is not allow-listed");
+    await expect(
+      service.uploadObject({
+        bucket: "private",
+        key: "unscoped/secret.pdf",
+        body: Buffer.from("secret"),
+        contentType: "application/pdf",
+      }),
+    ).rejects.toThrow("Private storage key is not allow-listed");
+  });
+});
+
+describe("Finance private document keys", () => {
+  const tenantId = "tenant_1";
+  const documentId = "04b7d8c4-c891-4af8-9011-d5a403ce3296";
+
+  it("allow-lists private statement, invoice, credit, and receipt documents", () => {
+    expect(
+      isPrivateStorageKey(
+        financeStatementStorageKey(tenantId, documentId, "a".repeat(64)),
+      ),
+    ).toBe(true);
+    for (const kind of ["invoice", "credit-note", "receipt"] as const) {
+      expect(
+        isPrivateStorageKey(
+          financeDocumentStorageKey(tenantId, kind, documentId),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("rejects unscoped or unexpected Finance document paths", () => {
+    expect(
+      isPrivateStorageKey(
+        `tenants/${tenantId}/finance-documents/${documentId}/invoice.csv`,
+      ),
+    ).toBe(false);
+    expect(
+      isPrivateStorageKey(`finance-statements/${documentId}/statement.pdf`),
+    ).toBe(false);
+    expect(
+      isPrivateStorageKey(
+        `tenants/${tenantId}/finance-statements/${documentId}/not-a-digest.pdf`,
+      ),
+    ).toBe(false);
   });
 });

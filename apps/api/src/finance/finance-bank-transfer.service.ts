@@ -213,6 +213,7 @@ export class FinanceBankTransferService {
           financeProfileId: true,
           invoiceNumber: true,
           status: true,
+          currency: true,
           totalMinor: true,
         },
       });
@@ -232,6 +233,8 @@ export class FinanceBankTransferService {
         throw new NotFoundException("Bank transfer details are unavailable");
       }
       return {
+        currency: invoice.currency,
+        outstandingMinor: balance.get(invoice.id)?.outstandingMinor ?? "0",
         accountHolderName: destination.accountHolderName,
         sortCode: destination.sortCode,
         accountNumber: destination.accountNumber,

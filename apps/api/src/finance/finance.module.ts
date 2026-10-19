@@ -7,6 +7,7 @@ import {
 import { AccessControlModule } from "../access-control/access-control.module";
 import { AuthModule } from "../auth/auth.module";
 import { CommonModule } from "../common/common.module";
+import { MailerModule } from "../mailer/mailer.module";
 import { FinanceAccessModule } from "./access/finance-access.module";
 import { FinancePayerGrantController } from "./access/finance-payer-grant.controller";
 import { FinancePayerGrantService } from "./access/finance-payer-grant.service";
@@ -16,12 +17,22 @@ import { FinanceCommandService } from "./finance-command.service";
 import { FinanceInvoiceController } from "./finance-invoice.controller";
 import { FinanceInvoiceService } from "./finance-invoice.service";
 import { FinanceBalanceService } from "./finance-balance.service";
+import { FinanceStatementController } from "./finance-statement.controller";
+import { FinanceStatementService } from "./finance-statement.service";
+import { FinanceStatementDocumentService } from "./finance-statement-document.service";
+import { FinanceDocumentController } from "./finance-document.controller";
+import { FinanceDocumentService } from "./finance-document.service";
+import { FinanceStatementNoticeService } from "./finance-statement-notice.service";
+import { FinanceStatementNoticeController } from "./finance-statement-notice.controller";
+import { FinanceStatementJobController } from "./finance-statement-job.controller";
 import { FinanceReceiptController } from "./finance-receipt.controller";
 import { FinanceReceiptService } from "./finance-receipt.service";
 import { FinanceBankTransferController } from "./finance-bank-transfer.controller";
 import { FinanceBankTransferService } from "./finance-bank-transfer.service";
 import { FinanceManualReceiptController } from "./finance-manual-receipt.controller";
 import { FinanceManualReceiptService } from "./finance-manual-receipt.service";
+import { FinanceProfileController } from "./finance-profile.controller";
+import { FinanceProfileService } from "./finance-profile.service";
 import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
 import { FinanceStripeCheckoutController } from "./finance-stripe-checkout.controller";
 import { FinanceStripeWebhookController } from "./stripe/finance-stripe-webhook.controller";
@@ -62,6 +73,7 @@ import {
   imports: [
     BillingModule,
     CommonModule,
+    MailerModule,
     AuthModule,
     AccessControlModule,
     FinanceAccessModule,
@@ -70,6 +82,10 @@ import {
     FinanceInvoiceController,
     FinanceCreditNoteController,
     FinanceReceiptController,
+    FinanceStatementController,
+    FinanceDocumentController,
+    FinanceStatementNoticeController,
+    FinanceStatementJobController,
     FinanceBankTransferController,
     FinanceManualReceiptController,
     FinanceStripeConnectionController,
@@ -77,15 +93,21 @@ import {
     FinancePayerGrantController,
     FinanceStripeWebhookController,
     FinanceStripeWebhookInternalController,
+    FinanceProfileController,
   ],
   providers: [
     FinanceBalanceService,
+    FinanceStatementService,
+    FinanceStatementDocumentService,
+    FinanceDocumentService,
+    FinanceStatementNoticeService,
     FinanceCommandService,
     FinanceInvoiceService,
     FinanceCreditNoteService,
     FinanceReceiptService,
     FinanceBankTransferService,
     FinanceManualReceiptService,
+    FinanceProfileService,
     FinancePayerGrantService,
     FinanceStripeConnectionService,
     FinanceStripeCheckoutAttemptService,

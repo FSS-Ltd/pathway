@@ -202,6 +202,20 @@ Optional GitHub Actions production secrets:
 - `AV30_TENANT_IDS`
 - `REPORT_BUNDLE_TENANT_IDS`
 - `OUTBOX_DISPATCH_TOKEN`
+- `FINANCE_STATEMENT_MONTH_END_URL`
+- `FINANCE_STATEMENT_MONTH_END_SECRET`
+- `FINANCE_STATEMENT_OUTBOX_DISPATCH_URL`
+- `FINANCE_STATEMENT_OUTBOX_SECRET`
+
+Finance statement notices use a dedicated worker dispatch endpoint and secret.
+Configure both optional secrets to enable delivery; the scheduled worker skips
+statement notices while either value is absent, and the general outbox worker
+leaves those events queued for the dedicated dispatcher.
+
+Month-end statements use an internal API endpoint and a dedicated secret. Set
+both optional values to schedule generation; the daily workflow runs it only on
+the first London calendar day and derives the previous month in Europe/London.
+Manual workflow dispatch generates the previous closed month.
 
 The GitHub connector reports `jntagengwa/pathway` as a private repository with
 default branch `master`. The CI workflow is configured for `master` and

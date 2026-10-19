@@ -1,8 +1,8 @@
 # NexSteps Finance add-on build plan
 
-**Status:** T01–T09 are merged; T10 confirmed receipt posting is in progress. Provider-backed card Checkout awaits an eligible school test account. Direct-charge Bacs remains blocked pending exact-path provider evidence in T13.
+**Status:** T01–T10 are merged; T11 statements and school currency settings are in progress. Provider-backed card Checkout awaits an eligible school test account. Direct-charge Bacs remains blocked pending exact-path provider evidence in T13.
 
-**Market:** Great Britain, GBP, one finance legal entity and one collection account per tenant for the initial release.
+**Market:** Great Britain and the 27 EU member states, with one local collection currency per school legal country, one finance legal entity and one collection account per tenant for the initial release.
 
 **Access:** Paid Finance entitlement only, including eligible plan or bundle inclusion.
 
@@ -42,7 +42,10 @@ Resolve tenant, organisation and legal-entity scope from authenticated server co
 
 ## 3. Financial contracts and invariants
 
-- Store GBP as integer minor units. Reject fractional minor units, invalid signs, unsupported currency and unsafe totals at the input boundary.
+- Store money as integer minor units in the school's configured collection currency. Reject fractional minor units, invalid signs, unsupported currency and unsafe totals at the input boundary.
+- Configure the school's legal country before issuing invoices or connecting Stripe. The country selects the collection currency: EUR for the 21 euro-area countries; CZK for Czechia; DKK for Denmark; HUF for Hungary; PLN for Poland; RON for Romania; SEK for Sweden; and GBP for the United Kingdom. The supported country/currency table is shared by the UI, API and database contract.
+- Lock the legal country and currency after the first Finance record or Stripe connection. Issued invoices, receipts, credits and statements retain their recorded currency; do not convert historical records when configuration changes.
+- Use the invoice's stored currency for family Checkout and all financial documents. Stripe supports card presentment in each listed currency, subject to the connected account's country and enabled capabilities. Presentment currency does not guarantee payout in that currency; Stripe may convert at settlement. HUF can be charged with two decimal places, but manual payouts require whole HUF amounts.
 - An issued invoice is immutable, including its legal-entity, payer, line, total, tax, due-date and terms snapshot. Draft edits do not rewrite an issued invoice.
 - Record corrections as voids, credits, reversals, refunds, returns or a linked replacement invoice. Preserve the original and the complete event history.
 - Derive amount due from issued charges, posted credits and append-only allocations of confirmed receipts, including reversals. Do not use a mutable invoice-paid flag as the financial source of truth.
@@ -139,7 +142,7 @@ Each task is a standalone branch and pull request using a purpose-based prefix s
 | **T08** | Signed, durable webhook inbox and replayable worker. Acknowledged events survive queue failure; duplicate and out-of-order events post once.                                                                                                                                                                              |                   4–6 |
 | **T09** | At most one unresolved checkout attempt per invoice obligation. Recover after provider timeout, replace a session when the balance changes, expire open sessions on payer-grant revocation, and reserve the amount against manual allocation. Never post from a redirect; no platform fee or cross-school customer reuse. |                   3–4 |
 | **T10** | Post only provider-confirmed receipts and allocate safely. Keep processing, family debt, fees and payouts distinct.                                                                                                                                                                                                       |                   3–4 |
-| **T11** | Private invoice, credit, receipt and on-demand/month-end statement documents; secure notices; correct reminder suppression during processing/dispute.                                                                                                                                                                     |                   4–6 |
+| **T11** | School country/currency setup; private invoice, credit, receipt and on-demand/month-end statement documents; secure notices; correct reminder suppression during processing/dispute.                                                                                                                                      |                   4–6 |
 | **T12** | Independently approved refunds and dispute/return movements. Preserve a refund and a later return as separate events.                                                                                                                                                                                                     |                   3–5 |
 | **T13** | Hosted mandate setup, fixed instalments and monthly invoice generation only after direct-charge Bacs compatibility is proved. Keep Bacs live-disabled until delayed-payment and return tests pass.                                                                                                                        |                   5–8 |
 | **T14** | Staff Finance workspace, defined reports and scoped exports using existing UI primitives. Reconcile each view against invoices and ledger.                                                                                                                                                                                |                   5–7 |

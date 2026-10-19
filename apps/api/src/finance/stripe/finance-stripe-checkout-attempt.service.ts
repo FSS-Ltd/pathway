@@ -70,6 +70,7 @@ export class FinanceStripeCheckoutAttemptService {
           financeProfileId: true,
           invoiceNumber: true,
           status: true,
+          currency: true,
           totalMinor: true,
         },
       });
@@ -146,6 +147,7 @@ export class FinanceStripeCheckoutAttemptService {
           stripeAccountId: true,
           invoiceId: true,
           amountMinor: true,
+          currency: true,
           idempotencyKey: true,
           integrationIdentifier: true,
           stripeCheckoutSessionId: true,
@@ -168,7 +170,8 @@ export class FinanceStripeCheckoutAttemptService {
         }
         if (
           existing.stripeConnectionId !== connection.id ||
-          existing.stripeAccountId !== connection.stripeAccountId
+          existing.stripeAccountId !== connection.stripeAccountId ||
+          existing.currency !== invoice.currency
         ) {
           throw new ConflictException(
             "An earlier checkout is still being resolved",
@@ -245,7 +248,7 @@ export class FinanceStripeCheckoutAttemptService {
           stripeAccountId: connection.stripeAccountId,
           livemode: connection.livemode,
           amountMinor: outstandingMinor,
-          currency: "GBP",
+          currency: invoice.currency,
           idempotencyKey: `finance-checkout-${attemptId}`,
           integrationIdentifier: financeCheckoutIntegrationIdentifier(),
         },
@@ -256,6 +259,7 @@ export class FinanceStripeCheckoutAttemptService {
           stripeAccountId: true,
           invoiceId: true,
           amountMinor: true,
+          currency: true,
           idempotencyKey: true,
           integrationIdentifier: true,
           stripeCheckoutSessionId: true,

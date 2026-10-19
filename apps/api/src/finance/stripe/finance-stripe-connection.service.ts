@@ -9,8 +9,8 @@ import {
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { randomUUID } from "node:crypto";
 import { FinanceAccessService } from "../access/finance-access.service";
+import type { FinanceCountryCode } from "@pathway/platform";
 import type { FinanceAccessScope } from "../access/finance-access.reader";
-import type { FinanceStripeConnectionStartInput } from "../dto/finance-stripe-connection.dto";
 import {
   FINANCE_STRIPE_CONNECT_CONFIG,
   type FinanceStripeConnectConfig,
@@ -90,28 +90,43 @@ export class FinanceStripeConnectionService {
 
   async createOnboardingLink(
     actor: FinanceStripeConnectionActor,
-    input: FinanceStripeConnectionStartInput,
   ): Promise<FinanceStripeOnboardingResult> {
     await this.financeAccess.assertStaffAction(
       actor,
       "MANAGE_COLLECTION_ACCOUNT",
     );
     const config = this.requireEnabled();
-    const profile = await this.getOrCreateProfile(actor, input.legalEntityName);
+    const configuredProfile = await this.getFinanceProfile(actor);
+    if (!configuredProfile) {
+      throw new BadRequestException(
+        "Save the school Finance settings before connecting Stripe",
+      );
+    }
     const connection = await this.getOrCreateConnection(
       actor,
-      profile.id,
+      configuredProfile.id,
       config,
     );
+    const profile = await this.getFinanceProfile(actor);
+    if (!profile || connection.financeProfileId !== profile.id) {
+      throw new ConflictException(
+        "Finance settings changed during Stripe setup",
+      );
+    }
 
     let accountId = connection.stripeAccountId;
     if (!accountId) {
       const created = await this.provider.createAccount({
         legalEntityName: profile.legalEntityName,
+        countryCode: profile.countryCode,
         connectionId: connection.id,
         idempotencyKey: `finance-connect-${connection.id}`,
       });
-      this.assertAccountModeAndCountry(created, config.mode);
+      this.assertAccountModeAndCountry(
+        created,
+        config.mode,
+        profile.countryCode,
+      );
       accountId = created.id;
       await this.saveAccountId(actor, connection.id, accountId);
     }
@@ -121,6 +136,7 @@ export class FinanceStripeConnectionService {
       connection.id,
       accountId,
       config.mode,
+      profile.countryCode,
     );
     if (status.status === "READY" || status.status === "DISCONNECTED") {
       return { ...status, onboardingUrl: null, expiresAt: null };
@@ -155,11 +171,14 @@ export class FinanceStripeConnectionService {
         ? toConnectionView(connection)
         : emptyConnectionState("NOT_CONNECTED");
     }
+    const profile = await this.getFinanceProfile(actor);
+    if (!profile) throw new NotFoundException("Finance profile not found");
     return this.refreshStoredConnection(
       actor,
       connection.id,
       connection.stripeAccountId,
       config.mode,
+      profile.countryCode,
     );
   }
 
@@ -179,13 +198,18 @@ export class FinanceStripeConnectionService {
           id: string;
           livemode: boolean;
           status: "DISCONNECTED" | "CONNECTING" | "READY" | "RESTRICTED";
+          countryCode: FinanceCountryCode;
         }[]
       >`
-        SELECT "id", "livemode", "status"
-        FROM "FinanceStripeConnection"
-        WHERE "tenantId" = ${tenantId}
-          AND "orgId" = ${orgId}
-          AND "stripeAccountId" = ${accountId}
+        SELECT c."id", c."livemode", c."status", p."countryCode"
+        FROM "FinanceStripeConnection" AS c
+        INNER JOIN "FinanceProfile" AS p
+          ON p."id" = c."financeProfileId"
+          AND p."tenantId" = c."tenantId"
+          AND p."orgId" = c."orgId"
+        WHERE c."tenantId" = ${tenantId}
+          AND c."orgId" = ${orgId}
+          AND c."stripeAccountId" = ${accountId}
         FOR UPDATE
       `;
       const connection = connections[0];
@@ -195,7 +219,11 @@ export class FinanceStripeConnectionService {
       }
 
       const account = await this.provider.retrieveAccount(accountId);
-      this.assertAccountModeAndCountry(account, config.mode);
+      this.assertAccountModeAndCountry(
+        account,
+        config.mode,
+        connection.countryCode,
+      );
       await tx.financeStripeConnection.updateMany({
         where: {
           id: connection.id,
@@ -267,52 +295,6 @@ export class FinanceStripeConnectionService {
     return this.config;
   }
 
-  private async getOrCreateProfile(
-    actor: FinanceStripeConnectionActor,
-    legalEntityName: string | undefined,
-  ) {
-    const existing = await withTenantRlsContext(
-      actor.tenantId,
-      actor.orgId,
-      (tx) =>
-        tx.financeProfile.findUnique({
-          where: {
-            tenantId_orgId: { tenantId: actor.tenantId, orgId: actor.orgId },
-          },
-        }),
-    );
-    if (existing) return existing;
-    if (!legalEntityName) {
-      throw new BadRequestException("Finance legal entity name is required");
-    }
-
-    try {
-      return await withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
-        tx.financeProfile.create({
-          data: {
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-            legalEntityName,
-          },
-        }),
-      );
-    } catch (error) {
-      if (!isUniqueConstraintError(error)) throw error;
-      const profile = await withTenantRlsContext(
-        actor.tenantId,
-        actor.orgId,
-        (tx) =>
-          tx.financeProfile.findUnique({
-            where: {
-              tenantId_orgId: { tenantId: actor.tenantId, orgId: actor.orgId },
-            },
-          }),
-      );
-      if (profile) return profile;
-      throw error;
-    }
-  }
-
   private async getOrCreateConnection(
     actor: FinanceStripeConnectionActor,
     financeProfileId: string,
@@ -338,16 +320,30 @@ export class FinanceStripeConnectionService {
     }
 
     try {
-      return await withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
-        tx.financeStripeConnection.create({
-          data: {
-            financeProfileId,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-            requestedByUserId: actor.userId,
-            livemode: config.mode === "live",
-          },
-        }),
+      return await withTenantRlsContext(
+        actor.tenantId,
+        actor.orgId,
+        async (tx) => {
+          const profiles = await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "FinanceProfile"
+          WHERE "id" = ${financeProfileId}
+            AND "tenantId" = ${actor.tenantId}
+            AND "orgId" = ${actor.orgId}
+          FOR SHARE
+        `;
+          if (profiles.length !== 1) {
+            throw new NotFoundException("Finance profile not found");
+          }
+          return tx.financeStripeConnection.create({
+            data: {
+              financeProfileId,
+              tenantId: actor.tenantId,
+              orgId: actor.orgId,
+              requestedByUserId: actor.userId,
+              livemode: config.mode === "live",
+            },
+          });
+        },
       );
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
@@ -403,9 +399,10 @@ export class FinanceStripeConnectionService {
     connectionId: string,
     accountId: string,
     mode: "test" | "live",
+    countryCode: FinanceCountryCode,
   ): Promise<FinanceStripeConnectionView> {
     const account = await this.provider.retrieveAccount(accountId);
-    this.assertAccountModeAndCountry(account, mode);
+    this.assertAccountModeAndCountry(account, mode, countryCode);
     const status = financeConnectionStatus(account);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await tx.financeStripeConnection.updateMany({
@@ -443,6 +440,21 @@ export class FinanceStripeConnectionService {
     );
   }
 
+  private async getFinanceProfile(actor: FinanceStripeConnectionActor) {
+    return withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
+      tx.financeProfile.findUnique({
+        where: {
+          tenantId_orgId: { tenantId: actor.tenantId, orgId: actor.orgId },
+        },
+        select: {
+          id: true,
+          legalEntityName: true,
+          countryCode: true,
+        },
+      }),
+    );
+  }
+
   private async getConnectionById(
     actor: FinanceStripeConnectionActor,
     connectionId: string,
@@ -462,8 +474,12 @@ export class FinanceStripeConnectionService {
   private assertAccountModeAndCountry(
     account: StripeFinanceAccount,
     mode: "test" | "live",
+    countryCode: FinanceCountryCode,
   ): void {
-    if (account.livemode !== (mode === "live") || account.country !== "GB") {
+    if (
+      account.livemode !== (mode === "live") ||
+      account.country !== countryCode
+    ) {
       throw new ServiceUnavailableException(
         "Stripe account configuration is invalid",
       );

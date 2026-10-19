@@ -2,7 +2,7 @@ const MIN_POSTGRES_BIGINT = -(1n << 63n);
 const MAX_POSTGRES_BIGINT = (1n << 63n) - 1n;
 const INTEGER_STRING = /^-?(?:0|[1-9]\d*)$/;
 
-/** Parse an exact amount in currency minor units (for example, pence). */
+/** Parse an exact amount in currency minor units (for example, cents). */
 export function parseMinorUnits(value: unknown): bigint {
   let amount: bigint;
 

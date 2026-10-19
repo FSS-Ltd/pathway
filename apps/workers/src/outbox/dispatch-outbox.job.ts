@@ -61,6 +61,7 @@ export class DispatchOutboxJob {
     private readonly client: OutboxDispatchClient,
     private readonly dispatcher: OutboxDispatcher,
     private readonly eventTypes?: readonly string[],
+    private readonly excludedEventTypes: readonly string[] = [],
   ) {}
 
   async run(
@@ -74,7 +75,9 @@ export class DispatchOutboxJob {
           where: {
             eventType: this.eventTypes
               ? { in: [...this.eventTypes] }
-              : { not: "ace.message.sent" },
+              : {
+                  notIn: ["ace.message.sent", ...this.excludedEventTypes],
+                },
             OR: [
               { status: "PENDING", nextAttemptAt: { lte: now } },
               { status: "PROCESSING", claimedAt: { lte: leaseCutoff } },
@@ -151,8 +154,14 @@ export class DispatchOutboxJob {
 export function createDispatchOutboxJob(
   dispatcher: OutboxDispatcher,
   eventTypes?: readonly string[],
+  excludedEventTypes: readonly string[] = [],
 ): DispatchOutboxJob {
-  return new DispatchOutboxJob(productionClient, dispatcher, eventTypes);
+  return new DispatchOutboxJob(
+    productionClient,
+    dispatcher,
+    eventTypes,
+    excludedEventTypes,
+  );
 }
 
 /**

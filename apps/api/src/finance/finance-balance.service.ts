@@ -14,6 +14,9 @@ interface InvoiceBalanceInput {
   id: string;
   status: "DRAFT" | "IN_REVIEW" | "ISSUED" | "VOID";
   totalMinor: bigint;
+  issuedAt?: Date | null;
+  voidedAt?: Date | null;
+  createdAt?: Date;
 }
 
 interface FinanceBalanceScope {
@@ -35,20 +38,34 @@ export class FinanceBalanceService {
     tx: Prisma.TransactionClient,
     actor: FinanceBalanceScope,
     invoices: readonly InvoiceBalanceInput[],
+    asOf?: Date,
+    ledgerCutoff?: Date,
   ): Promise<Map<string, FinanceInvoiceBalance>> {
-    const issued = invoices.filter((invoice) => invoice.status === "ISSUED");
+    const issued = invoices.filter((invoice) =>
+      isInvoiceIssuedAt(invoice, asOf, ledgerCutoff),
+    );
     const balances = new Map<string, FinanceInvoiceBalance>();
     for (const invoice of invoices) balances.set(invoice.id, zeroBalance);
     if (issued.length === 0) return balances;
 
     const invoiceIds = issued.map(({ id }) => id);
+    const movementCutoff = earlierDate(asOf, ledgerCutoff);
     const [credits, allocations] = await Promise.all([
       tx.financeCreditNote.findMany({
         where: {
           tenantId: actor.tenantId,
           orgId: actor.orgId,
           invoiceId: { in: invoiceIds },
-          status: "ISSUED",
+          ...(asOf
+            ? {
+                issuedAt: { lte: asOf },
+                ...(ledgerCutoff ? { createdAt: { lte: ledgerCutoff } } : {}),
+                OR: [
+                  { status: "ISSUED" as const },
+                  { status: "VOID" as const, voidedAt: { gt: asOf } },
+                ],
+              }
+            : { status: "ISSUED" as const }),
         },
         select: { invoiceId: true, totalMinor: true },
       }),
@@ -57,12 +74,23 @@ export class FinanceBalanceService {
           tenantId: actor.tenantId,
           orgId: actor.orgId,
           invoiceId: { in: invoiceIds },
-          receipt: { is: { status: "CONFIRMED" } },
+          ...(movementCutoff ? { createdAt: { lte: movementCutoff } } : {}),
+          receipt: {
+            is: {
+              status: "CONFIRMED",
+              ...(asOf ? { confirmedAt: { lte: asOf } } : {}),
+            },
+          },
         },
         select: {
           invoiceId: true,
           amountMinor: true,
-          reversals: { select: { amountMinor: true } },
+          reversals: {
+            where: movementCutoff
+              ? { createdAt: { lte: movementCutoff } }
+              : undefined,
+            select: { amountMinor: true },
+          },
         },
       }),
     ]);
@@ -115,4 +143,72 @@ export class FinanceBalanceService {
     }
     return balances;
   }
+
+  async accountBalanceAt(
+    tx: Prisma.TransactionClient,
+    actor: FinanceBalanceScope,
+    payerAccountId: string,
+    asOf: Date,
+    ledgerCutoff: Date = asOf,
+  ): Promise<string> {
+    const invoices = await tx.financeInvoice.findMany({
+      where: {
+        tenantId: actor.tenantId,
+        orgId: actor.orgId,
+        payerAccountId,
+        status: { in: ["ISSUED", "VOID"] },
+        issuedAt: { lte: asOf },
+        createdAt: { lte: ledgerCutoff },
+      },
+      select: {
+        id: true,
+        status: true,
+        totalMinor: true,
+        issuedAt: true,
+        voidedAt: true,
+        createdAt: true,
+      },
+    });
+    const balances = await this.forInvoices(
+      tx,
+      actor,
+      invoices,
+      asOf,
+      ledgerCutoff,
+    );
+    let balance = 0n;
+    for (const invoiceBalance of balances.values()) {
+      balance = addMinorUnits(
+        balance,
+        BigInt(invoiceBalance.outstandingMinor) -
+          BigInt(invoiceBalance.creditBalanceMinor),
+      );
+    }
+    return balance.toString();
+  }
+}
+
+function earlierDate(left?: Date, right?: Date): Date | undefined {
+  if (!left) return right;
+  if (!right) return left;
+  return left.getTime() <= right.getTime() ? left : right;
+}
+
+function isInvoiceIssuedAt(
+  invoice: InvoiceBalanceInput,
+  asOf?: Date,
+  ledgerCutoff?: Date,
+): boolean {
+  if (ledgerCutoff && invoice.createdAt && invoice.createdAt > ledgerCutoff) {
+    return false;
+  }
+  if (!asOf) return invoice.status === "ISSUED";
+  if (!invoice.issuedAt || invoice.issuedAt > asOf) return false;
+  return (
+    invoice.status === "ISSUED" ||
+    (invoice.status === "VOID" &&
+      invoice.voidedAt !== null &&
+      invoice.voidedAt !== undefined &&
+      invoice.voidedAt > asOf)
+  );
 }
