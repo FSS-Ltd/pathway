@@ -7,12 +7,12 @@ import {
 } from "../../tracker-engine";
 import { testProfile } from "../../tests/tracker-fixture";
 
-const now = new Date("2026-10-18T12:00:00Z");
+const now = new Date("2026-10-19T12:00:00Z");
 describe("England published catalogue history", () => {
   it("preserves the published first release and gives additions a new release", () => {
     expect(catalogueSchema.parse(catalogueV11).requirements).toHaveLength(68);
-    expect(TRACKER_CATALOGUE.version).toBe("1.10.0");
-    expect(TRACKER_CATALOGUE.releasedAt).toBe("2026-10-18");
+    expect(TRACKER_CATALOGUE.version).toBe("1.11.0");
+    expect(TRACKER_CATALOGUE.releasedAt).toBe("2026-10-19");
   });
   it.each(["eng-transport-review", "eng-boarding-classification"])(
     "retains %s version 1 but requires a new confirmation for its material update",

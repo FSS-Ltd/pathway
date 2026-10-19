@@ -6,7 +6,7 @@ import { buildTrackerChecklist } from "../../tracker-engine";
 import { testProfile } from "../../tests/tracker-fixture";
 
 function checklist(changes: Partial<TrackerProfileInput>) {
-  const now = new Date("2026-10-18T12:00:00Z");
+  const now = new Date("2026-10-19T12:00:00Z");
   return buildTrackerChecklist({
     catalogue: TRACKER_CATALOGUE,
     profile: {

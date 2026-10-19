@@ -3,7 +3,7 @@ import { TRACKER_CATALOGUE } from "..";
 import { trackerProfileInput } from "../../tracker.dto";
 import { buildTrackerChecklist } from "../../tracker-engine";
 import { testProfile } from "../../tests/tracker-fixture";
-const now = new Date("2026-10-18T12:00:00Z");
+const now = new Date("2026-10-19T12:00:00Z");
 const location = { countryCode: "GB", subdivisionCode: "GB-ENG" };
 function checklist(
   changes: Partial<TrackerProfileInput> = {},
@@ -47,6 +47,7 @@ describe("England national core applicability", () => {
           "BE",
           "BG",
           "HR",
+          "CY",
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
@@ -54,12 +55,12 @@ describe("England national core applicability", () => {
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(432);
+    ).toHaveLength(480);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(1056);
+    ).toHaveLength(1008);
     const result = checklist();
     expect(
       result.coverage.every(
@@ -107,6 +108,11 @@ describe("England national core applicability", () => {
     ).toEqual([]);
     expect(
       checklist({}, { countryCode: "HR", subdivisionCode: "" }).items.filter(
+        (item) => item.requirement.id.startsWith("eng"),
+      ),
+    ).toEqual([]);
+    expect(
+      checklist({}, { countryCode: "CY", subdivisionCode: "" }).items.filter(
         (item) => item.requirement.id.startsWith("eng"),
       ),
     ).toEqual([]);

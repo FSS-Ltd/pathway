@@ -14,7 +14,7 @@ const requirements = [
   ...personnelRequirements,
 ];
 const location = { countryCode: "GB", subdivisionCode: "GB-WLS" };
-const now = new Date("2026-10-18T12:00:00Z");
+const now = new Date("2026-10-19T12:00:00Z");
 function item(id: string): CatalogueRequirement {
   const requirement = requirements.find((entry) => entry.id === id);
   if (!requirement) throw new Error(`Missing Wales action ${id}`);
