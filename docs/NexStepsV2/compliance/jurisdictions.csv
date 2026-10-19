@@ -9,7 +9,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.08,BG,BG,Bulgaria,IN_REVIEW,Shared national and EU core partial; 28 oblast education health and food offices plus municipal permissions remain in review
 2.09,HR,HR,Croatia,IN_REVIEW,Shared national and EU core partial; 20 counties and Zagreb city offices plus municipal permissions remain in review
 2.10,CY,CY,Cyprus,IN_REVIEW,Shared national and EU core partial; district Social Welfare and education offices plus municipal permissions remain in review
-2.11,CZ,CZ,Czechia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.11,CZ,CZ,Czechia,IN_REVIEW,Fourteen regions including Prague; regional and local rules in review
 2.12,DK,DK,Denmark,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.13,EE,EE,Estonia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.14,FI,FI,Finland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
