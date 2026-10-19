@@ -48,6 +48,7 @@ describe("England national core applicability", () => {
           "BG",
           "HR",
           "CY",
+          "CZ",
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
@@ -55,12 +56,12 @@ describe("England national core applicability", () => {
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(480);
+    ).toHaveLength(528);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(1008);
+    ).toHaveLength(960);
     const result = checklist();
     expect(
       result.coverage.every(
@@ -113,6 +114,11 @@ describe("England national core applicability", () => {
     ).toEqual([]);
     expect(
       checklist({}, { countryCode: "CY", subdivisionCode: "" }).items.filter(
+        (item) => item.requirement.id.startsWith("eng"),
+      ),
+    ).toEqual([]);
+    expect(
+      checklist({}, { countryCode: "CZ", subdivisionCode: "" }).items.filter(
         (item) => item.requirement.id.startsWith("eng"),
       ),
     ).toEqual([]);

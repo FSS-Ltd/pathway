@@ -89,6 +89,6 @@ describe("Wales progressive national release", () => {
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(1008);
+    ).toHaveLength(960);
   });
 });
