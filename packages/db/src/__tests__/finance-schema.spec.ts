@@ -28,6 +28,10 @@ describe("Finance schema contract", () => {
       "enum FinanceBankTransferChangeStatus",
       "enum FinanceStripeConnectionStatus",
       "enum FinanceCheckoutAttemptStatus",
+      "enum FinanceRefundStatus",
+      "enum FinanceReceiptMovementType",
+      "enum FinanceReceiptMovementSource",
+      "enum FinanceRefundEventType",
       "model FinanceProfile",
       "model FinanceStatement",
       "model FinanceInvoiceNumberSequence",
@@ -49,6 +53,10 @@ describe("Finance schema contract", () => {
       "model FinanceCreditNoteLine",
       "model FinanceCreditNoteEvent",
       "model FinanceCommandReceipt",
+      "model FinanceRefund",
+      "model FinanceRefundEvent",
+      "model FinanceReceiptMovement",
+      "model FinanceReceiptMovementApplication",
     ]) {
       expect(schema.includes(declaration)).toBe(true);
     }
@@ -77,6 +85,7 @@ describe("Finance schema contract", () => {
       "20261101000000_finance_statements",
       "20261102000000_finance_supported_currencies",
       "20261103000000_finance_country_currency_profile",
+      "20261104000000_finance_refunds_and_returns",
     ]) {
       expect(financeMigrations).toContain(migration);
     }
@@ -159,6 +168,30 @@ describe("Finance schema contract", () => {
     expect(countryCurrencyMigration).toContain(
       '"FinanceProfile_country_currency_consistent" CHECK',
     );
+
+    const refundMigration = readFileSync(
+      path.join(
+        migrationDirectory,
+        "20261104000000_finance_refunds_and_returns",
+        "migration.sql",
+      ),
+      "utf8",
+    );
+    expect(refundMigration).toContain('"FinanceRefund_decision_shape" CHECK');
+    expect(refundMigration).toContain("SET search_path = ''");
+    expect(refundMigration).toContain('FROM %1$I."FinanceReceipt"');
+    expect(refundMigration).toContain('FROM %1$I."FinanceStripeWebhookEvent"');
+    expect(refundMigration).toContain(
+      '"FinanceRefundEvent_manual_return_reference_key"',
+    );
+    expect(refundMigration).toContain(
+      "CONSTRAINT = 'FinanceReceiptMovement_return_exceeds_source'",
+    );
+    expect(refundMigration).toContain(
+      "movement_original_id IS DISTINCT FROM original_application_movement_id",
+    );
+    expect(refundMigration).toContain("FOR UPDATE;");
+    expect(refundMigration).toContain('"FinanceRefundEvent_no_truncate"');
   });
 
   it("includes every Finance table in the strict Supabase RLS gate", () => {
@@ -184,6 +217,10 @@ describe("Finance schema contract", () => {
       "FinanceCreditNoteLine",
       "FinanceCreditNoteEvent",
       "FinanceCommandReceipt",
+      "FinanceRefund",
+      "FinanceRefundEvent",
+      "FinanceReceiptMovement",
+      "FinanceReceiptMovementApplication",
     ]) {
       expect(rlsGate.includes(`"${table}"`)).toBe(true);
     }

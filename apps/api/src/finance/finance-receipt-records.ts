@@ -19,7 +19,16 @@ export const financeReceiptInclude = {
           createdAt: true,
         },
       },
+      movementApplications: {
+        select: {
+          amountMinor: true,
+          movement: { select: { type: true } },
+        },
+      },
     },
+  },
+  movements: {
+    select: { amountMinor: true, type: true },
   },
 } as const;
 
@@ -36,6 +45,12 @@ export const financeAllocationInclude = {
       reason: true,
       actorUserId: true,
       createdAt: true,
+    },
+  },
+  movementApplications: {
+    select: {
+      amountMinor: true,
+      movement: { select: { type: true } },
     },
   },
   invoice: { select: { id: true, invoiceNumber: true, status: true } },
@@ -55,17 +70,41 @@ export function confirmedReceiptUnapplied(
       (sum, reversal) => addMinorUnits(sum, reversal.amountMinor),
       0n,
     );
-    const net = allocation.amountMinor - reversed;
+    const movementImpact = allocation.movementApplications.reduce(
+      (sum, application) => {
+        const isReturn = isReturnMovement(application.movement.type);
+        return addMinorUnits(
+          sum,
+          isReturn ? -application.amountMinor : application.amountMinor,
+        );
+      },
+      0n,
+    );
+    const net = allocation.amountMinor - reversed - movementImpact;
     if (net < 0n) {
       throw new Error("Finance allocation reversals exceed the allocation");
     }
     return addMinorUnits(total, net);
   }, 0n);
-  const unapplied = receipt.amountMinor - allocated;
-  if (unapplied < 0n) {
-    throw new Error("Finance receipt allocations exceed the receipt amount");
-  }
-  return unapplied;
+  const netMovementOutflow = receipt.movements.reduce((sum, movement) => {
+    const isReturn = isReturnMovement(movement.type);
+    return addMinorUnits(
+      sum,
+      isReturn ? -movement.amountMinor : movement.amountMinor,
+    );
+  }, 0n);
+  const unapplied = receipt.amountMinor - allocated - netMovementOutflow;
+  return unapplied > 0n ? unapplied : 0n;
+}
+
+function isReturnMovement(
+  type:
+    | "REFUND"
+    | "REFUND_RETURN"
+    | "DISPUTE_WITHDRAWAL"
+    | "DISPUTE_REINSTATEMENT",
+): boolean {
+  return type === "REFUND_RETURN" || type === "DISPUTE_REINSTATEMENT";
 }
 
 export function toFinanceReceiptView(receipt: FinanceReceiptRecord) {
@@ -96,7 +135,17 @@ export function toFinanceAllocationView(allocation: FinanceAllocationRecord) {
     (sum, reversal) => addMinorUnits(sum, reversal.amountMinor),
     0n,
   );
-  const netMinor = allocation.amountMinor - reversedMinor;
+  const movementImpactMinor = allocation.movementApplications.reduce(
+    (sum, application) => {
+      const isReturn = isReturnMovement(application.movement.type);
+      return addMinorUnits(
+        sum,
+        isReturn ? -application.amountMinor : application.amountMinor,
+      );
+    },
+    0n,
+  );
+  const netMinor = allocation.amountMinor - reversedMinor - movementImpactMinor;
   return {
     id: allocation.id,
     receiptId: allocation.receiptId,

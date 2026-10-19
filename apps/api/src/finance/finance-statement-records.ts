@@ -83,6 +83,10 @@ export function toFinanceStatementPdfInput(snapshot: FinanceStatementSnapshot) {
         amountMinor: snapshot.totals.unappliedFundsMinor,
       },
       {
+        label: "Uncovered receipt outflows",
+        amountMinor: snapshot.totals.uncoveredOutflowsMinor,
+      },
+      {
         label: "Processing funds",
         amountMinor: snapshot.totals.processingFundsMinor,
       },

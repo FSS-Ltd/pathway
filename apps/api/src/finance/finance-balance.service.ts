@@ -41,8 +41,9 @@ export class FinanceBalanceService {
     asOf?: Date,
     ledgerCutoff?: Date,
   ): Promise<Map<string, FinanceInvoiceBalance>> {
+    const effectiveAsOf = earlierDate(asOf, ledgerCutoff);
     const issued = invoices.filter((invoice) =>
-      isInvoiceIssuedAt(invoice, asOf, ledgerCutoff),
+      isInvoiceIssuedAt(invoice, effectiveAsOf, ledgerCutoff),
     );
     const balances = new Map<string, FinanceInvoiceBalance>();
     for (const invoice of invoices) balances.set(invoice.id, zeroBalance);
@@ -50,19 +51,20 @@ export class FinanceBalanceService {
 
     const invoiceIds = issued.map(({ id }) => id);
     const movementCutoff = earlierDate(asOf, ledgerCutoff);
-    const [credits, allocations] = await Promise.all([
+    const movementApplicationCutoff = ledgerCutoff ?? movementCutoff;
+    const [credits, allocations, receiptMovements] = await Promise.all([
       tx.financeCreditNote.findMany({
         where: {
           tenantId: actor.tenantId,
           orgId: actor.orgId,
           invoiceId: { in: invoiceIds },
-          ...(asOf
+          ...(effectiveAsOf
             ? {
-                issuedAt: { lte: asOf },
+                issuedAt: { lte: effectiveAsOf },
                 ...(ledgerCutoff ? { createdAt: { lte: ledgerCutoff } } : {}),
                 OR: [
                   { status: "ISSUED" as const },
-                  { status: "VOID" as const, voidedAt: { gt: asOf } },
+                  { status: "VOID" as const, voidedAt: { gt: effectiveAsOf } },
                 ],
               }
             : { status: "ISSUED" as const }),
@@ -78,7 +80,7 @@ export class FinanceBalanceService {
           receipt: {
             is: {
               status: "CONFIRMED",
-              ...(asOf ? { confirmedAt: { lte: asOf } } : {}),
+              ...(effectiveAsOf ? { confirmedAt: { lte: effectiveAsOf } } : {}),
             },
           },
         },
@@ -91,6 +93,40 @@ export class FinanceBalanceService {
               : undefined,
             select: { amountMinor: true },
           },
+        },
+      }),
+      tx.financeReceiptMovementApplication.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          orgId: actor.orgId,
+          invoiceId: { in: invoiceIds },
+          ...(movementApplicationCutoff
+            ? { createdAt: { lte: movementApplicationCutoff } }
+            : {}),
+          receiptAllocation: {
+            is: {
+              ...(movementCutoff ? { createdAt: { lte: movementCutoff } } : {}),
+              receipt: {
+                is: {
+                  status: "CONFIRMED",
+                  ...(effectiveAsOf
+                    ? { confirmedAt: { lte: effectiveAsOf } }
+                    : {}),
+                },
+              },
+            },
+          },
+          movement: {
+            is: {
+              ...(effectiveAsOf ? { occurredAt: { lte: effectiveAsOf } } : {}),
+              ...(ledgerCutoff ? { createdAt: { lte: ledgerCutoff } } : {}),
+            },
+          },
+        },
+        select: {
+          invoiceId: true,
+          amountMinor: true,
+          movement: { select: { type: true } },
         },
       }),
     ]);
@@ -125,13 +161,32 @@ export class FinanceBalanceService {
       );
     }
 
+    const movementImpactByInvoice = new Map<string, bigint>();
+    for (const application of receiptMovements) {
+      const isReturn =
+        application.movement.type === "REFUND_RETURN" ||
+        application.movement.type === "DISPUTE_REINSTATEMENT";
+      const impactMinor = isReturn
+        ? -application.amountMinor
+        : application.amountMinor;
+      movementImpactByInvoice.set(
+        application.invoiceId,
+        addMinorUnits(
+          movementImpactByInvoice.get(application.invoiceId) ?? 0n,
+          impactMinor,
+        ),
+      );
+    }
+
     for (const invoice of issued) {
       const issuedCredits = creditsByInvoice.get(invoice.id) ?? 0n;
       const netCharges = invoice.totalMinor - issuedCredits;
       if (netCharges < 0n) {
         throw new Error("Finance credits exceed the issued invoice amount");
       }
-      const allocatedReceipts = allocationsByInvoice.get(invoice.id) ?? 0n;
+      const allocatedReceipts =
+        (allocationsByInvoice.get(invoice.id) ?? 0n) -
+        (movementImpactByInvoice.get(invoice.id) ?? 0n);
       const outstanding = netCharges - allocatedReceipts;
       balances.set(invoice.id, {
         issuedGrossMinor: invoice.totalMinor.toString(),
@@ -151,13 +206,14 @@ export class FinanceBalanceService {
     asOf: Date,
     ledgerCutoff: Date = asOf,
   ): Promise<string> {
+    const effectiveAsOf = earlierDate(asOf, ledgerCutoff);
     const invoices = await tx.financeInvoice.findMany({
       where: {
         tenantId: actor.tenantId,
         orgId: actor.orgId,
         payerAccountId,
         status: { in: ["ISSUED", "VOID"] },
-        issuedAt: { lte: asOf },
+        issuedAt: { lte: effectiveAsOf },
         createdAt: { lte: ledgerCutoff },
       },
       select: {

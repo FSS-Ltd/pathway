@@ -8,6 +8,7 @@ export interface FinanceStatementTotalsInput {
   reversalsMinor: bigint;
   unappliedFundsMinor: bigint;
   processingFundsMinor: bigint;
+  uncoveredOutflowsMinor?: bigint;
 }
 
 export interface FinanceStatementTotals {
@@ -19,6 +20,7 @@ export interface FinanceStatementTotals {
   closingBalanceMinor: string;
   unappliedFundsMinor: string;
   processingFundsMinor: string;
+  uncoveredOutflowsMinor: string;
 }
 
 /** Totals use integer minor units; unapplied funds are reported outside debt. */
@@ -32,6 +34,7 @@ export function buildFinanceStatementTotals(
   const reversals = parseMinorUnits(input.reversalsMinor);
   const unapplied = nonNegative(input.unappliedFundsMinor);
   const processing = nonNegative(input.processingFundsMinor);
+  const uncovered = nonNegative(input.uncoveredOutflowsMinor ?? 0n);
   const closing = addMinorUnits(
     addMinorUnits(
       addMinorUnits(addMinorUnits(opening, charges), -credits),
@@ -49,6 +52,7 @@ export function buildFinanceStatementTotals(
     closingBalanceMinor: closing.toString(),
     unappliedFundsMinor: unapplied.toString(),
     processingFundsMinor: processing.toString(),
+    uncoveredOutflowsMinor: uncovered.toString(),
   };
 }
 

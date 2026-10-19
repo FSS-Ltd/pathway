@@ -29,6 +29,7 @@ export const financeStatementSnapshotSchema = z.object({
     closingBalanceMinor: signedMinorUnitSchema,
     unappliedFundsMinor: nonNegativeMinorUnitSchema,
     processingFundsMinor: nonNegativeMinorUnitSchema,
+    uncoveredOutflowsMinor: nonNegativeMinorUnitSchema.default("0"),
   }),
   lines: z.array(financeStatementLineSchema),
 });

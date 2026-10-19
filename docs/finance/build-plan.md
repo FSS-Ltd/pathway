@@ -1,6 +1,6 @@
 # NexSteps Finance add-on build plan
 
-**Status:** T01–T10 are merged; T11 statements and school currency settings are in progress. Provider-backed card Checkout awaits an eligible school test account. Direct-charge Bacs remains blocked pending exact-path provider evidence in T13.
+**Status:** T01–T11 are merged; T12 refunds and dispute/return movements are in progress. Provider-backed card Checkout awaits an eligible school test account. Direct-charge Bacs remains blocked pending exact-path provider evidence in T13.
 
 **Market:** Great Britain and the 27 EU member states, with one local collection currency per school legal country, one finance legal entity and one collection account per tenant for the initial release.
 

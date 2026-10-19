@@ -26,6 +26,13 @@ const checkoutSessionEventSchema = z.object({
         client_reference_id: z.string().min(1),
         amount_total: z.number().int().nonnegative(),
         currency: z.string().length(3),
+        payment_intent: z
+          .union([
+            z.string().startsWith("pi_"),
+            z.object({ id: z.string().startsWith("pi_") }).passthrough(),
+          ])
+          .nullable()
+          .optional(),
         payment_status: z.enum(["paid", "unpaid", "no_payment_required"]),
         status: z.enum(["open", "complete", "expired"]),
         metadata: z
@@ -140,11 +147,20 @@ export class FinanceStripePaymentWebhookService {
             );
           }
           if (event.data.object.payment_status === "paid") {
+            const paymentIntentId = paymentIntentIdFromSession(
+              event.data.object.payment_intent,
+            );
+            if (!paymentIntentId) {
+              throw new Error(
+                "Paid Finance Checkout event has no PaymentIntent identifier",
+              );
+            }
             await this.recordConfirmedReceipt(
               tx,
               input,
               attemptWithRelations,
               event.data.object.id,
+              paymentIntentId,
               new Date(event.created * 1_000),
             );
             return "processed";
@@ -173,11 +189,20 @@ export class FinanceStripePaymentWebhookService {
               "Successful Checkout event is not provider-confirmed",
             );
           }
+          const paymentIntentId = paymentIntentIdFromSession(
+            event.data.object.payment_intent,
+          );
+          if (!paymentIntentId) {
+            throw new Error(
+              "Successful Finance Checkout event has no PaymentIntent identifier",
+            );
+          }
           await this.recordConfirmedReceipt(
             tx,
             input,
             attemptWithRelations,
             event.data.object.id,
+            paymentIntentId,
             new Date(event.created * 1_000),
           );
           return "processed";
@@ -245,6 +270,7 @@ export class FinanceStripePaymentWebhookService {
       };
     },
     sessionId: string,
+    paymentIntentId: string,
     confirmedAt: Date,
   ): Promise<void> {
     if (!attempt.invoice.payerAccountId) {
@@ -335,9 +361,19 @@ export class FinanceStripePaymentWebhookService {
         orgId: input.orgId,
         status: { not: "PAID" },
       },
-      data: { status: "PAID" },
+      data: { status: "PAID", stripePaymentIntentId: paymentIntentId },
     });
   }
+}
+
+function paymentIntentIdFromSession(
+  paymentIntent: string | { id: string } | null | undefined,
+): string | null {
+  if (typeof paymentIntent === "string") return paymentIntent;
+  if (paymentIntent && typeof paymentIntent.id === "string") {
+    return paymentIntent.id;
+  }
+  return null;
 }
 
 function isCheckoutEventType(

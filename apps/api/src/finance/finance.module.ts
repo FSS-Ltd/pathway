@@ -27,6 +27,9 @@ import { FinanceStatementNoticeController } from "./finance-statement-notice.con
 import { FinanceStatementJobController } from "./finance-statement-job.controller";
 import { FinanceReceiptController } from "./finance-receipt.controller";
 import { FinanceReceiptService } from "./finance-receipt.service";
+import { FinanceRefundController } from "./finance-refund.controller";
+import { FinanceRefundService } from "./finance-refund.service";
+import { FinanceManualRefundReturnService } from "./finance-manual-refund-return.service";
 import { FinanceBankTransferController } from "./finance-bank-transfer.controller";
 import { FinanceBankTransferService } from "./finance-bank-transfer.service";
 import { FinanceManualReceiptController } from "./finance-manual-receipt.controller";
@@ -58,7 +61,14 @@ import {
 } from "./stripe/finance-stripe-checkout.config";
 import { FinanceStripeCheckoutAttemptService } from "./stripe/finance-stripe-checkout-attempt.service";
 import { FinanceStripeCheckoutService } from "./stripe/finance-stripe-checkout.service";
+import { FinanceStripeRefundSubmissionService } from "./stripe/finance-stripe-refund-submission.service";
+import {
+  DisabledFinanceStripeRefundProvider,
+  FINANCE_STRIPE_REFUND_PROVIDER,
+  StripeFinanceRefundProvider,
+} from "./stripe/finance-stripe-refund.provider";
 import { FinanceStripePaymentWebhookService } from "./stripe/finance-stripe-payment-webhook.service";
+import { FinanceStripeReversalWebhookService } from "./stripe/finance-stripe-reversal-webhook.service";
 import {
   FINANCE_STRIPE_WEBHOOK_CONFIG,
   loadFinanceStripeWebhookConfig,
@@ -82,6 +92,7 @@ import {
     FinanceInvoiceController,
     FinanceCreditNoteController,
     FinanceReceiptController,
+    FinanceRefundController,
     FinanceStatementController,
     FinanceDocumentController,
     FinanceStatementNoticeController,
@@ -105,6 +116,9 @@ import {
     FinanceInvoiceService,
     FinanceCreditNoteService,
     FinanceReceiptService,
+    FinanceRefundService,
+    FinanceManualRefundReturnService,
+    FinanceStripeRefundSubmissionService,
     FinanceBankTransferService,
     FinanceManualReceiptService,
     FinanceProfileService,
@@ -113,6 +127,7 @@ import {
     FinanceStripeCheckoutAttemptService,
     FinanceStripeCheckoutService,
     FinanceStripePaymentWebhookService,
+    FinanceStripeReversalWebhookService,
     PrismaFinanceStripeWebhookInbox,
     FinanceStripeWebhookService,
     FinanceStripeWebhookReplayService,
@@ -145,6 +160,16 @@ import {
         config.mode === "disabled"
           ? new DisabledFinanceStripeCheckoutProvider()
           : new StripeFinanceCheckoutProvider(config),
+      inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_REFUND_PROVIDER,
+      useFactory: (
+        config: ReturnType<typeof loadFinanceStripeCheckoutConfig>,
+      ) =>
+        config.mode === "disabled"
+          ? new DisabledFinanceStripeRefundProvider()
+          : new StripeFinanceRefundProvider(config),
       inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],
     },
     {
