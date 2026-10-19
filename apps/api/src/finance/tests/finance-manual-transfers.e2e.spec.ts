@@ -435,14 +435,22 @@ describe("Finance manual transfer evidence", () => {
           creator,
           refundRequest.id,
         );
-        expect(confirmedRefundReplay.events.map(({ type }) => type)).toEqual([
+        const refundEventTypes = confirmedRefundReplay.events.map(
+          ({ type }) => type,
+        );
+        expect(refundEventTypes.slice(0, 4)).toEqual([
           "REQUESTED",
           "APPROVED",
           "CONFIRMED",
           "RETURN_REQUESTED",
-          "RETURN_APPROVED",
-          "RETURNED",
         ]);
+        const returnEventTypes = refundEventTypes.slice(4);
+        // The approval and return share a transaction timestamp, so the id
+        // tie-breaker does not encode an order between these atomic events.
+        expect(returnEventTypes).toHaveLength(2);
+        expect(returnEventTypes).toEqual(
+          expect.arrayContaining(["RETURN_APPROVED", "RETURNED"]),
+        );
         await expect(
           refunds.request(
             creator,
