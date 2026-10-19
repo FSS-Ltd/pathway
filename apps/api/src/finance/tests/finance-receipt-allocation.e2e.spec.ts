@@ -8,6 +8,7 @@ import { FinanceCreditNoteService } from "../finance-credit-note.service";
 import { FinanceInvoiceService } from "../finance-invoice.service";
 import { FinanceBalanceService } from "../finance-balance.service";
 import { FinanceReceiptService } from "../finance-receipt.service";
+import { recordFinanceReceiptMovement } from "../finance-receipt-movement.service";
 import { FinanceStripePaymentWebhookService } from "../stripe/finance-stripe-payment-webhook.service";
 
 function requiredFixture(name: string): string {
@@ -486,6 +487,7 @@ describe("Finance receipt allocation ledger", () => {
               client_reference_id: checkoutAttemptId,
               amount_total: 200,
               currency: "gbp",
+              payment_intent: `pi_${randomUUID().replaceAll("-", "")}`,
               payment_status: "paid",
               status: "complete",
               metadata: {
@@ -560,6 +562,154 @@ describe("Finance receipt allocation ledger", () => {
             },
           }),
         ).toBe(1);
+
+        const unallocatedInvoiceDraft = await invoices.createDraft(
+          creator,
+          `invoice-unallocated-${randomUUID()}`,
+          {
+            payerAccountId: payer.id,
+            dueDate: "2026-11-15",
+            lines: [
+              {
+                description: "Unallocated receipt test",
+                quantity: "1.000",
+                unitAmountMinor: "1000",
+                taxRateBasisPoints: 0,
+              },
+            ],
+          },
+        );
+        await invoices.submitForReview(
+          creator,
+          unallocatedInvoiceDraft.id,
+          `invoice-unallocated-review-${randomUUID()}`,
+        );
+        await invoices.approve(
+          reviewer,
+          unallocatedInvoiceDraft.id,
+          `invoice-unallocated-approve-${randomUUID()}`,
+        );
+        const unallocatedInvoice = await invoices.issue(
+          creator,
+          unallocatedInvoiceDraft.id,
+          `invoice-unallocated-issue-${randomUUID()}`,
+        );
+        const partlyWithdrawnReceipt = await tx.financeReceipt.create({
+          data: {
+            financeProfileId: profile.id,
+            payerAccountId: payer.id,
+            tenantId,
+            orgId,
+            amountMinor: 1_000n,
+            source: "STRIPE_CARD",
+            status: "CONFIRMED",
+            confirmedAt: new Date(),
+          },
+        });
+        await recordFinanceReceiptMovement(tx, {
+          financeProfileId: profile.id,
+          receiptId: partlyWithdrawnReceipt.id,
+          tenantId,
+          orgId,
+          type: "DISPUTE_WITHDRAWAL",
+          source: "STRIPE",
+          amountMinor: 600n,
+          currency: "GBP",
+          sourceReference: `du_${randomUUID().replaceAll("-", "")}`,
+          occurredAt: new Date(),
+        });
+        expect(
+          (await receipts.get(creator, partlyWithdrawnReceipt.id))
+            .unappliedMinor,
+        ).toBe("400");
+        await expect(
+          receipts.allocate(
+            creator,
+            partlyWithdrawnReceipt.id,
+            `allocate-disputed-excess-${randomUUID()}`,
+            { invoiceId: unallocatedInvoice.id, amountMinor: "401" },
+          ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        const remainingFundsAllocation = await receipts.allocate(
+          creator,
+          partlyWithdrawnReceipt.id,
+          `allocate-disputed-remaining-${randomUUID()}`,
+          { invoiceId: unallocatedInvoice.id, amountMinor: "400" },
+        );
+        expect(remainingFundsAllocation.amountMinor).toBe("400");
+        expect(
+          (await invoices.get(creator, unallocatedInvoice.id)).balance,
+        ).toMatchObject({
+          allocatedReceiptsMinor: "400",
+          outstandingMinor: "600",
+        });
+
+        const sourceRefundMovement = await recordFinanceReceiptMovement(tx, {
+          financeProfileId: profile.id,
+          receiptId: partlyWithdrawnReceipt.id,
+          tenantId,
+          orgId,
+          type: "REFUND",
+          source: "STRIPE",
+          amountMinor: 50n,
+          currency: "GBP",
+          sourceReference: `re_${randomUUID().replaceAll("-", "")}`,
+          occurredAt: new Date(),
+        });
+        const unrelatedRefundMovement = await recordFinanceReceiptMovement(tx, {
+          financeProfileId: profile.id,
+          receiptId: partlyWithdrawnReceipt.id,
+          tenantId,
+          orgId,
+          type: "REFUND",
+          source: "STRIPE",
+          amountMinor: 50n,
+          currency: "GBP",
+          sourceReference: `re_${randomUUID().replaceAll("-", "")}`,
+          occurredAt: new Date(),
+        });
+        const unrelatedRefundApplication =
+          await tx.financeReceiptMovementApplication.findFirst({
+            where: {
+              movementId: unrelatedRefundMovement.id,
+              tenantId,
+              orgId,
+            },
+            select: { id: true },
+          });
+        if (!unrelatedRefundApplication) {
+          throw new Error("Expected the test refund to apply to the invoice");
+        }
+        const invalidReturnMovement = await tx.financeReceiptMovement.create({
+          data: {
+            financeProfileId: profile.id,
+            receiptId: partlyWithdrawnReceipt.id,
+            tenantId,
+            orgId,
+            type: "REFUND_RETURN",
+            source: "STRIPE",
+            amountMinor: 50n,
+            currency: "GBP",
+            sourceReference: `re_${randomUUID().replaceAll("-", "")}`,
+            originalMovementId: sourceRefundMovement.id,
+            occurredAt: new Date(),
+          },
+          select: { id: true },
+        });
+        await tx.$executeRaw`SAVEPOINT finance_return_application_source_check`;
+        await expect(
+          tx.$executeRaw`
+            INSERT INTO "FinanceReceiptMovementApplication" (
+              "id", "movementId", "invoiceId", "receiptAllocationId",
+              "reversesApplicationId", "tenantId", "orgId", "amountMinor"
+            ) VALUES (
+              ${randomUUID()}, ${invalidReturnMovement.id},
+              ${unallocatedInvoice.id}, ${remainingFundsAllocation.id},
+              ${unrelatedRefundApplication.id}, ${tenantId}, ${orgId}, 50
+            )
+          `,
+        ).rejects.toMatchObject({ code: "P2010", meta: { code: "23514" } });
+        await tx.$executeRaw`ROLLBACK TO SAVEPOINT finance_return_application_source_check`;
         throw rollbackFixture;
       }),
     ).rejects.toBe(rollbackFixture);

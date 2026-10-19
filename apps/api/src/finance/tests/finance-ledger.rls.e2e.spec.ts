@@ -42,6 +42,10 @@ const financeTables = [
   "FinanceCreditNoteLine",
   "FinanceCreditNoteEvent",
   "FinanceCommandReceipt",
+  "FinanceRefund",
+  "FinanceRefundEvent",
+  "FinanceReceiptMovement",
+  "FinanceReceiptMovementApplication",
 ] as const;
 
 interface FinanceProfileFixture {
@@ -734,5 +738,171 @@ describe("Finance ledger database foundation", () => {
     } finally {
       await removeProfile(profile);
     }
+  });
+
+  it("isolates refund events and receipt movements by tenant under the RLS role", async () => {
+    if (!requireDatabase()) return;
+    if (process.env.E2E_TENANT_RLS_ROLE !== tenantRlsRole) {
+      throw new Error("Finance ledger test requires the tenant RLS role");
+    }
+
+    const userId = randomUUID();
+    const profileAId = randomUUID();
+    const profileBId = randomUUID();
+    const payerAId = randomUUID();
+    const payerBId = randomUUID();
+    const receiptAId = randomUUID();
+    const receiptBId = randomUUID();
+    const refundAId = randomUUID();
+    const refundBId = randomUUID();
+    const eventAId = randomUUID();
+    const eventBId = randomUUID();
+    const movementAId = randomUUID();
+    const movementBId = randomUUID();
+    const rollbackFixture = new Error("rollback Finance refund RLS fixture");
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        await tx.user.create({
+          data: {
+            id: userId,
+            email: `finance-refund-rls-${userId}@example.test`,
+          },
+        });
+        for (const fixture of [
+          {
+            tenantId: tenantAId,
+            profileId: profileAId,
+            payerId: payerAId,
+            receiptId: receiptAId,
+            refundId: refundAId,
+            eventId: eventAId,
+            movementId: movementAId,
+          },
+          {
+            tenantId: tenantBId,
+            profileId: profileBId,
+            payerId: payerBId,
+            receiptId: receiptBId,
+            refundId: refundBId,
+            eventId: eventBId,
+            movementId: movementBId,
+          },
+        ]) {
+          const {
+            tenantId,
+            profileId,
+            payerId,
+            receiptId,
+            refundId,
+            eventId,
+            movementId,
+          } = fixture;
+          await applyTenantContext(tx, tenantId, orgId);
+          await tx.financeProfile.create({
+            data: {
+              id: profileId,
+              tenantId,
+              orgId,
+              legalEntityName: `Finance refund RLS ${profileId}`,
+            },
+          });
+          await tx.financePayerAccount.create({
+            data: {
+              id: payerId,
+              financeProfileId: profileId,
+              tenantId,
+              orgId,
+              displayName: "Refund RLS test",
+            },
+          });
+          await tx.financeReceipt.create({
+            data: {
+              id: receiptId,
+              financeProfileId: profileId,
+              payerAccountId: payerId,
+              tenantId,
+              orgId,
+              amountMinor: 1n,
+              currency: "GBP",
+              source: "STRIPE_CARD",
+              sourceReference: `cs_rls_${receiptId}`,
+              status: "CONFIRMED",
+              confirmedAt: new Date(),
+            },
+          });
+          await tx.financeRefund.create({
+            data: {
+              id: refundId,
+              financeProfileId: profileId,
+              receiptId,
+              tenantId,
+              orgId,
+              requestedByUserId: userId,
+              source: "STRIPE_CARD",
+              stripeAccountId: `acct_${refundId.replaceAll("-", "")}`,
+              amountMinor: 1n,
+              currency: "GBP",
+              reason: "RLS integration test",
+            },
+          });
+          await tx.financeRefundEvent.create({
+            data: {
+              id: eventId,
+              refundId,
+              tenantId,
+              orgId,
+              actorUserId: userId,
+              type: "REQUESTED",
+              reason: "RLS integration test",
+            },
+          });
+          await tx.financeReceiptMovement.create({
+            data: {
+              id: movementId,
+              financeProfileId: profileId,
+              receiptId,
+              tenantId,
+              orgId,
+              type: "DISPUTE_WITHDRAWAL",
+              source: "STRIPE",
+              amountMinor: 1n,
+              currency: "GBP",
+              sourceReference: `du_rls_${movementId}`,
+              occurredAt: new Date(),
+            },
+          });
+        }
+
+        await applyTenantContext(tx, tenantAId, orgId);
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE "${tenantRlsRole}"`);
+        const visibleRefunds = await tx.financeRefund.findMany({
+          where: { id: { in: [refundAId, refundBId] } },
+          select: { id: true },
+        });
+        const visibleEvents = await tx.financeRefundEvent.findMany({
+          where: { id: { in: [eventAId, eventBId] } },
+          select: { id: true },
+        });
+        const visibleMovements = await tx.financeReceiptMovement.findMany({
+          where: { id: { in: [movementAId, movementBId] } },
+          select: { id: true },
+        });
+        expect(visibleRefunds.map(({ id }) => id)).toEqual([refundAId]);
+        expect(visibleEvents.map(({ id }) => id)).toEqual([eventAId]);
+        expect(visibleMovements.map(({ id }) => id)).toEqual([movementAId]);
+
+        await expect(
+          tx.$executeRaw`
+            INSERT INTO "FinanceRefundEvent" (
+              "id", "refundId", "tenantId", "orgId", "actorUserId", "type"
+            ) VALUES (
+              ${randomUUID()}, ${refundBId}, ${tenantBId}, ${orgId}, ${userId}, 'REQUESTED'
+            )
+          `,
+        ).rejects.toMatchObject({ code: "P2010", meta: { code: "42501" } });
+        throw rollbackFixture;
+      }),
+    ).rejects.toBe(rollbackFixture);
   });
 });

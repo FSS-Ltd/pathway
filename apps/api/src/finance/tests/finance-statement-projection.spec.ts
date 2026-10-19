@@ -21,6 +21,7 @@ describe("buildFinanceStatementTotals", () => {
       closingBalanceMinor: "14500",
       unappliedFundsMinor: "2000",
       processingFundsMinor: "900",
+      uncoveredOutflowsMinor: "0",
     });
   });
 

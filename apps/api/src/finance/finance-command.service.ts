@@ -29,7 +29,14 @@ export type FinanceCommandType =
   | "REJECT_MANUAL_RECEIPT_REQUEST"
   | "SUBMIT_TRANSFER_NOTICE"
   | "APPROVE_BANK_TRANSFER_CHANGE"
-  | "REJECT_BANK_TRANSFER_CHANGE";
+  | "REJECT_BANK_TRANSFER_CHANGE"
+  | "REQUEST_REFUND"
+  | "APPROVE_REFUND"
+  | "REJECT_REFUND"
+  | "CONFIRM_MANUAL_REFUND"
+  | "REQUEST_REFUND_RETURN"
+  | "APPROVE_REFUND_RETURN"
+  | "REJECT_REFUND_RETURN";
 
 export type FinanceCommandResourceType =
   | "INVOICE"
@@ -37,7 +44,8 @@ export type FinanceCommandResourceType =
   | "ALLOCATION"
   | "MANUAL_RECEIPT_REQUEST"
   | "TRANSFER_NOTICE"
-  | "BANK_TRANSFER_CHANGE";
+  | "BANK_TRANSFER_CHANGE"
+  | "REFUND";
 
 export interface FinanceCommandResult<T> {
   resourceId: string;

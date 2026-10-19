@@ -245,7 +245,20 @@ export class FinanceReceiptService {
           (sum, reversal) => addMinorUnits(sum, reversal.amountMinor),
           0n,
         );
-        const remainingMinor = allocation.amountMinor - reversedMinor;
+        const movementImpactMinor = allocation.movementApplications.reduce(
+          (sum, application) => {
+            const isReturn =
+              application.movement.type === "REFUND_RETURN" ||
+              application.movement.type === "DISPUTE_REINSTATEMENT";
+            return addMinorUnits(
+              sum,
+              isReturn ? -application.amountMinor : application.amountMinor,
+            );
+          },
+          0n,
+        );
+        const remainingMinor =
+          allocation.amountMinor - reversedMinor - movementImpactMinor;
         if (amountMinor > remainingMinor) {
           throw new ConflictException(
             "Reversal exceeds the remaining allocated amount",

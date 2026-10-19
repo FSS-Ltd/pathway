@@ -35,19 +35,22 @@ export async function buildFinanceStatementSnapshot(
   const ledgerCutoffAt = input.generatedAt;
   const closingAt = new Date(input.periodEnd.getTime() - 1);
   const openingAt = new Date(input.periodStart.getTime() - 1);
+  const closingCutoffAt =
+    closingAt < ledgerCutoffAt ? closingAt : ledgerCutoffAt;
   const [
     openingBalance,
     closingBalance,
     activity,
     confirmedReceipts,
     processingReceipts,
+    receiptMovements,
   ] = await Promise.all([
     balances.accountBalanceAt(
       tx,
       scope,
       input.payerAccountId,
       openingAt,
-      ledgerCutoffAt,
+      openingAt,
     ),
     balances.accountBalanceAt(
       tx,
@@ -64,17 +67,33 @@ export async function buildFinanceStatementSnapshot(
         payerAccountId: input.payerAccountId,
         status: "CONFIRMED",
         createdAt: { lte: ledgerCutoffAt },
-        confirmedAt: { lte: closingAt },
+        confirmedAt: { lte: closingCutoffAt },
       },
       select: {
+        id: true,
         amountMinor: true,
         allocations: {
-          where: { createdAt: { lte: closingAt } },
+          where: { createdAt: { lte: closingCutoffAt } },
           select: {
             amountMinor: true,
             reversals: {
-              where: { createdAt: { lte: closingAt } },
+              where: { createdAt: { lte: closingCutoffAt } },
               select: { amountMinor: true },
+            },
+            movementApplications: {
+              where: {
+                createdAt: { lte: ledgerCutoffAt },
+                movement: {
+                  is: {
+                    createdAt: { lte: ledgerCutoffAt },
+                    occurredAt: { lte: closingCutoffAt },
+                  },
+                },
+              },
+              select: {
+                amountMinor: true,
+                movement: { select: { type: true } },
+              },
             },
           },
         },
@@ -85,41 +104,80 @@ export async function buildFinanceStatementSnapshot(
         tenantId: scope.tenantId,
         orgId: scope.orgId,
         payerAccountId: input.payerAccountId,
-        createdAt: { lte: closingAt },
+        createdAt: { lte: closingCutoffAt },
         OR: [
           {
             status: "PROCESSING",
-            updatedAt: { lte: closingAt },
+            updatedAt: { lte: closingCutoffAt },
           },
           {
             status: { in: ["CONFIRMED", "FAILED"] },
-            updatedAt: { gt: closingAt },
+            updatedAt: { gt: closingCutoffAt },
           },
         ],
       },
       select: { amountMinor: true },
     }),
+    tx.financeReceiptMovement.findMany({
+      where: {
+        tenantId: scope.tenantId,
+        orgId: scope.orgId,
+        receipt: { is: { payerAccountId: input.payerAccountId } },
+        createdAt: { lte: ledgerCutoffAt },
+        occurredAt: { lte: closingCutoffAt },
+      },
+      select: { receiptId: true, amountMinor: true, type: true },
+    }),
   ]);
-
-  const totalReceipts = confirmedReceipts.reduce(
-    (sum, receipt) => addMinorUnits(sum, receipt.amountMinor),
-    0n,
-  );
-  const netAllocated = confirmedReceipts.reduce(
-    (sum, receipt) =>
-      receipt.allocations.reduce((receiptSum, allocation) => {
-        const reversed = allocation.reversals.reduce(
-          (reversalSum, reversal) =>
-            addMinorUnits(reversalSum, reversal.amountMinor),
-          0n,
-        );
-        return addMinorUnits(receiptSum, allocation.amountMinor - reversed);
-      }, sum),
-    0n,
-  );
-  const unapplied = totalReceipts - netAllocated;
-  if (unapplied < 0n) {
-    throw new Error("Finance allocations exceed confirmed account receipts");
+  const movementOutflowByReceipt = new Map<string, bigint>();
+  for (const movement of receiptMovements) {
+    const isReturn =
+      movement.type === "REFUND_RETURN" ||
+      movement.type === "DISPUTE_REINSTATEMENT";
+    movementOutflowByReceipt.set(
+      movement.receiptId,
+      addMinorUnits(
+        movementOutflowByReceipt.get(movement.receiptId) ?? 0n,
+        isReturn ? -movement.amountMinor : movement.amountMinor,
+      ),
+    );
+  }
+  let unapplied = 0n;
+  let uncoveredOutflows = 0n;
+  for (const receipt of confirmedReceipts) {
+    const receiptAllocation = receipt.allocations.reduce((sum, allocation) => {
+      const reversed = allocation.reversals.reduce(
+        (reversalSum, reversal) =>
+          addMinorUnits(reversalSum, reversal.amountMinor),
+        0n,
+      );
+      const movementImpact = allocation.movementApplications.reduce(
+        (impactSum, application) => {
+          const isReturn =
+            application.movement.type === "REFUND_RETURN" ||
+            application.movement.type === "DISPUTE_REINSTATEMENT";
+          return addMinorUnits(
+            impactSum,
+            isReturn ? -application.amountMinor : application.amountMinor,
+          );
+        },
+        0n,
+      );
+      const net = allocation.amountMinor - reversed - movementImpact;
+      if (net < 0n) {
+        throw new Error("Finance receipt applications exceed an allocation");
+      }
+      return addMinorUnits(sum, net);
+    }, 0n);
+    const available =
+      receipt.amountMinor -
+      receiptAllocation -
+      (movementOutflowByReceipt.get(receipt.id) ?? 0n);
+    if (available > 0n) {
+      unapplied = addMinorUnits(unapplied, available);
+    } else if (available < 0n) {
+      uncoveredOutflows = addMinorUnits(uncoveredOutflows, -available);
+    }
   }
   const totals = buildFinanceStatementTotals({
     openingBalanceMinor: BigInt(openingBalance),
@@ -128,6 +186,7 @@ export async function buildFinanceStatementSnapshot(
     allocatedReceiptsMinor: activity.allocationsMinor,
     reversalsMinor: activity.reversalsMinor,
     unappliedFundsMinor: unapplied,
+    uncoveredOutflowsMinor: uncoveredOutflows,
     processingFundsMinor: processingReceipts.reduce(
       (sum, receipt) => addMinorUnits(sum, receipt.amountMinor),
       0n,

@@ -52,6 +52,7 @@ function stripePayload(
         client_reference_id: "attempt-1",
         amount_total: 5000,
         currency: "gbp",
+        payment_intent: "pi_finance_payment_1",
         payment_status: "paid",
         status: "complete",
         metadata: {
@@ -159,8 +160,29 @@ describe("FinanceStripePaymentWebhookService", () => {
       select: { id: true },
     });
     expect(tx.financeCheckoutAttempt.updateMany).toHaveBeenLastCalledWith(
-      expect.objectContaining({ data: { status: "PAID" } }),
+      expect.objectContaining({
+        data: {
+          status: "PAID",
+          stripePaymentIntentId: "pi_finance_payment_1",
+        },
+      }),
     );
+  });
+
+  it("requires a PaymentIntent before accepting a confirmed payment", async () => {
+    const { tx, service } = setup();
+
+    await expect(
+      service.process({
+        ...scope,
+        payloadJson: stripePayload({ payment_intent: null }),
+      }),
+    ).rejects.toThrow(
+      "Paid Finance Checkout event has no PaymentIntent identifier",
+    );
+
+    expect(tx.financeReceipt.create).not.toHaveBeenCalled();
+    expect(tx.financeCheckoutAttempt.updateMany).not.toHaveBeenCalled();
   });
 
   it("keeps completed unpaid sessions reserved without creating a receipt", async () => {
@@ -247,7 +269,12 @@ describe("FinanceStripePaymentWebhookService", () => {
     expect(tx.financeReceipt.create).not.toHaveBeenCalled();
     expect(tx.financeReceiptAllocation.create).not.toHaveBeenCalled();
     expect(tx.financeCheckoutAttempt.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "PAID" } }),
+      expect.objectContaining({
+        data: {
+          status: "PAID",
+          stripePaymentIntentId: "pi_finance_payment_1",
+        },
+      }),
     );
   });
 

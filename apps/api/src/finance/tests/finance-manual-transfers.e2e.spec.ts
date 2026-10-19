@@ -10,6 +10,10 @@ import { FinanceBalanceService } from "../finance-balance.service";
 import { FinanceManualReceiptService } from "../finance-manual-receipt.service";
 import { FinanceBankTransferService } from "../finance-bank-transfer.service";
 import { FinanceReceiptService } from "../finance-receipt.service";
+import { FinanceManualRefundReturnService } from "../finance-manual-refund-return.service";
+import { FinanceRefundService } from "../finance-refund.service";
+import { FinanceStripeRefundSubmissionService } from "../stripe/finance-stripe-refund-submission.service";
+import { DisabledFinanceStripeRefundProvider } from "../stripe/finance-stripe-refund.provider";
 
 function requiredFixture(name: string): string {
   const value = process.env[name];
@@ -71,6 +75,17 @@ describe("Finance manual transfer evidence", () => {
       balances,
     );
     const receipts = new FinanceReceiptService(access, commands, balances);
+    const refunds = new FinanceRefundService(
+      access,
+      commands,
+      new FinanceStripeRefundSubmissionService(
+        new DisabledFinanceStripeRefundProvider(),
+      ),
+    );
+    const manualRefundReturns = new FinanceManualRefundReturnService(
+      access,
+      commands,
+    );
     const creator = { tenantId, orgId, userId: creatorId };
     const reviewer = { tenantId, orgId, userId: reviewerId };
     const payer = { tenantId, orgId, userId: payerId };
@@ -302,7 +317,7 @@ describe("Finance manual transfer evidence", () => {
           beforeNotice.balance,
         );
 
-        await receipts.allocate(
+        const originalAllocation = await receipts.allocate(
           creator,
           approvedRequest.receiptId,
           `manual-receipt-allocation-${randomUUID()}`,
@@ -311,6 +326,139 @@ describe("Finance manual transfer evidence", () => {
         expect(
           (await invoices.get(creator, invoice.id)).balance.outstandingMinor,
         ).toBe("0");
+
+        const refundRequest = await refunds.request(
+          creator,
+          approvedRequest.receiptId,
+          `manual-refund-request-${randomUUID()}`,
+          { amountMinor: "700", reason: "Correct an overpayment" },
+        );
+        expect(refundRequest.status).toBe("PENDING");
+        expect(
+          (await invoices.get(creator, invoice.id)).balance.outstandingMinor,
+        ).toBe("0");
+        await expectForbidden(() =>
+          refunds.approve(
+            creator,
+            refundRequest.id,
+            `manual-refund-self-approve-${randomUUID()}`,
+            { reason: "Reviewed bank evidence" },
+          ),
+        );
+
+        const approvedRefund = await refunds.approve(
+          reviewer,
+          refundRequest.id,
+          `manual-refund-approve-${randomUUID()}`,
+          { reason: "Reviewed bank evidence" },
+        );
+        expect(approvedRefund.status).toBe("APPROVED");
+        expect(
+          (await invoices.get(creator, invoice.id)).balance.outstandingMinor,
+        ).toBe("0");
+
+        const confirmedRefund = await refunds.confirmManualRefund(
+          creator,
+          refundRequest.id,
+          `manual-refund-confirm-${randomUUID()}`,
+          { bankTransactionReference: `BANK-REFUND-${randomUUID()}` },
+        );
+        expect(confirmedRefund.status).toBe("CONFIRMED");
+        expect((await invoices.get(creator, invoice.id)).balance).toMatchObject(
+          {
+            allocatedReceiptsMinor: "1300",
+            outstandingMinor: "700",
+          },
+        );
+        await expect(
+          receipts.reverseAllocation(
+            creator,
+            originalAllocation.id,
+            `manual-reverse-after-refund-excess-${randomUUID()}`,
+            {
+              amountMinor: "1301",
+              reason: "Do not reverse refunded funds twice",
+            },
+          ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        const reversalAfterRefund = await receipts.reverseAllocation(
+          creator,
+          originalAllocation.id,
+          `manual-reverse-after-refund-${randomUUID()}`,
+          { amountMinor: "1300", reason: "Reverse remaining allocated funds" },
+        );
+        expect(reversalAfterRefund.amountMinor).toBe("1300");
+        expect(
+          (await invoices.get(creator, invoice.id)).balance.outstandingMinor,
+        ).toBe("2000");
+        const manualReturnReference = `BANK-RETURN-${randomUUID()}`;
+        const returnRequest = await manualRefundReturns.requestManualReturn(
+          creator,
+          refundRequest.id,
+          `manual-refund-return-request-${randomUUID()}`,
+          {
+            bankTransactionReference: manualReturnReference,
+            reason: "Bank returned the refund transfer",
+          },
+        );
+        expect(returnRequest.status).toBe("CONFIRMED");
+        await expectForbidden(() =>
+          manualRefundReturns.approveManualReturn(
+            creator,
+            refundRequest.id,
+            `manual-refund-return-self-approve-${randomUUID()}`,
+            { reason: "Review return evidence" },
+          ),
+        );
+        const returnApprovalKey = `manual-refund-return-approve-${randomUUID()}`;
+        const returnedRefund = await manualRefundReturns.approveManualReturn(
+          reviewer,
+          refundRequest.id,
+          returnApprovalKey,
+          { reason: "Matched the bank return" },
+        );
+        expect(returnedRefund.status).toBe("RETURNED");
+        expect(
+          (await invoices.get(creator, invoice.id)).balance.outstandingMinor,
+        ).toBe("1300");
+        expect(
+          (
+            await manualRefundReturns.approveManualReturn(
+              reviewer,
+              refundRequest.id,
+              returnApprovalKey,
+              { reason: "Matched the bank return" },
+            )
+          ).status,
+        ).toBe("RETURNED");
+        const confirmedRefundReplay = await refunds.get(
+          creator,
+          refundRequest.id,
+        );
+        const refundEventTypes = confirmedRefundReplay.events.map(
+          ({ type }) => type,
+        );
+        expect(refundEventTypes.slice(0, 4)).toEqual([
+          "REQUESTED",
+          "APPROVED",
+          "CONFIRMED",
+          "RETURN_REQUESTED",
+        ]);
+        const returnEventTypes = refundEventTypes.slice(4);
+        // The approval and return share a transaction timestamp, so the id
+        // tie-breaker does not encode an order between these atomic events.
+        expect(returnEventTypes).toHaveLength(2);
+        expect(returnEventTypes).toEqual(
+          expect.arrayContaining(["RETURN_APPROVED", "RETURNED"]),
+        );
+        await expect(
+          refunds.request(
+            creator,
+            approvedRequest.receiptId,
+            `manual-refund-excess-${randomUUID()}`,
+            { amountMinor: "2001", reason: "Excess amount test" },
+          ),
+        ).rejects.toBeInstanceOf(ConflictException);
         expect(authorizeIndependent).toHaveBeenCalledWith(
           expect.objectContaining({ tenantId, orgId }),
           creatorId,

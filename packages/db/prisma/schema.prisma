@@ -219,6 +219,13 @@ enum FinanceCommandType {
   SUBMIT_TRANSFER_NOTICE
   APPROVE_BANK_TRANSFER_CHANGE
   REJECT_BANK_TRANSFER_CHANGE
+  REQUEST_REFUND
+  APPROVE_REFUND
+  REJECT_REFUND
+  CONFIRM_MANUAL_REFUND
+  REQUEST_REFUND_RETURN
+  APPROVE_REFUND_RETURN
+  REJECT_REFUND_RETURN
 }
 
 enum FinanceCommandResourceType {
@@ -228,12 +235,53 @@ enum FinanceCommandResourceType {
   MANUAL_RECEIPT_REQUEST
   TRANSFER_NOTICE
   BANK_TRANSFER_CHANGE
+  REFUND
 }
 
 enum FinanceReceiptStatus {
   PROCESSING
   CONFIRMED
   FAILED
+}
+
+enum FinanceRefundStatus {
+  PENDING
+  REJECTED
+  APPROVED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  RETURNED
+}
+
+enum FinanceRefundSource {
+  MANUAL_TRANSFER
+  STRIPE_CARD
+}
+
+enum FinanceReceiptMovementType {
+  REFUND
+  REFUND_RETURN
+  DISPUTE_WITHDRAWAL
+  DISPUTE_REINSTATEMENT
+}
+
+enum FinanceReceiptMovementSource {
+  MANUAL_TRANSFER
+  STRIPE
+}
+
+enum FinanceRefundEventType {
+  REQUESTED
+  APPROVED
+  REJECTED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  RETURNED
+  RETURN_REQUESTED
+  RETURN_APPROVED
+  RETURN_REJECTED
 }
 
 enum FinanceReceiptSource {
@@ -1474,6 +1522,10 @@ model User {
   financeCommands                    FinanceCommandReceipt[]               @relation("FinanceCommandActor")
   financeReceiptAllocationsCreated    FinanceReceiptAllocation[]            @relation("FinanceReceiptAllocationActor")
   financeReceiptAllocationReversals   FinanceReceiptAllocationReversal[]    @relation("FinanceReceiptAllocationReversalActor")
+  financeRefundsRequested             FinanceRefund[]                        @relation("FinanceRefundRequester")
+  financeRefundsApproved              FinanceRefund[]                        @relation("FinanceRefundApprover")
+  financeRefundEvents                 FinanceRefundEvent[]                   @relation("FinanceRefundEventActor")
+  financeReceiptMovementsRecorded     FinanceReceiptMovement[]               @relation("FinanceReceiptMovementRecorder")
   financeBankTransferChangesRequested      FinanceBankTransferChange[]         @relation("FinanceBankTransferChangeRequester")
   financeBankTransferChangesDecided        FinanceBankTransferChange[]         @relation("FinanceBankTransferChangeDecider")
   financeManualReceiptRequestsCreated      FinanceManualReceiptRequest[]       @relation("FinanceManualReceiptRequester")
@@ -5034,6 +5086,8 @@ model FinanceProfile {
   stripeConnections     FinanceStripeConnection[]
   checkoutAttempts      FinanceCheckoutAttempt[]
   statements            FinanceStatement[]
+  refunds               FinanceRefund[]
+  receiptMovements      FinanceReceiptMovement[]
 
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
@@ -5147,6 +5201,7 @@ model FinanceCheckoutAttempt {
   idempotencyKey           String                        @unique @db.VarChar(255)
   integrationIdentifier    String                        @db.VarChar(255)
   stripeCheckoutSessionId  String?                       @db.VarChar(255)
+  stripePaymentIntentId    String?                       @db.VarChar(255)
   checkoutUrl              String?                       @db.Text
   expiresAt                DateTime?
   createdAt                DateTime                      @default(now())
@@ -5160,6 +5215,7 @@ model FinanceCheckoutAttempt {
 
   @@unique([id, tenantId, orgId])
   @@unique([stripeAccountId, stripeCheckoutSessionId])
+  @@unique([stripeAccountId, stripePaymentIntentId], map: "FinanceCheckoutAttempt_account_payment_intent_key")
   @@index([tenantId, orgId, invoiceId, status, createdAt])
   @@index([financeProfileId, status, createdAt])
 }
@@ -5263,6 +5319,7 @@ model FinanceInvoice {
   voidedBy                User?                      @relation("FinanceInvoiceVoidedBy", fields: [voidedByUserId], references: [id], onDelete: Restrict)
   lines                   FinanceInvoiceLine[]
   allocations             FinanceReceiptAllocation[]
+  movementApplications    FinanceReceiptMovementApplication[]
   checkoutAttempts        FinanceCheckoutAttempt[]
   events                  FinanceInvoiceEvent[]
   creditNotes             FinanceCreditNote[]
@@ -5427,6 +5484,8 @@ model FinanceReceipt {
   payerAccount     FinancePayerAccount?       @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
   allocations      FinanceReceiptAllocation[]
   manualReceiptRequest FinanceManualReceiptRequest?
+  refunds          FinanceRefund[]
+  movements        FinanceReceiptMovement[]
 
   @@unique([id, tenantId, orgId])
   @@unique([financeProfileId, source, sourceReference])
@@ -5534,6 +5593,7 @@ model FinanceReceiptAllocation {
   invoice         FinanceInvoice                         @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
   createdBy       User?                                   @relation("FinanceReceiptAllocationActor", fields: [createdByUserId], references: [id], onDelete: Restrict)
   reversals       FinanceReceiptAllocationReversal[]
+  movementApplications FinanceReceiptMovementApplication[]
 
   @@unique([id, tenantId, orgId])
   @@index([tenantId, receiptId, createdAt])
@@ -5554,4 +5614,115 @@ model FinanceReceiptAllocationReversal {
 
   @@unique([id, tenantId, orgId])
   @@index([tenantId, orgId, allocationId, createdAt])
+}
+
+model FinanceRefund {
+  id                       String              @id @default(uuid())
+  financeProfileId         String
+  receiptId                String
+  tenantId                 String
+  orgId                    String
+  requestedByUserId        String
+  approvedByUserId         String?
+  source                   FinanceRefundSource
+  status                   FinanceRefundStatus @default(PENDING)
+  amountMinor              BigInt
+  currency                 FinanceCurrency
+  reason                   String
+  decisionReason           String?
+  bankTransactionReference String?             @db.VarChar(255)
+  stripeAccountId          String?             @db.VarChar(255)
+  stripeRefundId           String?             @db.VarChar(255)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
+  approvedAt               DateTime?
+  submittedAt              DateTime?
+  providerStatusAt         DateTime?
+  confirmedAt              DateTime?
+  failedAt                 DateTime?
+  returnedAt               DateTime?
+  financeProfile           FinanceProfile      @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  receipt                  FinanceReceipt      @relation(fields: [receiptId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  requestedBy              User                @relation("FinanceRefundRequester", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  approvedBy               User?               @relation("FinanceRefundApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  events                   FinanceRefundEvent[]
+  movements                FinanceReceiptMovement[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([stripeAccountId, stripeRefundId])
+  @@unique([financeProfileId, bankTransactionReference])
+  @@index([tenantId, orgId, receiptId, status, createdAt])
+  @@index([financeProfileId, status, createdAt])
+}
+
+model FinanceRefundEvent {
+  id            String                 @id @default(uuid())
+  refundId      String?
+  tenantId      String
+  orgId         String
+  actorUserId   String?
+  stripeEventId String?                @unique @db.VarChar(255)
+  sourceReference String?               @db.VarChar(255)
+  providerOccurredAt DateTime?
+  type          FinanceRefundEventType
+  reason        String?
+  createdAt     DateTime               @default(now())
+  refund        FinanceRefund?         @relation(fields: [refundId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor         User?                  @relation("FinanceRefundEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, refundId, createdAt])
+}
+
+model FinanceReceiptMovement {
+  id                 String                         @id @default(uuid())
+  financeProfileId   String
+  receiptId          String
+  refundId           String?
+  tenantId           String
+  orgId              String
+  type               FinanceReceiptMovementType
+  source             FinanceReceiptMovementSource
+  amountMinor        BigInt
+  currency           FinanceCurrency
+  sourceReference    String                         @db.VarChar(255)
+  stripeEventId      String?                        @unique @db.VarChar(255)
+  originalMovementId String?
+  occurredAt         DateTime
+  recordedByUserId   String?
+  createdAt          DateTime                       @default(now())
+  financeProfile     FinanceProfile                 @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  receipt            FinanceReceipt                 @relation(fields: [receiptId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  refund             FinanceRefund?                 @relation(fields: [refundId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  originalMovement   FinanceReceiptMovement?        @relation("FinanceReceiptMovementReversal", fields: [originalMovementId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  inverseMovements   FinanceReceiptMovement[]       @relation("FinanceReceiptMovementReversal")
+  recordedBy         User?                          @relation("FinanceReceiptMovementRecorder", fields: [recordedByUserId], references: [id], onDelete: Restrict)
+  applications       FinanceReceiptMovementApplication[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([financeProfileId, source, type, sourceReference])
+  @@index([tenantId, orgId, receiptId, occurredAt])
+  @@index([tenantId, orgId, type, occurredAt])
+}
+
+model FinanceReceiptMovementApplication {
+  id                    String                             @id @default(uuid())
+  movementId            String
+  invoiceId             String
+  receiptAllocationId   String
+  reversesApplicationId String?
+  tenantId              String
+  orgId                 String
+  amountMinor           BigInt
+  createdAt             DateTime                           @default(now())
+  movement              FinanceReceiptMovement             @relation(fields: [movementId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice               FinanceInvoice                     @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  receiptAllocation     FinanceReceiptAllocation           @relation(fields: [receiptAllocationId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  reversesApplication   FinanceReceiptMovementApplication? @relation("FinanceReceiptMovementApplicationReversal", fields: [reversesApplicationId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  reversedByApplications FinanceReceiptMovementApplication[] @relation("FinanceReceiptMovementApplicationReversal")
+
+  @@unique([id, tenantId, orgId])
+  @@unique([movementId, reversesApplicationId], map: "FinanceReceiptMovementApplication_movement_reversal_key")
+  @@index([tenantId, orgId, invoiceId, createdAt])
+  @@index([tenantId, orgId, receiptAllocationId])
 }

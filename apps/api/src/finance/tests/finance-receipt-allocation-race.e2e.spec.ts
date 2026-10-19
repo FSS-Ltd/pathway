@@ -281,6 +281,7 @@ describe("Finance receipt allocation concurrency", () => {
                 client_reference_id: attemptId,
                 amount_total: 200,
                 currency: "gbp",
+                payment_intent: `pi_${randomUUID().replaceAll("-", "")}`,
                 payment_status: "paid",
                 status: "complete",
                 metadata: {

@@ -33,6 +33,7 @@ const snapshot: FinanceStatementSnapshot = {
     closingBalanceMinor: "12000",
     unappliedFundsMinor: "0",
     processingFundsMinor: "0",
+    uncoveredOutflowsMinor: "0",
   },
   lines: [],
 };

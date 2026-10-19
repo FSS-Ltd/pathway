@@ -6,6 +6,7 @@ import {
 import { runTransaction, withTenantRlsContext } from "@pathway/db";
 import { FinanceStripeConnectionService } from "./finance-stripe-connection.service";
 import { FinanceStripePaymentWebhookService } from "./finance-stripe-payment-webhook.service";
+import { FinanceStripeReversalWebhookService } from "./finance-stripe-reversal-webhook.service";
 import {
   FINANCE_STRIPE_WEBHOOK_CONFIG,
   type FinanceStripeWebhookConfig,
@@ -111,6 +112,8 @@ export class FinanceStripeWebhookReplayService {
     private readonly connectionSync: FinanceStripeConnectionService,
     @Inject(FinanceStripePaymentWebhookService)
     private readonly payments: FinanceStripePaymentWebhookService,
+    @Inject(FinanceStripeReversalWebhookService)
+    private readonly reversals: FinanceStripeReversalWebhookService,
   ) {}
 
   async processClaimedEvent(
@@ -159,7 +162,7 @@ export class FinanceStripeWebhookReplayService {
       return "processed";
     }
 
-    return this.payments.process({
+    const webhookInput = {
       stripeEventId: event.stripeEventId,
       tenantId: input.tenantId,
       orgId: input.orgId,
@@ -167,7 +170,11 @@ export class FinanceStripeWebhookReplayService {
       eventType: event.eventType,
       livemode: event.livemode,
       payloadJson: event.payloadJson,
-    });
+    };
+    if (this.reversals.supports(event.eventType)) {
+      return this.reversals.process(webhookInput);
+    }
+    return this.payments.process(webhookInput);
   }
 }
 

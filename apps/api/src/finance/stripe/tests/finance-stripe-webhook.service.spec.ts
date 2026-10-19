@@ -8,6 +8,7 @@ import {
   type FinanceStripeWebhookInbox,
 } from "../finance-stripe-webhook.service";
 import type { FinanceStripePaymentWebhookService } from "../finance-stripe-payment-webhook.service";
+import type { FinanceStripeReversalWebhookService } from "../finance-stripe-reversal-webhook.service";
 
 jest.mock("@pathway/db", () => ({
   runTransaction: jest.fn(),
@@ -98,6 +99,10 @@ describe("FinanceStripeWebhookReplayService", () => {
   const payments = {
     process: paymentProcess,
   } as unknown as FinanceStripePaymentWebhookService;
+  const reversals = {
+    supports: jest.fn().mockReturnValue(false),
+    process: jest.fn().mockResolvedValue("deferred"),
+  } as unknown as FinanceStripeReversalWebhookService;
   const config: FinanceStripeWebhookConfig = testConfig;
 
   beforeEach(() => {
@@ -122,6 +127,7 @@ describe("FinanceStripeWebhookReplayService", () => {
       config,
       sync,
       payments,
+      reversals,
     );
 
     await expect(
@@ -162,6 +168,7 @@ describe("FinanceStripeWebhookReplayService", () => {
       config,
       sync,
       payments,
+      reversals,
     );
 
     await expect(
@@ -208,6 +215,7 @@ describe("FinanceStripeWebhookReplayService", () => {
       config,
       sync,
       payments,
+      reversals,
     );
 
     await expect(

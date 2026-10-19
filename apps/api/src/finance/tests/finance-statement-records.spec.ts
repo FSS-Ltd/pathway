@@ -21,6 +21,7 @@ describe("toFinanceStatementPdfInput", () => {
         closingBalanceMinor: "0",
         unappliedFundsMinor: "0",
         processingFundsMinor: "0",
+        uncoveredOutflowsMinor: "250",
       },
       lines: [],
     };
@@ -29,5 +30,9 @@ describe("toFinanceStatementPdfInput", () => {
 
     expect(pdf.title).toBe("Statement 2026-10-01 to 2026-10-31");
     expect(pdf.periodEnd).toBe("2026-10-31T23:59:59.999Z");
+    expect(pdf.totals).toContainEqual({
+      label: "Uncovered receipt outflows",
+      amountMinor: "250",
+    });
   });
 });
