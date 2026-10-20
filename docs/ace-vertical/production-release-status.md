@@ -804,6 +804,14 @@ configuration. A focused homework UI test also proved all assignment actions
 remain disabled while another assignment saves. Fresh latest-head CI is
 required before merge.
 
+Head `f2d498d5dbe28692f48d44789434ffafb2d373c3` completed 307 API unit
+suites but failed one assertion in
+[run 39446426883](https://github.com/FSS-Ltd/pathway/actions/runs/39446426883):
+the test still required `--runInBand`, which had been replaced by the
+serial single-worker limit needed for worker recycling. The test now
+asserts one worker, the integration-only idle-memory limit, and absence of
+`--runInBand`. This correction needs fresh latest-head CI before merge.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of
