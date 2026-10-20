@@ -732,13 +732,17 @@ describe("NexSteps Home regulations and evidence RLS", () => {
     if (!useTenantRlsRole()) return;
 
     const [count] = await withNoTenantRlsContext((tx) =>
-      tx.$queryRaw<Array<{ count: bigint }>>`
-        SELECT count(*) AS "count" FROM "Jurisdiction"
+      tx.$queryRaw<Array<{ nations: bigint; oxford: bigint }>>`
+        SELECT
+          count(*) FILTER (WHERE level IN ('COUNTRY', 'NATION')) AS nations,
+          count(*) FILTER (WHERE "subdivisionCode" = 'GB-ENG-E07000178') AS oxford
+        FROM "Jurisdiction"
         WHERE "countryCode" = 'GB'
       `,
     );
 
-    expect(count.count).toBe(5n);
+    expect(count.nations).toBe(5n);
+    expect(count.oxford).toBe(1n);
   });
 
   it("rejects a write to global regulatory content under the tenant-scoped e2e role", async () => {

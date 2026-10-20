@@ -34,6 +34,17 @@ export const emptyProfile: TrackerProfileInput = {
   ace: null,
   icce: null,
 };
+
+function jurisdictionLabel(jurisdiction: TrackerJurisdiction): string {
+  const englandCouncil = jurisdiction.subdivisionCode?.startsWith("GB-ENG-E");
+  const level = englandCouncil
+    ? jurisdiction.level === "REGION"
+      ? "upper-tier council"
+      : "district council"
+    : jurisdiction.level.toLowerCase();
+  return `${jurisdiction.name} · ${jurisdiction.countryCode} (${level})`;
+}
+
 export function ProfileFields({
   value,
   setValue,
@@ -73,7 +84,7 @@ export function ProfileFields({
           <option value="">Unknown — choose operating location</option>
           {jurisdictions.map((j) => (
             <option key={j.id} value={j.id}>
-              {j.countryCode} · {j.name} ({j.level.toLowerCase()})
+              {jurisdictionLabel(j)}
             </option>
           ))}
         </select>

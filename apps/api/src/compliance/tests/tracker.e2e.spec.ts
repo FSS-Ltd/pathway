@@ -679,4 +679,46 @@ describe("Site tracker persistence and permission boundaries", () => {
       });
     }
   });
+  it("selects an English district with its upper-tier and national coverage through the API", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const jurisdictions = await request(server)
+      .get("/compliance/tracker/jurisdictions")
+      .set("Authorization", reader)
+      .expect(200);
+    const oxford = jurisdictions.body.find(
+      (entry: { subdivisionCode: string }) =>
+        entry.subdivisionCode === "GB-ENG-E07000178",
+    );
+    expect(oxford).toMatchObject({ level: "LOCAL_AUTHORITY" });
+    await save({ ...testProfile, jurisdictionId: oxford.id });
+    catalogueProvider.catalogue = TRACKER_CATALOGUE;
+    try {
+      const result = await request(server)
+        .get("/compliance/tracker/checklist")
+        .set("Authorization", reader)
+        .expect(200);
+      expect(result.body.coverage).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            jurisdiction: "GB-ENG",
+            status: "PARTIALLY_PUBLISHED",
+            regionalStatus: "IN_REVIEW",
+          }),
+          expect.objectContaining({
+            jurisdiction: "GB-ENG-E10000025",
+            status: "IN_REVIEW",
+          }),
+          expect.objectContaining({
+            jurisdiction: "GB-ENG-E07000178",
+            status: "IN_REVIEW",
+          }),
+        ]),
+      );
+      expect(result.body.items.length).toBeGreaterThan(0);
+      expect(result.body.coverageGaps).toBe(24);
+    } finally {
+      catalogueProvider.catalogue = trackerFixture();
+    }
+  });
 });

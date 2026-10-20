@@ -4,11 +4,14 @@ Step **2.01 remains partially published**. The merged release contains catalogue
 **154 reviewed source records and 106 current actions** across eight topics and all six
 institutional research sectors. It is not a complete England pack or legal
 certification. The initial v1.1 core passed its gate and was merged in PR #634. The v1.2 follow-up passed all eight CI checks, merged in PR #657 and was deployed and checked live on 17 October 2026.
+Catalogue 1.33.0 adds [local-authority selectors](local-authority-inventory.md)
+without publishing council-specific duties.
 
 ## Publication and coverage
 
-All 48 England jurisdiction/sector/topic cells are `PARTIALLY_PUBLISHED`; the
-other 1,440 cells remain `NOT_REVIEWED`. A partial cell can expose individually
+All 48 England national jurisdiction/sector/topic cells are
+`PARTIALLY_PUBLISHED`. The 15,216 English upper-tier and distinct-district
+cells added in catalogue 1.33.0 are `IN_REVIEW`. A partial cell can expose individually
 published, reviewed actions while continuing to count as a coverage gap. No cell
 is marked `REVIEWED_NO_REQUIREMENTS`. The source review expires 12 January 2027;
 expired, withdrawn or future requirements must not remain available for current

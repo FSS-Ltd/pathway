@@ -307,8 +307,16 @@ export function buildTrackerChecklist(
         status = "STALE";
         reason = "The source/applicability review is not current.";
       }
+      const selectedSubjurisdiction = location.jurisdictionCodes?.some(
+        (code) =>
+          code.length > 0 &&
+          code !== jurisdiction &&
+          code !== location.countryCode &&
+          (location.countryCode !== "GB" || code !== location.subdivisionCode),
+      );
       if (
         cell.requiresRegion &&
+        !selectedSubjurisdiction &&
         (!profile?.profile.region ||
           !cell.regions.includes(profile.profile.region))
       ) {
