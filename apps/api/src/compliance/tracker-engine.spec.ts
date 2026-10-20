@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { TrackerProfile, TrackerAttestation } from "@pathway/types";
 import { TRACKER_CATALOGUE, catalogueSchema } from "./catalogue";
+import { portugalRegionCodes } from "./catalogue/portugal";
 import {
   buildTrackerChecklist,
   evaluateCondition,
@@ -160,11 +161,11 @@ describe("institutional tracker catalogue and engine", () => {
         .map((topic, i) => `${row[0]}:${row[1]}:${topic}:${row[i + 2]}`);
     });
     expect(
-      TRACKER_CATALOGUE.coverage.map(
-        (c) => `${c.jurisdiction}:${c.sector}:${c.topic}:${c.status}`,
-      ),
-    ).toEqual(expected);
-    expect(expected).toHaveLength(1488);
+      TRACKER_CATALOGUE.coverage
+        .map((c) => `${c.jurisdiction}:${c.sector}:${c.topic}:${c.status}`)
+        .sort(),
+    ).toEqual(expected.sort());
+    expect(expected).toHaveLength(2448);
     expect(TRACKER_CATALOGUE.requirements.length).toBeGreaterThan(0);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
@@ -194,6 +195,8 @@ describe("institutional tracker catalogue and engine", () => {
           "MT",
           "NL",
           "PL",
+          "PT",
+          ...portugalRegionCodes,
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
