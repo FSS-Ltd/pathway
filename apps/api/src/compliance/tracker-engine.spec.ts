@@ -8,7 +8,7 @@ import {
   requirementSnapshot,
   getCurrentRequirement,
 } from "./tracker-engine";
-const now = new Date("2026-10-19T12:00:00Z");
+const now = new Date(`${TRACKER_CATALOGUE.releasedAt}T12:00:00Z`);
 const review = {
   reviewer: "Test reviewer",
   verifiedAt: "2026-10-15",
@@ -184,6 +184,7 @@ describe("institutional tracker catalogue and engine", () => {
           "EE",
           "FI",
           "FR",
+          "DE",
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);

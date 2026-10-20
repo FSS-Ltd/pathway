@@ -15,7 +15,7 @@ function actions(facts: Partial<TrackerProfileInput>) {
     location: { countryCode: "GB", subdivisionCode: "GB-ENG" },
     attestations: [],
     evidenceCounts: {},
-    now: new Date("2026-10-19T12:00:00Z"),
+    now: new Date(`${TRACKER_CATALOGUE.releasedAt}T12:00:00Z`),
   }).items;
 }
 

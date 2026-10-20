@@ -3,7 +3,7 @@ import { TRACKER_CATALOGUE } from "..";
 import { trackerProfileInput } from "../../tracker.dto";
 import { buildTrackerChecklist } from "../../tracker-engine";
 import { testProfile } from "../../tests/tracker-fixture";
-const now = new Date("2026-10-19T12:00:00Z");
+const now = new Date(`${TRACKER_CATALOGUE.releasedAt}T12:00:00Z`);
 const location = { countryCode: "GB", subdivisionCode: "GB-ENG" };
 function checklist(
   changes: Partial<TrackerProfileInput> = {},
@@ -53,6 +53,7 @@ describe("England national core applicability", () => {
           "EE",
           "FI",
           "FR",
+          "DE",
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
@@ -60,12 +61,12 @@ describe("England national core applicability", () => {
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(720);
+    ).toHaveLength(768);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(768);
+    ).toHaveLength(720);
     const result = checklist();
     expect(
       result.coverage.every(
