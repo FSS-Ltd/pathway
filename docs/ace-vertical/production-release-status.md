@@ -767,9 +767,14 @@ and mobile baselines remain open. ACE-M20 and ACE-C01 stay unaccepted at
 ACE-C02 web/API implementation is proceeding under the product owner's explicit
 exception to the M20 predecessor rule. Its assignment publication remains
 disabled in production until the M20 security gate is accepted. The C02
-branch is `feature/ace-c02-homework-assignments`; the task is not complete
-until its own PR has latest-head green CI and a confirmed merge. Mobile work
-and the ACE-M06 live email test remain deferred.
+branch is `feature/ace-c02-homework-assignments`; [PR #696](https://github.com/FSS-Ltd/pathway/pull/696)
+was raised from checked implementation commit
+`a7261f5a74285f8ae96649269d0f5bdfc330d1bc`. Local PostgreSQL HTTP
+tests passed 15/15, including a non-bypass tenant-RLS case; API/admin type,
+lint, build, UI interaction, Prisma validation and formatting checks passed.
+The first disposable-database reset applied both C02 migrations. Latest-head
+CI and the confirmed merge are still required, and the task remains
+unaccepted. Mobile work and the ACE-M06 live email test remain deferred.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
