@@ -776,6 +776,16 @@ The first disposable-database reset applied both C02 migrations. Latest-head
 CI and the confirmed merge are still required, and the task remains
 unaccepted. Mobile work and the ACE-M06 live email test remain deferred.
 
+PR #696's first latest-head CI revision `15cd51522c3487444f450ef2e92d381fb4396497`
+failed the Permission Definition Database job in
+[run 39417845937](https://github.com/FSS-Ltd/pathway/actions/runs/39417845937):
+the C02 schedule-runner migration assumed the new assignment table was in
+`app`, while that CI database created it in `public`. The same PR now discovers
+both physical table schemas from the foreign key. A fresh isolated `public`
+database applied every migration successfully, and the resulting cron function
+references `public."AceHomeworkAssignment"` and `public."Tenant"`. The
+corrected PR revision still needs its own latest-head CI and merge evidence.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of
