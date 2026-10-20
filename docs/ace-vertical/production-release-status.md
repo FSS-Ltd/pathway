@@ -868,8 +868,9 @@ linked-school checks. The next web/API step is C04 in
 [c04-homework-review-design.md](c04-homework-review-design.md); mobile remains
 paused. The plan count stays **48/150 (32%)**.
 
-ACE-C04 web/API implementation is on `feature/ace-c04-homework-review` for
-review. The migration applied in disposable `app` and `public` PostgreSQL
+ACE-C04 web/API implementation commit `88b5a5aa` is in draft
+[PR #704](https://github.com/FSS-Ltd/pathway/pull/704). The migration applied
+in disposable `app` and `public` PostgreSQL
 schemas. API, admin and worker typechecks, targeted lint and formatting, admin
 interaction test, and admin production build passed locally. A combined
 PostgreSQL E2E run was interrupted after its review-suite setup hook exceeded
