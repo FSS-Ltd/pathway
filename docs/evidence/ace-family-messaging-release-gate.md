@@ -144,3 +144,16 @@ read-probe correction and live allowed/nonmember/wrong-conversation join results
 are recorded in the release status under PRs #616, #617, and #619. These probes
 close the previously documented missing Realtime topic-ID test; they do not
 complete the signed-in web accessibility or paused mobile baselines.
+
+## Signed-in family access retry (PR #684)
+
+An approved Demo ACE School account reached `/ace/family` on 20 October 2026,
+but the family context request failed on both the initial load and one retry.
+The API production runtime log for `GET /ace/family/contexts` identified a
+read-only discovery transaction nested inside the active-site request's write
+transaction. The route now owns its independent transaction boundary, while
+the service continues to apply actor-scoped discovery and per-site RLS. The
+PostgreSQL HTTP regression test adds an active site membership to its guardian
+fixture: it reproduced HTTP 500 before the route fix and passed all five suite
+cases after it. A signed-in production keyboard and accessible-tree retry must
+wait for the corrected API deployment; this is not an M20 sign-off.
