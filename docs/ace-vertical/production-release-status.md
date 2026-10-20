@@ -697,13 +697,29 @@ for the product owner to run manually; the test account's email alerts were
 left disabled.
 
 Build step 1.3e6k in
-[PR #625](https://github.com/FSS-Ltd/pathway/pull/625) fixes the same observed
-keyboard focus gap in the shared
-notice inbox for staff and guardians. A signed-in 320px browser reproduction
-showed focus on the page body after opening a notice and after returning to the
-list. The step must pass current-revision CI, merge, and a production keyboard
-retry before the correction is released. ACE-M14 remains open while mobile
-notice work is paused.
+[PR #625](https://github.com/FSS-Ltd/pathway/pull/625) fixed the observed
+keyboard focus gap in the shared notice inbox for staff and guardians. The
+checked head `ec8581a885426200032ded5b76fdaa8e20eaf0bd` passed all eight
+applicable CI and CodeQL checks, including the admin unit job that ran both
+new notice inbox interaction tests. GitHub confirms the merge commit
+`3bf7af04c4737fc330ee1d12c612c4a9631ac067` on 13 October 2026.
+Vercel reports the matching admin deployment
+`dpl_GKx2EgS5QK4ry5ptVogU3TRqPaSp` READY on `app.nexsteps.dev`. A signed-in
+320px production keyboard retry focused the notice detail heading after Enter
+on a notice and the list heading after Enter on Back to notices. No receipt was
+acknowledged. ACE-M14 remains open while mobile notice work is paused; the
+verified count remains **48/150 (32%)**.
+
+ACE-C01 entitlement foundation starts from the #625 merge and includes the
+merged [PR #626](https://github.com/FSS-Ltd/pathway/pull/626) screen-family
+model: ACE schools and ACE learning centres share ACE capabilities, while
+public learning centres retain the state-school family. The newer platform
+contract makes Learning a core entitlement for every organisation; the older
+C01 add-on premise is superseded for this step. Homework-specific keys remain
+inside the ACE screen family, and institutional module selection rejects
+Learning as an included or paid add-on. This foundation adds no homework route
+or customer-facing enablement. The master plan's M20 prerequisite remains open,
+so C01 is not counted as accepted until that release gate is reconciled.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

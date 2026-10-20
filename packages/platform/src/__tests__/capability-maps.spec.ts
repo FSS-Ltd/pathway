@@ -35,6 +35,16 @@ const ACE_LEARNING_KEYS = [
   "learning.reports.generate",
 ] as const;
 
+const ACE_HOMEWORK_KEYS = [
+  "ace.homework.assignments.read",
+  "ace.homework.assignments.manage",
+  "ace.homework.submissions.write",
+  "ace.homework.evidence.read",
+  "ace.homework.evidence.write",
+  "ace.homework.reviews.manage",
+  "ace.homework.family.read",
+] as const;
+
 const ACE_CORE_KEYS = [
   "ace.attendance.export",
   "ace.settings.read",
@@ -112,6 +122,28 @@ describe("capability maps completeness", () => {
         ...ACE_LEARNING_KEYS,
       ]),
     );
+  });
+
+  it("grants the homework subset only through ACE screen families", () => {
+    for (const vertical of ["ACE_SCHOOL", "ACE_LEARNING_CENTRE"] as const) {
+      expect(VERTICAL_CAPABILITIES[vertical]).toEqual(
+        expect.arrayContaining(ACE_HOMEWORK_KEYS),
+      );
+    }
+    for (const [vertical, capabilities] of Object.entries(
+      VERTICAL_CAPABILITIES,
+    )) {
+      if (vertical === "ACE_SCHOOL" || vertical === "ACE_LEARNING_CENTRE")
+        continue;
+      for (const key of ACE_HOMEWORK_KEYS) {
+        expect(capabilities).not.toContain(key);
+      }
+    }
+    for (const capabilities of Object.values(MODULE_CAPABILITIES)) {
+      for (const key of ACE_HOMEWORK_KEYS) {
+        expect(capabilities).not.toContain(key);
+      }
+    }
   });
 
   it("maps Finance and Advanced Reporting keys to their real modules", () => {

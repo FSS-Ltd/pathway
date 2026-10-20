@@ -183,18 +183,29 @@ const NEW_PLATFORM_CORE_KEYS = [
   "safeguarding.concerns.manage",
 ] as const;
 
+const ACE_HOMEWORK_KEYS = [
+  "ace.homework.assignments.read",
+  "ace.homework.assignments.manage",
+  "ace.homework.submissions.write",
+  "ace.homework.evidence.read",
+  "ace.homework.evidence.write",
+  "ace.homework.reviews.manage",
+  "ace.homework.family.read",
+] as const;
+
 const APPROVED_REGISTRY_KEYS = [
   ...new Set([
     ...LEGACY_MAP_KEYS,
     ...SECTION_5_2_KEYS,
     ...ADDITIONAL_MATRIX_KEYS,
     ...NEW_PLATFORM_CORE_KEYS,
+    ...ACE_HOMEWORK_KEYS,
   ]),
 ];
 
 describe("capability definitions", () => {
-  it("contains exactly the 136 approved registry keys", () => {
-    expect(APPROVED_REGISTRY_KEYS).toHaveLength(136);
+  it("contains exactly the 143 approved registry keys", () => {
+    expect(APPROVED_REGISTRY_KEYS).toHaveLength(143);
     expect(Object.keys(CAPABILITY_DEFINITIONS).sort()).toEqual(
       [...APPROVED_REGISTRY_KEYS].sort(),
     );
@@ -262,6 +273,35 @@ describe("capability definitions", () => {
       expect(VERTICAL_CAPABILITIES[vertical]).not.toContain(
         "ace.parent.notices.read",
       );
+    }
+  });
+
+  it("keeps ACE homework permissions vertical-scoped and role-specific", () => {
+    for (const key of [
+      "ace.homework.assignments.read",
+      "ace.homework.submissions.write",
+      "ace.homework.evidence.read",
+      "ace.homework.evidence.write",
+      "ace.homework.family.read",
+    ] as const) {
+      expect(CAPABILITY_DEFINITIONS[key]).toMatchObject({
+        scope: "relationship",
+        sensitivity: "sensitive",
+        delegable: false,
+        requiredVertical: Vertical.ACE_SCHOOL,
+      });
+      expect(CAPABILITY_DEFINITIONS[key]).not.toHaveProperty("requiredModule");
+    }
+    for (const key of [
+      "ace.homework.assignments.manage",
+      "ace.homework.reviews.manage",
+    ] as const) {
+      expect(CAPABILITY_DEFINITIONS[key]).toMatchObject({
+        scope: "site",
+        sensitivity: "sensitive",
+        delegable: true,
+        requiredVertical: Vertical.ACE_SCHOOL,
+      });
     }
   });
 
