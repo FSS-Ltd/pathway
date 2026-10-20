@@ -36,11 +36,12 @@ describe("Finance statement request schemas", () => {
         periodEnd: "2026-10-01T00:00:00Z",
       }).success,
     ).toBe(false);
+    const now = Date.now();
     expect(
       financeStatementRequestSchema.safeParse({
         payerAccountId,
-        periodStart: "2026-10-19T00:00:00Z",
-        periodEnd: "2026-10-20T00:00:00Z",
+        periodStart: new Date(now).toISOString(),
+        periodEnd: new Date(now + 24 * 60 * 60 * 1000).toISOString(),
       }).success,
     ).toBe(false);
   });

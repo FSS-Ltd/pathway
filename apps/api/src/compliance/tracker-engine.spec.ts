@@ -183,6 +183,7 @@ describe("institutional tracker catalogue and engine", () => {
           "DK",
           "EE",
           "FI",
+          "FR",
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
