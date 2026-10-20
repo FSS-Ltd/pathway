@@ -12,7 +12,7 @@ export interface StudentHomeworkAssignment {
   dueAt: string;
   submission: null | {
     id: string;
-    status: "DRAFT" | "SUBMITTED" | "RETURNED";
+    status: "DRAFT" | "SUBMITTED" | "RETURNED" | "COMPLETED";
     draftText: string;
     version: number;
     versions: Array<{
@@ -26,6 +26,11 @@ export interface StudentHomeworkAssignment {
         fileName: string;
         mimeType: string;
         status: "CLEAN";
+      };
+      review: null | {
+        decision: "RETURNED" | "COMPLETED";
+        feedback: string;
+        releasedAt: string | null;
       };
     }>;
   };
@@ -45,17 +50,23 @@ async function homeworkRequest<T>(
 ): Promise<T> {
   if (isUsingMockApi())
     throw new Error("Homework is unavailable in mock mode.");
-  const response = await apiFetch(
-    `${API_BASE_URL}/ace/student/sites/${encodeURIComponent(siteId)}/homework${path}`,
-    {
-      method,
-      headers: buildAuthHeaders(),
-      credentials: "include",
-      cache: "no-store",
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal,
-    },
-  );
+  let response: Response;
+  try {
+    response = await apiFetch(
+      `${API_BASE_URL}/ace/student/sites/${encodeURIComponent(siteId)}/homework${path}`,
+      {
+        method,
+        headers: buildAuthHeaders(),
+        credentials: "include",
+        cache: "no-store",
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        signal,
+      },
+    );
+  } catch {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    throw new Error("Connection lost. Check your connection and try again.");
+  }
   if (!response.ok) {
     throw new Error(
       response.status === 404
@@ -129,11 +140,16 @@ export async function uploadStudentHomeworkEvidence(
       sha256,
     },
   );
-  const uploaded = await fetch(intent.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type, "x-upsert": "false" },
-    body: file,
-  });
+  let uploaded: Response;
+  try {
+    uploaded = await fetch(intent.uploadUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type, "x-upsert": "false" },
+      body: file,
+    });
+  } catch {
+    throw new Error("Evidence upload was interrupted. Try uploading again.");
+  }
   if (!uploaded.ok)
     throw new Error("Evidence upload failed. Please try again.");
   const checked = await homeworkRequest<{

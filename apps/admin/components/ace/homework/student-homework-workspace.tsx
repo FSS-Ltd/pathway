@@ -185,11 +185,13 @@ export function StudentHomeworkView({
                   <p className="text-sm text-text-muted">
                     {assignment.submission?.status === "SUBMITTED"
                       ? "Submitted"
-                      : assignment.submission?.status === "RETURNED"
-                        ? "Returned for revision"
-                        : assignment.submission?.status === "DRAFT"
-                          ? "Draft saved"
-                          : "Ready to start"}
+                      : assignment.submission?.status === "COMPLETED"
+                        ? "Completed"
+                        : assignment.submission?.status === "RETURNED"
+                          ? "Returned for revision"
+                          : assignment.submission?.status === "DRAFT"
+                            ? "Draft saved"
+                            : "Ready to start"}
                   </p>
                   <Button
                     type="button"
