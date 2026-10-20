@@ -135,6 +135,16 @@ const homeworkNavigation = (permissions: string[]) =>
   }).some((item) => item.href === "/ace/homework");
 assert.equal(homeworkNavigation([]), false);
 assert.equal(homeworkNavigation(["ace.homework.assignments.manage"]), true);
+const homeworkReviewNavigation = (permissions: string[]) =>
+  resolveAdminNavItems({
+    role: staffRole,
+    currentOrgIsMasterOrg: false,
+    capabilities: [],
+    permissions,
+    ui: { labels: {} },
+  }).some((item) => item.href === "/ace/homework/reviews");
+assert.equal(homeworkReviewNavigation([]), false);
+assert.equal(homeworkReviewNavigation(["ace.homework.reviews.manage"]), true);
 const messagingNavigation = (permissions: string[]) =>
   resolveAdminNavItems({
     role: staffRole,

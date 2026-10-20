@@ -73,6 +73,7 @@ const navItemsWithAccess: (SidebarNavItem & {
   {
     label: "Homework",
     href: "/ace/homework",
+    matchMode: "exact",
     iconIndex: 29,
     access: "staff-or-admin",
     permission: "ace.homework.assignments.manage",
@@ -81,7 +82,7 @@ const navItemsWithAccess: (SidebarNavItem & {
   {
     label: "Review homework",
     href: "/ace/homework/reviews",
-    iconIndex: 29,
+    iconIndex: 30,
     access: "staff-or-admin",
     permission: "ace.homework.reviews.manage",
     group: "Teaching",

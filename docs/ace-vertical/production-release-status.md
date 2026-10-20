@@ -878,6 +878,11 @@ typechecks, targeted lint and formatting, admin interaction test, and admin
 production build passed locally. CI must repeat the latest-head suites before
 this step can merge. The review and notification flags remain off. C04 is not
 accepted, and the plan count remains **48/150 (32%)**.
+The first CI run on `0b686d817d87f32d040b503f8b2e401e5f4155a9`
+([run 39499875376](https://github.com/FSS-Ltd/pathway/actions/runs/39499875376))
+failed the admin navigation uniqueness test because the new review link reused
+the assignment icon index; integration jobs were skipped. The current C04
+revision assigns a distinct review icon and awaits new latest-head CI.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
