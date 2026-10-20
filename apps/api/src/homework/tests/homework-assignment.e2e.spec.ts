@@ -212,7 +212,7 @@ describe("ACE homework assignment commands", () => {
     }
     if (!isDatabaseAvailable()) return;
     await app?.close();
-    await prisma.$executeRaw`TRUNCATE TABLE "AceHomeworkRecipient", "AceHomeworkAssignment"`;
+    await prisma.$executeRaw`TRUNCATE TABLE "AceHomeworkSubmissionVersion", "AceHomeworkEvidence", "AceHomeworkSubmission", "AceHomeworkRecipient", "AceHomeworkAssignment"`;
     await prisma.aceStaffYearBandAssignment.deleteMany({
       where: { tenantId: siteId },
     });
