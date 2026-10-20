@@ -275,7 +275,13 @@ export class HomeworkReviewService {
               { status: "SUBMITTED" },
               {
                 status: "COMPLETED",
-                versions: { some: { review: { is: { releasedAt: null } } } },
+                versions: {
+                  some: {
+                    review: {
+                      is: { decision: "COMPLETED", releasedAt: null },
+                    },
+                  },
+                },
               },
             ],
             recipient: {
