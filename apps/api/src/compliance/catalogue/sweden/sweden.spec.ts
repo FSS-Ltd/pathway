@@ -128,7 +128,7 @@ describe("Sweden partial national and county release", () => {
     expect(TRACKER_CATALOGUE.requirements).toEqual(
       expect.arrayContaining(catalogueV131.requirements),
     );
-    expect(TRACKER_CATALOGUE.version).toBe("1.32.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.33.0");
   });
 
   it("does not silently select Stockholm county when the site has no county", () => {

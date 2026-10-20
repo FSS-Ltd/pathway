@@ -313,11 +313,36 @@ async function run() {
       root.render(
         <ProfileEditor
           initial={checklist.profile}
-          jurisdictions={[]}
+          jurisdictions={[
+            {
+              id: "oxfordshire",
+              countryCode: "GB",
+              subdivisionCode: "GB-ENG-E10000025",
+              name: "Oxfordshire",
+              level: "REGION",
+              parentJurisdictionId: "england",
+            },
+            {
+              id: "oxford",
+              countryCode: "GB",
+              subdivisionCode: "GB-ENG-E07000178",
+              name: "Oxford",
+              level: "LOCAL_AUTHORITY",
+              parentJurisdictionId: "oxfordshire",
+            },
+          ]}
           canManage
           onSaved={() => changed++}
         />,
       ),
+    );
+    assert.match(
+      host.querySelector('option[value="oxfordshire"]')?.textContent ?? "",
+      /Oxfordshire · GB \(upper-tier council\)/,
+    );
+    assert.match(
+      host.querySelector('option[value="oxford"]')?.textContent ?? "",
+      /Oxford · GB \(district council\)/,
     );
     await click("Save profile");
     assert.match(host.textContent ?? "", /draft has been kept/);

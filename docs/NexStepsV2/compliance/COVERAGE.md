@@ -1,17 +1,17 @@
 # Coverage matrix
 
 Version **1**, established 13 October 2026. The current status is recorded in
-[coverage.csv](coverage.csv), not in this prose. As of catalogue 1.32.0 on
+[coverage.csv](coverage.csv), not in this prose. As of catalogue 1.33.0 on
 20 October 2026, all 31 national packs have published a **partial** core. No
 tracked sector/topic cell is fully published; see the
 [whole-program audit](FINAL-COVERAGE-AUDIT.md).
 
 [jurisdictions.csv](jurisdictions.csv) records the 31 ordered packs: four UK nations
-and 27 EU member states. [coverage.csv](coverage.csv) currently records **918 rows**
-(31 national jurisdictions plus 122 subdivisions, each across six sectors), each
-with **eight topic status columns**, giving **7,344 explicit cells**. The 1,488
-national cells are all `PARTIALLY_PUBLISHED`. Across the entire matrix, 2,220
-cells are `PARTIALLY_PUBLISHED` and 5,124 are `IN_REVIEW`.
+and 27 EU member states. [coverage.csv](coverage.csv) currently records **2,820
+rows** (31 national jurisdictions plus 439 subdivisions, each across six sectors),
+each with **eight topic status columns**, giving **22,560 explicit cells**. The
+1,488 national cells are all `PARTIALLY_PUBLISHED`. Across the entire matrix,
+2,220 cells are `PARTIALLY_PUBLISHED` and 20,340 are `IN_REVIEW`.
 This compact matrix is research tracking data, not runtime requirements.
 
 ## Dimensions
@@ -50,9 +50,11 @@ metadata in RESEARCH.md. The bare CSV status is never sufficient publication evi
 
 The `regional_review` field in [jurisdictions.csv](jurisdictions.csv) remains a
 research status, not proof that subdivisions have been exhaustively assessed. It
-is `IN_REVIEW` for 27 countries and `NOT_REVIEWED` for England, Scotland, Northern
-Ireland and Ireland. Resolve regional/local requirements, including education and
-childcare authorities that differ by provision.
+is `IN_REVIEW` for 28 countries and `NOT_REVIEWED` for Scotland, Northern Ireland
+and Ireland. England's 153 upper-tier and 164 additional district authorities
+are inventoried but all their topic cells remain `IN_REVIEW`. Resolve
+regional/local requirements, including education and childcare authorities that
+differ by provision.
 
 Track relevant subdivisions as additional jurisdiction keys and coverage rows in
 the same matrix, preserving the parent country's gaps until their scope is reviewed.

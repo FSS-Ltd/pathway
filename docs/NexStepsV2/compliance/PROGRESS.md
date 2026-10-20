@@ -1590,3 +1590,48 @@ Seed Database Identity, CodeQL and both language analyses. GitHub reported it
 The separate [whole-program audit](FINAL-COVERAGE-AUDIT.md) starts from that merge.
 No national pack or regional inventory is being treated as full coverage merely
 because all 31 numbered country PRs have merged.
+
+### Whole-program audit merged; England territorial remediation begins
+
+PR #700 passed all eight required CI checks on final head
+`6e9cc18648b03554aa2350315e38b0884400c388`. GitHub reported it `MERGED`
+at 2026-10-20T17:56:36Z with merge commit
+`665fd28f0299973fda403538969e38deda09a04c`; fetched `fss/master` matched.
+The next step starts from that merge on `feature/compliance-england-local-inventory`.
+The [England authority inventory](packs/england/local-authority-inventory.md)
+distinguishes 153 upper-tier authorities and 164 additional districts; source
+research and selector implementation are in progress. No England regional cell
+has been marked complete.
+
+### England local-authority inventory — local verification
+
+The draft catalogue 1.33.0 adds 153 English upper-tier councils and 164 distinct
+district councils from the official ONS April 2025 code lists, with parent links.
+All 15,216 new jurisdiction × sector × topic cells remain `IN_REVIEW`; no local
+legal duty has been published solely from the authority inventory. Selecting a
+district now shows its district, upper-tier and national coverage, and the
+profile selector names the two council tiers clearly. The [research record](packs/england/local-authority-inventory.md)
+documents sources, category counts and the 2027 Surrey reorganisation boundary.
+
+On the current local revision, API units passed 312 suites / 2,054 tests and the
+configured disposable-database E2E run passed 109 suites / 646 tests with tenant
+RLS. Oxford API/profile persistence, location-chain, national-action and explicit
+unreviewed-coverage scenarios passed. All 317 stored authority codes, names and
+parent links matched the ONS source files; the migration reran idempotently.
+API and admin typechecks, changed-file lint and Prettier, Prisma validation,
+permission-definition drift check, API and admin builds, and `git diff --check`
+passed. An actual profile-field preview using built admin styles was inspected
+at desktop and 390-pixel mobile widths; controls and council labels were readable
+in both. This was an unauthenticated component preview, so it does not prove the
+full live portal flow. No Chrome browser was opened.
+
+The implementation still requires final diff review, PR creation, eight passing
+current-head CI checks and host-confirmed merge. The whole-program audit remains
+open; authority names and national entry actions are not full legal coverage.
+
+PR #701 opened from `9fbebd84`. Its first hosted run completed all 312 API unit
+suites / 2,054 tests successfully, but the API unit step exceeded the workflow's
+five-minute ceiling immediately after Jest finished, so the Typecheck/Lint/Unit
+job failed and dependent database jobs were skipped. The step timeout is being
+raised to eight minutes without changing its test command. Fresh current-head
+CI and host-confirmed merge remain required before any next step.
