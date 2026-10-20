@@ -821,6 +821,19 @@ process growth, the integration worker now recycles at 2 GB and that job has a
 30-minute ceiling. Its next latest-head run must finish successfully before
 merge; a cancelled or timed-out result does not satisfy the gate.
 
+After merging current `master`, PR #696 head
+`d038dfbe121a5e80222433a1a587fba253d1bbde` passed the unit, CodeQL,
+Permission Definition Database, System Role Seed and Organisation Role RLS
+checks. The Integration Tests job in
+[run 39455843265](https://github.com/FSS-Ltd/pathway/actions/runs/39455843265)
+was cancelled at the 30-minute limit without a completed suite result. The
+same PR now splits Jest's 110 API E2E suites into two disjoint 55-suite CI
+jobs, each with its own PostgreSQL service and migrated database. Local Jest
+test discovery verified that both shards together cover the entire original
+suite set without overlap, including the C02 homework suite. The existing
+one-connection transaction check runs in the first shard. Both latest-head
+shards must pass before this step can merge; C02 remains unaccepted.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of
