@@ -1701,3 +1701,80 @@ suites and 2,056/2,056 tests**, exit 0. The worker tests passed 15 suites / 66
 tests; auth passed 3 suites / 15 tests. The hook's same commands have now been
 run successfully. This is a test-run flake, not a compliance assertion failure;
 hosted current-head CI remains mandatory before merge.
+
+### Scotland council-area inventory merged; Northern Ireland inventory begins
+
+[PR #703](https://github.com/FSS-Ltd/pathway/pull/703) passed all nine reported
+current-head checks on `9778751ddd941a2a276eda0b6e8e8a47c68a4b49`:
+typecheck/lint/unit, both integration shards, organisation-role RLS, permission
+definitions, system-role seed identity, CodeQL and both analyses. GitHub reported
+`MERGED` at 2026-10-20T20:32:35Z with merge commit
+`81d1f7868b0cfc0937d444e3356008337823177c`; fetched `fss/master` matched
+and had the checked head as its second parent. The next step starts from that
+merge on `feature/compliance-northern-ireland-local-inventory`. Scotland's 1,536
+council-area cells remain `IN_REVIEW`, and the whole-program audit remains open.
+
+### Northern Ireland local-government-district inventory — verification in progress
+
+The [territorial research note](packs/northern-ireland/district-inventory.md)
+separates the 11 ONS `N09` local government districts from the regional
+Education Authority and the separate HSC Trust and safeguarding routes.
+Catalogue 1.35.0 and the additive migration add the district selectors and 528
+explicit `IN_REVIEW` cells; no district-specific action is published. The ONS
+CSV, catalogue constants and SQL seed have identical 11 code/name pairs. The
+research matrix has 3,078 rows / 24,624 cells, including 66 Northern Ireland
+district/sector rows with eight `IN_REVIEW` topics each.
+
+The migration inserted 11 rows into the named disposable database and zero on
+rerun; all stored names, levels and `GB-NIR` parent links matched the ONS file.
+The Belfast tracker E2E passed 13 tests with the migration applied. Focused
+Northern Ireland and tracker-engine units passed 25 tests, API/admin typechecks
+passed after regenerating the stale local Prisma client, as did API lint,
+explicit changed-admin lint, Prisma schema validation and changed-file
+Prettier. A component preview using the actual profile fields and compiled
+admin styles was inspected at desktop and narrow mobile widths. The selected
+native option clips a long district name in its closed narrow control; the
+expanded options and accessible value retain the full name. Keyboard selection
+reached Newry, Mourne and Down. The preview is not an authenticated portal
+test. Full regression tests, builds, final diff review, PR, current-head CI and
+host-confirmed merge remain required.
+
+The full admin test command passed, including tracker and checklist browser
+tests. API and admin production builds passed after allowing generated-output
+writes and providing a localhost admin API URL plus synthetic Clerk build key.
+Worker tests passed 15 suites / 66 tests; auth passed 3 suites / 15 tests.
+Permission-definition registry drift was zero. `graphify update .` rebuilt
+graph.json and GRAPH_REPORT.md; it skipped graph.html because the 8,747-node
+graph exceeds its HTML visualization limit.
+
+The first full parallel API unit run reached 313 passing suites but timed out
+one unrelated guest-pass controller test at Jest's five-second per-test limit
+under heavy local load. It was stopped after the failure; a clean serial
+rerun is underway. The guest-pass failure is not a compliance assertion, but
+the full unit result remains pending until the rerun finishes.
+
+The serial API unit rerun completed cleanly with **316 suites / 2,069 tests**
+and exit 0. CI-shaped two-shard integration verification is now underway on
+the disposable database.
+
+Integration shard 1 passed 56 suites / 394 tests, including tenant RLS,
+Learning Centre provisioning and institutional agreement/personnel checks.
+Shard 2 is running. Repository-wide lint passed all 16 package tasks. The
+district gap explanation was tightened during final review so it does not
+suggest that every topic necessarily has a council-specific duty.
+
+Integration shard 2 passed 55 suites / 276 tests. Together the CI-shaped
+shards passed **111 suites / 670 tests**, with separate disposable-database
+setup and tenant RLS coverage. Final changed-file formatting, the tightened
+gap wording, source/data review and staged diff remain before the PR.
+
+The final gap-wording unit rerun passed (2/2). Changed-file Prettier and
+`git diff --check` passed; Graphify was refreshed after that wording change.
+After the E2E migration reset, the disposable database still contained 11
+distinct district selectors, all `LOCAL_AUTHORITY` children of `GB-NIR`.
+The official-source/TS/SQL parity check, API/admin typechecks, Prisma schema
+validation, API lint, explicit changed-admin lint, 16-package root lint,
+admin/API builds, full admin tests, worker/auth tests and permission registry
+checks passed. The first parallel API unit timeout and clean serial rerun are
+recorded above. Final staged-file review, PR, latest-head CI and host-confirmed
+merge remain the gate.

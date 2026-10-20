@@ -114,7 +114,7 @@ describe("Netherlands progressive national release", () => {
         ),
       ).toBe(true);
     }
-    expect(TRACKER_CATALOGUE.version).toBe("1.34.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.35.0");
     expect(TRACKER_CATALOGUE.sources).toEqual(
       expect.arrayContaining(catalogueV124.sources),
     );

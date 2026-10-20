@@ -44,6 +44,8 @@ function jurisdictionLabel(jurisdiction: TrackerJurisdiction): string {
         : "district council";
   } else if (jurisdiction.subdivisionCode?.startsWith("GB-SCT-S12")) {
     level = "council area";
+  } else if (jurisdiction.subdivisionCode?.startsWith("GB-NIR-N09")) {
+    level = "local government district";
   }
   return `${jurisdiction.name} · ${jurisdiction.countryCode} (${level})`;
 }

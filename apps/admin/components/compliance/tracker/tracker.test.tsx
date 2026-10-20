@@ -338,6 +338,14 @@ async function run() {
               level: "LOCAL_AUTHORITY",
               parentJurisdictionId: "scotland",
             },
+            {
+              id: "belfast",
+              countryCode: "GB",
+              subdivisionCode: "GB-NIR-N09000003",
+              name: "Belfast",
+              level: "LOCAL_AUTHORITY",
+              parentJurisdictionId: "northern-ireland",
+            },
           ]}
           canManage
           onSaved={() => changed++}
@@ -355,6 +363,10 @@ async function run() {
     assert.match(
       host.querySelector('option[value="edinburgh"]')?.textContent ?? "",
       /City of Edinburgh · GB \(council area\)/,
+    );
+    assert.match(
+      host.querySelector('option[value="belfast"]')?.textContent ?? "",
+      /Belfast · GB \(local government district\)/,
     );
     await click("Save profile");
     assert.match(host.textContent ?? "", /draft has been kept/);

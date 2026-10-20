@@ -7,3 +7,7 @@ The [Department of Education's independent-school route](https://www.education-n
 All regional cells remain `IN_REVIEW`. The actual HSC Trust, district council, local safeguarding route, provider contract, school classification and specialist licensing must be confirmed for each site. Curriculum, childcare ratios, residential provision, data rights/DPIA/DPO, food approvals and local transport licensing are incomplete. ICCE items are provider requirements only for actual ICCE participants. A missing fact stays unresolved rather than selecting England or silently claiming no obligation.
 
 All official/provider source pages were retrievable in the research browser. Automated HTTP checks returned 200 for 26 of 27 records; the Food Standards Agency's [Safe Catering PDF](https://www.food.gov.uk/sites/default/files/media/document/safe-catering_0.pdf) returned an HTTP access error to the script but its content was available through source search. See [PROGRESS.md](../../PROGRESS.md) for check and PR evidence.
+
+Catalogue 1.35.0 adds the [11 local-government-district selectors](district-inventory.md)
+from the ONS April 2025 geography file. Their 528 sector/topic cells remain
+`IN_REVIEW`; this does not close council, HSC Trust or specialist gaps.
