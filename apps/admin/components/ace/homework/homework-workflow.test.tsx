@@ -97,6 +97,31 @@ async function run() {
   await act(async () =>
     root.render(
       <HomeworkList
+        assignments={[
+          assignment,
+          { ...assignment, id: "second", title: "Decimals" },
+        ]}
+        options={options}
+        pendingId={assignment.id}
+        onEdit={() => actions.push("edit")}
+        onAction={() => actions.push("action")}
+      />,
+    ),
+  );
+  const secondCard = Array.from(container.querySelectorAll("li")).find((item) =>
+    item.textContent?.includes("Decimals"),
+  );
+  assert.ok(secondCard);
+  assert.ok(
+    Array.from(secondCard.querySelectorAll("button")).every(
+      (button) => button.disabled,
+    ),
+    "other assignments cannot start an action while a save is pending",
+  );
+
+  await act(async () =>
+    root.render(
+      <HomeworkList
         assignments={[assignment]}
         options={{ ...options, publicationEnabled: false }}
         pendingId={null}

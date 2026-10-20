@@ -223,7 +223,7 @@ export function HomeworkList({
               key={item.id}
               item={item}
               options={options}
-              pending={pendingId === item.id}
+              pending={pendingId !== null}
               onEdit={onEdit}
               onAction={onAction}
             />
