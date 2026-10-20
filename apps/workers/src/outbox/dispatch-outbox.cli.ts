@@ -20,7 +20,7 @@ async function main(): Promise<void> {
       behaviour: loadBehaviourOutboxEndpoint(process.env),
     }),
     undefined,
-    [FINANCE_STATEMENT_NOTICE_EVENT],
+    [FINANCE_STATEMENT_NOTICE_EVENT, "ace.homework.email"],
   ).run();
   console.log("[outbox] dispatch complete", result);
 }

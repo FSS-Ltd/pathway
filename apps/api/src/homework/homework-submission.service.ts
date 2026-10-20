@@ -4,7 +4,10 @@ import {
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
+  Inject,
 } from "@nestjs/common";
+import { OutboxService } from "../common/outbox/outbox.service";
+import { enqueueStaffSubmissionEmail } from "./homework-notifications";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import {
@@ -22,6 +25,7 @@ export function requireHomeworkSubmissionsEnabled(): void {
 
 @Injectable()
 export class HomeworkSubmissionService {
+  constructor(@Inject(OutboxService) private readonly outbox: OutboxService) {}
   async list(tenantId: string, userId: string) {
     return withStudentHomework(tenantId, userId, async (context) => {
       const recipients = await context.tx.aceHomeworkRecipient.findMany({
@@ -59,6 +63,13 @@ export class HomeworkSubmissionService {
                       status: true,
                     },
                   },
+                  review: {
+                    select: {
+                      decision: true,
+                      studentFeedback: true,
+                      releasedAt: true,
+                    },
+                  },
                 },
                 orderBy: { number: "desc" },
               },
@@ -72,7 +83,29 @@ export class HomeworkSubmissionService {
           process.env.ACE_HOMEWORK_SUBMISSIONS_ENABLED === "true",
         assignments: recipients.map((row) => ({
           ...row.assignment,
-          submission: row.submission,
+          submission: row.submission
+            ? {
+                ...row.submission,
+                versions: row.submission.versions.map((version) => ({
+                  id: version.id,
+                  number: version.number,
+                  text: version.text,
+                  late: version.late,
+                  submittedAt: version.submittedAt,
+                  evidence: version.evidence,
+                  review:
+                    version.review &&
+                    (version.review.decision === "RETURNED" ||
+                      version.review.releasedAt)
+                      ? {
+                          decision: version.review.decision,
+                          feedback: version.review.studentFeedback,
+                          releasedAt: version.review.releasedAt,
+                        }
+                      : null,
+                })),
+              }
+            : null,
         })),
       };
     });
@@ -175,8 +208,8 @@ export class HomeworkSubmissionService {
         where: { id_tenantId: { id: submission.id, tenantId } },
         select: { version: true, status: true },
       });
-      if (current.status === "SUBMITTED") {
-        throw new ConflictException("Homework has already been submitted");
+      if (current.status === "SUBMITTED" || current.status === "COMPLETED") {
+        throw new ConflictException("Homework is closed for submissions");
       }
       if (input.evidenceId) {
         const evidence = await context.tx.aceHomeworkEvidence.findFirst({
@@ -225,6 +258,13 @@ export class HomeworkSubmissionService {
           assignmentId,
           late: version.late,
         },
+      });
+      await enqueueStaffSubmissionEmail(context.tx, this.outbox, {
+        tenantId,
+        recipientId: recipient.id,
+        sourceId: version.id,
+        yearBandId: recipient.assignment.yearBandId,
+        today: context.today,
       });
       return version;
     });

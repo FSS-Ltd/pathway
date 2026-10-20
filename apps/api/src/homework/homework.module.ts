@@ -10,13 +10,23 @@ import { HomeworkStudentController } from "./homework-student.controller";
 import { HomeworkSubmissionService } from "./homework-submission.service";
 import { HomeworkEvidenceService } from "./homework-evidence.service";
 import { HomeworkMalwareScanner } from "../storage/homework-malware-scanner";
+import { HomeworkReviewController } from "./homework-review.controller";
+import { HomeworkReviewService } from "./homework-review.service";
+import { HomeworkGuardianController } from "./homework-guardian.controller";
+import { HomeworkGuardianService } from "./homework-guardian.service";
+import { MailerModule } from "../mailer/mailer.module";
+import { HomeworkEmailRunnerController } from "./homework-email-runner.controller";
+import { HomeworkEmailRunnerService } from "./homework-email-runner.service";
 
 @Module({
-  imports: [CommonModule, AuthModule, AccessControlModule],
+  imports: [CommonModule, AuthModule, AccessControlModule, MailerModule],
   controllers: [
     HomeworkController,
     HomeworkScheduleRunnerController,
     HomeworkStudentController,
+    HomeworkReviewController,
+    HomeworkGuardianController,
+    HomeworkEmailRunnerController,
   ],
   providers: [
     HomeworkService,
@@ -24,6 +34,9 @@ import { HomeworkMalwareScanner } from "../storage/homework-malware-scanner";
     HomeworkSubmissionService,
     HomeworkEvidenceService,
     HomeworkMalwareScanner,
+    HomeworkReviewService,
+    HomeworkGuardianService,
+    HomeworkEmailRunnerService,
   ],
 })
 export class HomeworkModule {}

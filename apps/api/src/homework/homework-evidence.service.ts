@@ -64,7 +64,10 @@ export class HomeworkEvidenceService {
           },
           select: { status: true },
         });
-        if (submitted?.status === "SUBMITTED") {
+        if (
+          submitted?.status === "SUBMITTED" ||
+          submitted?.status === "COMPLETED"
+        ) {
           throw new ConflictException(
             "Submitted homework cannot accept new evidence",
           );
