@@ -1,0 +1,9 @@
+# Hungary national checklist pack (2.18)
+
+Reviewed 2026-10-20. Catalogue 1.19.0 adds **21 conditional actions** and **16 official/provider sources** across six institutional sectors and eight topics. All 48 Hungary country cells are `PARTIALLY_PUBLISHED`, with regional status `IN_REVIEW`. The manual completion count is not legal certification.
+
+Actual provision controls the route. [Act CXC of 2011](https://njt.jog.gov.hu/jogszabaly/2011-190-00-00) and [Decree 229/2012](https://njt.jog.gov.hu/jogszabaly/2012-229-20-22) govern public-education institutions and the non-state operating-permission route. [Act XXXI of 1997](https://njt.jog.gov.hu/jogszabaly/1997-31-00-00) and [Decree 15/1998](https://njt.jog.gov.hu/jogszabaly/1998-15-20-3D) govern child-welfare care and role conditions. The [adult-training act](https://njt.jog.gov.hu/jogszabaly/2013-77-00-00) has its own scope and exclusions. [Act III of 2026](https://njt.jog.gov.hu/jogszabaly/2026-3-00-00) changes adult-training authority references **from 1 January 2027**; it is not the current filing route. The pack therefore asks for a current authority decision instead of treating a Learning Centre screen as a permit or public-funding determination.
+
+The child-welfare signalling network applies to legally covered institutions, not every adult or parent account. Care and training exclusions require a recorded reason and authority confirmation when uncertain. ICCE terms apply only where its qualifications are actually offered, separately from Hungarian school permission.
+
+The [county review](regional-review.md) records the nineteen counties and Budapest. County, municipal and provider-specific schooling, childcare, fire, health, food, transport and residential conditions remain in review. No checkbox is ticked automatically.
