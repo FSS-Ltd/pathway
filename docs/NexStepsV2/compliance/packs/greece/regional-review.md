@@ -1,0 +1,5 @@
+# Greece region and municipal review
+
+Reviewed 2026-10-20. [Gov.gr](https://www.gov.gr/en/regions) lists thirteen administrative regions. [ISO 3166-2's official Greece entry](https://www.iso.org/iso/iso_3166-2_newsletter_ii-1_corrected_2010-02-19.pdf) supplies `GR-A` through `GR-M` and the `GR-69` code for self-governed Mount Athos. The additive migration makes all fourteen selectable; Mount Athos is labelled as a special self-governed part, not treated as an ordinary region for legal conclusions.
+
+The regions are East Macedonia and Thrace (`GR-A`), Central Macedonia (`GR-B`), West Macedonia (`GR-C`), Epirus (`GR-D`), Thessaly (`GR-E`), Ionian Islands (`GR-F`), Western Greece (`GR-G`), Central Greece (`GR-H`), Attica (`GR-I`), Peloponnese (`GR-J`), North Aegean (`GR-K`), South Aegean (`GR-L`) and Crete (`GR-M`). Preschool-care licensing also depends on the municipality; KDAP and school processes involve regional offices. Region-by-region and municipal operating conditions have not been published in this pack. All sector/topic country cells remain partial and regional review remains `IN_REVIEW`.
