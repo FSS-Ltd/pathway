@@ -735,7 +735,7 @@ global migrations and fixtures; the integration run passed 109 suites and 645
 tests. This foundation still has no homework route or UI. ACE-M20 remains open,
 so ACE-C01 is not accepted and the verified plan count stays **48/150 (32%)**.
 
-Draft [PR #684](https://github.com/FSS-Ltd/pathway/pull/684) is the ACE-M20
+[PR #684](https://github.com/FSS-Ltd/pathway/pull/684) is the ACE-M20
 web release-evidence follow-up. Its initial head
 `8d27c7c37ad1956fd78caf08211286da315b66be` passed all eight CI and
 CodeQL checks, including the family landing unit test and 109 PostgreSQL
@@ -744,11 +744,32 @@ exposed an API 500 on family context discovery; a retry failed the same way.
 Vercel's `nexsteps-api` runtime log identified the nested read-only/write
 transaction conflict. The same failure was reproduced in the family-context
 PostgreSQL HTTP suite by giving the guardian an active site membership. The
-current PR corrects that route's transaction ownership. The local regression
+PR corrected that route's transaction ownership. The local regression
 result is recorded in the
-[M20 web evidence](../evidence/ace-family-messaging-release-gate.md);
-deployment and signed-in keyboard/accessibility retries remain pending. The PR
-remains unmerged, and the verified count remains **48/150 (32%)**.
+[M20 web evidence](../evidence/ace-family-messaging-release-gate.md).
+
+Subsequent release evidence supersedes that draft status: PR #684 passed all
+eight latest-head checks on `a15b616bf3b140e9163a92f575e8535505984471`,
+including the PostgreSQL family-context HTTP regression and admin family
+landing test. GitHub confirms merge commit
+`1bcdfe9a7d9bce22ce7dec98e46e5bcb179a5895` on 20 October 2026.
+Production workflow
+[39406598909](https://github.com/FSS-Ltd/pathway/actions/runs/39406598909)
+passed all four jobs; Vercel reported the matching API deployment
+`dpl_2AbTgVT4aNYJLtbKrwqcMQfW3DmE` and admin deployment
+`dpl_FHgLyoHb29eE63UnkeT6Xoj8DrdB` READY. The signed-in ACE family page
+then loaded without the prior 500; at 320px it had no horizontal overflow,
+exposed its empty state in the accessible tree, and showed keyboard focus.
+That demo account had no linked child, so the linked-account browser review
+and mobile baselines remain open. ACE-M20 and ACE-C01 stay unaccepted at
+**48/150 (32%)**.
+
+ACE-C02 web/API implementation is proceeding under the product owner's explicit
+exception to the M20 predecessor rule. Its assignment publication remains
+disabled in production until the M20 security gate is accepted. The C02
+branch is `feature/ace-c02-homework-assignments`; the task is not complete
+until its own PR has latest-head green CI and a confirmed merge. Mobile work
+and the ACE-M06 live email test remain deferred.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

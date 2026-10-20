@@ -41,6 +41,7 @@ const titleMap: Record<string, string> = {
   "/learning": "Learning",
   "/ace": "ACE overview",
   "/ace/pace": "PACE workflow",
+  "/ace/homework": "Homework",
   "/ace/pace/inventory": "PACE inventory",
   "/ace/behaviour": "Behaviour capture",
   "/ace/messages": "Messages",

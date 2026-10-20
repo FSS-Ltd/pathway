@@ -71,6 +71,14 @@ const navItemsWithAccess: (SidebarNavItem & {
     group: "Teaching",
   },
   {
+    label: "Homework",
+    href: "/ace/homework",
+    iconIndex: 29,
+    access: "staff-or-admin",
+    permission: "ace.homework.assignments.manage",
+    group: "Teaching",
+  },
+  {
     label: "Academic setup",
     href: "/ace/settings/academic",
     iconIndex: 27,

@@ -13,6 +13,7 @@ import {
   CheckSquare,
   ClipboardCheck,
   ClipboardList,
+  ClipboardPenLine,
   Megaphone,
   ShieldCheck,
   CreditCard,
@@ -106,6 +107,7 @@ const iconComponents: LucideIcon[] = [
   MessageCircle, // 26 Staff messages
   CalendarDays, // 27 ACE academic setup
   ClipboardList, // 28 ACE daily register
+  ClipboardPenLine, // 29 ACE homework assignments
 ];
 
 // Avoid JSX component identity mismatches when CI resolves lucide/react type versions differently.
