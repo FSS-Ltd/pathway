@@ -847,6 +847,19 @@ open, so the verified ACE master-plan count remains **48/150 (32%)**. The next
 web/API step is C03, designed in
 [c03-submission-design.md](c03-submission-design.md), with mobile paused.
 
+ACE-C03 web/API implementation commit `8904133b` is in
+[PR #702](https://github.com/FSS-Ltd/pathway/pull/702). Its additive migration
+applied in disposable `app` and `public` PostgreSQL schemas; a restricted-role
+probe saw all three new tables for the own tenant and none for another tenant.
+The local PostgreSQL HTTP suite ran 6/6 cases; evidence/storage/ClamAV unit
+suites ran 16/16 tests; student homework and student overview UI interaction
+tests, API/admin typechecks, targeted lint/format, and both builds passed.
+The local admin build used a disposable Clerk publishable key because this
+checkout has none. Latest-head CI and GitHub merge are still required. The
+submission flag remains off, and ACE-C03 is unaccepted pending M20, scanner
+provisioning and live linked-school checks. The plan count stays **48/150
+(32%)**.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of
