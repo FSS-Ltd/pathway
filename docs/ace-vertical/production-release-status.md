@@ -710,16 +710,20 @@ on a notice and the list heading after Enter on Back to notices. No receipt was
 acknowledged. ACE-M14 remains open while mobile notice work is paused; the
 verified count remains **48/150 (32%)**.
 
-ACE-C01 entitlement foundation starts from the #625 merge and includes the
-merged [PR #626](https://github.com/FSS-Ltd/pathway/pull/626) screen-family
+ACE-C01 entitlement foundation is under review in
+[PR #682](https://github.com/FSS-Ltd/pathway/pull/682). It starts from the #625
+merge and includes the merged
+[PR #626](https://github.com/FSS-Ltd/pathway/pull/626) screen-family
 model: ACE schools and ACE learning centres share ACE capabilities, while
 public learning centres retain the state-school family. The newer platform
 contract makes Learning a core entitlement for every organisation; the older
 C01 add-on premise is superseded for this step. Homework-specific keys remain
 inside the ACE screen family, and institutional module selection rejects
-Learning as an included or paid add-on. This foundation adds no homework route
-or customer-facing enablement. The master plan's M20 prerequisite remains open,
-so C01 is not counted as accepted until that release gate is reconciled.
+Learning as an included or paid add-on. Local verification passed 178 platform
+capability tests, three billing unit tests, and three PostgreSQL HTTP tests on
+an isolated database with all 167 migrations. This foundation adds no homework
+route or customer-facing enablement. The master plan's M20 prerequisite remains
+open, so C01 is not counted as accepted until that release gate is reconciled.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
