@@ -759,4 +759,42 @@ describe("Site tracker persistence and permission boundaries", () => {
       catalogueProvider.catalogue = trackerFixture();
     }
   });
+  it("selects a Northern Ireland district with national actions and explicit local gaps", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const jurisdictions = await request(server)
+      .get("/compliance/tracker/jurisdictions")
+      .set("Authorization", reader)
+      .expect(200);
+    const belfast = jurisdictions.body.find(
+      (entry: { subdivisionCode: string }) =>
+        entry.subdivisionCode === "GB-NIR-N09000003",
+    );
+    expect(belfast).toMatchObject({ level: "LOCAL_AUTHORITY" });
+    await save({ ...testProfile, jurisdictionId: belfast.id });
+    catalogueProvider.catalogue = TRACKER_CATALOGUE;
+    try {
+      const result = await request(server)
+        .get("/compliance/tracker/checklist")
+        .set("Authorization", reader)
+        .expect(200);
+      expect(result.body.coverage).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            jurisdiction: "GB-NIR",
+            status: "PARTIALLY_PUBLISHED",
+            regionalStatus: "IN_REVIEW",
+          }),
+          expect.objectContaining({
+            jurisdiction: "GB-NIR-N09000003",
+            status: "IN_REVIEW",
+          }),
+        ]),
+      );
+      expect(result.body.items.length).toBeGreaterThan(0);
+      expect(result.body.coverageGaps).toBe(16);
+    } finally {
+      catalogueProvider.catalogue = trackerFixture();
+    }
+  });
 });

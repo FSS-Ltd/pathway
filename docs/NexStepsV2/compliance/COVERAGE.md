@@ -1,17 +1,17 @@
 # Coverage matrix
 
 Version **1**, established 13 October 2026. The current status is recorded in
-[coverage.csv](coverage.csv), not in this prose. As of catalogue 1.34.0 on
+[coverage.csv](coverage.csv), not in this prose. As of catalogue 1.35.0 on
 20 October 2026, all 31 national packs have published a **partial** core. No
 tracked sector/topic cell is fully published; see the
 [whole-program audit](FINAL-COVERAGE-AUDIT.md).
 
 [jurisdictions.csv](jurisdictions.csv) records the 31 ordered packs: four UK nations
-and 27 EU member states. [coverage.csv](coverage.csv) currently records **3,012
-rows** (31 national jurisdictions plus 471 subdivisions, each across six sectors),
-each with **eight topic status columns**, giving **24,096 explicit cells**. The
+and 27 EU member states. [coverage.csv](coverage.csv) currently records **3,078
+rows** (31 national jurisdictions plus 482 subdivisions, each across six sectors),
+each with **eight topic status columns**, giving **24,624 explicit cells**. The
 1,488 national cells are all `PARTIALLY_PUBLISHED`. Across the entire matrix,
-2,220 cells are `PARTIALLY_PUBLISHED` and 21,876 are `IN_REVIEW`.
+2,220 cells are `PARTIALLY_PUBLISHED` and 22,404 are `IN_REVIEW`.
 This compact matrix is research tracking data, not runtime requirements.
 
 ## Dimensions
@@ -50,10 +50,10 @@ metadata in RESEARCH.md. The bare CSV status is never sufficient publication evi
 
 The `regional_review` field in [jurisdictions.csv](jurisdictions.csv) remains a
 research status, not proof that subdivisions have been exhaustively assessed. It
-is `IN_REVIEW` for 29 countries and `NOT_REVIEWED` for Northern Ireland and
-Ireland. England's 153 upper-tier and 164 additional district authorities and
-Scotland's 32 council areas are inventoried, but all their topic cells remain
-`IN_REVIEW`. Resolve
+is `IN_REVIEW` for 30 countries and `NOT_REVIEWED` for Ireland. England's 153
+upper-tier and 164 additional district authorities, Scotland's 32 council areas
+and Northern Ireland's 11 local government districts are inventoried, but all
+their topic cells remain `IN_REVIEW`. Resolve
 regional/local requirements, including education and childcare authorities that
 differ by provision.
 
