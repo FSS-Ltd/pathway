@@ -15,6 +15,16 @@ import {
   VERTICAL_CAPABILITIES,
 } from "../capability-maps";
 
+const HOMEWORK_KEYS = [
+  "ace.homework.assignments.read",
+  "ace.homework.assignments.manage",
+  "ace.homework.submissions.write",
+  "ace.homework.evidence.read",
+  "ace.homework.evidence.write",
+  "ace.homework.reviews.manage",
+  "ace.homework.family.read",
+] as const;
+
 describe("getOrgCapabilities", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,6 +59,41 @@ describe("getOrgCapabilities", () => {
       ]),
     );
   });
+
+  it.each(["ACE_SCHOOL", "ACE_LEARNING_CENTRE"])(
+    "grants %s homework without a Learning module",
+    async (vertical) => {
+      orgVerticalFindUnique.mockResolvedValueOnce({ vertical });
+      orgModuleFindMany.mockResolvedValueOnce([]);
+
+      expect(await getOrgCapabilities("org-ace")).toEqual(
+        expect.arrayContaining(HOMEWORK_KEYS),
+      );
+    },
+  );
+
+  it.each([
+    { label: "no modules", vertical: "CHURCH", modules: [] },
+    {
+      label: "Learning active",
+      vertical: "CHURCH",
+      modules: [{ module: "LEARNING", expiresAt: null }],
+    },
+    {
+      label: "public learning centre with Learning active",
+      vertical: "PUBLIC_LEARNING_CENTRE",
+      modules: [{ module: "LEARNING", expiresAt: null }],
+    },
+  ])(
+    "does not grant ACE homework to a non-ACE organisation with $label",
+    async ({ vertical, modules }) => {
+      orgVerticalFindUnique.mockResolvedValueOnce({ vertical });
+      orgModuleFindMany.mockResolvedValueOnce(modules);
+
+      const capabilities = await getOrgCapabilities("org-non-ace");
+      for (const key of HOMEWORK_KEYS) expect(capabilities).not.toContain(key);
+    },
+  );
 
   it("queries active modules and Finance history for servicing access", async () => {
     orgVerticalFindUnique.mockResolvedValueOnce(null);
