@@ -786,6 +786,14 @@ database applied every migration successfully, and the resulting cron function
 references `public."AceHomeworkAssignment"` and `public."Tenant"`. The
 corrected PR revision still needs its own latest-head CI and merge evidence.
 
+On corrected head `528732f0d4ada9b0f92c1676a0c95524b2522e48`, the
+Permission Definition Database check passed, while the Integration Tests job
+in [run 39436824439](https://github.com/FSS-Ltd/pathway/actions/runs/39436824439)
+aborted after the C02 homework suite passed: V8 reached its approximately
+4 GB heap limit across the serial integration run. The C02 PR now keeps one
+test worker but lets Jest recycle it after 1 GB of idle heap use. The next
+latest-head CI run must prove the entire integration job passes.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of
