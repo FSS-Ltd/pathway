@@ -9,7 +9,7 @@ function checklist(
   changes: Partial<TrackerProfileInput>,
   subdivisionCode = "FI-18",
 ) {
-  const now = new Date("2026-10-19T12:00:00Z");
+  const now = new Date(`${TRACKER_CATALOGUE.releasedAt}T12:00:00Z`);
   return buildTrackerChecklist({
     catalogue: TRACKER_CATALOGUE,
     profile: {

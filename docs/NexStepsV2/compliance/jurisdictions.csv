@@ -14,7 +14,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.13,EE,EE,Estonia,IN_REVIEW,Fifteen counties and 79 municipalities; education childcare premises and local child-protection routes in review
 2.14,FI,FI,Finland,IN_REVIEW,Nineteen regions including autonomous Åland (FI-01); current municipal and local-provider duties remain in review
 2.15,FR,FR,France,IN_REVIEW,101 departments including overseas; Bas-Rhin Haut-Rhin and Moselle private-school route distinguished; other departmental and local duties remain in review
-2.16,DE,DE,Germany,NOT_REVIEWED,Länder and local authorities
+2.16,DE,DE,Germany,IN_REVIEW,Sixteen Länder selectable; Land school and childcare law plus local authorities remain in review
 2.17,GR,GR,Greece,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.18,HU,HU,Hungary,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.19,IT,IT,Italy,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
