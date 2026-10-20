@@ -1578,3 +1578,15 @@ Verification commands: `pnpm --filter @pathway/api run typecheck`, `pnpm --filte
 Final legal self-review identified Social Services Act Chapter 19 Section 1's possible application to professionally run private child services outside education. The non-school action now explicitly requires that category assessment, and two education-specific duties permit a reasoned N/A decision where a childcare classification is outside the Education Act route. After this correction, focused Sweden/engine suites passed **2 suites / 25 tests**, and API typecheck, lint, build and Graphify passed again. Full unit and E2E suites above ran before this narrow catalogue-text/applicability-policy correction; current-head CI will rerun the required suites.
 
 [PR #699](https://github.com/FSS-Ltd/pathway/pull/699) opened from locally verified head `68fb3b26497f17d3ba80e916248fc8c25fb0898e`. Its commit hook passed lint in all 16 packages plus API, worker and auth tests. This progress-record update changes the PR head; all required current-head CI checks and host-confirmed merge remain the gate to the final coverage audit.
+
+### Sweden 2.31 merged; whole-program audit begins
+
+PR #699 passed all eight required CI checks on final head
+`a2551e8c8942c625c5a6e41a05a5a4e2e75e1e23`: Typecheck/Lint/Unit,
+Integration, Organisation Role RLS, Permission Definition Database, System Role
+Seed Database Identity, CodeQL and both language analyses. GitHub reported it
+`MERGED` at 2026-10-20T17:30:36Z with merge commit
+`d3937f1d452a2e6d64dc8056b794436e9667849b`; fetched `fss/master` matched.
+The separate [whole-program audit](FINAL-COVERAGE-AUDIT.md) starts from that merge.
+No national pack or regional inventory is being treated as full coverage merely
+because all 31 numbered country PRs have merged.
