@@ -4,6 +4,7 @@ import { portugalRegionCodes } from "../portugal";
 import { romaniaCountyCodes } from "../romania";
 import { slovakiaRegionCodes } from "../slovakia";
 import { sloveniaRegionCodes } from "../slovenia";
+import { spainRegionCodes } from "../spain";
 import { trackerProfileInput } from "../../tracker.dto";
 import { buildTrackerChecklist } from "../../tracker-engine";
 import { testProfile } from "../../tests/tracker-fixture";
@@ -38,7 +39,7 @@ function applicable(changes: Partial<TrackerProfileInput> = {}) {
 }
 describe("England national core applicability", () => {
   it("preserves England coverage and exposes incomplete national coverage", () => {
-    expect(TRACKER_CATALOGUE.coverage).toHaveLength(5424);
+    expect(TRACKER_CATALOGUE.coverage).toHaveLength(6336);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
         [
@@ -75,6 +76,8 @@ describe("England national core applicability", () => {
           ...slovakiaRegionCodes,
           "SI",
           ...sloveniaRegionCodes,
+          "ES",
+          ...spainRegionCodes,
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
@@ -82,12 +85,12 @@ describe("England national core applicability", () => {
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(1884);
+    ).toHaveLength(2046);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(96);
+    ).toHaveLength(48);
     const result = checklist();
     expect(
       result.coverage.every(
