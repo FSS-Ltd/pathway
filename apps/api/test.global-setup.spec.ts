@@ -12,7 +12,7 @@ describe("configureCiRlsRole", () => {
       "--maxWorkers=1",
     );
     expect(packageJson.scripts?.["test:integration"]).toContain(
-      "--workerIdleMemoryLimit=1GB",
+      "--workerIdleMemoryLimit=2GB",
     );
     expect(packageJson.scripts?.["test:integration"]).not.toContain(
       "--runInBand",

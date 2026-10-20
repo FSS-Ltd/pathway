@@ -812,6 +812,15 @@ serial single-worker limit needed for worker recycling. The test now
 asserts one worker, the integration-only idle-memory limit, and absence of
 `--runInBand`. This correction needs fresh latest-head CI before merge.
 
+Head `9631b25690951f8e14acd20f92eec1b2d97cd1b9` passed unit, CodeQL,
+Permission Definition Database, System Role Seed and Organisation Role RLS
+checks. Its Integration Tests job was cancelled by the 20-minute job limit in
+[run 39448212683](https://github.com/FSS-Ltd/pathway/actions/runs/39448212683)
+without a test failure result. To retain full serial coverage while limiting
+process growth, the integration worker now recycles at 2 GB and that job has a
+30-minute ceiling. Its next latest-head run must finish successfully before
+merge; a cancelled or timed-out result does not satisfy the gate.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of
