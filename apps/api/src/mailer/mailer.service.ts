@@ -294,6 +294,32 @@ export class MailerService {
     return result.data.id;
   }
 
+  isHomeworkEmailAvailable(): boolean {
+    return this.isEnabled && this.resend !== null;
+  }
+
+  async sendHomeworkNotification(to: string, eventId: string): Promise<string> {
+    if (!this.resend) throw new Error("Homework email provider unavailable");
+    const body =
+      "There is a homework update in NexSteps. Sign in to your school portal to view it.";
+    const result = await this.resend.emails.send(
+      {
+        from: this.fromAddress,
+        to,
+        subject: "NexSteps homework update",
+        text: body,
+        html: `<p>${body}</p>`,
+      },
+      { idempotencyKey: `ace-homework-email:${eventId}` },
+    );
+    if (result.error || !result.data?.id) {
+      throw new MessageEmailProviderRejectedError(
+        "Homework email provider rejected delivery",
+      );
+    }
+    return result.data.id;
+  }
+
   async sendBehaviourNotification(
     params: SendBehaviourNotificationParams,
   ): Promise<void> {

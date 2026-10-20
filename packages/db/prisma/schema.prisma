@@ -1310,6 +1310,7 @@ model Tenant {
   aceHomeworkSubmissions AceHomeworkSubmission[]
   aceHomeworkSubmissionVersions AceHomeworkSubmissionVersion[]
   aceHomeworkEvidence AceHomeworkEvidence[]
+  aceHomeworkReviews AceHomeworkReview[]
   aceTeachingDates       AceTeachingDate[]
   aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
   aceTimetableSchedules  AceTimetableSchedule[]
@@ -1543,6 +1544,8 @@ model User {
   financeStripeConnectionsDisconnected     FinanceStripeConnection[]           @relation("FinanceStripeConnectionDisconnector")
   studentIdentities                 StudentIdentity[]
   aceHomeworkEvidenceUploaded       AceHomeworkEvidence[] @relation("AceHomeworkEvidenceUploader")
+  aceHomeworkReviewsWritten         AceHomeworkReview[] @relation("AceHomeworkReviewer")
+  aceHomeworkReviewsReleased        AceHomeworkReview[] @relation("AceHomeworkReleaseActor")
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
   aceSchoolVolunteerCancellations AceSchoolVolunteerReservation[] @relation("AceVolunteerCancelledBy")
@@ -3277,6 +3280,12 @@ enum AceHomeworkSubmissionStatus {
   DRAFT
   SUBMITTED
   RETURNED
+  COMPLETED
+}
+
+enum AceHomeworkReviewDecision {
+  RETURNED
+  COMPLETED
 }
 
 enum AceHomeworkEvidenceStatus {
@@ -3314,6 +3323,7 @@ model AceHomeworkSubmissionVersion {
   text           String @db.VarChar(5000)
   evidenceId     String?
   evidence       AceHomeworkEvidence? @relation(fields: [evidenceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  review         AceHomeworkReview?
   late           Boolean
   submittedAt    DateTime @default(now())
 
@@ -3321,6 +3331,28 @@ model AceHomeworkSubmissionVersion {
   @@unique([tenantId, submissionId, number])
   @@unique([tenantId, submissionId, idempotencyKey])
   @@unique([evidenceId, tenantId])
+}
+
+model AceHomeworkReview {
+  id                String @id @default(uuid())
+  tenantId          String
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  versionId         String
+  version           AceHomeworkSubmissionVersion @relation(fields: [versionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  reviewedByUserId  String
+  reviewedBy        User @relation("AceHomeworkReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+  releasedByUserId  String?
+  releasedBy        User? @relation("AceHomeworkReleaseActor", fields: [releasedByUserId], references: [id], onDelete: Restrict)
+  decision          AceHomeworkReviewDecision
+  studentFeedback   String @db.VarChar(2000)
+  staffNote         String @db.VarChar(2000)
+  idempotencyKey    String @db.VarChar(80)
+  reviewedAt        DateTime @default(now())
+  releasedAt        DateTime?
+
+  @@unique([id, tenantId])
+  @@unique([versionId, tenantId])
+  @@index([tenantId, releasedAt])
 }
 
 model AceHomeworkEvidence {

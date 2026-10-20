@@ -11,6 +11,7 @@ export interface StudentHomeworkContext {
   userId: string;
   childId: string;
   now: Date;
+  today: Date;
 }
 
 export async function withStudentHomework<T>(
@@ -47,6 +48,7 @@ export async function withStudentHomework<T>(
       userId,
       childId: child.id,
       now,
+      today,
     });
   });
 }
@@ -79,6 +81,7 @@ export async function requireReleasedRecipient(
           title: true,
           instructions: true,
           dueAt: true,
+          yearBandId: true,
           publishedAt: true,
         },
       },

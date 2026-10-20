@@ -14,6 +14,7 @@ import {
   type HomeworkActor,
 } from "./homework-access";
 import type { PublishHomeworkDto } from "./dto/publish-homework.dto";
+import { enqueueAssignmentAudienceEmail } from "./homework-notifications";
 import { assignmentSelect } from "./homework-record";
 import {
   audienceFingerprint,
@@ -142,6 +143,15 @@ export async function publishHomeworkWithMode(
         assignmentId: id,
         recipientCount: audience.size,
       },
+    });
+    const recipients = await tx.aceHomeworkRecipient.findMany({
+      where: { tenantId: actor.tenantId, assignmentId: id },
+      select: { id: true, childId: true },
+    });
+    await enqueueAssignmentAudienceEmail(tx, {
+      tenantId: actor.tenantId,
+      assignmentId: id,
+      recipients,
     });
     return { ...published, recipientCount: audience.size };
   });

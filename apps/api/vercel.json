@@ -15,6 +15,10 @@
     {
       "path": "/api/internal/homework-schedules/run",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/homework-email/run",
+      "schedule": "* * * * *"
     }
   ],
   "functions": {

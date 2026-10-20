@@ -851,13 +851,31 @@ ACE-C03 web/API implementation commit `8904133b` is in
 [PR #702](https://github.com/FSS-Ltd/pathway/pull/702). Its additive migration
 applied in disposable `app` and `public` PostgreSQL schemas; a restricted-role
 probe saw all three new tables for the own tenant and none for another tenant.
-The local PostgreSQL HTTP suite ran 6/6 cases; evidence/storage/ClamAV unit
+The local PostgreSQL HTTP suite ran 6/6 substantive cases; evidence/storage/ClamAV unit
 suites ran 16/16 tests; student homework and student overview UI interaction
 tests, API/admin typechecks, targeted lint/format, and both builds passed.
 The local admin build used a disposable Clerk publishable key because this
-checkout has none. Latest-head CI and GitHub merge are still required. The
-submission flag remains off, and ACE-C03 is unaccepted pending M20, scanner
-provisioning and live linked-school checks. The plan count stays **48/150
+checkout has none. On checked head
+`855f54b807d21b728bc51c6cbcc1d57b7148c277`, all nine applicable CI
+checks passed. [Integration run 39484988125](https://github.com/FSS-Ltd/pathway/actions/runs/39484988125)
+ran the homework assignment and submission suites under global PostgreSQL
+setup, including the restricted-role submission RLS assertion; shard 1 passed
+56/56 suites and 392/392 tests, and shard 2 passed. GitHub confirmed PR #702
+merged to `master` on 20 October 2026 as
+`e282d6cbedef697bb4861f0b81cf2b6675b29ab0`. The submission flag remains
+off, and ACE-C03 is unaccepted pending M20, scanner provisioning and live
+linked-school checks. The next web/API step is C04 in
+[c04-homework-review-design.md](c04-homework-review-design.md); mobile remains
+paused. The plan count stays **48/150 (32%)**.
+
+ACE-C04 web/API implementation is on `feature/ace-c04-homework-review` for
+review. The migration applied in disposable `app` and `public` PostgreSQL
+schemas. API, admin and worker typechecks, targeted lint and formatting, admin
+interaction test, and admin production build passed locally. A combined
+PostgreSQL E2E run was interrupted after its review-suite setup hook exceeded
+30 seconds under competing local CPU load; CI must run the review, assignment
+and submission suites before this step can merge. The review and notification
+flags remain off. C04 is not accepted, and the plan count remains **48/150
 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
