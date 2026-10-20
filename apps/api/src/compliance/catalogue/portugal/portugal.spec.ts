@@ -152,7 +152,7 @@ describe("Portugal progressive national and regional release", () => {
           ["PARTIALLY_PUBLISHED", "IN_REVIEW"].includes(cell.status),
         ),
     ).toBe(true);
-    expect(TRACKER_CATALOGUE.version).toBe("1.31.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.32.0");
     expect(TRACKER_CATALOGUE.requirements).toEqual(
       expect.arrayContaining(catalogueV126.requirements),
     );

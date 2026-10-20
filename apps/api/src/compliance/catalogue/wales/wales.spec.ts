@@ -84,11 +84,11 @@ describe("Wales progressive national release", () => {
     expect(
       TRACKER_CATALOGUE.requirements.filter((r) => r.jurisdiction === "GB-ENG"),
     ).toEqual(catalogueV12.requirements);
-    expect(TRACKER_CATALOGUE.coverage).toHaveLength(6336);
+    expect(TRACKER_CATALOGUE.coverage).toHaveLength(7344);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(48);
+    ).toHaveLength(0);
   });
 });
