@@ -128,6 +128,14 @@ async function run() {
     assert.match(container.textContent ?? "", /Cia Alpha/);
     assert.match(container.textContent ?? "", /Bea Bravo/);
     assert.deepEqual(
+      Array.from(
+        container.querySelectorAll(
+          'section[aria-label="Children linked to you"] h3, section[aria-label="Your student access"] h3',
+        ),
+      ).map((heading) => heading.textContent?.trim()),
+      ["Ari Alpha", "Cia Alpha", "Bea Bravo"],
+    );
+    assert.deepEqual(
       Array.from(container.querySelectorAll('a[href$="/summary"]')).map(
         (anchor) => anchor.getAttribute("href"),
       ),

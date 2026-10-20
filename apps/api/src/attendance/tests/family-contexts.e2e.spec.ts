@@ -78,6 +78,7 @@ describe("ACE family context discovery", () => {
         subject: `family-full-${fullUserId}`,
         userId: fullUserId,
         tenantId: siteAId,
+        siteRole: "VIEWER",
       })
     ).authorization;
     limitedAuthorization = (
@@ -201,7 +202,7 @@ describe("ACE family context discovery", () => {
     await app?.close();
   });
 
-  it("discovers only active full guardian and student contexts across sites", async () => {
+  it("discovers linked contexts for a guardian with active site membership", async () => {
     if (!app) return;
     const server = app.getHttpServer();
     const activePermissions = new Set(

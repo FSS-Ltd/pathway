@@ -710,7 +710,7 @@ on a notice and the list heading after Enter on Back to notices. No receipt was
 acknowledged. ACE-M14 remains open while mobile notice work is paused; the
 verified count remains **48/150 (32%)**.
 
-ACE-C01 entitlement foundation is under review in
+ACE-C01 entitlement foundation was delivered in
 [PR #682](https://github.com/FSS-Ltd/pathway/pull/682). It starts from the #625
 merge and includes the merged
 [PR #626](https://github.com/FSS-Ltd/pathway/pull/626) screen-family
@@ -724,6 +724,31 @@ capability tests, three billing unit tests, and three PostgreSQL HTTP tests on
 an isolated database with all 167 migrations. This foundation adds no homework
 route or customer-facing enablement. The master plan's M20 prerequisite remains
 open, so C01 is not counted as accepted until that release gate is reconciled.
+
+GitHub confirms [PR #682](https://github.com/FSS-Ltd/pathway/pull/682) merged
+on 20 October 2026 as `f3457b437a056bdab4d26aa4e00ff633b37416ff` from
+checked head `eff3b4f6f89963002072287a1732702db39b637d`. All eight
+latest-head checks passed. The Integration Tests log for run
+[39351297992](https://github.com/FSS-Ltd/pathway/actions/runs/39351297992)
+shows `ace-learning-entitlement.e2e.spec.ts` passing against PostgreSQL with
+global migrations and fixtures; the integration run passed 109 suites and 645
+tests. This foundation still has no homework route or UI. ACE-M20 remains open,
+so ACE-C01 is not accepted and the verified plan count stays **48/150 (32%)**.
+
+Draft [PR #684](https://github.com/FSS-Ltd/pathway/pull/684) is the ACE-M20
+web release-evidence follow-up. Its initial head
+`8d27c7c37ad1956fd78caf08211286da315b66be` passed all eight CI and
+CodeQL checks, including the family landing unit test and 109 PostgreSQL
+integration suites. A signed-in Demo ACE School visit on 20 October 2026
+exposed an API 500 on family context discovery; a retry failed the same way.
+Vercel's `nexsteps-api` runtime log identified the nested read-only/write
+transaction conflict. The same failure was reproduced in the family-context
+PostgreSQL HTTP suite by giving the guardian an active site membership. The
+current PR corrects that route's transaction ownership. The local regression
+result is recorded in the
+[M20 web evidence](../evidence/ace-family-messaging-release-gate.md);
+deployment and signed-in keyboard/accessibility retries remain pending. The PR
+remains unmerged, and the verified count remains **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

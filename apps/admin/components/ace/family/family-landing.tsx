@@ -85,10 +85,10 @@ function ContextList({
           <li key={`${context.kind}:${context.siteId}:${context.childId}`}>
             <div className="rounded-xl border border-border-subtle bg-surface px-5 py-4 shadow-card">
               <div className="min-w-0 space-y-1">
-                <span className="block truncate font-heading text-lg font-semibold text-text-primary">
+                <h3 className="break-words font-heading text-lg font-semibold text-text-primary">
                   {context.childName}
-                </span>
-                <span className="block truncate text-sm text-text-muted">
+                </h3>
+                <span className="block break-words text-sm text-text-muted">
                   {context.siteName}
                 </span>
               </div>
