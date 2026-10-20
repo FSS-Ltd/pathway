@@ -1307,6 +1307,9 @@ model Tenant {
   aceSchoolEnrollments   AceSchoolEnrollment[]
   aceHomeworkAssignments AceHomeworkAssignment[]
   aceHomeworkRecipients  AceHomeworkRecipient[]
+  aceHomeworkSubmissions AceHomeworkSubmission[]
+  aceHomeworkSubmissionVersions AceHomeworkSubmissionVersion[]
+  aceHomeworkEvidence AceHomeworkEvidence[]
   aceTeachingDates       AceTeachingDate[]
   aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
   aceTimetableSchedules  AceTimetableSchedule[]
@@ -1539,6 +1542,7 @@ model User {
   financeStripeConnectionsRequested        FinanceStripeConnection[]           @relation("FinanceStripeConnectionRequester")
   financeStripeConnectionsDisconnected     FinanceStripeConnection[]           @relation("FinanceStripeConnectionDisconnector")
   studentIdentities                 StudentIdentity[]
+  aceHomeworkEvidenceUploaded       AceHomeworkEvidence[] @relation("AceHomeworkEvidenceUploader")
   revokedStudentIdentityLinks       StudentIdentityLink[]       @relation("StudentIdentityLinkRevokedBy")
   revokedGuardianChildRelationships GuardianChildRelationship[] @relation("GuardianChildRelationshipRevokedBy")
   aceSchoolVolunteerCancellations AceSchoolVolunteerReservation[] @relation("AceVolunteerCancelledBy")
@@ -3260,11 +3264,87 @@ model AceHomeworkRecipient {
   child        Child                 @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
   enrollmentId String
   enrollment   AceSchoolEnrollment   @relation(fields: [enrollmentId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict)
+  submission   AceHomeworkSubmission?
+  evidence     AceHomeworkEvidence[]
   publishedAt  DateTime              @default(now())
 
   @@unique([id, tenantId])
   @@unique([tenantId, assignmentId, childId])
   @@index([tenantId, childId, publishedAt])
+}
+
+enum AceHomeworkSubmissionStatus {
+  DRAFT
+  SUBMITTED
+  RETURNED
+}
+
+enum AceHomeworkEvidenceStatus {
+  PENDING
+  CLEAN
+  REJECTED
+}
+
+model AceHomeworkSubmission {
+  id          String @id @default(uuid())
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  recipientId String
+  recipient   AceHomeworkRecipient @relation(fields: [recipientId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  status      AceHomeworkSubmissionStatus @default(DRAFT)
+  draftText   String @default("") @db.VarChar(5000)
+  version     Int @default(0)
+  versions    AceHomeworkSubmissionVersion[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([id, tenantId])
+  @@unique([recipientId, tenantId])
+  @@index([tenantId, updatedAt])
+}
+
+model AceHomeworkSubmissionVersion {
+  id             String @id @default(uuid())
+  tenantId       String
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  submissionId   String
+  submission     AceHomeworkSubmission @relation(fields: [submissionId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  number         Int
+  idempotencyKey String @db.VarChar(80)
+  text           String @db.VarChar(5000)
+  evidenceId     String?
+  evidence       AceHomeworkEvidence? @relation(fields: [evidenceId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  late           Boolean
+  submittedAt    DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, submissionId, number])
+  @@unique([tenantId, submissionId, idempotencyKey])
+  @@unique([evidenceId, tenantId])
+}
+
+model AceHomeworkEvidence {
+  id             String @id @default(uuid())
+  tenantId       String
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  recipientId    String
+  recipient      AceHomeworkRecipient @relation(fields: [recipientId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  uploadedByUserId String
+  uploadedBy     User @relation("AceHomeworkEvidenceUploader", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  objectKey      String @unique @db.VarChar(260)
+  fileName       String @db.VarChar(160)
+  mimeType       String @db.VarChar(80)
+  byteLength     Int
+  sha256         String @db.VarChar(64)
+  status         AceHomeworkEvidenceStatus @default(PENDING)
+  expiresAt      DateTime
+  inspectedAt    DateTime?
+  version        AceHomeworkSubmissionVersion?
+  createdAt      DateTime @default(now())
+
+  @@unique([id, tenantId])
+  @@index([tenantId, recipientId, status])
+  @@index([status, expiresAt])
 }
 
 model AceTeachingDate {

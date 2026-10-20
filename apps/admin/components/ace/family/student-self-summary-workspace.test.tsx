@@ -27,7 +27,7 @@ async function run() {
   const root = createRoot(container);
   const originalFetch = globalThis.fetch;
   const requested: string[] = [];
-  let mode: "ready" | "unavailable" | "error" | "denied" = "ready";
+  let mode: "ready" | "homework" | "unavailable" | "error" | "denied" = "ready";
   setApiClientToken("student-token");
   globalThis.fetch = async (input, init) => {
     requested.push(String(input));
@@ -57,7 +57,7 @@ async function run() {
                       items: [{ date: "2026-10-10", status: "PRESENT" }],
                     },
                   },
-          homework: { status: "unavailable" },
+          homework: { status: mode === "homework" ? "ready" : "unavailable" },
           pace: { status: "unavailable" },
           faith: { status: "unavailable" },
           reports: { status: "unavailable" },
@@ -86,6 +86,21 @@ async function run() {
       "/ace/student/sites/site-one/attendance",
     );
 
+    mode = "homework";
+    await act(async () => {
+      root.render(
+        <StudentSelfSummaryView
+          key="homework"
+          siteId="site-one"
+          status="authenticated"
+        />,
+      );
+    });
+    assert.equal(
+      container.querySelector('a[href$="/homework"]')?.getAttribute("href"),
+      "/ace/student/sites/site-one/homework",
+    );
+
     mode = "unavailable";
     await act(async () => {
       root.render(
@@ -112,7 +127,7 @@ async function run() {
     const retry = container.querySelector("button");
     assert.ok(retry);
     await act(async () => retry.click());
-    assert.equal(requested.length, 4);
+    assert.equal(requested.length, 5);
 
     mode = "denied";
     await act(async () => {

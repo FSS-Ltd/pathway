@@ -13,6 +13,8 @@ export type StorageObject = {
   key: string;
 };
 
+export class StorageObjectTooLargeError extends Error {}
+
 @Injectable()
 export class SupabaseStorageService {
   private readonly logger = new Logger(SupabaseStorageService.name);
@@ -56,7 +58,46 @@ export class SupabaseStorageService {
     return { bucket, key: input.key };
   }
 
-  async downloadObject(bucket: string, key: string): Promise<Buffer | null> {
+  async createSignedUploadUrl(key: string): Promise<string | null> {
+    this.assertPrivateStorageKey("private", key);
+    if (!this.isConfigured()) return null;
+    const bucket = this.resolveBucket("private");
+    const baseUrl = process.env.SUPABASE_URL?.trim().replace(/\/$/, "");
+    if (!baseUrl) return null;
+    const response = await fetch(
+      `${baseUrl}/storage/v1/object/upload/sign/${encodePath(bucket)}/${encodeStorageKey(key)}`,
+      {
+        method: "POST",
+        headers: { ...this.authHeaders(), "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    if (!response.ok) {
+      this.logger.error({
+        message: "Supabase signed upload request failed",
+        status: response.status,
+      });
+      throw new Error("Supabase signed upload request failed");
+    }
+    const payload: unknown = await response.json();
+    const relativeUrl =
+      typeof payload === "object" && payload !== null && "url" in payload
+        ? payload.url
+        : null;
+    if (
+      typeof relativeUrl !== "string" ||
+      !relativeUrl.startsWith("/object/upload/sign/")
+    ) {
+      throw new Error("Supabase signed upload response was invalid");
+    }
+    return `${baseUrl}/storage/v1${relativeUrl}`;
+  }
+
+  async downloadObject(
+    bucket: string,
+    key: string,
+    maxBytes = Number.POSITIVE_INFINITY,
+  ): Promise<Buffer | null> {
     if (bucket === process.env.SUPABASE_STORAGE_PRIVATE_BUCKET?.trim()) {
       this.assertPrivateStorageKey("private", key);
     }
@@ -80,7 +121,31 @@ export class SupabaseStorageService {
       throw new Error("Supabase Storage download failed");
     }
 
-    return Buffer.from(await response.arrayBuffer());
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Supabase Storage response was empty");
+    const chunks: Buffer[] = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel();
+          throw new StorageObjectTooLargeError(
+            "Supabase Storage object exceeded the permitted size",
+          );
+        }
+        chunks.push(Buffer.from(value));
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    return Buffer.concat(chunks, total);
+  }
+
+  privateBucketName(): string | null {
+    return process.env.SUPABASE_STORAGE_PRIVATE_BUCKET?.trim() || null;
   }
 
   /**
