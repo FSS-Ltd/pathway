@@ -17,7 +17,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.16,DE,DE,Germany,IN_REVIEW,Sixteen Länder selectable; Land school and childcare law plus local authorities remain in review
 2.17,GR,GR,Greece,IN_REVIEW,Thirteen regions and self-governed Mount Athos selectable; municipal preschool and regional KDAP/school duties remain in review
 2.18,HU,HU,Hungary,IN_REVIEW,Nineteen counties and Budapest selectable; local education child-welfare training and premises duties remain in review
-2.19,IT,IT,Italy,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.19,IT,IT,Italy,IN_REVIEW,Twenty regions and autonomous Trento/Bolzano selectable; USR school decisions regional care and vocational-accreditation rules and municipal duties remain in review
 2.20,LV,LV,Latvia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.21,LT,LT,Lithuania,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.22,LU,LU,Luxembourg,NOT_REVIEWED,Relevant regional and local authorities; inventory pending

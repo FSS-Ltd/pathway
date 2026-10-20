@@ -56,6 +56,7 @@ describe("England national core applicability", () => {
           "DE",
           "GR",
           "HU",
+          "IT",
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
@@ -63,12 +64,12 @@ describe("England national core applicability", () => {
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "PARTIALLY_PUBLISHED",
       ),
-    ).toHaveLength(864);
+    ).toHaveLength(912);
     expect(
       TRACKER_CATALOGUE.coverage.filter(
         (cell) => cell.status === "NOT_REVIEWED",
       ),
-    ).toHaveLength(624);
+    ).toHaveLength(576);
     const result = checklist();
     expect(
       result.coverage.every(

@@ -187,6 +187,7 @@ describe("institutional tracker catalogue and engine", () => {
           "DE",
           "GR",
           "HU",
+          "IT",
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
