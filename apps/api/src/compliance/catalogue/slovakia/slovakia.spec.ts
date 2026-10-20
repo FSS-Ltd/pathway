@@ -93,7 +93,7 @@ describe("Slovakia partial national and kraj release", () => {
     expect(TRACKER_CATALOGUE.requirements).toEqual(
       expect.arrayContaining(catalogueV128.requirements),
     );
-    expect(TRACKER_CATALOGUE.version).toBe("1.33.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.34.0");
   });
 
   it("does not select a regional action without a confirmed region", () => {

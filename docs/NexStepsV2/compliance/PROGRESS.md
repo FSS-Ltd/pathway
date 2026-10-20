@@ -1635,3 +1635,69 @@ five-minute ceiling immediately after Jest finished, so the Typecheck/Lint/Unit
 job failed and dependent database jobs were skipped. The step timeout is being
 raised to eight minutes without changing its test command. Fresh current-head
 CI and host-confirmed merge remain required before any next step.
+
+### England territorial inventory merged; Scotland inventory begins
+
+[PR #701](https://github.com/FSS-Ltd/pathway/pull/701) passed all nine reported
+current-head checks on `dae75ca5cfcb6d4da0af75740ed905ef6b52ca46`:
+typecheck/lint/unit, both integration shards, organisation-role RLS, permission
+definitions, system-role seed identity, CodeQL, and both analyses. GitHub reported
+`MERGED` at 2026-10-20T19:24:43Z with merge commit
+`301a9a83d009137a8ecc2044c926be45fa65fc87`; fetched `fss/master` matched
+and had the checked head as its second parent. The next step starts from that
+merge on `feature/compliance-scotland-local-inventory`. England's 15,216 new
+local cells remain `IN_REVIEW`; the whole-program final coverage audit is open.
+
+### Scotland council-area inventory — local verification in progress
+
+Draft catalogue 1.34.0 adds the 32 Scottish council areas from the ONS April
+2025 county/unitary file and 1,536 explicit `IN_REVIEW` cells across six sectors
+and eight topics. The [territorial research note](packs/scotland/local-authority-inventory.md)
+explains why the 33 Scottish LAU statistical units are not a council list: North
+Ayrshire is one authority, while the LAU file splits its mainland from Arran
+and Cumbrae. No council-specific obligation is published by this inventory.
+
+The additive migration inserted 32 areas into the named disposable database,
+inserted zero on a second run, and all stored codes, names, levels and Scotland
+parent links matched the ONS file. The matrix has 3,012 rows / 24,096 cells,
+including all 32 councils × six sectors × eight `IN_REVIEW` topics without
+duplicate pairs. API/admin typechecks, API lint and focused Scotland/tracker
+units (23 tests) passed. The full API Jest summary reported 313 suites / 2,056
+tests passed; its shell wrapper then failed because `status` is a read-only zsh
+variable, so a clean command exit remains to be obtained. A full serial E2E run
+passed the new tracker and RLS suites but exhausted Node's 4 GB heap late in the
+run. A two-shard rerun matching CI is underway; shard 1 passed 55 suites / 386
+tests. No test assertion failure was reported in the serial run.
+
+The real profile fields and compiled admin styles were viewed in a local preview
+at desktop, 390-pixel mobile and 200% text. Keyboard selection moved from City
+of Edinburgh to North Ayrshire. The selected native option clips visually at
+200% on a narrow phone, while the expanded options and accessible name retain
+the full council. This preview does not establish the full authenticated portal
+flow. Remaining work: shard 2, clean admin/API unit exits, builds, permission
+registry, final diff/source review, PR, current-head CI and host-confirmed merge.
+
+The CI-shaped E2E rerun completed cleanly: shard 1 passed 55 suites / 386 tests
+and shard 2 passed 55 suites / 276 tests, **110 suites / 662 tests** in total,
+with separate disposable-database setup and tenant RLS. The admin unit command
+reran with exit 0, including tracker runtime and checklist browser tests.
+Permission-definition registry drift was zero. The full API unit command is
+being rerun with a clean shell exit; builds and final review remain.
+
+Final clean local run: API units passed 313 suites / 2,056 tests with exit 0;
+API and admin production builds passed, as did API/admin typechecks, API lint,
+explicit changed-admin lint, Prisma schema validation, changed-file Prettier,
+`git diff --check` and permission-definition drift (zero). E2E shard totals are
+recorded above. `graphify update .` rebuilt graph.json and GRAPH_REPORT.md;
+the tool skipped graph.html because 8,684 nodes exceed its HTML size limit.
+The 200% native-select clipping remains a UI limitation; no council identity is
+lost from the expanded options or accessible control. Final staged-file review,
+PR, latest-head CI and host-confirmed merge remain the delivery gate.
+
+The first pre-commit hook run passed repository lint but reported one failure
+in the unrelated guest-pass controller unit test (312/313 suites passed). That
+test passed alone, and the full API unit command passed on rerun with **313/313
+suites and 2,056/2,056 tests**, exit 0. The worker tests passed 15 suites / 66
+tests; auth passed 3 suites / 15 tests. The hook's same commands have now been
+run successfully. This is a test-run flake, not a compliance assertion failure;
+hosted current-head CI remains mandatory before merge.

@@ -7,3 +7,7 @@ The [Scottish Government's independent-school registration guidance](https://www
 All regional cells remain `IN_REVIEW`. A site must establish its council and Child Protection Committee procedures, school or care classification, responsible authority, contract terms and applicable specialist duties locally. The national pack does not resolve charity-specific, care workforce, curriculum, ratios, building, data-rights or local-licensing detail. Missing facts remain unresolved in the tracker rather than selecting England or treating an unreviewed area as having no duty. ICCE actions are provider requirements only when ICCE is actually offered.
 
 Verification includes schema validation, six-sector/eight-topic coverage assertions, independent-school plus ICCE and non-ACE centre applicability fixtures, preservation of prior catalogue history, API type/lint/build, and the relevant tracker unit and integration checks. See [PROGRESS.md](../../PROGRESS.md) for exact run and PR evidence.
+
+Catalogue 1.34.0 adds the [32 council-area selectors](local-authority-inventory.md)
+from the ONS April 2025 geography file. Their 1,536 sector/topic cells remain
+`IN_REVIEW`; they do not close the local or specialist gaps described above.

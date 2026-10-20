@@ -330,6 +330,14 @@ async function run() {
               level: "LOCAL_AUTHORITY",
               parentJurisdictionId: "oxfordshire",
             },
+            {
+              id: "edinburgh",
+              countryCode: "GB",
+              subdivisionCode: "GB-SCT-S12000036",
+              name: "City of Edinburgh",
+              level: "LOCAL_AUTHORITY",
+              parentJurisdictionId: "scotland",
+            },
           ]}
           canManage
           onSaved={() => changed++}
@@ -343,6 +351,10 @@ async function run() {
     assert.match(
       host.querySelector('option[value="oxford"]')?.textContent ?? "",
       /Oxford · GB \(district council\)/,
+    );
+    assert.match(
+      host.querySelector('option[value="edinburgh"]')?.textContent ?? "",
+      /City of Edinburgh · GB \(council area\)/,
     );
     await click("Save profile");
     assert.match(host.textContent ?? "", /draft has been kept/);

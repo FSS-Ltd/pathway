@@ -36,12 +36,15 @@ export const emptyProfile: TrackerProfileInput = {
 };
 
 function jurisdictionLabel(jurisdiction: TrackerJurisdiction): string {
-  const englandCouncil = jurisdiction.subdivisionCode?.startsWith("GB-ENG-E");
-  const level = englandCouncil
-    ? jurisdiction.level === "REGION"
-      ? "upper-tier council"
-      : "district council"
-    : jurisdiction.level.toLowerCase();
+  let level = jurisdiction.level.toLowerCase();
+  if (jurisdiction.subdivisionCode?.startsWith("GB-ENG-E")) {
+    level =
+      jurisdiction.level === "REGION"
+        ? "upper-tier council"
+        : "district council";
+  } else if (jurisdiction.subdivisionCode?.startsWith("GB-SCT-S12")) {
+    level = "council area";
+  }
   return `${jurisdiction.name} · ${jurisdiction.countryCode} (${level})`;
 }
 

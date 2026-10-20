@@ -1,7 +1,7 @@
 step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.01,GB-ENG,GB,England,IN_REVIEW,153 upper-tier authorities and 164 distinct districts inventoried; topic-specific council duties and other authority boundaries remain in review
 2.02,GB-WLS,GB,Wales,IN_REVIEW,22 councils; 3 national park planning authorities; 6 safeguarding-board areas; local duties not yet published
-2.03,GB-SCT,GB,Scotland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.03,GB-SCT,GB,Scotland,IN_REVIEW,32 council areas inventoried; topic-specific council duties and other regulator boundaries remain in review
 2.04,GB-NIR,GB,Northern Ireland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.05,IE,IE,Ireland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.06,AT,AT,Austria,IN_REVIEW,Nine Länder identified; childcare building fire youth and local permissions unreviewed
