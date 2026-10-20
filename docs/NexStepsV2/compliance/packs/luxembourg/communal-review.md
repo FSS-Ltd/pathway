@@ -1,0 +1,5 @@
+# Luxembourg canton and commune review
+
+The [official Geoportail commune layer](https://features.geoportail.lu/collections/302/items?f=html), synchronized 2026-10-18 and retrieved 2026-10-20, contains 100 current communes in 12 cantons. Its four-digit LAU2 codes are stored as `LU-LAU2-XXXX` local authorities under `LU-CANTON-XX` regions. The catalogue's typed code list and additive migration use the same snapshot. The older 102-commune count must not be used for current location selection.
+
+Only the current territorial inventory is reviewed. Commune-specific admissions, childcare planning, school-site decisions, accessibility, premises and referral arrangements have not been individually validated. Each country-level sector/topic cell remains partial and each regional status is `IN_REVIEW`. The site must check the competent commune, MENJE, ITM and other relevant authorities for its actual provision and location; an unresolved location must not default to Luxembourg City or indicate no obligations.

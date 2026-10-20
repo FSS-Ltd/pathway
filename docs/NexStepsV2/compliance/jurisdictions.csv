@@ -20,7 +20,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.19,IT,IT,Italy,IN_REVIEW,Twenty regions and autonomous Trento/Bolzano selectable; USR school decisions regional care and vocational-accreditation rules and municipal duties remain in review
 2.20,LV,LV,Latvia,IN_REVIEW,Forty-two current ATVK local authorities selectable; municipal interest-education and site-specific duties remain in review
 2.21,LT,LT,Lithuania,IN_REVIEW,Ten counties and sixty municipalities selectable; municipal admissions and site-specific duties remain in review
-2.22,LU,LU,Luxembourg,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.22,LU,LU,Luxembourg,IN_REVIEW,Twelve cantons and one hundred communes selectable; commune admissions and site-specific approvals remain in review
 2.23,MT,MT,Malta,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.24,NL,NL,Netherlands,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.25,PL,PL,Poland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
