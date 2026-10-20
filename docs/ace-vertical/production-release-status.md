@@ -794,6 +794,16 @@ aborted after the C02 homework suite passed: V8 reached its approximately
 test worker but lets Jest recycle it after 1 GB of idle heap use. The next
 latest-head CI run must prove the entire integration job passes.
 
+The next head `81aba0eecbc2cf70d3e0e487e23f2dc9e9abf513` failed the
+five-minute API unit-test step in
+[run 39443150487](https://github.com/FSS-Ltd/pathway/actions/runs/39443150487)
+before downstream database jobs could run. The worker recycle setting had
+applied to unit tests as well as integration tests. The same PR now passes that
+setting only to the integration command; the unit runner retains its prior
+configuration. A focused homework UI test also proved all assignment actions
+remain disabled while another assignment saves. Fresh latest-head CI is
+required before merge.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of

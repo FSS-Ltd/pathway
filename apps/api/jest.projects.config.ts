@@ -58,4 +58,4 @@ const e2e = {
   maxWorkers: 1,
 };
 
-export default { projects: [unit, e2e], workerIdleMemoryLimit: "1GB" };
+export default { projects: [unit, e2e] };
