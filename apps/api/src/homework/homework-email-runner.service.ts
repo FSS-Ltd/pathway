@@ -58,9 +58,14 @@ export class HomeworkEmailRunnerService {
     const result = { inspected: 0, sent: 0, suppressed: 0, failed: 0 };
     for (const { orgId } of orgs) {
       while (result.inspected < 10) {
-        const event = await this.claim(orgId);
-        if (!event) break;
+        const claim = await this.claim(orgId);
+        if (!claim) break;
         result.inspected += 1;
+        if (claim.kind === "expired") {
+          result.failed += 1;
+          continue;
+        }
+        const event = claim.event;
         const parsed = payloadSchema.safeParse(event.payload);
         if (
           !parsed.success ||
@@ -133,12 +138,18 @@ export class HomeworkEmailRunnerService {
     return runTransaction(async (tx) => {
       await applyTenantContext(tx, "", orgId);
       const now = new Date();
+      const expiredAt = new Date(now.getTime() - 5 * 60_000);
+      const due = {
+        OR: [
+          { status: "PENDING" as const, nextAttemptAt: { lte: now } },
+          { status: "PROCESSING" as const, claimedAt: { lte: expiredAt } },
+        ],
+      };
       const candidate = await tx.outboxEvent.findFirst({
         where: {
           orgId,
           eventType: "ace.homework.email",
-          status: "PENDING",
-          nextAttemptAt: { lte: now },
+          ...due,
         },
         orderBy: { createdAt: "asc" },
         select: {
@@ -146,18 +157,43 @@ export class HomeworkEmailRunnerService {
           aggregateId: true,
           aggregateType: true,
           payload: true,
+          status: true,
         },
       });
       if (!candidate) return null;
+      if (candidate.status === "PROCESSING") {
+        const expired = await tx.outboxEvent.updateMany({
+          where: {
+            id: candidate.id,
+            orgId,
+            status: "PROCESSING",
+            claimedAt: { lte: expiredAt },
+          },
+          data: {
+            status: "DEAD_LETTER",
+            claimedAt: null,
+            failedAt: now,
+            lastError: "HOMEWORK_EMAIL_CLAIM_EXPIRED",
+          },
+        });
+        return expired.count === 1 ? { kind: "expired" as const } : null;
+      }
       const claimed = await tx.outboxEvent.updateMany({
-        where: { id: candidate.id, orgId, status: "PENDING" },
+        where: {
+          id: candidate.id,
+          orgId,
+          status: "PENDING",
+          nextAttemptAt: { lte: now },
+        },
         data: {
           status: "PROCESSING",
           claimedAt: now,
           attempts: { increment: 1 },
         },
       });
-      return claimed.count === 1 ? candidate : null;
+      return claimed.count === 1
+        ? { kind: "event" as const, event: candidate }
+        : null;
     });
   }
 

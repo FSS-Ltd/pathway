@@ -9,7 +9,9 @@ import {
   seedE2eTypedRole,
 } from "../../../test-helpers.e2e";
 import { AppModule } from "../../app.module";
+import { EffectivePermissionsService } from "../../access-control/effective-permissions.service";
 import { MailerService } from "../../mailer/mailer.service";
+import { resolveHomeworkEmailRecipient } from "../homework-email-access";
 
 describe("ACE homework review", () => {
   const orgId = randomUUID();
@@ -39,8 +41,11 @@ describe("ACE homework review", () => {
   const previousCronSecret = process.env.CRON_SECRET;
 
   beforeAll(async () => {
-    if (!requireDatabase()) return;
+    if (!requireDatabase()) {
+      throw new Error("PostgreSQL is required for homework review E2E tests");
+    }
     process.env.ACE_HOMEWORK_REVIEWS_ENABLED = "true";
+    process.env.ACE_HOMEWORK_NOTIFICATIONS_ENABLED = "true";
     await prisma.org.create({
       data: {
         id: orgId,
@@ -468,9 +473,8 @@ describe("ACE homework review", () => {
     }
   });
 
-  it("dead letters an uncertain provider outcome without an automatic resend", async () => {
+  it("dead letters an expired delivery claim without sending again", async () => {
     if (!app) return;
-    process.env.ACE_HOMEWORK_NOTIFICATIONS_ENABLED = "true";
     process.env.CRON_SECRET = "homework-e2e-cron-secret";
     const event = await withTenantRlsContext(siteId, orgId, (tx) =>
       tx.outboxEvent.create({
@@ -480,7 +484,82 @@ describe("ACE homework review", () => {
           aggregateId: completedVersionId,
           eventType: "ace.homework.email",
           idempotencyKey: randomUUID(),
+          status: "PROCESSING",
+          attempts: 1,
+          claimedAt: new Date(Date.now() - 6 * 60_000),
+          createdAt: new Date("1999-01-01T00:00:00.000Z"),
+          payload: {
+            tenantId: siteId,
+            recipientId,
+            sourceId: completedVersionId,
+            action: "SUBMITTED",
+            audience: "STAFF",
+            userId: reviewerId,
+          },
+        },
+        select: { id: true },
+      }),
+    );
+    const mailer = app.get(MailerService);
+    const availability = jest
+      .spyOn(mailer, "isHomeworkEmailAvailable")
+      .mockReturnValue(true);
+    const send = jest
+      .spyOn(mailer, "sendHomeworkNotification")
+      .mockResolvedValue("provider-id");
+    try {
+      const response = await request(app.getHttpServer())
+        .get("/internal/homework-email/run")
+        .set("Authorization", `Bearer ${process.env.CRON_SECRET}`);
+      expect(response.status).toBe(503);
+      expect(
+        send.mock.calls.some(([, deliveryId]) => deliveryId === event.id),
+      ).toBe(false);
+      const record = await prisma.outboxEvent.findUniqueOrThrow({
+        where: { id: event.id },
+        select: { status: true, lastError: true },
+      });
+      expect(record).toEqual({
+        status: "DEAD_LETTER",
+        lastError: "HOMEWORK_EMAIL_CLAIM_EXPIRED",
+      });
+    } finally {
+      availability.mockRestore();
+      send.mockRestore();
+    }
+  });
+
+  it("dead letters an uncertain provider outcome without an automatic resend", async () => {
+    if (!app) return;
+    process.env.ACE_HOMEWORK_NOTIFICATIONS_ENABLED = "true";
+    process.env.CRON_SECRET = "homework-e2e-cron-secret";
+    const recipientEmail = await resolveHomeworkEmailRecipient(orgId, {
+      tenantId: siteId,
+      recipientId,
+      sourceId: completedVersionId,
+      action: "SUBMITTED",
+      audience: "STAFF",
+      userId: reviewerId,
+    });
+    expect(recipientEmail).toBe(`${reviewerId}@example.test`);
+    const permission = await app.get(EffectivePermissionsService).resolve({
+      userId: reviewerId,
+      orgId,
+      tenantId: siteId,
+      permission: "ace.homework.reviews.manage",
+      now: new Date(),
+    });
+    expect(permission.allowed).toBe(true);
+    const event = await withTenantRlsContext(siteId, orgId, (tx) =>
+      tx.outboxEvent.create({
+        data: {
+          orgId,
+          aggregateType: "ACE_HOMEWORK",
+          aggregateId: completedVersionId,
+          eventType: "ace.homework.email",
+          idempotencyKey: randomUUID(),
           createdAt: new Date("1998-01-01T00:00:00.000Z"),
+          nextAttemptAt: new Date("1998-01-01T00:00:00.000Z"),
           payload: {
             tenantId: siteId,
             recipientId,
@@ -545,6 +624,7 @@ describe("ACE homework review", () => {
           eventType: "ace.homework.email",
           idempotencyKey: randomUUID(),
           createdAt: new Date("1997-01-01T00:00:00.000Z"),
+          nextAttemptAt: new Date("1997-01-01T00:00:00.000Z"),
           payload: {
             tenantId: randomUUID(),
             recipientId,
@@ -679,23 +759,16 @@ describe("ACE homework review", () => {
   });
 
   it("keeps review rows behind tenant RLS", async () => {
-    if (!app) return;
-    const own = await withTenantRlsContext(
-      siteId,
-      orgId,
-      (tx) =>
-        tx.$queryRaw<
+    if (!app || process.env.E2E_USE_GLOBAL_SETUP !== "true") return;
+    const countForTenant = (tenantId: string) =>
+      withTenantRlsContext(tenantId, orgId, async (tx) => {
+        await tx.$executeRawUnsafe('SET LOCAL ROLE "pathway_e2e_tenant_rls"');
+        return tx.$queryRaw<
           Array<{ count: bigint }>
-        >`SELECT count(*) AS count FROM "AceHomeworkReview"`,
-    );
-    const other = await withTenantRlsContext(
-      randomUUID(),
-      orgId,
-      (tx) =>
-        tx.$queryRaw<
-          Array<{ count: bigint }>
-        >`SELECT count(*) AS count FROM "AceHomeworkReview"`,
-    );
+        >`SELECT count(*) AS count FROM "AceHomeworkReview"`;
+      });
+    const own = await countForTenant(siteId);
+    const other = await countForTenant(randomUUID());
     expect(own[0].count).toBeGreaterThan(0n);
     expect(other[0].count).toBe(0n);
   });

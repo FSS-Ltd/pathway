@@ -27,6 +27,9 @@ CREATE UNIQUE INDEX "AceHomeworkReview_versionId_tenantId_key"
   ON "AceHomeworkReview"("versionId", "tenantId");
 CREATE INDEX "AceHomeworkReview_tenantId_releasedAt_idx"
   ON "AceHomeworkReview"("tenantId", "releasedAt");
+CREATE INDEX "OutboxEvent_ace_homework_email_due_idx"
+  ON "OutboxEvent"("status", "nextAttemptAt", "claimedAt", "orgId")
+  WHERE "eventType" = 'ace.homework.email';
 
 ALTER TABLE "AceHomeworkReview" ADD CONSTRAINT "AceHomeworkReview_tenantId_fkey"
   FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -76,8 +79,12 @@ BEGIN
       SELECT event."orgId"
       FROM %I."OutboxEvent" event
       WHERE event."eventType" = 'ace.homework.email'
-        AND event."status"::text = 'PENDING'
-        AND event."nextAttemptAt" <= CURRENT_TIMESTAMP
+        AND (
+          (event."status"::text = 'PENDING'
+            AND event."nextAttemptAt" <= CURRENT_TIMESTAMP)
+          OR (event."status"::text = 'PROCESSING'
+            AND event."claimedAt" <= CURRENT_TIMESTAMP - INTERVAL '5 minutes')
+        )
       GROUP BY event."orgId"
       ORDER BY MIN(event."createdAt"), event."orgId"
     $function$;

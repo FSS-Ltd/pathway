@@ -53,7 +53,8 @@ alerts to current class staff, and return/release alerts to the affected student
 or linked guardians. Email contains only a generic action prompt,
 never homework content, feedback, child name or evidence details. A per-event,
 per-user delivery claim prevents automatic duplicate sends after an uncertain
-provider outcome. Provider failures remain visible for operational review.
+provider outcome. Expired claims become dead letters for operational review
+without an automatic resend. Provider failures remain visible for review.
 
 The plan names a worker job, but the production deployment already schedules
 API cron functions for ACE notices, homework publication and message email.

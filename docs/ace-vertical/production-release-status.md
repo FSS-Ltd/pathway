@@ -868,16 +868,16 @@ linked-school checks. The next web/API step is C04 in
 [c04-homework-review-design.md](c04-homework-review-design.md); mobile remains
 paused. The plan count stays **48/150 (32%)**.
 
-ACE-C04 web/API implementation commit `88b5a5aa` is in draft
-[PR #704](https://github.com/FSS-Ltd/pathway/pull/704). The migration applied
-in disposable `app` and `public` PostgreSQL
-schemas. API, admin and worker typechecks, targeted lint and formatting, admin
-interaction test, and admin production build passed locally. A combined
-PostgreSQL E2E run was interrupted after its review-suite setup hook exceeded
-30 seconds under competing local CPU load; CI must run the review, assignment
-and submission suites before this step can merge. The review and notification
-flags remain off. C04 is not accepted, and the plan count remains **48/150
-(32%)**.
+ACE-C04 web/API implementation is in draft
+[PR #704](https://github.com/FSS-Ltd/pathway/pull/704). Its migration applied
+in disposable `app` and `public` PostgreSQL schemas, including the scoped
+homework-email due index and stale-claim discovery function. The combined
+PostgreSQL homework review, assignment and submission suites passed 34/34
+substantive tests under the global restricted-role setup. API, admin and worker
+typechecks, targeted lint and formatting, admin interaction test, and admin
+production build passed locally. CI must repeat the latest-head suites before
+this step can merge. The review and notification flags remain off. C04 is not
+accepted, and the plan count remains **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
