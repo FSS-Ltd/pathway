@@ -1,0 +1,7 @@
+# France departmental and local-authority review
+
+Reviewed 2026-10-19. The [French government department inventory](https://geo.api.gouv.fr/decoupage-administratif/departements) supplies 101 selectable departments, including overseas departments. The database migration adds these under France without changing existing jurisdiction rows. The [2026 INSEE geographic code](https://www.insee.fr/fr/information/2560452) is a cross-check for subsequent revisions.
+
+The published pack distinguishes the private-school prior-authorisation route for Moselle (`FR-57`), Bas-Rhin (`FR-67`) and Haut-Rhin (`FR-68`) under [Education Code article L481-1](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000043983842). Other departments use the general route under [article L441-1](https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000043983848) when the provider is a private school outside a state contract. Missing department information leaves both route actions unresolved.
+
+All France sector/topic cells remain partial and regional review remains in progress. The catalogue has not resolved departmental ACM/EAJE decisions, local building and food authorisations, school contract and public-school duties, or adaptations for overseas departments. Site managers must confirm the relevant authority and actual provision before treating a route as inapplicable. A country-level action does not imply these duties are settled.
