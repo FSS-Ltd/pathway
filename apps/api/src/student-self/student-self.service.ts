@@ -10,6 +10,7 @@ import {
   isStudentAttendanceEnabled,
   UNAVAILABLE_STUDENT_SECTIONS,
 } from "./student-self-release-policy";
+import { requireCurrentStudent } from "./current-student";
 
 type AttendanceResult =
   | { status: "ready"; data: FamilyDailyAttendanceHistory }
@@ -22,7 +23,8 @@ export interface StudentSelfSummary {
   asOf: Date;
   sections: {
     attendance: AttendanceResult;
-  } & typeof UNAVAILABLE_STUDENT_SECTIONS;
+    homework: { status: "ready" | "unavailable" };
+  } & Omit<typeof UNAVAILABLE_STUDENT_SECTIONS, "homework">;
 }
 
 @Injectable()
@@ -49,12 +51,11 @@ export class StudentSelfService {
     const asOf = new Date();
     const schoolDay = localDate(asOf, site.timezone ?? "");
     if (!schoolDay) throw new NotFoundException("Student summary not found");
-    const childName = await this.requireCurrentStudent(
+    const childName = await withTenantRlsContext(
       siteId,
       site.orgId,
-      userId,
-      asOf,
-      schoolDay,
+      async (tx) =>
+        (await requireCurrentStudent(tx, siteId, userId, asOf, schoolDay)).name,
     );
     const from = new Date(
       Date.parse(`${schoolDay}T00:00:00.000Z`) - 29 * 86_400_000,
@@ -88,69 +89,23 @@ export class StudentSelfService {
     const checkedSchoolDay = localDate(checkedAt, site.timezone ?? "");
     if (!checkedSchoolDay)
       throw new NotFoundException("Student summary not found");
-    await this.requireCurrentStudent(
-      siteId,
-      site.orgId,
-      userId,
-      checkedAt,
-      checkedSchoolDay,
+    await withTenantRlsContext(siteId, site.orgId, async (tx) =>
+      requireCurrentStudent(tx, siteId, userId, checkedAt, checkedSchoolDay),
     );
     return {
       siteId,
       childName,
       asOf,
-      sections: { attendance, ...UNAVAILABLE_STUDENT_SECTIONS },
-    };
-  }
-
-  private async requireCurrentStudent(
-    siteId: string,
-    orgId: string,
-    userId: string,
-    now: Date,
-    schoolDay: string,
-  ): Promise<string> {
-    const date = new Date(`${schoolDay}T00:00:00.000Z`);
-    return withTenantRlsContext(siteId, orgId, async (tx) => {
-      const [policy, links] = await Promise.all([
-        tx.studentPortalPolicy.findUnique({
-          where: { tenantId: siteId },
-          select: { studentPortalEnabled: true },
-        }),
-        tx.studentIdentityLink.findMany({
-          where: {
-            tenantId: siteId,
-            linkedAt: { lte: now },
-            endedAt: null,
-            revokedAt: null,
-            studentIdentity: {
-              tenantId: siteId,
-              userId,
-              user: { isActive: true },
-            },
-            child: { tenantId: siteId, isGuest: false },
-          },
-          select: {
-            child: { select: { id: true, firstName: true, lastName: true } },
-          },
-          take: 2,
-        }),
-      ]);
-      if (!policy?.studentPortalEnabled || links.length !== 1) {
-        throw new NotFoundException("Student summary not found");
-      }
-      const child = links[0].child;
-      const enrollment = await tx.aceSchoolEnrollment.findFirst({
-        where: {
-          tenantId: siteId,
-          childId: child.id,
-          startsOn: { lte: date },
-          OR: [{ endsOn: null }, { endsOn: { gte: date } }],
+      sections: {
+        attendance,
+        ...UNAVAILABLE_STUDENT_SECTIONS,
+        homework: {
+          status:
+            process.env.ACE_HOMEWORK_SUBMISSIONS_ENABLED === "true"
+              ? "ready"
+              : "unavailable",
         },
-        select: { id: true },
-      });
-      if (!enrollment) throw new NotFoundException("Student summary not found");
-      return `${child.firstName} ${child.lastName}`.trim();
-    });
+      },
+    };
   }
 }

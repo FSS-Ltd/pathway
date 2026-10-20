@@ -150,6 +150,22 @@ export function StudentSelfSummaryView({
           </Button>
         </Card>
       ) : null}
+      {status === "authenticated" &&
+      currentLoad.state === "ready" &&
+      currentLoad.summary.sections.homework.status === "ready" ? (
+        <Card
+          title="Homework"
+          description="Assignments released to your student account."
+        >
+          <Button asChild variant="outline" className="mt-4 min-h-11">
+            <Link
+              href={`/ace/student/sites/${encodeURIComponent(siteId)}/homework`}
+            >
+              View homework
+            </Link>
+          </Button>
+        </Card>
+      ) : null}
     </main>
   );
 }

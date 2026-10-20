@@ -834,6 +834,19 @@ suite set without overlap, including the C02 homework suite. The existing
 one-connection transaction check runs in the first shard. Both latest-head
 shards must pass before this step can merge; C02 remains unaccepted.
 
+PR [#696](https://github.com/FSS-Ltd/pathway/pull/696) completed the ACE-C02
+web/API implementation at checked head
+`a8ae0a98740661fc7daf58a8fe6bc1554a667670`. Its nine applicable
+latest-head checks passed, including both disjoint PostgreSQL integration
+shards (55 suites each), API unit/type/lint checks, CodeQL, and database
+policy/seed checks. The integration logs show the homework assignment HTTP
+suite ran rather than being skipped. GitHub confirmed the merge on
+20 October 2026 as `b9d9e75210ef8d9155c340b4d5c3eff7d383e8f2`.
+Publication remains disabled by default; M20 and C01/C02 acceptance are still
+open, so the verified ACE master-plan count remains **48/150 (32%)**. The next
+web/API step is C03, designed in
+[c03-submission-design.md](c03-submission-design.md), with mobile paused.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of

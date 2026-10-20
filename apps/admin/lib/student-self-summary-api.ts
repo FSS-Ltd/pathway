@@ -23,7 +23,7 @@ export interface StudentSelfSummary {
         }
       | { status: "unavailable" }
       | { status: "error"; message: string };
-    homework: { status: "unavailable" };
+    homework: { status: "ready" | "unavailable" };
     pace: { status: "unavailable" };
     faith: { status: "unavailable" };
     reports: { status: "unavailable" };

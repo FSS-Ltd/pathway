@@ -62,9 +62,19 @@ export function noticeAttachmentKey(
   return `tenants/${tenantId}/notices/${noticeId}/${sanitizeStorageSegment(fileName)}`;
 }
 
+export function homeworkEvidenceKey(
+  tenantId: string,
+  recipientId: string,
+  evidenceId: string,
+  mimeType: "application/pdf" | "image/png" | "image/jpeg",
+  phase: "upload" | "clean",
+): string {
+  return `tenants/${tenantId}/homework/${recipientId}/${evidenceId}/${phase}.${storageExtension(mimeType)}`;
+}
+
 /** Private buckets may only receive tenant-isolated classes registered here. */
 export function isPrivateStorageKey(key: string): boolean {
-  return /^tenants\/[^/]+\/(?:children\/[^/]+\/photo\.[^/]+|staff\/[^/]+\/avatar\.[^/]+|lessons\/[^/]+\/resources\/[^/]+|reports\/[^/]+\/bundle\.csv|privacy-exports\/[^/]+\/export\.zip|messages\/[^/]+\/[^/]+|notices\/[^/]+\/[^/]+|(?:agreements|compliance-evidence)\/[0-9a-f-]{36}\/document\.pdf|finance-statements\/[0-9a-f-]{36}\/[0-9a-f]{64}\.pdf|finance-documents\/[0-9a-f-]{36}\/(?:invoice|credit-note|receipt)\.pdf)$/.test(
+  return /^tenants\/[^/]+\/(?:children\/[^/]+\/photo\.[^/]+|staff\/[^/]+\/avatar\.[^/]+|lessons\/[^/]+\/resources\/[^/]+|reports\/[^/]+\/bundle\.csv|privacy-exports\/[^/]+\/export\.zip|messages\/[^/]+\/[^/]+|notices\/[^/]+\/[^/]+|homework\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/(?:upload|clean)\.(?:pdf|png|jpg)|(?:agreements|compliance-evidence)\/[0-9a-f-]{36}\/document\.pdf|finance-statements\/[0-9a-f-]{36}\/[0-9a-f]{64}\.pdf|finance-documents\/[0-9a-f-]{36}\/(?:invoice|credit-note|receipt)\.pdf)$/.test(
     key,
   );
 }
