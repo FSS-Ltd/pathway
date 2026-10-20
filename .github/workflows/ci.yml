@@ -99,7 +99,7 @@ jobs:
         run: pnpm --filter @pathway/nexsteps-home test:unit
 
       - name: Test (Unit) - api
-        timeout-minutes: 5
+        timeout-minutes: 8
         run: pnpm --filter @pathway/api test:unit
 
   integration:

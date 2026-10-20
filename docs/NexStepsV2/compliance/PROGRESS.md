@@ -1628,3 +1628,10 @@ full live portal flow. No Chrome browser was opened.
 The implementation still requires final diff review, PR creation, eight passing
 current-head CI checks and host-confirmed merge. The whole-program audit remains
 open; authority names and national entry actions are not full legal coverage.
+
+PR #701 opened from `9fbebd84`. Its first hosted run completed all 312 API unit
+suites / 2,054 tests successfully, but the API unit step exceeded the workflow's
+five-minute ceiling immediately after Jest finished, so the Typecheck/Lint/Unit
+job failed and dependent database jobs were skipped. The step timeout is being
+raised to eight minutes without changing its test command. Fresh current-head
+CI and host-confirmed merge remain required before any next step.
