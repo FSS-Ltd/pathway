@@ -120,7 +120,7 @@ describe("Malta progressive national release", () => {
         ),
       ).toBe(true);
     }
-    expect(TRACKER_CATALOGUE.version).toBe("1.25.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.26.0");
     expect(TRACKER_CATALOGUE.sources).toEqual(
       expect.arrayContaining(catalogueV123.sources),
     );
