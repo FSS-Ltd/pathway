@@ -26,7 +26,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.25,PL,PL,Poland,IN_REVIEW,Sixteen voivodeships and 2479 TERC gminas selectable; powiat and gmina duties remain in review
 2.26,PT,PT,Portugal,IN_REVIEW,Eighteen mainland districts and two autonomous regions plus 308 CAOP2025 municipalities selectable; regional topic rules and local decisions remain in review
 2.27,RO,RO,Romania,IN_REVIEW,42 Eurostat NUTS 2024 counties seeded; SIRUTA municipalities and local-authority rules remain in review
-2.28,SK,SK,Slovakia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.28,SK,SK,Slovakia,IN_REVIEW,Eight Eurostat NUTS 3 kraje seeded; municipal and regional legal decisions in review
 2.29,SI,SI,Slovenia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.30,ES,ES,Spain,NOT_REVIEWED,Autonomous communities and cities; local authorities
 2.31,SE,SE,Sweden,NOT_REVIEWED,Relevant regional and local authorities; inventory pending

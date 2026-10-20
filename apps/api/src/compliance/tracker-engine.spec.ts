@@ -4,6 +4,7 @@ import type { TrackerProfile, TrackerAttestation } from "@pathway/types";
 import { TRACKER_CATALOGUE, catalogueSchema } from "./catalogue";
 import { portugalRegionCodes } from "./catalogue/portugal";
 import { romaniaCountyCodes } from "./catalogue/romania";
+import { slovakiaRegionCodes } from "./catalogue/slovakia";
 import {
   buildTrackerChecklist,
   evaluateCondition,
@@ -166,7 +167,7 @@ describe("institutional tracker catalogue and engine", () => {
         .map((c) => `${c.jurisdiction}:${c.sector}:${c.topic}:${c.status}`)
         .sort(),
     ).toEqual(expected.sort());
-    expect(expected).toHaveLength(4464);
+    expect(expected).toHaveLength(4848);
     expect(TRACKER_CATALOGUE.requirements.length).toBeGreaterThan(0);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
@@ -200,6 +201,8 @@ describe("institutional tracker catalogue and engine", () => {
           ...portugalRegionCodes,
           "RO",
           ...romaniaCountyCodes,
+          "SK",
+          ...slovakiaRegionCodes,
         ].includes(item.jurisdiction),
       ),
     ).toBe(true);
