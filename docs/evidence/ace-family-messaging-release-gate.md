@@ -45,12 +45,12 @@ from a previous account are absent during the next account's loading state.
   Clerk test key and a test API URL; it did not contact a live school account.
   All eight latest-head checks passed before merge; the checked revision and
   merge commit are recorded in the release status.
-- The complete ACE-M20 matrix still needs independent probes for every notice,
-  child, identity, message, and realtime topic ID, plus removed site membership
-  across all routes. Web keyboard and screen-reader checks also need a signed-in
-  environment. Mobile screenshots, interaction, accessibility, and offline
-  baselines remain paused. No student direct-messaging release claim is made
-  until API, navigation, compose, and realtime topic evidence are all recorded.
+- At this step, the ACE-M20 matrix still needed independent notice, child,
+  identity, message, and Realtime topic ID probes, plus removed site membership
+  across routes. Later sections record the follow-up API probes. Web keyboard
+  and screen-reader checks still need a signed-in environment. Mobile
+  screenshots, interaction, accessibility, and offline baselines remain paused;
+  the full ACE-M20 release claim remains open.
 
 **Rollback:** revert the account-bound family landing change independently;
 the existing server-side access rules and stored messages remain intact.
@@ -71,12 +71,12 @@ All four affected suites ran against disposable PostgreSQL locally and passed
 | Student invitation ID                                             | Other signed-in account and another school site                 | Hidden                         |
 | Unlinked child ID                                                 | Guardian detail and edit                                        | Hidden; child record unchanged |
 
-The current web API has conversation-ID and message-sequence routes, but no
-standalone message-ID route or realtime-topic claim endpoint. The former has
-database participant and sequence checks; the latter needs a separate gate if
-realtime is introduced. Full ACE-M20 sign-off still needs the remaining access
-matrix, signed-in web keyboard and screen-reader checks, and the mobile work
-that the product owner paused.
+The web API has conversation-ID and message-sequence routes, but no standalone
+message-ID route. Database participant and sequence checks cover those routes.
+Private Realtime topic claims were subsequently added and are covered below.
+Full ACE-M20 sign-off still needs the remaining access matrix, signed-in web
+keyboard and screen-reader checks, and the mobile work that the product owner
+paused.
 
 ## Family summary and web link follow-up (step 1.3e5w, [PR #572](https://github.com/FSS-Ltd/pathway/pull/572))
 
@@ -131,3 +131,16 @@ before the new account's request returns. The signed-out timetable tests
 check that a previous child's name is absent. This is component-level web
 evidence; signed-in browser keyboard and screen-reader checks and mobile
 baselines remain required for the full ACE-M20 gate.
+
+## Private Realtime topic follow-up (steps 1.3e6f through 1.3e6f2)
+
+Staff and guardian conversation routes now issue two-minute, one-conversation
+ES256 private Broadcast claims after their existing access checks. The
+`family-messaging-security.e2e.spec.ts` PostgreSQL HTTP suite verifies allowed
+participant claims, signed-out and unjoined denials, wrong-topic denial, and
+revocation when the ACE capability or staff read role is removed. The policy
+rechecks current participation and forbids client publishing. The production
+read-probe correction and live allowed/nonmember/wrong-conversation join results
+are recorded in the release status under PRs #616, #617, and #619. These probes
+close the previously documented missing Realtime topic-ID test; they do not
+complete the signed-in web accessibility or paused mobile baselines.
