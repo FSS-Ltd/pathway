@@ -93,7 +93,7 @@ describe("Spain partial national and autonomous-community release", () => {
     expect(TRACKER_CATALOGUE.requirements).toEqual(
       expect.arrayContaining(catalogueV130.requirements),
     );
-    expect(TRACKER_CATALOGUE.version).toBe("1.31.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.32.0");
   });
 
   it("does not select a regional action when location is unresolved", () => {
