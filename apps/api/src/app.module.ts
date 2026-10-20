@@ -11,6 +11,7 @@ import { BehaviourModule } from "./behaviour/behaviour.module";
 import { AceDashboardModule } from "./ace-dashboard/ace-dashboard.module";
 import { MessagingModule } from "./messaging/messaging.module";
 import { AceNoticesModule } from "./ace-notices/ace-notices.module";
+import { HomeworkModule } from "./homework/homework.module";
 
 // Core modules
 import { HealthModule } from "./health/health.module";
@@ -98,6 +99,7 @@ import { FinanceModule } from "./finance/finance.module";
     AceDashboardModule,
     MessagingModule,
     AceNoticesModule,
+    HomeworkModule,
     LeadsModule,
     StaffModule,
     PublicSignupModule,

@@ -1305,6 +1305,8 @@ model Tenant {
   aceYearBands           AceYearBand[]
   aceStaffYearBandAssignments AceStaffYearBandAssignment[]
   aceSchoolEnrollments   AceSchoolEnrollment[]
+  aceHomeworkAssignments AceHomeworkAssignment[]
+  aceHomeworkRecipients  AceHomeworkRecipient[]
   aceTeachingDates       AceTeachingDate[]
   aceSchoolVolunteerReservations AceSchoolVolunteerReservation[]
   aceTimetableSchedules  AceTimetableSchedule[]
@@ -1483,6 +1485,8 @@ model User {
   lastActiveTenant   Tenant? @relation("UserLastActiveTenant", fields: [lastActiveTenantId], references: [id])
 
   children                          Child[]                     @relation("ParentChildren")
+  aceHomeworkAssignmentsCreated     AceHomeworkAssignment[]     @relation("AceHomeworkAssignmentAuthor")
+  aceHomeworkAssignmentsScheduled   AceHomeworkAssignment[]     @relation("AceHomeworkAssignmentScheduler")
   createdAt                         DateTime                    @default(now())
   updatedAt                         DateTime                    @updatedAt
   firstLoginAt                      DateTime? // Track when user first logs in (for onboarding)
@@ -2017,6 +2021,7 @@ model Child {
   childNotes                 ChildNote[]
   learningLogs               LearningLog[]
   aceSchoolEnrollments       AceSchoolEnrollment[]
+  aceHomeworkRecipients      AceHomeworkRecipient[]
   aceStudentTimetableDrafts  AceStudentTimetableDraft[]
   aceStudentTimetablePublications AceStudentTimetablePublication[]
   subjectEnrollments         StudentSubjectEnrollment[]
@@ -3084,6 +3089,7 @@ model Subject {
   sortOrder           Int?
   learningLogs        LearningLog[]
   subjectEnrollments  StudentSubjectEnrollment[]
+  aceHomeworkAssignments AceHomeworkAssignment[]
   aceStudentTimetableEntries AceStudentTimetableEntry[]
   paceAssessments     PaceAssessment[]
   paceProgress        PaceProgress[]
@@ -3109,6 +3115,7 @@ model AcademicYear {
   status    AcademicYearStatus @default(ACTIVE)
   periods   AcademicPeriod[]
   schoolEnrollments AceSchoolEnrollment[]
+  aceHomeworkAssignments AceHomeworkAssignment[]
   teachingDates AceTeachingDate[]
   createdAt DateTime           @default(now())
   updatedAt DateTime           @default(now()) @updatedAt
@@ -3150,6 +3157,7 @@ model AceYearBand {
   isActive         Boolean                      @default(true)
   staffAssignments AceStaffYearBandAssignment[]
   schoolEnrollments AceSchoolEnrollment[]
+  aceHomeworkAssignments AceHomeworkAssignment[]
   aceTimetableSchedules AceTimetableSchedule[]
   createdAt        DateTime                     @default(now())
   updatedAt        DateTime                     @updatedAt
@@ -3188,15 +3196,75 @@ model AceSchoolEnrollment {
   academicYear   AcademicYear @relation(fields: [academicYearId, tenantId], references: [id, tenantId], onDelete: Restrict)
   yearBandId     String
   yearBand       AceYearBand  @relation(fields: [yearBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  homeworkRecipients AceHomeworkRecipient[]
   startsOn       DateTime     @db.Date
   endsOn         DateTime?    @db.Date
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   @@unique([id, tenantId])
+  @@unique([id, tenantId, childId])
   @@unique([tenantId, childId, startsOn])
   @@index([tenantId, yearBandId, startsOn, endsOn])
   @@index([tenantId, childId, startsOn, endsOn])
+}
+
+enum AceHomeworkAssignmentStatus {
+  DRAFT
+  SCHEDULED
+  NEEDS_REVIEW
+  PUBLISHED
+  CANCELLED
+}
+
+model AceHomeworkAssignment {
+  id                  String                      @id @default(uuid())
+  tenantId            String
+  tenant              Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  academicYearId      String
+  academicYear        AcademicYear                @relation(fields: [academicYearId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  yearBandId          String
+  yearBand            AceYearBand                 @relation(fields: [yearBandId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  subjectId           String
+  subject             Subject                     @relation(fields: [subjectId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  createdByUserId     String
+  createdBy           User                        @relation("AceHomeworkAssignmentAuthor", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  scheduledByUserId   String?
+  scheduledBy         User?                       @relation("AceHomeworkAssignmentScheduler", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
+  title               String                      @db.VarChar(160)
+  instructions        String                      @db.Text
+  dueAt               DateTime
+  status              AceHomeworkAssignmentStatus @default(DRAFT)
+  version             Int                         @default(1)
+  scheduledAt         DateTime?
+  scheduleFailureReason String?                   @db.VarChar(80)
+  scheduledAudienceHash String?                   @db.VarChar(64)
+  publishedAt         DateTime?
+  cancelledAt         DateTime?
+  recipients          AceHomeworkRecipient[]
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  @@unique([id, tenantId])
+  @@index([tenantId, status, scheduledAt])
+  @@index([tenantId, yearBandId, dueAt])
+}
+
+model AceHomeworkRecipient {
+  id           String                @id @default(uuid())
+  tenantId     String
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  assignmentId String
+  assignment   AceHomeworkAssignment @relation(fields: [assignmentId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  childId      String
+  child        Child                 @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  enrollmentId String
+  enrollment   AceSchoolEnrollment   @relation(fields: [enrollmentId, tenantId, childId], references: [id, tenantId, childId], onDelete: Restrict)
+  publishedAt  DateTime              @default(now())
+
+  @@unique([id, tenantId])
+  @@unique([tenantId, assignmentId, childId])
+  @@index([tenantId, childId, publishedAt])
 }
 
 model AceTeachingDate {

@@ -9,6 +9,12 @@ describe("configureCiRlsRole", () => {
     ) as { scripts?: Record<string, string> };
 
     expect(packageJson.scripts?.["test:integration"]).toContain(
+      "--maxWorkers=1",
+    );
+    expect(packageJson.scripts?.["test:integration"]).toContain(
+      "--workerIdleMemoryLimit=2GB",
+    );
+    expect(packageJson.scripts?.["test:integration"]).not.toContain(
       "--runInBand",
     );
   });

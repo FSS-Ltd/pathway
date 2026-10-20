@@ -1,0 +1,17 @@
+export const assignmentSelect = {
+  id: true,
+  title: true,
+  instructions: true,
+  academicYearId: true,
+  yearBandId: true,
+  subjectId: true,
+  dueAt: true,
+  status: true,
+  version: true,
+  scheduledAt: true,
+  scheduleFailureReason: true,
+  publishedAt: true,
+  cancelledAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
