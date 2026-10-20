@@ -23,7 +23,7 @@ step,jurisdiction,country,name,regional_review,regional_inventory_to_assess
 2.22,LU,LU,Luxembourg,IN_REVIEW,Twelve cantons and one hundred communes selectable; commune admissions and site-specific approvals remain in review
 2.23,MT,MT,Malta,IN_REVIEW,Six regional councils and sixty-eight local councils selectable; local and site-specific rules remain in review
 2.24,NL,NL,Netherlands,IN_REVIEW,Twelve provinces and 342 municipalities selectable; municipal and site-specific duties remain in review
-2.25,PL,PL,Poland,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
+2.25,PL,PL,Poland,IN_REVIEW,Sixteen voivodeships and 2479 TERC gminas selectable; powiat and gmina duties remain in review
 2.26,PT,PT,Portugal,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.27,RO,RO,Romania,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
 2.28,SK,SK,Slovakia,NOT_REVIEWED,Relevant regional and local authorities; inventory pending
