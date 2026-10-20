@@ -1,0 +1,5 @@
+# Malta regional and local-council review
+
+Reviewed 2026-10-20 against the [Office of the Address Registrar's local-council table](https://address.gov.mt/local-council/) and [regional-council list](https://address.gov.mt/regions/). The location migration seeds six regional councils and 68 local councils, including the Gozo Region. These are administrative local authorities, not the National Statistics Office's statistical districts. `MT-REGION-...` and `MT-LC-...` are deterministic Nexsteps location identifiers derived from names, not official Maltese codes.
+
+The portal inventory supports exact site selection and keeps absent or unverified location information unresolved. It does **not** assert that any local council has issued a school, ECEC, planning, food or transport approval. Individual council conditions, planning decisions, inspections and school/childcare licence conditions remain in review. Sites should retain authority correspondence and confirm uncertain requirements with DQSE, MFHEA, the relevant regulator and local council before recording N/A.
