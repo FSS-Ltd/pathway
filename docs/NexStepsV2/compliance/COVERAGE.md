@@ -1,11 +1,17 @@
 # Coverage matrix
 
-Version **1**, established 13 October 2026. All coverage is **NOT_REVIEWED**.
-No jurisdiction has a published institutional compliance pack in this delivery.
+Version **1**, established 13 October 2026. The current status is recorded in
+[coverage.csv](coverage.csv), not in this prose. As of catalogue 1.32.0 on
+20 October 2026, all 31 national packs have published a **partial** core. No
+tracked sector/topic cell is fully published; see the
+[whole-program audit](FINAL-COVERAGE-AUDIT.md).
 
 [jurisdictions.csv](jurisdictions.csv) records the 31 ordered packs: four UK nations
-and 27 EU member states. [coverage.csv](coverage.csv) records **186 rows** (31 × six
-sectors), each with **eight topic status columns**, giving **1,488 explicit cells**.
+and 27 EU member states. [coverage.csv](coverage.csv) currently records **918 rows**
+(31 national jurisdictions plus 122 subdivisions, each across six sectors), each
+with **eight topic status columns**, giving **7,344 explicit cells**. The 1,488
+national cells are all `PARTIALLY_PUBLISHED`. Across the entire matrix, 2,220
+cells are `PARTIALLY_PUBLISHED` and 5,124 are `IN_REVIEW`.
 This compact matrix is research tracking data, not runtime requirements.
 
 ## Dimensions
@@ -42,10 +48,11 @@ metadata in RESEARCH.md. The bare CSV status is never sufficient publication evi
 
 ## Regional coverage
 
-Every jurisdiction starts with `regional_review=NOT_REVIEWED`. The inventory column
-is a research instruction, not a claim that subdivisions have been exhaustively
-identified. Resolve regional/local requirements during that jurisdiction's pack
-step, including education and childcare authorities that differ by provision.
+The `regional_review` field in [jurisdictions.csv](jurisdictions.csv) remains a
+research status, not proof that subdivisions have been exhaustively assessed. It
+is `IN_REVIEW` for 27 countries and `NOT_REVIEWED` for England, Scotland, Northern
+Ireland and Ireland. Resolve regional/local requirements, including education and
+childcare authorities that differ by provision.
 
 Track relevant subdivisions as additional jurisdiction keys and coverage rows in
 the same matrix, preserving the parent country's gaps until their scope is reviewed.
