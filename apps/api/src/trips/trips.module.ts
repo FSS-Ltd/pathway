@@ -6,16 +6,25 @@ import { PermissionSlipScheduleRunnerController } from "./permission-slip-schedu
 import { PermissionSlipScheduleRunnerService } from "./permission-slip-schedule-runner.service";
 import { PermissionSlipVersionService } from "./permission-slip-version.service";
 import { PermissionSlipDraftService } from "./permission-slip-draft.service";
+import { PermissionSlipResponseController } from "./permission-slip-response.controller";
+import { PermissionSlipResponseService } from "./permission-slip-response.service";
+import { PermissionSlipExceptionService } from "./permission-slip-exception.service";
 import { TripsController } from "./trips.controller";
 import { TripsService } from "./trips.service";
 
 @Module({
   imports: [CommonModule, AuthModule, AccessControlModule],
-  controllers: [TripsController, PermissionSlipScheduleRunnerController],
+  controllers: [
+    TripsController,
+    PermissionSlipResponseController,
+    PermissionSlipScheduleRunnerController,
+  ],
   providers: [
     TripsService,
     PermissionSlipDraftService,
     PermissionSlipVersionService,
+    PermissionSlipResponseService,
+    PermissionSlipExceptionService,
     PermissionSlipScheduleRunnerService,
   ],
 })
