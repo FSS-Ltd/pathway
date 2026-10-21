@@ -49,6 +49,27 @@ describe("Tracker boundary validation", () => {
       }).success,
     ).toBe(false);
   });
+  it("validates independent Belgian childcare facts", () => {
+    const profile = trackerProfileInput.parse({
+      ...testProfile,
+      belgianEducationCommunity: "FRENCH",
+      belgianChildcareAuthority: "IRISCARE",
+      belgianPaidUnderThreeCare: true,
+    });
+    expect(
+      evaluateCondition(
+        { field: "belgianChildcareAuthority", op: "eq", value: "IRISCARE" },
+        profile,
+        { countryCode: "BE", subdivisionCode: "BE1" },
+      ),
+    ).toBe("APPLICABLE");
+    expect(
+      trackerProfileInput.safeParse({
+        ...testProfile,
+        belgianChildcareAuthority: "BRUSSELS",
+      }).success,
+    ).toBe(false);
+  });
   it("rejects caller scope on archive", () => {
     expect(
       trackerArchiveInput.safeParse({ tenantId: "injected" }).success,

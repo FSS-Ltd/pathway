@@ -70,9 +70,33 @@ export class TrackerProfileService {
         facts,
       );
       const location = await trackerLocation(tx, profile.jurisdictionId);
-      if (profile.belgianEducationCommunity && location.countryCode !== "BE")
+      if (
+        (profile.belgianEducationCommunity ||
+          profile.belgianChildcareAuthority ||
+          profile.belgianPaidUnderThreeCare != null) &&
+        location.countryCode !== "BE"
+      )
         throw new BadRequestException(
-          "Belgian education Community applies only to a site operating in Belgium.",
+          "Belgian education and childcare facts apply only to a site operating in Belgium.",
+        );
+      if (profile.belgianPaidUnderThreeCare && profile.childcare === false)
+        throw new BadRequestException(
+          "Paid under-three care cannot be selected when the site says it offers no childcare.",
+        );
+      const region = location.subdivisionCode;
+      const authority = profile.belgianChildcareAuthority;
+      if (
+        region &&
+        authority &&
+        !(
+          (region === "BE1" && authority !== "GERMAN_COMMUNITY_MINISTRY") ||
+          (region === "BE2" && authority === "OPGROEIEN") ||
+          (region === "BE3" &&
+            ["ONE", "GERMAN_COMMUNITY_MINISTRY"].includes(authority))
+        )
+      )
+        throw new BadRequestException(
+          "The childcare authority does not serve the selected Belgian Region. Confirm the care route with the competent authority.",
         );
       if (current && isDeepStrictEqual(currentProfile?.profile, profile)) {
         await auditTracker(tx, actor, AuditAction.VIEWED, [current.id]);

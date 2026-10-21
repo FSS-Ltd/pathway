@@ -12,6 +12,8 @@ const profileLabels: Record<string, string> = {
   jurisdictionId: "Operating jurisdiction",
   localAuthority: "Local authority",
   belgianEducationCommunity: "Belgian education Community",
+  belgianChildcareAuthority: "Belgian childcare licensing authority",
+  belgianPaidUnderThreeCare: "Paid professional care for under-threes",
   providerCategory: "Actual provider category",
   fundingStatus: "Funding status",
   minimumAge: "Minimum age",

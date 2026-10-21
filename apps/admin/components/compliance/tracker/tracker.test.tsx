@@ -208,6 +208,8 @@ async function run() {
             ...emptyProfile,
             jurisdictionId: "brussels",
             belgianEducationCommunity: "FRENCH",
+            belgianChildcareAuthority: "IRISCARE",
+            belgianPaidUnderThreeCare: true,
           }}
           setValue={(next) => {
             selectedProfile = next;
@@ -218,6 +220,14 @@ async function run() {
               countryCode: "BE",
               subdivisionCode: "BE1",
               name: "Brussels-Capital Region",
+              level: "REGION",
+              parentJurisdictionId: "belgium",
+            },
+            {
+              id: "flanders",
+              countryCode: "BE",
+              subdivisionCode: "BE2",
+              name: "Flemish Region",
               level: "REGION",
               parentJurisdictionId: "belgium",
             },
@@ -239,14 +249,35 @@ async function run() {
     );
     assert.match(host.textContent ?? "", /Education language Community/);
     assert.match(host.textContent ?? "", /German Speaking/);
+    assert.match(host.textContent ?? "", /Childcare licensing authority/);
+    assert.match(host.textContent ?? "", /ONE/);
+    assert.match(host.textContent ?? "", /Paid professional care/);
+    const childcareSelect = [...host.querySelectorAll("label")]
+      .find((label) => label.firstChild?.textContent?.trim() === "Childcare")
+      ?.querySelector("select");
+    assert.ok(childcareSelect);
+    await act(async () => {
+      childcareSelect.value = "false";
+      childcareSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    assert.equal(selectedProfile?.belgianChildcareAuthority, null);
+    assert.equal(selectedProfile?.belgianPaidUnderThreeCare, null);
     const operatingLocation = host.querySelector("select");
     assert.ok(operatingLocation);
+    await act(async () => {
+      operatingLocation.value = "flanders";
+      operatingLocation.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    assert.equal(selectedProfile?.belgianChildcareAuthority, null);
+    assert.equal(selectedProfile?.belgianEducationCommunity, null);
     await act(async () => {
       operatingLocation.value = "england";
       operatingLocation.dispatchEvent(new Event("change", { bubbles: true }));
     });
     assert.equal(selectedProfile?.jurisdictionId, "england");
     assert.equal(selectedProfile?.belgianEducationCommunity, null);
+    assert.equal(selectedProfile?.belgianChildcareAuthority, null);
+    assert.equal(selectedProfile?.belgianPaidUnderThreeCare, null);
     await act(async () => root.render(<TrackerWorkspace canManage />));
     await settle();
     assert.match(host.textContent ?? "", /could not be refreshed/);

@@ -26,6 +26,11 @@ export const trackerProfileInput = z
       .enum(["FLEMISH", "FRENCH", "GERMAN_SPEAKING"])
       .nullable()
       .optional(),
+    belgianChildcareAuthority: z
+      .enum(["OPGROEIEN", "ONE", "IRISCARE", "GERMAN_COMMUNITY_MINISTRY"])
+      .nullable()
+      .optional(),
+    belgianPaidUnderThreeCare: flag.optional(),
     sector: z
       .enum(["CHURCH", "CLUB", "SCHOOL", "CHARITY", "LEARNING_CENTRE"])
       .nullable(),
@@ -102,6 +107,8 @@ export const trackerProfileInput = z
   });
 const additionalProfileDefaults = {
   belgianEducationCommunity: null,
+  belgianChildcareAuthority: null,
+  belgianPaidUnderThreeCare: null,
   schoolCategory: null,
   englandSchoolMedicalDutiesApply: null,
   personalDataController: null,

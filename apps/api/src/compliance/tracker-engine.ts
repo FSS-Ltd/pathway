@@ -303,6 +303,22 @@ export function buildTrackerChecklist(
         reason +=
           " The education Community responsible for this provision is not recorded.";
       if (
+        location.countryCode === "BE" &&
+        topic === "education_childcare" &&
+        profile?.profile.childcare !== false &&
+        !profile?.profile.belgianChildcareAuthority
+      )
+        reason +=
+          " The childcare authority for this site's actual care service is not recorded.";
+      if (
+        location.countryCode === "BE" &&
+        topic === "education_childcare" &&
+        profile?.profile.childcare === true &&
+        profile.profile.belgianPaidUnderThreeCare == null
+      )
+        reason +=
+          " Whether the site provides paid professional under-three care is unresolved.";
+      if (
         cell.review &&
         (cell.review.verifiedAt > day(now) ||
           cell.review.reviewDueAt < day(now) ||

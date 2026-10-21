@@ -6,7 +6,7 @@ export function words(value: string): string {
     .toLowerCase()
     .split("_")
     .map((word) =>
-      word === "ace" || word === "icce"
+      word === "ace" || word === "icce" || word === "one"
         ? word.toUpperCase()
         : word.charAt(0).toUpperCase() + word.slice(1),
     )

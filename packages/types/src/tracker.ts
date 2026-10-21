@@ -18,6 +18,13 @@ export interface TrackerProfileInput {
   region: string | null;
   localAuthority: string | null;
   belgianEducationCommunity?: "FLEMISH" | "FRENCH" | "GERMAN_SPEAKING" | null;
+  belgianChildcareAuthority?:
+    | "OPGROEIEN"
+    | "ONE"
+    | "IRISCARE"
+    | "GERMAN_COMMUNITY_MINISTRY"
+    | null;
+  belgianPaidUnderThreeCare?: boolean | null;
   sector: Sector | null;
   vertical: InstitutionalVertical | null;
   providerCategory:

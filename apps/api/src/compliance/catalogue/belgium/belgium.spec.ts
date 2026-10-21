@@ -6,7 +6,10 @@ import { trackerProfileInput } from "../../tracker.dto";
 import { buildTrackerChecklist } from "../../tracker-engine";
 import { testProfile } from "../../tests/tracker-fixture";
 
-function checklist(changes: Partial<TrackerProfileInput>) {
+function checklist(
+  changes: Partial<TrackerProfileInput>,
+  subdivisionCode = "",
+) {
   const now = new Date(`${TRACKER_CATALOGUE.releasedAt}T12:00:00Z`);
   return buildTrackerChecklist({
     catalogue: TRACKER_CATALOGUE,
@@ -15,7 +18,7 @@ function checklist(changes: Partial<TrackerProfileInput>) {
       updatedAt: now.toISOString(),
       profile: trackerProfileInput.parse({ ...testProfile, ...changes }),
     },
-    location: { countryCode: "BE", subdivisionCode: "" },
+    location: { countryCode: "BE", subdivisionCode },
     attestations: [],
     evidenceCounts: {},
     now,
@@ -68,6 +71,7 @@ describe("Belgium shared-core release", () => {
   });
 
   it("publishes reviewed partial cells and preserves all earlier releases", () => {
+    expect(TRACKER_CATALOGUE.version).toBe("1.39.0");
     expect(catalogueSchema.safeParse(TRACKER_CATALOGUE).success).toBe(true);
     const cells = TRACKER_CATALOGUE.coverage.filter(
       (cell) => cell.jurisdiction === "BE",
@@ -106,5 +110,58 @@ describe("Belgium shared-core release", () => {
     expect(
       TRACKER_CATALOGUE.sources.slice(0, catalogueV17.sources.length),
     ).toEqual(catalogueV17.sources);
+  });
+
+  it.each([
+    ["OPGROEIEN", "BE2", "bel.opgroeien-under-three-licence"],
+    ["ONE", "BE3", "bel.one-under-three-authorisation"],
+    ["IRISCARE", "BE1", "bel.iriscare-under-three-authorisation"],
+  ] as const)(
+    "applies the %s under-three route only to declared paid care in %s",
+    (authority, region, requirementId) => {
+      const care = {
+        childcare: true,
+        belgianPaidUnderThreeCare: true,
+        belgianChildcareAuthority: authority,
+      } as const;
+      const item = (
+        changes: Partial<TrackerProfileInput>,
+        area: string = region,
+      ) =>
+        checklist({ ...care, ...changes }, area).items.find(
+          (entry) => entry.requirement.id === requirementId,
+        )?.applicability;
+      expect(item({})).toBe("APPLICABLE");
+      expect(item({ belgianPaidUnderThreeCare: false })).toBe("NOT_APPLICABLE");
+      expect(item({ belgianChildcareAuthority: null })).toBe("UNRESOLVED");
+      expect(item({}, "")).toBe("UNRESOLVED");
+      expect(item({ childcare: false })).toBe("NOT_APPLICABLE");
+    },
+  );
+
+  it("applies German-speaking childcare recognition to school-age care too", () => {
+    const item = checklist(
+      {
+        childcare: true,
+        belgianPaidUnderThreeCare: false,
+        belgianChildcareAuthority: "GERMAN_COMMUNITY_MINISTRY",
+      },
+      "BE3",
+    ).items.find(
+      (entry) => entry.requirement.id === "bel.german-care-recognition",
+    );
+    expect(item?.applicability).toBe("APPLICABLE");
+    expect(item?.completed).toBe(false);
+    expect(
+      checklist(
+        {
+          childcare: true,
+          belgianChildcareAuthority: "GERMAN_COMMUNITY_MINISTRY",
+        },
+        "BE1",
+      ).items.find(
+        (entry) => entry.requirement.id === "bel.german-care-recognition",
+      )?.applicability,
+    ).toBe("NOT_APPLICABLE");
   });
 });
