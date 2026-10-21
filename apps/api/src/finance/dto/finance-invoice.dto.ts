@@ -38,7 +38,9 @@ export const financeInvoiceDraftSchema = z
 export const financeInvoiceListQuerySchema = z
   .object({
     status: z.enum(["DRAFT", "IN_REVIEW", "ISSUED", "VOID"]).optional(),
+    payerAccountId: z.string().uuid().optional(),
     limit: z.coerce.number().int().min(1).max(100).default(50),
+    cursor: z.string().uuid().optional(),
   })
   .strict();
 

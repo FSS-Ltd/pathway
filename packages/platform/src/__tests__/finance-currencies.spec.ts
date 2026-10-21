@@ -1,6 +1,7 @@
 import {
   FINANCE_COUNTRY_CURRENCY_OPTIONS,
   FINANCE_CURRENCIES,
+  financeCurrencyFractionDigits,
   financeCurrencyForCountry,
 } from "../finance-currencies";
 
@@ -57,5 +58,10 @@ describe("Finance country currencies", () => {
       "RON",
       "SEK",
     ]);
+    expect(
+      FINANCE_CURRENCIES.map((currency) =>
+        financeCurrencyFractionDigits(currency),
+      ),
+    ).toEqual([2, 2, 2, 2, 2, 2, 2, 2]);
   });
 });

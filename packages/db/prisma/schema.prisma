@@ -256,6 +256,7 @@ enum FinanceCreditNoteEventType {
 }
 
 enum FinanceCommandType {
+  CREATE_PAYER_ACCOUNT
   CREATE_INVOICE
   UPDATE_INVOICE
   SUBMIT_INVOICE_FOR_REVIEW
@@ -288,6 +289,7 @@ enum FinanceCommandType {
 }
 
 enum FinanceCommandResourceType {
+  PAYER_ACCOUNT
   INVOICE
   CREDIT_NOTE
   ALLOCATION
@@ -457,6 +459,8 @@ enum AuditEntityType {
   ENROLMENT_ROLL
   BILLING_QUOTE
   BILLING_CENSUS
+  FINANCE_REPORT
+  FINANCE_PAYER_ACCOUNT
 }
 
 enum OutboxStatus {

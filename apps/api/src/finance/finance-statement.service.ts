@@ -38,16 +38,22 @@ export class FinanceStatementService {
   ) {
     await this.access.assertStaffAction(actor, "READ_RECORDS");
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      const items = await tx.financeStatement.findMany({
+      const rows = await tx.financeStatement.findMany({
         where: {
           tenantId: actor.tenantId,
           orgId: actor.orgId,
           payerAccountId: query.payerAccountId,
         },
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         orderBy: [{ periodEnd: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-        take: query.limit,
+        take: query.limit + 1,
       });
-      return { items: items.map(toFinanceStatementView) };
+      const hasMore = rows.length > query.limit;
+      const items = rows.slice(0, query.limit);
+      return {
+        nextCursor: hasMore ? (items.at(-1)?.id ?? null) : null,
+        items: items.map(toFinanceStatementView),
+      };
     });
   }
 
@@ -58,16 +64,22 @@ export class FinanceStatementService {
   ) {
     await this.assertPayerAccess(actor, payerAccountId, "READ_STATEMENTS");
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      const items = await tx.financeStatement.findMany({
+      const rows = await tx.financeStatement.findMany({
         where: {
           tenantId: actor.tenantId,
           orgId: actor.orgId,
           payerAccountId,
         },
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         orderBy: [{ periodEnd: "desc" }, { createdAt: "desc" }, { id: "desc" }],
-        take: query.limit,
+        take: query.limit + 1,
       });
-      return { items: items.map(toFinanceStatementView) };
+      const hasMore = rows.length > query.limit;
+      const items = rows.slice(0, query.limit);
+      return {
+        nextCursor: hasMore ? (items.at(-1)?.id ?? null) : null,
+        items: items.map(toFinanceStatementView),
+      };
     });
   }
 

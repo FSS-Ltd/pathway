@@ -54,6 +54,8 @@ import { ParentMessagingHistoryService } from "../messaging/parent-messaging-his
 import { ParentMessagingCommandService } from "../messaging/parent-messaging-command.service";
 import { ParentMessagingConversationService } from "../messaging/parent-messaging-conversation.service";
 import { ParentMessagingReadCursorService } from "../messaging/parent-messaging-read-cursor.service";
+import { FinanceBalanceService } from "../finance/finance-balance.service";
+import { FinanceReportRepository } from "../finance/finance-report.repository";
 
 type DeclaredDependency = {
   index: number;
@@ -251,6 +253,10 @@ describe("dependency injection metadata", () => {
     {
       target: GoCardlessBillingWebhookProvider,
       dependencies: [{ index: 0, param: BILLING_PROVIDER_CONFIG }],
+    },
+    {
+      target: FinanceReportRepository,
+      dependencies: [{ index: 0, param: FinanceBalanceService }],
     },
   ])(
     "declares explicit constructor dependencies for $target.name",

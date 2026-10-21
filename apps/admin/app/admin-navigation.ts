@@ -243,16 +243,14 @@ const navItemsWithAccess: (SidebarNavItem & {
   },
   { ...defaultSidebarItems[11], access: "billing", group: "Admin" }, // Billing (org admin only)
   {
-    label: "Finance settings",
-    href: "/finance/settings",
+    label: "Finance",
+    href: "/finance",
     icon: React.createElement(Wallet, {
       "aria-hidden": true,
       className: "h-5 w-5",
     }),
     access: "staff-or-admin",
-    capability: "finance.invoices.read",
-    permission: "finance.payments.manage",
-    additionalPermission: "finance.payments.read",
+    permission: "finance.invoices.read",
     group: "Admin",
   },
   {

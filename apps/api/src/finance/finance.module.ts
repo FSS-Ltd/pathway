@@ -36,6 +36,11 @@ import { FinanceManualReceiptController } from "./finance-manual-receipt.control
 import { FinanceManualReceiptService } from "./finance-manual-receipt.service";
 import { FinanceProfileController } from "./finance-profile.controller";
 import { FinanceProfileService } from "./finance-profile.service";
+import { FinanceReportController } from "./finance-report.controller";
+import { FinanceReportService } from "./finance-report.service";
+import { FinanceReportRepository } from "./finance-report.repository";
+import { FinancePayerAccountController } from "./finance-payer-account.controller";
+import { FinancePayerAccountService } from "./finance-payer-account.service";
 import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
 import { FinanceStripeCheckoutController } from "./finance-stripe-checkout.controller";
 import { FinanceBacsMandateController } from "./finance-bacs-mandate.controller";
@@ -48,6 +53,7 @@ import { FinanceStripeWebhookInternalController } from "./stripe/finance-stripe-
 import {
   FINANCE_STRIPE_CONNECT_CONFIG,
   loadFinanceStripeConnectConfig,
+  type FinanceStripeConnectConfig,
 } from "./stripe/finance-stripe-connect.config";
 import {
   DisabledFinanceStripeConnectProvider,
@@ -55,6 +61,10 @@ import {
   StripeFinanceConnectProvider,
 } from "./stripe/finance-stripe-connect.provider";
 import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connection.service";
+import {
+  FINANCE_STRIPE_REPORTING_PROVIDER,
+  StripeFinanceReportingProvider,
+} from "./stripe/finance-stripe-reporting.provider";
 import {
   DisabledFinanceStripeCheckoutProvider,
   FINANCE_STRIPE_CHECKOUT_PROVIDER,
@@ -127,9 +137,14 @@ import {
     FinanceStripeWebhookController,
     FinanceStripeWebhookInternalController,
     FinanceProfileController,
+    FinanceReportController,
+    FinancePayerAccountController,
   ],
   providers: [
     FinanceBalanceService,
+    FinanceReportService,
+    FinanceReportRepository,
+    FinancePayerAccountService,
     FinanceStatementService,
     FinanceStatementDocumentService,
     FinanceDocumentService,
@@ -172,6 +187,14 @@ import {
         config.mode === "disabled"
           ? new DisabledFinanceStripeConnectProvider()
           : new StripeFinanceConnectProvider(config),
+      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_REPORTING_PROVIDER,
+      useFactory: (config: FinanceStripeConnectConfig) =>
+        new StripeFinanceReportingProvider(
+          config.mode === "disabled" ? "" : config.secretKey,
+        ),
       inject: [FINANCE_STRIPE_CONNECT_CONFIG],
     },
     {

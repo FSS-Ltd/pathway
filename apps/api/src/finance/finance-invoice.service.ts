@@ -47,18 +47,23 @@ export class FinanceInvoiceService {
   async list(actor: FinanceInvoiceActor, query: FinanceInvoiceListQuery) {
     await this.financeAccess.assertStaffAction(actor, "READ_RECORDS");
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      const invoices = await tx.financeInvoice.findMany({
+      const rows = await tx.financeInvoice.findMany({
         where: {
           tenantId: actor.tenantId,
           orgId: actor.orgId,
           status: query.status,
+          payerAccountId: query.payerAccountId,
         },
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: financeInvoiceInclude,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: query.limit,
+        take: query.limit + 1,
       });
+      const hasMore = rows.length > query.limit;
+      const invoices = rows.slice(0, query.limit);
       const balances = await this.balances.forInvoices(tx, actor, invoices);
       return {
+        nextCursor: hasMore ? (invoices.at(-1)?.id ?? null) : null,
         items: invoices.map((invoice) => {
           const balance = balances.get(invoice.id);
           if (!balance) {

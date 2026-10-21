@@ -118,6 +118,33 @@ describe("Finance invoice and credit lifecycle", () => {
           createKey,
           draftInput,
         );
+        const secondDraft = await invoices.createDraft(
+          creator,
+          `invoice-create-${randomUUID()}`,
+          draftInput,
+        );
+        const firstPage = await invoices.list(creator, {
+          status: "DRAFT",
+          payerAccountId: payer.id,
+          limit: 1,
+        });
+        expect(firstPage.items).toHaveLength(1);
+        expect(firstPage.nextCursor).toBe(firstPage.items[0]?.id);
+        const secondPage = await invoices.list(creator, {
+          status: "DRAFT",
+          payerAccountId: payer.id,
+          limit: 1,
+          cursor: firstPage.nextCursor ?? undefined,
+        });
+        expect(secondPage.items).toHaveLength(1);
+        expect(secondPage.items[0]?.id).not.toBe(firstPage.items[0]?.id);
+        expect([draft.id, secondDraft.id]).toEqual(
+          expect.arrayContaining([
+            firstPage.items[0]?.id,
+            secondPage.items[0]?.id,
+          ]),
+        );
+        expect(secondPage.nextCursor).toBeNull();
         const replayedDraft = await invoices.createDraft(
           creator,
           createKey,

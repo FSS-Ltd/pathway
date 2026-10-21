@@ -198,6 +198,31 @@ describe("Finance receipt allocation ledger", () => {
           },
         });
 
+        const firstReceiptPage = await receipts.list(creator, {
+          status: "CONFIRMED",
+          payerAccountId: payer.id,
+          limit: 1,
+        });
+        expect(firstReceiptPage.items).toHaveLength(1);
+        expect(firstReceiptPage.nextCursor).not.toBeNull();
+        const secondReceiptPage = await receipts.list(creator, {
+          status: "CONFIRMED",
+          payerAccountId: payer.id,
+          limit: 1,
+          cursor: firstReceiptPage.nextCursor ?? undefined,
+        });
+        expect(secondReceiptPage.items).toHaveLength(1);
+        expect(secondReceiptPage.items[0]?.id).not.toBe(
+          firstReceiptPage.items[0]?.id,
+        );
+        expect([firstReceipt.id, secondReceipt.id]).toEqual(
+          expect.arrayContaining([
+            firstReceiptPage.items[0]?.id,
+            secondReceiptPage.items[0]?.id,
+          ]),
+        );
+        expect(secondReceiptPage.nextCursor).toBeNull();
+
         const initialInvoice = await invoices.get(creator, invoice.id);
         expect(initialInvoice.balance).toEqual({
           issuedGrossMinor: "2000",
