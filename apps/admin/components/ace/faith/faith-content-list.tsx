@@ -3,6 +3,7 @@
 import React from "react";
 import { Badge, Button, Input, Label } from "@pathway/ui";
 import type { FaithContent, FaithDraft } from "@/lib/ace-faith-api";
+import { FaithReflectionReview } from "./faith-reflection-review";
 
 type Action = "publish" | "schedule" | "cancel-schedule" | "withdraw";
 
@@ -24,6 +25,7 @@ function FaithContentCard({
   authoringEnabled,
   publicationEnabled,
   canCancelSchedule,
+  canReviewReflections,
   pending,
   onRevision,
   onEditDraft,
@@ -33,6 +35,7 @@ function FaithContentCard({
   authoringEnabled: boolean;
   publicationEnabled: boolean;
   canCancelSchedule: boolean;
+  canReviewReflections: boolean;
   pending: boolean;
   onRevision: (item: FaithContent, replacement?: boolean) => void;
   onEditDraft: (item: FaithContent, draft: FaithDraft) => void;
@@ -49,6 +52,7 @@ function FaithContentCard({
   } | null>(null);
   const [scheduleAt, setScheduleAt] = React.useState("");
   const [validation, setValidation] = React.useState<string | null>(null);
+  const [reviewOpen, setReviewOpen] = React.useState(false);
   const isPublished = Boolean(item.latestVersionId) && !item.withdrawnAt;
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
@@ -150,6 +154,20 @@ function FaithContentCard({
             </Button>
           ) : null}
         </div>
+      ) : null}
+      {isPublished && canReviewReflections ? (
+        <Button
+          type="button"
+          variant="secondary"
+          aria-expanded={reviewOpen}
+          aria-controls={reviewOpen ? `faith-review-${item.id}` : undefined}
+          onClick={() => setReviewOpen((value) => !value)}
+        >
+          {reviewOpen ? "Hide reflections" : "Review reflections"}
+        </Button>
+      ) : null}
+      {reviewOpen && isPublished ? (
+        <FaithReflectionReview contentId={item.id} />
       ) : null}
       {item.drafts.length > 0 ? (
         <div className="mt-4 space-y-3 border-t border-border pt-4">
@@ -322,6 +340,7 @@ export function FaithContentList({
   authoringEnabled,
   publicationEnabled,
   canCancelSchedule = false,
+  canReviewReflections = false,
   pendingId,
   onRevision,
   onEditDraft,
@@ -331,6 +350,7 @@ export function FaithContentList({
   authoringEnabled: boolean;
   publicationEnabled: boolean;
   canCancelSchedule?: boolean;
+  canReviewReflections?: boolean;
   pendingId: string | null;
   onRevision: (item: FaithContent, replacement?: boolean) => void;
   onEditDraft: (item: FaithContent, draft: FaithDraft) => void;
@@ -363,6 +383,7 @@ export function FaithContentList({
           authoringEnabled={authoringEnabled}
           publicationEnabled={publicationEnabled}
           canCancelSchedule={canCancelSchedule}
+          canReviewReflections={canReviewReflections}
           pending={pendingId !== null}
           onRevision={onRevision}
           onEditDraft={onEditDraft}

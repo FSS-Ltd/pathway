@@ -738,6 +738,17 @@ enum FaithContentAudienceType {
   AGE_BAND
 }
 
+enum FaithReflectionVisibility {
+  AUTHOR_AND_STAFF
+  RELEASED_GUARDIANS
+}
+
+enum FaithReflectionModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum AceCommunityGroupMembershipMode {
   MANUAL
   AGE_RANGE
@@ -1605,6 +1616,7 @@ model User {
   authoredAceReportDrafts     AceReportDraft[]            @relation("AceReportDraftAuthor")
   reviewedAceReports          AceReportReview[]           @relation("AceReportReviewReviewer")
   authoredFaithContentDrafts  FaithContentDraft[]          @relation("FaithContentDraftAuthor")
+  moderatedFaithReflections   FaithReflection[]            @relation("FaithReflectionModeratedBy")
   releasedFaithReflections    FaithReflection[]            @relation("FaithReflectionReleasedBy")
   tripsCreated                Trip[]                       @relation("TripCreatedBy")
   tripsCancelled              Trip[]                       @relation("TripCancelledBy")
@@ -2044,6 +2056,7 @@ model Child {
   demeritStageOverrides      DemeritStageOverride[]
   behaviourReviewRequests   BehaviourReviewRequest[]
   studentIdentityLinks       StudentIdentityLink[]
+  faithReflections           FaithReflection[]
   guardianChildRelationships GuardianChildRelationship[]
   familyIdentityInvites      FamilyIdentityInvite[]
   aceTermReports             AceTermReport[]
@@ -3739,6 +3752,7 @@ model FaithContent {
 model FaithSiteSettings {
   tenantId     String   @id
   displayLabel String   @default("Faith Corner")
+  reflectionsEnabled Boolean @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -3847,8 +3861,13 @@ model FaithReflection {
   tenantId              String
   faithContentVersionId String
   studentIdentityId     String
+  childId               String?
   reflectionEncrypted   String    @db.Text
   submittedAt           DateTime
+  visibility            FaithReflectionVisibility @default(AUTHOR_AND_STAFF)
+  moderationStatus      FaithReflectionModerationStatus @default(PENDING)
+  moderatedAt           DateTime?
+  moderatedByUserId     String?
   guardianReleasedAt    DateTime?
   releasedByUserId      String?
   createdAt             DateTime  @default(now())
@@ -3857,12 +3876,15 @@ model FaithReflection {
   tenant              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   faithContentVersion FaithContentVersion @relation(fields: [faithContentVersionId, tenantId], references: [id, tenantId], onDelete: Restrict)
   studentIdentity     StudentIdentity     @relation(fields: [studentIdentityId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  child               Child?              @relation(fields: [childId, tenantId], references: [id, tenantId], onDelete: Restrict)
+  moderatedBy         User?               @relation("FaithReflectionModeratedBy", fields: [moderatedByUserId], references: [id], onDelete: Restrict)
   releasedBy          User?               @relation("FaithReflectionReleasedBy", fields: [releasedByUserId], references: [id], onDelete: Restrict)
 
   @@unique([id, tenantId])
   @@unique([tenantId, faithContentVersionId, studentIdentityId])
   @@index([tenantId, faithContentVersionId, submittedAt])
   @@index([tenantId, studentIdentityId])
+  @@index([tenantId, childId])
   @@index([tenantId, guardianReleasedAt])
 }
 

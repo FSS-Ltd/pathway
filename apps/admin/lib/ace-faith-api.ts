@@ -68,6 +68,21 @@ export type FaithDraftInput = {
   audience: FaithAudience;
 };
 
+export type FaithReflection = {
+  id: string;
+  studentName?: string;
+  text: string;
+  submittedAt: string;
+  moderationStatus: "PENDING" | "APPROVED" | "REJECTED";
+  visibility: "AUTHOR_AND_STAFF" | "RELEASED_GUARDIANS";
+  guardianReleasedAt: string | null;
+};
+
+export type FaithReflectionList = {
+  items: FaithReflection[];
+  nextCursor: string | null;
+};
+
 export class FaithRequestError extends Error {
   constructor(
     message: string,
@@ -121,7 +136,40 @@ export const fetchFaithContent = (signal?: AbortSignal, cursor?: string) =>
 export const fetchFaithOptions = (signal?: AbortSignal) =>
   faithRequest<FaithOptions>("/options", "GET", undefined, signal);
 export const fetchFaithSettings = (signal?: AbortSignal) =>
-  faithRequest<{ displayLabel: string }>("/settings", "GET", undefined, signal);
+  faithRequest<{
+    displayLabel: string;
+    reflectionsEnabled: boolean;
+    reflectionFeatureAvailable: boolean;
+  }>("/settings", "GET", undefined, signal);
+export const fetchFaithReflections = (
+  contentId: string,
+  signal?: AbortSignal,
+  cursor?: string,
+) =>
+  faithRequest<FaithReflectionList>(
+    `/content/${encodeURIComponent(contentId)}/reflections?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
+    "GET",
+    undefined,
+    signal,
+  );
+export const moderateFaithReflection = (
+  contentId: string,
+  reflectionId: string,
+  decision: "APPROVED" | "REJECTED",
+) =>
+  faithRequest<unknown>(
+    `/content/${encodeURIComponent(contentId)}/reflections/${encodeURIComponent(reflectionId)}/moderate`,
+    "POST",
+    { decision },
+  );
+export const releaseFaithReflection = (
+  contentId: string,
+  reflectionId: string,
+) =>
+  faithRequest<unknown>(
+    `/content/${encodeURIComponent(contentId)}/reflections/${encodeURIComponent(reflectionId)}/release`,
+    "POST",
+  );
 export const createFaithDraft = (input: FaithDraftInput) =>
   faithRequest<unknown>("/content", "POST", input);
 export const updateFaithDraft = (
@@ -187,7 +235,15 @@ export const withdrawFaithContent = (
       expectedVersionId,
     },
   );
-export const updateFaithSettings = (displayLabel: string) =>
-  faithRequest<{ displayLabel: string }>("/settings", "PATCH", {
-    displayLabel,
-  });
+export const updateFaithSettings = (
+  displayLabel: string,
+  reflectionsEnabled?: boolean,
+) =>
+  faithRequest<{ displayLabel: string; reflectionsEnabled: boolean }>(
+    "/settings",
+    "PATCH",
+    {
+      displayLabel,
+      ...(reflectionsEnabled === undefined ? {} : { reflectionsEnabled }),
+    },
+  );

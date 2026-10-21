@@ -10,3 +10,4 @@ export * from "./messaging/contracts";
 export * from "./messaging/realtime-events";
 export * from "./messaging/recipient-policy";
 export * from "./finance-currencies";
+export * from "./faith/reflection-policy";
