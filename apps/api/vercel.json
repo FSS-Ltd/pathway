@@ -23,6 +23,10 @@
     {
       "path": "/api/internal/faith-schedules/run",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/permission-slip-schedules/run",
+      "schedule": "* * * * *"
     }
   ],
   "functions": {

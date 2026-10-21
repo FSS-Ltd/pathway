@@ -1625,6 +1625,7 @@ model User {
   permissionSlipsCreated      PermissionSlip[]             @relation("PermissionSlipCreatedBy")
   permissionSlipVersionsCreated PermissionSlipVersion[]     @relation("PermissionSlipVersionCreatedBy")
   permissionSlipVersionsPublished PermissionSlipVersion[]   @relation("PermissionSlipVersionPublishedBy")
+  permissionSlipVersionsScheduled PermissionSlipVersion[]   @relation("PermissionSlipVersionScheduledBy")
   permissionSlipExceptionsRecorded PermissionSlipException[] @relation("PermissionSlipExceptionRecordedBy")
   permissionSlipExceptionsWitnessed PermissionSlipException[] @relation("PermissionSlipExceptionWitness")
   aceCommunityGroupsCreated       AceCommunityGroup[]              @relation("AceCommunityGroupCreatedBy")
@@ -2770,6 +2771,9 @@ model PermissionSlipVersion {
   requiresReconsent    Boolean                            @default(false)
   publishedAt          DateTime?
   publishedByUserId    String?
+  scheduledAt          DateTime?
+  scheduledByUserId    String?
+  scheduleFailureReason String?
   supersedesVersionId  String?
   createdByUserId      String
   createdAt            DateTime                           @default(now())
@@ -2779,6 +2783,7 @@ model PermissionSlipVersion {
   permissionSlip    PermissionSlip            @relation(fields: [permissionSlipId, tenantId], references: [id, tenantId], onDelete: Restrict)
   createdBy         User                      @relation("PermissionSlipVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   publishedBy       User?                     @relation("PermissionSlipVersionPublishedBy", fields: [publishedByUserId], references: [id], onDelete: Restrict)
+  scheduledBy       User?                     @relation("PermissionSlipVersionScheduledBy", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
   supersedesVersion PermissionSlipVersion?    @relation("PermissionSlipVersionSupersession", fields: [supersedesVersionId, tenantId, permissionSlipId], references: [id, tenantId, permissionSlipId], onDelete: Restrict)
   supersededBy      PermissionSlipVersion[]   @relation("PermissionSlipVersionSupersession")
   recipients        PermissionSlipRecipient[]
