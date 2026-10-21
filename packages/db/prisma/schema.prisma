@@ -1355,6 +1355,7 @@ model Tenant {
   aceTermReportVersions  AceTermReportVersion[]
   faithAgeBands          FaithAgeBand[]
   faithContents          FaithContent[]
+  faithSiteSettings       FaithSiteSettings?
   faithContentDrafts     FaithContentDraft[]
   faithContentVersions   FaithContentVersion[]
   faithContentAudiences  FaithContentAudience[]
@@ -1491,6 +1492,7 @@ model User {
   children                          Child[]                     @relation("ParentChildren")
   aceHomeworkAssignmentsCreated     AceHomeworkAssignment[]     @relation("AceHomeworkAssignmentAuthor")
   aceHomeworkAssignmentsScheduled   AceHomeworkAssignment[]     @relation("AceHomeworkAssignmentScheduler")
+  faithContentDraftsScheduled        FaithContentDraft[]         @relation("FaithContentDraftScheduler")
   createdAt                         DateTime                    @default(now())
   updatedAt                         DateTime                    @updatedAt
   firstLoginAt                      DateTime? // Track when user first logs in (for onboarding)
@@ -3720,10 +3722,11 @@ model FaithAgeBand {
 }
 
 model FaithContent {
-  id        String   @id @default(uuid())
-  tenantId  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(uuid())
+  tenantId    String
+  withdrawnAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   drafts   FaithContentDraft[]
@@ -3733,21 +3736,36 @@ model FaithContent {
   @@index([tenantId, createdAt])
 }
 
+model FaithSiteSettings {
+  tenantId     String   @id
+  displayLabel String   @default("Faith Corner")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+}
+
 model FaithContentDraft {
-  id             String                  @id @default(uuid())
-  tenantId       String
-  faithContentId String
-  title          String
-  contentPayload Json
-  status         FaithContentDraftStatus @default(DRAFT)
-  authorUserId   String
-  publishedAt    DateTime?
-  createdAt      DateTime                @default(now())
-  updatedAt      DateTime                @updatedAt
+  id                        String                  @id @default(uuid())
+  tenantId                  String
+  faithContentId            String
+  title                     String
+  contentPayload            Json
+  status                    FaithContentDraftStatus @default(DRAFT)
+  authorUserId              String
+  publishedAt               DateTime?
+  scheduledAt               DateTime?
+  scheduledByUserId         String?
+  scheduleExpectedVersionId String?
+  scheduleFailureReason     String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
 
   tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   faithContent     FaithContent         @relation(fields: [faithContentId, tenantId], references: [id, tenantId], onDelete: Restrict)
   author           User                 @relation("FaithContentDraftAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+  scheduledBy      User?                @relation("FaithContentDraftScheduler", fields: [scheduledByUserId], references: [id], onDelete: Restrict)
+  scheduleExpectedVersion FaithContentVersion? @relation("FaithContentDraftScheduleVersion", fields: [scheduleExpectedVersionId, tenantId, faithContentId], references: [id, tenantId, faithContentId], onDelete: Restrict)
   publishedVersion FaithContentVersion? @relation("FaithContentVersionSourceDraft")
 
   @@unique([id, tenantId])
@@ -3773,6 +3791,7 @@ model FaithContentVersion {
   sourceDraft       FaithContentDraft      @relation("FaithContentVersionSourceDraft", fields: [sourceDraftId, tenantId, faithContentId], references: [id, tenantId, faithContentId], onDelete: Restrict)
   supersedesVersion FaithContentVersion?   @relation("FaithContentVersionSupersession", fields: [supersedesVersionId, tenantId, faithContentId], references: [id, tenantId, faithContentId], onDelete: Restrict)
   supersededBy      FaithContentVersion?   @relation("FaithContentVersionSupersession")
+  scheduledDrafts   FaithContentDraft[]     @relation("FaithContentDraftScheduleVersion")
   audiences         FaithContentAudience[]
   readReceipts      FaithReadReceipt[]
   reflections       FaithReflection[]

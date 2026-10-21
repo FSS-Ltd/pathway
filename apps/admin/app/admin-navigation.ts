@@ -1,5 +1,5 @@
 import React from "react";
-import { ListChecks, Wallet } from "lucide-react";
+import { BookHeart, ListChecks, Wallet } from "lucide-react";
 import type { Capability, PermissionKey } from "@pathway/platform";
 import { defaultSidebarItems, type SidebarNavItem } from "@pathway/ui";
 import {
@@ -85,6 +85,17 @@ const navItemsWithAccess: (SidebarNavItem & {
     iconIndex: 30,
     access: "staff-or-admin",
     permission: "ace.homework.reviews.manage",
+    group: "Teaching",
+  },
+  {
+    label: "Faith content",
+    href: "/ace/faith",
+    icon: React.createElement(BookHeart, {
+      "aria-hidden": true,
+      className: "h-4 w-4",
+    }),
+    access: "staff-or-admin",
+    permission: "ace.faith.manage",
     group: "Teaching",
   },
   {
