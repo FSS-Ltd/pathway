@@ -1778,3 +1778,55 @@ admin/API builds, full admin tests, worker/auth tests and permission registry
 checks passed. The first parallel API unit timeout and clean serial rerun are
 recorded above. Final staged-file review, PR, latest-head CI and host-confirmed
 merge remain the gate.
+
+### Northern Ireland district inventory merged; Ireland inventory begins
+
+[PR #705](https://github.com/FSS-Ltd/pathway/pull/705) passed all nine
+current-head checks on `717a73884fd64fe5a62643c8f60c1c34b5a6fbd7`:
+typecheck/lint/unit, both integration shards, organisation-role RLS, permission
+definitions, system-role seed identity, CodeQL and both analyses. GitHub
+confirmed `MERGED` at 2026-10-20T22:03:50Z with merge commit
+`c581c36bb2ea127e6ddb296b9bcc0e51a98cff95`; `fss/master` matched that
+commit before the next branch was created. Ireland starts on
+`feature/compliance-ireland-local-inventory`. Northern Ireland's 528 district
+cells remain `IN_REVIEW`.
+
+### Ireland local-authority inventory — verification in progress
+
+The [territorial research note](packs/ireland/local-authority-inventory.md)
+identifies 31 current local authorities using Tailte Éireann's 2024 statutory
+boundary `BDY_ID` values. Catalogue 1.36.0 and the additive migration add
+selectors and 1,488 explicit `IN_REVIEW` sector/topic cells; no new local legal
+action is published. Distinct Tusla service areas and specialist authority
+boundaries remain unresolved. The source CSV has multiple polygons per
+authority; deduplicated IDs and names match the TypeScript inventory.
+
+Source/TypeScript/SQL parity passed for all 31 authority IDs and names. The
+research matrix has 3,264 rows / 26,112 cells, including 186 Ireland local
+rows / 1,488 `IN_REVIEW` cells. The additive migration applied to the named
+disposable PostgreSQL database (`INSERT 0 31`) and was idempotent on rerun
+(`INSERT 0 0`); all 31 codes had one Ireland parent. After the normal E2E
+reset-and-migrate setup, Dublin City was available through the jurisdiction API.
+
+Focused Ireland/release-history units passed seven tests, API and admin
+typechecks passed, API lint and explicit changed-admin lint passed, and Prisma
+schema validation passed with the test database URL. The first full API unit
+run found three catalogue-size assertions left at 24,624; after updating them
+to 26,112, the affected 37 tests and the full rerun passed **317 suites /
+2,071 tests**. The full admin test command passed. The tracker integration
+suite passed 14 scenarios, including Dublin selection and site/tenant
+boundaries. The first full integration shard 1 attempt omitted the CI
+`E2E_TENANT_RLS_ROLE` variable; six boundary tests stopped on fixture setup.
+With the CI role settings, shard 1 passed **56 suites / 395 tests** and shard 2
+passed **55 suites / 276 tests**, total **111 suites / 671 tests**.
+
+Repository-wide lint passed all 16 package tasks after allowing Turbo to write
+its generated logs; API/admin production builds passed. Permission-definition
+registry drift was zero. `graphify update .` refreshed graph.json and
+GRAPH_REPORT.md; it skipped graph.html because the 8,752-node graph exceeds
+its HTML visualisation limit. The actual profile fields rendered with compiled
+admin CSS in the in-app browser at desktop and mobile width. At mobile width,
+the closed native select clips the long authority label; the expanded option
+and accessible value retain the full name. The preview used synthetic data,
+not an authenticated live portal. Final format/diff review, PR, current-head
+CI and host-confirmed merge remain.

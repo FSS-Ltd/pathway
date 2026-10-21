@@ -93,7 +93,7 @@ describe("Slovenia partial national and statistical-region release", () => {
     expect(TRACKER_CATALOGUE.requirements).toEqual(
       expect.arrayContaining(catalogueV129.requirements),
     );
-    expect(TRACKER_CATALOGUE.version).toBe("1.35.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.36.0");
   });
 
   it("does not select a regional action without a confirmed region", () => {

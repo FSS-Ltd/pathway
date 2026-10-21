@@ -170,7 +170,7 @@ describe("institutional tracker catalogue and engine", () => {
         .map((c) => `${c.jurisdiction}:${c.sector}:${c.topic}:${c.status}`)
         .sort(),
     ).toEqual(expected.sort());
-    expect(expected).toHaveLength(24624);
+    expect(expected).toHaveLength(26112);
     expect(TRACKER_CATALOGUE.requirements.length).toBeGreaterThan(0);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
