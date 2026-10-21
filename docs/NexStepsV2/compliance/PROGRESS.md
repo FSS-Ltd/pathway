@@ -1830,3 +1830,49 @@ the closed native select clips the long authority label; the expanded option
 and accessible value retain the full name. The preview used synthetic data,
 not an authenticated live portal. Final format/diff review, PR, current-head
 CI and host-confirmed merge remain.
+
+### Ireland local-authority inventory merged; Austria Land inventory begins
+
+[PR #707](https://github.com/FSS-Ltd/pathway/pull/707) passed all nine
+current-head checks on `155a70b4e9dd2cc3c8225a44eeaba8493870847e`:
+typecheck/lint/unit, both integration shards, organisation-role RLS,
+permission-definition database, system-role seed identity, CodeQL and both
+analyses. GitHub confirmed `MERGED` at 2026-10-21T10:34:17Z with merge
+`8627ea3522dbca8842b207ef62757e5940a2e4f0`; fetched `fss/master`
+matched and had the checked head as its second parent. The next step starts
+from that merge on `feature/compliance-austria-land-inventory`. Ireland's
+1,488 local-authority cells remain `IN_REVIEW`.
+
+### Austria Land inventory — verification in progress
+
+The Austrian government [EDM list 3012](https://edm.gv.at/edm_portal/redaList.do?display=plain&lang=de&seqCode=yj86by532rpgb4)
+lists all nine `AT-1` through `AT-9` ISO 3166-2 Bundesländer. Catalogue 1.37.0
+and an additive migration add Land selectors and 432 explicit `IN_REVIEW`
+sector/topic cells; no new Land-specific legal action is published. District,
+municipal and provider-specific law remains a separate research boundary.
+
+The nine code/name pairs were checked against the official EDM list. The matrix
+has 54 Land/sector rows and all 432 topic cells are `IN_REVIEW`. The migration
+inserted nine rows into the disposable integration database and inserted zero on
+a second run. Prisma validation, API and admin typechecks, root lint (16
+packages), explicit changed admin-file ESLint, Prettier, permission-definition
+check, API and admin builds, and admin runtime tests passed. The API unit suite
+passed 318 suites and 2,073 tests with an 8 GiB Node heap. A first concurrent
+run exhausted its default heap; its fixed-date Germany fixture was corrected to
+use the current catalogue release date. The first integration shard passed 399
+of 400 tests but one unrelated attendance invalid-date test returned 404 instead
+of 400; the isolated test subsequently passed 8/8 and the full shard rerun
+passed 56 suites and 400 tests. The second shard passed 55 suites and 283 of
+284 tests, with an unrelated Lessons PATCH returning 404 instead of 200; that
+spec passed all 10 tests in isolation. A second full-shard run again passed 55
+suites and 283 of 284 tests, but an unrelated ACE notice draft permission case
+returned 501 instead of 403; that spec then passed 10/10 in isolation. The
+local full second-shard check remains red and needs an independent current-head
+CI result or further diagnosis. The affected tracker API E2E passed in the
+first shard. Graphify refreshed to 8,822 nodes and 13,077 edges after an
+initial worktree-cache permission failure. The in-app mobile
+preview showed the `Bundesland` option and keyboard selection worked. A scaled
+desktop-width rendering in the in-app browser showed the two-column layout
+without visible overflow. These previews used synthetic location options and
+did not exercise an authenticated live portal. No PR or merge is claimed for
+this step yet.

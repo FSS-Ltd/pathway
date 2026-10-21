@@ -48,6 +48,8 @@ function jurisdictionLabel(jurisdiction: TrackerJurisdiction): string {
     level = "local government district";
   } else if (jurisdiction.subdivisionCode?.startsWith("IE-LA-")) {
     level = "local authority";
+  } else if (/^AT-[1-9]$/.test(jurisdiction.subdivisionCode ?? "")) {
+    level = "Bundesland";
   }
   return `${jurisdiction.name} · ${jurisdiction.countryCode} (${level})`;
 }

@@ -40,7 +40,7 @@ function applicable(changes: Partial<TrackerProfileInput> = {}) {
 }
 describe("England national core applicability", () => {
   it("preserves England coverage and exposes incomplete national coverage", () => {
-    expect(TRACKER_CATALOGUE.coverage).toHaveLength(26112);
+    expect(TRACKER_CATALOGUE.coverage).toHaveLength(26544);
     expect(
       TRACKER_CATALOGUE.requirements.every((item) =>
         [

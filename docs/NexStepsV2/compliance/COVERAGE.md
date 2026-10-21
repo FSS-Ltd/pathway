@@ -1,17 +1,17 @@
 # Coverage matrix
 
 Version **1**, established 13 October 2026. The current status is recorded in
-[coverage.csv](coverage.csv), not in this prose. As of catalogue 1.36.0 on
-20 October 2026, all 31 national packs have published a **partial** core. No
+[coverage.csv](coverage.csv), not in this prose. As of catalogue 1.37.0 on
+21 October 2026, all 31 national packs have published a **partial** core. No
 tracked sector/topic cell is fully published; see the
 [whole-program audit](FINAL-COVERAGE-AUDIT.md).
 
 [jurisdictions.csv](jurisdictions.csv) records the 31 ordered packs: four UK nations
-and 27 EU member states. [coverage.csv](coverage.csv) currently records **3,264
-rows** (31 national jurisdictions plus 513 subdivisions, each across six sectors),
-each with **eight topic status columns**, giving **26,112 explicit cells**. The
+and 27 EU member states. [coverage.csv](coverage.csv) currently records **3,318
+rows** (31 national jurisdictions plus 522 subdivisions, each across six sectors),
+each with **eight topic status columns**, giving **26,544 explicit cells**. The
 1,488 national cells are all `PARTIALLY_PUBLISHED`. Across the entire matrix,
-2,220 cells are `PARTIALLY_PUBLISHED` and 23,892 are `IN_REVIEW`.
+2,220 cells are `PARTIALLY_PUBLISHED` and 24,324 are `IN_REVIEW`.
 This compact matrix is research tracking data, not runtime requirements.
 
 ## Dimensions
@@ -50,11 +50,10 @@ metadata in RESEARCH.md. The bare CSV status is never sufficient publication evi
 
 The `regional_review` field in [jurisdictions.csv](jurisdictions.csv) remains a
 research status, not proof that subdivisions have been exhaustively assessed. It
-is `IN_REVIEW` for all 31 countries. England's 153
-upper-tier and 164 additional district authorities, Scotland's 32 council areas,
-Northern Ireland's 11 local government districts and Ireland's 31 local
-authorities are inventoried, but all
-their topic cells remain `IN_REVIEW`. Resolve
+is `IN_REVIEW` for all 31 countries. England's 153 upper-tier and 164 additional
+district authorities, Scotland's 32 council areas, Northern Ireland's 11 local
+government districts, Ireland's 31 local authorities and Austria's nine Länder
+are inventoried, but all their topic cells remain `IN_REVIEW`. Resolve
 regional/local requirements, including education and childcare authorities that
 differ by provision.
 
