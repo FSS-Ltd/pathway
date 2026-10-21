@@ -1988,3 +1988,23 @@ respectively. The first two admin build attempts lacked local prerender
 configuration; a synthetic Clerk key and test API URL resolved that. The final
 staged diff and all changed files were inspected without a remaining code issue.
 The PR, current-head CI and host-confirmed merge remain.
+
+### Belgian education-Community PR #714 CI repair
+
+[PR #714](https://github.com/FSS-Ltd/pathway/pull/714) first ran on
+`9c0c01b9b82db7020b6a7f046b61aa353d2d4fb5`. Eight current-head checks
+passed, including integration shard 1; integration shard 2 failed the legacy
+profile-facts E2E assertion because the newly normalized null
+`belgianEducationCommunity` field was absent from the expected object. The API
+behaviour is intentional. The assertion now compares against the normalized
+profile, as that test's earlier legacy-read assertion already does. This is a
+test repair within the same build step. The focused disposable-database rerun
+passed both tracker suites (2 suites / 19 tests), including the repaired legacy
+profile read and Belgian site persistence. A new commit, current-head CI and
+merge remain required; no next step has started.
+
+The first repair-commit hook encountered a 5-second timeout in the unrelated
+`test.global-setup.spec.ts` while running unit tests in parallel; it was stopped
+after that failure. The same spec passed alone (1 suite / 3 tests, assertion
+completed in 28 ms). The normal hook must pass on retry before pushing the
+repair commit; CI must then rerun on that new revision.
