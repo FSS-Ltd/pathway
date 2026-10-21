@@ -118,6 +118,15 @@ function ContextList({
                       contextLabel={`for ${context.childName} at ${context.siteName}`}
                     />
                   ))}
+                {process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED === "true" &&
+                context.kind === "parent" &&
+                context.sections.includes("ace-summary") ? (
+                  <SectionLink
+                    href={`/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/homework`}
+                    label="Homework"
+                    contextLabel={`for ${context.childName} at ${context.siteName}`}
+                  />
+                ) : null}
               </div>
               {context.sections.length === 0 ? (
                 <p className="mt-3 text-sm text-text-muted">

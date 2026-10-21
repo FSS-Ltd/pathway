@@ -35,8 +35,14 @@ export function StudentHomeworkForm({
   const [error, setError] = React.useState("");
   const [notice, setNotice] = React.useState("");
   const retryKey = React.useRef<string | null>(null);
-  const submitted = assignment.submission?.status === "SUBMITTED";
-  const canEdit = enabled && !submitted;
+  const status = assignment.submission?.status;
+  const locked = status === "SUBMITTED" || status === "COMPLETED";
+  const canEdit = enabled && !locked;
+  const releasedFeedback = assignment.submission?.versions.some(
+    (version) =>
+      version.review?.decision === "COMPLETED" &&
+      version.review.releasedAt !== null,
+  );
 
   async function run(
     kind: "save" | "upload" | "submit",
@@ -87,6 +93,16 @@ export function StudentHomeworkForm({
                 {version.evidence ? (
                   <p className="mt-1 text-sm text-text-muted">
                     Evidence: {version.evidence.fileName}
+                  </p>
+                ) : null}
+                {version.review?.feedback ? (
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-text-primary">
+                    <span className="font-medium">
+                      {version.review.decision === "RETURNED"
+                        ? "Feedback for your revision: "
+                        : "Released feedback: "}
+                    </span>
+                    {version.review.feedback}
                   </p>
                 ) : null}
               </li>
@@ -174,8 +190,8 @@ export function StudentHomeworkForm({
                 onClick={() =>
                   void run("save", async () => {
                     await saveStudentHomeworkDraft(siteId, assignment.id, text);
-                    setNotice("Draft saved.");
                     await onChanged();
+                    setNotice("Draft saved.");
                   })
                 }
               >
@@ -223,8 +239,8 @@ export function StudentHomeworkForm({
                       evidenceId,
                       idempotencyKey: retryKey.current,
                     });
-                    setNotice("Homework submitted.");
                     await onChanged();
+                    setNotice("Homework submitted.");
                   })
                 }
               >
@@ -233,16 +249,20 @@ export function StudentHomeworkForm({
             </div>
           </div>
         </Card>
-      ) : !enabled && !submitted ? (
+      ) : !enabled && !locked ? (
         <Card title="Submissions unavailable">
           <p role="status" className="text-sm text-text-muted">
             Your school has not enabled homework submissions yet.
           </p>
         </Card>
       ) : (
-        <Card title="Submitted">
+        <Card title={status === "COMPLETED" ? "Completed" : "Submitted"}>
           <p role="status" className="text-sm text-text-muted">
-            Your work has been sent to the school.
+            {status === "COMPLETED"
+              ? releasedFeedback
+                ? "Your work is complete. Your school's feedback is shown above."
+                : "Your work is complete. Feedback will appear here when your school releases it."
+              : "Your work has been sent to the school."}
           </p>
         </Card>
       )}

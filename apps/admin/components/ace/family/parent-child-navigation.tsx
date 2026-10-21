@@ -10,14 +10,16 @@ import {
 } from "@/lib/family-contexts-api";
 import { useSession, type SessionStatus } from "@/lib/use-session-compat";
 
-type ChildSection = Extract<
-  FamilySection,
-  | "parent-summary"
-  | "ace-summary"
-  | "attendance"
-  | "sessions"
-  | "subject-timetable"
->;
+type ChildSection =
+  | Extract<
+      FamilySection,
+      | "parent-summary"
+      | "ace-summary"
+      | "attendance"
+      | "sessions"
+      | "subject-timetable"
+    >
+  | "homework";
 
 const sectionRoutes: Record<ChildSection, string> = {
   "parent-summary": "overview",
@@ -25,6 +27,7 @@ const sectionRoutes: Record<ChildSection, string> = {
   attendance: "attendance",
   sessions: "timetable",
   "subject-timetable": "subject-timetable",
+  homework: "homework",
 };
 
 const sectionLabels: Record<ChildSection, string> = {
@@ -33,6 +36,7 @@ const sectionLabels: Record<ChildSection, string> = {
   attendance: "attendance",
   sessions: "sessions",
   "subject-timetable": "subject timetable",
+  homework: "homework",
 };
 
 export function childSectionForRoute(
@@ -49,6 +53,8 @@ export function childSectionForRoute(
       return "sessions";
     case "subject-timetable":
       return "subject-timetable";
+    case "homework":
+      return "homework";
     default:
       return null;
   }
@@ -102,7 +108,9 @@ export function ParentChildNavigationView({
           (context) =>
             context.kind === "parent" &&
             context.siteId === siteId &&
-            context.sections.includes(section),
+            context.sections.includes(
+              section === "homework" ? "ace-summary" : section,
+            ),
         )
       : [];
   const current = linked.find((context) => context.childId === childId);

@@ -884,6 +884,40 @@ failed the admin navigation uniqueness test because the new review link reused
 the assignment icon index; integration jobs were skipped. The current C04
 revision assigns a distinct review icon and awaits new latest-head CI.
 
+That draft status is superseded. [PR #704](https://github.com/FSS-Ltd/pathway/pull/704)
+passed all nine applicable checks at head
+`f0e52dd3833adbdf3cb50ce66dedc472192a4b97`. CI
+[run 39502782518](https://github.com/FSS-Ltd/pathway/actions/runs/39502782518)
+ran the homework assignment, submission and review PostgreSQL HTTP suites in
+integration shard 1; that shard passed 56/56 suites and 397/397 tests, and
+shard 2 passed 56/56 suites and 284/284 tests. The completed admin unit chain
+included the new review interaction test and passed the navigation checks.
+CodeQL, role seed, permission definition and organisation RLS checks also
+passed. GitHub confirmed the merge to `master` on 20 October 2026 as
+`88bc85ead2fc578c53fc742e4cf510c84a574de8`. The C04 flags remain off;
+M20, the C03 scanner/private bucket, linked-school review and safe notification
+delivery still gate acceptance. The verified count remains **48/150 (32%)**.
+
+ACE-C05 web work starts from that merge on branch
+`feature/ace-c05-homework-web`, with the scoped design in
+[c05-homework-web-design.md](c05-homework-web-design.md). Staff and student
+workspaces already exist from C02–C04. This step adds the missing guardian read
+view and corrects the student completed/feedback journey. Mobile remains
+paused, so full C05 acceptance and the plan count are unchanged.
+The guardian link and route use a default-off
+`NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED` build flag; the existing API retains its
+own current-relationship and tenant checks. Local admin `test:unit` passed
+with the guardian privacy, student completion/retry and family navigation
+tests in the executed script. Admin typecheck, targeted lint, formatting and
+the production build with the web flag enabled passed. The homework review
+PostgreSQL HTTP suite passed 12/12 in a fresh disposable database, including
+guardian release and access-denial assertions; that database was removed.
+`graphify update .` rebuilt the code graph and skipped HTML rendering because
+the repository graph exceeds its visualization limit. A signed-in linked-child
+browser review remains an acceptance gate; current-head CI is required before
+the web step can merge. This step does not set a publication, submission,
+review, notification or web flag in production.
+
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
 The failed Prisma attempt was marked rolled back, then attempt 2 of

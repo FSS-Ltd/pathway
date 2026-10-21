@@ -29,6 +29,9 @@ async function run() {
   const methods: string[] = [];
   let enabled = true;
   let submitted = false;
+  let reviewState: "none" | "completed" | "returned" = "none";
+  let interruptSubmit = true;
+  const submitKeys: string[] = [];
   setApiClientToken("student-token");
   globalThis.fetch = async (input, init) => {
     methods.push(init?.method ?? "GET");
@@ -55,6 +58,11 @@ async function run() {
       };
       assert.ok(body.idempotencyKey);
       assert.equal(body.text, "A draft answer");
+      submitKeys.push(body.idempotencyKey);
+      if (interruptSubmit) {
+        interruptSubmit = false;
+        throw new TypeError("Network request failed");
+      }
       submitted = true;
       return Response.json({
         id: "version",
@@ -73,7 +81,14 @@ async function run() {
           dueAt: "2026-11-15T16:00:00.000Z",
           submission: {
             id: "submission",
-            status: submitted ? "SUBMITTED" : "DRAFT",
+            status:
+              reviewState === "completed"
+                ? "COMPLETED"
+                : reviewState === "returned"
+                  ? "RETURNED"
+                  : submitted
+                    ? "SUBMITTED"
+                    : "DRAFT",
             draftText: "A draft answer",
             version: submitted ? 1 : 0,
             versions: submitted
@@ -85,6 +100,21 @@ async function run() {
                     late: false,
                     submittedAt: "2026-10-20T12:00:00.000Z",
                     evidence: null,
+                    review:
+                      reviewState === "none"
+                        ? null
+                        : {
+                            decision:
+                              reviewState === "completed"
+                                ? "COMPLETED"
+                                : "RETURNED",
+                            feedback: "Please check the final step.",
+                            releasedAt:
+                              reviewState === "completed"
+                                ? "2026-10-20T13:00:00.000Z"
+                                : null,
+                            staffNote: "Private staff note",
+                          },
                   },
                 ]
               : [],
@@ -122,6 +152,11 @@ async function run() {
     );
     assert.ok(submit);
     await act(async () => submit.click());
+    assert.match(container.textContent ?? "", /Connection lost/);
+    assert.equal(container.querySelector("textarea")?.value, "A draft answer");
+    await act(async () => submit.click());
+    assert.equal(submitKeys.length, 2);
+    assert.equal(submitKeys[0], submitKeys[1]);
     assert.ok(methods.includes("POST"));
     assert.match(
       container.textContent ?? "",
@@ -136,8 +171,49 @@ async function run() {
     await act(async () => back.click());
     assert.equal(document.activeElement?.textContent, "My homework");
 
+    reviewState = "completed";
+    await act(async () =>
+      root.render(
+        <StudentHomeworkView
+          key="completed"
+          siteId="site-one"
+          status="authenticated"
+        />,
+      ),
+    );
+    assert.match(container.textContent ?? "", /Completed/);
+    const openCompleted = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Open assignment",
+    );
+    assert.ok(openCompleted);
+    await act(async () => openCompleted.click());
+    assert.equal(container.querySelector("textarea"), null);
+    assert.match(container.textContent ?? "", /Please check the final step/);
+    assert.match(container.textContent ?? "", /feedback is shown above/);
+    assert.doesNotMatch(container.textContent ?? "", /Feedback will appear/);
+    assert.doesNotMatch(container.textContent ?? "", /Private staff note/);
+
+    reviewState = "returned";
+    await act(async () =>
+      root.render(
+        <StudentHomeworkView
+          key="returned"
+          siteId="site-one"
+          status="authenticated"
+        />,
+      ),
+    );
+    const openReturned = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Open assignment",
+    );
+    assert.ok(openReturned);
+    await act(async () => openReturned.click());
+    assert.ok(container.querySelector("textarea"));
+    assert.match(container.textContent ?? "", /Feedback for your revision/);
+
     enabled = false;
     submitted = false;
+    reviewState = "none";
     await act(async () =>
       root.render(
         <StudentHomeworkView

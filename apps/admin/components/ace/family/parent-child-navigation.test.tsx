@@ -82,6 +82,7 @@ async function run() {
   assert.equal(childSectionForRoute("attendance"), "attendance");
   assert.equal(childSectionForRoute("timetable"), "sessions");
   assert.equal(childSectionForRoute("subject-timetable"), "subject-timetable");
+  assert.equal(childSectionForRoute("homework"), "homework");
   assert.equal(childSectionForRoute("unknown"), null);
 
   const { createRoot } = await import("react-dom/client");
@@ -115,7 +116,8 @@ async function run() {
       | "ace-summary"
       | "attendance"
       | "sessions"
-      | "subject-timetable",
+      | "subject-timetable"
+      | "homework",
     key: string,
     status: "authenticated" | "unauthenticated" = "authenticated",
   ) => {
@@ -162,6 +164,22 @@ async function run() {
       ],
     );
     assert.doesNotMatch(container.textContent ?? "", /Cia|Dan|Eli/);
+
+    await render("child-one", "homework", "homework");
+    assert.match(container.textContent ?? "", /Ari Alpha at Alpha School/);
+    assert.equal(
+      container.querySelector("nav")?.getAttribute("aria-label"),
+      "Choose child for homework",
+    );
+    assert.deepEqual(
+      Array.from(container.querySelectorAll("nav a")).map((link) =>
+        link.getAttribute("href"),
+      ),
+      [
+        "/ace/parent/sites/school-one/children/child-one/homework",
+        "/ace/parent/sites/school-one/children/child-two/homework",
+      ],
+    );
 
     await render("child-one", "subject-timetable", "subjects");
     assert.deepEqual(

@@ -30,6 +30,9 @@ async function run() {
     "linked";
   let releaseDeferred: ((response: Response) => void) | undefined;
   const originalFetch = globalThis.fetch;
+  const originalHomeworkWebFlag =
+    process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED;
+  process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED = "true";
   setApiClientToken("family-token");
   globalThis.fetch = async (input, init) => {
     requested.push(String(input));
@@ -211,6 +214,28 @@ async function run() {
       ),
       ["/ace/parent/sites/school-one/notices"],
     );
+    assert.deepEqual(
+      Array.from(container.querySelectorAll('a[href$="/homework"]')).map(
+        (anchor) => anchor.getAttribute("href"),
+      ),
+      [
+        "/ace/parent/sites/school-one/children/child-one/homework",
+        "/ace/parent/sites/school-one/children/child-three/homework",
+      ],
+    );
+
+    process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED = "false";
+    await act(async () =>
+      root.render(
+        <FamilyLandingView
+          key="homework-off"
+          status="authenticated"
+          accountId="family-a"
+        />,
+      ),
+    );
+    assert.equal(container.querySelectorAll('a[href$="/homework"]').length, 0);
+    process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED = "true";
 
     mode = "partial";
     await act(async () =>
@@ -243,6 +268,7 @@ async function run() {
       0,
     );
     assert.equal(container.querySelectorAll('a[href$="/notices"]').length, 1);
+    assert.equal(container.querySelectorAll('a[href$="/homework"]').length, 0);
 
     mode = "legacy";
     await act(async () =>
@@ -326,6 +352,11 @@ async function run() {
   } finally {
     await act(async () => root.unmount());
     globalThis.fetch = originalFetch;
+    if (originalHomeworkWebFlag === undefined)
+      delete process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED;
+    else
+      process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED =
+        originalHomeworkWebFlag;
     setApiClientToken(null);
     container.remove();
   }
