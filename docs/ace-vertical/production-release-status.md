@@ -913,10 +913,48 @@ the production build with the web flag enabled passed. The homework review
 PostgreSQL HTTP suite passed 12/12 in a fresh disposable database, including
 guardian release and access-denial assertions; that database was removed.
 `graphify update .` rebuilt the code graph and skipped HTML rendering because
-the repository graph exceeds its visualization limit. A signed-in linked-child
-browser review remains an acceptance gate; current-head CI is required before
-the web step can merge. This step does not set a publication, submission,
-review, notification or web flag in production.
+the repository graph exceeds its visualization limit. A disposable local
+render of the guardian page at 320 px showed no horizontal overflow and a
+visible keyboard focus ring; it used test data and bypassed authentication
+only in a temporary, uncommitted preview that was removed. It does not prove
+linked-account access in production. PR
+[#706](https://github.com/FSS-Ltd/pathway/pull/706) passed all nine applicable
+latest-head checks on `34d1749ea0356ed4acb87fe58836452f4dc5d91e`.
+[CI run 39510179413](https://github.com/FSS-Ltd/pathway/actions/runs/39510179413)
+executed the admin guardian, student and child-navigation test chain, plus
+the homework-review PostgreSQL HTTP suite in integration shard 1. Shard 1
+passed 56/56 suites and 398/398 tests; shard 2 passed 56/56 and 284/284.
+GitHub confirmed the merge into `master` on 21 October 2026 as
+`13c374f75e59cfc5a4edc25d02e9d3789be91496`. A signed-in linked-child
+browser review and the M20/C03/mobile gates still block full C05 acceptance.
+No publication, submission, review, notification or web flag was set in
+production. The verified count remains **48/150 (32%)**.
+
+ACE-C06 Faith content work begins from that merge on branch
+`feature/ace-c06-faith-content-web` in PR
+[#708](https://github.com/FSS-Ltd/pathway/pull/708). The implementation was
+published at `11b91b343e75e8502469deef8f636c6a19750d8a`; current-head CI
+and merge evidence are still pending. CI
+[run 39585297887](https://github.com/FSS-Ltd/pathway/actions/runs/39585297887)
+on `89e152b10b701c47df7faf4e827a1e829d6c3ac9` passed CodeQL but failed
+the API access-matrix unit test because C06's route rows lacked status entries;
+the dependent database jobs were skipped. The same-step correction registers
+the implemented Faith routes and passed the focused matrix suite (9/9), API
+typecheck, lint and formatting locally. It awaits CI on the corrected head.
+The scoped API and staff-web design is in
+[c06-faith-content-design.md](c06-faith-content-design.md). The additive Faith
+lifecycle migration applied with all 191 repository migrations to a fresh
+disposable PostgreSQL database. The Faith HTTP suite executed 4/4 tests there,
+including cross-site and linked-child denial, scheduled publication, invalid
+historical payload handling and a VIEWER with a misassigned management grant.
+Prisma validation, database typecheck/lint, API typecheck/lint/build, admin
+typecheck/lint/build, the full admin unit chain (including Faith workflow and
+pagination), focused UI tests, formatting and diff checks passed locally. A
+320 px local staff-page preview showed no horizontal overflow and visible
+keyboard focus; it used test data and does not prove live school access. C06
+still requires its latest-head CI, review protection and confirmed PR merge.
+The authoring and publication flags remain default-off, with no production
+enablement or C06 acceptance claimed. The verified count stays **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
