@@ -7,6 +7,7 @@ import { withTenantRlsContext } from "@pathway/db";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import type { RecordPhysicalResponseInput } from "./dto/record-physical-response.dto";
+import { validConsentVersionIds } from "./permission-slip-consent-versions";
 import { lockCurrentSlip } from "./permission-slip-response-access";
 import { requireTripSlipStaff, type TripSlipActor } from "./trip-slip-access";
 
@@ -54,20 +55,30 @@ export class PermissionSlipExceptionService {
         select: { id: true },
       });
       if (!enrollment) throw new NotFoundException("Permission slip not found");
+      const versions = await tx.permissionSlipVersion.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          permissionSlipId: slipId,
+          publishedAt: { not: null },
+        },
+        orderBy: { version: "desc" },
+        select: { id: true, requiresReconsent: true },
+      });
+      const validVersionIds = validConsentVersionIds(versions);
       const [response, existingException] = await Promise.all([
         tx.permissionSlipResponse.findFirst({
           where: {
             tenantId: actor.tenantId,
-            permissionSlipVersionId: version.id,
-            permissionSlipRecipientId: recipient.id,
+            permissionSlipVersionId: { in: validVersionIds },
+            childId: input.childId,
           },
           select: { id: true },
         }),
         tx.permissionSlipException.findFirst({
           where: {
             tenantId: actor.tenantId,
-            permissionSlipVersionId: version.id,
-            permissionSlipRecipientId: recipient.id,
+            permissionSlipVersionId: { in: validVersionIds },
+            childId: input.childId,
           },
           select: { id: true },
         }),

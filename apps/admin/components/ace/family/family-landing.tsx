@@ -139,6 +139,15 @@ function ContextList({
                     contextLabel={`for ${context.childName} at ${context.siteName}`}
                   />
                 ) : null}
+                {process.env.NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED === "true" &&
+                context.kind === "parent" &&
+                context.sections.includes("slips") ? (
+                  <SectionLink
+                    href={`/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/slips`}
+                    label="Trip permission slips"
+                    contextLabel={`for ${context.childName} at ${context.siteName}`}
+                  />
+                ) : null}
               </div>
               {context.sections.length === 0 ? (
                 <p className="mt-3 text-sm text-text-muted">

@@ -9,6 +9,9 @@ import { PermissionSlipDraftService } from "./permission-slip-draft.service";
 import { PermissionSlipResponseController } from "./permission-slip-response.controller";
 import { PermissionSlipResponseService } from "./permission-slip-response.service";
 import { PermissionSlipExceptionService } from "./permission-slip-exception.service";
+import { PermissionSlipReadController } from "./permission-slip-read.controller";
+import { PermissionSlipFamilyReadService } from "./permission-slip-family-read.service";
+import { PermissionSlipStaffReadService } from "./permission-slip-staff-read.service";
 import { TripsController } from "./trips.controller";
 import { TripsService } from "./trips.service";
 
@@ -17,6 +20,7 @@ import { TripsService } from "./trips.service";
   controllers: [
     TripsController,
     PermissionSlipResponseController,
+    PermissionSlipReadController,
     PermissionSlipScheduleRunnerController,
   ],
   providers: [
@@ -25,6 +29,8 @@ import { TripsService } from "./trips.service";
     PermissionSlipVersionService,
     PermissionSlipResponseService,
     PermissionSlipExceptionService,
+    PermissionSlipFamilyReadService,
+    PermissionSlipStaffReadService,
     PermissionSlipScheduleRunnerService,
   ],
 })

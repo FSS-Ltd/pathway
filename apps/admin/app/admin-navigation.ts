@@ -1,5 +1,5 @@
 import React from "react";
-import { BookHeart, ListChecks, Wallet } from "lucide-react";
+import { BookHeart, BusFront, ListChecks, Wallet } from "lucide-react";
 import type { Capability, PermissionKey } from "@pathway/platform";
 import { defaultSidebarItems, type SidebarNavItem } from "@pathway/ui";
 import {
@@ -96,6 +96,17 @@ const navItemsWithAccess: (SidebarNavItem & {
     }),
     access: "staff-or-admin",
     permission: "ace.faith.manage",
+    group: "Teaching",
+  },
+  {
+    label: "Trips and slips",
+    href: "/ace/trips",
+    icon: React.createElement(BusFront, {
+      "aria-hidden": true,
+      className: "h-4 w-4",
+    }),
+    access: "staff-or-admin",
+    permission: "school.permission_slips.read",
     group: "Teaching",
   },
   {
@@ -279,6 +290,8 @@ export function resolveAdminNavItems({
   return navItemsWithAccess
     .filter(
       (item) =>
+        (item.href !== "/ace/trips" ||
+          process.env.NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED === "true") &&
         meetsAccessRequirement(role, item.access, {
           currentOrgIsMasterOrg,
         }) &&

@@ -74,6 +74,7 @@ export class FamilyContextsService {
                 "messaging.conversations.read",
                 "messaging.messages.read",
                 "ace.faith.read",
+                "school.permission_slips.read",
               ],
             },
             isActive: true,
@@ -225,6 +226,11 @@ export class FamilyContextsService {
           scoped.activeParentChildIds.has(child.id) &&
           activePermissions.has("ace.faith.read") &&
           !discovery.studentSiteIds.has(site.id);
+        const slipsAvailable =
+          isAceSchool &&
+          scoped.activeParentChildIds.has(child.id) &&
+          activePermissions.has("school.permission_slips.read") &&
+          !discovery.studentSiteIds.has(site.id);
         items.push({
           kind: "parent",
           siteId: site.id,
@@ -240,10 +246,12 @@ export class FamilyContextsService {
                   "ace-summary",
                   ...parentSections,
                   ...(faithAvailable ? ["faith" as const] : []),
+                  ...(slipsAvailable ? ["slips" as const] : []),
                 ]
               : [
                   ...parentSections,
                   ...(faithAvailable ? ["faith" as const] : []),
+                  ...(slipsAvailable ? ["slips" as const] : []),
                 ],
         });
       }

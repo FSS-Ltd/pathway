@@ -1006,10 +1006,33 @@ The existing Oasis permission-slip implementation was reviewed read-only at
 `f31ec65`; C09 keeps tenant and student eligibility checks at publication
 instead of trusting submitted child identifiers. Full C09 acceptance remains
 open until each guardian response can reproduce the exact consent text they
-accepted. ACE-C10 guardian response commands are in progress on
-`feature/ace-c10-guardian-consent`; online responses default off pending an
-approved school retention instruction for consent records, IP and device
-metadata. The verified ACE count remains **48/150 (32%)**.
+accepted. ACE-C10 guardian response and witnessed exception commands merged in
+[PR #716](https://github.com/FSS-Ltd/pathway/pull/716) on 21 October 2026.
+All nine latest-head checks passed on
+`2c79137ebf1068a30f84988172d7279a6c363225`; CI ran the
+trip-slip-response, trip-slip-version, and trips-slips.rls PostgreSQL E2E
+suites and the permission-slip-version unit suite. GitHub reports merge commit
+`49f5a36b22fdc4a8b149e51d3702e49dd555ec13`. The product owner decided
+that IP and device evidence follows each school's consent-record retention
+policy. Online responses remain disabled behind
+`ACE_TRIP_SLIP_RESPONSE_ENABLED` until each participating school has recorded
+its approved retention instructions and the release gate is reviewed. ACE-C11
+web/API read and response screens are in progress in
+[PR #718](https://github.com/FSS-Ltd/pathway/pull/718) on
+`feature/ace-c11-trip-slip-web`. The first pushed revision was
+`e106ca95`; latest-head CI and merge evidence are pending. The web slice adds guardian child-scoped
+published reads and response states, plus staff drafting, publication review,
+version comparison, response summaries, and witnessed exceptions. The admin
+pages default off behind `NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED`; the API's
+online response and publication flags remain separate release gates. A local
+disposable PostgreSQL run passed the response, version and RLS suites (17/17
+tests), including two linked children and nonmaterial consent carryforward.
+The admin unit chain, both typechecks, focused lint/format checks, and API and
+admin builds passed. A signed-in 320px/200% keyboard and accessible-tree
+review still needs a configured school session after deployment. Mobile work
+remains paused, and C11 reminder delivery is reserved for C12. C09, C10 and
+C11 full acceptance remain open; the verified ACE count remains **48/150
+(32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
