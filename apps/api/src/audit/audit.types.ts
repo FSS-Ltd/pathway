@@ -13,6 +13,8 @@ export enum AuditEntityType {
   ACE_MESSAGE = "ACE_MESSAGE",
   ACE_NOTICE = "ACE_NOTICE",
   ACE_RECORD = "ACE_RECORD",
+  FINANCE_REPORT = "FINANCE_REPORT",
+  FINANCE_PAYER_ACCOUNT = "FINANCE_PAYER_ACCOUNT",
 }
 
 export enum AuditAction {

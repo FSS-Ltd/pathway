@@ -1,9 +1,5 @@
 import type { FinanceCurrency } from "@pathway/platform";
 
-const integerFormatter = new Intl.NumberFormat("en-GB", {
-  maximumFractionDigits: 0,
-});
-
 export function formatFinanceMoney(
   amountMinor: string,
   currency: FinanceCurrency,
@@ -11,14 +7,17 @@ export function formatFinanceMoney(
   const amount = BigInt(amountMinor);
   const isNegative = amount < 0n;
   const absolute = isNegative ? -amount : amount;
-  const whole = integerFormatter.format(absolute / 100n);
-  const fraction = (absolute % 100n).toString().padStart(2, "0");
-  const parts = new Intl.NumberFormat("en-GB", {
+  const formatter = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).formatToParts(isNegative ? -1 : 1);
+  });
+  const fractionDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
+  const unit = 10n ** BigInt(fractionDigits);
+  const whole = new Intl.NumberFormat("en-GB", {
+    maximumFractionDigits: 0,
+  }).format(absolute / unit);
+  const fraction = (absolute % unit).toString().padStart(fractionDigits, "0");
+  const parts = formatter.formatToParts(isNegative ? -1 : 1);
   let hasWhole = false;
 
   return parts

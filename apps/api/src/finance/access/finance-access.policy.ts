@@ -10,6 +10,7 @@ const servicingStaffActions: ReadonlySet<FinanceStaffAction> = new Set([
   "DOWNLOAD_DOCUMENT",
   "EXPORT_REPORT",
   "RECORD_IN_FLIGHT_PAYMENT",
+  "ALLOCATE_RECEIPT",
   "RECONCILE",
   "REFUND",
   "HANDLE_DISPUTE",

@@ -53,17 +53,24 @@ export class FinanceReceiptService {
   async list(actor: FinanceReceiptActor, query: FinanceReceiptListQuery) {
     await this.financeAccess.assertStaffAction(actor, "READ_RECORDS");
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      const receipts = await tx.financeReceipt.findMany({
+      const rows = await tx.financeReceipt.findMany({
         where: {
           tenantId: actor.tenantId,
           orgId: actor.orgId,
           status: query.status,
+          payerAccountId: query.payerAccountId,
         },
+        ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
         include: financeReceiptInclude,
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: query.limit,
+        take: query.limit + 1,
       });
-      return { items: receipts.map(toFinanceReceiptView) };
+      const hasMore = rows.length > query.limit;
+      const receipts = rows.slice(0, query.limit);
+      return {
+        nextCursor: hasMore ? (receipts.at(-1)?.id ?? null) : null,
+        items: receipts.map(toFinanceReceiptView),
+      };
     });
   }
 

@@ -8,6 +8,7 @@ export interface FinanceCommandActor extends FinanceAccessScope {
 }
 
 export type FinanceCommandType =
+  | "CREATE_PAYER_ACCOUNT"
   | "CREATE_INVOICE"
   | "UPDATE_INVOICE"
   | "SUBMIT_INVOICE_FOR_REVIEW"
@@ -39,6 +40,7 @@ export type FinanceCommandType =
   | "REJECT_REFUND_RETURN";
 
 export type FinanceCommandResourceType =
+  | "PAYER_ACCOUNT"
   | "INVOICE"
   | "CREDIT_NOTE"
   | "ALLOCATION"
