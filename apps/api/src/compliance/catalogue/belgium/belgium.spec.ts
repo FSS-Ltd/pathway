@@ -71,7 +71,7 @@ describe("Belgium shared-core release", () => {
   });
 
   it("publishes reviewed partial cells and preserves all earlier releases", () => {
-    expect(TRACKER_CATALOGUE.version).toBe("1.41.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.42.0");
     expect(catalogueSchema.safeParse(TRACKER_CATALOGUE).success).toBe(true);
     const cells = TRACKER_CATALOGUE.coverage.filter(
       (cell) => cell.jurisdiction === "BE",
@@ -281,6 +281,97 @@ describe("Belgium shared-core release", () => {
         { belgianFrenchSchoolRoute: "FWB_SUBSIDISED" },
         project,
         "BE2",
+      ),
+    ).toBe("NOT_APPLICABLE");
+  });
+
+  it("limits German-speaking Community school actions to organised and subsidised schools", () => {
+    const applicability = (
+      changes: Partial<TrackerProfileInput>,
+      id: string,
+      region = "BE3",
+    ) =>
+      checklist(
+        {
+          providerCategory: "INDEPENDENT_SCHOOL",
+          belgianEducationCommunity: "GERMAN_SPEAKING",
+          belgianGermanReducedHoursSecondary: false,
+          ...changes,
+        },
+        region,
+      ).items.find((item) => item.requirement.id === id)?.applicability;
+    const project = "bel.german-school-project";
+    const rules = "bel.german-school-rules";
+    const attendance = "bel.german-school-attendance-control";
+    expect(
+      applicability({ belgianGermanSchoolRoute: "DG_ORGANISED" }, project),
+    ).toBe("APPLICABLE");
+    expect(
+      applicability({ belgianGermanSchoolRoute: "DG_SUBSIDISED" }, rules),
+    ).toBe("APPLICABLE");
+    expect(
+      applicability({ belgianGermanSchoolRoute: "DG_SUBSIDISED" }, attendance),
+    ).toBe("APPLICABLE");
+    for (const route of [
+      "DG_RECOGNISED_UNSUBSIDISED",
+      "OUTSIDE_DG_NETWORK",
+    ] as const)
+      expect(applicability({ belgianGermanSchoolRoute: route }, project)).toBe(
+        "NOT_APPLICABLE",
+      );
+    expect(applicability({ belgianGermanSchoolRoute: null }, project)).toBe(
+      "UNRESOLVED",
+    );
+    expect(
+      applicability(
+        {
+          belgianGermanSchoolRoute: "DG_ORGANISED",
+          belgianGermanReducedHoursSecondary: null,
+        },
+        project,
+      ),
+    ).toBe("UNRESOLVED");
+    expect(
+      applicability(
+        {
+          belgianGermanSchoolRoute: "DG_ORGANISED",
+          belgianGermanReducedHoursSecondary: true,
+        },
+        project,
+      ),
+    ).toBe("NOT_APPLICABLE");
+    expect(
+      applicability(
+        {
+          belgianGermanSchoolRoute: "DG_ORGANISED",
+          belgianGermanReducedHoursSecondary: true,
+        },
+        attendance,
+      ),
+    ).toBe("APPLICABLE");
+    expect(
+      applicability(
+        { belgianGermanSchoolRoute: "DG_ORGANISED" },
+        project,
+        "BE1",
+      ),
+    ).toBe("NOT_APPLICABLE");
+    expect(
+      applicability(
+        {
+          belgianGermanSchoolRoute: "DG_ORGANISED",
+          providerCategory: "OUT_OF_SCHOOL",
+        },
+        project,
+      ),
+    ).toBe("NOT_APPLICABLE");
+    expect(
+      applicability(
+        {
+          belgianGermanSchoolRoute: "DG_ORGANISED",
+          belgianEducationCommunity: "FRENCH",
+        },
+        project,
       ),
     ).toBe("NOT_APPLICABLE");
   });

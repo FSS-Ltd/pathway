@@ -14,6 +14,9 @@ const profileLabels: Record<string, string> = {
   belgianEducationCommunity: "Belgian education Community",
   belgianSchoolRecognitionStatus: "Belgian school recognition status",
   belgianFrenchSchoolRoute: "French Community school route",
+  belgianGermanSchoolRoute: "German-speaking Community school route",
+  belgianGermanReducedHoursSecondary:
+    "German reduced-hours secondary provision",
   belgianChildcareAuthority: "Belgian childcare licensing authority",
   belgianPaidUnderThreeCare: "Paid professional care for under-threes",
   providerCategory: "Actual provider category",

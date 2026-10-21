@@ -284,6 +284,7 @@ async function run() {
     });
     assert.equal(selectedProfile?.belgianSchoolRecognitionStatus, null);
     assert.equal(selectedProfile?.belgianFrenchSchoolRoute, null);
+    assert.equal(selectedProfile?.belgianGermanSchoolRoute, null);
     const operatingLocation = host.querySelector("select");
     assert.ok(operatingLocation);
     await act(async () => {
@@ -293,6 +294,7 @@ async function run() {
     assert.equal(selectedProfile?.belgianChildcareAuthority, null);
     assert.equal(selectedProfile?.belgianEducationCommunity, null);
     assert.equal(selectedProfile?.belgianSchoolRecognitionStatus, null);
+    assert.equal(selectedProfile?.belgianGermanSchoolRoute, null);
     await act(async () => {
       operatingLocation.value = "england";
       operatingLocation.dispatchEvent(new Event("change", { bubbles: true }));
@@ -302,6 +304,54 @@ async function run() {
     assert.equal(selectedProfile?.belgianSchoolRecognitionStatus, null);
     assert.equal(selectedProfile?.belgianChildcareAuthority, null);
     assert.equal(selectedProfile?.belgianPaidUnderThreeCare, null);
+    await act(async () =>
+      root.render(
+        <ProfileFields
+          value={{
+            ...emptyProfile,
+            jurisdictionId: "wallonia",
+            sector: "SCHOOL",
+            vertical: "ACE_SCHOOL",
+            providerCategory: "INDEPENDENT_SCHOOL",
+            belgianEducationCommunity: "GERMAN_SPEAKING",
+            belgianGermanSchoolRoute: "DG_RECOGNISED_UNSUBSIDISED",
+            belgianGermanReducedHoursSecondary: false,
+          }}
+          setValue={(next) => {
+            selectedProfile = next;
+          }}
+          jurisdictions={[
+            {
+              id: "wallonia",
+              countryCode: "BE",
+              subdivisionCode: "BE3",
+              name: "Walloon Region",
+              level: "REGION",
+              parentJurisdictionId: "belgium",
+            },
+          ]}
+        />,
+      ),
+    );
+    assert.match(
+      host.textContent ?? "",
+      /German-speaking Community school route/,
+    );
+    assert.match(host.textContent ?? "", /Recognised, no subsidy/);
+    assert.match(host.textContent ?? "", /Reduced-hours secondary education/);
+    const germanRouteSelect = [...host.querySelectorAll("label")]
+      .find(
+        (label) =>
+          label.firstChild?.textContent?.trim() ===
+          "German-speaking Community school route",
+      )
+      ?.querySelector("select");
+    assert.ok(germanRouteSelect);
+    await act(async () => {
+      germanRouteSelect.value = "DG_SUBSIDISED";
+      germanRouteSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    assert.equal(selectedProfile?.belgianGermanSchoolRoute, "DG_SUBSIDISED");
     await act(async () => root.render(<TrackerWorkspace canManage />));
     await settle();
     assert.match(host.textContent ?? "", /could not be refreshed/);

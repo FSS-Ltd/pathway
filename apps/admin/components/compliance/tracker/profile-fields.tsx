@@ -22,6 +22,8 @@ export const emptyProfile: TrackerProfileInput = {
   belgianEducationCommunity: null,
   belgianSchoolRecognitionStatus: null,
   belgianFrenchSchoolRoute: null,
+  belgianGermanSchoolRoute: null,
+  belgianGermanReducedHoursSecondary: null,
   belgianChildcareAuthority: null,
   belgianPaidUnderThreeCare: null,
   sector: null,
@@ -121,6 +123,14 @@ export function ProfileFields({
                 country === "BE" && jurisdictionId === value.jurisdictionId
                   ? value.belgianFrenchSchoolRoute
                   : null,
+              belgianGermanSchoolRoute:
+                country === "BE" && jurisdictionId === value.jurisdictionId
+                  ? value.belgianGermanSchoolRoute
+                  : null,
+              belgianGermanReducedHoursSecondary:
+                country === "BE" && jurisdictionId === value.jurisdictionId
+                  ? value.belgianGermanReducedHoursSecondary
+                  : null,
               belgianChildcareAuthority:
                 country === "BE" && jurisdictionId === value.jurisdictionId
                   ? value.belgianChildcareAuthority
@@ -154,6 +164,8 @@ export function ProfileFields({
                 belgianEducationCommunity,
                 belgianSchoolRecognitionStatus: null,
                 belgianFrenchSchoolRoute: null,
+                belgianGermanSchoolRoute: null,
+                belgianGermanReducedHoursSecondary: null,
               })
             }
           />
@@ -278,6 +290,16 @@ export function ProfileFields({
               !providerCategory ||
               ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(providerCategory)
                 ? value.belgianFrenchSchoolRoute
+                : null,
+            belgianGermanSchoolRoute:
+              !providerCategory ||
+              ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(providerCategory)
+                ? value.belgianGermanSchoolRoute
+                : null,
+            belgianGermanReducedHoursSecondary:
+              !providerCategory ||
+              ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(providerCategory)
+                ? value.belgianGermanReducedHoursSecondary
                 : null,
           })
         }

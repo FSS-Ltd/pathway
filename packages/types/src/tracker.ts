@@ -28,6 +28,13 @@ export interface TrackerProfileInput {
     | "FWB_SUBSIDISED"
     | "OUTSIDE_FWB_NETWORK"
     | null;
+  belgianGermanSchoolRoute?:
+    | "DG_ORGANISED"
+    | "DG_SUBSIDISED"
+    | "DG_RECOGNISED_UNSUBSIDISED"
+    | "OUTSIDE_DG_NETWORK"
+    | null;
+  belgianGermanReducedHoursSecondary?: boolean | null;
   belgianChildcareAuthority?:
     | "OPGROEIEN"
     | "ONE"

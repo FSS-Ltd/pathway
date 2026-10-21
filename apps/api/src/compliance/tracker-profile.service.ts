@@ -74,6 +74,8 @@ export class TrackerProfileService {
         (profile.belgianEducationCommunity ||
           profile.belgianSchoolRecognitionStatus ||
           profile.belgianFrenchSchoolRoute ||
+          profile.belgianGermanSchoolRoute ||
+          profile.belgianGermanReducedHoursSecondary != null ||
           profile.belgianChildcareAuthority ||
           profile.belgianPaidUnderThreeCare != null) &&
         location.countryCode !== "BE"
@@ -110,6 +112,28 @@ export class TrackerProfileService {
       )
         throw new BadRequestException(
           "French Community school route requires the French education Community and an actual school provider category.",
+        );
+      if (
+        profile.belgianGermanSchoolRoute &&
+        (profile.belgianEducationCommunity !== "GERMAN_SPEAKING" ||
+          !["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+            profile.providerCategory ?? "",
+          ) ||
+          (location.subdivisionCode && location.subdivisionCode !== "BE3"))
+      )
+        throw new BadRequestException(
+          "German-speaking Community school route requires an actual school in its Walloon language region.",
+        );
+      if (
+        profile.belgianGermanReducedHoursSecondary != null &&
+        (profile.belgianEducationCommunity !== "GERMAN_SPEAKING" ||
+          !["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+            profile.providerCategory ?? "",
+          ) ||
+          (location.subdivisionCode && location.subdivisionCode !== "BE3"))
+      )
+        throw new BadRequestException(
+          "Reduced-hours secondary classification requires a German-speaking Community school.",
         );
       const region = location.subdivisionCode;
       const authority = profile.belgianChildcareAuthority;

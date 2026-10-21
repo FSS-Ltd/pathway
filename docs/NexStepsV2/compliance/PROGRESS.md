@@ -2162,3 +2162,39 @@ for outside-network family declarations. French/German-speaking specialist and
 local scope remains partial. Tests, PR and host gate evidence remain pending.
 
 Local verification for catalogue 1.41.0 (21 October 2026): Prisma generate and validate passed; API and admin typechecks passed; focused Belgium catalogue/DTO tests and the tracker API integration suite passed (16 integration tests); the broader compliance unit run passed (62 suites, 349 tests); the admin tracker UI test passed; root lint and explicit changed-admin ESLint passed; changed-file Prettier check passed; API and admin production builds passed. The admin build used disposable public configuration. A desktop rendering of the school-route fields was inspected in the in-app browser. A separate mobile viewport inspection remains pending, so this UI check is not recorded as fully complete yet. PR and CI evidence remain pending.
+
+### French Community school route merged; German-speaking Community review begins
+
+The mobile follow-up for catalogue 1.41.0 inspected the profile at 390 px in the
+in-app browser: the school-route field remained visible and the document had no
+horizontal overflow (390 px document and viewport widths). [PR #721](https://github.com/FSS-Ltd/pathway/pull/721)
+passed all nine CI checks on final head `f8d34774f18548b6d037fd4fe355ca75ace50c67`:
+the full typecheck/lint/unit job, both integration shards, three database/role
+jobs and CodeQL. GitHub confirmed `MERGED` at 2026-10-21T21:43:26Z with merge
+`1240ac4e2ca723c8dcb21aa47fa005890513b6b3`; fetched `fss/master` matched
+and had the checked head as its second parent. The next review starts from that
+merge on `feature/compliance-belgium-german-school`.
+
+### German-speaking Community school route — implementation in progress
+
+The [31 August 1998 decree](https://refli.be/fr/lex/1998037687) applies its
+school-project, internal-regulations and attendance-control provisions to
+ordinary and specialised schools organised or subsidised by the
+German-speaking Community. The [Community's primary-school recognition
+guidance](https://ostbelgienbildung.be/PortalData/21/Resources/downloads/home/schulvorschriften/Schulvorschrift_Gruendung_Schliessung.pdf)
+distinguishes recognition from subsidy. Catalogue 1.42.0 introduces an
+explicit route fact and conditional actions for the decree's organised and
+subsidised schools. Article 1's reduced-hours secondary exception is recorded
+separately: only Article 28 applies to that route among the actions in this
+release. Recognised-unsubsidised, outside-network and specialist routes remain
+incomplete; no Belgian coverage cell is marked complete.
+
+Local checks so far for catalogue 1.42.0: schema parsing reported version
+1.42.0 and 870 requirements; Prisma schema validation, root lint, explicit
+changed-admin ESLint, changed-file Prettier and the admin tracker runtime test
+passed. Desktop and 390 px mobile previews of the German school-route fields
+were inspected in the in-app browser; the mobile document width equalled its
+viewport with no horizontal overflow. The focused API catalogue/DTO unit run
+and API typecheck are still active but have not reported results. The host has
+heavy memory pressure while an unrelated multi-worker Jest job runs, so API
+integration, builds and final PR CI remain pending. This step is not complete.

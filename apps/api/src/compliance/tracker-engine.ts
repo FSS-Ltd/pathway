@@ -327,6 +327,28 @@ export function buildTrackerChecklist(
       if (
         location.countryCode === "BE" &&
         topic === "education_childcare" &&
+        ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+          profile?.profile.providerCategory ?? "",
+        ) &&
+        profile?.profile.belgianEducationCommunity === "GERMAN_SPEAKING" &&
+        !profile?.profile.belgianGermanSchoolRoute
+      )
+        reason +=
+          " The school's organised, subsidised, recognised-unsubsidised or outside-network route with the German-speaking Community is not recorded.";
+      if (
+        location.countryCode === "BE" &&
+        ["registration_governance", "education_childcare"].includes(topic) &&
+        ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+          profile?.profile.providerCategory ?? "",
+        ) &&
+        profile?.profile.belgianEducationCommunity === "GERMAN_SPEAKING" &&
+        profile?.profile.belgianGermanReducedHoursSecondary == null
+      )
+        reason +=
+          " The German-speaking Community's reduced-hours secondary classification is not recorded.";
+      if (
+        location.countryCode === "BE" &&
+        topic === "education_childcare" &&
         profile?.profile.childcare !== false &&
         !profile?.profile.belgianChildcareAuthority
       )
