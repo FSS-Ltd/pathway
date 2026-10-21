@@ -48,6 +48,7 @@ describe("organisation role schema contract", () => {
   });
 
   it("makes missing organisation role tables a strict RLS gate failure", () => {
+    const resultDeclaration = /const\s+\[\s*unforcedTables,\s*disabledTables/;
     expect(rlsGate).toContain('"OrgRoleDefinition"');
     expect(rlsGate).toContain('"OrgRolePermission"');
     expect(rlsGate).toContain('"OrgRoleRevision"');
@@ -59,7 +60,7 @@ describe("organisation role schema contract", () => {
     expect(rlsGate).toContain("role_oid = 0 THEN 'PUBLIC'");
     expect(rlsGate).toContain("findUnreviewedRolePolicies");
     expect(rlsGate).toContain("'PUBLIC', 'anon', 'authenticated'");
-    expect(rlsGate).toContain("const [unforcedTables, disabledTables");
+    expect(rlsGate).toMatch(resultDeclaration);
     expect(rlsGate).toContain("disabledRequiredTables");
     expect(rlsGate).toContain("requiredPublicRoleGrants");
     expect(rlsGate).toContain('schema !== "app"');
@@ -68,9 +69,7 @@ describe("organisation role schema contract", () => {
     );
     const forceRlsPredicate = rlsGate.indexOf("relforcerowsecurity = false");
     const disabledRlsPredicate = rlsGate.indexOf("relrowsecurity = false");
-    const resultNames = rlsGate.indexOf(
-      "const [unforcedTables, disabledTables",
-    );
+    const resultNames = rlsGate.search(resultDeclaration);
     expect(forceRlsPredicate).toBeGreaterThan(-1);
     expect(disabledRlsPredicate).toBeGreaterThan(forceRlsPredicate);
     expect(resultNames).toBeGreaterThan(disabledRlsPredicate);
