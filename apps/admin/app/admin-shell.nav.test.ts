@@ -145,6 +145,21 @@ const homeworkReviewNavigation = (permissions: string[]) =>
   }).some((item) => item.href === "/ace/homework/reviews");
 assert.equal(homeworkReviewNavigation([]), false);
 assert.equal(homeworkReviewNavigation(["ace.homework.reviews.manage"]), true);
+const originalTripSlipFlag = process.env.NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED;
+const tripSlipNavigation = (permissions: string[]) =>
+  resolveAdminNavItems({
+    role: staffRole,
+    currentOrgIsMasterOrg: false,
+    capabilities: [],
+    permissions,
+    ui: { labels: {} },
+  }).some((item) => item.href === "/ace/trips");
+process.env.NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED = "true";
+assert.equal(tripSlipNavigation([]), false);
+assert.equal(tripSlipNavigation(["school.permission_slips.read"]), true);
+if (originalTripSlipFlag === undefined)
+  delete process.env.NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED;
+else process.env.NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED = originalTripSlipFlag;
 const messagingNavigation = (permissions: string[]) =>
   resolveAdminNavItems({
     role: staffRole,

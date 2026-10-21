@@ -99,6 +99,44 @@ describe("ACE permission-slip responses", () => {
     });
   }
 
+  async function createDisplayCorrection(
+    first: Awaited<ReturnType<typeof createPublishedSlip>>,
+  ) {
+    const snapshot = { ...first.snapshot, title: "Museum visit consent" };
+    const versionHash = slipVersionHash(snapshot);
+    const versionId = await withTenantRlsContext(siteId, orgId, async (tx) => {
+      const version = await tx.permissionSlipVersion.create({
+        data: {
+          tenantId: siteId,
+          permissionSlipId: first.slipId,
+          version: 2,
+          contentSnapshot: snapshot,
+          changeClassification: "NON_MATERIAL",
+          requiresReconsent: false,
+          supersedesVersionId: first.versionId,
+          createdByUserId: leaderId,
+        },
+      });
+      await tx.permissionSlipRecipient.createMany({
+        data: [childId, otherChildId].map((recipientChildId) => ({
+          tenantId: siteId,
+          permissionSlipVersionId: version.id,
+          childId: recipientChildId,
+        })),
+      });
+      await tx.permissionSlipVersion.update({
+        where: { id_tenantId: { id: version.id, tenantId: siteId } },
+        data: {
+          versionHash,
+          publishedAt: new Date(),
+          publishedByUserId: leaderId,
+        },
+      });
+      return version.id;
+    });
+    return { ...first, versionId, versionHash, snapshot };
+  }
+
   function responseInput(
     version: Awaited<ReturnType<typeof createPublishedSlip>>,
     overrides: Record<string, unknown> = {},
@@ -196,21 +234,30 @@ describe("ACE permission-slip responses", () => {
         tenantId: siteId,
         userId: leaderId,
         scope: "site",
-        permissionKeys: ["school.permission_slips.manage"],
+        permissionKeys: [
+          "school.permission_slips.manage",
+          "school.permission_slips.read",
+        ],
       }),
       await seedE2eTypedRole({
         orgId,
         tenantId: siteId,
         userId: guardianAId,
         scope: "site",
-        permissionKeys: ["school.permission_slips.respond"],
+        permissionKeys: [
+          "school.permission_slips.respond",
+          "school.permission_slips.read",
+        ],
       }),
       await seedE2eTypedRole({
         orgId,
         tenantId: siteId,
         userId: guardianBId,
         scope: "site",
-        permissionKeys: ["school.permission_slips.respond"],
+        permissionKeys: [
+          "school.permission_slips.respond",
+          "school.permission_slips.read",
+        ],
       }),
     );
     await withTenantRlsContext(siteId, orgId, async (tx) => {
@@ -502,10 +549,115 @@ describe("ACE permission-slip responses", () => {
       .set("Authorization", guardianAAuth)
       .send(responseInput(version));
     expect(online.status).toBe(409);
+    const correction = await createDisplayCorrection(version);
+    const repeatedAfterCorrection = await request(app.getHttpServer())
+      .post(exceptionUrl)
+      .set("Authorization", leaderAuth)
+      .send({
+        ...body,
+        expectedVersionId: correction.versionId,
+        expectedVersionHash: correction.versionHash,
+      });
+    expect(repeatedAfterCorrection.status).toBe(409);
     const rows = await prisma.$queryRaw<Array<{ reason: string }>>`
       SELECT "reason" FROM "PermissionSlipException" WHERE "id" = ${recorded.body.id}
     `;
     expect(rows[0].reason.startsWith("v1:")).toBe(true);
     expect(rows[0].reason).not.toContain("Signed paper form");
+  });
+
+  it("limits family reads to a linked child and omits the other recipients", async () => {
+    if (!app) throw new Error("E2E app did not start");
+    const version = await createPublishedSlip();
+    const base = `/ace/family/sites/${siteId}/children/${childId}/permission-slips`;
+    const list = await request(app.getHttpServer())
+      .get(base)
+      .set("Authorization", guardianAAuth);
+    expect(list.status).toBe(200);
+    expect(
+      list.body.items.some(
+        (item: { id: string }) => item.id === version.slipId,
+      ),
+    ).toBe(true);
+    const detail = await request(app.getHttpServer())
+      .get(`${base}/${version.slipId}`)
+      .set("Authorization", guardianAAuth);
+    expect(detail.status).toBe(200);
+    expect(detail.body.versionHash).toBe(version.versionHash);
+    expect(detail.body.snapshot.consentText).toBe(version.snapshot.consentText);
+    expect(JSON.stringify(detail.body)).not.toContain(otherChildId);
+    const foreign = await request(app.getHttpServer())
+      .get(
+        `/ace/family/sites/${siteId}/children/${otherChildId}/permission-slips/${version.slipId}`,
+      )
+      .set("Authorization", guardianAAuth);
+    expect(foreign.status).toBe(404);
+  });
+
+  it("keeps two linked children in separate slip contexts", async () => {
+    if (!app) throw new Error("E2E app did not start");
+    const version = await createPublishedSlip();
+    const secondRelationshipId = randomUUID();
+    await prisma.guardianChildRelationship.create({
+      data: {
+        id: secondRelationshipId,
+        tenantId: siteId,
+        childId: otherChildId,
+        guardianIdentityId: guardianAIdentityId,
+        startsAt: new Date(Date.now() - 86_400_000),
+      },
+    });
+    try {
+      const first = await request(app.getHttpServer())
+        .get(
+          `/ace/family/sites/${siteId}/children/${childId}/permission-slips/${version.slipId}`,
+        )
+        .set("Authorization", guardianAAuth);
+      const second = await request(app.getHttpServer())
+        .get(
+          `/ace/family/sites/${siteId}/children/${otherChildId}/permission-slips/${version.slipId}`,
+        )
+        .set("Authorization", guardianAAuth);
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(first.body.childId).toBe(childId);
+      expect(second.body.childId).toBe(otherChildId);
+      expect(first.body.response).toBeNull();
+      expect(second.body.response).toBeNull();
+    } finally {
+      await prisma.guardianChildRelationship.delete({
+        where: { id: secondRelationshipId },
+      });
+    }
+  });
+
+  it("carries prior consent through a display correction without accepting it twice", async () => {
+    if (!app) throw new Error("E2E app did not start");
+    const first = await createPublishedSlip();
+    const responseUrl = `/ace/family/sites/${siteId}/permission-slips/${first.slipId}/respond`;
+    const answered = await request(app.getHttpServer())
+      .post(responseUrl)
+      .set("Authorization", guardianAAuth)
+      .send(responseInput(first));
+    expect(answered.status).toBe(201);
+    const successor = await createDisplayCorrection(first);
+    const detail = await request(app.getHttpServer())
+      .get(
+        `/ace/family/sites/${siteId}/children/${childId}/permission-slips/${first.slipId}`,
+      )
+      .set("Authorization", guardianAAuth);
+    expect(detail.status).toBe(200);
+    expect(detail.body.response.id).toBe(answered.body.id);
+    expect(detail.body.canRespond).toBe(false);
+    const duplicate = await request(app.getHttpServer())
+      .post(responseUrl)
+      .set("Authorization", guardianAAuth)
+      .send(responseInput(successor));
+    expect(duplicate.status).toBe(409);
+    const summary = await request(app.getHttpServer())
+      .get(`/school/sites/${siteId}/permission-slips/${first.slipId}/responses`)
+      .set("Authorization", leaderAuth);
+    expect(summary.status).toBe(200);
+    expect(summary.body.childrenWithResponse).toBe(1);
   });
 });

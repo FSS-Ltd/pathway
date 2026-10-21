@@ -23,6 +23,7 @@ export type FamilySection =
   | "sessions"
   | "subject-timetable"
   | "faith"
+  | "slips"
   | "notices"
   | "messages"
   | "volunteering";

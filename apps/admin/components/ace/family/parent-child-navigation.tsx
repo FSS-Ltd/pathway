@@ -19,6 +19,7 @@ type ChildSection =
       | "sessions"
       | "subject-timetable"
       | "faith"
+      | "slips"
     >
   | "homework";
 
@@ -30,6 +31,7 @@ const sectionRoutes: Record<ChildSection, string> = {
   "subject-timetable": "subject-timetable",
   homework: "homework",
   faith: "faith",
+  slips: "slips",
 };
 
 const sectionLabels: Record<ChildSection, string> = {
@@ -40,6 +42,7 @@ const sectionLabels: Record<ChildSection, string> = {
   "subject-timetable": "subject timetable",
   homework: "homework",
   faith: "faith",
+  slips: "trip permission slips",
 };
 
 export function childSectionForRoute(
@@ -60,6 +63,8 @@ export function childSectionForRoute(
       return "homework";
     case "faith":
       return "faith";
+    case "slips":
+      return "slips";
     default:
       return null;
   }

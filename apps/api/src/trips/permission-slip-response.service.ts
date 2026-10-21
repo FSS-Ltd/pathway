@@ -10,6 +10,8 @@ import { z } from "zod";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import type { RespondToSlipInput } from "./dto/respond-to-slip.dto";
+import { validConsentVersionIds } from "./permission-slip-consent-versions";
+import { requireGuardianSlipChild } from "./permission-slip-family-access";
 import { lockCurrentSlip } from "./permission-slip-response-access";
 import type { TripSlipActor } from "./trip-slip-access";
 
@@ -50,7 +52,7 @@ export class PermissionSlipResponseService {
       );
     const now = new Date();
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
-      const { site, version, snapshot, today } = await lockCurrentSlip(
+      const { version, snapshot } = await lockCurrentSlip(
         tx,
         slipId,
         actor,
@@ -58,59 +60,21 @@ export class PermissionSlipResponseService {
         input.expectedVersionHash,
         now,
       );
-      if (!site.org.parentPortalEnabled)
-        throw new NotFoundException("Permission slip not found");
-      const studentIdentity = await tx.studentIdentity.findUnique({
+      const relationship = await requireGuardianSlipChild(
+        tx,
+        actor,
+        input.childId,
+        now,
+      );
+      const recipient = await tx.permissionSlipRecipient.findFirst({
         where: {
-          tenantId_userId: {
-            tenantId: actor.tenantId,
-            userId: actor.userId,
-          },
+          tenantId: actor.tenantId,
+          permissionSlipVersionId: version.id,
+          childId: input.childId,
         },
         select: { id: true },
       });
-      if (studentIdentity)
-        throw new NotFoundException("Permission slip not found");
-      const relationship = await tx.guardianChildRelationship.findFirst({
-        where: {
-          tenantId: actor.tenantId,
-          childId: input.childId,
-          legalAccess: "FULL",
-          startsAt: { lte: now },
-          endedAt: null,
-          revokedAt: null,
-          guardianIdentity: {
-            tenantId: actor.tenantId,
-            userId: actor.userId,
-            user: { isActive: true },
-          },
-          child: { isGuest: false },
-        },
-        select: { id: true, guardianIdentityId: true },
-      });
-      if (!relationship)
-        throw new NotFoundException("Permission slip not found");
-      const [recipient, enrollment] = await Promise.all([
-        tx.permissionSlipRecipient.findFirst({
-          where: {
-            tenantId: actor.tenantId,
-            permissionSlipVersionId: version.id,
-            childId: input.childId,
-          },
-          select: { id: true },
-        }),
-        tx.aceSchoolEnrollment.findFirst({
-          where: {
-            tenantId: actor.tenantId,
-            childId: input.childId,
-            startsOn: { lte: today },
-            OR: [{ endsOn: null }, { endsOn: { gte: today } }],
-          },
-          select: { id: true },
-        }),
-      ]);
-      if (!recipient || !enrollment)
-        throw new NotFoundException("Permission slip not found");
+      if (!recipient) throw new NotFoundException("Permission slip not found");
 
       const validQuestions = new Set(
         snapshot.questions.map((question) => question.id),
@@ -130,15 +94,27 @@ export class PermissionSlipResponseService {
         throw new ConflictException("Answer every required question");
 
       const fingerprint = responseFingerprint(input);
+      const versions = await tx.permissionSlipVersion.findMany({
+        where: {
+          tenantId: actor.tenantId,
+          permissionSlipId: slipId,
+          publishedAt: { not: null },
+        },
+        orderBy: { version: "desc" },
+        select: { id: true, requiresReconsent: true },
+      });
+      const validIds = validConsentVersionIds(versions);
       const [previous, existingException] = await Promise.all([
         tx.permissionSlipResponse.findFirst({
           where: {
             tenantId: actor.tenantId,
-            permissionSlipVersionId: version.id,
-            guardianChildRelationshipId: relationship.id,
+            permissionSlipVersionId: { in: validIds },
+            guardianChildRelationshipId: relationship.relationshipId,
           },
+          orderBy: { respondedAt: "desc" },
           select: {
             id: true,
+            permissionSlipVersionId: true,
             decision: true,
             versionHash: true,
             respondedAt: true,
@@ -149,8 +125,8 @@ export class PermissionSlipResponseService {
         tx.permissionSlipException.findFirst({
           where: {
             tenantId: actor.tenantId,
-            permissionSlipVersionId: version.id,
-            permissionSlipRecipientId: recipient.id,
+            permissionSlipVersionId: { in: validIds },
+            childId: input.childId,
           },
           select: { id: true },
         }),
@@ -167,6 +143,7 @@ export class PermissionSlipResponseService {
           throw new ConflictException("Permission slip already answered");
         }
         if (
+          previous.permissionSlipVersionId !== version.id ||
           previous.idempotencyKey !== input.idempotencyKey ||
           payload.requestFingerprint !== fingerprint
         )
@@ -185,7 +162,7 @@ export class PermissionSlipResponseService {
           permissionSlipVersionId: version.id,
           permissionSlipRecipientId: recipient.id,
           childId: input.childId,
-          guardianChildRelationshipId: relationship.id,
+          guardianChildRelationshipId: relationship.relationshipId,
           guardianIdentityId: relationship.guardianIdentityId,
           versionHash: input.expectedVersionHash,
           decision: input.decision,
