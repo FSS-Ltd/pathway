@@ -44,6 +44,17 @@ export type FinanceCountryCode =
   (typeof FINANCE_COUNTRY_CURRENCY_OPTIONS)[number]["countryCode"];
 export type FinanceCurrency = (typeof FINANCE_CURRENCIES)[number];
 
+export const FINANCE_CURRENCY_FRACTION_DIGITS = {
+  GBP: 2,
+  EUR: 2,
+  CZK: 2,
+  DKK: 2,
+  HUF: 2,
+  PLN: 2,
+  RON: 2,
+  SEK: 2,
+} as const satisfies Record<FinanceCurrency, number>;
+
 export const FINANCE_CURRENCY_NAMES: Record<FinanceCurrency, string> = {
   GBP: "Pound sterling",
   EUR: "Euro",
@@ -71,4 +82,14 @@ export function financeCurrencyForCountry(
   );
   if (!country) throw new RangeError("Finance country is not supported");
   return country.currency;
+}
+
+export function isFinanceCurrency(value: string): value is FinanceCurrency {
+  return FINANCE_CURRENCIES.some((currency) => currency === value);
+}
+
+export function financeCurrencyFractionDigits(
+  currency: FinanceCurrency,
+): number {
+  return FINANCE_CURRENCY_FRACTION_DIGITS[currency];
 }

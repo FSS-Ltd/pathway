@@ -1,4 +1,7 @@
-import type { FinanceCurrency } from "@pathway/platform";
+import {
+  financeCurrencyFractionDigits,
+  type FinanceCurrency,
+} from "@pathway/platform";
 
 export function formatFinanceMoney(
   amountMinor: string,
@@ -7,11 +10,13 @@ export function formatFinanceMoney(
   const amount = BigInt(amountMinor);
   const isNegative = amount < 0n;
   const absolute = isNegative ? -amount : amount;
+  const fractionDigits = financeCurrencyFractionDigits(currency);
   const formatter = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   });
-  const fractionDigits = formatter.resolvedOptions().maximumFractionDigits ?? 2;
   const unit = 10n ** BigInt(fractionDigits);
   const whole = new Intl.NumberFormat("en-GB", {
     maximumFractionDigits: 0,

@@ -1,3 +1,8 @@
+import {
+  financeCurrencyFractionDigits as getFinanceCurrencyFractionDigits,
+  isFinanceCurrency,
+} from "@pathway/platform";
+
 export function formatFinanceMoney(
   minorUnits: string,
   currency: string | null | undefined,
@@ -7,12 +12,13 @@ export function formatFinanceMoney(
     const amount = BigInt(minorUnits);
     const negative = amount < 0n;
     const absolute = negative ? -amount : amount;
+    const fractionDigits = financeCurrencyFractionDigits(currency);
     const formatter = new Intl.NumberFormat("en-GB", {
       style: "currency",
       currency,
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
     });
-    const fractionDigits =
-      formatter.resolvedOptions().maximumFractionDigits ?? 2;
     const unit = 10n ** BigInt(fractionDigits);
     const whole = absolute / unit;
     const fraction = String(absolute % unit).padStart(fractionDigits, "0");
@@ -34,6 +40,9 @@ export function formatFinanceMoney(
 }
 
 export function financeCurrencyFractionDigits(currency: string): number {
+  if (isFinanceCurrency(currency)) {
+    return getFinanceCurrencyFractionDigits(currency);
+  }
   return (
     new Intl.NumberFormat("en-GB", {
       style: "currency",
