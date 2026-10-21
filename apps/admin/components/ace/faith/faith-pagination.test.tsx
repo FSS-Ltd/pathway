@@ -119,7 +119,11 @@ async function run() {
       case "/ace/faith/options":
         return response({ ageBands: [] });
       case "/ace/faith/settings":
-        return response({ displayLabel: "Faith Corner" });
+        return response({
+          displayLabel: "Faith Corner",
+          reflectionsEnabled: false,
+          reflectionFeatureAvailable: false,
+        });
       default:
         throw new Error(`Unexpected request ${url.pathname}`);
     }

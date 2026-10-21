@@ -930,31 +930,60 @@ browser review and the M20/C03/mobile gates still block full C05 acceptance.
 No publication, submission, review, notification or web flag was set in
 production. The verified count remains **48/150 (32%)**.
 
-ACE-C06 Faith content work begins from that merge on branch
-`feature/ace-c06-faith-content-web` in PR
-[#708](https://github.com/FSS-Ltd/pathway/pull/708). The implementation was
-published at `11b91b343e75e8502469deef8f636c6a19750d8a`; current-head CI
-and merge evidence are still pending. CI
-[run 39585297887](https://github.com/FSS-Ltd/pathway/actions/runs/39585297887)
-on `89e152b10b701c47df7faf4e827a1e829d6c3ac9` passed CodeQL but failed
-the API access-matrix unit test because C06's route rows lacked status entries;
-the dependent database jobs were skipped. The same-step correction registers
-the implemented Faith routes and passed the focused matrix suite (9/9), API
-typecheck, lint and formatting locally. It awaits CI on the corrected head.
-The scoped API and staff-web design is in
-[c06-faith-content-design.md](c06-faith-content-design.md). The additive Faith
-lifecycle migration applied with all 191 repository migrations to a fresh
-disposable PostgreSQL database. The Faith HTTP suite executed 4/4 tests there,
-including cross-site and linked-child denial, scheduled publication, invalid
-historical payload handling and a VIEWER with a misassigned management grant.
-Prisma validation, database typecheck/lint, API typecheck/lint/build, admin
-typecheck/lint/build, the full admin unit chain (including Faith workflow and
-pagination), focused UI tests, formatting and diff checks passed locally. A
-320 px local staff-page preview showed no horizontal overflow and visible
-keyboard focus; it used test data and does not prove live school access. C06
-still requires its latest-head CI, review protection and confirmed PR merge.
-The authoring and publication flags remain default-off, with no production
-enablement or C06 acceptance claimed. The verified count stays **48/150 (32%)**.
+ACE-C06 Faith content lifecycle and staff web merged in
+[PR #708](https://github.com/FSS-Ltd/pathway/pull/708) on 21 October 2026.
+The checked head `cc6650dee9c0a15a31a6a4ef7f5f06b7105c52d2` passed all nine
+applicable latest-head checks, including the corrected access-matrix unit test,
+CodeQL, both PostgreSQL integration shards, system-role seed database identity,
+permission definition database, and organisation-role RLS. CI run
+[39586960682](https://github.com/FSS-Ltd/pathway/actions/runs/39586960682)
+ran the Faith HTTP E2E suite and applied migration
+`20261125000000_ace_faith_content_lifecycle`. GitHub confirmed the merge
+commit `d0afa2ff9a2bb93109623a2dc6cd7ad07887c2a6`. The C06 design and
+local verification remain in [c06-faith-content-design.md](c06-faith-content-design.md).
+The authoring and publication flags remain default-off; linked-account live
+review, M20, C08 and mobile acceptance remain gated. The verified ACE count
+stays **48/150 (32%)**.
+
+ACE-C07 Faith read and reflection policy merged in
+[PR #710](https://github.com/FSS-Ltd/pathway/pull/710) on 21 October 2026.
+The checked head `9d94e4c57ad09378d77d477326fbbc1ca02dc68f` passed all
+nine applicable latest-head checks in CI run
+[39596890496](https://github.com/FSS-Ltd/pathway/actions/runs/39596890496)
+and CodeQL. CI logs confirmed the Faith reflection, Faith content, and Faith
+reporting PostgreSQL suites actually ran, along with both new admin Faith
+settings and reflection-review interaction tests. GitHub confirmed merge
+commit `672dfb154c4db21e08a96dff806a5ec3718cbf02` into `master`.
+The approved F18 student-authored
+reflection policy governs this step. The implementation adds explicit private
+and guardian-released visibility, staff moderation, student receipts, a
+reference-only safeguarding report path, and a staff web review panel. The
+new `ACE_FAITH_REFLECTIONS_ENABLED` flag and per-site setting both default off.
+The additive migration applied in a fresh isolated PostgreSQL database. Local
+verification passed Prisma validation, API/admin/platform/database typechecks,
+API and platform lint, explicit staff UI lint, the API and admin builds, the
+admin unit chain, the access-matrix and reflection policy unit suites, and
+three Faith/reporting PostgreSQL suites (42/42 tests). The admin build used
+nonproduction API and Clerk test keys because local credentials are absent.
+Production linked-account and mobile review remain pending. The verified ACE
+count remains **48/150 (32%)**.
+
+ACE-C08 web family reading is in progress on
+`feature/ace-c08-faith-family-web`, based on the confirmed C07 merge. This
+slice adds student and guardian reading routes, school-configured Faith
+terminology in family navigation, and student-only reflection entry. Mobile
+reading and offline cache remain paused, so full C08 acceptance remains open.
+Student read receipts require an explicit button; opening content makes no
+write. The family feed pages the current eligible version by publication time,
+so scheduled content and revisions appear in the reading order shown to users.
+`NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED` defaults off and gates family navigation and
+pages until a separate school release decision. Local checks passed for API
+and admin typechecks, focused lint and formatting, both production builds,
+the admin unit chain, and the family-context and Faith-content PostgreSQL
+HTTP suites (6/6 and 5/5 tests) against a disposable database. A signed-in
+linked-account browser review remains pending. PR and CI evidence will be
+recorded when the current step reaches its delivery gate. The verified ACE
+count remains **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

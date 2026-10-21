@@ -32,7 +32,9 @@ async function run() {
   const originalFetch = globalThis.fetch;
   const originalHomeworkWebFlag =
     process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED;
+  const originalFaithWebFlag = process.env.NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED;
   process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED = "true";
+  process.env.NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED = "true";
   setApiClientToken("family-token");
   globalThis.fetch = async (input, init) => {
     requested.push(String(input));
@@ -58,6 +60,7 @@ async function run() {
                   siteName: "Alpha School",
                   childId: "child-one",
                   childName: "Ari Alpha",
+                  faithLabel: "Reflection Room",
                   sections:
                     mode === "legacy"
                       ? undefined
@@ -69,6 +72,7 @@ async function run() {
                             "attendance",
                             "sessions",
                             "subject-timetable",
+                            "faith",
                             "notices",
                             "messages",
                             "volunteering",
@@ -112,6 +116,7 @@ async function run() {
                             "attendance",
                             "sessions",
                             "subject-timetable",
+                            "faith",
                           ],
                 },
               ],
@@ -223,6 +228,32 @@ async function run() {
         "/ace/parent/sites/school-one/children/child-three/homework",
       ],
     );
+    assert.deepEqual(
+      Array.from(container.querySelectorAll('a[href$="/faith"]')).map(
+        (anchor) => anchor.getAttribute("href"),
+      ),
+      [
+        "/ace/parent/sites/school-one/children/child-one/faith",
+        "/ace/student/sites/school-two/faith",
+      ],
+    );
+    assert.match(
+      container.querySelector('a[href$="/child-one/faith"]')?.textContent ?? "",
+      /Reflection Room for Ari Alpha at Alpha School/,
+    );
+
+    process.env.NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED = "false";
+    await act(async () =>
+      root.render(
+        <FamilyLandingView
+          key="faith-off"
+          status="authenticated"
+          accountId="family-a"
+        />,
+      ),
+    );
+    assert.equal(container.querySelectorAll('a[href$="/faith"]').length, 0);
+    process.env.NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED = "true";
 
     process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED = "false";
     await act(async () =>
@@ -357,6 +388,9 @@ async function run() {
     else
       process.env.NEXT_PUBLIC_ACE_HOMEWORK_WEB_ENABLED =
         originalHomeworkWebFlag;
+    if (originalFaithWebFlag === undefined)
+      delete process.env.NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED;
+    else process.env.NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED = originalFaithWebFlag;
     setApiClientToken(null);
     container.remove();
   }

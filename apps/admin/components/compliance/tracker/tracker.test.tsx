@@ -11,7 +11,7 @@ import { TrackerWorkspace } from "./workspace";
 import { Confirmation } from "./confirmation";
 import { RetainedHistory } from "./retained-history";
 import { ProfileEditor } from "./profile-editor";
-import { emptyProfile } from "./profile-fields";
+import { emptyProfile, ProfileFields } from "./profile-fields";
 import { resolveAdminNavItems } from "@/app/admin-navigation";
 import { resolveOrgUi } from "@/lib/org-ui";
 import { setApiTokenGetter } from "@/lib/api-transport";
@@ -199,6 +199,28 @@ async function run() {
     await settle();
   };
   try {
+    await act(async () =>
+      root.render(
+        <ProfileFields
+          value={{ ...emptyProfile, jurisdictionId: "brussels" }}
+          setValue={() => {}}
+          jurisdictions={[
+            {
+              id: "brussels",
+              countryCode: "BE",
+              subdivisionCode: "BE1",
+              name: "Brussels-Capital Region",
+              level: "REGION",
+              parentJurisdictionId: "belgium",
+            },
+          ]}
+        />,
+      ),
+    );
+    assert.match(
+      host.textContent ?? "",
+      /Region does not identify the language Community/,
+    );
     await act(async () => root.render(<TrackerWorkspace canManage />));
     await settle();
     assert.match(host.textContent ?? "", /could not be refreshed/);
@@ -362,6 +384,14 @@ async function run() {
               level: "REGION",
               parentJurisdictionId: "austria",
             },
+            {
+              id: "brussels",
+              countryCode: "BE",
+              subdivisionCode: "BE1",
+              name: "Brussels-Capital Region",
+              level: "REGION",
+              parentJurisdictionId: "belgium",
+            },
           ]}
           canManage
           onSaved={() => changed++}
@@ -391,6 +421,10 @@ async function run() {
     assert.match(
       host.querySelector('option[value="wien"]')?.textContent ?? "",
       /Wien · AT \(Bundesland\)/,
+    );
+    assert.match(
+      host.querySelector('option[value="brussels"]')?.textContent ?? "",
+      /Brussels-Capital Region · BE \(Region\)/,
     );
     await click("Save profile");
     assert.match(host.textContent ?? "", /draft has been kept/);

@@ -47,12 +47,16 @@ function faithError(cause: unknown): string {
 export function FaithWorkspace() {
   const { permissions, isLoading: accessLoading } = useAdminAccess();
   const canManage = permissions?.includes("ace.faith.manage") === true;
+  const canReadReflections = permissions?.includes("ace.faith.read") === true;
   const [list, setList] = React.useState<FaithList | null>(null);
   const canPublish =
     permissions?.includes("ace.faith.publish") === true &&
     list?.siteLead === true;
   const [options, setOptions] = React.useState<FaithOptions | null>(null);
   const [displayLabel, setDisplayLabel] = React.useState("Faith Corner");
+  const [reflectionsEnabled, setReflectionsEnabled] = React.useState(false);
+  const [reflectionFeatureAvailable, setReflectionFeatureAvailable] =
+    React.useState(false);
   const [editing, setEditing] = React.useState<{
     content: FaithContent | null;
     draft: FaithDraft | null;
@@ -77,6 +81,8 @@ export function FaithWorkspace() {
         setList(null);
         setOptions(null);
         setDisplayLabel("Faith Corner");
+        setReflectionsEnabled(false);
+        setReflectionFeatureAvailable(false);
         setEditing(null);
         setPendingId(null);
         setError(null);
@@ -109,6 +115,8 @@ export function FaithWorkspace() {
         setList(content);
         setOptions(choices);
         setDisplayLabel(settings.displayLabel);
+        setReflectionsEnabled(settings.reflectionsEnabled);
+        setReflectionFeatureAvailable(settings.reflectionFeatureAvailable);
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted || generation !== siteGeneration.current)
@@ -381,6 +389,7 @@ export function FaithWorkspace() {
           authoringEnabled={list.authoringEnabled}
           publicationEnabled={list.publicationEnabled && canPublish}
           canCancelSchedule={canPublish}
+          canReviewReflections={canReadReflections}
           pendingId={pendingId}
           onRevision={(content, replacement) =>
             setEditing({ content, draft: null, replacement })
@@ -415,15 +424,21 @@ export function FaithWorkspace() {
       {canPublish && list?.authoringEnabled && !isLoading ? (
         <FaithSettingsForm
           displayLabel={displayLabel}
+          reflectionsEnabled={reflectionsEnabled}
+          reflectionFeatureAvailable={reflectionFeatureAvailable}
           pending={pendingId !== null}
-          onSave={(label) =>
+          onSave={(label, enabled) =>
             perform(
               "settings",
               async () => {
-                const updated = await updateFaithSettings(label);
+                const updated = await updateFaithSettings(
+                  label,
+                  reflectionFeatureAvailable ? enabled : undefined,
+                );
                 setDisplayLabel(updated.displayLabel);
+                setReflectionsEnabled(updated.reflectionsEnabled);
               },
-              "Site display name saved.",
+              "Site settings saved.",
             )
           }
         />

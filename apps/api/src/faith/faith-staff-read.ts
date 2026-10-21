@@ -144,8 +144,13 @@ export async function getFaithSettings(actor: FaithActor) {
     await requireFaithStaff(tx, actor);
     const row = await tx.faithSiteSettings.findUnique({
       where: { tenantId: actor.tenantId },
-      select: { displayLabel: true },
+      select: { displayLabel: true, reflectionsEnabled: true },
     });
-    return { displayLabel: row?.displayLabel ?? "Faith Corner" };
+    return {
+      displayLabel: row?.displayLabel ?? "Faith Corner",
+      reflectionsEnabled: row?.reflectionsEnabled ?? false,
+      reflectionFeatureAvailable:
+        process.env.ACE_FAITH_REFLECTIONS_ENABLED === "true",
+    };
   });
 }
