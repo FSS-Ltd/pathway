@@ -989,7 +989,8 @@ HTTP suites (6/6 and 5/5 tests) against a disposable database. A signed-in
 linked-account browser review remains pending. The verified ACE count remains
 **48/150 (32%)**.
 
-ACE-C09 trip and permission-slip versioning is in progress on
+ACE-C09 trip and permission-slip versioning is in progress in
+[PR #715](https://github.com/FSS-Ltd/pathway/pull/715) on
 `feature/ace-c09-trip-slip-versioning`, based on the confirmed C08 merge.
 The API step adds site-scoped trip drafts and cancellation, permission-slip
 drafts and immutable published snapshots with a reproducible SHA-256 hash,
@@ -999,9 +1000,9 @@ recipient changes require reconsent; a display-title correction alone does
 not. Publication defaults off behind `ACE_TRIP_SLIP_PUBLICATION_ENABLED`.
 The existing Oasis permission-slip implementation was reviewed read-only at
 `f31ec65`; C09 keeps tenant and student eligibility checks at publication
-instead of trusting submitted child identifiers. The C09 PR, CI and merge
-evidence will be added at its delivery gate. The verified ACE count remains
-**48/150 (32%)**.
+instead of trusting submitted child identifiers. The initial PR revision was
+`3e067259`; latest-head CI and merge evidence are pending. The verified ACE
+count remains **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
