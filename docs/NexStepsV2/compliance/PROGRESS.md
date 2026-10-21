@@ -1874,5 +1874,10 @@ initial worktree-cache permission failure. The in-app mobile
 preview showed the `Bundesland` option and keyboard selection worked. A scaled
 desktop-width rendering in the in-app browser showed the two-column layout
 without visible overflow. These previews used synthetic location options and
-did not exercise an authenticated live portal. No PR or merge is claimed for
-this step yet.
+did not exercise an authenticated live portal.
+
+[PR #709](https://github.com/FSS-Ltd/pathway/pull/709) was opened as a draft
+from checked implementation commit `b57e619b0695d61b8a2c095d1007a1e216fd4ffe`
+because local integration shard 2 remained red in unrelated tests. Current-head
+CI is pending. The draft PR does not satisfy the merge gate; no next build step
+has started.
