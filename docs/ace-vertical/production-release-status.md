@@ -968,9 +968,14 @@ nonproduction API and Clerk test keys because local credentials are absent.
 Production linked-account and mobile review remain pending. The verified ACE
 count remains **48/150 (32%)**.
 
-ACE-C08 web family reading is in progress on
-`feature/ace-c08-faith-family-web`, based on the confirmed C07 merge. This
-slice adds student and guardian reading routes, school-configured Faith
+ACE-C08 web family reading merged in
+[PR #713](https://github.com/FSS-Ltd/pathway/pull/713) on 21 October 2026.
+The checked head `5bab95d918e2220d5024177e6a94117b0184fcde` passed all
+nine applicable latest-head checks. CI logs confirmed the Faith-content and
+family-context PostgreSQL HTTP suites ran, along with the family Faith feed,
+family landing, and parent-child navigation admin unit tests. GitHub confirmed
+merge commit `eb5c33e8c91d6cad938489c909ee9ef74e7bd896` into `master`.
+This slice adds student and guardian reading routes, school-configured Faith
 terminology in family navigation, and student-only reflection entry. Mobile
 reading and offline cache remain paused, so full C08 acceptance remains open.
 Student read receipts require an explicit button; opening content makes no
@@ -981,9 +986,22 @@ pages until a separate school release decision. Local checks passed for API
 and admin typechecks, focused lint and formatting, both production builds,
 the admin unit chain, and the family-context and Faith-content PostgreSQL
 HTTP suites (6/6 and 5/5 tests) against a disposable database. A signed-in
-linked-account browser review remains pending. PR and CI evidence will be
-recorded when the current step reaches its delivery gate. The verified ACE
-count remains **48/150 (32%)**.
+linked-account browser review remains pending. The verified ACE count remains
+**48/150 (32%)**.
+
+ACE-C09 trip and permission-slip versioning is in progress on
+`feature/ace-c09-trip-slip-versioning`, based on the confirmed C08 merge.
+The API step adds site-scoped trip drafts and cancellation, permission-slip
+drafts and immutable published snapshots with a reproducible SHA-256 hash,
+recipient snapshots, change classification, scheduled publication, and a
+minute cron. Destination, dates, description, consent wording, questions, and
+recipient changes require reconsent; a display-title correction alone does
+not. Publication defaults off behind `ACE_TRIP_SLIP_PUBLICATION_ENABLED`.
+The existing Oasis permission-slip implementation was reviewed read-only at
+`f31ec65`; C09 keeps tenant and student eligibility checks at publication
+instead of trusting submitted child identifiers. The C09 PR, CI and merge
+evidence will be added at its delivery gate. The verified ACE count remains
+**48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

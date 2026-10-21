@@ -13,6 +13,7 @@ import { MessagingModule } from "./messaging/messaging.module";
 import { AceNoticesModule } from "./ace-notices/ace-notices.module";
 import { HomeworkModule } from "./homework/homework.module";
 import { FaithModule } from "./faith/faith.module";
+import { TripsModule } from "./trips/trips.module";
 
 // Core modules
 import { HealthModule } from "./health/health.module";
@@ -102,6 +103,7 @@ import { FinanceModule } from "./finance/finance.module";
     AceNoticesModule,
     HomeworkModule,
     FaithModule,
+    TripsModule,
     LeadsModule,
     StaffModule,
     PublicSignupModule,
