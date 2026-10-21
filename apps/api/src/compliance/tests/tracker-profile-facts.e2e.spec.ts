@@ -142,7 +142,7 @@ describe("Legacy site profile facts persistence", () => {
       .get("/compliance/tracker/profile")
       .set("Authorization", authorization)
       .expect(200);
-    expect(read.body.profile).toEqual(profile);
+    expect(read.body.profile).toEqual(normalizeTrackerProfile(profile));
     expect(read.body.version).toBe(2);
   });
   it("preserves enriched facts for legacy writes and rejects contradictory merged profiles", async () => {

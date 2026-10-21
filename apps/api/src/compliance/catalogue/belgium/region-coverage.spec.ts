@@ -36,6 +36,14 @@ describe("Belgium Region inventory", () => {
       result.items.some((item) => item.requirement.id.startsWith("bel.")),
     ).toBe(true);
     expect(result.coverageGaps).toBe(TRACKER_TOPICS.length * 2);
+    expect(
+      result.coverage.find(
+        (cell) =>
+          cell.jurisdiction === "BE" && cell.topic === "education_childcare",
+      )?.reason,
+    ).toContain(
+      "education Community responsible for this provision is not recorded",
+    );
   });
 
   it("does not infer a Region or Community from the country", () => {

@@ -23,6 +23,32 @@ describe("Tracker boundary validation", () => {
       ),
     ).toBe("UNRESOLVED");
   });
+  it("keeps Belgian Community separate from location and validates its values", () => {
+    const profile = trackerProfileInput.parse({
+      ...testProfile,
+      belgianEducationCommunity: "FRENCH",
+    });
+    expect(
+      evaluateCondition(
+        { field: "belgianEducationCommunity", op: "eq", value: "FRENCH" },
+        profile,
+        { countryCode: "BE", subdivisionCode: "BE1" },
+      ),
+    ).toBe("APPLICABLE");
+    expect(
+      evaluateCondition(
+        { field: "belgianEducationCommunity", op: "eq", value: "FRENCH" },
+        { ...profile, belgianEducationCommunity: null },
+        { countryCode: "BE", subdivisionCode: "BE1" },
+      ),
+    ).toBe("UNRESOLVED");
+    expect(
+      trackerProfileInput.safeParse({
+        ...testProfile,
+        belgianEducationCommunity: "BRUSSELS",
+      }).success,
+    ).toBe(false);
+  });
   it("rejects caller scope on archive", () => {
     expect(
       trackerArchiveInput.safeParse({ tenantId: "injected" }).success,

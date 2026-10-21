@@ -296,6 +296,13 @@ export function buildTrackerChecklist(
       let regionalStatus = cell.regionalStatus;
       let reason = cell.reason;
       if (
+        location.countryCode === "BE" &&
+        topic === "education_childcare" &&
+        !profile?.profile.belgianEducationCommunity
+      )
+        reason +=
+          " The education Community responsible for this provision is not recorded.";
+      if (
         cell.review &&
         (cell.review.verifiedAt > day(now) ||
           cell.review.reviewDueAt < day(now) ||

@@ -886,7 +886,16 @@ describe("Site tracker persistence and permission boundaries", () => {
       level: "REGION",
       name: "Brussels-Capital Region",
     });
-    await save({ ...testProfile, jurisdictionId: brussels.id });
+    const belgian = await save({
+      ...testProfile,
+      jurisdictionId: brussels.id,
+      belgianEducationCommunity: "FRENCH",
+    });
+    expect(belgian.profile.belgianEducationCommunity).toBe("FRENCH");
+    expect(
+      (await app.get(TrackerProfileService).get(actor))?.profile
+        .belgianEducationCommunity,
+    ).toBe("FRENCH");
     catalogueProvider.catalogue = TRACKER_CATALOGUE;
     try {
       const result = await request(server)
@@ -908,6 +917,14 @@ describe("Site tracker persistence and permission boundaries", () => {
       );
       expect(result.body.items.length).toBeGreaterThan(0);
       expect(result.body.coverageGaps).toBe(16);
+      await expect(
+        save({
+          ...testProfile,
+          belgianEducationCommunity: "FRENCH",
+        }),
+      ).rejects.toThrow(
+        "Belgian education Community applies only to a site operating in Belgium.",
+      );
     } finally {
       catalogueProvider.catalogue = trackerFixture();
     }
