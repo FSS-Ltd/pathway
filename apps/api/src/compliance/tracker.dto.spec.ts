@@ -85,6 +85,20 @@ describe("Tracker boundary validation", () => {
       }).success,
     ).toBe(false);
   });
+  it("accepts a French Community network route as a separate provider fact", () => {
+    const profile = trackerProfileInput.parse({
+      ...testProfile,
+      belgianEducationCommunity: "FRENCH",
+      belgianFrenchSchoolRoute: "OUTSIDE_FWB_NETWORK",
+    });
+    expect(profile.belgianFrenchSchoolRoute).toBe("OUTSIDE_FWB_NETWORK");
+    expect(
+      trackerProfileInput.safeParse({
+        ...testProfile,
+        belgianFrenchSchoolRoute: "RECOGNISED",
+      }).success,
+    ).toBe(false);
+  });
   it("rejects caller scope on archive", () => {
     expect(
       trackerArchiveInput.safeParse({ tenantId: "injected" }).success,

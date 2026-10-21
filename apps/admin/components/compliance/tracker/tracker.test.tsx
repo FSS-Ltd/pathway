@@ -209,6 +209,7 @@ async function run() {
             jurisdictionId: "brussels",
             belgianEducationCommunity: "FRENCH",
             belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
+            belgianFrenchSchoolRoute: "OUTSIDE_FWB_NETWORK",
             belgianChildcareAuthority: "IRISCARE",
             belgianPaidUnderThreeCare: true,
           }}
@@ -250,11 +251,12 @@ async function run() {
     );
     assert.match(host.textContent ?? "", /Education language Community/);
     assert.match(host.textContent ?? "", /German Speaking/);
-    assert.match(
+    assert.match(host.textContent ?? "", /French Community school route/);
+    assert.match(host.textContent ?? "", /Neither organised nor subsidised/);
+    assert.doesNotMatch(
       host.textContent ?? "",
-      /School recognition with this education Community/,
+      /Recognised by another authority/,
     );
-    assert.match(host.textContent ?? "", /Recognised by another authority/);
     assert.match(host.textContent ?? "", /Childcare licensing authority/);
     assert.match(host.textContent ?? "", /ONE/);
     assert.match(host.textContent ?? "", /Paid professional care/);
@@ -281,6 +283,7 @@ async function run() {
       educationSelect.dispatchEvent(new Event("change", { bubbles: true }));
     });
     assert.equal(selectedProfile?.belgianSchoolRecognitionStatus, null);
+    assert.equal(selectedProfile?.belgianFrenchSchoolRoute, null);
     const operatingLocation = host.querySelector("select");
     assert.ok(operatingLocation);
     await act(async () => {

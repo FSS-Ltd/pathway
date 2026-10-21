@@ -23,6 +23,11 @@ export interface TrackerProfileInput {
     | "NOT_RECOGNISED"
     | "RECOGNISED_ELSEWHERE"
     | null;
+  belgianFrenchSchoolRoute?:
+    | "FWB_ORGANISED"
+    | "FWB_SUBSIDISED"
+    | "OUTSIDE_FWB_NETWORK"
+    | null;
   belgianChildcareAuthority?:
     | "OPGROEIEN"
     | "ONE"

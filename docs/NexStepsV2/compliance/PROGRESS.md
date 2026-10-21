@@ -2132,3 +2132,33 @@ The full local API unit run in the pre-commit hook was interrupted after
 severe parallel-runner slowdown; reported suites were passing, but that run
 has no passing final result. The PR's full unit CI job must pass on its latest
 head before merge.
+
+### Flemish school recognition merged; French Community school review begins
+
+[PR #720](https://github.com/FSS-Ltd/pathway/pull/720) passed all nine
+required checks on final head `678854df0b446be1b06b7df4b0d348b17e037065`:
+the full typecheck/lint/unit job, both integration shards, three
+permission/role database jobs, and CodeQL. GitHub confirmed `MERGED` at
+2026-10-21T20:55:16Z with merge
+`47147b0d641391740e7e261bb0e845e7fc1c4b43`; fetched `fss/master`
+matched and had the checked head as its second parent. The next review starts
+from that merge on `feature/compliance-belgium-french-school-recognition`.
+The [whole-program coverage audit](FINAL-COVERAGE-AUDIT.md) remains open.
+
+### French Community school network — implementation in progress
+
+The [French Community education code](https://refli.be/fr/lex/2019A30854)
+distinguishes organised, subsidised and outside-network provision. Articles
+1.5.1-2/5 require the organising-body and school projects; Article 1.7.1-10
+requires organised/subsidised schools to maintain attendance registers and
+report unjustified absences. Article 1.7.1-12 places home-education declarations
+for compulsory-age children outside that network on responsible adults, with
+optional submission by the private-school director under their responsibility.
+The [federal age guidance](https://www.belgium.be/fr/formation/enseignement/droits_et_devoirs/obligation_scolaire)
+sets the compulsory-age boundary. Catalogue 1.41.0 adds a separate French
+school-route profile fact, two conditional statutory actions for
+organised/subsidised schools and a clearly labelled provider recommendation
+for outside-network family declarations. French/German-speaking specialist and
+local scope remains partial. Tests, PR and host gate evidence remain pending.
+
+Local verification for catalogue 1.41.0 (21 October 2026): Prisma generate and validate passed; API and admin typechecks passed; focused Belgium catalogue/DTO tests and the tracker API integration suite passed (16 integration tests); the broader compliance unit run passed (62 suites, 349 tests); the admin tracker UI test passed; root lint and explicit changed-admin ESLint passed; changed-file Prettier check passed; API and admin production builds passed. The admin build used disposable public configuration. A desktop rendering of the school-route fields was inspected in the in-app browser. A separate mobile viewport inspection remains pending, so this UI check is not recorded as fully complete yet. PR and CI evidence remain pending.

@@ -13,18 +13,15 @@ import type {
 import { Choice, words } from "./profile-choice";
 export { words } from "./profile-choice";
 import { ProfileFacts } from "./profile-facts";
+import { BelgianSchoolRouteFields } from "./belgian-school-route-fields";
 import { fieldClass } from "../agreements/shared";
-const schoolRecognitionStatuses = [
-  "COMMUNITY_RECOGNISED",
-  "NOT_RECOGNISED",
-  "RECOGNISED_ELSEWHERE",
-] as const;
 export const emptyProfile: TrackerProfileInput = {
   jurisdictionId: null,
   region: null,
   localAuthority: null,
   belgianEducationCommunity: null,
   belgianSchoolRecognitionStatus: null,
+  belgianFrenchSchoolRoute: null,
   belgianChildcareAuthority: null,
   belgianPaidUnderThreeCare: null,
   sector: null,
@@ -120,6 +117,10 @@ export function ProfileFields({
                 country === "BE" && jurisdictionId === value.jurisdictionId
                   ? value.belgianSchoolRecognitionStatus
                   : null,
+              belgianFrenchSchoolRoute:
+                country === "BE" && jurisdictionId === value.jurisdictionId
+                  ? value.belgianFrenchSchoolRoute
+                  : null,
               belgianChildcareAuthority:
                 country === "BE" && jurisdictionId === value.jurisdictionId
                   ? value.belgianChildcareAuthority
@@ -152,6 +153,7 @@ export function ProfileFields({
                 ...value,
                 belgianEducationCommunity,
                 belgianSchoolRecognitionStatus: null,
+                belgianFrenchSchoolRoute: null,
               })
             }
           />
@@ -161,49 +163,7 @@ export function ProfileFields({
             education. This selection does not certify registration or remove
             unreviewed coverage gaps.
           </p>
-          {(!value.providerCategory ||
-            ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
-              value.providerCategory,
-            )) && (
-            <label className="block min-w-0">
-              School recognition with this education Community
-              <select
-                className={fieldClass}
-                value={value.belgianSchoolRecognitionStatus ?? ""}
-                disabled={
-                  !value.belgianEducationCommunity || !value.providerCategory
-                }
-                onChange={(event) =>
-                  set(
-                    "belgianSchoolRecognitionStatus",
-                    schoolRecognitionStatuses.find(
-                      (status) => status === event.target.value,
-                    ) ?? null,
-                  )
-                }
-              >
-                <option value="">
-                  {!value.belgianEducationCommunity
-                    ? "Choose education Community first"
-                    : !value.providerCategory
-                      ? "Choose actual provider category first"
-                      : "Unknown"}
-                </option>
-                <option value="COMMUNITY_RECOGNISED">
-                  Recognised by this Community
-                </option>
-                <option value="NOT_RECOGNISED">Not recognised</option>
-                <option value="RECOGNISED_ELSEWHERE">
-                  Recognised by another authority
-                </option>
-              </select>
-            </label>
-          )}
-          <p className="text-sm text-text-muted">
-            Recognition and public funding are separate. Confirm the school's
-            status with its education authority; a private school may be
-            unrecognised or recognised elsewhere.
-          </p>
+          <BelgianSchoolRouteFields value={value} setValue={setValue} />
           <Choice
             label="Childcare licensing authority"
             value={value.belgianChildcareAuthority ?? null}
@@ -313,6 +273,11 @@ export function ProfileFields({
               !providerCategory ||
               ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(providerCategory)
                 ? value.belgianSchoolRecognitionStatus
+                : null,
+            belgianFrenchSchoolRoute:
+              !providerCategory ||
+              ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(providerCategory)
+                ? value.belgianFrenchSchoolRoute
                 : null,
           })
         }

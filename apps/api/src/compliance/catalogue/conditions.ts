@@ -8,6 +8,7 @@ const stringField = z.enum([
   "localAuthority",
   "belgianEducationCommunity",
   "belgianSchoolRecognitionStatus",
+  "belgianFrenchSchoolRoute",
   "belgianChildcareAuthority",
   "sector",
   "vertical",
@@ -24,6 +25,11 @@ const allowedValues: Partial<
     "COMMUNITY_RECOGNISED",
     "NOT_RECOGNISED",
     "RECOGNISED_ELSEWHERE",
+  ],
+  belgianFrenchSchoolRoute: [
+    "FWB_ORGANISED",
+    "FWB_SUBSIDISED",
+    "OUTSIDE_FWB_NETWORK",
   ],
   belgianChildcareAuthority: [
     "OPGROEIEN",
