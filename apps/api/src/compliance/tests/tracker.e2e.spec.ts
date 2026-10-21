@@ -872,4 +872,44 @@ describe("Site tracker persistence and permission boundaries", () => {
       catalogueProvider.catalogue = trackerFixture();
     }
   });
+  it("selects a Belgian Region without treating it as a language Community", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const jurisdictions = await request(server)
+      .get("/compliance/tracker/jurisdictions")
+      .set("Authorization", reader)
+      .expect(200);
+    const brussels = jurisdictions.body.find(
+      (entry: { subdivisionCode: string }) => entry.subdivisionCode === "BE1",
+    );
+    expect(brussels).toMatchObject({
+      level: "REGION",
+      name: "Brussels-Capital Region",
+    });
+    await save({ ...testProfile, jurisdictionId: brussels.id });
+    catalogueProvider.catalogue = TRACKER_CATALOGUE;
+    try {
+      const result = await request(server)
+        .get("/compliance/tracker/checklist")
+        .set("Authorization", reader)
+        .expect(200);
+      expect(result.body.coverage).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            jurisdiction: "BE",
+            status: "PARTIALLY_PUBLISHED",
+            regionalStatus: "IN_REVIEW",
+          }),
+          expect.objectContaining({
+            jurisdiction: "BE1",
+            status: "IN_REVIEW",
+          }),
+        ]),
+      );
+      expect(result.body.items.length).toBeGreaterThan(0);
+      expect(result.body.coverageGaps).toBe(16);
+    } finally {
+      catalogueProvider.catalogue = trackerFixture();
+    }
+  });
 });
