@@ -2,7 +2,7 @@
 
 **As of:** 21 October 2026.
 
-**Decision:** No live collection is authorised. One-off card collection is planned through Stripe Connect direct charges. The connected school account and account-scoped transaction path must be exercised in T07–T10 before release. Direct-charge Bacs remains blocked pending explicit Stripe compatibility evidence; do not substitute another charge model.
+**Decision:** No live collection is authorised. One-off card collection is planned through Stripe Connect direct charges. Direct-charge Bacs setup and payment have now been demonstrated in Stripe test mode for a synthetic GB school account. This is test-mode compatibility evidence only: live Bacs remains disabled pending cancellation/return assurance, CI and the later release gates. Do not substitute another charge model.
 
 ## What is established
 
@@ -22,30 +22,32 @@ On 18 October 2026, a read-only test-mode check found the newly connected school
 
 On 19 October 2026, a read-only check using the test platform key returned one connected account in GB. Its details were not submitted, requirements were past due, charges and payouts were disabled, and `card_payments` was `inactive`; `bacs_debit_payments` was absent and Bacs display settings were not configured. The response contained no evidence that this account is ready for school collection. Account identifiers and personal details are intentionally omitted.
 
-On 21 October 2026, after sandbox Connect authorization was restored, a fictional GB company profile and Stripe test address were saved to the existing test-mode school account. Its Accounts v2 status remains `card_payments: restricted` with no request recorded, no `bacs_debit_payments` capability, and past-due requirements. A follow-up Accounts v2 update to add remaining business fields and request capabilities returned HTTP 403 because hosted onboarding had already started. The generated hosted onboarding link opens a Stripe login-creation step and requires completion by the school's owner or a manager. The page is left open in the Codex in-app browser for user handoff; no password or agreement acceptance was submitted. The remaining profile and capability work must use that hosted flow. No Bacs setup, mandate, or payment was created. Account identifiers and personal details are intentionally omitted.
+On 21 October 2026, after sandbox Connect authorization was restored, a fictional GB company profile and Stripe test address were saved to the existing test-mode school account. Its Accounts v2 status showed `card_payments: restricted` with no request recorded, no `bacs_debit_payments` capability, and past-due requirements. A follow-up Accounts v2 update to add remaining business fields and request capabilities returned HTTP 403 because hosted onboarding had already started. The generated hosted onboarding link required completion by the school's owner or a manager; at that point, no password or agreement acceptance had been submitted and no Bacs setup or payment had been created. The later test-mode mandate and payment are recorded below. Account identifiers and personal details are intentionally omitted.
+
+Later on 21 October 2026, the user authorized a test-only hosted Bacs mandate submission using fictional payer details. Stripe confirmed the SetupIntent and saved the mandate. A direct connected-account GBP PaymentIntent then moved from `processing` to `succeeded`; a separate insufficient-funds test moved from `processing` to `requires_payment_method`. Both were created in test mode (`livemode=false`) on the synthetic school account. This proves that the exercised Stripe configuration accepts the planned direct-charge Bacs setup and payment path in test mode. It does not establish live eligibility, prove the application's signed webhook delivery end to end, or clear live-release gates. No real school, real bank account, live payment or production data was used. Provider cancellation and return/dispute simulation remain outstanding; application cancellation, delayed-status, duplicate-event and Bacs receipt-return paths have unit coverage.
 
 #### Synthetic school profile for sandbox testing only
 
 Use the following fictional GB school data with Stripe test keys only. Stripe documents test values for successful identity, address, business-ID, phone, URL and payout verification in its [Connect testing guide](https://docs.stripe.com/connect/testing). These values do not establish that the direct-charge Bacs path is supported.
 
-| Field | Sandbox test value |
-| --- | --- |
-| School | `NexSteps Demo School Ltd` (already saved) |
-| Entity | GB company; use `private_corporation` only for this fictional incorporated-company fixture |
-| Business address | `address_full_match`, London, `EC1A 1BB`, GB |
-| Business registration ID | `000000000` (Stripe test success value; use only if the GB company-number field accepts the test token) |
-| Business URL | `https://accessible.stripe.com` (Stripe test success URL) |
-| Product description | `School tuition, meals and activities for sandbox testing` |
-| School phone | `0000000000` (Stripe test success value) |
-| Representative, director and sole owner | `Alex Example`, title `Director`, 100% ownership; fictional test identity |
-| Representative date of birth and ID | `1901-01-01` and `000000000` (Stripe test success values) |
-| Payout bank | Sort code `108800`, account `00012345` (Stripe GB test payout success values) |
+| Field                                   | Sandbox test value                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| School                                  | `NexSteps Demo School Ltd` (already saved)                                                              |
+| Entity                                  | GB company; use `private_corporation` only for this fictional incorporated-company fixture              |
+| Business address                        | `address_full_match`, London, `EC1A 1BB`, GB                                                            |
+| Business registration ID                | `000000000` (Stripe test success value; use only if the GB company-number field accepts the test token) |
+| Business URL                            | `https://accessible.stripe.com` (Stripe test success URL)                                               |
+| Product description                     | `School tuition, meals and activities for sandbox testing`                                              |
+| School phone                            | `0000000000` (Stripe test success value)                                                                |
+| Representative, director and sole owner | `Alex Example`, title `Director`, 100% ownership; fictional test identity                               |
+| Representative date of birth and ID     | `1901-01-01` and `000000000` (Stripe test success values)                                               |
+| Payout bank                             | Sort code `108800`, account `00012345` (Stripe GB test payout success values)                           |
 
 Use a test inbox controlled by the operator for Stripe login or account notices; `example.com` is only a placeholder. The account holder must create or sign in to the Stripe login, confirm the prefilled test information, and accept the test-mode Connect agreement in the hosted form. Do not record or submit those attestations on the account holder's behalf. The current account already has hosted onboarding started, so Stripe-managed business and person details must be entered through that flow; the Accounts v2 API restricts edits after onboarding starts ([update-account reference](https://docs.stripe.com/api/v2/core/accounts/update)).
 
 ### Bacs Direct Debit
 
-[Stripe's Bacs guide](https://docs.stripe.com/payments/bacs-debit) documents delayed confirmation and Connect use through destination charges; when `on_behalf_of` is used, it says to request the connected account's `bacs_debit_payments` capability. Stripe's [direct-charge guide](https://docs.stripe.com/connect/direct-charges) documents account-scoped requests through the `Stripe-Account` header, but does not establish Bacs support for that direct-charge path. The sandbox account has no Bacs capability. Display settings are not capability or payment evidence. Keep direct-charge Bacs disabled and obtain provider confirmation plus exact-path tests before T13 can pass. Do not silently switch to destination charges.
+[Stripe's Bacs guide](https://docs.stripe.com/payments/bacs-debit) documents delayed confirmation and Connect use through destination charges; when `on_behalf_of` is used, it says to request the connected account's `bacs_debit_payments` capability. Stripe's [direct-charge guide](https://docs.stripe.com/connect/direct-charges) documents account-scoped requests through the `Stripe-Account` header, but does not establish Bacs support for that direct-charge path. The test-mode SetupIntent and connected-account PaymentIntent above are direct evidence for the exercised sandbox configuration. Stripe's [Bacs test scenarios](https://docs.stripe.com/testing#bacs-direct-debit) also document delayed success, failure and dispute cases. Keep live Bacs disabled until cancellation, return/dispute, signed-event replay and release-assurance tests pass. Do not silently switch to destination charges.
 
 ### NexSteps application version
 
@@ -89,7 +91,7 @@ Test independently approved refunds, disputes and returns, including a return af
 
 ### T13: Bacs compatibility
 
-Keep Bacs live-disabled. Prove the exact school-account/method configuration, hosted mandate setup, delayed processing, success, failure, cancellation, return, duplicate and missed-event recovery before any release. If direct-charge Bacs is unsupported, raise an architecture decision; do not choose destination charges or another provider without approval.
+Keep Bacs live-disabled. Test mode now proves the exact synthetic school-account setup, mandate, direct-charge success and insufficient-funds failure. Finish provider cancellation and return/dispute simulation, plus duplicate and missed-event replay assurance, before any live release. If direct-charge Bacs fails outside this tested sandbox configuration, raise an architecture decision; do not choose destination charges or another provider without approval.
 
 For each test, record the repository and provider API/SDK versions, date, redacted event identifiers, expected and actual account context, and result. Use disposable test data only.
 

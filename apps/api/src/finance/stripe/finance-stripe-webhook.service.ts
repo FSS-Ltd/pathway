@@ -6,6 +6,7 @@ import {
 import { runTransaction, withTenantRlsContext } from "@pathway/db";
 import { FinanceStripeConnectionService } from "./finance-stripe-connection.service";
 import { FinanceStripePaymentWebhookService } from "./finance-stripe-payment-webhook.service";
+import { FinanceStripeBacsWebhookService } from "./finance-stripe-bacs-webhook.service";
 import { FinanceStripeReversalWebhookService } from "./finance-stripe-reversal-webhook.service";
 import {
   FINANCE_STRIPE_WEBHOOK_CONFIG,
@@ -110,6 +111,8 @@ export class FinanceStripeWebhookReplayService {
     private readonly config: FinanceStripeWebhookConfig,
     @Inject(FinanceStripeConnectionService)
     private readonly connectionSync: FinanceStripeConnectionService,
+    @Inject(FinanceStripeBacsWebhookService)
+    private readonly bacs: FinanceStripeBacsWebhookService,
     @Inject(FinanceStripePaymentWebhookService)
     private readonly payments: FinanceStripePaymentWebhookService,
     @Inject(FinanceStripeReversalWebhookService)
@@ -173,6 +176,9 @@ export class FinanceStripeWebhookReplayService {
     };
     if (this.reversals.supports(event.eventType)) {
       return this.reversals.process(webhookInput);
+    }
+    if (this.bacs.supports(event.eventType)) {
+      return this.bacs.process(webhookInput);
     }
     return this.payments.process(webhookInput);
   }

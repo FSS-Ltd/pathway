@@ -1,6 +1,6 @@
 # NexSteps Finance add-on build plan
 
-**Status:** T01–T12 are merged. T13 is blocked pending direct-charge Bacs compatibility proof and an eligible sandbox connected account. Provider-backed card Checkout also awaits an eligible school test account.
+**Status:** T01–T12 are merged. T13 is in progress on [PR #712](https://github.com/FSS-Ltd/pathway/pull/712). Hosted Bacs setup and direct-charge success/failure have been demonstrated in Stripe test mode with a synthetic school account. Bacs submission remains test-only; cancellation/return assurance and the T13 merge gate remain outstanding. Provider-backed card Checkout still awaits an eligible school test account.
 
 **Market:** Great Britain and the 27 EU member states, with one local collection currency per school legal country, one finance legal entity and one collection account per tenant for the initial release.
 
@@ -153,6 +153,10 @@ Each task is a standalone branch and pull request using a purpose-based prefix s
 | **T19** | Explicitly authorised, reconciled live pilot and operational handover. Reconcile school receipts, invoice balances, fees and payouts; no cross-tenant/unentitled access.                                                                                                                                                  |                   2–3 |
 
 The task estimates sum to **66–102 engineering-days** for the expanded scope. This replaces the earlier 30–45 day estimate, which did not include the clarified servicing policy, frozen statements, defined reports, expanded UX/accessibility work and per-task delivery gates. Provider onboarding/approval, sandbox access, bank return timing, review queues and CI/merge waiting are calendar dependencies and excluded; re-estimate after reviewing the T01 account evidence and T02 schema findings.
+
+### T13 Bacs job operation
+
+The API's internal collection job is `POST /internal/finance/bacs/run-due`. The worker command is `pnpm --filter @pathway/workers finance:bacs:run-due`; configure `FINANCE_BACS_COLLECTION_JOB_URL` with that exact HTTPS endpoint and `FINANCE_BACS_COLLECTION_JOB_SECRET` with the same secret configured on the API. The API rejects the job outside test mode, and the production provider binding remains disabled. Do not schedule this worker against live collection until the cancellation, return, replay and release-assurance gates pass.
 
 ## 9. T01 repository findings
 

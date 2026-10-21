@@ -28,6 +28,12 @@ describe("Finance schema contract", () => {
       "enum FinanceBankTransferChangeStatus",
       "enum FinanceStripeConnectionStatus",
       "enum FinanceCheckoutAttemptStatus",
+      "enum FinanceMandateStatus",
+      "enum FinanceCollectionPlanStatus",
+      "enum FinanceCollectionPlanEventType",
+      "enum FinanceCollectionInstalmentStatus",
+      "enum FinanceDebitAttemptStatus",
+      "enum FinanceRecurringInvoiceTemplateStatus",
       "enum FinanceRefundStatus",
       "enum FinanceReceiptMovementType",
       "enum FinanceReceiptMovementSource",
@@ -46,6 +52,14 @@ describe("Finance schema contract", () => {
       "model FinanceTransferNotice",
       "model FinanceStripeConnection",
       "model FinanceCheckoutAttempt",
+      "model FinanceStripeCustomer",
+      "model FinanceMandate",
+      "model FinanceCollectionPlan",
+      "model FinanceCollectionPlanEvent",
+      "model FinanceCollectionInstalment",
+      "model FinanceDebitAttempt",
+      "model FinanceRecurringInvoiceTemplate",
+      "model FinanceRecurringInvoiceTemplateLine",
       "model FinancePayerAccount",
       "model FinancePayerGrant",
       "model FinanceCreditNoteNumberSequence",
@@ -86,6 +100,7 @@ describe("Finance schema contract", () => {
       "20261102000000_finance_supported_currencies",
       "20261103000000_finance_country_currency_profile",
       "20261104000000_finance_refunds_and_returns",
+      "20261128000000_finance_bacs_collections",
     ]) {
       expect(financeMigrations).toContain(migration);
     }
@@ -169,6 +184,42 @@ describe("Finance schema contract", () => {
       '"FinanceProfile_country_currency_consistent" CHECK',
     );
 
+    const bacsMigration = readFileSync(
+      path.join(
+        migrationDirectory,
+        "20261128000000_finance_bacs_collections",
+        "migration.sql",
+      ),
+      "utf8",
+    );
+    expect(bacsMigration).toContain(
+      "FinanceDebitAttempt_one_unresolved_instalment_key",
+    );
+    expect(bacsMigration).toContain(
+      "FinanceCollectionPlan_one_live_invoice_key",
+    );
+    expect(bacsMigration).toContain(
+      '"FinanceCollectionPlanEvent_stripeEventId_planId_key"',
+    );
+    expect(bacsMigration).toContain('"providerStatusAt" TIMESTAMP(3)');
+    expect(bacsMigration).toContain('"dueDays" INTEGER NOT NULL DEFAULT 14');
+    expect(bacsMigration).toContain(
+      "\"status\" IN ('SCHEDULED', 'SUBMISSION_PENDING')",
+    );
+    expect(bacsMigration).toContain(
+      'FROM %1$I."FinanceRecurringInvoiceTemplate"',
+    );
+    expect(bacsMigration).toContain('"FinanceDebitAttempt_scope_guard"');
+    expect(bacsMigration).toContain(
+      "CONSTRAINT = 'FinanceCollectionPlan_financial_terms_immutable'",
+    );
+    expect(bacsMigration).toContain(
+      "CONSTRAINT = 'FinanceDebitAttempt_financial_terms_immutable'",
+    );
+    expect(bacsMigration).toContain("app.list_due_finance_collection_scopes");
+    expect(bacsMigration).toContain("SECURITY DEFINER");
+    expect(bacsMigration).toContain("SET search_path = ");
+
     const refundMigration = readFileSync(
       path.join(
         migrationDirectory,
@@ -210,6 +261,14 @@ describe("Finance schema contract", () => {
       "FinanceTransferNotice",
       "FinanceStripeConnection",
       "FinanceCheckoutAttempt",
+      "FinanceStripeCustomer",
+      "FinanceMandate",
+      "FinanceCollectionPlan",
+      "FinanceCollectionPlanEvent",
+      "FinanceCollectionInstalment",
+      "FinanceDebitAttempt",
+      "FinanceRecurringInvoiceTemplate",
+      "FinanceRecurringInvoiceTemplateLine",
       "FinanceStatement",
       "FinancePayerAccount",
       "FinancePayerGrant",

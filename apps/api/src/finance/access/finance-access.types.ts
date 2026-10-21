@@ -31,14 +31,19 @@ export type FinanceStaffAction =
   | "CREATE_MANDATE"
   | "SCHEDULE_DEBIT"
   | "SUBMIT_ROUTINE_DEBIT"
-  | "APPROVE_AUTOMATED_DEBIT";
+  | "APPROVE_AUTOMATED_DEBIT"
+  | "CANCEL_COLLECTION_PLAN";
 
 export type FinancePayerAction =
   | "READ_ACCOUNT"
   | "READ_STATEMENTS"
   | "DOWNLOAD_DOCUMENT"
   | "DECLARE_TRANSFER"
-  | "SETTLE_ISSUED_INVOICE";
+  | "SETTLE_ISSUED_INVOICE"
+  | "SETUP_MANDATE"
+  | "ACCEPT_COLLECTION_PLAN"
+  | "CANCEL_MANDATE"
+  | "CANCEL_COLLECTION_PLAN";
 
 export type FinancePermissionKey = Extract<PermissionKey, `finance.${string}`>;
 export type FinancePayerPermissionKey =

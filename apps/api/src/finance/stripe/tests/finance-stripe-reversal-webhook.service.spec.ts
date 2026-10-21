@@ -1,5 +1,6 @@
 import type { Prisma } from "@pathway/db";
 import { FinanceStripeReversalWebhookService } from "../finance-stripe-reversal-webhook.service";
+import { findReceiptForPaymentIntent } from "../finance-stripe-reversal-webhook.persistence";
 import type { FinanceStripeReversalWebhookInput } from "../finance-stripe-reversal-webhook.contracts";
 import type { FinanceStripeRefundProvider } from "../finance-stripe-refund.provider";
 
@@ -56,6 +57,7 @@ interface MockApplication {
 interface MockTransaction {
   $queryRaw: jest.Mock;
   financeCheckoutAttempt: { findFirst: jest.Mock };
+  financeDebitAttempt: { findFirst: jest.Mock };
   financeReceipt: { findFirst: jest.Mock };
   financeRefund: { findFirst: jest.Mock; updateMany: jest.Mock };
   financeRefundEvent: {
@@ -147,6 +149,9 @@ function setup(): {
         financeProfileId: "profile-1",
         stripeCheckoutSessionId: "cs_school_1",
       }),
+    },
+    financeDebitAttempt: {
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     financeReceipt: {
       findFirst: jest.fn().mockResolvedValue({
@@ -360,6 +365,49 @@ function webhookInput(
 }
 
 describe("FinanceStripeReversalWebhookService", () => {
+  it("resolves Bacs receipts when no card checkout attempt exists", async () => {
+    const receipt = {
+      id: "bacs-receipt-1",
+      financeProfileId: "profile-1",
+      amountMinor: 500n,
+      currency: "GBP",
+      confirmedAt: occurredAt,
+    };
+    const tx = {
+      financeCheckoutAttempt: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      financeDebitAttempt: {
+        findFirst: jest.fn().mockResolvedValue({
+          instalment: { plan: { financeProfileId: "profile-1" } },
+        }),
+      },
+      financeReceipt: {
+        findFirst: jest.fn().mockResolvedValue(receipt),
+      },
+    } as unknown as Prisma.TransactionClient;
+
+    await expect(
+      findReceiptForPaymentIntent(
+        tx,
+        {
+          stripeEventId: "evt_bacs_return",
+          tenantId,
+          orgId,
+          stripeAccountId,
+          eventType: "charge.dispute.created",
+          livemode: false,
+          payloadJson: {} as Prisma.JsonValue,
+        },
+        stripeAccountId,
+        "pi_school_bacs",
+      ),
+    ).resolves.toMatchObject({
+      attempt: { financeProfileId: "profile-1" },
+      receipt,
+    });
+  });
+
   it("records a refund and its later same-second return as separate ledger movements", async () => {
     const { service, movements, applications, refund, refundEvents } = setup();
     const succeeded = stripeRefundEvent({

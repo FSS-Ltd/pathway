@@ -65,6 +65,7 @@ describe("Finance access policy", () => {
       "REVERSE_RECEIPT",
       "REVOKE_PAYER_ACCESS",
       "APPROVE_AUTOMATED_DEBIT",
+      "CANCEL_COLLECTION_PLAN",
     ] as const) {
       expect(canPerformFinanceStaffAction("SERVICING_ONLY", action)).toBe(true);
     }
@@ -100,6 +101,18 @@ describe("Finance access policy", () => {
     expect(
       canPerformFinancePayerAction("SERVICING_ONLY", "SETTLE_ISSUED_INVOICE"),
     ).toBe(true);
+    expect(
+      canPerformFinancePayerAction("SERVICING_ONLY", "CANCEL_MANDATE"),
+    ).toBe(true);
+    expect(
+      canPerformFinancePayerAction("SERVICING_ONLY", "CANCEL_COLLECTION_PLAN"),
+    ).toBe(true);
+    expect(
+      canPerformFinancePayerAction("SERVICING_ONLY", "SETUP_MANDATE"),
+    ).toBe(false);
+    expect(
+      canPerformFinancePayerAction("SERVICING_ONLY", "ACCEPT_COLLECTION_PLAN"),
+    ).toBe(false);
   });
 
   it("allows transfer notices for issued invoices in active and servicing modes", () => {

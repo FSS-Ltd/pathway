@@ -3,7 +3,12 @@ import type { FinanceStripeConnectConfig } from "./finance-stripe-connect.config
 export type FinanceStripeCheckoutConfig =
   | { mode: "disabled" }
   | {
-      mode: "test" | "live";
+      mode: "test";
+      secretKey: string;
+      webAppUrl: string;
+    }
+  | {
+      mode: "live";
       secretKey: string;
       webAppUrl: string;
     };

@@ -38,6 +38,11 @@ import { FinanceProfileController } from "./finance-profile.controller";
 import { FinanceProfileService } from "./finance-profile.service";
 import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
 import { FinanceStripeCheckoutController } from "./finance-stripe-checkout.controller";
+import { FinanceBacsMandateController } from "./finance-bacs-mandate.controller";
+import {
+  FinanceCollectionPlanController,
+  FinancePayerCollectionPlanController,
+} from "./finance-collection-plan.controller";
 import { FinanceStripeWebhookController } from "./stripe/finance-stripe-webhook.controller";
 import { FinanceStripeWebhookInternalController } from "./stripe/finance-stripe-webhook-internal.controller";
 import {
@@ -61,6 +66,17 @@ import {
 } from "./stripe/finance-stripe-checkout.config";
 import { FinanceStripeCheckoutAttemptService } from "./stripe/finance-stripe-checkout-attempt.service";
 import { FinanceStripeCheckoutService } from "./stripe/finance-stripe-checkout.service";
+import { FinanceStripeBacsMandateService } from "./stripe/finance-stripe-bacs-mandate.service";
+import { FinanceCollectionPlanService } from "./finance-collection-plan.service";
+import { FinanceRecurringInvoiceController } from "./finance-recurring-invoice.controller";
+import { FinanceRecurringInvoiceService } from "./finance-recurring-invoice.service";
+import { FinanceBacsCollectionJobController } from "./finance-bacs-collection-job.controller";
+import { FinanceBacsCollectionService } from "./finance-bacs-collection.service";
+import {
+  DisabledFinanceStripeBacsProvider,
+  FINANCE_STRIPE_BACS_PROVIDER,
+  StripeFinanceBacsProvider,
+} from "./stripe/finance-stripe-bacs.provider";
 import { FinanceStripeRefundSubmissionService } from "./stripe/finance-stripe-refund-submission.service";
 import {
   DisabledFinanceStripeRefundProvider,
@@ -68,6 +84,7 @@ import {
   StripeFinanceRefundProvider,
 } from "./stripe/finance-stripe-refund.provider";
 import { FinanceStripePaymentWebhookService } from "./stripe/finance-stripe-payment-webhook.service";
+import { FinanceStripeBacsWebhookService } from "./stripe/finance-stripe-bacs-webhook.service";
 import { FinanceStripeReversalWebhookService } from "./stripe/finance-stripe-reversal-webhook.service";
 import {
   FINANCE_STRIPE_WEBHOOK_CONFIG,
@@ -101,6 +118,11 @@ import {
     FinanceManualReceiptController,
     FinanceStripeConnectionController,
     FinanceStripeCheckoutController,
+    FinanceBacsMandateController,
+    FinanceCollectionPlanController,
+    FinancePayerCollectionPlanController,
+    FinanceRecurringInvoiceController,
+    FinanceBacsCollectionJobController,
     FinancePayerGrantController,
     FinanceStripeWebhookController,
     FinanceStripeWebhookInternalController,
@@ -126,7 +148,12 @@ import {
     FinanceStripeConnectionService,
     FinanceStripeCheckoutAttemptService,
     FinanceStripeCheckoutService,
+    FinanceStripeBacsMandateService,
+    FinanceCollectionPlanService,
+    FinanceRecurringInvoiceService,
+    FinanceBacsCollectionService,
     FinanceStripePaymentWebhookService,
+    FinanceStripeBacsWebhookService,
     FinanceStripeReversalWebhookService,
     PrismaFinanceStripeWebhookInbox,
     FinanceStripeWebhookService,
@@ -160,6 +187,16 @@ import {
         config.mode === "disabled"
           ? new DisabledFinanceStripeCheckoutProvider()
           : new StripeFinanceCheckoutProvider(config),
+      inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_BACS_PROVIDER,
+      useFactory: (
+        config: ReturnType<typeof loadFinanceStripeCheckoutConfig>,
+      ) =>
+        config.mode !== "test"
+          ? new DisabledFinanceStripeBacsProvider()
+          : new StripeFinanceBacsProvider(config),
       inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],
     },
     {
