@@ -71,7 +71,7 @@ describe("Belgium shared-core release", () => {
   });
 
   it("publishes reviewed partial cells and preserves all earlier releases", () => {
-    expect(TRACKER_CATALOGUE.version).toBe("1.39.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.40.0");
     expect(catalogueSchema.safeParse(TRACKER_CATALOGUE).success).toBe(true);
     const cells = TRACKER_CATALOGUE.coverage.filter(
       (cell) => cell.jurisdiction === "BE",
@@ -163,5 +163,41 @@ describe("Belgium shared-core release", () => {
         (entry) => entry.requirement.id === "bel.german-care-recognition",
       )?.applicability,
     ).toBe("NOT_APPLICABLE");
+  });
+
+  it("applies Flemish recognition only to a declared Community-recognised school", () => {
+    const profile = {
+      providerCategory: "INDEPENDENT_SCHOOL",
+      belgianEducationCommunity: "FLEMISH",
+      belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
+      fundingStatus: "PRIVATE",
+    } as const;
+    const applicability = (
+      changes: Partial<TrackerProfileInput>,
+      region = "BE2",
+    ) =>
+      checklist({ ...profile, ...changes }, region).items.find(
+        (item) => item.requirement.id === "bel.flemish-school-recognition",
+      )?.applicability;
+    expect(applicability({})).toBe("APPLICABLE");
+    expect(applicability({ fundingStatus: "PUBLIC" })).toBe("APPLICABLE");
+    expect(applicability({}, "BE1")).toBe("APPLICABLE");
+    expect(applicability({ belgianSchoolRecognitionStatus: null })).toBe(
+      "UNRESOLVED",
+    );
+    expect(
+      applicability({ belgianSchoolRecognitionStatus: "NOT_RECOGNISED" }),
+    ).toBe("NOT_APPLICABLE");
+    expect(
+      applicability({ belgianSchoolRecognitionStatus: "RECOGNISED_ELSEWHERE" }),
+    ).toBe("NOT_APPLICABLE");
+    expect(applicability({ belgianEducationCommunity: "FRENCH" })).toBe(
+      "NOT_APPLICABLE",
+    );
+    expect(applicability({ providerCategory: "OUT_OF_SCHOOL" })).toBe(
+      "NOT_APPLICABLE",
+    );
+    expect(applicability({}, "")).toBe("UNRESOLVED");
+    expect(applicability({}, "BE3")).toBe("NOT_APPLICABLE");
   });
 });

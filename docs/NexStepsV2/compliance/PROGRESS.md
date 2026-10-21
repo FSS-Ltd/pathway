@@ -2085,3 +2085,50 @@ minutes of severe local slowdown; all reported suites had passed up to that
 point, but the run has **no passing final result**. The focused 62-suite
 compliance run and database integration tests remain the local acceptance
 evidence. The full required CI unit job must pass on the PR head before merge.
+
+### Belgian childcare authority merged; Flemish school recognition review begins
+
+[PR #717](https://github.com/FSS-Ltd/pathway/pull/717) passed all nine required
+checks on final head `57652bb9ea99bb280097c110f2781e4699d759e1`, including
+both integration shards, the full unit job, permission and role database jobs,
+and CodeQL. GitHub confirmed `MERGED` at 2026-10-21T17:04:29Z with merge
+`7f70475fff14d5746e2aa0261493d67cd89fd05b`; fetched `fss/master`
+matched and had the checked head as its second parent. The next step starts
+from that merge on `feature/compliance-belgium-flemish-school-recognition`.
+The wider [coverage audit](FINAL-COVERAGE-AUDIT.md) remains open.
+
+### Flemish school recognition — implementation in progress
+
+Primary authority review on 21 October 2026 found that the [Flemish Government
+distinguishes recognition from funding](https://www.vlaanderen.be/erkenning-van-een-school-of-andere-onderwijsinstelling).
+It recognises schools in Flanders and Brussels; recognition is a condition for
+official study certificates and public funding, while some schools are
+recognised without funding. Its [recognition-inspection
+guidance](https://www.vlaanderen.be/onderwijsprofessionals/organisatie-en-administratie/onderwijskwaliteit-en-toezicht/toezicht-op-de-onderwijskwaliteit/erkenningsonderzoek-scholen-academies-en-centra)
+distinguishes provisional and definitive decisions and lists conditions for
+in-scope schools. The [July 2026 amended primary-school circular](https://data-onderwijs.vlaanderen.be/edulex/document.aspx?docid=9284)
+links the conditions to the Basic Education Decree and flags a caveat around
+new application dates; the action therefore asserts no universal deadline.
+[Unrecognised private schools](https://www.vlaanderen.be/onderwijs-en-vorming/kwaliteitszorg-in-het-onderwijs/erkende-en-niet-erkende-onderwijsinstellingen)
+cannot issue Flemish-recognised certificates; some schools are recognised by
+another authority, so neither route is inferred from funding, ACE or a screen
+set. The profile now declares Community recognition, no recognition or
+recognition elsewhere separately. The new statutory checklist action is
+conditional on an actual school, Flemish Community recognition, and Flanders
+or Brussels; its coverage cells remain partial. French/German-speaking school
+routes, external recognition, unrecognised-provider obligations and local rules
+remain in review.
+
+Local verification: `pnpm --filter @pathway/db prisma:generate`, Prisma
+validation with a disposable URL, API and admin typechecks, API and admin
+builds, `pnpm lint` (16 packages), explicit changed-admin ESLint, Prettier on
+all changed files, 62 compliance unit suites (347 tests), admin runtime tests,
+and the disposable-database tracker E2E suite (16 tests) passed. A narrow
+viewport preview showed the Community-relative status field, its labels and
+context text. The final diff and changed files were reviewed before PR
+creation. PR and current-head CI evidence will be appended after host review;
+this step remains in progress until the PR is merged.
+The full local API unit run in the pre-commit hook was interrupted after
+severe parallel-runner slowdown; reported suites were passing, but that run
+has no passing final result. The PR's full unit CI job must pass on its latest
+head before merge.

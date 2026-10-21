@@ -14,11 +14,17 @@ import { Choice, words } from "./profile-choice";
 export { words } from "./profile-choice";
 import { ProfileFacts } from "./profile-facts";
 import { fieldClass } from "../agreements/shared";
+const schoolRecognitionStatuses = [
+  "COMMUNITY_RECOGNISED",
+  "NOT_RECOGNISED",
+  "RECOGNISED_ELSEWHERE",
+] as const;
 export const emptyProfile: TrackerProfileInput = {
   jurisdictionId: null,
   region: null,
   localAuthority: null,
   belgianEducationCommunity: null,
+  belgianSchoolRecognitionStatus: null,
   belgianChildcareAuthority: null,
   belgianPaidUnderThreeCare: null,
   sector: null,
@@ -110,6 +116,10 @@ export function ProfileFields({
                 country === "BE" && jurisdictionId === value.jurisdictionId
                   ? value.belgianEducationCommunity
                   : null,
+              belgianSchoolRecognitionStatus:
+                country === "BE" && jurisdictionId === value.jurisdictionId
+                  ? value.belgianSchoolRecognitionStatus
+                  : null,
               belgianChildcareAuthority:
                 country === "BE" && jurisdictionId === value.jurisdictionId
                   ? value.belgianChildcareAuthority
@@ -138,7 +148,11 @@ export function ProfileFields({
             value={value.belgianEducationCommunity ?? null}
             options={["FLEMISH", "FRENCH", "GERMAN_SPEAKING"]}
             onChange={(belgianEducationCommunity) =>
-              set("belgianEducationCommunity", belgianEducationCommunity)
+              setValue({
+                ...value,
+                belgianEducationCommunity,
+                belgianSchoolRecognitionStatus: null,
+              })
             }
           />
           <p className="text-sm text-text-muted">
@@ -146,6 +160,49 @@ export function ProfileFields({
             Community. Confirm the competent authority for the site's actual
             education. This selection does not certify registration or remove
             unreviewed coverage gaps.
+          </p>
+          {(!value.providerCategory ||
+            ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+              value.providerCategory,
+            )) && (
+            <label className="block min-w-0">
+              School recognition with this education Community
+              <select
+                className={fieldClass}
+                value={value.belgianSchoolRecognitionStatus ?? ""}
+                disabled={
+                  !value.belgianEducationCommunity || !value.providerCategory
+                }
+                onChange={(event) =>
+                  set(
+                    "belgianSchoolRecognitionStatus",
+                    schoolRecognitionStatuses.find(
+                      (status) => status === event.target.value,
+                    ) ?? null,
+                  )
+                }
+              >
+                <option value="">
+                  {!value.belgianEducationCommunity
+                    ? "Choose education Community first"
+                    : !value.providerCategory
+                      ? "Choose actual provider category first"
+                      : "Unknown"}
+                </option>
+                <option value="COMMUNITY_RECOGNISED">
+                  Recognised by this Community
+                </option>
+                <option value="NOT_RECOGNISED">Not recognised</option>
+                <option value="RECOGNISED_ELSEWHERE">
+                  Recognised by another authority
+                </option>
+              </select>
+            </label>
+          )}
+          <p className="text-sm text-text-muted">
+            Recognition and public funding are separate. Confirm the school's
+            status with its education authority; a private school may be
+            unrecognised or recognised elsewhere.
           </p>
           <Choice
             label="Childcare licensing authority"
@@ -248,7 +305,17 @@ export function ProfileFields({
           "OUT_OF_SCHOOL",
           "OTHER",
         ]}
-        onChange={(v) => set("providerCategory", v)}
+        onChange={(providerCategory) =>
+          setValue({
+            ...value,
+            providerCategory,
+            belgianSchoolRecognitionStatus:
+              !providerCategory ||
+              ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(providerCategory)
+                ? value.belgianSchoolRecognitionStatus
+                : null,
+          })
+        }
       />
       <Choice
         label="Funding status"

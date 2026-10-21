@@ -208,6 +208,7 @@ async function run() {
             ...emptyProfile,
             jurisdictionId: "brussels",
             belgianEducationCommunity: "FRENCH",
+            belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
             belgianChildcareAuthority: "IRISCARE",
             belgianPaidUnderThreeCare: true,
           }}
@@ -249,6 +250,11 @@ async function run() {
     );
     assert.match(host.textContent ?? "", /Education language Community/);
     assert.match(host.textContent ?? "", /German Speaking/);
+    assert.match(
+      host.textContent ?? "",
+      /School recognition with this education Community/,
+    );
+    assert.match(host.textContent ?? "", /Recognised by another authority/);
     assert.match(host.textContent ?? "", /Childcare licensing authority/);
     assert.match(host.textContent ?? "", /ONE/);
     assert.match(host.textContent ?? "", /Paid professional care/);
@@ -262,6 +268,19 @@ async function run() {
     });
     assert.equal(selectedProfile?.belgianChildcareAuthority, null);
     assert.equal(selectedProfile?.belgianPaidUnderThreeCare, null);
+    const educationSelect = [...host.querySelectorAll("label")]
+      .find(
+        (label) =>
+          label.firstChild?.textContent?.trim() ===
+          "Education language Community",
+      )
+      ?.querySelector("select");
+    assert.ok(educationSelect);
+    await act(async () => {
+      educationSelect.value = "FLEMISH";
+      educationSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    assert.equal(selectedProfile?.belgianSchoolRecognitionStatus, null);
     const operatingLocation = host.querySelector("select");
     assert.ok(operatingLocation);
     await act(async () => {
@@ -270,12 +289,14 @@ async function run() {
     });
     assert.equal(selectedProfile?.belgianChildcareAuthority, null);
     assert.equal(selectedProfile?.belgianEducationCommunity, null);
+    assert.equal(selectedProfile?.belgianSchoolRecognitionStatus, null);
     await act(async () => {
       operatingLocation.value = "england";
       operatingLocation.dispatchEvent(new Event("change", { bubbles: true }));
     });
     assert.equal(selectedProfile?.jurisdictionId, "england");
     assert.equal(selectedProfile?.belgianEducationCommunity, null);
+    assert.equal(selectedProfile?.belgianSchoolRecognitionStatus, null);
     assert.equal(selectedProfile?.belgianChildcareAuthority, null);
     assert.equal(selectedProfile?.belgianPaidUnderThreeCare, null);
     await act(async () => root.render(<TrackerWorkspace canManage />));

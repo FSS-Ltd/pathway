@@ -70,6 +70,21 @@ describe("Tracker boundary validation", () => {
       }).success,
     ).toBe(false);
   });
+  it("validates Belgian school recognition independently of funding", () => {
+    const profile = trackerProfileInput.parse({
+      ...testProfile,
+      belgianEducationCommunity: "FLEMISH",
+      belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
+      fundingStatus: "PRIVATE",
+    });
+    expect(profile.belgianSchoolRecognitionStatus).toBe("COMMUNITY_RECOGNISED");
+    expect(
+      trackerProfileInput.safeParse({
+        ...testProfile,
+        belgianSchoolRecognitionStatus: "FUNDED",
+      }).success,
+    ).toBe(false);
+  });
   it("rejects caller scope on archive", () => {
     expect(
       trackerArchiveInput.safeParse({ tenantId: "injected" }).success,

@@ -72,6 +72,7 @@ export class TrackerProfileService {
       const location = await trackerLocation(tx, profile.jurisdictionId);
       if (
         (profile.belgianEducationCommunity ||
+          profile.belgianSchoolRecognitionStatus ||
           profile.belgianChildcareAuthority ||
           profile.belgianPaidUnderThreeCare != null) &&
         location.countryCode !== "BE"
@@ -82,6 +83,22 @@ export class TrackerProfileService {
       if (profile.belgianPaidUnderThreeCare && profile.childcare === false)
         throw new BadRequestException(
           "Paid under-three care cannot be selected when the site says it offers no childcare.",
+        );
+      if (
+        profile.belgianSchoolRecognitionStatus &&
+        !profile.belgianEducationCommunity
+      )
+        throw new BadRequestException(
+          "Select the Belgian education Community before recording its school recognition status.",
+        );
+      if (
+        profile.belgianSchoolRecognitionStatus &&
+        !["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+          profile.providerCategory ?? "",
+        )
+      )
+        throw new BadRequestException(
+          "School recognition status applies only to an actual school. Confirm the provider category.",
         );
       const region = location.subdivisionCode;
       const authority = profile.belgianChildcareAuthority;
