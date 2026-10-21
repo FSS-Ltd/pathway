@@ -1,6 +1,6 @@
 # NexSteps Finance add-on build plan
 
-**Status:** T01–T12 are merged. T13 is in progress on [PR #712](https://github.com/FSS-Ltd/pathway/pull/712). Hosted Bacs setup and direct-charge success/failure have been demonstrated in Stripe test mode with a synthetic school account. Bacs submission remains test-only; cancellation/return assurance and the T13 merge gate remain outstanding. Provider-backed card Checkout still awaits an eligible school test account.
+**Status:** T01–T13 are merged. T13 added hosted Bacs setup, fixed instalments and monthly invoice generation; a test-mode mandate and direct-charge success/failure were demonstrated on a synthetic school account in [PR #712](https://github.com/FSS-Ltd/pathway/pull/712). Bacs submission remains test-only while cancellation/return assurance is outstanding. Provider-backed card Checkout still awaits an eligible school test account.
 
 **Market:** Great Britain and the 27 EU member states, with one local collection currency per school legal country, one finance legal entity and one collection account per tenant for the initial release.
 
