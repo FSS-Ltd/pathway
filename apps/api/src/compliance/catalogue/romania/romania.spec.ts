@@ -108,7 +108,7 @@ describe("Romania partial national and county release", () => {
     expect(TRACKER_CATALOGUE.requirements).toEqual(
       expect.arrayContaining(catalogueV127.requirements),
     );
-    expect(TRACKER_CATALOGUE.version).toBe("1.37.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.38.0");
   });
 
   it("does not select a county action without a confirmed county", () => {

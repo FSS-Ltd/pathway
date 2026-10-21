@@ -50,6 +50,8 @@ function jurisdictionLabel(jurisdiction: TrackerJurisdiction): string {
     level = "local authority";
   } else if (/^AT-[1-9]$/.test(jurisdiction.subdivisionCode ?? "")) {
     level = "Bundesland";
+  } else if (/^BE[1-3]$/.test(jurisdiction.subdivisionCode ?? "")) {
+    level = "Region";
   }
   return `${jurisdiction.name} · ${jurisdiction.countryCode} (${level})`;
 }
@@ -81,6 +83,11 @@ export function ProfileFields({
     "ace",
     "icce",
   ] as const;
+  const isBelgianSite = jurisdictions.some(
+    (jurisdiction) =>
+      jurisdiction.id === value.jurisdictionId &&
+      jurisdiction.countryCode === "BE",
+  );
   return (
     <div className="grid min-w-0 gap-4 sm:grid-cols-2">
       <label className="block min-w-0 sm:col-span-2">
@@ -102,6 +109,13 @@ export function ProfileFields({
           nation. Billing address is not used.
         </span>
       </label>
+      {isBelgianSite && (
+        <p className="text-sm text-text-muted sm:col-span-2">
+          Belgium's geographic Region does not identify the language Community
+          responsible for education or childcare. Confirm the competent
+          authority for the site's provision before relying on the checklist.
+        </p>
+      )}
       {(["region", "localAuthority"] as const).map((key) => (
         <label className="block min-w-0" key={key}>
           {key === "region" ? "Region" : "Local authority"}

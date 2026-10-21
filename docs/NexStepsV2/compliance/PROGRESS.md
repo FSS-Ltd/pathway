@@ -1881,3 +1881,53 @@ from checked implementation commit `b57e619b0695d61b8a2c095d1007a1e216fd4ffe`
 because local integration shard 2 remained red in unrelated tests. Current-head
 CI is pending. The draft PR does not satisfy the merge gate; no next build step
 has started.
+
+### Austria Land inventory merged; Belgium Region inventory begins
+
+[PR #709](https://github.com/FSS-Ltd/pathway/pull/709) passed all nine required
+current-head checks on `97ed2cc20aa79b9bf65e905ba5c76f2e1a08f174`:
+typecheck/lint/unit, both integration shards, organisation-role RLS,
+permission-definition database, system-role seed identity, CodeQL and both
+analyses. GitHub confirmed `MERGED` at 2026-10-21T12:03:46Z with merge
+`27917e97d958a322514c0023800f353ae50d7000`; fetched `fss/master`
+matched, with the checked head as its second parent. The next step starts from
+that merge on `feature/compliance-belgium-territorial-inventory`. Austria's 432
+Land cells remain `IN_REVIEW`.
+
+### Belgium Region inventory — implementation and verification in progress
+
+[Eurostat's NUTS correspondence table](https://ec.europa.eu/eurostat/web/nuts/correspondence-tables)
+identifies Belgium's three geographic Regions; the [Belgian federal
+portal](https://www.belgium.be/en/about_belgium/government/regions) confirms
+their institutional role. Catalogue 1.38.0 and an additive migration add
+`BE1`, `BE2` and `BE3` geographic selectors and 144 explicit `IN_REVIEW`
+sector/topic cells. No Region- or Community-specific legal obligation is
+published by this inventory. The [three language
+Communities](https://www.belgium.be/en/about_belgium/government/communities)
+are overlapping authorities; education and childcare classification still
+needs a separate site-profile decision, particularly in Brussels and the
+German-speaking area. Current profile location fields must not infer that
+decision from geography.
+
+The three Eurostat code/name pairs were checked against the official Region
+table and the federal three-Region description. All 18 new matrix rows have
+ten CSV columns, yielding 144 `IN_REVIEW` topic cells; runtime/CSV parity and
+the affected catalogue/engine unit tests passed after correcting three
+Learning Centre rows that initially omitted the eighth topic. The migration
+inserted three rows into the disposable integration database and zero on a
+second run; each has Belgium as parent. Prisma schema validation, API and
+admin typechecks, root lint (16 packages), explicit changed-file ESLint,
+Prettier, permission-definition check, API/admin builds, and the admin tracker
+runtime test passed. The focused tracker API/database suite passed 16 tests,
+including the Brussels selection, manual persistence and tenant-boundary
+cases. Graphify refreshed after the UI code change. A synthetic preview
+of the actual profile component in the in-app browser showed the selected
+Region and Community warning at desktop and 390-pixel mobile width; the
+preview did not exercise an authenticated portal session. Complete API/database
+integration shard 1 passed **57 suites / 405 tests**. The complete API unit
+rerun passed **319 suites / 2,075 tests**. Integration shard 2 and the full
+admin test command passed. Complete API/database integration shard 2 passed
+**56 suites / 284 tests**. The two shards and the focused tracker suite cover
+catalogue selection, current source publication, persistence, site isolation
+and the Belgian Region gap; they do not establish substantive Community law
+coverage. Final staged diff review and the PR remain.
