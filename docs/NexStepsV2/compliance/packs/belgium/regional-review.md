@@ -97,3 +97,31 @@ routes do not receive this action. Their obligations and family-facing
 information need a separate primary-source review. French and German-speaking
 school recognition, provider subtypes, inspection details and municipal rules
 also remain incomplete; no Belgian coverage cell is marked complete.
+
+## French Community school network and outside-network route
+
+Reviewed 21 October 2026 against the [current French Community education
+code](https://refli.be/fr/lex/2019A30854), especially Articles 1.3.1-1,
+1.5.1-2, 1.5.1-5, 1.7.1-10 and 1.7.1-12, and the [federal compulsory-age
+guidance](https://www.belgium.be/fr/formation/enseignement/droits_et_devoirs/obligation_scolaire).
+The code distinguishes schools organised by WBE, schools subsidised by the
+French Community, and education outside that network. These categories are
+not equivalent to the portal's ACE status, private/public funding shorthand,
+or the Flemish recognition decision. A separate site-profile declaration
+records the route. The statutory school-project and attendance-register
+actions apply only to a declared organised or subsidised school in Brussels or
+Wallonia. Portal attendance is an evidence signal and does not prove reporting
+to the Community's system.
+
+For a compulsory-age child educated outside an organised or subsidised school,
+Article 1.7.1-12 places the annual home-education declaration on the
+responsible adults, who may delegate submission to the private school's
+director under their own responsibility. The catalogue therefore gives an
+outside-network school serving ages five to 17 a **recommendation** to explain
+the route and record the submission arrangement. It does not mislabel the
+parents' duty as a universal school duty. The official annual deadline and
+exceptions should be confirmed with the authority for the current school
+year. Unknown age or route leaves applicability unresolved. An outside-network
+learning centre that is not legally a school still requires separate review.
+School admission to subsidies, special education, German-speaking provision,
+and regional/municipal duties remain open; no coverage cell is closed.

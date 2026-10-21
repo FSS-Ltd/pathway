@@ -73,6 +73,7 @@ export class TrackerProfileService {
       if (
         (profile.belgianEducationCommunity ||
           profile.belgianSchoolRecognitionStatus ||
+          profile.belgianFrenchSchoolRoute ||
           profile.belgianChildcareAuthority ||
           profile.belgianPaidUnderThreeCare != null) &&
         location.countryCode !== "BE"
@@ -99,6 +100,16 @@ export class TrackerProfileService {
       )
         throw new BadRequestException(
           "School recognition status applies only to an actual school. Confirm the provider category.",
+        );
+      if (
+        profile.belgianFrenchSchoolRoute &&
+        (profile.belgianEducationCommunity !== "FRENCH" ||
+          !["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+            profile.providerCategory ?? "",
+          ))
+      )
+        throw new BadRequestException(
+          "French Community school route requires the French education Community and an actual school provider category.",
         );
       const region = location.subdivisionCode;
       const authority = profile.belgianChildcareAuthority;

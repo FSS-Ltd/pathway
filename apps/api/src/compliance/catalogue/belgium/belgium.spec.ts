@@ -71,7 +71,7 @@ describe("Belgium shared-core release", () => {
   });
 
   it("publishes reviewed partial cells and preserves all earlier releases", () => {
-    expect(TRACKER_CATALOGUE.version).toBe("1.40.0");
+    expect(TRACKER_CATALOGUE.version).toBe("1.41.0");
     expect(catalogueSchema.safeParse(TRACKER_CATALOGUE).success).toBe(true);
     const cells = TRACKER_CATALOGUE.coverage.filter(
       (cell) => cell.jurisdiction === "BE",
@@ -199,5 +199,89 @@ describe("Belgium shared-core release", () => {
     );
     expect(applicability({}, "")).toBe("UNRESOLVED");
     expect(applicability({}, "BE3")).toBe("NOT_APPLICABLE");
+  });
+
+  it("separates French Community network schools from outside-network family declarations", () => {
+    const applicability = (
+      changes: Partial<TrackerProfileInput>,
+      id: string,
+      region = "BE3",
+    ) =>
+      checklist(
+        {
+          providerCategory: "INDEPENDENT_SCHOOL",
+          belgianEducationCommunity: "FRENCH",
+          minimumAge: 5,
+          maximumAge: 16,
+          ...changes,
+        },
+        region,
+      ).items.find((item) => item.requirement.id === id)?.applicability;
+    const project = "bel.french-school-project";
+    const attendance = "bel.french-school-attendance";
+    const family = "bel.french-outside-network-family-declaration";
+    expect(
+      applicability({ belgianFrenchSchoolRoute: "FWB_ORGANISED" }, project),
+    ).toBe("APPLICABLE");
+    expect(
+      applicability({ belgianFrenchSchoolRoute: "FWB_SUBSIDISED" }, attendance),
+    ).toBe("APPLICABLE");
+    expect(
+      applicability(
+        { belgianFrenchSchoolRoute: "OUTSIDE_FWB_NETWORK" },
+        family,
+      ),
+    ).toBe("APPLICABLE");
+    expect(
+      applicability(
+        { belgianFrenchSchoolRoute: "OUTSIDE_FWB_NETWORK" },
+        project,
+      ),
+    ).toBe("NOT_APPLICABLE");
+    expect(
+      applicability({ belgianFrenchSchoolRoute: "FWB_SUBSIDISED" }, family),
+    ).toBe("NOT_APPLICABLE");
+    expect(applicability({ belgianFrenchSchoolRoute: null }, project)).toBe(
+      "UNRESOLVED",
+    );
+    expect(
+      applicability(
+        { belgianFrenchSchoolRoute: "OUTSIDE_FWB_NETWORK", maximumAge: null },
+        family,
+      ),
+    ).toBe("UNRESOLVED");
+    expect(
+      applicability(
+        {
+          belgianFrenchSchoolRoute: "OUTSIDE_FWB_NETWORK",
+          minimumAge: 18,
+          maximumAge: 20,
+        },
+        family,
+      ),
+    ).toBe("NOT_APPLICABLE");
+    expect(
+      applicability(
+        {
+          belgianFrenchSchoolRoute: "FWB_SUBSIDISED",
+          belgianEducationCommunity: "FLEMISH",
+        },
+        project,
+      ),
+    ).toBe("NOT_APPLICABLE");
+    expect(
+      applicability(
+        { belgianFrenchSchoolRoute: "FWB_SUBSIDISED" },
+        project,
+        "BE1",
+      ),
+    ).toBe("APPLICABLE");
+    expect(
+      applicability(
+        { belgianFrenchSchoolRoute: "FWB_SUBSIDISED" },
+        project,
+        "BE2",
+      ),
+    ).toBe("NOT_APPLICABLE");
   });
 });

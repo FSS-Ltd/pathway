@@ -891,6 +891,7 @@ describe("Site tracker persistence and permission boundaries", () => {
       jurisdictionId: brussels.id,
       belgianEducationCommunity: "FRENCH",
       belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
+      belgianFrenchSchoolRoute: "FWB_SUBSIDISED",
       belgianChildcareAuthority: "IRISCARE",
       belgianPaidUnderThreeCare: true,
       childcare: true,
@@ -899,6 +900,7 @@ describe("Site tracker persistence and permission boundaries", () => {
     expect(belgian.profile.belgianSchoolRecognitionStatus).toBe(
       "COMMUNITY_RECOGNISED",
     );
+    expect(belgian.profile.belgianFrenchSchoolRoute).toBe("FWB_SUBSIDISED");
     expect(belgian.profile.belgianChildcareAuthority).toBe("IRISCARE");
     expect(belgian.profile.belgianPaidUnderThreeCare).toBe(true);
     expect(
@@ -951,6 +953,14 @@ describe("Site tracker persistence and permission boundaries", () => {
       await expect(
         save({
           ...testProfile,
+          belgianFrenchSchoolRoute: "FWB_SUBSIDISED",
+        }),
+      ).rejects.toThrow(
+        "Belgian education and childcare facts apply only to a site operating in Belgium.",
+      );
+      await expect(
+        save({
+          ...testProfile,
           jurisdictionId: brussels.id,
           childcare: true,
           belgianChildcareAuthority: "GERMAN_COMMUNITY_MINISTRY",
@@ -982,6 +992,16 @@ describe("Site tracker persistence and permission boundaries", () => {
           belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
         }),
       ).rejects.toThrow("School recognition status applies only");
+      await expect(
+        save({
+          ...testProfile,
+          jurisdictionId: brussels.id,
+          providerCategory: "OUT_OF_SCHOOL",
+          belgianEducationCommunity: "FRENCH",
+          belgianSchoolRecognitionStatus: null,
+          belgianFrenchSchoolRoute: "FWB_SUBSIDISED",
+        }),
+      ).rejects.toThrow("French Community school route requires");
     } finally {
       catalogueProvider.catalogue = trackerFixture();
     }

@@ -308,10 +308,22 @@ export function buildTrackerChecklist(
         ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
           profile?.profile.providerCategory ?? "",
         ) &&
+        profile?.profile.belgianEducationCommunity === "FLEMISH" &&
         !profile?.profile.belgianSchoolRecognitionStatus
       )
         reason +=
           " The school's recognition status with its education Community is not recorded.";
+      if (
+        location.countryCode === "BE" &&
+        topic === "education_childcare" &&
+        ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+          profile?.profile.providerCategory ?? "",
+        ) &&
+        profile?.profile.belgianEducationCommunity === "FRENCH" &&
+        !profile?.profile.belgianFrenchSchoolRoute
+      )
+        reason +=
+          " The school's organised, subsidised or outside-network route with the French Community is not recorded.";
       if (
         location.countryCode === "BE" &&
         topic === "education_childcare" &&
