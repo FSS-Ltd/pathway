@@ -945,8 +945,10 @@ The authoring and publication flags remain default-off; linked-account live
 review, M20, C08 and mobile acceptance remain gated. The verified ACE count
 stays **48/150 (32%)**.
 
-ACE-C07 Faith read and reflection policy is in progress on branch
-`feature/ace-c07-faith-reflections-web`. The approved F18 student-authored
+ACE-C07 Faith read and reflection policy is in progress in
+[PR #710](https://github.com/FSS-Ltd/pathway/pull/710) on branch
+`feature/ace-c07-faith-reflections-web`. Its initial published head was
+`0911177869db4c7040b814e927ff753897d4ba99`. The approved F18 student-authored
 reflection policy governs this step. The implementation adds explicit private
 and guardian-released visibility, staff moderation, student receipts, a
 reference-only safeguarding report path, and a staff web review panel. The
@@ -957,7 +959,7 @@ API and platform lint, explicit staff UI lint, the API and admin builds, the
 admin unit chain, the access-matrix and reflection policy unit suites, and
 three Faith/reporting PostgreSQL suites (42/42 tests). The admin build used
 nonproduction API and Clerk test keys because local credentials are absent.
-Its PR, latest-head CI, merge and production evidence are pending; C08 has not
+Latest-head CI, review, merge and production evidence are pending; C08 has not
 started. The verified ACE count remains **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
