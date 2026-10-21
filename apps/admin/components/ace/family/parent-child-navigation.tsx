@@ -18,6 +18,7 @@ type ChildSection =
       | "attendance"
       | "sessions"
       | "subject-timetable"
+      | "faith"
     >
   | "homework";
 
@@ -28,6 +29,7 @@ const sectionRoutes: Record<ChildSection, string> = {
   sessions: "timetable",
   "subject-timetable": "subject-timetable",
   homework: "homework",
+  faith: "faith",
 };
 
 const sectionLabels: Record<ChildSection, string> = {
@@ -37,6 +39,7 @@ const sectionLabels: Record<ChildSection, string> = {
   sessions: "sessions",
   "subject-timetable": "subject timetable",
   homework: "homework",
+  faith: "faith",
 };
 
 export function childSectionForRoute(
@@ -55,6 +58,8 @@ export function childSectionForRoute(
       return "subject-timetable";
     case "homework":
       return "homework";
+    case "faith":
+      return "faith";
     default:
       return null;
   }
@@ -152,7 +157,10 @@ export function ParentChildNavigationView({
       ) : (
         <>
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-            Viewing {sectionLabels[section]}
+            Viewing{" "}
+            {section === "faith"
+              ? (current.faithLabel ?? "Faith Corner")
+              : sectionLabels[section]}
           </p>
           <p className="mt-1 font-heading text-lg font-semibold text-text-primary">
             {current.childName}{" "}
@@ -162,7 +170,7 @@ export function ParentChildNavigationView({
           </p>
           {linked.length > 1 ? (
             <nav
-              aria-label={`Choose child for ${sectionLabels[section]}`}
+              aria-label={`Choose child for ${section === "faith" ? (current.faithLabel ?? "Faith Corner") : sectionLabels[section]}`}
               className="mt-3"
             >
               <p className="mb-2 text-sm text-text-muted">Switch child</p>

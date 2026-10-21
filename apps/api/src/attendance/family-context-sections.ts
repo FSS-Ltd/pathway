@@ -5,6 +5,7 @@ export type FamilySection =
   | "attendance"
   | "sessions"
   | "subject-timetable"
+  | "faith"
   | "notices"
   | "messages"
   | "volunteering";

@@ -83,6 +83,21 @@ export type FaithReflectionList = {
   nextCursor: string | null;
 };
 
+export type FamilyFaithItem = {
+  id: string;
+  versionId: string;
+  title: string;
+  contentPayload: FaithPayload;
+  publishedAt: string;
+};
+
+export type FamilyFaithFeed = {
+  displayLabel: string;
+  reflectionsEnabled: boolean;
+  items: FamilyFaithItem[];
+  nextCursor: string | null;
+};
+
 export class FaithRequestError extends Error {
   constructor(
     message: string,
@@ -132,6 +147,52 @@ export const fetchFaithContent = (signal?: AbortSignal, cursor?: string) =>
     "GET",
     undefined,
     signal,
+  );
+export const fetchFamilyFaithFeed = (
+  siteId: string,
+  childId?: string,
+  cursor?: string,
+  signal?: AbortSignal,
+) => {
+  const query = new URLSearchParams({ limit: "20" });
+  if (childId) query.set("childId", childId);
+  if (cursor) query.set("cursor", cursor);
+  return faithRequest<FamilyFaithFeed>(
+    `/sites/${encodeURIComponent(siteId)}/feed?${query}`,
+    "GET",
+    undefined,
+    signal,
+  );
+};
+export const fetchFamilyFaithReflections = (
+  siteId: string,
+  contentId: string,
+  childId?: string,
+  signal?: AbortSignal,
+) => {
+  const query = new URLSearchParams({ siteId, limit: "20" });
+  if (childId) query.set("childId", childId);
+  return faithRequest<FaithReflectionList>(
+    `/content/${encodeURIComponent(contentId)}/reflections?${query}`,
+    "GET",
+    undefined,
+    signal,
+  );
+};
+export const submitFamilyFaithReflection = (
+  siteId: string,
+  contentId: string,
+  text: string,
+) =>
+  faithRequest<FaithReflection>(
+    `/content/${encodeURIComponent(contentId)}/reflections?siteId=${encodeURIComponent(siteId)}`,
+    "POST",
+    { text },
+  );
+export const markFamilyFaithRead = (siteId: string, contentId: string) =>
+  faithRequest<{ id: string; readAt: string }>(
+    `/content/${encodeURIComponent(contentId)}/read?siteId=${encodeURIComponent(siteId)}`,
+    "POST",
   );
 export const fetchFaithOptions = (signal?: AbortSignal) =>
   faithRequest<FaithOptions>("/options", "GET", undefined, signal);

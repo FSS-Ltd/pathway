@@ -58,6 +58,7 @@ describe("ACE family context discovery", () => {
           orgId: orgAId,
           name: "Alpha School",
           slug: `family-site-${siteAId}`,
+          timezone: "Europe/London",
         },
         {
           id: siteBId,
@@ -70,6 +71,7 @@ describe("ACE family context discovery", () => {
           orgId: orgAId,
           name: "Gamma School",
           slug: `family-site-${siteCId}`,
+          timezone: "Europe/London",
         },
       ],
     });
@@ -305,6 +307,64 @@ describe("ACE family context discovery", () => {
       await withTenantRlsContext(siteAId, orgAId, (tx) =>
         tx.studentIdentity.delete({ where: { id: identity.id } }),
       );
+    }
+  });
+
+  it("advertises Faith only for enrolled ACE readers using the site's label", async () => {
+    if (!app) return;
+    const permission = await prisma.permissionDefinition.findUnique({
+      where: { key: "ace.faith.read" },
+      select: { isActive: true },
+    });
+    expect(permission?.isActive).toBe(true);
+    const yearId = randomUUID();
+    const bandId = randomUUID();
+    await withTenantRlsContext(siteAId, orgAId, async (tx) => {
+      await tx.academicYear.create({
+        data: {
+          id: yearId,
+          tenantId: siteAId,
+          name: "Faith discovery year",
+          startsOn: new Date("2020-01-01"),
+          endsOn: new Date("2040-12-31"),
+        },
+      });
+      await tx.aceYearBand.create({
+        data: { id: bandId, tenantId: siteAId, name: "Faith discovery band" },
+      });
+      await tx.aceSchoolEnrollment.create({
+        data: {
+          tenantId: siteAId,
+          childId: childAId,
+          academicYearId: yearId,
+          yearBandId: bandId,
+          startsOn: new Date("2020-01-01"),
+        },
+      });
+      await tx.faithSiteSettings.create({
+        data: { tenantId: siteAId, displayLabel: "Reflection Room" },
+      });
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .get(route)
+        .set("Authorization", fullAuthorization);
+      expect(response.status).toBe(200);
+      expect(response.body.items[0]).toMatchObject({
+        siteId: siteAId,
+        faithLabel: "Reflection Room",
+      });
+      expect(response.body.items[0].sections).toContain("faith");
+      expect(response.body.items[1].sections).not.toContain("faith");
+    } finally {
+      await withTenantRlsContext(siteAId, orgAId, async (tx) => {
+        await tx.aceSchoolEnrollment.deleteMany({
+          where: { childId: childAId },
+        });
+        await tx.faithSiteSettings.delete({ where: { tenantId: siteAId } });
+        await tx.aceYearBand.delete({ where: { id: bandId } });
+        await tx.academicYear.delete({ where: { id: yearId } });
+      });
     }
   });
 

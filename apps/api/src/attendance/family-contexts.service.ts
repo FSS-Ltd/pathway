@@ -18,6 +18,7 @@ export interface FamilyContext {
   siteName: string;
   childId: string;
   childName: string;
+  faithLabel?: string;
   sections: FamilySection[];
 }
 
@@ -72,6 +73,7 @@ export class FamilyContextsService {
                 "ace.parent.notices.read",
                 "messaging.conversations.read",
                 "messaging.messages.read",
+                "ace.faith.read",
               ],
             },
             isActive: true,
@@ -105,46 +107,53 @@ export class FamilyContextsService {
         site.id,
         site.orgId,
         async (tx) => {
-          const [relationships, policy, links] = await Promise.all([
-            site.org.parentPortalEnabled
-              ? tx.guardianChildRelationship.findMany({
-                  where: {
-                    tenantId: site.id,
-                    legalAccess: "FULL",
-                    startsAt: { lte: now },
-                    endedAt: null,
-                    revokedAt: null,
-                    guardianIdentity: { tenantId: site.id, userId },
-                    child: { tenantId: site.id, isGuest: false },
-                  },
-                  select: {
-                    child: {
-                      select: { id: true, firstName: true, lastName: true },
+          const [relationships, policy, links, faithSettings] =
+            await Promise.all([
+              site.org.parentPortalEnabled
+                ? tx.guardianChildRelationship.findMany({
+                    where: {
+                      tenantId: site.id,
+                      legalAccess: "FULL",
+                      startsAt: { lte: now },
+                      endedAt: null,
+                      revokedAt: null,
+                      guardianIdentity: { tenantId: site.id, userId },
+                      child: { tenantId: site.id, isGuest: false },
                     },
-                  },
-                })
-              : Promise.resolve([]),
-            tx.studentPortalPolicy.findUnique({
-              where: { tenantId: site.id },
-              select: { studentPortalEnabled: true },
-            }),
-            tx.studentIdentityLink.findMany({
-              where: {
-                tenantId: site.id,
-                linkedAt: { lte: now },
-                endedAt: null,
-                revokedAt: null,
-                studentIdentity: { tenantId: site.id, userId },
-                child: { tenantId: site.id, isGuest: false },
-              },
-              select: {
-                child: {
-                  select: { id: true, firstName: true, lastName: true },
+                    select: {
+                      child: {
+                        select: { id: true, firstName: true, lastName: true },
+                      },
+                    },
+                  })
+                : Promise.resolve([]),
+              tx.studentPortalPolicy.findUnique({
+                where: { tenantId: site.id },
+                select: { studentPortalEnabled: true },
+              }),
+              tx.studentIdentityLink.findMany({
+                where: {
+                  tenantId: site.id,
+                  linkedAt: { lte: now },
+                  endedAt: null,
+                  revokedAt: null,
+                  studentIdentity: { tenantId: site.id, userId },
+                  child: { tenantId: site.id, isGuest: false },
                 },
-              },
-              take: 2,
-            }),
-          ]);
+                select: {
+                  child: {
+                    select: { id: true, firstName: true, lastName: true },
+                  },
+                },
+                take: 2,
+              }),
+              isAceSchool
+                ? tx.faithSiteSettings.findUnique({
+                    where: { tenantId: site.id },
+                    select: { displayLabel: true },
+                  })
+                : Promise.resolve(null),
+            ]);
           const activeParentChildIds =
             isAceSchool && schoolDay && relationships.length > 0
               ? await tx.aceSchoolEnrollment.findMany({
@@ -200,6 +209,7 @@ export class FamilyContextsService {
             ),
             studentChild,
             studentSummaryEnabled: Boolean(studentEnrollment),
+            faithLabel: faithSettings?.displayLabel ?? "Faith Corner",
           };
         },
       );
@@ -210,21 +220,38 @@ export class FamilyContextsService {
         isAceSchool,
       );
       for (const child of scoped.parentChildren) {
+        const faithAvailable =
+          isAceSchool &&
+          scoped.activeParentChildIds.has(child.id) &&
+          activePermissions.has("ace.faith.read") &&
+          !discovery.studentSiteIds.has(site.id);
         items.push({
           kind: "parent",
           siteId: site.id,
           siteName: site.name,
           childId: child.id,
           childName: `${child.firstName} ${child.lastName}`.trim(),
+          ...(faithAvailable ? { faithLabel: scoped.faithLabel } : {}),
           sections:
             scoped.activeParentChildIds.has(child.id) &&
             activePermissions.has("ace.parent.progress.read") &&
             !discovery.studentSiteIds.has(site.id)
-              ? ["ace-summary", ...parentSections]
-              : parentSections,
+              ? [
+                  "ace-summary",
+                  ...parentSections,
+                  ...(faithAvailable ? ["faith" as const] : []),
+                ]
+              : [
+                  ...parentSections,
+                  ...(faithAvailable ? ["faith" as const] : []),
+                ],
         });
       }
       if (scoped.studentChild) {
+        const faithAvailable =
+          isAceSchool &&
+          scoped.studentSummaryEnabled &&
+          activePermissions.has("ace.faith.read");
         items.push({
           kind: "student",
           siteId: site.id,
@@ -232,8 +259,13 @@ export class FamilyContextsService {
           childId: scoped.studentChild.id,
           childName:
             `${scoped.studentChild.firstName} ${scoped.studentChild.lastName}`.trim(),
+          ...(faithAvailable ? { faithLabel: scoped.faithLabel } : {}),
           sections: scoped.studentSummaryEnabled
-            ? ["student-summary", ...CHILD_SECTIONS]
+            ? [
+                "student-summary",
+                ...CHILD_SECTIONS,
+                ...(faithAvailable ? ["faith" as const] : []),
+              ]
             : CHILD_SECTIONS,
         });
       }

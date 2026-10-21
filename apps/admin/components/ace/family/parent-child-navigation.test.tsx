@@ -29,12 +29,14 @@ const contexts = [
     siteName: "Alpha School",
     childId: "child-one",
     childName: "Ari Alpha",
+    faithLabel: "Reflection Room",
     sections: [
       "parent-summary",
       "ace-summary",
       "attendance",
       "sessions",
       "subject-timetable",
+      "faith",
     ],
   },
   {
@@ -43,11 +45,13 @@ const contexts = [
     siteName: "Alpha School",
     childId: "child-two",
     childName: "Bea Alpha",
+    faithLabel: "Reflection Room",
     sections: [
       "parent-summary",
       "ace-summary",
       "attendance",
       "subject-timetable",
+      "faith",
     ],
   },
   {
@@ -83,6 +87,7 @@ async function run() {
   assert.equal(childSectionForRoute("timetable"), "sessions");
   assert.equal(childSectionForRoute("subject-timetable"), "subject-timetable");
   assert.equal(childSectionForRoute("homework"), "homework");
+  assert.equal(childSectionForRoute("faith"), "faith");
   assert.equal(childSectionForRoute("unknown"), null);
 
   const { createRoot } = await import("react-dom/client");
@@ -117,7 +122,8 @@ async function run() {
       | "attendance"
       | "sessions"
       | "subject-timetable"
-      | "homework",
+      | "homework"
+      | "faith",
     key: string,
     status: "authenticated" | "unauthenticated" = "authenticated",
   ) => {
@@ -178,6 +184,22 @@ async function run() {
       [
         "/ace/parent/sites/school-one/children/child-one/homework",
         "/ace/parent/sites/school-one/children/child-two/homework",
+      ],
+    );
+
+    await render("child-one", "faith", "faith");
+    assert.match(container.textContent ?? "", /Viewing Reflection Room/);
+    assert.equal(
+      container.querySelector("nav")?.getAttribute("aria-label"),
+      "Choose child for Reflection Room",
+    );
+    assert.deepEqual(
+      Array.from(container.querySelectorAll("nav a")).map((link) =>
+        link.getAttribute("href"),
+      ),
+      [
+        "/ace/parent/sites/school-one/children/child-one/faith",
+        "/ace/parent/sites/school-one/children/child-two/faith",
       ],
     );
 

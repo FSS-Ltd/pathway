@@ -127,6 +127,18 @@ function ContextList({
                     contextLabel={`for ${context.childName} at ${context.siteName}`}
                   />
                 ) : null}
+                {process.env.NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED === "true" &&
+                context.sections.includes("faith") ? (
+                  <SectionLink
+                    href={
+                      context.kind === "student"
+                        ? `/ace/student/sites/${encodeURIComponent(context.siteId)}/faith`
+                        : `/ace/parent/sites/${encodeURIComponent(context.siteId)}/children/${encodeURIComponent(context.childId)}/faith`
+                    }
+                    label={context.faithLabel ?? "Faith Corner"}
+                    contextLabel={`for ${context.childName} at ${context.siteName}`}
+                  />
+                ) : null}
               </div>
               {context.sections.length === 0 ? (
                 <p className="mt-3 text-sm text-text-muted">
