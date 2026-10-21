@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Header,
+  Inject,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -28,7 +29,9 @@ import { FinanceRecurringInvoiceService } from "./finance-recurring-invoice.serv
 @UseGuards(AuthUserGuard, FinanceAccessGuard, PermissionGuard)
 export class FinanceRecurringInvoiceController {
   constructor(
+    @Inject(FinanceRecurringInvoiceService)
     private readonly templates: FinanceRecurringInvoiceService,
+    @Inject(PathwayRequestContext)
     private readonly requestContext: PathwayRequestContext,
   ) {}
 
