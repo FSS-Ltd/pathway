@@ -974,12 +974,13 @@ slice adds student and guardian reading routes, school-configured Faith
 terminology in family navigation, and student-only reflection entry. Mobile
 reading and offline cache remain paused, so full C08 acceptance remains open.
 Student read receipts require an explicit button; opening content makes no
-write.
+write. The family feed pages the current eligible version by publication time,
+so scheduled content and revisions appear in the reading order shown to users.
 `NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED` defaults off and gates family navigation and
 pages until a separate school release decision. Local checks passed for API
 and admin typechecks, focused lint and formatting, both production builds,
 the admin unit chain, and the family-context and Faith-content PostgreSQL
-HTTP suites (6/6 and 4/4 tests) against a disposable database. A signed-in
+HTTP suites (6/6 and 5/5 tests) against a disposable database. A signed-in
 linked-account browser review remains pending. PR and CI evidence will be
 recorded when the current step reaches its delivery gate. The verified ACE
 count remains **48/150 (32%)**.

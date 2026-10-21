@@ -569,6 +569,87 @@ describe("ACE Faith content lifecycle", () => {
     });
   });
 
+  it("orders eligible readings by publication time before paging", async () => {
+    if (!app) throw new Error("E2E app did not start");
+    const create = async (title: string, ageScoped = false) => {
+      const response = await request(app!.getHttpServer())
+        .post("/ace/faith/content")
+        .set("Authorization", leaderAuth)
+        .send({
+          title,
+          contentPayload: { body: "A school reading." },
+          audience: ageScoped
+            ? { type: "AGE_BAND", ageBandIds: [ageBandId] }
+            : { type: "ALL_ACTIVE_STUDENTS" },
+        });
+      expect(response.status).toBe(201);
+      return response.body as { id: string; draftId: string };
+    };
+    const publish = async (draft: { id: string; draftId: string }) => {
+      const response = await request(app!.getHttpServer())
+        .post(`/ace/faith/content/${draft.id}/publish`)
+        .set("Authorization", leaderAuth)
+        .send({ draftId: draft.draftId, expectedVersionId: null });
+      expect(response.status).toBe(201);
+      return response.body.id as string;
+    };
+    const laterPublishedDraft = await create("Created first, published second");
+    const earlierPublishedDraft = await create(
+      "Created second, published first",
+    );
+    const ageScopedDraft = await create("Older pupils only", true);
+    const earlierPublishedVersionId = await publish(earlierPublishedDraft);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const laterPublishedVersionId = await publish(laterPublishedDraft);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const ageScopedVersionId = await publish(ageScopedDraft);
+    try {
+      const youngerFirst = await request(app.getHttpServer())
+        .get(
+          `/ace/faith/sites/${siteId}/feed?childId=${youngerChildId}&limit=1`,
+        )
+        .set("Authorization", guardianAuth);
+      expect(youngerFirst.status).toBe(200);
+      expect(
+        youngerFirst.body.items.map((item: { id: string }) => item.id),
+      ).toEqual([laterPublishedDraft.id]);
+      expect(youngerFirst.body.nextCursor).toBe(laterPublishedVersionId);
+      const youngerSecond = await request(app.getHttpServer())
+        .get(
+          `/ace/faith/sites/${siteId}/feed?childId=${youngerChildId}&limit=1&cursor=${youngerFirst.body.nextCursor}`,
+        )
+        .set("Authorization", guardianAuth);
+      expect(youngerSecond.status).toBe(200);
+      expect(
+        youngerSecond.body.items.map((item: { id: string }) => item.id),
+      ).toEqual([earlierPublishedDraft.id]);
+      expect(youngerSecond.body.items[0].id).not.toBe(ageScopedDraft.id);
+      const olderFirst = await request(app.getHttpServer())
+        .get(`/ace/faith/sites/${siteId}/feed?childId=${childId}&limit=1`)
+        .set("Authorization", guardianAuth);
+      expect(olderFirst.status).toBe(200);
+      expect(olderFirst.body.items[0].id).toBe(ageScopedDraft.id);
+      const inaccessibleCursor = await request(app.getHttpServer())
+        .get(
+          `/ace/faith/sites/${siteId}/feed?childId=${youngerChildId}&cursor=${ageScopedVersionId}`,
+        )
+        .set("Authorization", guardianAuth);
+      expect(inaccessibleCursor.status).toBe(404);
+    } finally {
+      for (const [draft, versionId] of [
+        [laterPublishedDraft, laterPublishedVersionId],
+        [earlierPublishedDraft, earlierPublishedVersionId],
+        [ageScopedDraft, ageScopedVersionId],
+      ] as const) {
+        const response = await request(app.getHttpServer())
+          .post(`/ace/faith/content/${draft.id}/withdraw`)
+          .set("Authorization", leaderAuth)
+          .send({ expectedVersionId: versionId });
+        expect(response.status).toBe(201);
+      }
+    }
+  });
+
   it("publishes due drafts and marks a schedule for review when its publisher becomes inactive", async () => {
     if (!app) throw new Error("E2E app did not start");
     const create = async (title: string) => {

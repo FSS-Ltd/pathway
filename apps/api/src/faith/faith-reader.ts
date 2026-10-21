@@ -89,21 +89,7 @@ export function faithAudienceIncludesAge(
   birth: Date | null,
   today: Date,
 ): boolean {
-  const birthdayThisYear = birth
-    ? new Date(
-        Date.UTC(
-          today.getUTCFullYear(),
-          birth.getUTCMonth(),
-          birth.getUTCDate(),
-        ),
-      )
-    : null;
-  const age =
-    birth && birthdayThisYear
-      ? today.getUTCFullYear() -
-        birth.getUTCFullYear() -
-        (today < birthdayThisYear ? 1 : 0)
-      : null;
+  const age = faithStudentAge(birth, today);
   return audiences.some(
     (audience) =>
       audience.type === "ALL_ACTIVE_STUDENTS" ||
@@ -114,4 +100,24 @@ export function faithAudienceIncludesAge(
         age >= audience.minimumAge &&
         age <= audience.maximumAge),
   );
+}
+
+export function faithStudentAge(
+  birth: Date | null,
+  today: Date,
+): number | null {
+  const birthdayThisYear = birth
+    ? new Date(
+        Date.UTC(
+          today.getUTCFullYear(),
+          birth.getUTCMonth(),
+          birth.getUTCDate(),
+        ),
+      )
+    : null;
+  return birth && birthdayThisYear
+    ? today.getUTCFullYear() -
+        birth.getUTCFullYear() -
+        (today < birthdayThisYear ? 1 : 0)
+    : null;
 }
