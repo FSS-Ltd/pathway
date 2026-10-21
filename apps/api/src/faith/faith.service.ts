@@ -280,17 +280,37 @@ export class FaithService {
     return getFaithSettings(actor);
   }
 
-  async updateSettings(input: { displayLabel: string }, actor: FaithActor) {
+  async updateSettings(
+    input: { displayLabel: string; reflectionsEnabled?: boolean },
+    actor: FaithActor,
+  ) {
     assertFaithActor(actor);
     if (!authoringEnabled())
       throw new ServiceUnavailableException("Faith authoring is not enabled");
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await requireFaithStaff(tx, actor, true);
+      if (
+        input.reflectionsEnabled === true &&
+        process.env.ACE_FAITH_REFLECTIONS_ENABLED !== "true"
+      ) {
+        throw new ServiceUnavailableException(
+          "Faith reflections are not enabled",
+        );
+      }
       const row = await tx.faithSiteSettings.upsert({
         where: { tenantId: actor.tenantId },
-        create: { tenantId: actor.tenantId, displayLabel: input.displayLabel },
-        update: { displayLabel: input.displayLabel },
-        select: { displayLabel: true },
+        create: {
+          tenantId: actor.tenantId,
+          displayLabel: input.displayLabel,
+          reflectionsEnabled: input.reflectionsEnabled ?? false,
+        },
+        update: {
+          displayLabel: input.displayLabel,
+          ...(input.reflectionsEnabled === undefined
+            ? {}
+            : { reflectionsEnabled: input.reflectionsEnabled }),
+        },
+        select: { displayLabel: true, reflectionsEnabled: true },
       });
       await auditFaith(
         tx,

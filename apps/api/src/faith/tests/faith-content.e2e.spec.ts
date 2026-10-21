@@ -561,7 +561,11 @@ describe("ACE Faith content lifecycle", () => {
     const settings = await request(app.getHttpServer())
       .get("/ace/faith/settings")
       .set("Authorization", leaderAuth);
-    expect(settings.body).toEqual({ displayLabel: "School Reflections" });
+    expect(settings.body).toEqual({
+      displayLabel: "School Reflections",
+      reflectionsEnabled: false,
+      reflectionFeatureAvailable: false,
+    });
   });
 
   it("publishes due drafts and marks a schedule for review when its publisher becomes inactive", async () => {

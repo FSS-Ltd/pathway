@@ -68,6 +68,7 @@ export const withdrawFaithSchema = z
 export const faithSettingsSchema = z
   .object({
     displayLabel: z.string().trim().min(2).max(60),
+    reflectionsEnabled: z.boolean().optional(),
   })
   .strict();
 export const faithFeedQuerySchema = z

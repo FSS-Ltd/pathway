@@ -57,6 +57,9 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R38: "migrated",
   R39: "migrated",
   R40: "migrated",
+  R41: "migrated",
+  R42: "migrated",
+  R43: "migrated",
   R69: { pending: "self-scoped; no capability/permission layer by design" },
   R70: "migrated",
   R71: "migrated",
@@ -76,6 +79,9 @@ const ROUTE_STATUS: Record<string, "migrated" | { pending: string }> = {
   R85: "migrated",
   R86: "migrated",
   R87: "migrated",
+  R88: "migrated",
+  R89: "migrated",
+  R90: "migrated",
 };
 
 for (let n = 15; n <= 68; n += 1) {

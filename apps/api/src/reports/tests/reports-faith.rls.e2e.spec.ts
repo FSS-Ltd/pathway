@@ -2217,6 +2217,10 @@ describe("ACE report publication storage", () => {
           tx.$executeRaw`
             UPDATE "FaithReflection"
             SET
+              "moderationStatus" = 'APPROVED',
+              "moderatedAt" = ${new Date("2026-08-01T10:30:00.000Z")},
+              "moderatedByUserId" = ${fixture.reviewerUserId},
+              "visibility" = 'RELEASED_GUARDIANS',
               "guardianReleasedAt" = ${new Date("2026-08-01T11:00:00.000Z")},
               "releasedByUserId" = ${fixture.unrelatedUserId}
             WHERE "id" = ${reflectionId}
@@ -2272,6 +2276,10 @@ describe("ACE report publication storage", () => {
         await tx.$executeRaw`
           UPDATE "FaithReflection"
           SET
+            "moderationStatus" = 'APPROVED',
+            "moderatedAt" = ${new Date("2026-08-01T10:30:00.000Z")},
+            "moderatedByUserId" = ${fixture.reviewerUserId},
+            "visibility" = 'RELEASED_GUARDIANS',
             "guardianReleasedAt" = ${new Date("2026-08-01T11:00:00.000Z")},
             "releasedByUserId" = ${fixture.reviewerUserId}
           WHERE "id" = ${reflectionId}
