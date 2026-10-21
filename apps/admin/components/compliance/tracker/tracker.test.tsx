@@ -6,6 +6,7 @@ import type {
   TrackerChecklist,
   TrackerChecklistItem,
   TrackerAttestationInput,
+  TrackerProfileInput,
 } from "@pathway/types";
 import { TrackerWorkspace } from "./workspace";
 import { Confirmation } from "./confirmation";
@@ -199,11 +200,18 @@ async function run() {
     await settle();
   };
   try {
+    let selectedProfile: TrackerProfileInput | null = null;
     await act(async () =>
       root.render(
         <ProfileFields
-          value={{ ...emptyProfile, jurisdictionId: "brussels" }}
-          setValue={() => {}}
+          value={{
+            ...emptyProfile,
+            jurisdictionId: "brussels",
+            belgianEducationCommunity: "FRENCH",
+          }}
+          setValue={(next) => {
+            selectedProfile = next;
+          }}
           jurisdictions={[
             {
               id: "brussels",
@@ -213,14 +221,32 @@ async function run() {
               level: "REGION",
               parentJurisdictionId: "belgium",
             },
+            {
+              id: "england",
+              countryCode: "GB",
+              subdivisionCode: "GB-ENG",
+              name: "England",
+              level: "NATION",
+              parentJurisdictionId: "uk",
+            },
           ]}
         />,
       ),
     );
     assert.match(
       host.textContent ?? "",
-      /Region does not identify the language Community/,
+      /Region does not identify the education Community/,
     );
+    assert.match(host.textContent ?? "", /Education language Community/);
+    assert.match(host.textContent ?? "", /German Speaking/);
+    const operatingLocation = host.querySelector("select");
+    assert.ok(operatingLocation);
+    await act(async () => {
+      operatingLocation.value = "england";
+      operatingLocation.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    assert.equal(selectedProfile?.jurisdictionId, "england");
+    assert.equal(selectedProfile?.belgianEducationCommunity, null);
     await act(async () => root.render(<TrackerWorkspace canManage />));
     await settle();
     assert.match(host.textContent ?? "", /could not be refreshed/);

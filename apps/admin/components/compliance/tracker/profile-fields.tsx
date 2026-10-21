@@ -18,6 +18,7 @@ export const emptyProfile: TrackerProfileInput = {
   jurisdictionId: null,
   region: null,
   localAuthority: null,
+  belgianEducationCommunity: null,
   sector: null,
   vertical: null,
   providerCategory: null,
@@ -95,7 +96,18 @@ export function ProfileFields({
         <select
           className={fieldClass}
           value={value.jurisdictionId ?? ""}
-          onChange={(e) => set("jurisdictionId", e.target.value || null)}
+          onChange={(e) => {
+            const jurisdictionId = e.target.value || null;
+            const country = jurisdictions.find(
+              (item) => item.id === jurisdictionId,
+            )?.countryCode;
+            setValue({
+              ...value,
+              jurisdictionId,
+              belgianEducationCommunity:
+                country === "BE" ? value.belgianEducationCommunity : null,
+            });
+          }}
         >
           <option value="">Unknown — choose operating location</option>
           {jurisdictions.map((j) => (
@@ -110,11 +122,23 @@ export function ProfileFields({
         </span>
       </label>
       {isBelgianSite && (
-        <p className="text-sm text-text-muted sm:col-span-2">
-          Belgium's geographic Region does not identify the language Community
-          responsible for education or childcare. Confirm the competent
-          authority for the site's provision before relying on the checklist.
-        </p>
+        <div className="space-y-2 sm:col-span-2">
+          <Choice
+            label="Education language Community"
+            value={value.belgianEducationCommunity ?? null}
+            options={["FLEMISH", "FRENCH", "GERMAN_SPEAKING"]}
+            onChange={(belgianEducationCommunity) =>
+              set("belgianEducationCommunity", belgianEducationCommunity)
+            }
+          />
+          <p className="text-sm text-text-muted">
+            Belgium's geographic Region does not identify the education
+            Community. Confirm the competent authority for the site's actual
+            education. Childcare licensing may follow a different route,
+            including ONE, Opgroeien or Iriscare in Brussels. This selection
+            does not certify registration or remove unreviewed coverage gaps.
+          </p>
+        </div>
       )}
       {(["region", "localAuthority"] as const).map((key) => (
         <label className="block min-w-0" key={key}>

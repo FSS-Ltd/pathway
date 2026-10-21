@@ -17,6 +17,7 @@ export interface TrackerProfileInput {
   jurisdictionId: string | null;
   region: string | null;
   localAuthority: string | null;
+  belgianEducationCommunity?: "FLEMISH" | "FRENCH" | "GERMAN_SPEAKING" | null;
   sector: Sector | null;
   vertical: InstitutionalVertical | null;
   providerCategory:

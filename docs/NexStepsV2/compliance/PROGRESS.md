@@ -1931,3 +1931,60 @@ admin test command passed. Complete API/database integration shard 2 passed
 catalogue selection, current source publication, persistence, site isolation
 and the Belgian Region gap; they do not establish substantive Community law
 coverage. Final staged diff review and the PR remain.
+
+### Belgium Region inventory merged; Community profile classification begins
+
+[PR #711](https://github.com/FSS-Ltd/pathway/pull/711) passed all nine current-head
+checks on `98a561d0cbfeda7a2a4d847f3ad556b8d633e042`: typecheck/lint/unit,
+both integration shards, organisation-role RLS, permission-definition database,
+system-role seed identity, CodeQL, and both analyses. GitHub confirmed `MERGED`
+at 2026-10-21T13:21:10Z with merge
+`d55932f06bbca623cea4701496dd6a107224cf63`; fetched `fss/master`
+matched and had the checked head as its second parent. The next step starts
+from that merge on `feature/compliance-belgium-community-profile`. All 144
+Belgian Region cells remain `IN_REVIEW`.
+
+### Belgian education-Community profile — local verification complete
+
+The [Belgian federal portal](https://www.belgium.be/en/about_belgium/government/communities)
+distinguishes the three language Communities from the three geographic Regions.
+This step adds an explicit nullable education-Community fact for Belgian site
+profiles, validates it at the API boundary and against the selected operating
+country, and makes it usable by future catalogue conditions. Existing profiles
+remain unknown; a Region never infers a Community. The fact is stored in the
+existing versioned profile JSON and revision history, so no schema migration is
+needed. Even after selection, Community duties remain unpublished until their
+source/applicability review is complete; the tracker continues to show gaps.
+
+Belgian childcare licensing is a separate unresolved classification.
+[Opgroeien's Brussels starter guidance](https://www.opgroeien.be/aanbod/kinderopvang/starters)
+distinguishes Opgroeien, ONE and Iriscare according to the care setting and its
+organisation; it must not be inferred from the education Community.
+
+Local verification on this branch: API/admin typechecks and builds passed; root
+lint passed all 16 packages, with separate ESLint for the changed admin
+`components` files; Prettier, Prisma schema validation and permission-definition
+zero-drift passed. The full compliance unit subset passed **62 suites / 340
+tests**, the admin package runtime command passed, and the focused tracker
+integration passed **1 suite / 16 tests** on the disposable database, including
+Community persistence, Belgian Region gap, non-Belgian rejection and existing
+site/tenant boundaries. Graphify refreshed to 8,993 nodes / 13,387 edges; it
+skipped HTML visualisation because the graph exceeds its renderer's limit. The
+actual profile component was inspected in the in-app browser at desktop,
+390-pixel mobile and 125% text sizes using synthetic data. Its Community
+selector was keyboard-selectable; the runtime test confirmed that switching
+from Belgium to England clears the Community fact. An authenticated live-portal
+session was not available for this local preview.
+
+An initial API typecheck used a stale local Prisma client; regeneration resolved
+unrelated faith-schema errors. The first integration attempt targeted the
+stale default test database and lacked compliance tables; a second attempt
+accidentally reset the disposable database twice, removing seeded permission
+definitions. The corrected global-setup-only reset passed. A repository-wide
+serial unit run reached 196 suites before Node exhausted its heap. A
+worker-recycled retry was stopped after 13 suites because the full compliance
+subset and the required PR CI provide the relevant and repository-wide checks,
+respectively. The first two admin build attempts lacked local prerender
+configuration; a synthetic Clerk key and test API URL resolved that. The final
+staged diff and all changed files were inspected without a remaining code issue.
+The PR, current-head CI and host-confirmed merge remain.

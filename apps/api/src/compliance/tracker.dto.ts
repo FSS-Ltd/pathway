@@ -22,6 +22,10 @@ export const trackerProfileInput = z
     jurisdictionId: trackerId.nullable(),
     region: text,
     localAuthority: text,
+    belgianEducationCommunity: z
+      .enum(["FLEMISH", "FRENCH", "GERMAN_SPEAKING"])
+      .nullable()
+      .optional(),
     sector: z
       .enum(["CHURCH", "CLUB", "SCHOOL", "CHARITY", "LEARNING_CENTRE"])
       .nullable(),
@@ -97,6 +101,7 @@ export const trackerProfileInput = z
       });
   });
 const additionalProfileDefaults = {
+  belgianEducationCommunity: null,
   schoolCategory: null,
   englandSchoolMedicalDutiesApply: null,
   personalDataController: null,
