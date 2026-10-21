@@ -1006,4 +1006,80 @@ describe("Site tracker persistence and permission boundaries", () => {
       catalogueProvider.catalogue = trackerFixture();
     }
   });
+  it("persists and scopes the German-speaking school route", async () => {
+    if (!app) return;
+    const server = app.getHttpServer();
+    const jurisdictions = await request(server)
+      .get("/compliance/tracker/jurisdictions")
+      .set("Authorization", reader)
+      .expect(200);
+    const wallonia = jurisdictions.body.find(
+      (entry: { subdivisionCode: string }) => entry.subdivisionCode === "BE3",
+    );
+    const brussels = jurisdictions.body.find(
+      (entry: { subdivisionCode: string }) => entry.subdivisionCode === "BE1",
+    );
+    const german = await save({
+      ...testProfile,
+      jurisdictionId: wallonia.id,
+      belgianEducationCommunity: "GERMAN_SPEAKING",
+      belgianSchoolRecognitionStatus: null,
+      belgianFrenchSchoolRoute: null,
+      belgianGermanSchoolRoute: "DG_SUBSIDISED",
+      belgianGermanReducedHoursSecondary: false,
+      belgianChildcareAuthority: null,
+      belgianPaidUnderThreeCare: null,
+      childcare: false,
+    });
+    expect(german.profile.belgianGermanSchoolRoute).toBe("DG_SUBSIDISED");
+    expect(german.profile.belgianGermanReducedHoursSecondary).toBe(false);
+    catalogueProvider.catalogue = TRACKER_CATALOGUE;
+    try {
+      const checklist = await request(server)
+        .get("/compliance/tracker/checklist")
+        .set("Authorization", reader)
+        .expect(200);
+      expect(
+        checklist.body.items.find(
+          (entry: { requirement: { id: string } }) =>
+            entry.requirement.id === "bel.german-school-project",
+        )?.applicability,
+      ).toBe("APPLICABLE");
+      await expect(
+        save({
+          ...testProfile,
+          jurisdictionId: brussels.id,
+          belgianEducationCommunity: "GERMAN_SPEAKING",
+          belgianSchoolRecognitionStatus: null,
+          belgianFrenchSchoolRoute: null,
+          belgianGermanSchoolRoute: "DG_SUBSIDISED",
+          belgianGermanReducedHoursSecondary: false,
+          belgianChildcareAuthority: null,
+          belgianPaidUnderThreeCare: null,
+        }),
+      ).rejects.toThrow("German-speaking Community school route requires");
+      await expect(
+        save({
+          ...testProfile,
+          jurisdictionId: wallonia.id,
+          providerCategory: "OUT_OF_SCHOOL",
+          belgianEducationCommunity: "GERMAN_SPEAKING",
+          belgianSchoolRecognitionStatus: null,
+          belgianFrenchSchoolRoute: null,
+          belgianGermanSchoolRoute: null,
+          belgianGermanReducedHoursSecondary: false,
+          belgianChildcareAuthority: null,
+          belgianPaidUnderThreeCare: null,
+        }),
+      ).rejects.toThrow("Reduced-hours secondary classification requires");
+      await expect(
+        save({
+          ...testProfile,
+          belgianGermanSchoolRoute: "DG_SUBSIDISED",
+        }),
+      ).rejects.toThrow("Belgian education and childcare facts apply only");
+    } finally {
+      catalogueProvider.catalogue = trackerFixture();
+    }
+  });
 });

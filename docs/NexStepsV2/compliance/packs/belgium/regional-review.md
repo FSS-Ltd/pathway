@@ -125,3 +125,31 @@ year. Unknown age or route leaves applicability unresolved. An outside-network
 learning centre that is not legally a school still requires separate review.
 School admission to subsidies, special education, German-speaking provision,
 and regional/municipal duties remain open; no coverage cell is closed.
+
+## German-speaking Community organised and subsidised schools
+
+Reviewed 21 October 2026 against the [consolidated 31 August 1998
+decree](https://refli.be/fr/lex/1998037687), especially Articles 1, 20, 28,
+40 and 41. Article 1 applies the decree to ordinary and specialised schools
+organised or subsidised by the German-speaking Community, but extends only
+selected articles, including Article 28, to reduced-hours secondary education.
+Article 20 requires a school project; Articles 40–41 require internal
+regulations and acknowledgements at enrolment and after amendments. Those
+three articles must not be assigned to the reduced-hours category through this
+decree. Article 28 obliges the school head to assist official enrolment and
+regular-attendance controls in both categories.
+Portal attendance and agreement records are supporting signals, not proof of
+any government report or signature. The [Community's primary-school
+guidance](https://ostbelgienbildung.be/PortalData/21/Resources/downloads/home/schulvorschriften/Schulvorschrift_Gruendung_Schliessung.pdf)
+explains that recognition can exist without subsidy, so the profile records
+organised, subsidised, recognised-unsubsidised and outside-network routes
+separately. No legal duty from the organised/subsidised decree is assigned to
+the latter two routes merely because a school is private or recognised.
+
+Recognition conditions for unsubsidised schools, home education, admissions
+by organising-body type, specialised provision, language arrangements and
+municipal rules still require separate review. The school-route selection is
+restricted to actual schools with a compatible known operating Region. A
+separate reduced-hours secondary declaration is not inferred from a generic
+part-time timetable. Uncertain route, classification or location remains
+unresolved. Belgian cells remain partial.

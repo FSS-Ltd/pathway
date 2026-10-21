@@ -34,6 +34,16 @@ export const trackerProfileInput = z
       .enum(["FWB_ORGANISED", "FWB_SUBSIDISED", "OUTSIDE_FWB_NETWORK"])
       .nullable()
       .optional(),
+    belgianGermanSchoolRoute: z
+      .enum([
+        "DG_ORGANISED",
+        "DG_SUBSIDISED",
+        "DG_RECOGNISED_UNSUBSIDISED",
+        "OUTSIDE_DG_NETWORK",
+      ])
+      .nullable()
+      .optional(),
+    belgianGermanReducedHoursSecondary: flag.optional(),
     belgianChildcareAuthority: z
       .enum(["OPGROEIEN", "ONE", "IRISCARE", "GERMAN_COMMUNITY_MINISTRY"])
       .nullable()
@@ -117,6 +127,8 @@ const additionalProfileDefaults = {
   belgianEducationCommunity: null,
   belgianSchoolRecognitionStatus: null,
   belgianFrenchSchoolRoute: null,
+  belgianGermanSchoolRoute: null,
+  belgianGermanReducedHoursSecondary: null,
   belgianChildcareAuthority: null,
   belgianPaidUnderThreeCare: null,
   schoolCategory: null,

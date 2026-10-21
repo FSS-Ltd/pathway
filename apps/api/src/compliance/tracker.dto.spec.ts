@@ -99,6 +99,22 @@ describe("Tracker boundary validation", () => {
       }).success,
     ).toBe(false);
   });
+  it("accepts a German-speaking Community school route as a separate provider fact", () => {
+    const profile = trackerProfileInput.parse({
+      ...testProfile,
+      belgianEducationCommunity: "GERMAN_SPEAKING",
+      belgianGermanSchoolRoute: "DG_RECOGNISED_UNSUBSIDISED",
+      belgianGermanReducedHoursSecondary: false,
+    });
+    expect(profile.belgianGermanSchoolRoute).toBe("DG_RECOGNISED_UNSUBSIDISED");
+    expect(profile.belgianGermanReducedHoursSecondary).toBe(false);
+    expect(
+      trackerProfileInput.safeParse({
+        ...testProfile,
+        belgianGermanSchoolRoute: "RECOGNISED",
+      }).success,
+    ).toBe(false);
+  });
   it("rejects caller scope on archive", () => {
     expect(
       trackerArchiveInput.safeParse({ tenantId: "injected" }).success,
