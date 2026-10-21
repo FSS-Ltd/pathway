@@ -989,9 +989,13 @@ HTTP suites (6/6 and 5/5 tests) against a disposable database. A signed-in
 linked-account browser review remains pending. The verified ACE count remains
 **48/150 (32%)**.
 
-ACE-C09 trip and permission-slip versioning is in progress in
-[PR #715](https://github.com/FSS-Ltd/pathway/pull/715) on
-`feature/ace-c09-trip-slip-versioning`, based on the confirmed C08 merge.
+ACE-C09 trip and permission-slip versioning merged in
+[PR #715](https://github.com/FSS-Ltd/pathway/pull/715) on 21 October 2026.
+All nine latest-head checks passed on
+`7cce9e343ebb6237fad956cd60dc9e37615bff2a` (CI run `39622506619`);
+the CI log confirms the permission-slip-version unit test and
+trip-slip-version and trips-slips.rls PostgreSQL E2E suites ran.
+GitHub reports merge commit `66837066ad1414aabcaa36a243e35428caf7b0ca`.
 The API step adds site-scoped trip drafts and cancellation, permission-slip
 drafts and immutable published snapshots with a reproducible SHA-256 hash,
 recipient snapshots, change classification, scheduled publication, and a
@@ -1000,9 +1004,12 @@ recipient changes require reconsent; a display-title correction alone does
 not. Publication defaults off behind `ACE_TRIP_SLIP_PUBLICATION_ENABLED`.
 The existing Oasis permission-slip implementation was reviewed read-only at
 `f31ec65`; C09 keeps tenant and student eligibility checks at publication
-instead of trusting submitted child identifiers. The initial PR revision was
-`3e067259`; latest-head CI and merge evidence are pending. The verified ACE
-count remains **48/150 (32%)**.
+instead of trusting submitted child identifiers. Full C09 acceptance remains
+open until each guardian response can reproduce the exact consent text they
+accepted. ACE-C10 guardian response commands are in progress on
+`feature/ace-c10-guardian-consent`; online responses default off pending an
+approved school retention instruction for consent records, IP and device
+metadata. The verified ACE count remains **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.
