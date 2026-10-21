@@ -1,6 +1,6 @@
 # Finance provider compatibility evidence
 
-**As of:** 19 October 2026.
+**As of:** 21 October 2026.
 
 **Decision:** No live collection is authorised. One-off card collection is planned through Stripe Connect direct charges. The connected school account and account-scoped transaction path must be exercised in T07–T10 before release. Direct-charge Bacs remains blocked pending explicit Stripe compatibility evidence; do not substitute another charge model.
 
@@ -21,6 +21,27 @@ Read-only v1 and v2 connected-account list responses returned no accounts. No sc
 On 18 October 2026, a read-only test-mode check found the newly connected school test account still had card payments inactive and onboarding requirements incomplete. It cannot create a Finance card Checkout Session yet. No payment was created. Complete test-account onboarding before claiming provider-backed Checkout verification; do not use live mode for this proof.
 
 On 19 October 2026, a read-only check using the test platform key returned one connected account in GB. Its details were not submitted, requirements were past due, charges and payouts were disabled, and `card_payments` was `inactive`; `bacs_debit_payments` was absent and Bacs display settings were not configured. The response contained no evidence that this account is ready for school collection. Account identifiers and personal details are intentionally omitted.
+
+On 21 October 2026, after sandbox Connect authorization was restored, a fictional GB company profile and Stripe test address were saved to the existing test-mode school account. Its Accounts v2 status remains `card_payments: restricted` with no request recorded, no `bacs_debit_payments` capability, and past-due requirements. A follow-up Accounts v2 update to add remaining business fields and request capabilities returned HTTP 403 because hosted onboarding had already started. The generated hosted onboarding link opens a Stripe login-creation step and requires completion by the school's owner or a manager. The page is left open in the Codex in-app browser for user handoff; no password or agreement acceptance was submitted. The remaining profile and capability work must use that hosted flow. No Bacs setup, mandate, or payment was created. Account identifiers and personal details are intentionally omitted.
+
+#### Synthetic school profile for sandbox testing only
+
+Use the following fictional GB school data with Stripe test keys only. Stripe documents test values for successful identity, address, business-ID, phone, URL and payout verification in its [Connect testing guide](https://docs.stripe.com/connect/testing). These values do not establish that the direct-charge Bacs path is supported.
+
+| Field | Sandbox test value |
+| --- | --- |
+| School | `NexSteps Demo School Ltd` (already saved) |
+| Entity | GB company; use `private_corporation` only for this fictional incorporated-company fixture |
+| Business address | `address_full_match`, London, `EC1A 1BB`, GB |
+| Business registration ID | `000000000` (Stripe test success value; use only if the GB company-number field accepts the test token) |
+| Business URL | `https://accessible.stripe.com` (Stripe test success URL) |
+| Product description | `School tuition, meals and activities for sandbox testing` |
+| School phone | `0000000000` (Stripe test success value) |
+| Representative, director and sole owner | `Alex Example`, title `Director`, 100% ownership; fictional test identity |
+| Representative date of birth and ID | `1901-01-01` and `000000000` (Stripe test success values) |
+| Payout bank | Sort code `108800`, account `00012345` (Stripe GB test payout success values) |
+
+Use a test inbox controlled by the operator for Stripe login or account notices; `example.com` is only a placeholder. The account holder must create or sign in to the Stripe login, confirm the prefilled test information, and accept the test-mode Connect agreement in the hosted form. Do not record or submit those attestations on the account holder's behalf. The current account already has hosted onboarding started, so Stripe-managed business and person details must be entered through that flow; the Accounts v2 API restricts edits after onboarding starts ([update-account reference](https://docs.stripe.com/api/v2/core/accounts/update)).
 
 ### Bacs Direct Debit
 
