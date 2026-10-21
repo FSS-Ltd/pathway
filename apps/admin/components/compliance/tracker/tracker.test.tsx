@@ -346,6 +346,14 @@ async function run() {
               level: "LOCAL_AUTHORITY",
               parentJurisdictionId: "northern-ireland",
             },
+            {
+              id: "dublin-city",
+              countryCode: "IE",
+              subdivisionCode: "IE-LA-265011",
+              name: "Dublin City Council",
+              level: "LOCAL_AUTHORITY",
+              parentJurisdictionId: "ireland",
+            },
           ]}
           canManage
           onSaved={() => changed++}
@@ -367,6 +375,10 @@ async function run() {
     assert.match(
       host.querySelector('option[value="belfast"]')?.textContent ?? "",
       /Belfast · GB \(local government district\)/,
+    );
+    assert.match(
+      host.querySelector('option[value="dublin-city"]')?.textContent ?? "",
+      /Dublin City Council · IE \(local authority\)/,
     );
     await click("Save profile");
     assert.match(host.textContent ?? "", /draft has been kept/);

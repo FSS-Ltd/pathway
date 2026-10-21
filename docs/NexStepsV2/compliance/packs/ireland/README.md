@@ -11,3 +11,7 @@ The pack uses [EU GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng) and [
 Every Irish sector/topic cell remains `PARTIALLY_PUBLISHED` and its regional status `IN_REVIEW`. School recognition, Tusla service classification, local-authority or fire conditions, specialist permissions, childcare staffing ratios, additional educational needs, individual vetting eligibility, detailed data-rights/DPIA/DPO duties, transport and boarding require further review. The item-level N/A policy requires a documented reason where an exception is allowed. A missing profile fact remains unresolved; it must not fall back to England or silently count as no obligation.
 
 Scripted source checks returned HTTP 200 for the Irish Statute Book, Tusla, regulator, FSAI and provider pages. Some gov.ie pages reject scripted requests, while EUR-Lex returned HTTP 202; the content and citation paths were cross-checked with official source search. These access limitations do not change the remaining partial-coverage status. See [PROGRESS.md](../../PROGRESS.md) for test and PR evidence.
+
+Catalogue 1.36.0 adds the [31 local-authority selectors](local-authority-inventory.md)
+from Tailte Éireann's 2024 statutory-boundary data. Their 1,488 sector/topic
+cells remain `IN_REVIEW`; Tusla areas and specialist duties remain separate gaps.
