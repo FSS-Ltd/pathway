@@ -11,3 +11,8 @@ The core applies [EU GDPR](https://eur-lex.europa.eu/eli/reg/2016/679/oj/eng) wi
 Every Austrian sector/topic cell remains `PARTIALLY_PUBLISHED`, with regional status `IN_REVIEW`. [Regional inventory](regional-review.md) identifies all nine Länder. Kindergarten authorisation, staffing and safeguarding; building, fire and accessibility permits; youth supervision; local transport and specialist food approval are not complete. A site with no recorded Land cannot receive a presumed regional rule, and an unreviewed Land never means no obligation. Actual provider classification, funding and ACE/ICCE participation remain separate facts.
 
 The pack's primary sources were checked against official legal/regulator pages. RIS links include a 2026 date parameter to avoid silently switching to the 2027 private-school text. See [PROGRESS.md](../../PROGRESS.md) for local checks, source access limits and PR evidence.
+
+Catalogue 1.37.0 adds the [nine Bundesland selectors](regional-review.md) from
+the Austrian government's ISO subdivision list. Their 432 sector/topic cells
+remain `IN_REVIEW`; district, municipality and provider-specific duties remain
+separate gaps.

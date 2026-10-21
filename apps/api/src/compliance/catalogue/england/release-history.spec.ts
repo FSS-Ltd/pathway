@@ -11,8 +11,8 @@ const now = new Date(`${TRACKER_CATALOGUE.releasedAt}T12:00:00Z`);
 describe("England published catalogue history", () => {
   it("preserves the published first release and gives additions a new release", () => {
     expect(catalogueSchema.parse(catalogueV11).requirements).toHaveLength(68);
-    expect(TRACKER_CATALOGUE.version).toBe("1.36.0");
-    expect(TRACKER_CATALOGUE.releasedAt).toBe("2026-10-20");
+    expect(TRACKER_CATALOGUE.version).toBe("1.37.0");
+    expect(TRACKER_CATALOGUE.releasedAt).toBe("2026-10-21");
   });
   it.each(["eng-transport-review", "eng-boarding-classification"])(
     "retains %s version 1 but requires a new confirmation for its material update",

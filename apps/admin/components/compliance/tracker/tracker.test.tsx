@@ -354,6 +354,14 @@ async function run() {
               level: "LOCAL_AUTHORITY",
               parentJurisdictionId: "ireland",
             },
+            {
+              id: "wien",
+              countryCode: "AT",
+              subdivisionCode: "AT-9",
+              name: "Wien",
+              level: "REGION",
+              parentJurisdictionId: "austria",
+            },
           ]}
           canManage
           onSaved={() => changed++}
@@ -379,6 +387,10 @@ async function run() {
     assert.match(
       host.querySelector('option[value="dublin-city"]')?.textContent ?? "",
       /Dublin City Council · IE \(local authority\)/,
+    );
+    assert.match(
+      host.querySelector('option[value="wien"]')?.textContent ?? "",
+      /Wien · AT \(Bundesland\)/,
     );
     await click("Save profile");
     assert.match(host.textContent ?? "", /draft has been kept/);
