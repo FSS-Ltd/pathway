@@ -931,7 +931,10 @@ No publication, submission, review, notification or web flag was set in
 production. The verified count remains **48/150 (32%)**.
 
 ACE-C06 Faith content work begins from that merge on branch
-`feature/ace-c06-faith-content-web`. The scoped API and staff-web design is in
+`feature/ace-c06-faith-content-web` in PR
+[#708](https://github.com/FSS-Ltd/pathway/pull/708). The implementation was
+published at `11b91b343e75e8502469deef8f636c6a19750d8a`; current-head CI
+and merge evidence are still pending. The scoped API and staff-web design is in
 [c06-faith-content-design.md](c06-faith-content-design.md). The additive Faith
 lifecycle migration applied with all 191 repository migrations to a fresh
 disposable PostgreSQL database. The Faith HTTP suite executed 4/4 tests there,
