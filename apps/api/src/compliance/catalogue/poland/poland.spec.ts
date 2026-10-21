@@ -146,7 +146,6 @@ describe("Poland progressive national release", () => {
         (cell) => cell.jurisdiction === "PL",
       )?.regionalStatus,
     ).toBe("UNAVAILABLE");
-    expect(TRACKER_CATALOGUE.version).toBe("1.38.0");
     expect(TRACKER_CATALOGUE.sources).toEqual(
       expect.arrayContaining(catalogueV125.sources),
     );

@@ -7,6 +7,7 @@ const stringField = z.enum([
   "region",
   "localAuthority",
   "belgianEducationCommunity",
+  "belgianChildcareAuthority",
   "sector",
   "vertical",
   "providerCategory",
@@ -18,6 +19,12 @@ const allowedValues: Partial<
   Record<z.infer<typeof stringField>, readonly string[]>
 > = {
   belgianEducationCommunity: ["FLEMISH", "FRENCH", "GERMAN_SPEAKING"],
+  belgianChildcareAuthority: [
+    "OPGROEIEN",
+    "ONE",
+    "IRISCARE",
+    "GERMAN_COMMUNITY_MINISTRY",
+  ],
   sector: ["SCHOOL", "CHURCH", "CHARITY", "CLUB", "LEARNING_CENTRE"],
   vertical: INSTITUTIONAL_VERTICALS,
   providerCategory: [
@@ -41,6 +48,7 @@ const booleanField = z.enum([
   "operatesVehicles",
   "eyfsApplies",
   "childcare",
+  "belgianPaidUnderThreeCare",
   "charitable",
   "food",
   "transport",

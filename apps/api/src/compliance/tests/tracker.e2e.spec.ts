@@ -890,8 +890,13 @@ describe("Site tracker persistence and permission boundaries", () => {
       ...testProfile,
       jurisdictionId: brussels.id,
       belgianEducationCommunity: "FRENCH",
+      belgianChildcareAuthority: "IRISCARE",
+      belgianPaidUnderThreeCare: true,
+      childcare: true,
     });
     expect(belgian.profile.belgianEducationCommunity).toBe("FRENCH");
+    expect(belgian.profile.belgianChildcareAuthority).toBe("IRISCARE");
+    expect(belgian.profile.belgianPaidUnderThreeCare).toBe(true);
     expect(
       (await app.get(TrackerProfileService).get(actor))?.profile
         .belgianEducationCommunity,
@@ -917,14 +922,36 @@ describe("Site tracker persistence and permission boundaries", () => {
       );
       expect(result.body.items.length).toBeGreaterThan(0);
       expect(result.body.coverageGaps).toBe(16);
+      expect(
+        result.body.items.find(
+          (entry: { requirement: { id: string } }) =>
+            entry.requirement.id === "bel.iriscare-under-three-authorisation",
+        )?.applicability,
+      ).toBe("APPLICABLE");
       await expect(
         save({
           ...testProfile,
           belgianEducationCommunity: "FRENCH",
         }),
       ).rejects.toThrow(
-        "Belgian education Community applies only to a site operating in Belgium.",
+        "Belgian education and childcare facts apply only to a site operating in Belgium.",
       );
+      await expect(
+        save({
+          ...testProfile,
+          jurisdictionId: brussels.id,
+          childcare: true,
+          belgianChildcareAuthority: "GERMAN_COMMUNITY_MINISTRY",
+        }),
+      ).rejects.toThrow("The childcare authority does not serve");
+      await expect(
+        save({
+          ...testProfile,
+          jurisdictionId: brussels.id,
+          childcare: false,
+          belgianPaidUnderThreeCare: true,
+        }),
+      ).rejects.toThrow("Paid under-three care cannot be selected");
     } finally {
       catalogueProvider.catalogue = trackerFixture();
     }

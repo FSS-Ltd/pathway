@@ -2008,3 +2008,80 @@ The first repair-commit hook encountered a 5-second timeout in the unrelated
 after that failure. The same spec passed alone (1 suite / 3 tests, assertion
 completed in 28 ms). The normal hook must pass on retry before pushing the
 repair commit; CI must then rerun on that new revision.
+
+### Belgian education-Community profile merged; childcare authority review begins
+
+[PR #714](https://github.com/FSS-Ltd/pathway/pull/714) passed all nine required
+checks on final head `17df350a6f62e227073b115afec9ebd1fc012648`:
+typecheck/lint/unit, both integration shards, organisation-role RLS,
+permission-definition database, system-role seed identity, CodeQL and both
+analyses. GitHub confirmed `MERGED` at 2026-10-21T15:32:34Z with merge
+`f7c9a6419549cecc3c0d758f56fc2e557d013a92`; fetched `fss/master`
+matched and had the checked head as its second parent. The new step starts
+from that merge on `feature/compliance-belgium-childcare-authority`. The
+education Community is now a declared profile fact, while childcare authority
+and all Belgian Region legal cells remain unresolved.
+
+### Belgian childcare authority and licensing actions — implementation in progress
+
+Primary-source review on 21 October 2026 distinguishes four care routes:
+[Opgroeien's starter guidance](https://www.opgroeien.be/aanbod/kinderopvang/starters)
+distinguishes Flemish care and the organised-language routes for Brussels;
+[ONE's current FAQ](https://my.one.be/information/faq/petite-enfance/)
+requires authorisation before early-childhood settings open regardless of
+subsidy; [Iriscare](https://www.iriscare.brussels/fr/professionnels/familles-avec-enfants/accueil-denfants/)
+requires authorisation for Brussels bicommunal paid under-three settings; the
+[German-speaking Community family portal](https://ostbelgienfamilie.be/desktopdefault.aspx/tabid-5887/)
+says Ministry recognition precedes childcare operation, including school-age
+forms. A school's education Community cannot decide its care regulator. The
+profile therefore records the childcare authority and whether the site offers
+paid professional under-three care as separate nullable declarations. National
+checklist actions condition on those facts and Region; missing answers remain
+unresolved. This step does not resolve all care staffing, inspection,
+school-age, Region or municipal rules, and does not certify a selected provider.
+
+Initial checks: API and admin typechecks passed after correcting a test-only
+TypeScript literal inference; focused Belgium and boundary units passed 2
+suites / 12 tests. The first catalogue test failed because four new sources
+lacked the parent `BE` territory required for national actions; territorial
+metadata was corrected. A first disposable-database attempt used the stale
+`.env.test` credentials for the live test container and could not reset its
+schema. The corrected container-specific connection completed the named
+disposable database setup and passed both tracker E2E suites, **19 tests**,
+including Brussels persistence, conditional Iriscare applicability and the
+legacy profile read. Source content was verified through the current official
+pages; direct command-line fetches of Opgroeien and Ostbelgien were blocked by
+their edge challenge (HTTP 503 and 403), while ONE and Iriscare returned 200.
+Full local checks, UI inspection, final diff review, PR and current-head CI
+remain required.
+
+After the catalogue release bump, ten historical country tests exposed brittle
+assertions against the global latest-version string. Their country source and
+requirement preservation assertions remain; the current-version assertion now
+lives in the Belgian release test. The rerun passed **62 compliance unit suites
+/ 345 tests**. Root lint passed 16/16 packages and explicit ESLint for changed
+admin components passed; the full admin runtime command and focused tracker
+runtime test passed. API/admin typechecks and production builds passed, using
+synthetic Clerk/public API values solely for local admin prerender. Prisma
+schema validation and permission-definition zero-drift passed. The final
+tracker E2E rerun passed **1 suite / 16 tests** after adding the contradictory
+care-fact rejection assertion. `graphify update .` rebuilt the code graph
+(9,017 nodes / 13,487 edges; HTML visualisation skipped due graph size).
+The actual `ProfileFields` markup with built admin CSS was visually inspected
+in the in-app browser at desktop, 390px mobile and 125% root text size with
+synthetic site data; controls and helper text remained legible without
+horizontal overflow. The synthetic static preview did not exercise a full
+authenticated admin session. Temporary preview files and server were removed.
+Final reruns passed root lint (16/16), the admin production build, changed-file
+Prettier, and `git diff --check`. The Graphify code graph was rebuilt after the
+last UI and documentation edits. A focused semantic extraction of the changed
+Belgian review documents identified the separate authority, service and
+Region declarations and the four source-backed actions; the broader document
+corpus has not been re-extracted. Final diff review, PR and current-head CI
+remain required.
+
+The commit hook's repository-wide API unit run was stopped after over 20
+minutes of severe local slowdown; all reported suites had passed up to that
+point, but the run has **no passing final result**. The focused 62-suite
+compliance run and database integration tests remain the local acceptance
+evidence. The full required CI unit job must pass on the PR head before merge.

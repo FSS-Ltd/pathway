@@ -19,6 +19,8 @@ export const emptyProfile: TrackerProfileInput = {
   region: null,
   localAuthority: null,
   belgianEducationCommunity: null,
+  belgianChildcareAuthority: null,
+  belgianPaidUnderThreeCare: null,
   sector: null,
   vertical: null,
   providerCategory: null,
@@ -105,7 +107,15 @@ export function ProfileFields({
               ...value,
               jurisdictionId,
               belgianEducationCommunity:
-                country === "BE" ? value.belgianEducationCommunity : null,
+                country === "BE" && jurisdictionId === value.jurisdictionId
+                  ? value.belgianEducationCommunity
+                  : null,
+              belgianChildcareAuthority:
+                country === "BE" && jurisdictionId === value.jurisdictionId
+                  ? value.belgianChildcareAuthority
+                  : null,
+              belgianPaidUnderThreeCare:
+                country === "BE" ? value.belgianPaidUnderThreeCare : null,
             });
           }}
         >
@@ -134,9 +144,51 @@ export function ProfileFields({
           <p className="text-sm text-text-muted">
             Belgium's geographic Region does not identify the education
             Community. Confirm the competent authority for the site's actual
-            education. Childcare licensing may follow a different route,
-            including ONE, Opgroeien or Iriscare in Brussels. This selection
-            does not certify registration or remove unreviewed coverage gaps.
+            education. This selection does not certify registration or remove
+            unreviewed coverage gaps.
+          </p>
+          <Choice
+            label="Childcare licensing authority"
+            value={value.belgianChildcareAuthority ?? null}
+            options={[
+              "OPGROEIEN",
+              "ONE",
+              "IRISCARE",
+              "GERMAN_COMMUNITY_MINISTRY",
+            ]}
+            onChange={(belgianChildcareAuthority) =>
+              set("belgianChildcareAuthority", belgianChildcareAuthority)
+            }
+          />
+          <label className="block min-w-0">
+            Paid professional care for children under three
+            <select
+              className={fieldClass}
+              value={
+                value.belgianPaidUnderThreeCare === null ||
+                value.belgianPaidUnderThreeCare === undefined
+                  ? "unknown"
+                  : String(value.belgianPaidUnderThreeCare)
+              }
+              onChange={(event) =>
+                set(
+                  "belgianPaidUnderThreeCare",
+                  event.target.value === "unknown"
+                    ? null
+                    : event.target.value === "true",
+                )
+              }
+            >
+              <option value="unknown">Unknown</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </label>
+          <p className="text-sm text-text-muted">
+            Confirm the care service's own authority; the education Community
+            may differ. In Brussels, organised language and service type affect
+            the route. Check with the local authority before treating any care
+            action as not applicable.
           </p>
         </div>
       )}
@@ -247,14 +299,20 @@ export function ProfileFields({
             <select
               className={fieldClass}
               value={value[key] === null ? "unknown" : String(value[key])}
-              onChange={(e) =>
-                set(
-                  key,
+              onChange={(e) => {
+                const next =
                   e.target.value === "unknown"
                     ? null
-                    : e.target.value === "true",
-                )
-              }
+                    : e.target.value === "true";
+                if (key === "childcare" && next === false)
+                  setValue({
+                    ...value,
+                    childcare: false,
+                    belgianChildcareAuthority: null,
+                    belgianPaidUnderThreeCare: null,
+                  });
+                else set(key, next);
+              }}
             >
               <option value="unknown">Unknown</option>
               <option value="true">Yes</option>
