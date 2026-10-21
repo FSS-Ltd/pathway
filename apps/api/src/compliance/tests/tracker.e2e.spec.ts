@@ -890,11 +890,15 @@ describe("Site tracker persistence and permission boundaries", () => {
       ...testProfile,
       jurisdictionId: brussels.id,
       belgianEducationCommunity: "FRENCH",
+      belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
       belgianChildcareAuthority: "IRISCARE",
       belgianPaidUnderThreeCare: true,
       childcare: true,
     });
     expect(belgian.profile.belgianEducationCommunity).toBe("FRENCH");
+    expect(belgian.profile.belgianSchoolRecognitionStatus).toBe(
+      "COMMUNITY_RECOGNISED",
+    );
     expect(belgian.profile.belgianChildcareAuthority).toBe("IRISCARE");
     expect(belgian.profile.belgianPaidUnderThreeCare).toBe(true);
     expect(
@@ -939,6 +943,14 @@ describe("Site tracker persistence and permission boundaries", () => {
       await expect(
         save({
           ...testProfile,
+          belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
+        }),
+      ).rejects.toThrow(
+        "Belgian education and childcare facts apply only to a site operating in Belgium.",
+      );
+      await expect(
+        save({
+          ...testProfile,
           jurisdictionId: brussels.id,
           childcare: true,
           belgianChildcareAuthority: "GERMAN_COMMUNITY_MINISTRY",
@@ -952,6 +964,24 @@ describe("Site tracker persistence and permission boundaries", () => {
           belgianPaidUnderThreeCare: true,
         }),
       ).rejects.toThrow("Paid under-three care cannot be selected");
+      await expect(
+        save({
+          ...testProfile,
+          jurisdictionId: brussels.id,
+          providerCategory: "OUT_OF_SCHOOL",
+          belgianEducationCommunity: null,
+          belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
+        }),
+      ).rejects.toThrow("Select the Belgian education Community");
+      await expect(
+        save({
+          ...testProfile,
+          jurisdictionId: brussels.id,
+          providerCategory: "OUT_OF_SCHOOL",
+          belgianEducationCommunity: "FRENCH",
+          belgianSchoolRecognitionStatus: "COMMUNITY_RECOGNISED",
+        }),
+      ).rejects.toThrow("School recognition status applies only");
     } finally {
       catalogueProvider.catalogue = trackerFixture();
     }

@@ -70,3 +70,30 @@ school recognition and local premises permissions. A portal checkbox is a
 manual confirmation, not proof of an external licence. Operators should
 confirm applicability with the competent authority before treating a care
 action as inapplicable.
+
+## Flemish school recognition boundary
+
+Reviewed 21 October 2026 against the [Flemish recognition
+overview](https://www.vlaanderen.be/erkenning-van-een-school-of-andere-onderwijsinstelling),
+[recognition-inspection process](https://www.vlaanderen.be/onderwijsprofessionals/organisatie-en-administratie/onderwijskwaliteit-en-toezicht/toezicht-op-de-onderwijskwaliteit/erkenningsonderzoek-scholen-academies-en-centra)
+and [recognised versus unrecognised institutions](https://www.vlaanderen.be/onderwijs-en-vorming/kwaliteitszorg-in-het-onderwijs/erkende-en-niet-erkende-onderwijsinstellingen).
+The [current primary-school circular BaO/97/3](https://data-onderwijs.vlaanderen.be/edulex/document.aspx?docid=9284)
+links recognition conditions to the Basic Education Decree and was amended on
+6 July 2026. It flags legislative caveats around the 2026–27 application
+dates, so this checklist does not assert one deadline for every school.
+Recognition is distinct from public funding. A Flemish-recognised school may
+be privately funded; an unrecognised private school cannot issue
+Flemish-recognised study certificates, and an externally recognised school
+needs its own authority review. The site profile therefore records the
+declared school recognition route separately from education Community, sector
+and funding. Changing Community or operating jurisdiction clears this
+Community-relative declaration.
+
+Catalogue 1.40.0 adds one conditional statutory action to hold and maintain
+the relevant Flemish recognition decision for an actual school in Flanders or
+Brussels that declares Flemish Community recognition. An unknown route or
+missing Region leaves it unresolved; unrecognised and externally recognised
+routes do not receive this action. Their obligations and family-facing
+information need a separate primary-source review. French and German-speaking
+school recognition, provider subtypes, inspection details and municipal rules
+also remain incomplete; no Belgian coverage cell is marked complete.

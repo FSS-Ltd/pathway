@@ -18,6 +18,11 @@ export interface TrackerProfileInput {
   region: string | null;
   localAuthority: string | null;
   belgianEducationCommunity?: "FLEMISH" | "FRENCH" | "GERMAN_SPEAKING" | null;
+  belgianSchoolRecognitionStatus?:
+    | "COMMUNITY_RECOGNISED"
+    | "NOT_RECOGNISED"
+    | "RECOGNISED_ELSEWHERE"
+    | null;
   belgianChildcareAuthority?:
     | "OPGROEIEN"
     | "ONE"

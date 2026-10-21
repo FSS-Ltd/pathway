@@ -305,6 +305,16 @@ export function buildTrackerChecklist(
       if (
         location.countryCode === "BE" &&
         topic === "education_childcare" &&
+        ["INDEPENDENT_SCHOOL", "STATE_SCHOOL"].includes(
+          profile?.profile.providerCategory ?? "",
+        ) &&
+        !profile?.profile.belgianSchoolRecognitionStatus
+      )
+        reason +=
+          " The school's recognition status with its education Community is not recorded.";
+      if (
+        location.countryCode === "BE" &&
+        topic === "education_childcare" &&
         profile?.profile.childcare !== false &&
         !profile?.profile.belgianChildcareAuthority
       )
