@@ -2195,6 +2195,11 @@ changed-admin ESLint, changed-file Prettier and the admin tracker runtime test
 passed. Desktop and 390 px mobile previews of the German school-route fields
 were inspected in the in-app browser; the mobile document width equalled its
 viewport with no horizontal overflow. The focused API catalogue/DTO unit run
-and API typecheck are still active but have not reported results. The host has
-heavy memory pressure while an unrelated multi-worker Jest job runs, so API
-integration, builds and final PR CI remain pending. This step is not complete.
+and API typecheck were stopped without results after the user directed that
+local tests run only when no other worktree is testing. An unrelated
+multi-worker Jest job remains active in the finance worktree. API
+unit/integration tests, final API typecheck and builds remain pending. [Draft
+PR #722](https://github.com/FSS-Ltd/pathway/pull/722) was raised from head
+`6f032af3eec83c7059f4aaa1a3504d4a69191190` with these limitations
+disclosed. Current-head CI and merge evidence are still pending; this step is
+not complete.
