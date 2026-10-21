@@ -16,6 +16,7 @@ const servicingStaffActions: ReadonlySet<FinanceStaffAction> = new Set([
   "REVERSE_RECEIPT",
   "REVOKE_PAYER_ACCESS",
   "APPROVE_AUTOMATED_DEBIT",
+  "CANCEL_COLLECTION_PLAN",
 ]);
 
 export function resolveFinanceAccessMode(
@@ -51,7 +52,9 @@ export function canPerformFinancePayerAction(
       action === "READ_STATEMENTS" ||
       action === "DOWNLOAD_DOCUMENT" ||
       action === "DECLARE_TRANSFER" ||
-      action === "SETTLE_ISSUED_INVOICE")
+      action === "SETTLE_ISSUED_INVOICE" ||
+      action === "CANCEL_MANDATE" ||
+      action === "CANCEL_COLLECTION_PLAN")
   );
 }
 

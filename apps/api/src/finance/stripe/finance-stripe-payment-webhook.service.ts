@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { FinanceCurrency } from "@pathway/platform";
 import { FinanceBalanceService } from "../finance-balance.service";
 import { lockInvoice } from "../finance-invoice-operations";
+import { recordConfirmedStripeReceipt } from "./finance-stripe-receipt";
 
 const checkoutEventTypes = [
   "checkout.session.completed",
@@ -273,86 +274,17 @@ export class FinanceStripePaymentWebhookService {
     paymentIntentId: string,
     confirmedAt: Date,
   ): Promise<void> {
-    if (!attempt.invoice.payerAccountId) {
-      throw new Error("Finance Checkout invoice has no payer account");
-    }
-    const existing = await tx.financeReceipt.findFirst({
-      where: {
-        financeProfileId: attempt.financeProfileId,
-        tenantId: input.tenantId,
-        orgId: input.orgId,
-        source: "STRIPE_CARD",
-        sourceReference: sessionId,
-      },
-      select: {
-        id: true,
-        tenantId: true,
-        orgId: true,
-        payerAccountId: true,
-        amountMinor: true,
-        currency: true,
-        status: true,
-        confirmedAt: true,
-      },
+    await recordConfirmedStripeReceipt(tx, this.balances, {
+      tenantId: input.tenantId,
+      orgId: input.orgId,
+      financeProfileId: attempt.financeProfileId,
+      invoice: attempt.invoice,
+      amountMinor: attempt.amountMinor,
+      currency: attempt.currency,
+      source: "STRIPE_CARD",
+      sourceReference: sessionId,
+      confirmedAt,
     });
-
-    if (existing) {
-      if (
-        existing.tenantId !== input.tenantId ||
-        existing.orgId !== input.orgId ||
-        existing.payerAccountId !== attempt.invoice.payerAccountId ||
-        existing.amountMinor !== attempt.amountMinor ||
-        existing.currency !== attempt.currency ||
-        existing.status !== "CONFIRMED" ||
-        !existing.confirmedAt
-      ) {
-        throw new Error(
-          "Existing Finance Checkout receipt does not match the payment",
-        );
-      }
-    } else {
-      const receipt = await tx.financeReceipt.create({
-        data: {
-          financeProfileId: attempt.financeProfileId,
-          payerAccountId: attempt.invoice.payerAccountId,
-          tenantId: input.tenantId,
-          orgId: input.orgId,
-          amountMinor: attempt.amountMinor,
-          currency: attempt.currency,
-          source: "STRIPE_CARD",
-          sourceReference: sessionId,
-          status: "CONFIRMED",
-          confirmedAt,
-        },
-        select: { id: true },
-      });
-
-      if (attempt.invoice.status === "ISSUED") {
-        const balances = await this.balances.forInvoices(tx, input, [
-          attempt.invoice,
-        ]);
-        const outstandingMinor = BigInt(
-          balances.get(attempt.invoiceId)?.outstandingMinor ?? "0",
-        );
-        const allocationMinor =
-          outstandingMinor < attempt.amountMinor
-            ? outstandingMinor
-            : attempt.amountMinor;
-        if (allocationMinor > 0n) {
-          await tx.financeReceiptAllocation.create({
-            data: {
-              receiptId: receipt.id,
-              invoiceId: attempt.invoiceId,
-              tenantId: input.tenantId,
-              orgId: input.orgId,
-              amountMinor: allocationMinor,
-              createdByUserId: null,
-            },
-            select: { id: true },
-          });
-        }
-      }
-    }
 
     await tx.financeCheckoutAttempt.updateMany({
       where: {

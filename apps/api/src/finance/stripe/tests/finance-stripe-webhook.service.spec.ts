@@ -8,6 +8,7 @@ import {
   type FinanceStripeWebhookInbox,
 } from "../finance-stripe-webhook.service";
 import type { FinanceStripePaymentWebhookService } from "../finance-stripe-payment-webhook.service";
+import type { FinanceStripeBacsWebhookService } from "../finance-stripe-bacs-webhook.service";
 import type { FinanceStripeReversalWebhookService } from "../finance-stripe-reversal-webhook.service";
 
 jest.mock("@pathway/db", () => ({
@@ -103,6 +104,11 @@ describe("FinanceStripeWebhookReplayService", () => {
     supports: jest.fn().mockReturnValue(false),
     process: jest.fn().mockResolvedValue("deferred"),
   } as unknown as FinanceStripeReversalWebhookService;
+  const bacsProcess = jest.fn().mockResolvedValue("deferred");
+  const bacs = {
+    supports: jest.fn().mockReturnValue(false),
+    process: bacsProcess,
+  } as unknown as FinanceStripeBacsWebhookService;
   const config: FinanceStripeWebhookConfig = testConfig;
 
   beforeEach(() => {
@@ -126,6 +132,7 @@ describe("FinanceStripeWebhookReplayService", () => {
     const service = new FinanceStripeWebhookReplayService(
       config,
       sync,
+      bacs,
       payments,
       reversals,
     );
@@ -167,6 +174,7 @@ describe("FinanceStripeWebhookReplayService", () => {
     const service = new FinanceStripeWebhookReplayService(
       config,
       sync,
+      bacs,
       payments,
       reversals,
     );
@@ -214,6 +222,7 @@ describe("FinanceStripeWebhookReplayService", () => {
     const service = new FinanceStripeWebhookReplayService(
       config,
       sync,
+      bacs,
       payments,
       reversals,
     );
@@ -233,5 +242,50 @@ describe("FinanceStripeWebhookReplayService", () => {
         payloadJson: payload,
       }),
     );
+  });
+
+  it("routes Bacs events before the card Checkout fallback", async () => {
+    const payload = {
+      id: "evt_finance_bacs_replay",
+      type: "payment_intent.processing",
+      livemode: false,
+      account: "acct_finance_unit_001",
+      data: { object: {} },
+    };
+    mockRls.mockImplementationOnce(async (_tenantId, _orgId, callback) =>
+      callback({
+        financeStripeWebhookEvent: {
+          findFirst: jest.fn().mockResolvedValue({
+            stripeEventId: payload.id,
+            stripeAccountId: "acct_finance_unit_001",
+            eventType: payload.type,
+            livemode: false,
+            payloadJson: payload,
+          }),
+        },
+      } as never),
+    );
+    jest.mocked(bacs.supports).mockReturnValueOnce(true);
+    bacsProcess.mockResolvedValueOnce("processed");
+    const service = new FinanceStripeWebhookReplayService(
+      config,
+      sync,
+      bacs,
+      payments,
+      reversals,
+    );
+
+    await expect(
+      service.processClaimedEvent({
+        eventId: "row-bacs",
+        tenantId: "tenant-a",
+        orgId: "org-a",
+        claimToken: "claim-bacs",
+      }),
+    ).resolves.toBe("processed");
+    expect(bacsProcess).toHaveBeenCalledWith(
+      expect.objectContaining({ stripeEventId: payload.id }),
+    );
+    expect(paymentProcess).not.toHaveBeenCalled();
   });
 });

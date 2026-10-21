@@ -22,12 +22,48 @@ export async function findReceiptForPaymentIntent(
       stripeCheckoutSessionId: true,
     },
   });
-  if (!attempt?.stripeCheckoutSessionId) return null;
-  const receipt = await tx.financeReceipt.findFirst({
+  if (attempt?.stripeCheckoutSessionId) {
+    const receipt = await tx.financeReceipt.findFirst({
+      where: {
+        financeProfileId: attempt.financeProfileId,
+        source: "STRIPE_CARD",
+        sourceReference: attempt.stripeCheckoutSessionId,
+        status: "CONFIRMED",
+        tenantId: input.tenantId,
+        orgId: input.orgId,
+      },
+      select: {
+        id: true,
+        financeProfileId: true,
+        amountMinor: true,
+        currency: true,
+        confirmedAt: true,
+      },
+    });
+    if (receipt) return { attempt, receipt };
+  }
+
+  const debitAttempt = await tx.financeDebitAttempt.findFirst({
     where: {
-      financeProfileId: attempt.financeProfileId,
-      source: "STRIPE_CARD",
-      sourceReference: attempt.stripeCheckoutSessionId,
+      stripeAccountId,
+      stripePaymentIntentId: paymentIntentId,
+      status: "SUCCEEDED",
+      tenantId: input.tenantId,
+      orgId: input.orgId,
+    },
+    select: {
+      instalment: {
+        select: { plan: { select: { financeProfileId: true } } },
+      },
+    },
+  });
+  const financeProfileId = debitAttempt?.instalment.plan.financeProfileId;
+  if (!financeProfileId) return null;
+  const bacsReceipt = await tx.financeReceipt.findFirst({
+    where: {
+      financeProfileId,
+      source: "STRIPE_BACS",
+      sourceReference: paymentIntentId,
       status: "CONFIRMED",
       tenantId: input.tenantId,
       orgId: input.orgId,
@@ -40,7 +76,9 @@ export async function findReceiptForPaymentIntent(
       confirmedAt: true,
     },
   });
-  return receipt ? { attempt, receipt } : null;
+  return bacsReceipt
+    ? { attempt: { financeProfileId }, receipt: bacsReceipt }
+    : null;
 }
 
 export async function createRefundReturnMovement(

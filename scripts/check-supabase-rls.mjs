@@ -15,8 +15,14 @@ const strict = args.has("--strict");
 const envFile = resolveRlsEnvFile();
 const fileEnv = envFile ? loadEnvFile(envFile) : {};
 const env = { ...fileEnv, ...process.env };
-const databaseUrl = firstPresent(env.E2E_DATABASE_URL, env.DIRECT_URL, env.DATABASE_URL);
-const databaseSchema = databaseUrl ? schemaFromDatabaseUrl(databaseUrl) : undefined;
+const databaseUrl = firstPresent(
+  env.E2E_DATABASE_URL,
+  env.DIRECT_URL,
+  env.DATABASE_URL,
+);
+const databaseSchema = databaseUrl
+  ? schemaFromDatabaseUrl(databaseUrl)
+  : undefined;
 const accepted = isTrue(env.SUPABASE_RLS_GATE_ACCEPTED);
 const REQUIRED_RLS_TABLES = [
   "PermissionDefinition",
@@ -49,6 +55,14 @@ const REQUIRED_RLS_TABLES = [
   "FinanceTransferNotice",
   "FinanceStripeConnection",
   "FinanceCheckoutAttempt",
+  "FinanceStripeCustomer",
+  "FinanceMandate",
+  "FinanceCollectionPlan",
+  "FinanceCollectionPlanEvent",
+  "FinanceCollectionInstalment",
+  "FinanceDebitAttempt",
+  "FinanceRecurringInvoiceTemplate",
+  "FinanceRecurringInvoiceTemplateLine",
   "FinanceStatement",
   "FinanceStripeWebhookEvent",
   "FinancePayerAccount",
@@ -170,7 +184,8 @@ async function main() {
 
   try {
     const queries = await Promise.all([
-      prisma.$queryRawUnsafe(`
+      prisma.$queryRawUnsafe(
+        `
       SELECT n.nspname AS schema_name, c.relname AS table_name
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -179,8 +194,11 @@ async function main() {
         AND c.relforcerowsecurity = false
         AND c.relname = ANY($1::text[])
       ORDER BY c.relname
-    `, REQUIRED_RLS_TABLES),
-      prisma.$queryRawUnsafe(`
+    `,
+        REQUIRED_RLS_TABLES,
+      ),
+      prisma.$queryRawUnsafe(
+        `
       SELECT n.nspname AS schema_name, c.relname AS table_name
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -189,8 +207,12 @@ async function main() {
         AND c.relrowsecurity = false
         AND (n.nspname = $1 OR c.relname = ANY($2::text[]))
       ORDER BY c.relname
-    `, databaseSchema, REQUIRED_RLS_TABLES),
-      prisma.$queryRawUnsafe(`
+    `,
+        databaseSchema,
+        REQUIRED_RLS_TABLES,
+      ),
+      prisma.$queryRawUnsafe(
+        `
       SELECT
         tp.table_schema AS schema_name,
         tp.table_name,
@@ -205,8 +227,12 @@ async function main() {
         AND (tp.table_schema = $1 OR tp.table_name = ANY($2::text[]))
       GROUP BY tp.table_schema, tp.table_name, tp.grantee
       ORDER BY tp.table_name, tp.grantee
-    `, databaseSchema, REQUIRED_RLS_TABLES),
-      prisma.$queryRawUnsafe(`
+    `,
+        databaseSchema,
+        REQUIRED_RLS_TABLES,
+      ),
+      prisma.$queryRawUnsafe(
+        `
       SELECT n.nspname AS schema_name, c.relname AS table_name
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -214,7 +240,9 @@ async function main() {
         AND c.relkind IN ('r', 'p')
         AND c.relname = ANY($1::text[])
       ORDER BY c.relname
-    `, REQUIRED_RLS_TABLES),
+    `,
+        REQUIRED_RLS_TABLES,
+      ),
       prisma.$queryRawUnsafe(`
       SELECT c.relname AS table_name, p.polname AS policy_name, p.polcmd AS command,
         p.polpermissive AS permissive,
@@ -233,10 +261,18 @@ async function main() {
       ORDER BY c.relname, p.polname
     `),
     ]);
-    const [unforcedTables, disabledTables, publicRoleGrants, requiredTables, policies] = queries;
+    const [
+      unforcedTables,
+      disabledTables,
+      publicRoleGrants,
+      requiredTables,
+      policies,
+    ] = queries;
 
-    const { missing: missingRequiredTables, duplicate: duplicateRequiredTables } =
-      findRequiredTableCopies(requiredTables, REQUIRED_RLS_TABLES);
+    const {
+      missing: missingRequiredTables,
+      duplicate: duplicateRequiredTables,
+    } = findRequiredTableCopies(requiredTables, REQUIRED_RLS_TABLES);
     const unreviewedRolePolicies = findUnreviewedRolePolicies(policies);
     const disabledRequiredTables = findRequiredTableEntries(
       disabledTables,
@@ -288,9 +324,13 @@ async function main() {
     }
 
     if (unforcedTables.length > 0) {
-      console.warn(`[supabase-rls] ${unforcedTables.length} required tables do not force RLS:`);
+      console.warn(
+        `[supabase-rls] ${unforcedTables.length} required tables do not force RLS:`,
+      );
       for (const table of unforcedTables) {
-        console.warn(`[supabase-rls] - ${table.schema_name}.${table.table_name}`);
+        console.warn(
+          `[supabase-rls] - ${table.schema_name}.${table.table_name}`,
+        );
       }
     }
 
@@ -380,7 +420,9 @@ function resolveRlsEnvFile() {
 function schemaFromDatabaseUrl(url) {
   const schema = new URL(url).searchParams.get("schema");
   if (schema !== "app" && schema !== "public") {
-    throw new Error("The RLS gate requires a database URL with schema=app or schema=public.");
+    throw new Error(
+      "The RLS gate requires a database URL with schema=app or schema=public.",
+    );
   }
   return schema;
 }

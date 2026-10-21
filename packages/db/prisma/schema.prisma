@@ -110,6 +110,65 @@ enum SubscriptionStatus {
   INCOMPLETE
 }
 
+enum FinanceCollectionInstalmentStatus {
+  SCHEDULED
+  SUBMISSION_PENDING
+  PROCESSING
+  PAID
+  COVERED
+  FAILED
+  PAUSED
+  CANCELLED
+}
+
+enum FinanceCollectionPlanEventType {
+  CREATED
+  APPROVED
+  ACCEPTED
+  PAUSED
+  RESUMED
+  CANCELLED
+  DEBIT_SUBMITTED
+  DEBIT_PROCESSING
+  DEBIT_SUCCEEDED
+  DEBIT_FAILED
+  MANUAL_PAYMENT_COVERED
+  REVIEW_REQUIRED
+}
+
+enum FinanceCollectionPlanStatus {
+  PENDING_REVIEW
+  PENDING_PAYER_ACCEPTANCE
+  ACTIVE
+  PAUSED
+  CANCELLED
+  COMPLETED
+}
+
+enum FinanceDebitAttemptStatus {
+  CREATING
+  SUBMITTED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  UNKNOWN
+}
+
+enum FinanceMandateStatus {
+  PENDING_SETUP
+  ACTIVE
+  CANCELLED
+  FAILED
+  UNKNOWN
+}
+
+enum FinanceRecurringInvoiceTemplateStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+}
+
 enum FinanceCurrency {
   GBP
   EUR
@@ -1253,6 +1312,14 @@ model Org {
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
+  financeStripeCustomers FinanceStripeCustomer[]
+  financeMandates FinanceMandate[]
+  financeCollectionPlans FinanceCollectionPlan[]
+  financeCollectionPlanEvents FinanceCollectionPlanEvent[]
+  financeCollectionInstalments FinanceCollectionInstalment[]
+  financeDebitAttempts FinanceDebitAttempt[]
+  financeRecurringInvoiceTemplates FinanceRecurringInvoiceTemplate[]
+  financeRecurringInvoiceTemplateLines FinanceRecurringInvoiceTemplateLine[]
 }
 
 // NOTE: Tenant == Site (true isolation boundary / RLS). Admin UI “Site selector”
@@ -1432,6 +1499,14 @@ model Tenant {
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
+  financeStripeCustomers FinanceStripeCustomer[]
+  financeMandates FinanceMandate[]
+  financeCollectionPlans FinanceCollectionPlan[]
+  financeCollectionPlanEvents FinanceCollectionPlanEvent[]
+  financeCollectionInstalments FinanceCollectionInstalment[]
+  financeDebitAttempts FinanceDebitAttempt[]
+  financeRecurringInvoiceTemplates FinanceRecurringInvoiceTemplate[]
+  financeRecurringInvoiceTemplateLines FinanceRecurringInvoiceTemplateLine[]
   @@unique([id, orgId])
   @@index([orgId])
   childRegistrationSubmissions ChildRegistrationSubmission[]
@@ -1650,6 +1725,13 @@ model User {
   accessTagExclusions        AccessTagExclusion[] @relation("AccessTagExclusionAssignee")
   accessTagExclusionsIssued  AccessTagExclusion[] @relation("AccessTagExcluder")
   accessTagExclusionsRevoked AccessTagExclusion[] @relation("AccessTagExclusionRevoker")
+  financeMandatesCreated FinanceMandate[] @relation("FinanceMandateCreator")
+  financeMandatesAccepted FinanceMandate[] @relation("FinanceMandateAccepter")
+  financeCollectionPlansCreated FinanceCollectionPlan[] @relation("FinanceCollectionPlanCreator")
+  financeCollectionPlansApproved FinanceCollectionPlan[] @relation("FinanceCollectionPlanApprover")
+  financeCollectionPlansAccepted FinanceCollectionPlan[] @relation("FinanceCollectionPlanAccepter")
+  financeCollectionPlanEvents FinanceCollectionPlanEvent[] @relation("FinanceCollectionPlanEventActor")
+  financeRecurringInvoiceTemplatesCreated FinanceRecurringInvoiceTemplate[] @relation("FinanceRecurringTemplateCreator")
 }
 
 // Auth identity linking external providers (e.g., Auth0) to internal users.
@@ -5289,6 +5371,230 @@ model ComplianceEvidence {
   @@index([tenantId, orgId, requirementId, id])
 }
 
+model FinanceCollectionInstalment {
+  id            String                            @id @default(uuid())
+  planId        String
+  tenantId      String
+  orgId         String
+  sequence      Int
+  amountMinor   BigInt
+  dueAt         DateTime                          @db.Date
+  status        FinanceCollectionInstalmentStatus @default(SCHEDULED)
+  paidAt        DateTime?
+  createdAt     DateTime                          @default(now())
+  updatedAt     DateTime                          @updatedAt
+  plan          FinanceCollectionPlan             @relation(fields: [planId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  debitAttempts FinanceDebitAttempt[]
+  tenant        Tenant                            @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org           Org                               @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([planId, sequence])
+  @@index([tenantId, orgId, status, dueAt])
+}
+
+model FinanceCollectionPlan {
+  id                 String                        @id @default(uuid())
+  financeProfileId   String
+  stripeConnectionId String
+  payerAccountId     String
+  invoiceId          String
+  mandateId          String
+  tenantId           String
+  orgId              String
+  version            Int                           @default(1)
+  status             FinanceCollectionPlanStatus   @default(PENDING_REVIEW)
+  amountMinor        BigInt
+  currency           FinanceCurrency               @default(GBP)
+  instalmentCount    Int
+  firstDueAt         DateTime
+  dayOfMonth         Int
+  consentVersion     String                        @db.VarChar(64)
+  createdByUserId    String
+  approvedByUserId   String?
+  acceptedByUserId   String?
+  approvedAt         DateTime?
+  acceptedAt         DateTime?
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+  financeProfile     FinanceProfile                @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  stripeConnection   FinanceStripeConnection       @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount       FinancePayerAccount           @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  invoice            FinanceInvoice                @relation(fields: [invoiceId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  mandate            FinanceMandate                @relation(fields: [mandateId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  createdBy          User                          @relation("FinanceCollectionPlanCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  approvedBy         User?                         @relation("FinanceCollectionPlanApprover", fields: [approvedByUserId], references: [id], onDelete: Restrict)
+  acceptedBy         User?                         @relation("FinanceCollectionPlanAccepter", fields: [acceptedByUserId], references: [id], onDelete: Restrict)
+  events             FinanceCollectionPlanEvent[]
+  instalments        FinanceCollectionInstalment[]
+  tenant             Tenant                        @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                Org                           @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, invoiceId, status, version])
+  @@index([tenantId, orgId, payerAccountId, status])
+}
+
+model FinanceCollectionPlanEvent {
+  id            String                         @id @default(uuid())
+  planId        String
+  tenantId      String
+  orgId         String
+  actorUserId   String?
+  stripeEventId String?                        @db.VarChar(255)
+  type          FinanceCollectionPlanEventType
+  details       Json?
+  createdAt     DateTime                       @default(now())
+  plan          FinanceCollectionPlan          @relation(fields: [planId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor         User?                          @relation("FinanceCollectionPlanEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  tenant        Tenant                         @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org           Org                            @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([stripeEventId, planId])
+  @@index([tenantId, orgId, planId, createdAt])
+}
+
+model FinanceDebitAttempt {
+  id                    String                      @id @default(uuid())
+  instalmentId          String
+  stripeConnectionId    String
+  tenantId              String
+  orgId                 String
+  stripeAccountId       String                      @db.VarChar(255)
+  amountMinor           BigInt
+  currency              FinanceCurrency             @default(GBP)
+  status                FinanceDebitAttemptStatus   @default(CREATING)
+  idempotencyKey        String                      @unique @db.VarChar(255)
+  stripePaymentIntentId String?                     @db.VarChar(255)
+  submittedAt           DateTime?
+  providerStatusAt      DateTime?
+  statusUpdatedAt       DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  instalment            FinanceCollectionInstalment @relation(fields: [instalmentId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  stripeConnection      FinanceStripeConnection     @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant                Tenant                      @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                   Org                         @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([stripeAccountId, stripePaymentIntentId])
+  @@index([tenantId, orgId, status, createdAt])
+}
+
+model FinanceMandate {
+  id                          String                  @id @default(uuid())
+  financeProfileId            String
+  stripeConnectionId          String
+  payerAccountId              String
+  financeStripeCustomerId     String
+  tenantId                    String
+  orgId                       String
+  stripeAccountId             String                  @db.VarChar(255)
+  livemode                    Boolean
+  stripeCheckoutSessionId     String?                 @db.VarChar(255)
+  checkoutUrl                 String?                 @db.Text
+  setupExpiresAt              DateTime?
+  stripeSetupIntentId         String?                 @db.VarChar(255)
+  stripePaymentMethodId       String?                 @db.VarChar(255)
+  stripeMandateId             String?                 @db.VarChar(255)
+  status                      FinanceMandateStatus    @default(PENDING_SETUP)
+  consentVersion              String                  @db.VarChar(64)
+  acceptedAt                  DateTime?
+  acceptedByUserId            String?
+  cancelledAt                 DateTime?
+  providerCancellationPending Boolean                 @default(false)
+  providerStatusAt            DateTime?
+  createdByUserId             String
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  financeProfile              FinanceProfile          @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  stripeConnection            FinanceStripeConnection @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount                FinancePayerAccount     @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  stripeCustomer              FinanceStripeCustomer   @relation(fields: [financeStripeCustomerId, payerAccountId, tenantId, orgId], references: [id, payerAccountId, tenantId, orgId], onDelete: Restrict)
+  acceptedBy                  User?                   @relation("FinanceMandateAccepter", fields: [acceptedByUserId], references: [id], onDelete: Restrict)
+  createdBy                   User                    @relation("FinanceMandateCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  collectionPlans             FinanceCollectionPlan[]
+  tenant                      Tenant                  @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                         Org                     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([stripeAccountId, stripeMandateId])
+  @@unique([stripeAccountId, stripeCheckoutSessionId])
+  @@unique([stripeAccountId, stripeSetupIntentId])
+  @@index([tenantId, orgId, payerAccountId, status, createdAt])
+}
+
+model FinanceRecurringInvoiceTemplate {
+  id               String                                @id @default(uuid())
+  financeProfileId String
+  payerAccountId   String
+  tenantId         String
+  orgId            String
+  currency         FinanceCurrency                       @default(GBP)
+  status           FinanceRecurringInvoiceTemplateStatus @default(ACTIVE)
+  dayOfMonth       Int
+  dueDays          Int                                   @default(14)
+  nextPeriodStart  DateTime                              @db.Date
+  createdByUserId  String
+  createdAt        DateTime                              @default(now())
+  updatedAt        DateTime                              @updatedAt
+  financeProfile   FinanceProfile                        @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount     FinancePayerAccount                   @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  createdBy        User                                  @relation("FinanceRecurringTemplateCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  lines            FinanceRecurringInvoiceTemplateLine[]
+  invoices         FinanceInvoice[]
+  tenant           Tenant                                @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org              Org                                   @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, status, nextPeriodStart])
+}
+
+model FinanceRecurringInvoiceTemplateLine {
+  id                 String                          @id @default(uuid())
+  templateId         String
+  tenantId           String
+  orgId              String
+  lineOrder          Int
+  description        String
+  quantity           Decimal                         @db.Decimal(12, 3)
+  unitAmountMinor    BigInt
+  taxRateBasisPoints Int                             @default(0)
+  createdAt          DateTime                        @default(now())
+  template           FinanceRecurringInvoiceTemplate @relation(fields: [templateId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant             Tenant                          @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                Org                             @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, lineOrder])
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, templateId])
+}
+
+model FinanceStripeCustomer {
+  id                 String                  @id @default(uuid())
+  financeProfileId   String
+  stripeConnectionId String
+  payerAccountId     String
+  tenantId           String
+  orgId              String
+  stripeAccountId    String                  @db.VarChar(255)
+  stripeCustomerId   String                  @db.VarChar(255)
+  livemode           Boolean
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  financeProfile     FinanceProfile          @relation(fields: [financeProfileId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  stripeConnection   FinanceStripeConnection @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  payerAccount       FinancePayerAccount     @relation(fields: [payerAccountId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  mandates           FinanceMandate[]
+  tenant             Tenant                  @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                Org                     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, payerAccountId, tenantId, orgId])
+  @@unique([stripeAccountId, stripeCustomerId])
+  @@index([tenantId, orgId, payerAccountId])
+}
+
 model FinanceProfile {
   id                 String                           @id @default(uuid())
   orgId              String
@@ -5315,6 +5621,10 @@ model FinanceProfile {
   refunds               FinanceRefund[]
   receiptMovements      FinanceReceiptMovement[]
 
+  stripeCustomers FinanceStripeCustomer[]
+  mandates FinanceMandate[]
+  collectionPlans FinanceCollectionPlan[]
+  recurringInvoiceTemplates FinanceRecurringInvoiceTemplate[]
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, orgId])
   @@index([orgId, tenantId])
@@ -5340,6 +5650,10 @@ model FinanceStripeConnection {
   disconnectedBy       User?                         @relation("FinanceStripeConnectionDisconnector", fields: [disconnectedByUserId], references: [id], onDelete: Restrict)
   checkoutAttempts     FinanceCheckoutAttempt[]
 
+  stripeCustomers FinanceStripeCustomer[]
+  mandates FinanceMandate[]
+  collectionPlans FinanceCollectionPlan[]
+  debitAttempts FinanceDebitAttempt[]
   @@unique([id, tenantId, orgId])
   @@index([tenantId, orgId, status])
 }
@@ -5385,6 +5699,10 @@ model FinancePayerAccount {
   transferNotices       FinanceTransferNotice[]
   statements            FinanceStatement[]
 
+  stripeCustomers FinanceStripeCustomer[]
+  mandates FinanceMandate[]
+  collectionPlans FinanceCollectionPlan[]
+  recurringInvoiceTemplates FinanceRecurringInvoiceTemplate[]
   @@unique([id, tenantId, orgId])
   @@index([financeProfileId, displayName])
   @@index([tenantId, orgId, createdAt])
@@ -5551,11 +5869,16 @@ model FinanceInvoice {
   creditNotes             FinanceCreditNote[]
   transferNotices         FinanceTransferNotice[]
 
+  recurringTemplateId String?
+  recurringPeriodStart DateTime? @db.Date
+  recurringTemplate FinanceRecurringInvoiceTemplate? @relation(fields: [recurringTemplateId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  collectionPlans FinanceCollectionPlan[]
   @@unique([id, tenantId, orgId])
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, status, dueAt])
   @@index([financeProfileId, status, createdAt])
   @@index([tenantId, orgId, payerAccountId, status])
+  @@unique([recurringTemplateId, recurringPeriodStart])
 }
 
 model FinanceInvoiceLine {

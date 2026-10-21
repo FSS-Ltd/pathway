@@ -13,7 +13,10 @@ type FinanceWebhookTestTransaction = {
     findFirst: jest.Mock;
     create: jest.Mock;
   };
-  financeReceiptAllocation: { create: jest.Mock };
+  financeReceiptAllocation: {
+    aggregate: jest.Mock;
+    create: jest.Mock;
+  };
 };
 
 let mockFinanceWebhookTransaction: FinanceWebhookTestTransaction;
@@ -106,6 +109,9 @@ function setup(outstandingMinor = "5000") {
       create: jest.fn().mockResolvedValue({ id: "receipt-1" }),
     },
     financeReceiptAllocation: {
+      aggregate: jest.fn().mockResolvedValue({
+        _sum: { amountMinor: 5000n },
+      }),
       create: jest.fn().mockResolvedValue({ id: "allocation-1" }),
     },
   };
@@ -268,6 +274,14 @@ describe("FinanceStripePaymentWebhookService", () => {
 
     expect(tx.financeReceipt.create).not.toHaveBeenCalled();
     expect(tx.financeReceiptAllocation.create).not.toHaveBeenCalled();
+    expect(tx.financeReceiptAllocation.aggregate).toHaveBeenCalledWith({
+      where: {
+        receiptId: "receipt-existing",
+        tenantId: scope.tenantId,
+        orgId: scope.orgId,
+      },
+      _sum: { amountMinor: true },
+    });
     expect(tx.financeCheckoutAttempt.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {

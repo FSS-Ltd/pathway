@@ -19,7 +19,8 @@
     "outbox:dispatch": "tsx src/outbox/dispatch-outbox.cli.ts",
     "outbox:dispatch-addon-trials": "tsx src/outbox/dispatch-addon-trial-outbox.cli.ts",
     "outbox:dispatch-finance-statements": "tsx src/outbox/dispatch-finance-statement-notice.cli.ts",
-    "finance:statements:month-end": "tsx src/finance/run-finance-statement-month-end.cli.ts"
+    "finance:statements:month-end": "tsx src/finance/run-finance-statement-month-end.cli.ts",
+    "finance:bacs:run-due": "tsx src/finance/run-finance-bacs-collection.cli.ts"
   },
   "dependencies": {
     "@pathway/ace-domain": "workspace:*",
