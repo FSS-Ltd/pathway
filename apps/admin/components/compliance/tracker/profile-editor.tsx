@@ -11,6 +11,7 @@ import { emptyProfile, ProfileFields, words } from "./profile-fields";
 const profileLabels: Record<string, string> = {
   jurisdictionId: "Operating jurisdiction",
   localAuthority: "Local authority",
+  belgianEducationCommunity: "Belgian education Community",
   providerCategory: "Actual provider category",
   fundingStatus: "Funding status",
   minimumAge: "Minimum age",

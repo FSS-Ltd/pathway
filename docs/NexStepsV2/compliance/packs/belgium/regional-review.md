@@ -25,3 +25,17 @@ municipality.
 | Flemish and Walloon Regions; municipalities | [Federal explanation of Communities and Regions](https://www.belgium.be/en/about_belgium/government/communities)                                                                                                                                           | Building use, fire, accessibility, transport and municipal permissions by premises and activity.                                         |
 
 These are unresolved coverage boundaries, not a finding of no obligations. The site profile must identify the relevant language Community and physical Region; its current country/subdivision fields are insufficient to infer every Brussels service authority. The national checklist deliberately asks for an authority classification rather than applying one Community's rule to all Belgium sites.
+
+## Site language-Community classification
+
+The site profile now records the language Community responsible for the actual
+education provision as a separate, nullable fact: Flemish, French, or German-speaking.
+This follows the [Belgian federal distinction between
+Communities](https://www.belgium.be/en/about_belgium/government/communities)
+and [geographic Regions](https://www.belgium.be/en/about_belgium/government/regions),
+rechecked 21 October 2026. The selection is an institutional declaration, not
+an inference from the Region or evidence of registration. Childcare licensing is
+a separate question: [Opgroeien's Brussels starter guidance](https://www.opgroeien.be/aanbod/kinderopvang/starters)
+distinguishes Opgroeien, ONE and Iriscare routes for childcare. An unknown value
+stays unresolved. The catalogue can condition future reviewed rules on this
+fact, but no Community-specific legal duty is published by the profile change.

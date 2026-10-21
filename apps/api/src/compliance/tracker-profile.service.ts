@@ -1,5 +1,10 @@
 import { isDeepStrictEqual } from "node:util";
-import { ConflictException, Inject, Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+} from "@nestjs/common";
 import type {
   TrackerProfile,
   TrackerProfileInput,
@@ -64,7 +69,11 @@ export class TrackerProfileService {
         normalizeTrackerProfile(input.profile, currentProfile?.profile),
         facts,
       );
-      await trackerLocation(tx, profile.jurisdictionId);
+      const location = await trackerLocation(tx, profile.jurisdictionId);
+      if (profile.belgianEducationCommunity && location.countryCode !== "BE")
+        throw new BadRequestException(
+          "Belgian education Community applies only to a site operating in Belgium.",
+        );
       if (current && isDeepStrictEqual(currentProfile?.profile, profile)) {
         await auditTracker(tx, actor, AuditAction.VIEWED, [current.id]);
         return serializeTrackerProfile(current);
