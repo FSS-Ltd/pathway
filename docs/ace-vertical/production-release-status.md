@@ -1017,8 +1017,10 @@ that IP and device evidence follows each school's consent-record retention
 policy. Online responses remain disabled behind
 `ACE_TRIP_SLIP_RESPONSE_ENABLED` until each participating school has recorded
 its approved retention instructions and the release gate is reviewed. ACE-C11
-web/API read and response screens are in progress on
-`feature/ace-c11-trip-slip-web`. The web slice adds guardian child-scoped
+web/API read and response screens are in progress in
+[PR #718](https://github.com/FSS-Ltd/pathway/pull/718) on
+`feature/ace-c11-trip-slip-web`. The first pushed revision was
+`e106ca95`; latest-head CI and merge evidence are pending. The web slice adds guardian child-scoped
 published reads and response states, plus staff drafting, publication review,
 version comparison, response summaries, and witnessed exceptions. The admin
 pages default off behind `NEXT_PUBLIC_ACE_TRIP_SLIP_WEB_ENABLED`; the API's
