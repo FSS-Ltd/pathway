@@ -945,10 +945,16 @@ The authoring and publication flags remain default-off; linked-account live
 review, M20, C08 and mobile acceptance remain gated. The verified ACE count
 stays **48/150 (32%)**.
 
-ACE-C07 Faith read and reflection policy is in progress in
-[PR #710](https://github.com/FSS-Ltd/pathway/pull/710) on branch
-`feature/ace-c07-faith-reflections-web`. Its initial published head was
-`0911177869db4c7040b814e927ff753897d4ba99`. The approved F18 student-authored
+ACE-C07 Faith read and reflection policy merged in
+[PR #710](https://github.com/FSS-Ltd/pathway/pull/710) on 21 October 2026.
+The checked head `9d94e4c57ad09378d77d477326fbbc1ca02dc68f` passed all
+nine applicable latest-head checks in CI run
+[39596890496](https://github.com/FSS-Ltd/pathway/actions/runs/39596890496)
+and CodeQL. CI logs confirmed the Faith reflection, Faith content, and Faith
+reporting PostgreSQL suites actually ran, along with both new admin Faith
+settings and reflection-review interaction tests. GitHub confirmed merge
+commit `672dfb154c4db21e08a96dff806a5ec3718cbf02` into `master`.
+The approved F18 student-authored
 reflection policy governs this step. The implementation adds explicit private
 and guardian-released visibility, staff moderation, student receipts, a
 reference-only safeguarding report path, and a staff web review panel. The
@@ -959,8 +965,24 @@ API and platform lint, explicit staff UI lint, the API and admin builds, the
 admin unit chain, the access-matrix and reflection policy unit suites, and
 three Faith/reporting PostgreSQL suites (42/42 tests). The admin build used
 nonproduction API and Clerk test keys because local credentials are absent.
-Latest-head CI, review, merge and production evidence are pending; C08 has not
-started. The verified ACE count remains **48/150 (32%)**.
+Production linked-account and mobile review remain pending. The verified ACE
+count remains **48/150 (32%)**.
+
+ACE-C08 web family reading is in progress on
+`feature/ace-c08-faith-family-web`, based on the confirmed C07 merge. This
+slice adds student and guardian reading routes, school-configured Faith
+terminology in family navigation, and student-only reflection entry. Mobile
+reading and offline cache remain paused, so full C08 acceptance remains open.
+Student read receipts require an explicit button; opening content makes no
+write.
+`NEXT_PUBLIC_ACE_FAITH_WEB_ENABLED` defaults off and gates family navigation and
+pages until a separate school release decision. Local checks passed for API
+and admin typechecks, focused lint and formatting, both production builds,
+the admin unit chain, and the family-context and Faith-content PostgreSQL
+HTTP suites (6/6 and 4/4 tests) against a disposable database. A signed-in
+linked-account browser review remains pending. PR and CI evidence will be
+recorded when the current step reaches its delivery gate. The verified ACE
+count remains **48/150 (32%)**.
 
 PR [#504](https://github.com/FSS-Ltd/pathway/pull/504) corrected the family
 discovery policy target and merged as `26d43e4b6d194be5370bbc34f709bea4b025a351`.

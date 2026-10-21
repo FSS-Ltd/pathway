@@ -11,6 +11,7 @@ export type FamilyContext = {
   siteName: string;
   childId: string;
   childName: string;
+  faithLabel?: string;
   sections: FamilySection[];
 };
 
@@ -21,6 +22,7 @@ export type FamilySection =
   | "attendance"
   | "sessions"
   | "subject-timetable"
+  | "faith"
   | "notices"
   | "messages"
   | "volunteering";

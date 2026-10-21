@@ -381,6 +381,7 @@ describe("ACE Faith content lifecycle", () => {
       .get(`/ace/faith/sites/${siteId}/feed?childId=${childId}`)
       .set("Authorization", guardianAuth);
     expect(allowed.status).toBe(200);
+    expect(allowed.body.reflectionsEnabled).toBe(false);
     expect(allowed.body.items).toEqual([
       expect.objectContaining({
         id,

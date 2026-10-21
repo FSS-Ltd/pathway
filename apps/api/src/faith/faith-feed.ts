@@ -39,7 +39,7 @@ export async function readFaithFeed(
       }),
       tx.faithSiteSettings.findUnique({
         where: { tenantId: actor.tenantId },
-        select: { displayLabel: true },
+        select: { displayLabel: true, reflectionsEnabled: true },
       }),
       tx.faithContent.findMany({
         where: { tenantId: actor.tenantId, withdrawnAt: null },
@@ -69,6 +69,9 @@ export async function readFaithFeed(
       throw new NotFoundException("Faith content not found");
     return {
       displayLabel: settings?.displayLabel ?? "Faith Corner",
+      reflectionsEnabled:
+        process.env.ACE_FAITH_REFLECTIONS_ENABLED === "true" &&
+        settings?.reflectionsEnabled === true,
       nextCursor:
         contents.length > query.limit ? contents[query.limit - 1].id : null,
       items: contents.slice(0, query.limit).flatMap((content) => {
