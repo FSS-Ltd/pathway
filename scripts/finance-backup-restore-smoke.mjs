@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
+import { URL, fileURLToPath } from "node:url";
 
 const DISPOSABLE_TOKEN = "finance-backup-restore-disposable-databases";
 const SOURCE_DATABASE = "pathway_finance_backup_source";
@@ -134,8 +134,8 @@ function main() {
   const seedSql = `
     INSERT INTO app."Org" ("id", "name", "slug", "planCode", "createdAt", "updatedAt")
     VALUES ('${FIXTURE_ORG_ID}', 'Finance Backup Fixture', 'finance-backup-restore-fixture', 'starter', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
-    INSERT INTO app."Tenant" ("id", "name", "slug", "orgId")
-    VALUES ('${FIXTURE_TENANT_ID}', 'Finance Backup Fixture', 'finance-backup-restore-fixture', '${FIXTURE_ORG_ID}');
+    INSERT INTO app."Tenant" ("id", "name", "slug", "orgId", "createdAt", "updatedAt")
+    VALUES ('${FIXTURE_TENANT_ID}', 'Finance Backup Fixture', 'finance-backup-restore-fixture', '${FIXTURE_ORG_ID}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
     INSERT INTO app."FinanceProfile" ("id", "orgId", "tenantId", "legalEntityName", "createdAt", "updatedAt")
     VALUES ('${FIXTURE_PROFILE_ID}', '${FIXTURE_ORG_ID}', '${FIXTURE_TENANT_ID}', '${FIXTURE_LEGAL_ENTITY}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
   `;
