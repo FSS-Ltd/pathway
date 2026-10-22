@@ -9,6 +9,7 @@ import { mobileTokens } from "@/design/tokens";
 const FAMILY_ITEMS = [
   { routeName: "home", label: "Dashboard", icon: "home-outline" as const },
   { routeName: "updates", label: "Notices", icon: "notifications-outline" as const },
+  { routeName: "finance", label: "Finance", icon: "wallet-outline" as const },
   { routeName: "account", label: "Settings", icon: "settings-outline" as const },
 ];
 

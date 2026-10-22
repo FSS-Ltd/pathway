@@ -26,6 +26,12 @@ export default function FamilyTabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="finance"
+        options={{
+          title: "Finance",
+        }}
+      />
+      <Tabs.Screen
         name="account"
         options={{
           title: "Settings",

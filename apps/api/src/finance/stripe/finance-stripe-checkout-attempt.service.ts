@@ -36,6 +36,64 @@ export class FinanceStripeCheckoutAttemptService {
     private readonly config: FinanceStripeCheckoutConfig,
   ) {}
 
+  async getPayerStatus(
+    actor: FinanceStripeCheckoutActor,
+    attemptId: string,
+  ): Promise<{
+    attemptId: string;
+    invoiceId: string;
+    payerAccountId: string;
+    status: "CHECKING" | "CONFIRMED" | "EXPIRED" | "FAILED";
+    checkedAt: string;
+  }> {
+    const attempt = await withTenantRlsContext(
+      actor.tenantId,
+      actor.orgId,
+      (tx) =>
+        tx.financeCheckoutAttempt.findFirst({
+          where: {
+            id: attemptId,
+            tenantId: actor.tenantId,
+            orgId: actor.orgId,
+          },
+          select: {
+            id: true,
+            invoiceId: true,
+            status: true,
+            payerGrant: {
+              select: {
+                financePayerAccountId: true,
+                payerUserId: true,
+                revokedAt: true,
+              },
+            },
+          },
+        }),
+    );
+    if (!attempt) throw new NotFoundException("Payment attempt not found");
+    if (
+      attempt.payerGrant.payerUserId !== actor.userId ||
+      attempt.payerGrant.revokedAt
+    ) {
+      throw new ForbiddenException("Finance access unavailable");
+    }
+
+    await this.financeAccess.assertPayerAction(
+      actor,
+      actor.userId,
+      attempt.payerGrant.financePayerAccountId,
+      "READ_ACCOUNT",
+    );
+
+    return {
+      attemptId: attempt.id,
+      invoiceId: attempt.invoiceId,
+      payerAccountId: attempt.payerGrant.financePayerAccountId,
+      status: checkoutStatusForPayer(attempt.status),
+      checkedAt: new Date().toISOString(),
+    };
+  }
+
   async prepare(
     actor: FinanceStripeCheckoutActor,
     payerAccountId: string,
@@ -444,6 +502,15 @@ export class FinanceStripeCheckoutAttemptService {
     if (!attempt) throw new NotFoundException("Checkout attempt not found");
     return attempt.payerGrant.financePayerAccountId;
   }
+}
+
+function checkoutStatusForPayer(
+  status: "CREATING" | "OPEN" | "COMPLETED" | "PAID" | "EXPIRED" | "FAILED",
+): "CHECKING" | "CONFIRMED" | "EXPIRED" | "FAILED" {
+  if (status === "PAID") return "CONFIRMED";
+  if (status === "EXPIRED") return "EXPIRED";
+  if (status === "FAILED") return "FAILED";
+  return "CHECKING";
 }
 
 function checkingView(attemptId: string): FinanceStripeCheckoutView {
