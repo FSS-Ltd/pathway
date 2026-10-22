@@ -7,6 +7,12 @@ import {
   loadEnvFile,
   resolveEnvFile,
 } from "./lib/env-file.mjs";
+import {
+  applyFinanceProductionDefaults,
+  FINANCE_PRODUCTION_SYNC_KEYS,
+  STRIPE_PRODUCTION_SYNC_KEYS,
+  validateFinanceProductionEnv,
+} from "./lib/finance-production-env.mjs";
 
 const args = new Set(process.argv.slice(2));
 const apply = args.has("--apply");
@@ -56,9 +62,7 @@ const PROJECTS = {
   api: {
     idEnv: "VERCEL_API_PROJECT_ID",
     optionalKeys: [
-      "STRIPE_SECRET_KEY_TEST",
-      "STRIPE_WEBHOOK_SECRET_TEST",
-      "STRIPE_PRICE_MAP_TEST",
+      ...FINANCE_PRODUCTION_SYNC_KEYS,
       "FINANCE_STATEMENT_OUTBOX_SECRET",
       "FINANCE_STATEMENT_MONTH_END_SECRET",
       "RESEND_WEBHOOK_SECRET",
@@ -88,16 +92,8 @@ const PROJECTS = {
       "CLERK_SECRET_KEY",
       "CLERK_WEBHOOK_SIGNING_SECRET",
       "BILLING_PROVIDER",
-      "STRIPE_SECRET_KEY",
-      "STRIPE_SECRET_KEY_TEST",
-      "STRIPE_WEBHOOK_SECRET_SNAPSHOT",
-      "STRIPE_WEBHOOK_SECRET_THIN",
-      "STRIPE_WEBHOOK_SECRET_TEST",
-      "STRIPE_PRICE_MAP",
-      "STRIPE_PRICE_MAP_TEST",
-      "STRIPE_PUBLISHABLE_KEY",
-      "STRIPE_SUCCESS_URL",
-      "STRIPE_CANCEL_URL",
+      ...STRIPE_PRODUCTION_SYNC_KEYS,
+      ...FINANCE_PRODUCTION_SYNC_KEYS,
       "RESEND_API_KEY",
       "RESEND_FROM",
       "RESEND_WEBHOOK_SECRET",
@@ -230,6 +226,9 @@ function collectApplyErrors(plans) {
         "api DATABASE_URL must use the Supavisor transaction pooler for Vercel runtime; move the direct/session URL to DIRECT_URL.",
       );
     }
+    if (plan.name === "api") {
+      errors.push(...validateFinanceProductionEnv(env));
+    }
     if (plan.missingRequired.length > 0) {
       errors.push(
         `${plan.name} is missing required vars: ${plan.missingRequired.join(
@@ -286,7 +285,7 @@ async function syncProject(plan) {
 }
 
 function withDerivedValues(values) {
-  const next = { ...values };
+  const next = applyFinanceProductionDefaults(values);
   next.NODE_ENV ??= "production";
 
   applyAlias(next, "SSTRIPE_PRICE_MAP", "STRIPE_PRICE_MAP");

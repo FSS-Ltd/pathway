@@ -18,10 +18,47 @@ export function loadFinanceStripeConnectConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): FinanceStripeConnectConfig {
   const mode = env.FINANCE_STRIPE_CONNECT_MODE?.trim().toLowerCase();
-  if (!mode || mode === "disabled") return { mode: "disabled" };
+  const liveSwitch = env.FINANCE_STRIPE_LIVE_ENABLED?.trim().toLowerCase();
+  if (liveSwitch && liveSwitch !== "true" && liveSwitch !== "false") {
+    throw new Error("FINANCE_STRIPE_LIVE_ENABLED must be true or false");
+  }
+  const liveEnabled = liveSwitch === "true";
+  const vercelEnv = env.VERCEL_ENV?.trim().toLowerCase();
+
+  if (!mode || mode === "disabled") {
+    if (liveEnabled) {
+      throw new Error(
+        "FINANCE_STRIPE_LIVE_ENABLED requires FINANCE_STRIPE_CONNECT_MODE=live",
+      );
+    }
+    return { mode: "disabled" };
+  }
   if (mode !== "test" && mode !== "live") {
     throw new Error(
       "FINANCE_STRIPE_CONNECT_MODE must be disabled, test, or live",
+    );
+  }
+
+  if (
+    mode === "live" &&
+    (!liveEnabled ||
+      env.NODE_ENV !== "production" ||
+      vercelEnv !== "production")
+  ) {
+    throw new Error(
+      "Finance Stripe live mode requires an explicit production opt-in",
+    );
+  }
+  if (
+    mode === "test" &&
+    (vercelEnv === "production" ||
+      (!vercelEnv && env.NODE_ENV === "production"))
+  ) {
+    throw new Error("Finance test mode is unavailable in a production runtime");
+  }
+  if (liveEnabled && mode !== "live") {
+    throw new Error(
+      "FINANCE_STRIPE_LIVE_ENABLED requires FINANCE_STRIPE_CONNECT_MODE=live",
     );
   }
 
