@@ -41,6 +41,9 @@ import { FinanceReportService } from "./finance-report.service";
 import { FinanceReportRepository } from "./finance-report.repository";
 import { FinancePayerAccountController } from "./finance-payer-account.controller";
 import { FinancePayerAccountService } from "./finance-payer-account.service";
+import { FinanceFamilyController } from "./finance-family.controller";
+import { FinanceFamilyService } from "./finance-family.service";
+import { FinancePayerCheckoutStatusController } from "./finance-payer-checkout-status.controller";
 import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
 import { FinanceStripeCheckoutController } from "./finance-stripe-checkout.controller";
 import { FinanceBacsMandateController } from "./finance-bacs-mandate.controller";
@@ -139,12 +142,15 @@ import {
     FinanceProfileController,
     FinanceReportController,
     FinancePayerAccountController,
+    FinanceFamilyController,
+    FinancePayerCheckoutStatusController,
   ],
   providers: [
     FinanceBalanceService,
     FinanceReportService,
     FinanceReportRepository,
     FinancePayerAccountService,
+    FinanceFamilyService,
     FinanceStatementService,
     FinanceStatementDocumentService,
     FinanceDocumentService,
