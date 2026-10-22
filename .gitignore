@@ -14,7 +14,6 @@ docs/BLOG_AUTOMATION_COWORKER.md
 
 # builds
 dist
-apps/api/api/serverless/
 .next
 .expo
 .expo-shared

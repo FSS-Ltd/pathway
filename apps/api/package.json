@@ -9,7 +9,7 @@
     "build:serverless": "node ./scripts/build-serverless.mjs",
     "test:serverless": "node ./scripts/test-serverless-bundle.mjs",
     "start": "node dist/src/main.js",
-    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.{ts,tsx}\" \"api/**/*.{ts,tsx,js,cjs}\" --no-error-on-unmatched-pattern",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"scripts/**/*.{ts,tsx,mjs}\" \"serverless/**/*.{ts,mjs}\" \"api/**/*.{ts,tsx,js,cjs}\" --no-error-on-unmatched-pattern",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm test:unit && pnpm test:finance-pdf",
     "test:finance-pdf": "tsx --tsconfig tsconfig.json scripts/test-finance-pdf.ts",

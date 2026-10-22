@@ -5,12 +5,12 @@ import { fileURLToPath } from "node:url";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outputDirectory = resolve(apiRoot, "api/serverless");
+const outputDirectory = resolve(apiRoot, "dist/serverless");
 const require = createRequire(import.meta.url);
 const ncc = require("@vercel/ncc");
 
 const { code, assets } = await ncc(
-  resolve(apiRoot, "api/bootstrap-entry.mjs"),
+  resolve(apiRoot, "serverless/bootstrap-entry.mjs"),
   {
     externals: ["@prisma/client"],
     sourceMap: false,

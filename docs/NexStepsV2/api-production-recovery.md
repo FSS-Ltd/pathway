@@ -17,9 +17,13 @@ database-backed health after each API production deployment.
 - Step: standalone API startup and file-descriptor repair.
 - Branch: `fix/api-startup-file-descriptors` from `master` at
   `7e4f1db9e2cb8aa1933f9b7ce17c771aba9847c6`.
-- Pull request: pending.
-- Checked revision: pending.
-- Required CI and review: pending.
+- Pull request: [#724](https://github.com/FSS-Ltd/pathway/pull/724), open as a
+  draft.
+- Checked revision: `9db15079df22856c2ce9f308f8fe9c20b3a88f13` (the preview
+  failure led to a source-layout fix now being verified locally).
+- Required CI and review: artifact CI and both CodeQL analyses passed on the
+  checked revision; workspace CI was still running. Approval and current-revision
+  CI are pending.
 - Merge commit: pending.
 - Production deployment: pending.
 
@@ -33,10 +37,16 @@ database-backed health after each API production deployment.
 - Node 24 artifact test with a 1,024 descriptor limit: attempted, but the
   database-backed `/health` assertion returned 500 because the local Docker
   daemon was unavailable and the disposable Postgres service could not start.
-  The full artifact test remains required in CI, where it uses a fresh Postgres
-  service.
+  On the relocated artifact layout, staging, bundle import, both `/health/env`
+  routes, allowed-origin preflight, and unauthenticated auth response passed
+  before the same database-only failure. The full artifact test remains required
+  in CI, where it uses a fresh Postgres service.
 - `graphify update .`: passed after the code changes.
-- Protected Vercel preview health: pending.
+- Protected Vercel preview `dpl_7wSQpF6inGJWBJh6xoy2Z9hoZegA` failed during
+  Vercel's independent route TypeScript check. Vercel treated bootstrap sources
+  under `apps/api/api/` as function entrypoints and reported TS2835 extension
+  errors in compliance catalogue imports. The sources have been moved outside
+  the route directory; a corrected preview and its health checks are pending.
 - Production `/health`, `/health/env`, auth preflight, and public blog reads:
   pending.
 - Runtime logs and scheduled jobs observed for 15 minutes: pending.

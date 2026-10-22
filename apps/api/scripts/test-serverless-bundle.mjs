@@ -21,9 +21,8 @@ import { URL } from "node:url";
 const fetch = globalThis.fetch;
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repositoryRoot = resolve(apiRoot, "../..");
 const entryPath = resolve(apiRoot, "api/[...path].js");
-const bundleDirectory = resolve(apiRoot, "api/serverless");
+const bundleDirectory = resolve(apiRoot, "dist/serverless");
 const dependenciesPath = resolve(apiRoot, "node_modules");
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
@@ -39,34 +38,33 @@ process.env.CORS_ALLOWED_ORIGINS = "http://localhost:3000";
 
 const stagedRoot = await mkdtemp(join(tmpdir(), "pathway-api-bundle-"));
 const stagedApi = join(stagedRoot, "api");
+const stagedBundleDirectory = join(stagedRoot, "dist/serverless");
 await mkdir(stagedApi, { recursive: true });
+await mkdir(stagedBundleDirectory, { recursive: true });
 await cp(entryPath, join(stagedApi, "[...path].js"));
-await cp(bundleDirectory, join(stagedApi, "serverless"), { recursive: true });
-await symlink(dependenciesPath, join(stagedApi, "node_modules"), "dir");
-await symlink(
-  resolve(repositoryRoot, "node_modules/.pnpm"),
-  join(stagedRoot, ".pnpm"),
-  "dir",
-);
+await cp(bundleDirectory, stagedBundleDirectory, { recursive: true });
+await symlink(dependenciesPath, join(stagedRoot, "node_modules"), "dir");
 await writeFile(join(stagedRoot, "package.json"), '{"type":"module"}');
 
 try {
   assert.equal(
-    await exists(join(stagedApi, "src")),
+    await exists(join(stagedRoot, "src")),
     false,
     "the staged function must not contain API source files",
   );
   const bundleSource = await readFile(
-    join(stagedApi, "serverless/index.mjs"),
+    join(stagedBundleDirectory, "index.mjs"),
     "utf8",
   );
   assert.doesNotMatch(bundleSource, /tsx\/cjs|tsx\/esm/);
 
   const bundle = await import(
-    new URL(`file://${join(stagedApi, "serverless/index.mjs")}`)
+    new URL(`file://${join(stagedBundleDirectory, "index.mjs")}`)
   );
   assert.equal(typeof bundle.createServerlessHandler, "function");
-  const runtimeRequire = createRequire(join(stagedApi, "serverless/index.mjs"));
+  const runtimeRequire = createRequire(
+    join(stagedBundleDirectory, "index.mjs"),
+  );
   assert.equal(
     runtimeRequire.extensions[".ts"],
     undefined,
@@ -106,12 +104,6 @@ try {
     ]);
     assert.equal(firstHealth.status, 200);
     assert.equal(secondHealth.status, 200);
-    const databaseHealth = await fetch(`${baseUrl}/health`);
-    assert.equal(databaseHealth.status, 200);
-    const databaseHealthBody = await databaseHealth.json();
-    assert.equal(databaseHealthBody.status, "ok");
-    assert.equal(typeof databaseHealthBody.dbTime, "string");
-
     const preflight = await fetch(`${baseUrl}/auth/me`, {
       method: "OPTIONS",
       headers: {
@@ -127,6 +119,12 @@ try {
 
     const unauthorized = await fetch(`${baseUrl}/auth/me`);
     assert.equal(unauthorized.status, 401);
+
+    const databaseHealth = await fetch(`${baseUrl}/health`);
+    assert.equal(databaseHealth.status, 200);
+    const databaseHealthBody = await databaseHealth.json();
+    assert.equal(databaseHealthBody.status, "ok");
+    assert.equal(typeof databaseHealthBody.dbTime, "string");
   } finally {
     await new Promise((resolvePromise, reject) =>
       server.close((error) => (error ? reject(error) : resolvePromise())),

@@ -18,7 +18,7 @@ describe("Vercel API bundle", () => {
     );
     const includeFiles = config.functions["api/[...path].js"]?.includeFiles;
 
-    expect(includeFiles).toContain("api/serverless/**");
+    expect(includeFiles).toContain("dist/serverless/**");
     expect(includeFiles).toContain("node_modules/@prisma/client/");
     expect(includeFiles).toContain("../../packages/db/prisma/schema.prisma");
     expect(includeFiles).toContain(".prisma/client/**");
