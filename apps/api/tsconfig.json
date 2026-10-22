@@ -26,6 +26,7 @@
   },
   "include": [
     "api",
+    "serverless",
     "src",
     "scripts",
     "../../packages/auth/src",

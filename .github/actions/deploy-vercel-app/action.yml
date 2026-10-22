@@ -141,3 +141,19 @@ runs:
         # three apps sharing this action are forced, not just admin.
         url="$(pnpm dlx vercel@54.13.0 deploy --prod --force --archive=tgz --project="$VERCEL_PROJECT_ID" --token="$VERCEL_TOKEN")"
         echo "Deployed ${{ inputs.app }} to $url"
+
+    - name: Verify production API health
+      if: ${{ inputs.app == 'api' }}
+      shell: bash
+      env:
+        API_HEALTH_URL: https://api.nexsteps.dev/health
+      run: |
+        set -euo pipefail
+        response="$(curl --fail --silent --show-error --location --max-time 30 "$API_HEALTH_URL")"
+        node -e '
+          const health = JSON.parse(process.argv[1]);
+          if (health.status !== "ok" || typeof health.dbTime !== "string" || !health.dbTime) {
+            throw new Error("API health response is missing status=ok or database time");
+          }
+          console.log(`API health passed; database time ${health.dbTime}`);
+        ' "$response"
