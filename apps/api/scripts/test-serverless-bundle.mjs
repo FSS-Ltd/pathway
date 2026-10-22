@@ -42,6 +42,7 @@ const stagedBundleDirectory = join(stagedRoot, "dist/serverless");
 await mkdir(stagedApi, { recursive: true });
 await mkdir(stagedBundleDirectory, { recursive: true });
 await cp(entryPath, join(stagedApi, "[...path].js"));
+await cp(join(apiRoot, "api/package.json"), join(stagedApi, "package.json"));
 await cp(bundleDirectory, stagedBundleDirectory, { recursive: true });
 await symlink(dependenciesPath, join(stagedRoot, "node_modules"), "dir");
 await writeFile(join(stagedRoot, "package.json"), '{"type":"module"}');
