@@ -32,7 +32,7 @@
   "functions": {
     "api/[...path].js": {
       "maxDuration": 30,
-      "includeFiles": "{dist/serverless/**,node_modules/@prisma/client/{index.js,default.js,package.json,runtime/**},../../packages/db/prisma/schema.prisma,../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**}"
+      "includeFiles": "{dist/serverless/**,../../packages/db/prisma/schema.prisma,../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**}"
     }
   },
   "routes": [

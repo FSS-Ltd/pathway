@@ -14,20 +14,34 @@ database-backed health after each API production deployment.
 
 ## Delivery evidence
 
-- Step: standalone API startup and file-descriptor repair.
-- Branch: `fix/api-startup-file-descriptors` from `master` at
-  `7e4f1db9e2cb8aa1933f9b7ce17c771aba9847c6`.
-- Pull request: [#724](https://github.com/FSS-Ltd/pathway/pull/724), open as a
-  draft.
-- Checked revision: `9db15079df22856c2ce9f308f8fe9c20b3a88f13` (the preview
-  failure led to a source-layout fix now being verified locally).
-- Required CI and review: artifact CI and both CodeQL analyses passed on the
-  checked revision; workspace CI was still running. Approval and current-revision
-  CI are pending.
-- Merge commit: pending.
-- Production deployment: pending.
+- Startup bundle PR [#724](https://github.com/FSS-Ltd/pathway/pull/724)
+  merged as `f76cd34c9aad82546496b67879a81f981d69ba63` with passing CI.
+- Production workflow [39733639646](https://github.com/FSS-Ltd/pathway/actions/runs/39733639646)
+  failed twice after the API build completed, at deployment output finalization.
+- Local Vercel CLI 64.7.0 reproduced the failure in preview
+  `dpl_DM7k2zY61VRstiNouT3J23D2GTjm`: `EEXIST` creating the Prisma package
+  symlink after explicit included files had already created its destination.
+- Removing only the directory mapping from generated output produced READY
+  preview `dpl_CRs3YpJaVnS5YQxi94VCu5r6vFzu`. Its `/health/env` returned 500:
+  the function wrapper used ESM syntax inside an explicitly CommonJS package.
+- Follow-up repair: `fix/api-vercel-artifact-packaging`, based on master
+  `e0c016e41a781c998b62c3965ff66935d1395eff`. PR, CI, working Linux preview,
+  merge and production recovery remain pending.
+- Source repair relies on Vercel tracing for Prisma runtime modules, retains
+  explicit generated-client/engine/schema assets, and exports the wrapper using
+  CommonJS. The staged artifact test now includes the wrapper's package.json.
 
-## Verification
+## Follow-up local verification
+
+- Node 24 Vercel preview build passed with the source repair.
+- Generated filePathMap has no Prisma directory/child-file collision.
+- CommonJS wrapper syntax and require smoke test passed.
+- API lint, typecheck, formatting, focused configuration test and all 332 unit
+  suites / 2,135 tests passed. Jest reported a force-exited worker after passing.
+- Workspace lint passed. Local Docker is unavailable; the database-backed
+  artifact and integration checks must pass in CI.
+
+## Earlier verification
 
 - Local TypeScript build and ncc bundle: passed with Node 24 and ncc 0.45.0.
 - API lint, TypeScript typecheck, and Prettier checks: passed.
