@@ -69,6 +69,7 @@ export function calculateFinanceReportTotals(input: {
   failedReceipts: Array<{ amountMinor: bigint }>;
   transferNotices: Array<{ amountMinor: bigint }>;
   period: FinanceReportPeriod;
+  externalRefundReviewAmounts?: readonly bigint[];
 }): FinanceReportTotals {
   const refunds = input.periodMovements
     .filter(
@@ -144,6 +145,7 @@ export function calculateFinanceReportTotals(input: {
       input.processingReceipts.map((receipt) => receipt.amountMinor),
     ).toString(),
     reviewRequiredMinor: sumMinorUnits([
+      ...(input.externalRefundReviewAmounts ?? []),
       ...input.pendingManualReceipts.map((receipt) => receipt.amountMinor),
       ...input.pendingRefunds.map((refund) => refund.amountMinor),
       ...input.failedReceipts.map((receipt) => receipt.amountMinor),

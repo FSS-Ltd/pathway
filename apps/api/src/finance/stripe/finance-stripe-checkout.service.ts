@@ -123,6 +123,11 @@ export class FinanceStripeCheckoutService {
         !error.retryable
       ) {
         await this.attempts.markFailed(actor, attempt.id);
+        throw new UnprocessableEntityException({
+          code: "FINANCE_CARD_PAYMENT_UNAVAILABLE",
+          message:
+            "Card payment is unavailable for this invoice. Choose another payment method or contact the school.",
+        });
       }
       throw new ServiceUnavailableException(
         "A card payment session could not be started. Please try again.",

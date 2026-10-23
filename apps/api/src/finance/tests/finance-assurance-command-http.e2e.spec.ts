@@ -141,6 +141,7 @@ describe("Finance command identity and Bacs name HTTP assurance", () => {
       expect(changed.body).toMatchObject({
         statusCode: 409,
         error: "Conflict",
+        code: "IDEMPOTENCY_CONFLICT",
       });
       const crossMethod = await request(app.getHttpServer())
         .patch(`/finance/invoices/${id}`)
@@ -151,6 +152,7 @@ describe("Finance command identity and Bacs name HTTP assurance", () => {
       expect(crossMethod.body).toMatchObject({
         statusCode: 409,
         error: "Conflict",
+        code: "IDEMPOTENCY_CONFLICT",
       });
       expect((await f.invoices.get(f.actor, id)).totalMinor).toBe("500");
       await withTenantRlsContext(f.tenantId, f.orgId, async (tx) => {

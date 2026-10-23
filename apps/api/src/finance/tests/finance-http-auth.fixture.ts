@@ -93,9 +93,18 @@ export async function createFinanceHttpFixture() {
   // Finance access reader/policy, typed permissions, controllers and services.
   const objects = new Map<string, Buffer>();
   const storage = {
+    privateBucketName: () =>
+      process.env.SUPABASE_STORAGE_PRIVATE_BUCKET?.trim() ?? null,
     uploadObject: jest.fn(
-      async (input: { bucket: string; key: string; body: Buffer }) => {
-        objects.set(input.key, input.body);
+      async (input: {
+        bucket: string;
+        key: string;
+        body: Buffer;
+        overwrite?: boolean;
+      }) => {
+        if (input.overwrite !== false || !objects.has(input.key)) {
+          objects.set(input.key, input.body);
+        }
         return true;
       },
     ),

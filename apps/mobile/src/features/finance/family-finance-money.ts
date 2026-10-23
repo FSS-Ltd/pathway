@@ -13,25 +13,18 @@ export function formatFinanceAmount(
     maximumFractionDigits: fractionDigits,
   });
   const unit = 10n ** BigInt(fractionDigits);
-  const whole = new Intl.NumberFormat("en-GB", {
-    maximumFractionDigits: 0,
-  }).format(absolute / unit);
+  // Hermes Intl rejects BigInt, and Number would lose precision for large
+  // amounts. Group exact decimal digits using the formatter's en-GB convention.
+  const whole = (absolute / unit)
+    .toString()
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const fraction = (absolute % unit).toString().padStart(fractionDigits, "0");
-  const parts = formatter.formatToParts(isNegative ? -1 : 1);
-  let hasWhole = false;
-
-  return parts
-    .map((part) => {
-      if (part.type === "integer") {
-        if (hasWhole) return "";
-        hasWhole = true;
-        return whole;
-      }
-      if (part.type === "group") return "";
-      if (part.type === "fraction") return fraction;
-      return part.value;
-    })
-    .join("");
+  const exactNumber = fractionDigits > 0 ? `${whole}.${fraction}` : whole;
+  // Native Intl also lacks formatToParts. A numeric 1 supplies only the
+  // currency/sign layout; the actual money digits never become a Number.
+  return formatter
+    .format(isNegative ? -1 : 1)
+    .replace(/1(?:\.\d+)?/, exactNumber);
 }
 
 export function parseMajorAmountToMinor(

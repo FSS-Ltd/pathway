@@ -179,3 +179,20 @@ replay, both combined-movement arrival orders, restricted/disconnected public
 reports, request starvation, failed SQL capture and dry-run regressions were
 observed failing before their fixes. Existing unit mocks were updated to represent
 empty aggregate history instead of returning unrelated lock rows.
+
+### Event-driven wakeup assurance gap (T18)
+
+The owner's updated engineering rules require committed changes to wake workers
+through events, with durable startup/reconnect catch-up and due-time retries.
+The signed Finance ingress currently commits its inbox record before returning,
+but does not signal the canonical worker. The worker CLI performs a bounded drain
+and exits; the gated five-minute workflow remains the normal discovery mechanism.
+This source audit identifies an unresolved T18 requirement, not a verified event
+implementation. No production service, deployment or new dependency was introduced.
+
+Before closure, verify post-commit delivery, duplicate handling, idle request/query
+counts, reconnect catch-up, tenant and revocation boundaries, unsubscribe cleanup
+and graceful shutdown. The existing bounded recovery workflow may remain only as
+a documented fallback with its reason, frequency and query budget. The local CI
+polling watcher was stopped; GitHub jobs continue independently. T19 remains
+unstarted while T18 and PR #735 are incomplete.

@@ -6,6 +6,8 @@ export type StorageUploadInput = {
   key: string;
   body: Buffer;
   contentType: string;
+  /** False creates once and reuses an existing object identity on conflict. */
+  overwrite?: boolean;
 };
 
 export type StorageObject = {
@@ -38,13 +40,19 @@ export class SupabaseStorageService {
       headers: {
         ...this.authHeaders(),
         "Content-Type": input.contentType,
-        "x-upsert": "true",
+        "x-upsert": String(input.overwrite ?? true),
       },
       body: new Uint8Array(input.body),
     });
 
     if (!response.ok) {
       const message = await this.safeResponseText(response);
+      if (
+        input.overwrite === false &&
+        isExistingObjectResponse(response.status, message)
+      ) {
+        return { bucket, key: input.key };
+      }
       this.logger.error({
         message: "Supabase Storage upload failed",
         status: response.status,
@@ -199,6 +207,25 @@ export class SupabaseStorageService {
     const text = await response.text().catch(() => "");
     return text.slice(0, 500);
   }
+}
+
+function isExistingObjectResponse(status: number, body: string): boolean {
+  if (status !== 400 && status !== 409) return false;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return false;
+  }
+  if (typeof payload !== "object" || payload === null) return false;
+  const code = "code" in payload ? payload.code : null;
+  const error = "error" in payload ? payload.error : null;
+  return (
+    code === "ResourceAlreadyExists" ||
+    code === "KeyAlreadyExists" ||
+    code === "already_exists" ||
+    error === "Duplicate"
+  );
 }
 
 function encodeStorageKey(key: string): string {
