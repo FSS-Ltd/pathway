@@ -380,6 +380,37 @@ enum FinanceStripeWebhookEventStatus {
   DEAD_LETTER
 }
 
+enum FinanceStripeEvidenceSource {
+  SIGNED_WEBHOOK
+  API_RECONCILIATION
+}
+
+enum FinanceReconciliationCaseKind {
+  UNKNOWN_OPERATION
+  UNMATCHED_MONEY
+  PROVIDER_UNAVAILABLE
+  COVERAGE_GAP
+  REPLAY_FAILED
+  REFUND_AND_RETURN
+  SETTLEMENT_DIFFERENCE
+  CONNECTION_DISCONNECTED
+}
+
+enum FinanceReconciliationCaseStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum FinanceReconciliationCaseEventType {
+  DETECTED
+  UPDATED
+  ACKNOWLEDGED
+  RESOLVED
+  REOPENED
+  REPLAY_REQUESTED
+}
+
 enum FinanceCheckoutAttemptStatus {
   CREATING
   OPEN
@@ -1312,6 +1343,8 @@ model Org {
   financeStatements              FinanceStatement[]
   financeStripeConnections       FinanceStripeConnection[]
   financeStripeWebhookEvents FinanceStripeWebhookEvent[]
+  financeReconciliationStates FinanceReconciliationState[]
+  financeReconciliationCases FinanceReconciliationCase[]
   financeCheckoutAttempts FinanceCheckoutAttempt[]
   outboxEvents        OutboxEvent[]
   createdAt           DateTime                 @default(now())
@@ -1429,6 +1462,8 @@ model Tenant {
   financeStatements                     FinanceStatement[]
   financeStripeConnections              FinanceStripeConnection[]
   financeStripeWebhookEvents             FinanceStripeWebhookEvent[]
+  financeReconciliationStates FinanceReconciliationState[]
+  financeReconciliationCases FinanceReconciliationCase[]
   financeCheckoutAttempts               FinanceCheckoutAttempt[]
   aceTermReports         AceTermReport[]
   aceReportCompilations  AceReportCompilation[]
@@ -1634,6 +1669,7 @@ model User {
   financeStatementsRequested               FinanceStatement[]                  @relation("FinanceStatementRequester")
   financeStripeConnectionsRequested        FinanceStripeConnection[]           @relation("FinanceStripeConnectionRequester")
   financeStripeConnectionsDisconnected     FinanceStripeConnection[]           @relation("FinanceStripeConnectionDisconnector")
+  financeReconciliationCaseEvents FinanceReconciliationCaseEvent[] @relation("FinanceReconciliationCaseEventActor")
   studentIdentities                 StudentIdentity[]
   aceHomeworkEvidenceUploaded       AceHomeworkEvidence[] @relation("AceHomeworkEvidenceUploader")
   aceHomeworkReviewsWritten         AceHomeworkReview[] @relation("AceHomeworkReviewer")
@@ -5484,6 +5520,7 @@ model FinanceDebitAttempt {
   @@unique([id, tenantId, orgId])
   @@unique([stripeAccountId, stripePaymentIntentId])
   @@index([tenantId, orgId, status, createdAt])
+  @@index([stripeConnectionId, tenantId, orgId, id], map: "FinanceDebitAttempt_recovery_idx")
 }
 
 model FinanceMandate {
@@ -5527,6 +5564,7 @@ model FinanceMandate {
   @@unique([stripeAccountId, stripeCheckoutSessionId])
   @@unique([stripeAccountId, stripeSetupIntentId])
   @@index([tenantId, orgId, payerAccountId, status, createdAt])
+  @@index([stripeConnectionId, tenantId, orgId, id], map: "FinanceMandate_recovery_idx")
 }
 
 model FinanceRecurringInvoiceTemplate {
@@ -5654,6 +5692,12 @@ model FinanceStripeConnection {
   disconnectedBy       User?                         @relation("FinanceStripeConnectionDisconnector", fields: [disconnectedByUserId], references: [id], onDelete: Restrict)
   checkoutAttempts     FinanceCheckoutAttempt[]
 
+  settlementEvidence FinanceSettlementEvidence[]
+  payoutReconciliations FinancePayoutReconciliation[]
+  reconciliationStates FinanceReconciliationState[]
+  reconciliationCases FinanceReconciliationCase[]
+  recoveredEvents FinanceStripeWebhookEvent[] @relation("FinanceStripeReconciliationEvidence")
+
   stripeCustomers FinanceStripeCustomer[]
   mandates FinanceMandate[]
   collectionPlans FinanceCollectionPlan[]
@@ -5670,6 +5714,8 @@ model FinanceStripeWebhookEvent {
   livemode         Boolean
   payloadSha256    String
   payloadJson      Json
+  evidenceSource   FinanceStripeEvidenceSource     @default(SIGNED_WEBHOOK)
+  reconciliationConnectionId String?
   status           FinanceStripeWebhookEventStatus @default(RECEIVED)
   tenantId         String?
   orgId            String?
@@ -5682,9 +5728,82 @@ model FinanceStripeWebhookEvent {
   receivedAt       DateTime                        @default(now())
   tenant           Tenant?                         @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
   org              Org?                            @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  reconciliationConnection FinanceStripeConnection? @relation("FinanceStripeReconciliationEvidence", fields: [reconciliationConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
 
   @@index([tenantId, orgId, status, nextAttemptAt])
   @@index([status, nextAttemptAt, claimedAt])
+  @@index([reconciliationConnectionId, receivedAt], map: "FinanceStripeWebhookEvent_recovery_received_idx")
+}
+
+model FinanceReconciliationState {
+  id                 String                  @id @default(uuid())
+  stripeConnectionId String
+  tenantId           String
+  orgId              String
+  stream             String                  @db.VarChar(32)
+  windowFrom         DateTime?
+  windowTo           DateTime?
+  pageCursor         String?                 @db.VarChar(255)
+  completedThrough   DateTime?
+  lastSucceededAt    DateTime?
+  leaseToken         String?                 @db.VarChar(64)
+  leaseExpiresAt     DateTime?
+  retryAfter         DateTime?
+  lastError          String?                 @db.VarChar(64)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  stripeConnection   FinanceStripeConnection @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant             Tenant                  @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                Org                     @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@unique([stripeConnectionId, stream])
+  @@index([tenantId, orgId, updatedAt])
+  @@index([retryAfter, leaseExpiresAt])
+}
+
+model FinanceReconciliationCase {
+  id                 String                           @id @default(uuid())
+  stripeConnectionId String
+  tenantId           String
+  orgId              String
+  caseKey            String                           @db.VarChar(255)
+  kind               FinanceReconciliationCaseKind
+  status             FinanceReconciliationCaseStatus  @default(OPEN)
+  resourceReference  String?                          @db.VarChar(255)
+  amountMinor        BigInt?
+  currency           String?                          @db.VarChar(3)
+  details            Json
+  acknowledgedAt     DateTime?
+  resolvedAt         DateTime?
+  lastSeenAt         DateTime                         @default(now())
+  createdAt          DateTime                         @default(now())
+  updatedAt          DateTime                         @updatedAt
+  stripeConnection   FinanceStripeConnection          @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  tenant             Tenant                           @relation(fields: [tenantId, orgId], references: [id, orgId], onDelete: Restrict)
+  org                Org                              @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  events             FinanceReconciliationCaseEvent[]
+
+  @@unique([id, tenantId, orgId])
+  @@unique([stripeConnectionId, caseKey])
+  @@index([tenantId, orgId, status, lastSeenAt])
+}
+
+model FinanceReconciliationCaseEvent {
+  id          String                             @id @default(uuid())
+  caseId      String
+  tenantId    String
+  orgId       String
+  actorUserId String?
+  type        FinanceReconciliationCaseEventType
+  details     Json
+  createdAt   DateTime                           @default(now())
+  case        FinanceReconciliationCase          @relation(fields: [caseId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+  actor       User?                              @relation("FinanceReconciliationCaseEventActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@unique([id, tenantId, orgId])
+  @@index([tenantId, orgId, caseId, createdAt], map: "FinanceReconciliationCaseEvent_scope_case_created_idx")
+  @@index([tenantId, orgId, type, id], map: "FinanceReconciliationCaseEvent_request_idx")
 }
 
 model FinancePayerAccount {
@@ -5766,6 +5885,7 @@ model FinanceCheckoutAttempt {
   @@unique([stripeAccountId, stripePaymentIntentId], map: "FinanceCheckoutAttempt_account_payment_intent_key")
   @@index([tenantId, orgId, invoiceId, status, createdAt])
   @@index([financeProfileId, status, createdAt])
+  @@index([stripeConnectionId, tenantId, orgId, id], map: "FinanceCheckoutAttempt_recovery_idx")
 }
 
 model FinanceStatement {
@@ -6189,6 +6309,7 @@ model FinanceRefund {
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
   approvedAt               DateTime?
+  providerAttemptStartedAt DateTime?
   submittedAt              DateTime?
   providerStatusAt         DateTime?
   confirmedAt              DateTime?
@@ -6206,6 +6327,7 @@ model FinanceRefund {
   @@unique([financeProfileId, bankTransactionReference])
   @@index([tenantId, orgId, receiptId, status, createdAt])
   @@index([financeProfileId, status, createdAt])
+  @@index([tenantId, orgId, stripeAccountId, id], map: "FinanceRefund_recovery_idx")
 }
 
 model FinanceRefundEvent {
@@ -6256,6 +6378,7 @@ model FinanceReceiptMovement {
   @@unique([financeProfileId, source, type, sourceReference])
   @@index([tenantId, orgId, receiptId, occurredAt])
   @@index([tenantId, orgId, type, occurredAt])
+  @@index([tenantId, orgId, type, id], map: "FinanceReceiptMovement_recovery_idx")
 }
 
 model FinanceReceiptMovementApplication {
@@ -6278,4 +6401,43 @@ model FinanceReceiptMovementApplication {
   @@unique([movementId, reversesApplicationId], map: "FinanceReceiptMovementApplication_movement_reversal_key")
   @@index([tenantId, orgId, invoiceId, createdAt])
   @@index([tenantId, orgId, receiptAllocationId])
+}
+
+
+// Private processor evidence; never a family receipt or debt posting.
+model FinanceSettlementEvidence {
+  id                 String @id @default(uuid())
+  stripeConnectionId String
+  tenantId           String
+  orgId              String
+  stripeAccountId    String @db.VarChar(255)
+  livemode           Boolean
+  resourceType       String @db.VarChar(32)
+  providerReference  String @db.VarChar(255)
+  digest             String @db.VarChar(64)
+  facts              Json
+  observedAt         DateTime
+  stripeConnection   FinanceStripeConnection @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@unique([stripeConnectionId, resourceType, providerReference, digest], map: "FinanceSettlementEvidence_identity_key")
+  @@index([tenantId, orgId, stripeConnectionId, observedAt], map: "FinanceSettlementEvidence_scope_observed_idx")
+}
+
+// Latest continuation pointer; each revision has an immutable evidence snapshot.
+model FinancePayoutReconciliation {
+  id                 String @id @default(uuid())
+  stripeConnectionId String
+  tenantId           String
+  orgId              String
+  payoutId           String @db.VarChar(255)
+  payoutFacts        Json
+  coverage           Json
+  complete           Boolean
+  status             String @db.VarChar(32)
+  observedAt         DateTime
+  updatedAt          DateTime
+  stripeConnection   FinanceStripeConnection @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@unique([stripeConnectionId, payoutId])
+  @@index([tenantId, orgId, stripeConnectionId, status, payoutId], map: "FinancePayoutReconciliation_unresolved_idx")
 }

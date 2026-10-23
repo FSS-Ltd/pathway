@@ -4,7 +4,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { runTransaction, withTenantRlsContext } from "@pathway/db";
-import { FinanceStripeConnectionService } from "./finance-stripe-connection.service";
+import { FinanceStripeAccountSyncService } from "./finance-stripe-account-sync.service";
 import { FinanceStripePaymentWebhookService } from "./finance-stripe-payment-webhook.service";
 import { FinanceStripeBacsWebhookService } from "./finance-stripe-bacs-webhook.service";
 import { FinanceStripeReversalWebhookService } from "./finance-stripe-reversal-webhook.service";
@@ -109,8 +109,8 @@ export class FinanceStripeWebhookReplayService {
   constructor(
     @Inject(FINANCE_STRIPE_WEBHOOK_CONFIG)
     private readonly config: FinanceStripeWebhookConfig,
-    @Inject(FinanceStripeConnectionService)
-    private readonly connectionSync: FinanceStripeConnectionService,
+    @Inject(FinanceStripeAccountSyncService)
+    private readonly connectionSync: FinanceStripeAccountSyncService,
     @Inject(FinanceStripeBacsWebhookService)
     private readonly bacs: FinanceStripeBacsWebhookService,
     @Inject(FinanceStripePaymentWebhookService)

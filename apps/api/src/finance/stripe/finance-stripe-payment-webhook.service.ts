@@ -5,13 +5,10 @@ import type { FinanceCurrency } from "@pathway/platform";
 import { FinanceBalanceService } from "../finance-balance.service";
 import { lockInvoice } from "../finance-invoice-operations";
 import { recordConfirmedStripeReceipt } from "./finance-stripe-receipt";
-
-const checkoutEventTypes = [
-  "checkout.session.completed",
-  "checkout.session.async_payment_succeeded",
-  "checkout.session.async_payment_failed",
-  "checkout.session.expired",
-] as const;
+import {
+  financeStripeCheckoutEventTypes as checkoutEventTypes,
+  isFinanceStripeCheckoutEventType,
+} from "./finance-stripe-checkout-events";
 
 const checkoutSessionEventSchema = z.object({
   id: z.string().min(1),
@@ -69,7 +66,7 @@ export class FinanceStripePaymentWebhookService {
   async process(
     input: FinanceStripePaymentWebhookInput,
   ): Promise<"processed" | "deferred"> {
-    if (!isCheckoutEventType(input.eventType)) return "deferred";
+    if (!isFinanceStripeCheckoutEventType(input.eventType)) return "deferred";
     const event = parseCheckoutEvent(input);
     const stripeAccountId = input.stripeAccountId;
     if (!stripeAccountId || event.account !== stripeAccountId) {
@@ -306,12 +303,6 @@ function paymentIntentIdFromSession(
     return paymentIntent.id;
   }
   return null;
-}
-
-function isCheckoutEventType(
-  eventType: string,
-): eventType is (typeof checkoutEventTypes)[number] {
-  return checkoutEventTypes.some((supported) => supported === eventType);
 }
 
 function parseCheckoutEvent(

@@ -246,41 +246,12 @@ describe("Finance schema contract", () => {
   });
 
   it("includes every Finance table in the strict Supabase RLS gate", () => {
-    for (const table of [
-      "FinanceProfile",
-      "FinanceInvoiceNumberSequence",
-      "FinanceCreditNoteNumberSequence",
-      "FinanceInvoice",
-      "FinanceInvoiceLine",
-      "FinanceInvoiceEvent",
-      "FinanceReceipt",
-      "FinanceReceiptAllocation",
-      "FinanceReceiptAllocationReversal",
-      "FinanceBankTransferChange",
-      "FinanceManualReceiptRequest",
-      "FinanceTransferNotice",
-      "FinanceStripeConnection",
-      "FinanceCheckoutAttempt",
-      "FinanceStripeCustomer",
-      "FinanceMandate",
-      "FinanceCollectionPlan",
-      "FinanceCollectionPlanEvent",
-      "FinanceCollectionInstalment",
-      "FinanceDebitAttempt",
-      "FinanceRecurringInvoiceTemplate",
-      "FinanceRecurringInvoiceTemplateLine",
-      "FinanceStatement",
-      "FinancePayerAccount",
-      "FinancePayerGrant",
-      "FinanceCreditNote",
-      "FinanceCreditNoteLine",
-      "FinanceCreditNoteEvent",
-      "FinanceCommandReceipt",
-      "FinanceRefund",
-      "FinanceRefundEvent",
-      "FinanceReceiptMovement",
-      "FinanceReceiptMovementApplication",
-    ]) {
+    const tables = Array.from(
+      schema.matchAll(/^model (Finance\w+)\s*\{/gm),
+      (match) => match[1],
+    );
+    expect(tables.length).toBeGreaterThan(30);
+    for (const table of tables) {
       expect(rlsGate.includes(`"${table}"`)).toBe(true);
     }
   });

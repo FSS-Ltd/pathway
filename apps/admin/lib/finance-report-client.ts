@@ -62,6 +62,21 @@ const reportRowSchema = z.object({
 const providerSchema = z.object({
   status: z.enum(["CONNECTED", "NOT_CONNECTED", "UNAVAILABLE"]),
   fetchedAt: z.string().nullable(),
+  source: z.literal("PERSISTED_RECONCILIATION"),
+  context: z
+    .object({ id: z.string(), accountId: z.string(), livemode: z.boolean() })
+    .nullable(),
+  freshness: z.enum(["CURRENT", "STALE", "INCOMPLETE", "NOT_SYNCED"]),
+  periodStartCoverage: z.literal("UNPROVEN"),
+  truncated: z.boolean(),
+  coverage: z.array(
+    z.object({
+      stream: z.string(),
+      completedThrough: z.string().nullable(),
+      lastSucceededAt: z.string().nullable(),
+      lastError: z.string().nullable(),
+    }),
+  ),
   feesByCurrency: z.array(
     z.object({ currency: z.string(), amountMinor: z.string() }),
   ),
@@ -139,13 +154,7 @@ export async function fetchFinanceReport(
       metadata: metadataSchema,
       totals: totalsSchema.nullable(),
       rows: z.array(reportRowSchema),
-      provider: z
-        .object({
-          status: z.enum(["CONNECTED", "NOT_CONNECTED", "UNAVAILABLE"]),
-          fetchedAt: z.string().nullable(),
-          feesByCurrency: providerSchema.shape.feesByCurrency,
-        })
-        .optional(),
+      provider: providerSchema.omit({ payouts: true }).optional(),
     })
     .parse(payload);
 }

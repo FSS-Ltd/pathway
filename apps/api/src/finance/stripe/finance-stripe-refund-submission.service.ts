@@ -1,17 +1,18 @@
 import {
-  ConflictException,
   Inject,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
+import { canRetryFinanceProviderOperation } from "../domain/finance-provider-retry";
 import { lockReceipt } from "../finance-receipt-operations";
 import {
   loadFinanceRefund,
   lockFinanceRefund,
 } from "../finance-refund.persistence";
 import type { FinanceRefundActor } from "../finance-refund.service";
+import { reconcileFinanceReceiptException } from "../finance-receipt-exception.persistence";
 import { recordFinanceReceiptMovement } from "../finance-receipt-movement.service";
 import {
   financeRefundInclude,
@@ -20,8 +21,10 @@ import {
 import {
   FINANCE_STRIPE_REFUND_PROVIDER,
   FinanceStripeRefundProviderError,
+  FinanceStripeRefundUnknownOutcomeError,
   type FinanceStripeRefundProvider,
 } from "./finance-stripe-refund.provider";
+import { prepareFinanceStripeRefund } from "./finance-stripe-refund-preparation";
 
 @Injectable()
 export class FinanceStripeRefundSubmissionService {
@@ -34,55 +37,9 @@ export class FinanceStripeRefundSubmissionService {
     const facts = await withTenantRlsContext(
       actor.tenantId,
       actor.orgId,
-      async (tx) => {
-        const refund = await loadFinanceRefund(tx, actor, refundId);
-        const receipt = await tx.financeReceipt.findFirst({
-          where: {
-            id: refund.receiptId,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-          },
-          select: { sourceReference: true },
-        });
-        if (!receipt?.sourceReference || !refund.stripeAccountId) {
-          throw new ConflictException(
-            "Stripe refund is missing its connected account or payment evidence",
-          );
-        }
-        const attempt = await tx.financeCheckoutAttempt.findFirst({
-          where: {
-            stripeAccountId: refund.stripeAccountId,
-            stripeCheckoutSessionId: receipt.sourceReference,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-            status: "PAID",
-          },
-          select: { stripePaymentIntentId: true },
-        });
-        if (!attempt?.stripePaymentIntentId) {
-          throw new ConflictException(
-            "Stripe refund is missing its confirmed PaymentIntent",
-          );
-        }
-        return {
-          status: refund.status,
-          id: refund.id,
-          amountMinor: refund.amountMinor,
-          currency: refund.currency,
-          stripeAccountId: refund.stripeAccountId,
-          paymentIntentId: attempt.stripePaymentIntentId,
-        };
-      },
+      (tx) => prepareFinanceStripeRefund(tx, actor, refundId, new Date()),
     );
-
-    if (
-      ["SUBMITTED", "CONFIRMED", "RETURNED", "FAILED"].includes(facts.status)
-    ) {
-      return this.get(actor, refundId);
-    }
-    if (facts.status !== "APPROVED") {
-      throw new ConflictException("Finance refund is not approved");
-    }
+    if (facts.kind === "view") return facts.view;
 
     let providerResult: Awaited<
       ReturnType<FinanceStripeRefundProvider["createRefund"]>
@@ -90,12 +47,21 @@ export class FinanceStripeRefundSubmissionService {
     try {
       providerResult = await this.stripeRefunds.createRefund({
         stripeAccountId: facts.stripeAccountId,
+        livemode: facts.livemode,
         paymentIntentId: facts.paymentIntentId,
         refundId: facts.id,
         amountMinor: facts.amountMinor,
         currency: facts.currency,
+        creationPermitted: canRetryFinanceProviderOperation(
+          facts.providerAttemptStartedAt,
+        ),
       });
     } catch (error) {
+      if (error instanceof FinanceStripeRefundUnknownOutcomeError) {
+        throw new ServiceUnavailableException(
+          "Refund outcome needs reconciliation. No new refund was sent.",
+        );
+      }
       if (error instanceof ServiceUnavailableException) throw error;
       if (
         error instanceof FinanceStripeRefundProviderError &&
@@ -157,6 +123,11 @@ export class FinanceStripeRefundSubmissionService {
           sourceReference: providerResult.id,
           occurredAt: providerResult.createdAt,
         });
+        await reconcileFinanceReceiptException(tx, {
+          ...actor,
+          receiptId: refund.receiptId,
+          source: "STRIPE",
+        });
       }
       const eventType = stripeResponseEventType(providerResult.status);
       await tx.financeRefund.updateMany({
@@ -201,12 +172,6 @@ export class FinanceStripeRefundSubmissionService {
       if (!updated) throw new NotFoundException("Finance refund not found");
       return toFinanceRefundView(updated);
     });
-  }
-
-  private async get(actor: FinanceRefundActor, refundId: string) {
-    return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) =>
-      toFinanceRefundView(await loadFinanceRefund(tx, actor, refundId)),
-    );
   }
 
   private async recordPermanentFailure(

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { FinanceStripeReversalWebhookInput } from "./finance-stripe-reversal-webhook.contracts";
+import { reconcileFinanceReceiptException } from "../finance-receipt-exception.persistence";
 import { lockReceipt } from "../finance-receipt-operations";
 import { recordFinanceReceiptMovement } from "../finance-receipt-movement.service";
 import {
@@ -64,6 +65,7 @@ export class FinanceStripeReversalWebhookService {
       (chargeIdFromStripe(refund.charge)
         ? await this.stripe.retrieveChargePaymentIntent({
             stripeAccountId,
+            livemode: input.livemode,
             chargeId: chargeIdFromStripe(refund.charge)!,
           })
         : null);
@@ -221,6 +223,11 @@ export class FinanceStripeReversalWebhookService {
           sourceReference,
         );
       }
+      await reconcileFinanceReceiptException(tx, {
+        ...input,
+        receiptId: payment.receipt.id,
+        source: "STRIPE",
+      });
       return "processed";
     });
   }
@@ -240,6 +247,7 @@ export class FinanceStripeReversalWebhookService {
       (chargeIdFromStripe(dispute.charge)
         ? await this.stripe.retrieveChargePaymentIntent({
             stripeAccountId,
+            livemode: input.livemode,
             chargeId: chargeIdFromStripe(dispute.charge)!,
           })
         : null);
@@ -275,6 +283,11 @@ export class FinanceStripeReversalWebhookService {
           sourceReference: dispute.id,
           stripeEventId: event.id,
           occurredAt: eventAt,
+        });
+        await reconcileFinanceReceiptException(tx, {
+          ...input,
+          receiptId: payment.receipt.id,
+          source: "STRIPE",
         });
         return "processed";
       }
@@ -315,6 +328,11 @@ export class FinanceStripeReversalWebhookService {
         stripeEventId: event.id,
         originalMovementId: originalMovement.id,
         occurredAt: eventAt,
+      });
+      await reconcileFinanceReceiptException(tx, {
+        ...input,
+        receiptId: payment.receipt.id,
+        source: "STRIPE",
       });
       return "processed";
     });

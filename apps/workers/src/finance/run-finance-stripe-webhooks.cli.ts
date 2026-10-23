@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { closePrisma } from "@pathway/db";
+import { readFinanceReconciliationMode } from "./finance-reconciliation-config";
 import { FinanceStripeWebhookJob } from "./finance-stripe-webhook.job";
 import { HttpFinanceStripeWebhookProcessor } from "./http-finance-stripe-webhook-processor";
 import { PrismaFinanceStripeWebhookStore } from "./finance-stripe-webhook.store";
@@ -10,8 +11,11 @@ async function main(): Promise<void> {
   if (!rawUrl) throw new Error("BILLING_INTERNAL_API_URL is required");
   if (!secret) throw new Error("INTERNAL_AUTH_SECRET is required");
 
+  const livemode = readFinanceReconciliationMode(
+    process.env.FINANCE_RECONCILIATION_MODE,
+  );
   const result = await new FinanceStripeWebhookJob(
-    new PrismaFinanceStripeWebhookStore(),
+    new PrismaFinanceStripeWebhookStore(livemode),
     new HttpFinanceStripeWebhookProcessor(new URL(rawUrl), secret),
   ).run();
   console.log("[finance-stripe-webhook] run", result);

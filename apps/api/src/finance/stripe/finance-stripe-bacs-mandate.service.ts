@@ -19,6 +19,10 @@ import {
   type FinanceStripeBacsProvider,
   type FinanceStripeBacsSetupSession,
 } from "./finance-stripe-bacs.provider";
+import {
+  FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER,
+  type FinanceStripeMandateServicingProvider,
+} from "./finance-stripe-mandate-servicing.contracts";
 
 export interface FinanceStripeBacsMandateActor extends FinanceAccessScope {
   userId: string;
@@ -38,6 +42,7 @@ export interface FinanceStripeBacsMandateCancellationResult {
 }
 
 type MandateSetupPreparation =
+  | { kind: "review" }
   | {
       kind: "existing";
       mandateId: string;
@@ -58,11 +63,16 @@ type MandateSetupPreparation =
 export class FinanceStripeBacsMandateService {
   constructor(
     @Inject(FinanceAccessService)
-    private readonly financeAccess: FinanceAccessService,
+    private readonly financeAccess: Pick<
+      FinanceAccessService,
+      "assertPayerAction"
+    >,
     @Inject(FINANCE_STRIPE_CHECKOUT_CONFIG)
     private readonly config: FinanceStripeCheckoutConfig,
     @Inject(FINANCE_STRIPE_BACS_PROVIDER)
     private readonly provider: FinanceStripeBacsProvider,
+    @Inject(FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER)
+    private readonly servicing: FinanceStripeMandateServicingProvider,
   ) {}
 
   async startSetup(
@@ -186,8 +196,9 @@ export class FinanceStripeBacsMandateService {
               orgId: actor.orgId,
               status: "PENDING_SETUP",
             },
-            data: { status: "FAILED" },
+            data: { status: "UNKNOWN" },
           });
+          return { kind: "review" as const };
         }
 
         const customer = await tx.financeStripeCustomer.findFirst({
@@ -211,6 +222,11 @@ export class FinanceStripeBacsMandateService {
       },
     );
 
+    if (setup.kind === "review") {
+      throw new ConflictException(
+        "The school is checking the existing Bacs setup. Do not start another mandate",
+      );
+    }
     if (setup.kind === "existing") {
       return {
         mandateId: setup.mandateId,
@@ -358,9 +374,12 @@ export class FinanceStripeBacsMandateService {
         }
       });
     } catch (error) {
-      await this.provider
+      await this.servicing
         .expireMandateSetupSession({
           stripeAccountId: setup.stripeAccountId,
+          livemode: setup.livemode,
+          customerId: stripeCustomerId,
+          mandateId,
           sessionId: session.id,
           idempotencyKey: `finance-bacs-expire-${mandateId}`,
         })
@@ -414,8 +433,12 @@ export class FinanceStripeBacsMandateService {
             stripeConnectionId: true,
             stripeAccountId: true,
             stripeCheckoutSessionId: true,
+            stripeSetupIntentId: true,
+            stripeMandateId: true,
             stripePaymentMethodId: true,
             providerCancellationPending: true,
+            livemode: true,
+            stripeCustomer: { select: { stripeCustomerId: true } },
           },
         });
         if (!current) throw new NotFoundException("Bacs mandate not found");
@@ -489,8 +512,12 @@ export class FinanceStripeBacsMandateService {
             stripeConnectionId: true,
             stripeAccountId: true,
             stripeCheckoutSessionId: true,
+            stripeSetupIntentId: true,
+            stripeMandateId: true,
             stripePaymentMethodId: true,
             providerCancellationPending: true,
+            livemode: true,
+            stripeCustomer: { select: { stripeCustomerId: true } },
           },
         });
         return {
@@ -509,42 +536,55 @@ export class FinanceStripeBacsMandateService {
           : "CONFIRMED",
       };
     }
-    if (this.config.mode === "disabled") {
-      return {
-        mandateId,
-        status: "CANCELLED",
-        providerCancellation: "PENDING",
-      };
-    }
-
     try {
       if (mandate.stripePaymentMethodId) {
-        await this.provider.detachPaymentMethod({
+        await this.servicing.detachPaymentMethod({
           stripeAccountId: mandate.stripeAccountId,
+          livemode: mandate.livemode,
+          customerId: mandate.stripeCustomer.stripeCustomerId,
           paymentMethodId: mandate.stripePaymentMethodId,
           idempotencyKey: `finance-bacs-cancel-${mandateId}`,
         });
       } else if (mandate.stripeCheckoutSessionId) {
-        await this.provider.expireMandateSetupSession({
+        await this.servicing.expireMandateSetupSession({
           stripeAccountId: mandate.stripeAccountId,
+          livemode: mandate.livemode,
+          customerId: mandate.stripeCustomer.stripeCustomerId,
+          mandateId,
           sessionId: mandate.stripeCheckoutSessionId,
           idempotencyKey: `finance-bacs-expire-${mandateId}`,
         });
       }
-      await withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
-        tx.financeMandate.updateMany({
-          where: {
-            id: mandateId,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-          },
-          data: { providerCancellationPending: false },
-        }),
+      const acknowledged = await withTenantRlsContext(
+        actor.tenantId,
+        actor.orgId,
+        (tx) =>
+          tx.financeMandate.updateMany({
+            where: {
+              id: mandateId,
+              tenantId: actor.tenantId,
+              orgId: actor.orgId,
+              status: "CANCELLED",
+              providerCancellationPending: true,
+              stripeConnectionId: mandate.stripeConnectionId,
+              stripeAccountId: mandate.stripeAccountId,
+              livemode: mandate.livemode,
+              stripeCheckoutSessionId: mandate.stripeCheckoutSessionId,
+              stripeSetupIntentId: mandate.stripeSetupIntentId,
+              stripePaymentMethodId: mandate.stripePaymentMethodId,
+              stripeMandateId: mandate.stripeMandateId,
+              stripeCustomer: {
+                stripeCustomerId: mandate.stripeCustomer.stripeCustomerId,
+              },
+            },
+            data: { providerCancellationPending: false },
+          }),
       );
       return {
         mandateId,
         status: "CANCELLED",
-        providerCancellation: "CONFIRMED",
+        providerCancellation:
+          acknowledged.count === 1 ? "CONFIRMED" : "PENDING",
       };
     } catch {
       return {

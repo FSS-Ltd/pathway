@@ -96,15 +96,18 @@ describe("FinanceBacsCollectionService", () => {
     status: "CREATING" | "UNKNOWN";
     stripePaymentIntentId: null;
     idempotencyKey: string;
+    createdAt: Date;
   };
 
   beforeEach(() => {
+    jest.useFakeTimers({ now: new Date("2026-10-21T12:00:00Z") });
     jest.clearAllMocks();
     debitAttempt = {
       id: "attempt-1",
       status: "CREATING",
       stripePaymentIntentId: null,
       idempotencyKey: "finance-bacs-debit-attempt-1",
+      createdAt: new Date("2026-10-21T11:55:00Z"),
     };
     tx = {
       $queryRaw: jest.fn().mockResolvedValue([{ id: "row-1" }]),
@@ -196,6 +199,36 @@ describe("FinanceBacsCollectionService", () => {
       { mode: "test" } as unknown as FinanceStripeCheckoutConfig,
       provider as unknown as FinanceStripeBacsProvider,
     );
+  });
+
+  afterEach(() => jest.useRealTimers());
+
+  it.each([23, 24, 26])(
+    "pauses an unknown debit after %s hours without reusing an expired provider key",
+    async (hours) => {
+      debitAttempt.createdAt = new Date(Date.now() - hours * 60 * 60_000);
+      debitAttempt.status = "UNKNOWN";
+      await service.runDue(new Date("2026-10-21T12:00:00Z"));
+      expect(provider.createDebit).not.toHaveBeenCalled();
+      expect(tx.financeDebitAttempt.create).not.toHaveBeenCalled();
+      expect(tx.financeCollectionPlan.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: "PAUSED" } }),
+      );
+      expect(tx.financeCollectionPlanEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: "REVIEW_REQUIRED",
+            details: { reason: "UNKNOWN_DEBIT_REQUIRES_RECONCILIATION" },
+          }),
+        }),
+      );
+    },
+  );
+
+  it("uses wall-clock retention even when a job is run for a historical schedule date", async () => {
+    debitAttempt.createdAt = new Date(Date.now() - 26 * 60 * 60_000);
+    await service.runDue(new Date("2026-10-20T12:00:00Z"));
+    expect(provider.createDebit).not.toHaveBeenCalled();
   });
 
   it("retries a timed-out debit with its original idempotency key", async () => {

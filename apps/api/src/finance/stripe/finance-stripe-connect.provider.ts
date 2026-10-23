@@ -2,6 +2,12 @@ import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
 import type { FinanceCountryCode } from "@pathway/platform";
 import type { FinanceStripeConnectConfig } from "./finance-stripe-connect.config";
+import {
+  parseFinanceStripeAccount,
+  StripeFinanceAccountReader,
+  type StripeFinanceAccount,
+} from "./finance-stripe-account-reader.provider";
+export type { StripeFinanceAccount } from "./finance-stripe-account-reader.provider";
 
 const STRIPE_API_VERSION = "2026-09-30.endive";
 const STRIPE_API_BASE_URL = "https://api.stripe.com";
@@ -13,30 +19,10 @@ export const FINANCE_STRIPE_CONNECT_PROVIDER = Symbol(
   "FINANCE_STRIPE_CONNECT_PROVIDER",
 );
 
-const stripeAccountSchema = z.object({
-  id: z.string().startsWith("acct_"),
-  livemode: z.boolean(),
-  identity: z.object({ country: z.string().length(2) }),
-  configuration: z.object({
-    merchant: z.object({
-      capabilities: z.object({
-        card_payments: z.object({ status: z.string().min(1) }),
-      }),
-    }),
-  }),
-});
-
 const stripeAccountLinkSchema = z.object({
   url: z.string().url(),
   expires_at: z.string().datetime({ offset: true }),
 });
-
-export type StripeFinanceAccount = {
-  id: string;
-  livemode: boolean;
-  country: string;
-  cardPaymentsStatus: string;
-};
 
 export type StripeFinanceAccountLink = {
   url: string;
@@ -96,7 +82,7 @@ export class StripeFinanceConnectProvider implements FinanceStripeConnectProvide
         include: ["configuration.merchant", "identity", "defaults"],
       },
     });
-    return this.parseAccount(response);
+    return parseFinanceStripeAccount(response);
   }
 
   async createOnboardingLink(input: {
@@ -127,15 +113,10 @@ export class StripeFinanceConnectProvider implements FinanceStripeConnectProvide
   }
 
   async retrieveAccount(accountId: string): Promise<StripeFinanceAccount> {
-    const query = new URLSearchParams();
-    query.append("include[0]", "configuration.merchant");
-    query.append("include[1]", "identity");
-    query.append("include[2]", "defaults");
-    const response = await this.request(
-      `/v2/core/accounts/${encodeURIComponent(accountId)}?${query.toString()}`,
-      { method: "GET" },
-    );
-    return this.parseAccount(response);
+    return new StripeFinanceAccountReader(
+      this.config,
+      this.fetcher,
+    ).retrieveAccount(accountId);
   }
 
   private async request(
@@ -166,18 +147,6 @@ export class StripeFinanceConnectProvider implements FinanceStripeConnectProvide
     } catch {
       throw providerUnavailable();
     }
-  }
-
-  private parseAccount(value: unknown): StripeFinanceAccount {
-    const result = stripeAccountSchema.safeParse(value);
-    if (!result.success) throw providerUnavailable();
-    return {
-      id: result.data.id,
-      livemode: result.data.livemode,
-      country: result.data.identity.country.toUpperCase(),
-      cardPaymentsStatus:
-        result.data.configuration.merchant.capabilities.card_payments.status,
-    };
   }
 }
 

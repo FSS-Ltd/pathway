@@ -143,7 +143,7 @@ function setup(): {
   };
 
   mockTransaction = {
-    $queryRaw: jest.fn().mockResolvedValue([{ id: refundId }]),
+    $queryRaw: jest.fn().mockResolvedValue([]),
     financeCheckoutAttempt: {
       findFirst: jest.fn().mockResolvedValue({
         financeProfileId: "profile-1",
@@ -391,13 +391,9 @@ describe("FinanceStripeReversalWebhookService", () => {
       findReceiptForPaymentIntent(
         tx,
         {
-          stripeEventId: "evt_bacs_return",
           tenantId,
           orgId,
-          stripeAccountId,
-          eventType: "charge.dispute.created",
           livemode: false,
-          payloadJson: {} as Prisma.JsonValue,
         },
         stripeAccountId,
         "pi_school_bacs",

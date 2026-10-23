@@ -21,6 +21,8 @@ import {
   type StripeFinanceAccount,
 } from "./finance-stripe-connect.provider";
 
+import { financeStripeAccountStatus } from "./finance-stripe-account-reader.provider";
+
 export interface FinanceStripeConnectionActor extends FinanceAccessScope {
   userId: string;
 }
@@ -180,60 +182,6 @@ export class FinanceStripeConnectionService {
       config.mode,
       profile.countryCode,
     );
-  }
-
-  /**
-   * Webhook deliveries can be out of order, so read the current Stripe account
-   * while holding its tenant-scoped row lock instead of applying event data.
-   */
-  async refreshFromWebhook(
-    tenantId: string,
-    orgId: string,
-    accountId: string,
-  ): Promise<void> {
-    const config = this.requireEnabled();
-    await withTenantRlsContext(tenantId, orgId, async (tx) => {
-      const connections = await tx.$queryRaw<
-        {
-          id: string;
-          livemode: boolean;
-          status: "DISCONNECTED" | "CONNECTING" | "READY" | "RESTRICTED";
-          countryCode: FinanceCountryCode;
-        }[]
-      >`
-        SELECT c."id", c."livemode", c."status", p."countryCode"
-        FROM "FinanceStripeConnection" AS c
-        INNER JOIN "FinanceProfile" AS p
-          ON p."id" = c."financeProfileId"
-          AND p."tenantId" = c."tenantId"
-          AND p."orgId" = c."orgId"
-        WHERE c."tenantId" = ${tenantId}
-          AND c."orgId" = ${orgId}
-          AND c."stripeAccountId" = ${accountId}
-        FOR UPDATE
-      `;
-      const connection = connections[0];
-      if (!connection || connection.status === "DISCONNECTED") return;
-      if (connection.livemode !== (config.mode === "live")) {
-        throw new ConflictException("Finance Stripe connection mode mismatch");
-      }
-
-      const account = await this.provider.retrieveAccount(accountId);
-      this.assertAccountModeAndCountry(
-        account,
-        config.mode,
-        connection.countryCode,
-      );
-      await tx.financeStripeConnection.updateMany({
-        where: {
-          id: connection.id,
-          tenantId,
-          orgId,
-          status: { not: "DISCONNECTED" },
-        },
-        data: { status: financeConnectionStatus(account) },
-      });
-    });
   }
 
   async disconnect(
@@ -403,7 +351,7 @@ export class FinanceStripeConnectionService {
   ): Promise<FinanceStripeConnectionView> {
     const account = await this.provider.retrieveAccount(accountId);
     this.assertAccountModeAndCountry(account, mode, countryCode);
-    const status = financeConnectionStatus(account);
+    const status = financeStripeAccountStatus(account);
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       await tx.financeStripeConnection.updateMany({
         where: {
@@ -485,14 +433,6 @@ export class FinanceStripeConnectionService {
       );
     }
   }
-}
-
-function financeConnectionStatus(
-  account: StripeFinanceAccount,
-): "CONNECTING" | "READY" | "RESTRICTED" {
-  if (account.cardPaymentsStatus === "active") return "READY";
-  if (account.cardPaymentsStatus === "pending") return "CONNECTING";
-  return "RESTRICTED";
 }
 
 function toConnectionView(connection: {

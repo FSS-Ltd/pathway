@@ -1,0 +1,72 @@
+name: Finance reconciliation worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Execution stays disabled until explicitly approved and enabled.
+    - cron: "*/5 * * * *"
+
+concurrency:
+  group: finance-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  run:
+    name: Dispatch scoped Finance recovery pages
+    if: vars.ENABLE_FINANCE_RECONCILIATION == 'true'
+    runs-on: ubuntu-22.04
+    environment: production
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ENABLE_FINANCE_RECONCILIATION: ${{ vars.ENABLE_FINANCE_RECONCILIATION }}
+      FINANCE_RECONCILIATION_MODE: ${{ vars.FINANCE_RECONCILIATION_MODE }}
+      BILLING_INTERNAL_API_URL: ${{ secrets.BILLING_INTERNAL_API_URL }}
+      INTERNAL_AUTH_SECRET: ${{ secrets.INTERNAL_AUTH_SECRET }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Verify required configuration
+        shell: bash
+        run: |
+          test -n "$DATABASE_URL" || { echo "DATABASE_URL is required." >&2; exit 1; }
+          test -n "$BILLING_INTERNAL_API_URL" || { echo "BILLING_INTERNAL_API_URL is required." >&2; exit 1; }
+          test -n "$INTERNAL_AUTH_SECRET" || { echo "INTERNAL_AUTH_SECRET is required." >&2; exit 1; }
+          case "$FINANCE_RECONCILIATION_MODE" in
+            test|live) ;;
+            *) echo "FINANCE_RECONCILIATION_MODE must explicitly be test or live." >&2; exit 1 ;;
+          esac
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Dispatch recovery pages
+        id: reconcile
+        timeout-minutes: 5
+        # Launch for at most four minutes; in-flight calls can drain for 55 seconds.
+        run: pnpm --filter @pathway/workers finance:reconciliation
+
+      - name: Drain canonical Finance webhook evidence
+        # Each event keeps the existing 20-second HTTP timeout and 50-event scope batch.
+        # The five-minute step limit also bounds large multi-school backlogs; leases recover next cadence.
+        if: ${{ !cancelled() && (steps.reconcile.outcome == 'success' || steps.reconcile.outcome == 'failure') }}
+        timeout-minutes: 5
+        run: pnpm --filter @pathway/workers finance:stripe-webhooks

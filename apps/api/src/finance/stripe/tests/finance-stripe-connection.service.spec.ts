@@ -147,48 +147,6 @@ describe("FinanceStripeConnectionService", () => {
     );
   });
 
-  it("refreshes the latest Stripe account state for a webhook under a row lock", async () => {
-    mockConnectionRawQuery.mockResolvedValue([
-      {
-        id: "connection-a",
-        status: "CONNECTING",
-        livemode: false,
-        countryCode: "GB",
-      },
-    ]);
-
-    await service.refreshFromWebhook("tenant-a", "org-a", "acct_test_school");
-
-    expect(provider.retrieveAccount).toHaveBeenCalledWith("acct_test_school");
-    expect(mockConnectionUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          id: "connection-a",
-          tenantId: "tenant-a",
-          orgId: "org-a",
-          status: { not: "DISCONNECTED" },
-        }),
-        data: { status: "READY" },
-      }),
-    );
-  });
-
-  it("does not revive a disconnected connection from a delayed webhook", async () => {
-    mockConnectionRawQuery.mockResolvedValue([
-      {
-        id: "connection-a",
-        status: "DISCONNECTED",
-        livemode: false,
-        countryCode: "GB",
-      },
-    ]);
-
-    await service.refreshFromWebhook("tenant-a", "org-a", "acct_test_school");
-
-    expect(provider.retrieveAccount).not.toHaveBeenCalled();
-    expect(mockConnectionUpdateMany).not.toHaveBeenCalled();
-  });
-
   it("refuses collection-account changes when Finance is in servicing mode", async () => {
     access.assertStaffAction.mockRejectedValue(
       new ForbiddenException("Finance action unavailable"),

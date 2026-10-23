@@ -1,4 +1,5 @@
 "use client";
+import { ProviderEvidenceSummary } from "./provider-evidence-summary";
 
 import React from "react";
 import { Button, Card } from "@pathway/ui";
@@ -274,41 +275,7 @@ export function FinanceReportWorkspace({
           title="Stripe fees and payouts"
           description="These actual connected-account movements reconcile school settlement. They do not reduce family invoice balances."
         >
-          {report.provider?.status === "CONNECTED" ? (
-            <div className="space-y-3">
-              <p className="text-xs text-text-muted">
-                Provider data checked{" "}
-                {formatFinanceDateTime(report.provider.fetchedAt)}.
-              </p>
-              {report.provider.feesByCurrency.length ? (
-                <ul className="grid gap-2 sm:grid-cols-2">
-                  {report.provider.feesByCurrency.map((fee) => (
-                    <li
-                      key={fee.currency}
-                      className="rounded-lg border border-border-subtle p-3"
-                    >
-                      <p className="text-xs text-text-muted">
-                        Processor fees · {fee.currency}
-                      </p>
-                      <p className="mt-1 font-semibold tabular-nums text-text-primary">
-                        {formatFinanceMoney(fee.amountMinor, fee.currency)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-text-muted">
-                  No processor fee movements were found in this period.
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-text-muted">
-              {report.provider?.status === "NOT_CONNECTED"
-                ? "Connect the school’s Stripe account to load actual fee and payout evidence."
-                : "Stripe data is unavailable. Retry after checking the connected account."}
-            </p>
-          )}
+          <ProviderEvidenceSummary provider={report.provider} />
         </Card>
       ) : null}
 

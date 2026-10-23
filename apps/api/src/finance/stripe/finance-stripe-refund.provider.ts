@@ -1,7 +1,11 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
 import type { FinanceCurrency } from "@pathway/platform";
-import type { FinanceStripeCheckoutConfig } from "./finance-stripe-checkout.config";
+import type { FinanceStripeServicingConfig } from "./finance-stripe-servicing.config";
+import {
+  stripeChargeIdSchema,
+  type FinanceStripeAccountScope,
+} from "./finance-stripe-references";
 
 const STRIPE_API_VERSION = "2026-09-30.endive";
 const STRIPE_API_BASE_URL = "https://api.stripe.com";
@@ -22,7 +26,7 @@ const refundSchema = z.object({
     "canceled",
   ]),
   created: z.number().int().positive(),
-  livemode: z.boolean(),
+  livemode: z.boolean().optional(),
   metadata: z.record(z.string()).nullable().optional(),
 });
 const refundListSchema = z.object({
@@ -30,7 +34,7 @@ const refundListSchema = z.object({
   has_more: z.boolean(),
 });
 const chargeSchema = z.object({
-  id: z.string().startsWith("ch_"),
+  id: stripeChargeIdSchema,
   object: z.literal("charge"),
   payment_intent: z
     .union([
@@ -42,18 +46,23 @@ const chargeSchema = z.object({
 
 export type FinanceStripeRefundStatus = z.infer<typeof refundSchema>["status"];
 
+export interface FinanceStripeRefundRequest extends FinanceStripeAccountScope {
+  paymentIntentId: string;
+  refundId: string;
+  amountMinor: bigint;
+  currency: FinanceCurrency;
+  creationPermitted: boolean;
+}
+
+export interface FinanceStripeChargeLookup extends FinanceStripeAccountScope {
+  chargeId: string;
+}
+
 export interface FinanceStripeRefundProvider {
-  retrieveChargePaymentIntent(input: {
-    stripeAccountId: string;
-    chargeId: string;
-  }): Promise<string | null>;
-  createRefund(input: {
-    stripeAccountId: string;
-    paymentIntentId: string;
-    refundId: string;
-    amountMinor: bigint;
-    currency: FinanceCurrency;
-  }): Promise<{
+  retrieveChargePaymentIntent(
+    input: FinanceStripeChargeLookup,
+  ): Promise<string | null>;
+  createRefund(input: FinanceStripeRefundRequest): Promise<{
     id: string;
     amountMinor: bigint;
     currency: FinanceCurrency;
@@ -66,6 +75,12 @@ export class FinanceStripeRefundProviderError extends Error {
   constructor(readonly retryable: boolean) {
     super("Stripe refund is temporarily unavailable");
     this.name = "FinanceStripeRefundProviderError";
+  }
+}
+
+export class FinanceStripeRefundUnknownOutcomeError extends FinanceStripeRefundProviderError {
+  constructor() {
+    super(true);
   }
 }
 
@@ -86,18 +101,17 @@ export class DisabledFinanceStripeRefundProvider implements FinanceStripeRefundP
 export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider {
   constructor(
     private readonly config: Exclude<
-      FinanceStripeCheckoutConfig,
+      FinanceStripeServicingConfig,
       { mode: "disabled" }
     >,
     private readonly fetcher: typeof fetch = fetch,
   ) {}
 
-  async retrieveChargePaymentIntent(input: {
-    stripeAccountId: string;
-    chargeId: string;
-  }): Promise<string | null> {
+  async retrieveChargePaymentIntent(
+    input: FinanceStripeChargeLookup,
+  ): Promise<string | null> {
     const payload = await this.request(
-      input.stripeAccountId,
+      input,
       `/v1/charges/${encodeURIComponent(input.chargeId)}`,
     );
     const parsed = chargeSchema.safeParse(payload);
@@ -107,13 +121,7 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
     return paymentIntentId(parsed.data.payment_intent);
   }
 
-  async createRefund(input: {
-    stripeAccountId: string;
-    paymentIntentId: string;
-    refundId: string;
-    amountMinor: bigint;
-    currency: FinanceCurrency;
-  }): Promise<{
+  async createRefund(input: FinanceStripeRefundRequest): Promise<{
     id: string;
     amountMinor: bigint;
     currency: FinanceCurrency;
@@ -127,6 +135,8 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
 
     const existingRefund = await this.findExistingRefund(input);
     if (existingRefund) return existingRefund;
+    if (!input.creationPermitted)
+      throw new FinanceStripeRefundUnknownOutcomeError();
 
     const form = new URLSearchParams();
     form.set("payment_intent", input.paymentIntentId);
@@ -135,7 +145,7 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
     form.set("metadata[finance_refund_id]", input.refundId);
 
     const response = await this.request(
-      input.stripeAccountId,
+      input,
       "/v1/refunds",
       `finance-refund-${input.refundId}`,
       form.toString(),
@@ -143,7 +153,8 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
     const parsed = refundSchema.safeParse(response);
     if (
       !parsed.success ||
-      parsed.data.livemode !== (this.config.mode === "live") ||
+      (parsed.data.livemode !== undefined &&
+        parsed.data.livemode !== input.livemode) ||
       parsed.data.amount !== amount ||
       parsed.data.currency.toUpperCase() !== input.currency
     ) {
@@ -158,18 +169,14 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
     };
   }
 
-  private async findExistingRefund(input: {
-    stripeAccountId: string;
-    paymentIntentId: string;
-    refundId: string;
-    amountMinor: bigint;
-    currency: FinanceCurrency;
-  }) {
+  private async findExistingRefund(input: FinanceStripeRefundRequest) {
     let startingAfter: string | undefined;
     let existingRefund: z.infer<typeof refundSchema> | undefined;
     let hasMore = true;
+    let pages = 0;
 
     while (hasMore) {
+      if (++pages > 10) throw new FinanceStripeRefundProviderError(true);
       const query = new URLSearchParams({
         payment_intent: input.paymentIntentId,
         limit: "100",
@@ -177,7 +184,7 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
       if (startingAfter) query.set("starting_after", startingAfter);
 
       const response = await this.request(
-        input.stripeAccountId,
+        input,
         `/v1/refunds?${query.toString()}`,
       );
       const parsed = refundListSchema.safeParse(response);
@@ -194,13 +201,15 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
       hasMore = parsed.data.has_more;
       if (!hasMore) continue;
       const lastId = parsed.data.data.at(-1)?.id;
-      if (!lastId) throw new FinanceStripeRefundProviderError(true);
+      if (!lastId || lastId === startingAfter)
+        throw new FinanceStripeRefundProviderError(true);
       startingAfter = lastId;
     }
 
     if (!existingRefund) return null;
     if (
-      existingRefund.livemode !== (this.config.mode === "live") ||
+      (existingRefund.livemode !== undefined &&
+        existingRefund.livemode !== input.livemode) ||
       existingRefund.amount !== Number(input.amountMinor) ||
       existingRefund.currency.toUpperCase() !== input.currency
     ) {
@@ -217,18 +226,26 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
   }
 
   private async request(
-    stripeAccountId: string,
+    scope: FinanceStripeAccountScope,
     path: string,
     idempotencyKey?: string,
     body?: string,
   ): Promise<unknown> {
+    if (
+      scope.livemode !== (this.config.mode === "live") ||
+      !new RegExp(`^(?:sk|rk)_${this.config.mode}_`).test(
+        this.config.secretKey,
+      ) ||
+      !/^acct_[A-Za-z0-9_]+$/.test(scope.stripeAccountId)
+    )
+      throw new FinanceStripeRefundProviderError(true);
     try {
       const response = await this.fetcher(`${STRIPE_API_BASE_URL}${path}`, {
         method: body === undefined ? "GET" : "POST",
         headers: {
           Authorization: `Bearer ${this.config.secretKey}`,
           "Stripe-Version": STRIPE_API_VERSION,
-          "Stripe-Account": stripeAccountId,
+          "Stripe-Account": scope.stripeAccountId,
           ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
           ...(body !== undefined
             ? { "Content-Type": "application/x-www-form-urlencoded" }

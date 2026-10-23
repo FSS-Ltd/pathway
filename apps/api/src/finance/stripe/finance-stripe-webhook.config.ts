@@ -1,4 +1,4 @@
-import type { FinanceStripeConnectConfig } from "./finance-stripe-connect.config";
+import type { FinanceStripeServicingConfig } from "./finance-stripe-servicing.config";
 
 export type FinanceStripeWebhookConfig =
   | { mode: "disabled" }
@@ -13,20 +13,20 @@ export const FINANCE_STRIPE_WEBHOOK_CONFIG = Symbol(
 );
 
 export function loadFinanceStripeWebhookConfig(
-  connect: FinanceStripeConnectConfig,
+  servicing: FinanceStripeServicingConfig,
   env: NodeJS.ProcessEnv = process.env,
 ): FinanceStripeWebhookConfig {
-  if (connect.mode === "disabled") return { mode: "disabled" };
+  if (servicing.mode === "disabled") return { mode: "disabled" };
 
   const webhookSecret =
-    connect.mode === "test"
+    servicing.mode === "test"
       ? env.FINANCE_STRIPE_WEBHOOK_SECRET_TEST?.trim()
       : env.FINANCE_STRIPE_WEBHOOK_SECRET_LIVE?.trim();
   if (!webhookSecret) return { mode: "disabled" };
 
   return {
-    mode: connect.mode,
-    secretKey: connect.secretKey,
+    mode: servicing.mode,
+    secretKey: servicing.secretKey,
     webhookSecret,
   };
 }

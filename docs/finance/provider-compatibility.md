@@ -97,6 +97,20 @@ For each test, record the repository and provider API/SDK versions, date, redact
 
 ## Bacs safety gate
 
-Bacs submission is not a receipt. Do not reduce an invoice balance until a signed provider event confirms settlement. Stripe documents typical settlement delays of four business days for an existing mandate and seven for a new mandate; sandbox timing may be accelerated. Families must see a pending state and must not be prompted to pay again while an attempt is unresolved.
+Bacs submission is not a receipt. Do not reduce an invoice balance until signed provider evidence or a scoped authenticated provider read confirms payment success and is captured durably for canonical processing. API recovery keeps explicit API provenance; it is never labelled as signature-verified. Processor payouts remain separate. Stripe documents typical settlement delays of four business days for an existing mandate and seven for a new mandate; sandbox timing may be accelerated. Families must see a pending state and must not be prompted to pay again while an attempt is unresolved.
 
 Live Bacs remains disabled until T13's exact-path tests, T18 assurance and the separately authorised pilot gates pass. A documentation gap or failed test is a blocker, not permission to change the charge model.
+
+## T17 read-only sandbox recovery observation — 23 October 2026
+
+The selected NexSteps Sandbox platform was verified against the explicitly named test credential before account-scoped reads. The existing synthetic Bacs school account contained four test PaymentIntents: two succeeded and two required a new payment method. Their Charge objects used `py_` identifiers. A direct `GET /v1/charges/{id}` returned the successful non-card charge with `livemode=false`, `payment_method_details.type=bacs_debit`, GBP 100 minor units and the matching PaymentIntent. No payment, refund, mandate, account or configuration was created or changed.
+
+This exposed a recovery compatibility gap: charge validators accepted `ch_` only. T17 now accepts both `ch_` and `py_` Charge identifiers in reconciliation reads and refund/dispute references, while retaining account/mode checks and rejecting other resource types. The actual reconciliation adapter then listed all four test charges and retrieved the matching successful `py_` Charge using its pinned `2026-09-30.endive` API version. Provider identifiers, business details, bank data and key values are omitted from this record.
+
+Five regression assertions failed before the fix; four focused suites / 37 tests passed afterwards, including canonical reversal tests. This is a read-only object-shape/recovery proof. It does not prove signed webhook delivery, provider cancellation/returns, card eligibility, payout reconciliation or a live release. Those gates remain open.
+
+## T17 historical mandate servicing read proof
+
+The actual servicing reader retrieved the existing synthetic school's successful SetupIntent, active Mandate and `bacs_debit` PaymentMethod in the verified NexSteps Sandbox platform/account scope. All three objects were test mode; their customer/method/mandate references agreed. The generic and customer-bound PaymentMethod GETs returned the same identity and customer under the pinned `2026-09-30.endive` API version. The proof fetch transport rejected every non-GET request. No mandate, bank details, provider setting or payment was created or changed. Provider identifiers and credentials are omitted from this record.
+
+Mandate has no creation timestamp; the reader retains the available acceptance timestamp and does not invent a creation date. Acceptance IP/user-agent and bank/contact details are stripped. See [Mandate object](https://docs.stripe.com/api/mandates/object), [SetupIntent retrieval](https://docs.stripe.com/api/setup_intents/retrieve), [PaymentMethod retrieval](https://docs.stripe.com/api/payment_methods/retrieve) and [customer-bound PaymentMethod retrieval](https://docs.stripe.com/api/payment_methods/customer). The cancellation paths were verified with synthetic local data and provider doubles; no actual provider cancellation was submitted. This read proof does not establish card-charge eligibility or enable live Bacs.

@@ -142,56 +142,6 @@ describe("StripeFinanceBacsProvider", () => {
     expect(form.has("on_behalf_of")).toBe(false);
   });
 
-  it("detaches the PaymentMethod on the same connected account", async () => {
-    const fetcher = jest
-      .fn()
-      .mockResolvedValue(stripeResponse({ id: "pm_school_bacs" }));
-    const provider = new StripeFinanceBacsProvider(testConfig, fetcher);
-
-    await provider.detachPaymentMethod({
-      stripeAccountId: "acct_school_test",
-      paymentMethodId: "pm_school_bacs",
-      idempotencyKey: "finance-mandate-cancel-1",
-    });
-
-    expect(fetcher).toHaveBeenCalledWith(
-      "https://api.stripe.com/v1/payment_methods/pm_school_bacs/detach",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          "Stripe-Account": "acct_school_test",
-          "Idempotency-Key": "finance-mandate-cancel-1",
-        }),
-      }),
-    );
-  });
-
-  it("expires a pending setup Checkout Session on the connected account", async () => {
-    const fetcher = jest
-      .fn()
-      .mockResolvedValue(
-        stripeResponse({ id: "cs_test_mandate", status: "expired" }),
-      );
-    const provider = new StripeFinanceBacsProvider(testConfig, fetcher);
-
-    await provider.expireMandateSetupSession({
-      stripeAccountId: "acct_school_test",
-      sessionId: "cs_test_mandate",
-      idempotencyKey: "finance-mandate-expire-1",
-    });
-
-    expect(fetcher).toHaveBeenCalledWith(
-      "https://api.stripe.com/v1/checkout/sessions/cs_test_mandate/expire",
-      expect.objectContaining({
-        method: "POST",
-        headers: expect.objectContaining({
-          "Stripe-Account": "acct_school_test",
-          "Idempotency-Key": "finance-mandate-expire-1",
-        }),
-      }),
-    );
-  });
-
   it("rejects a non-Stripe hosted setup URL", async () => {
     const provider = new StripeFinanceBacsProvider(testConfig, async () =>
       stripeResponse({

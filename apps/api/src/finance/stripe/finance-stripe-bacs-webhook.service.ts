@@ -9,9 +9,9 @@ import {
 } from "../domain/finance-collection-terms";
 import { recordConfirmedStripeReceipt } from "./finance-stripe-receipt";
 import {
-  FINANCE_STRIPE_BACS_PROVIDER,
-  type FinanceStripeBacsProvider,
-} from "./finance-stripe-bacs.provider";
+  FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER,
+  type FinanceStripeMandateServicingProvider,
+} from "./finance-stripe-mandate-servicing.contracts";
 import {
   parseFinanceStripeBacsEvent,
   type FinanceStripeBacsWebhookInput,
@@ -32,11 +32,14 @@ const supportedEvents = new Set([
 export class FinanceStripeBacsWebhookService {
   constructor(
     @Inject(FinanceAccessService)
-    private readonly financeAccess: FinanceAccessService,
+    private readonly financeAccess: Pick<FinanceAccessService, "resolveMode">,
     @Inject(FinanceBalanceService)
     private readonly balances: FinanceBalanceService,
-    @Inject(FINANCE_STRIPE_BACS_PROVIDER)
-    private readonly provider: FinanceStripeBacsProvider,
+    @Inject(FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER)
+    private readonly provider: Pick<
+      FinanceStripeMandateServicingProvider,
+      "detachPaymentMethod"
+    >,
   ) {}
 
   supports(eventType: string): boolean {
@@ -89,6 +92,7 @@ export class FinanceStripeBacsWebhookService {
               stripeAccountId: true,
               livemode: true,
               stripeSetupIntentId: true,
+              stripeCheckoutSessionId: true,
               stripePaymentMethodId: true,
               stripeMandateId: true,
               stripeCustomer: {
@@ -211,7 +215,12 @@ export class FinanceStripeBacsWebhookService {
             kind: "cleanup" as const,
             mandateId: mandate.id,
             stripeAccountId: mandate.stripeAccountId,
+            stripeConnectionId: mandate.stripeConnectionId,
+            setupIntentId: event.setupIntentId,
+            checkoutSessionId: mandate.stripeCheckoutSessionId,
+            stripeMandateId: event.mandateId,
             paymentMethodId: event.paymentMethodId,
+            customerId: mandate.stripeCustomer.stripeCustomerId,
           };
         }
         return { kind: "processed" as const };
@@ -267,22 +276,25 @@ export class FinanceStripeBacsWebhookService {
         },
       });
       if (!current) return "deferred";
-      if (
-        current.providerStatusAt &&
-        event.eventCreatedAt <= current.providerStatusAt
-      ) {
-        return "processed";
-      }
       const isInactive =
         event.kind === "payment_method_detached" ||
         (event.kind === "mandate_updated" && event.status === "inactive");
+      if (
+        current.providerStatusAt &&
+        (event.eventCreatedAt < current.providerStatusAt ||
+          (event.eventCreatedAt.getTime() ===
+            current.providerStatusAt.getTime() &&
+            !isInactive))
+      ) {
+        return "processed";
+      }
       const status = isInactive ? "CANCELLED" : current.status;
       await tx.financeMandate.update({
         where: { id: current.id },
         data: {
           status,
           cancelledAt: isInactive ? event.eventCreatedAt : undefined,
-          providerCancellationPending: false,
+          providerCancellationPending: isInactive ? false : undefined,
           providerStatusAt: event.eventCreatedAt,
         },
       });
@@ -651,12 +663,19 @@ export class FinanceStripeBacsWebhookService {
     target: {
       mandateId: string;
       stripeAccountId: string;
+      stripeConnectionId: string;
+      setupIntentId: string;
+      checkoutSessionId: string | null;
+      stripeMandateId: string;
       paymentMethodId: string;
+      customerId: string;
     },
   ): Promise<void> {
     try {
       await this.provider.detachPaymentMethod({
         stripeAccountId: target.stripeAccountId,
+        livemode: input.livemode,
+        customerId: target.customerId,
         paymentMethodId: target.paymentMethodId,
         idempotencyKey: `finance-bacs-revoked-${target.mandateId}`,
       });
@@ -666,6 +685,16 @@ export class FinanceStripeBacsWebhookService {
             id: target.mandateId,
             tenantId: input.tenantId,
             orgId: input.orgId,
+            status: "CANCELLED",
+            providerCancellationPending: true,
+            stripeConnectionId: target.stripeConnectionId,
+            stripeAccountId: target.stripeAccountId,
+            livemode: input.livemode,
+            stripeSetupIntentId: target.setupIntentId,
+            stripeCheckoutSessionId: target.checkoutSessionId,
+            stripePaymentMethodId: target.paymentMethodId,
+            stripeMandateId: target.stripeMandateId,
+            stripeCustomer: { stripeCustomerId: target.customerId },
           },
           data: { providerCancellationPending: false },
         }),

@@ -39,6 +39,12 @@ import { FinanceProfileService } from "./finance-profile.service";
 import { FinanceReportController } from "./finance-report.controller";
 import { FinanceReportService } from "./finance-report.service";
 import { FinanceReportRepository } from "./finance-report.repository";
+import { FinanceSettlementReportRepository } from "./reconciliation/finance-settlement-report.repository";
+import { FinanceReconciliationController } from "./finance-reconciliation.controller";
+import { FinanceReconciliationService } from "./finance-reconciliation.service";
+import { FinanceRecoveryInternalController } from "./reconciliation/finance-recovery-internal.controller";
+import { FinanceRecoveryService } from "./reconciliation/finance-recovery.service";
+import { FinanceReconciliationStateRepository } from "./reconciliation/finance-reconciliation-state.repository";
 import { FinancePayerAccountController } from "./finance-payer-account.controller";
 import { FinancePayerAccountService } from "./finance-payer-account.service";
 import { FinanceFamilyController } from "./finance-family.controller";
@@ -56,7 +62,6 @@ import { FinanceStripeWebhookInternalController } from "./stripe/finance-stripe-
 import {
   FINANCE_STRIPE_CONNECT_CONFIG,
   loadFinanceStripeConnectConfig,
-  type FinanceStripeConnectConfig,
 } from "./stripe/finance-stripe-connect.config";
 import {
   DisabledFinanceStripeConnectProvider,
@@ -64,10 +69,16 @@ import {
   StripeFinanceConnectProvider,
 } from "./stripe/finance-stripe-connect.provider";
 import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connection.service";
+import { FinanceStripeAccountSyncService } from "./stripe/finance-stripe-account-sync.service";
 import {
-  FINANCE_STRIPE_REPORTING_PROVIDER,
-  StripeFinanceReportingProvider,
-} from "./stripe/finance-stripe-reporting.provider";
+  FINANCE_STRIPE_ACCOUNT_READER,
+  StripeFinanceAccountReader,
+} from "./stripe/finance-stripe-account-reader.provider";
+import {
+  FINANCE_STRIPE_SERVICING_CONFIG,
+  loadFinanceStripeServicingConfig,
+  type FinanceStripeServicingConfig,
+} from "./stripe/finance-stripe-servicing.config";
 import {
   DisabledFinanceStripeCheckoutProvider,
   FINANCE_STRIPE_CHECKOUT_PROVIDER,
@@ -80,6 +91,8 @@ import {
 import { FinanceStripeCheckoutAttemptService } from "./stripe/finance-stripe-checkout-attempt.service";
 import { FinanceStripeCheckoutService } from "./stripe/finance-stripe-checkout.service";
 import { FinanceStripeBacsMandateService } from "./stripe/finance-stripe-bacs-mandate.service";
+import { FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER } from "./stripe/finance-stripe-mandate-servicing.contracts";
+import { StripeFinanceMandateServicingProvider } from "./stripe/finance-stripe-mandate-servicing.provider";
 import { FinanceCollectionPlanService } from "./finance-collection-plan.service";
 import { FinanceRecurringInvoiceController } from "./finance-recurring-invoice.controller";
 import { FinanceRecurringInvoiceService } from "./finance-recurring-invoice.service";
@@ -141,6 +154,8 @@ import {
     FinanceStripeWebhookInternalController,
     FinanceProfileController,
     FinanceReportController,
+    FinanceReconciliationController,
+    FinanceRecoveryInternalController,
     FinancePayerAccountController,
     FinanceFamilyController,
     FinancePayerCheckoutStatusController,
@@ -149,6 +164,10 @@ import {
     FinanceBalanceService,
     FinanceReportService,
     FinanceReportRepository,
+    FinanceSettlementReportRepository,
+    FinanceReconciliationService,
+    FinanceRecoveryService,
+    FinanceReconciliationStateRepository,
     FinancePayerAccountService,
     FinanceFamilyService,
     FinanceStatementService,
@@ -167,6 +186,7 @@ import {
     FinanceProfileService,
     FinancePayerGrantService,
     FinanceStripeConnectionService,
+    FinanceStripeAccountSyncService,
     FinanceStripeCheckoutAttemptService,
     FinanceStripeCheckoutService,
     FinanceStripeBacsMandateService,
@@ -196,12 +216,15 @@ import {
       inject: [FINANCE_STRIPE_CONNECT_CONFIG],
     },
     {
-      provide: FINANCE_STRIPE_REPORTING_PROVIDER,
-      useFactory: (config: FinanceStripeConnectConfig) =>
-        new StripeFinanceReportingProvider(
-          config.mode === "disabled" ? "" : config.secretKey,
-        ),
+      provide: FINANCE_STRIPE_SERVICING_CONFIG,
+      useFactory: loadFinanceStripeServicingConfig,
       inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_ACCOUNT_READER,
+      useFactory: (config: FinanceStripeServicingConfig) =>
+        new StripeFinanceAccountReader(config),
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
     {
       provide: FINANCE_STRIPE_CHECKOUT_CONFIG,
@@ -230,18 +253,22 @@ import {
     },
     {
       provide: FINANCE_STRIPE_REFUND_PROVIDER,
-      useFactory: (
-        config: ReturnType<typeof loadFinanceStripeCheckoutConfig>,
-      ) =>
+      useFactory: (config: FinanceStripeServicingConfig) =>
         config.mode === "disabled"
           ? new DisabledFinanceStripeRefundProvider()
           : new StripeFinanceRefundProvider(config),
-      inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER,
+      useFactory: (config: FinanceStripeServicingConfig) =>
+        new StripeFinanceMandateServicingProvider(config),
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
     {
       provide: FINANCE_STRIPE_WEBHOOK_CONFIG,
       useFactory: loadFinanceStripeWebhookConfig,
-      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
   ],
 })
