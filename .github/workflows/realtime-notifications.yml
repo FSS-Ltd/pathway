@@ -1,0 +1,45 @@
+name: Realtime notification database
+
+on:
+  pull_request:
+    branches: [master, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transactional-capture:
+    name: Transactional realtime notification capture
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pathway_realtime_notifications_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify transactional capture and isolation
+        env:
+          REALTIME_NOTIFICATION_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/pathway_realtime_notifications_test
+        run: >-
+          pnpm --filter @pathway/db test:unit --runTestsByPath
+          src/__tests__/realtime-notifications.integration.spec.ts

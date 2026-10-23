@@ -77,6 +77,7 @@ export class DispatchOutboxJob {
               ? { in: [...this.eventTypes] }
               : {
                   notIn: ["ace.message.sent", ...this.excludedEventTypes],
+                  not: { startsWith: "realtime." },
                 },
             OR: [
               { status: "PENDING", nextAttemptAt: { lte: now } },

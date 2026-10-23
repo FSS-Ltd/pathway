@@ -1,12 +1,34 @@
 # FSS Agent Operating System v2
 ## Strategic & Technical Agent Interchangeability
 
-**Version**: 2.0  
+**Version**: 2.1
+**Updated**: 2026-10-23
 **Created**: April 2026  
 **Owner**: Jean-Fidele Ntagengwa, CTO FSS  
 **Scope**: FSS client services, product development, financial modeling, and operations  
 
 ---
+
+## Event-driven architecture default
+
+- For all builds, use subscriptions and events by default for application updates,
+  provider lifecycle changes and worker wakeups. Do not repeatedly poll a database
+  or API just to discover whether state changed.
+- Keep durable state authoritative: commit changes before notifying, handle
+  duplicate events idempotently, and reconcile at startup and after reconnect so
+  missed events cannot lose work.
+- Authenticate subscriptions and preserve tenant, permission and revocation
+  boundaries. Events do not grant access; recheck authority before reading data or
+  executing work. Keep sensitive data and credentials out of notification payloads.
+- Schedule retries and expiry work for their due times. On-demand health checks,
+  active job-lease heartbeats and bounded reconnect backoff have separate purposes.
+  Any necessary periodic reconciliation fallback must document its reason,
+  frequency and query budget, and must not become the normal update mechanism.
+- Verify idle query/request counts, committed-change delivery, duplicate handling,
+  reconnect catch-up, permission revocation, isolation, unsubscribe cleanup and
+  graceful shutdown.
+- Do not introduce a paid event service or deployment without the user's existing
+  authorization. Respect repository delivery gates when converting existing polling.
 
 ## Graphify Pre-Change Gate
 
