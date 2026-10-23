@@ -1,12 +1,34 @@
 # BUILD.md
 ## Technical Agent Operating Manual (Claude or Codex)
 
-**Version**: 2.0  
+**Version**: 2.1
+**Updated**: 2026-10-23
 **Created**: April 2026  
 **Owner**: Jean-Fidele Ntagengwa  
 **Scope**: How Technical Agent operates in FSS (role-based, model-agnostic)  
 
 ---
+
+## Event-driven delivery checks
+
+Use the event-driven default in AGENTS.md for every build. Before converting an
+existing polling path, identify its durable source, commit boundary, notification
+consumer, permission boundary and reconnect/startup catch-up behavior. Map existing
+read models to source mutations and feature-owned invalidation handlers.
+
+A successful HTTP enqueue or broadcast is not proof that durable work finished.
+Keep pending state until the owning consumer acknowledges completion. Preserve
+idempotency, lease ownership and dead-letter handling, and recheck authority when
+executing deferred work. Renew subscription authentication without refetching
+unchanged application data. Do not replace a polling interval with a recursive
+refresh timeout.
+
+Measure idle data requests separately from authentication renewal, reconnect
+attempts and active lease heartbeats. Test rollback, duplicates, lost notifications,
+revocation, tenant isolation, unsubscribe and shutdown. Any reconciliation fallback
+must name its owner, reason, frequency, indexed query budget and recovery bound.
+Stage production capture behind an explicit activation gate until its dedicated
+consumer is deployed and verified; record activation and rollback evidence.
 
 ## Graphify Pre-Change Gate
 

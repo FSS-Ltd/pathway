@@ -97,7 +97,10 @@ describe("DispatchOutboxJob", () => {
     expect(outboxEvent.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          eventType: { notIn: ["ace.message.sent"] },
+          eventType: {
+            notIn: ["ace.message.sent"],
+            not: { startsWith: "realtime." },
+          },
         }),
       }),
     );
@@ -162,6 +165,7 @@ describe("DispatchOutboxJob", () => {
         where: expect.objectContaining({
           eventType: {
             notIn: ["ace.message.sent", "finance.statement.notice.requested"],
+            not: { startsWith: "realtime." },
           },
         }),
       }),
