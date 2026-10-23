@@ -282,6 +282,40 @@ describe("FinanceStripeCheckoutService", () => {
     );
   });
 
+  it.each([23, 24, 26])(
+    "retains an unknown attempt after %s hours instead of crossing provider idempotency retention",
+    async (hours) => {
+      attemptState = {
+        id: "attempt-unknown",
+        financeProfileId: "profile-a",
+        stripeConnectionId: "connection-a",
+        stripeAccountId: "acct_school_test",
+        invoiceId: "invoice-a",
+        amountMinor: 12500n,
+        idempotencyKey: "finance-checkout-attempt-unknown",
+        integrationIdentifier: "nexsteps-finance-abcdefgh",
+        stripeCheckoutSessionId: null,
+        checkoutUrl: null,
+        expiresAt: null,
+        createdAt: new Date(Date.now() - hours * 60 * 60 * 1000),
+        status: "CREATING",
+      };
+
+      await expect(
+        service.startCheckout(actor, "payer-account-a", "invoice-a"),
+      ).resolves.toEqual({
+        attemptId: "attempt-unknown",
+        status: "CHECKING",
+        checkoutUrl: null,
+        expiresAt: null,
+      });
+      expect(attemptState.status).toBe("CREATING");
+      expect(mockCheckoutAttemptCreate).not.toHaveBeenCalled();
+      expect(mockCreateSession).not.toHaveBeenCalled();
+      expect(mockCheckoutAttemptUpdateMany).not.toHaveBeenCalled();
+    },
+  );
+
   it("blocks checkout when the explicit payer grant has been revoked", async () => {
     mockAssertPayerAction.mockRejectedValueOnce(
       new ForbiddenException("Finance access unavailable"),

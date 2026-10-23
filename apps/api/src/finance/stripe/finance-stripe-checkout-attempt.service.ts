@@ -23,7 +23,8 @@ import type {
   FinanceStripeCheckoutView,
 } from "./finance-stripe-checkout.types";
 
-const CHECKOUT_RETRY_WINDOW_MS = 25 * 60 * 60 * 1000;
+// Stripe may prune v1 idempotency keys after 24 hours. Keep a safety margin.
+const CHECKOUT_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 
 @Injectable()
 export class FinanceStripeCheckoutAttemptService {
@@ -256,34 +257,16 @@ export class FinanceStripeCheckoutAttemptService {
           return { kind: "view", view: checkingView(existing.id) };
         }
         if (
-          existing.status === "OPEN" ||
-          now.getTime() - existing.createdAt.getTime() >
+          existing.status === "CREATING" &&
+          now.getTime() - existing.createdAt.getTime() >=
             CHECKOUT_RETRY_WINDOW_MS
         ) {
-          if (existing.status === "CREATING") {
-            await tx.financeCheckoutAttempt.updateMany({
-              where: {
-                id: existing.id,
-                tenantId: actor.tenantId,
-                orgId: actor.orgId,
-                status: "CREATING",
-              },
-              data: { status: "EXPIRED" },
-            });
-          }
-          if (existing.status === "OPEN") {
-            return {
-              kind: "retrieve",
-              attempt: {
-                ...existing,
-                invoiceNumber: invoice.invoiceNumber,
-                status: existing.status,
-              },
-            };
-          }
-        } else {
+          // Only provider evidence may release this obligation after an unknown outcome.
+          return { kind: "view", view: checkingView(existing.id) };
+        }
+        if (existing.status === "OPEN") {
           return {
-            kind: "create",
+            kind: "retrieve",
             attempt: {
               ...existing,
               invoiceNumber: invoice.invoiceNumber,
@@ -291,6 +274,14 @@ export class FinanceStripeCheckoutAttemptService {
             },
           };
         }
+        return {
+          kind: "create",
+          attempt: {
+            ...existing,
+            invoiceNumber: invoice.invoiceNumber,
+            status: existing.status,
+          },
+        };
       }
 
       const attemptId = randomUUID();
