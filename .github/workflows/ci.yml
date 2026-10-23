@@ -289,6 +289,90 @@ jobs:
           src/concerns/tests/concerns.e2e.spec.ts
           src/access-control/tests/effective-permissions.tenant-rls.e2e.spec.ts
 
+  finance-backup-restore:
+    name: Finance Backup Restore
+    runs-on: ubuntu-22.04
+    needs: ci
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pathway_finance_backup_source
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.7.0
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --prefer-offline
+
+      - name: Create empty restore target
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: postgres
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: createdb pathway_finance_backup_target
+
+      - name: Apply current migrations to the source database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_finance_backup_source?schema=app
+        run: pnpm db:deploy
+
+      - name: Test backup restore safety guards
+        run: >-
+          node --test
+          scripts/finance-backup-restore-smoke.test.mjs
+          scripts/lib/finance-production-env.test.mjs
+
+      - name: Dump and restore synthetic Finance data
+        env:
+          NODE_ENV: test
+          FINANCE_BACKUP_RESTORE_PG_CLIENT_IMAGE: postgres:16-alpine
+          FINANCE_BACKUP_RESTORE_DISPOSABLE_TOKEN: finance-backup-restore-disposable-databases
+          FINANCE_BACKUP_RESTORE_SOURCE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_finance_backup_source?schema=app
+          FINANCE_BACKUP_RESTORE_TARGET_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pathway_finance_backup_target?schema=app
+        run: node scripts/finance-backup-restore-smoke.mjs
+
   system-role-seed-proof:
     name: System Role Seed Database Identity
     runs-on: ubuntu-22.04
