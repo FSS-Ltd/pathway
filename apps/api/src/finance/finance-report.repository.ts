@@ -58,7 +58,7 @@ export class FinanceReportRepository {
             stripeAccountId: { not: null },
           },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: { stripeAccountId: true, livemode: true },
+          select: { id: true, stripeAccountId: true, livemode: true },
         });
 
         const [
@@ -510,6 +510,7 @@ export class FinanceReportRepository {
           profile,
           connection: connection?.stripeAccountId
             ? {
+                id: connection.id,
                 accountId: connection.stripeAccountId,
                 livemode: connection.livemode,
               }

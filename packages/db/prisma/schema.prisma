@@ -5692,6 +5692,8 @@ model FinanceStripeConnection {
   disconnectedBy       User?                         @relation("FinanceStripeConnectionDisconnector", fields: [disconnectedByUserId], references: [id], onDelete: Restrict)
   checkoutAttempts     FinanceCheckoutAttempt[]
 
+  settlementEvidence FinanceSettlementEvidence[]
+  payoutReconciliations FinancePayoutReconciliation[]
   reconciliationStates FinanceReconciliationState[]
   reconciliationCases FinanceReconciliationCase[]
   recoveredEvents FinanceStripeWebhookEvent[] @relation("FinanceStripeReconciliationEvidence")
@@ -5801,6 +5803,7 @@ model FinanceReconciliationCaseEvent {
 
   @@unique([id, tenantId, orgId])
   @@index([tenantId, orgId, caseId, createdAt], map: "FinanceReconciliationCaseEvent_scope_case_created_idx")
+  @@index([tenantId, orgId, type, id], map: "FinanceReconciliationCaseEvent_request_idx")
 }
 
 model FinancePayerAccount {
@@ -6398,4 +6401,43 @@ model FinanceReceiptMovementApplication {
   @@unique([movementId, reversesApplicationId], map: "FinanceReceiptMovementApplication_movement_reversal_key")
   @@index([tenantId, orgId, invoiceId, createdAt])
   @@index([tenantId, orgId, receiptAllocationId])
+}
+
+
+// Private processor evidence; never a family receipt or debt posting.
+model FinanceSettlementEvidence {
+  id                 String @id @default(uuid())
+  stripeConnectionId String
+  tenantId           String
+  orgId              String
+  stripeAccountId    String @db.VarChar(255)
+  livemode           Boolean
+  resourceType       String @db.VarChar(32)
+  providerReference  String @db.VarChar(255)
+  digest             String @db.VarChar(64)
+  facts              Json
+  observedAt         DateTime
+  stripeConnection   FinanceStripeConnection @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@unique([stripeConnectionId, resourceType, providerReference, digest], map: "FinanceSettlementEvidence_identity_key")
+  @@index([tenantId, orgId, stripeConnectionId, observedAt], map: "FinanceSettlementEvidence_scope_observed_idx")
+}
+
+// Latest continuation pointer; each revision has an immutable evidence snapshot.
+model FinancePayoutReconciliation {
+  id                 String @id @default(uuid())
+  stripeConnectionId String
+  tenantId           String
+  orgId              String
+  payoutId           String @db.VarChar(255)
+  payoutFacts        Json
+  coverage           Json
+  complete           Boolean
+  status             String @db.VarChar(32)
+  observedAt         DateTime
+  updatedAt          DateTime
+  stripeConnection   FinanceStripeConnection @relation(fields: [stripeConnectionId, tenantId, orgId], references: [id, tenantId, orgId], onDelete: Restrict)
+
+  @@unique([stripeConnectionId, payoutId])
+  @@index([tenantId, orgId, stripeConnectionId, status, payoutId], map: "FinancePayoutReconciliation_unresolved_idx")
 }

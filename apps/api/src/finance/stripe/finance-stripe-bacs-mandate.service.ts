@@ -433,6 +433,8 @@ export class FinanceStripeBacsMandateService {
             stripeConnectionId: true,
             stripeAccountId: true,
             stripeCheckoutSessionId: true,
+            stripeSetupIntentId: true,
+            stripeMandateId: true,
             stripePaymentMethodId: true,
             providerCancellationPending: true,
             livemode: true,
@@ -510,6 +512,8 @@ export class FinanceStripeBacsMandateService {
             stripeConnectionId: true,
             stripeAccountId: true,
             stripeCheckoutSessionId: true,
+            stripeSetupIntentId: true,
+            stripeMandateId: true,
             stripePaymentMethodId: true,
             providerCancellationPending: true,
             livemode: true,
@@ -551,20 +555,36 @@ export class FinanceStripeBacsMandateService {
           idempotencyKey: `finance-bacs-expire-${mandateId}`,
         });
       }
-      await withTenantRlsContext(actor.tenantId, actor.orgId, (tx) =>
-        tx.financeMandate.updateMany({
-          where: {
-            id: mandateId,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-          },
-          data: { providerCancellationPending: false },
-        }),
+      const acknowledged = await withTenantRlsContext(
+        actor.tenantId,
+        actor.orgId,
+        (tx) =>
+          tx.financeMandate.updateMany({
+            where: {
+              id: mandateId,
+              tenantId: actor.tenantId,
+              orgId: actor.orgId,
+              status: "CANCELLED",
+              providerCancellationPending: true,
+              stripeConnectionId: mandate.stripeConnectionId,
+              stripeAccountId: mandate.stripeAccountId,
+              livemode: mandate.livemode,
+              stripeCheckoutSessionId: mandate.stripeCheckoutSessionId,
+              stripeSetupIntentId: mandate.stripeSetupIntentId,
+              stripePaymentMethodId: mandate.stripePaymentMethodId,
+              stripeMandateId: mandate.stripeMandateId,
+              stripeCustomer: {
+                stripeCustomerId: mandate.stripeCustomer.stripeCustomerId,
+              },
+            },
+            data: { providerCancellationPending: false },
+          }),
       );
       return {
         mandateId,
         status: "CANCELLED",
-        providerCancellation: "CONFIRMED",
+        providerCancellation:
+          acknowledged.count === 1 ? "CONFIRMED" : "PENDING",
       };
     } catch {
       return {

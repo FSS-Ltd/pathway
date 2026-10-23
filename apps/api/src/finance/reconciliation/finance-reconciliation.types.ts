@@ -12,7 +12,9 @@ export interface FinanceConnectionScope extends FinanceReconciliationScope {
 
 export type FinanceRecoveryStream =
   | FinanceReconciliationStream
-  | "unresolvedOperations";
+  | "unresolvedOperations"
+  | "payoutContinuations"
+  | "caseRequests";
 
 export interface FinanceReconciliationLease {
   scope: FinanceConnectionScope;

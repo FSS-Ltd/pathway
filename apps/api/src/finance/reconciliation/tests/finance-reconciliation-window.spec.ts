@@ -90,10 +90,12 @@ describe("Finance reconciliation coverage window", () => {
     });
   });
 
-  it("sweeps all unresolved history at a fixed five-minute cutoff", () => {
-    expect(
-      planReconciliationWindow(empty, "unresolvedOperations", now),
-    ).toEqual({
+  it.each([
+    "unresolvedOperations",
+    "payoutContinuations",
+    "caseRequests",
+  ] as const)("sweeps %s history at a fixed five-minute cutoff", (stream) => {
+    expect(planReconciliationWindow(empty, stream, now)).toEqual({
       from: new Date(0),
       to: new Date("2026-10-23T12:00:00Z"),
       cursor: null,
@@ -102,14 +104,14 @@ describe("Finance reconciliation coverage window", () => {
     expect(
       planReconciliationWindow(
         { active: null, completedThrough: new Date("2026-10-23T12:00:00Z") },
-        "unresolvedOperations",
+        stream,
         new Date("2026-10-23T12:04:59Z"),
       ),
     ).toBeNull();
     expect(
       planReconciliationWindow(
         { active: null, completedThrough: new Date("2026-10-23T12:00:00Z") },
-        "unresolvedOperations",
+        stream,
         new Date("2026-10-23T12:05:00Z"),
       ),
     ).toMatchObject({

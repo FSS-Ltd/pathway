@@ -13,6 +13,7 @@ interface FinanceStripeWebhookCandidate {
 }
 
 export class PrismaFinanceStripeWebhookStore implements FinanceStripeWebhookStore {
+  constructor(private readonly livemode?: boolean) {}
   async findDueScopes(now: Date): Promise<FinanceStripeWebhookScope[]> {
     return runTransaction(async (tx) => {
       const rows = await tx.$queryRaw<FinanceStripeWebhookScope[]>`
@@ -38,6 +39,7 @@ export class PrismaFinanceStripeWebhookStore implements FinanceStripeWebhookStor
         where: {
           tenantId: scope.tenantId,
           orgId: scope.orgId,
+          livemode: this.livemode,
           OR: [
             {
               status: { in: ["RECEIVED", "RETRY"] },
@@ -58,6 +60,7 @@ export class PrismaFinanceStripeWebhookStore implements FinanceStripeWebhookStor
             id: event.id,
             tenantId: scope.tenantId,
             orgId: scope.orgId,
+            livemode: this.livemode,
             OR: [
               {
                 status: { in: ["RECEIVED", "RETRY"] },

@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  ServiceUnavailableException,
-} from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { AuditAction, AuditEntityType } from "../audit/audit.types";
 import { recordAuditEventInTransaction } from "../audit/audit.service";
@@ -18,28 +14,20 @@ import {
   financeReportFilename,
   type CsvColumn,
 } from "./finance-report-csv";
-import { resolveFinanceReportPeriod } from "./finance-report-period";
 import {
-  FINANCE_STRIPE_CONNECT_CONFIG,
-  type FinanceStripeConnectConfig,
-} from "./stripe/finance-stripe-connect.config";
-import {
-  FINANCE_STRIPE_REPORTING_PROVIDER,
-  type FinanceStripeReportingClient,
-  type StripeFinanceReportingResult,
-} from "./stripe/finance-stripe-reporting.provider";
+  FINANCE_STRIPE_SERVICING_CONFIG,
+  type FinanceStripeServicingConfig,
+} from "./stripe/finance-stripe-servicing.config";
 import type {
   FinanceReportRow,
   FinanceReportSnapshot,
 } from "./finance-report.types";
 import { FinanceReportRepository } from "./finance-report.repository";
-
-type ProviderReport = {
-  status: "CONNECTED" | "NOT_CONNECTED" | "UNAVAILABLE";
-  fetchedAt: string | null;
-  feesByCurrency: StripeFinanceReportingResult["feesByCurrency"];
-  payouts: StripeFinanceReportingResult["payouts"];
-};
+import {
+  FinanceSettlementReportRepository,
+  emptySettlementReport,
+} from "./reconciliation/finance-settlement-report.repository";
+import type { FinanceSettlementReport } from "./reconciliation/finance-settlement-report.types";
 
 const reportColumns: readonly CsvColumn<FinanceReportRow>[] = [
   { header: "Record type", value: (row) => row.recordType },
@@ -65,16 +53,16 @@ export class FinanceReportService {
     private readonly access: FinanceAccessService,
     @Inject(FinanceReportRepository)
     private readonly repository: FinanceReportRepository,
-    @Inject(FINANCE_STRIPE_CONNECT_CONFIG)
-    private readonly stripeConfig: FinanceStripeConnectConfig,
-    @Inject(FINANCE_STRIPE_REPORTING_PROVIDER)
-    private readonly stripeReports: FinanceStripeReportingClient,
+    @Inject(FINANCE_STRIPE_SERVICING_CONFIG)
+    private readonly stripeConfig: FinanceStripeServicingConfig,
+    @Inject(FinanceSettlementReportRepository)
+    private readonly settlementReports: FinanceSettlementReportRepository,
   ) {}
 
   async summary(actor: FinanceRequestActor, filters: FinanceReportFilters) {
     await this.access.assertStaffAction(actor, "READ_RECORDS");
     const snapshot = await this.repository.loadSnapshot(actor, filters);
-    const provider = await this.providerReport(snapshot, filters);
+    const provider = await this.providerReport(actor, snapshot, filters);
     return {
       metadata: snapshot.metadata,
       totals: snapshot.totals,
@@ -101,7 +89,7 @@ export class FinanceReportService {
         rows: snapshot.rows.filter((row) => row.recordType === type),
       };
     }
-    const provider = await this.providerReport(snapshot, filters);
+    const provider = await this.providerReport(actor, snapshot, filters);
     return {
       type,
       metadata: {
@@ -113,6 +101,12 @@ export class FinanceReportService {
         status: provider.status,
         fetchedAt: provider.fetchedAt,
         feesByCurrency: provider.feesByCurrency,
+        source: provider.source,
+        context: provider.context,
+        freshness: provider.freshness,
+        periodStartCoverage: provider.periodStartCoverage,
+        truncated: provider.truncated,
+        coverage: provider.coverage,
       },
       rows: [
         ...provider.payouts.map(
@@ -122,12 +116,10 @@ export class FinanceReportService {
               reference: payout.id,
               date: payout.createdAt,
               payerName: null,
-              status: payout.status,
+              status: payout.reconciliationStatus,
               amountMinor: payout.amountMinor,
               currency: payout.currency,
-              description: payout.arrivalAt
-                ? `Expected arrival ${payout.arrivalAt}`
-                : "Stripe connected-account payout",
+              description: `Saved payout evidence; ${payout.complete ? "constituent pagination complete" : "constituent comparison incomplete or unsupported"}. Net ${payout.netMinor} ${payout.currency} minor units.`,
               dueDate: null,
               outstandingMinor: null,
               ageingBucket: null,
@@ -141,9 +133,10 @@ export class FinanceReportService {
             recordType: "processor-fee",
             reference: `FEE-${fee.currency}-${filters.from}-${filters.to}`,
             date: provider.fetchedAt,
-            status: "RECONCILED",
+            status: "OBSERVED",
             currency: fee.currency,
-            description: "Stripe processor fees for the selected period",
+            description:
+              "Saved Stripe processor fee evidence for the selected period; coverage may be incomplete",
             feeMinor: fee.amountMinor,
           }),
         ),
@@ -169,9 +162,45 @@ export class FinanceReportService {
       { header: "Currency", value: (row) => row.currency },
       { header: "Report basis", value: (row) => row.reportingBasis },
     ];
+    const provider = "provider" in data ? data.provider : null;
+    const settlementContext = provider
+      ? financeReportCsv({
+          columns: [
+            { header: "Settlement source", value: (row) => row.source },
+            {
+              header: "Stripe account",
+              value: (row) => row.context?.accountId ?? null,
+            },
+            {
+              header: "Stripe environment",
+              value: (row) =>
+                row.context ? (row.context.livemode ? "live" : "test") : null,
+            },
+            { header: "Evidence observed at", value: (row) => row.fetchedAt },
+            { header: "Evidence freshness", value: (row) => row.freshness },
+            {
+              header: "Historical start coverage",
+              value: (row) => row.periodStartCoverage,
+            },
+            { header: "Truncated", value: (row) => String(row.truncated) },
+            {
+              header: "Stream cutoffs",
+              value: (row) =>
+                row.coverage
+                  .map(
+                    (stream) =>
+                      `${stream.stream}: ${stream.completedThrough ?? "unknown"}`,
+                  )
+                  .join("; "),
+            },
+          ],
+          rows: [provider],
+        })
+      : null;
     const csv = [
       financeReportCsv({ columns: contextColumns, rows: [data.metadata] }),
       "",
+      ...(settlementContext ? [settlementContext, ""] : []),
       financeReportCsv({ columns: reportColumns, rows: data.rows }),
     ].join("\r\n");
     await withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
@@ -200,47 +229,25 @@ export class FinanceReportService {
   }
 
   private async providerReport(
+    actor: FinanceRequestActor,
     snapshot: FinanceReportSnapshot,
     filters: FinanceReportFilters,
-  ): Promise<ProviderReport> {
+  ): Promise<FinanceSettlementReport> {
     const connection = snapshot.connection;
-    if (!connection || this.stripeConfig.mode === "disabled") {
-      return {
-        status: "NOT_CONNECTED",
-        fetchedAt: null,
-        feesByCurrency: [],
-        payouts: [],
-      };
-    }
-    if ((this.stripeConfig.mode === "live") !== connection.livemode) {
-      return {
-        status: "UNAVAILABLE",
-        fetchedAt: null,
-        feesByCurrency: [],
-        payouts: [],
-      };
-    }
-    const period = resolveFinanceReportPeriod(filters);
-    try {
-      const data = await this.stripeReports.listReportActivity(
-        connection.accountId,
-        {
-          from: period.periodStart,
-          to: period.periodEnd,
-        },
-      );
-      return { status: "CONNECTED", ...data };
-    } catch (error) {
-      if (error instanceof ServiceUnavailableException) {
-        return {
-          status: "UNAVAILABLE",
-          fetchedAt: null,
-          feesByCurrency: [],
-          payouts: [],
-        };
-      }
-      throw error;
-    }
+    if (!connection) return emptySettlementReport("NOT_CONNECTED", null);
+    if (
+      this.stripeConfig.mode !== "disabled" &&
+      (this.stripeConfig.mode === "live") !== connection.livemode
+    )
+      return emptySettlementReport("UNAVAILABLE", connection);
+    const report = await this.settlementReports.load(
+      actor,
+      connection,
+      filters,
+    );
+    return this.stripeConfig.mode === "disabled"
+      ? { ...report, status: "UNAVAILABLE" }
+      : report;
   }
 }
 
@@ -253,6 +260,6 @@ function reportBasis(type: FinanceReportType): string {
     case "exceptions":
       return "Open processing, review, failed, unmatched and unapplied items as of the ledger cutoff.";
     case "payout-reconciliation":
-      return "Connected-account payout and fee evidence fetched from Stripe for the selected period; amounts remain grouped by provider currency.";
+      return "Saved connected-account payout and fee evidence for the selected period; amounts remain grouped by provider currency. Stream cutoffs and freshness describe saved observations. Earliest historical coverage is unproven.";
   }
 }

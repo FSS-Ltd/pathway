@@ -91,3 +91,63 @@ The thirteenth increment retains uncertain mandate setup identity. Missing sessi
 The fourteenth increment adds historical mandate-object projections and stored-operation matching shared by current reads and original events. Only explicit setup success/cancellation, mandate inactivity and method detachment queue canonical transitions. Unconfirmed current setup stays observed. Setup success is not money. Active provider events cannot acknowledge an outstanding cancellation. Node24 verification: three unit suites /30 tests, three database suites /19 tests, typecheck, lint and formatting passed. These helpers await sweeper registration.
 
 The fifteenth increment bounds capture pages at ten provider objects, adds account-scoped SetupIntent discovery and an independent unresolved-operation state stream. The latter scans all historical ages at a fixed five-minute cutoff and resumes its original cursor across later intervals. The selector reads at most a page plus lookahead from each operation class, then returns one scoped page. It does not write state or cases. Refund/dispute receipt scope is proved through canonical Checkout/Bacs identities, since receipts have no connection FK. Approved/submitted/confirmed refunds remain inspectable for later returns; reinstated withdrawals leave the unresolved set. The additive recovery-jobs migration extends the stream allowlist and adds five indexes supporting scoped keyset paging. Index creation takes ordinary migration locks and must run under the planned release procedure; no production migration was run. Verification: 49 unit and 18 database tests, typecheck, Prisma validation, lint and formatting passed. Runtime coordination remains outstanding.
+
+## Integrated T17 runtime
+
+Recovery runs one durable page per authenticated internal request. Provider reads
+share a twenty-second deadline; ordinary discovery requests ten objects, payout
+discovery one payout, and payout preparation one page of twenty-five constituents.
+Historical sweeps inspect one stored operation. Page capture and cursor advance
+remain atomic. The API function ceiling increases from thirty to sixty seconds
+for remote preparation, bounded database capture and bootstrap overhead; this is
+configuration only, with no deployment performed.
+
+The gated worker launches at most four requests concurrently, five hundred per
+run, and stops launching after four minutes. In-flight requests have a fifty-five
+second timeout. Its five-minute schedule remains off until
+`ENABLE_FINANCE_RECONCILIATION=true` is explicitly configured with
+`FINANCE_RECONCILIATION_MODE=test|live`, database URL, internal API URL and secret.
+The workflow drains the existing canonical inbox afterward with its own five-minute
+limit. Claims use the selected environment so opposite-mode evidence is not
+repeatedly retried against an incompatible API. Worker discovery exposes stored
+scope IDs only; request callers cannot supply a provider account or mode.
+
+Staff case actions append durable audited requests. Acknowledgement does not
+resolve a case. Rechecks retrieve a verified stored resource or exact local
+operation and capture through canonical handlers. Unsupported references require
+manual review; they never report a repair. Replays revalidate immutable inbox
+scope and leave active processing claims untouched. The scoped CLI defaults to
+dry run, uses explicitly supplied operator environment and prints only status
+and counts. See the [missed-webhook](runbooks/missed-webhooks.md),
+[provider-outage](runbooks/provider-outage.md) and
+[refund/return](runbooks/refunds-and-returns.md) procedures.
+
+Settlement observations and payout continuation pointers are private and forced
+through tenant RLS. Immutable evidence preserves account, environment, digest and
+observation cutoff. A complete automatic payout compares only same-currency net
+constituents with its principal; manual, pending, incomplete, mixed-currency and
+differing payouts stay explicit. Reports read this persisted evidence, group fees
+by currency, and expose stream cutoffs, stale/missing coverage, bounded truncation
+and an unproven historical start. Neither a balance transaction nor a payout
+creates family debt or a second receipt.
+
+### Controlled Sandbox runtime evidence
+
+A full read-only dry run exercised all twelve streams against the previously
+authorised synthetic school in the verified test platform. Events returned one
+bounded page of ten and `continued`; Checkout, SetupIntent, PaymentIntent, Charge,
+refund, dispute, balance transaction and payout reads completed their first page.
+The three local historical/request continuation streams completed empty pages.
+No stream failed. Historical objects without matching local fixture obligations
+remained exceptions; the proof did not manufacture matches or claim complete
+event coverage. Seven scoped record counts (inbox, state, cases, receipts,
+movements, settlement evidence and payout pointers) stayed zero. The transport
+rejected every non-GET request. This proves reads and dry-run isolation; it does
+not exercise an actual provider payout or authorise a live pilot.
+
+The additive settlement migration introduces two private evidence/pointer tables,
+scoped indexes, forced-RLS policies and integrity triggers. The dispatcher migration
+extends the stream allowlist, adds request/completion indexes and a backend-only
+scope-discovery function. Both require an administrative migration role; the
+runtime role must receive explicit function execution rights if distinct from the
+migration role. No production migration has been run.

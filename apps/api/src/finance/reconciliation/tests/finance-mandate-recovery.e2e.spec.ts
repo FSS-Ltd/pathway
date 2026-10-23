@@ -268,6 +268,66 @@ describe("matched historical mandate recovery", () => {
     );
   });
 
+  it.each(["mandate", "method"] as const)(
+    "honours same-second %s inactivity after setup confirmation",
+    async (resource) => {
+      await withReconciliationMandate(
+        async ({ tx, scope, setupIntent, mandateId }) => {
+          const observedAt = new Date("2026-10-23T12:00:00Z");
+          if (!setupIntent.mandate || !setupIntent.payment_method)
+            throw new Error("Fixture setup identity is missing");
+          await recoverFinanceMandateObject(
+            tx,
+            scope,
+            setupIntent,
+            observedAt,
+            "capture",
+          );
+          await replay(tx, scope, "setup_intent.succeeded");
+          await recoverFinanceMandateObject(
+            tx,
+            scope,
+            resource === "mandate"
+              ? {
+                  id: setupIntent.mandate,
+                  object: "mandate",
+                  livemode: false,
+                  status: "inactive",
+                  payment_method: setupIntent.payment_method,
+                  acceptedAt: null,
+                }
+              : {
+                  id: setupIntent.payment_method,
+                  object: "payment_method",
+                  livemode: false,
+                  created: setupIntent.created,
+                  type: "bacs_debit",
+                  customer: null,
+                },
+            observedAt,
+            "capture",
+          );
+          await replay(
+            tx,
+            scope,
+            resource === "mandate"
+              ? "mandate.updated"
+              : "payment_method.detached",
+          );
+          expect(
+            await tx.financeMandate.findUnique({
+              where: { id: mandateId },
+              select: { status: true, providerStatusAt: true },
+            }),
+          ).toEqual({
+            status: "CANCELLED",
+            providerStatusAt: observedAt,
+          });
+        },
+      );
+    },
+  );
+
   it("replays actual provider inactivity to cancel future plans", async () => {
     await withReconciliationDebit(
       async ({ tx, scope, mandateId, paymentIntent }) => {

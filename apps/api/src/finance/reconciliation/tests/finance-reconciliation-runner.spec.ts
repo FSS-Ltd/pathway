@@ -193,6 +193,22 @@ describe("bounded Finance reconciliation", () => {
     );
   });
 
+  it("returns a durable continuation at a configured job page budget", async () => {
+    const deps = { ...dependencies(), maxPages: 1 };
+    deps.provider.listPage.mockResolvedValue({
+      data: [object],
+      nextCursor: "re_continued",
+    });
+    deps.states.commitPage.mockImplementation(async (current, nextCursor) => ({
+      kind: "continued",
+      lease: { ...current, window: { ...current.window, cursor: nextCursor } },
+    }));
+    expect(
+      await runFinanceReconciliation({ ...input, mode: "sync" }, deps),
+    ).toMatchObject({ status: "continued", pages: 1 });
+    expect(deps.provider.listPage).toHaveBeenCalledTimes(1);
+  });
+
   it("stops after ten pages and releases the persisted continuation", async () => {
     const deps = dependencies();
     let page = 0;

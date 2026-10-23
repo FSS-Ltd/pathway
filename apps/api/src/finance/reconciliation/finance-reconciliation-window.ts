@@ -17,7 +17,11 @@ export function planReconciliationWindow(
   stream: FinanceRecoveryStream,
   now: Date,
 ): FinanceReconciliationWindow | null {
-  const interval = stream === "unresolvedOperations" ? 5 * 60_000 : 1000;
+  const unresolved =
+    stream === "unresolvedOperations" ||
+    stream === "payoutContinuations" ||
+    stream === "caseRequests";
+  const interval = unresolved ? 5 * 60_000 : 1000;
   const cutoff = new Date(Math.floor(now.getTime() / interval) * interval);
   const day = 24 * 60 * 60 * 1000;
   if (
@@ -27,7 +31,7 @@ export function planReconciliationWindow(
   )
     return null;
 
-  if (stream === "unresolvedOperations")
+  if (unresolved)
     return {
       ...(state.active ?? { from: new Date(0), to: cutoff, cursor: null }),
       gap: null,

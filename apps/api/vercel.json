@@ -31,7 +31,7 @@
   ],
   "functions": {
     "api/[...path].js": {
-      "maxDuration": 30,
+      "maxDuration": 60,
       "includeFiles": "{dist/serverless/**,../../packages/db/prisma/schema.prisma,../../node_modules/.pnpm/@prisma+client@*/node_modules/.prisma/client/**}"
     }
   },

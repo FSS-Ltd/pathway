@@ -39,6 +39,12 @@ import { FinanceProfileService } from "./finance-profile.service";
 import { FinanceReportController } from "./finance-report.controller";
 import { FinanceReportService } from "./finance-report.service";
 import { FinanceReportRepository } from "./finance-report.repository";
+import { FinanceSettlementReportRepository } from "./reconciliation/finance-settlement-report.repository";
+import { FinanceReconciliationController } from "./finance-reconciliation.controller";
+import { FinanceReconciliationService } from "./finance-reconciliation.service";
+import { FinanceRecoveryInternalController } from "./reconciliation/finance-recovery-internal.controller";
+import { FinanceRecoveryService } from "./reconciliation/finance-recovery.service";
+import { FinanceReconciliationStateRepository } from "./reconciliation/finance-reconciliation-state.repository";
 import { FinancePayerAccountController } from "./finance-payer-account.controller";
 import { FinancePayerAccountService } from "./finance-payer-account.service";
 import { FinanceFamilyController } from "./finance-family.controller";
@@ -73,10 +79,6 @@ import {
   loadFinanceStripeServicingConfig,
   type FinanceStripeServicingConfig,
 } from "./stripe/finance-stripe-servicing.config";
-import {
-  FINANCE_STRIPE_REPORTING_PROVIDER,
-  StripeFinanceReportingProvider,
-} from "./stripe/finance-stripe-reporting.provider";
 import {
   DisabledFinanceStripeCheckoutProvider,
   FINANCE_STRIPE_CHECKOUT_PROVIDER,
@@ -152,6 +154,8 @@ import {
     FinanceStripeWebhookInternalController,
     FinanceProfileController,
     FinanceReportController,
+    FinanceReconciliationController,
+    FinanceRecoveryInternalController,
     FinancePayerAccountController,
     FinanceFamilyController,
     FinancePayerCheckoutStatusController,
@@ -160,6 +164,10 @@ import {
     FinanceBalanceService,
     FinanceReportService,
     FinanceReportRepository,
+    FinanceSettlementReportRepository,
+    FinanceReconciliationService,
+    FinanceRecoveryService,
+    FinanceReconciliationStateRepository,
     FinancePayerAccountService,
     FinanceFamilyService,
     FinanceStatementService,
@@ -216,14 +224,6 @@ import {
       provide: FINANCE_STRIPE_ACCOUNT_READER,
       useFactory: (config: FinanceStripeServicingConfig) =>
         new StripeFinanceAccountReader(config),
-      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
-    },
-    {
-      provide: FINANCE_STRIPE_REPORTING_PROVIDER,
-      useFactory: (config: FinanceStripeServicingConfig) =>
-        new StripeFinanceReportingProvider(
-          config.mode === "disabled" ? "" : config.secretKey,
-        ),
       inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
     {

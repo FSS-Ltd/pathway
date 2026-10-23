@@ -23,6 +23,7 @@ import { FinanceOverview } from "./finance-overview";
 import { FinanceInvoiceWorkspace } from "./invoice-workspace";
 import { FinancePaymentWorkspace } from "./payment-workspace";
 import { FinanceStatementWorkspace } from "./statement-workspace";
+import { FinanceOperationsWorkspace } from "./operations-workspace";
 import { FinanceReportWorkspace } from "./report-workspace";
 
 type FinanceTab =
@@ -30,7 +31,8 @@ type FinanceTab =
   | "invoices"
   | "payments"
   | "statements"
-  | "reports";
+  | "reports"
+  | "operations";
 
 type FinanceWorkspaceProps = {
   canCreateInvoices: boolean;
@@ -232,6 +234,7 @@ export function FinanceWorkspace({
       ? [{ id: "statements" as const, label: "Statements" }]
       : []),
     { id: "reports", label: "Reports" },
+    { id: "operations", label: "Operations" },
   ];
   const handleTabKeyDown = (
     event: React.KeyboardEvent<HTMLButtonElement>,
@@ -459,6 +462,9 @@ export function FinanceWorkspace({
                 onLoadMore={loadMoreStatements}
                 onRefresh={load}
               />
+            ) : null}
+            {activeTab === tab.id && tab.id === "operations" ? (
+              <FinanceOperationsWorkspace canManage={canManageAllocations} />
             ) : null}
             {activeTab === tab.id && tab.id === "reports" ? (
               <FinanceReportWorkspace
