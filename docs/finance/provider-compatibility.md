@@ -1,8 +1,22 @@
 # Finance provider compatibility evidence
 
-**As of:** 21 October 2026.
+**As of:** 23 October 2026.
 
 **Decision:** No live collection is authorised. One-off card collection is planned through Stripe Connect direct charges. Direct-charge Bacs setup and payment have now been demonstrated in Stripe test mode for a synthetic GB school account. This is test-mode compatibility evidence only: live Bacs remains disabled pending cancellation/return assurance, CI and the later release gates. Do not substitute another charge model.
+
+## T18 runtime evidence on 23 October 2026
+
+The selected test key was verified against the expected NexSteps Sandbox platform before account-scoped operations. Finance used its pinned `2026-09-30.endive` API version. An actual connected-account £1 card Checkout completed with synthetic Stripe test data. A genuine signed `checkout.session.completed` event was durably stored while the worker was stopped: the application still showed no receipt and 100 minor units outstanding. Canonical replay and a restarted worker produced exactly one confirmed receipt and allocation, with zero outstanding. Five duplicate signed deliveries did not duplicate money. The evidence is specific to the exercised GBP card configuration and does not establish other countries, currencies or live eligibility.
+
+The provider returned 100 minor units principal, 23 minor units processor fee and 77 minor units net. There was no application fee or destination transfer. Fees and net settlement remained separate from family debt. The returned descriptor was the synthetic fixture's placeholder, not an accepted school statement descriptor. No payout existed and payouts were disabled; payout reconciliation therefore remains an open provider assurance gate.
+
+Read-only readiness checks still returned two Standard GB school accounts with incomplete onboarding, inactive capabilities and disabled charges/payouts. Successful test charges do not supersede these account-readiness results or establish live capability approval. The owner/manager must complete hosted test onboarding in the selected Sandbox. No login credential, owner attestation or Connect agreement was submitted on their behalf during this assurance step.
+
+A GBP card amount of 29 minor units was rejected by Stripe, while a 30 minor unit session was accepted without payment. NexSteps now checks its explicit per-method support bounds before a new collection instruction and at the provider boundary. Those bounds are product support policy, not a claim that every Stripe account, settlement currency or network has the same limits. Invoice debt is not altered to fit a collection bound.
+
+The populated disposable application database was dumped and restored into a separate local database. Source and restored canonical balances agreed: one invoice, one receipt, one allocation, one completed genuine provider event and zero outstanding. Selected ledger/event snapshots had the same SHA-256 digest, and forced row-level security remained enabled. This establishes a local recovery exercise, not production RPO/RTO.
+
+Bacs delayed-success/failure, cancellation, mandate refusal and dispute runtime assurance is blocked on the selected connected account. A synthetic SetupIntent was created in test mode and remained `requires_confirmation` with a payment method present. Confirmation returned HTTP 400 `invalid_request_error`: the allowed payment method types were not activated for the account. No debit instruction, receipt or allocation was created; the synthetic invoice remained fully outstanding. Completing account onboarding and enabling the required Bacs method/capability in the same Sandbox is required before retrying. Earlier test-mode compatibility remains valid for its stated scope; additional scenarios are not passing claims until the application ledger and signed-event outcomes are reconciled. Live Bacs stays disabled. No production migration, deployment, real payment or live pilot occurred.
 
 ## What is established
 

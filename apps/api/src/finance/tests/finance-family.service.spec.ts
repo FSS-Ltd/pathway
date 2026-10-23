@@ -184,9 +184,36 @@ describe("FinanceFamilyService", () => {
         id: invoice.id,
         invoiceNumber: "12",
         balance: expect.objectContaining({ outstandingMinor: "1000" }),
+        cardPayment: { eligible: true, reason: null },
         lines: [expect.objectContaining({ description: "School trip" })],
       }),
     );
+    balances.forInvoices.mockResolvedValue(
+      new Map([
+        [
+          invoice.id,
+          {
+            issuedGrossMinor: "1000",
+            issuedCreditsMinor: "0",
+            allocatedReceiptsMinor: "971",
+            outstandingMinor: "29",
+            creditBalanceMinor: "0",
+          },
+        ],
+      ]),
+    );
+    const smallBalance = await service.listInvoices(actor, payerAccountId, {
+      limit: 50,
+    });
+    expect(smallBalance.items[0]).toMatchObject({
+      totalMinor: "1000",
+      balance: { outstandingMinor: "29" },
+      cardPayment: {
+        eligible: false,
+        reason:
+          "Card payments require at least £0.30. Choose another payment method for this amount.",
+      },
+    });
   });
 
   it("does not read an invoice when the payer grant is denied", async () => {

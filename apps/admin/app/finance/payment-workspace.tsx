@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Button, Card } from "@pathway/ui";
+import { Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import {
   fetchFinanceReceipt,
   type FinanceInvoice,
@@ -101,7 +102,7 @@ export function FinancePaymentWorkspace({
       {error ? (
         <p
           role="alert"
-          className="rounded-lg border border-status-danger/20 bg-status-danger/5 p-3 text-sm text-status-danger"
+          className="rounded-lg border border-status-danger/20 bg-status-danger/5 p-3 text-sm text-text-primary"
         >
           {error}
         </p>
@@ -155,7 +156,7 @@ export function FinancePaymentWorkspace({
             exception, never as a receipt.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <caption className="sr-only">Finance receipt register</caption>
               <thead className="border-b border-border-subtle text-xs uppercase tracking-wide text-text-muted">
@@ -384,7 +385,7 @@ function ReceiptStatus({
       : status.toLowerCase();
   return (
     <span
-      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${status === "CONFIRMED" ? "border-status-success/30 bg-status-success/5 text-status-success" : status === "PROCESSING" ? "border-status-warning/30 bg-status-warning/5 text-text-primary" : "border-status-danger/30 bg-status-danger/5 text-status-danger"}`}
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${status === "CONFIRMED" ? "border-status-ok/30 bg-status-ok/5 text-text-primary" : status === "PROCESSING" ? "border-status-warn/30 bg-status-warn/5 text-text-primary" : "border-status-danger/30 bg-status-danger/5 text-text-primary"}`}
     >
       {label}
     </span>

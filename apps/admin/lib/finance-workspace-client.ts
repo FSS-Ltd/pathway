@@ -3,24 +3,56 @@ import { API_BASE_URL, apiFetch } from "./api-client";
 import { apiErrorFromResponse } from "./api-transport";
 import { financeJsonResponse } from "./finance-api-client-support";
 
-export type FinanceInvoice = {
-  id: string;
-  payerAccountId: string;
-  invoiceNumber: string | null;
-  status: "DRAFT" | "IN_REVIEW" | "ISSUED" | "VOID";
-  payerName: string | null;
-  currency: string;
-  totalMinor: string;
-  balance: {
-    outstandingMinor: string;
-    issuedCreditsMinor: string;
-    allocatedReceiptsMinor: string;
-  };
-  dueDate: string | null;
-  issuedAt: string | null;
-  approvedAt: string | null;
-  createdAt: string;
-};
+const invoiceSchema = z.object({
+  id: z.string(),
+  payerAccountId: z.string(),
+  invoiceNumber: z.string().nullable(),
+  status: z.enum(["DRAFT", "IN_REVIEW", "ISSUED", "VOID"]),
+  payerName: z.string().nullable(),
+  currency: z.string(),
+  totalMinor: z.string(),
+  balance: z.object({
+    outstandingMinor: z.string(),
+    issuedCreditsMinor: z.string(),
+    allocatedReceiptsMinor: z.string(),
+  }),
+  dueDate: z.string().nullable(),
+  issuedAt: z.string().nullable(),
+  approvedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type FinanceInvoice = z.infer<typeof invoiceSchema>;
+const invoiceDetailSchema = invoiceSchema.extend({
+  reviewRevision: z.string().regex(/^[a-f0-9]{64}$/),
+  legalEntityName: z.string().nullable(),
+  subtotalMinor: z.string(),
+  taxMinor: z.string(),
+  updatedAt: z.string(),
+  legalEntityNameSnapshot: z.string().nullable(),
+  lines: z.array(
+    z.object({
+      id: z.string(),
+      description: z.string(),
+      quantity: z.string(),
+      unitAmountMinor: z.string(),
+      taxRateBasisPoints: z.number().int(),
+      netAmountMinor: z.string(),
+      taxAmountMinor: z.string(),
+      totalMinor: z.string(),
+    }),
+  ),
+});
+export type FinanceInvoiceDetail = z.infer<typeof invoiceDetailSchema>;
+
+export async function fetchFinanceInvoice(
+  invoiceId: string,
+): Promise<FinanceInvoiceDetail> {
+  const payload = await getJson(
+    `${API_BASE_URL}/finance/invoices/${encodeURIComponent(invoiceId)}`,
+    "Invoice preview could not be loaded.",
+  );
+  return invoiceDetailSchema.parse(payload);
+}
 
 export type FinanceReceipt = {
   id: string;
@@ -85,26 +117,7 @@ export async function fetchFinanceInvoices(
   return z
     .object({
       nextCursor: z.string().uuid().nullable(),
-      items: z.array(
-        z.object({
-          id: z.string(),
-          payerAccountId: z.string(),
-          invoiceNumber: z.string().nullable(),
-          status: z.enum(["DRAFT", "IN_REVIEW", "ISSUED", "VOID"]),
-          payerName: z.string().nullable(),
-          currency: z.string(),
-          totalMinor: z.string(),
-          balance: z.object({
-            outstandingMinor: z.string(),
-            issuedCreditsMinor: z.string(),
-            allocatedReceiptsMinor: z.string(),
-          }),
-          dueDate: z.string().nullable(),
-          issuedAt: z.string().nullable(),
-          approvedAt: z.string().nullable(),
-          createdAt: z.string(),
-        }),
-      ),
+      items: z.array(invoiceSchema),
     })
     .parse(payload);
 }
@@ -335,11 +348,12 @@ export async function transitionFinanceInvoice(
   invoiceId: string,
   action: "submit-review" | "approve" | "issue",
   idempotencyKey: string,
+  expectedRevision: string,
 ) {
   return financeInvoiceCommand(
     `/finance/invoices/${encodeURIComponent(invoiceId)}/${action}`,
     "POST",
-    undefined,
+    { expectedRevision },
     "Invoice action could not be completed.",
     idempotencyKey,
   );

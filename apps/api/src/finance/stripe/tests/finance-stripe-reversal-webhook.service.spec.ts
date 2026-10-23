@@ -67,6 +67,7 @@ interface MockTransaction {
     create: jest.Mock;
   };
   financeReceiptMovement: { findFirst: jest.Mock; create: jest.Mock };
+  financeCreditNote: { findMany: jest.Mock };
   financeReceiptAllocation: { findMany: jest.Mock };
   financeReceiptMovementApplication: { findMany: jest.Mock; create: jest.Mock };
 }
@@ -143,7 +144,14 @@ function setup(): {
   };
 
   mockTransaction = {
-    $queryRaw: jest.fn().mockResolvedValue([]),
+    $queryRaw: jest
+      .fn()
+      .mockImplementation(async (query: TemplateStringsArray) =>
+        query.join("").includes('FROM "FinanceInvoice"')
+          ? [{ id: "invoice-1", status: "ISSUED", totalMinor: 1_000n }]
+          : [],
+      ),
+    financeCreditNote: { findMany: jest.fn().mockResolvedValue([]) },
     financeCheckoutAttempt: {
       findFirst: jest.fn().mockResolvedValue({
         financeProfileId: "profile-1",
@@ -310,21 +318,30 @@ function setup(): {
     financeReceiptMovementApplication: {
       findMany: jest
         .fn()
-        .mockImplementation(async (input: { where: { movementId: string } }) =>
-          applications
-            .filter(
-              (application) =>
-                application.movementId === input.where.movementId,
-            )
-            .map((application) => ({
-              ...application,
-              reversedByApplications: applications
-                .filter(
-                  (candidate) =>
-                    candidate.reversesApplicationId === application.id,
-                )
-                .map(({ amountMinor }) => ({ amountMinor })),
-            })),
+        .mockImplementation(
+          async (input: {
+            where: { movementId?: string; invoiceId?: { in: string[] } };
+          }) =>
+            applications
+              .filter((application) =>
+                input.where.movementId
+                  ? application.movementId === input.where.movementId
+                  : input.where.invoiceId?.in.includes(application.invoiceId),
+              )
+              .map((application) => ({
+                ...application,
+                movement: {
+                  type: movements.find(
+                    ({ id }) => id === application.movementId,
+                  )?.type,
+                },
+                reversedByApplications: applications
+                  .filter(
+                    (candidate) =>
+                      candidate.reversesApplicationId === application.id,
+                  )
+                  .map(({ amountMinor }) => ({ amountMinor })),
+              })),
         ),
       create: jest
         .fn()

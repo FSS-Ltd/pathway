@@ -46,6 +46,17 @@ export const financeInvoiceListQuerySchema = z
 
 export const financeInvoiceIdSchema = z.string().uuid();
 
+export const financeInvoiceTransitionSchema = z
+  .object({
+    expectedRevision: z
+      .string()
+      .regex(
+        /^[a-f0-9]{64}$/,
+        "Open a fresh invoice preview before confirming",
+      ),
+  })
+  .strict();
+
 export const financeRequestChangesSchema = z
   .object({ reason: z.string().trim().min(1).max(500) })
   .strict();

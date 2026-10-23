@@ -116,6 +116,28 @@ describe("FamilyFinanceInvoiceCard", () => {
     );
   });
 
+  it("explains an unsupported card amount while preserving bank transfer and debt", () => {
+    const reason =
+      "Card payments require at least £0.30. Choose another payment method for this amount.";
+    const { getByText, queryByRole, getByRole } = render(
+      <FamilyFinanceInvoiceCard
+        accountName="North School"
+        canPay
+        invoice={{
+          ...invoice,
+          balance: { ...invoice.balance, outstandingMinor: "29" },
+          cardPayment: { eligible: false, reason },
+        }}
+        onRefresh={jest.fn()}
+      />,
+    );
+    expect(getByText(reason)).toBeTruthy();
+    expect(queryByRole("button", { name: "Pay invoice" })).toBeNull();
+    expect(getByRole("button", { name: "Bank transfer" })).toBeTruthy();
+    expect(getByText("GBP 29")).toBeTruthy();
+    expect(mockStartCheckout).not.toHaveBeenCalled();
+  });
+
   it("does not offer payment without the family payment permission", () => {
     const { queryByRole } = render(
       <FamilyFinanceInvoiceCard

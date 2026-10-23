@@ -354,7 +354,7 @@ export class FinanceStatementService {
               periodStart: new Date(period.periodStart),
               periodEnd: new Date(period.periodEnd),
               generatedAt,
-              ledgerCutoffAt: generatedAt,
+              ledgerCutoffAt: new Date(snapshot.ledgerCutoffAt),
               currency: profile.currency,
               openingBalanceMinor: BigInt(snapshot.totals.openingBalanceMinor),
               chargesIssuedMinor: BigInt(snapshot.totals.chargesIssuedMinor),

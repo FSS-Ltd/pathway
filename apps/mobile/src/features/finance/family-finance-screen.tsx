@@ -1,14 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  AppState,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
 
 import { BrandedCard, SectionTitle } from "@/components/primitives/ui";
 import { Screen } from "@/components/primitives/screen";
@@ -17,32 +15,9 @@ import { useAppReady } from "@/hooks/use-app-ready";
 import { ApiError } from "@/lib/api/client";
 import { FamilyFinanceInvoiceCard } from "./family-finance-invoice-card";
 import { FamilyFinanceStatementCard } from "./family-finance-statement-card";
-import {
-  createFamilyStatement,
-  listFamilyInvoices,
-  listFamilyPayerAccounts,
-  listFamilyStatements,
-  type FamilyInvoice,
-  type FamilyPayerAccount,
-  type FamilyStatement,
-} from "./family-finance-api";
-
-type AccountData = {
-  account: FamilyPayerAccount;
-  invoices: FamilyInvoice[];
-  statements: FamilyStatement[];
-};
-
-type FinanceViewState =
-  | { status: "loading"; siteId: string | null }
-  | {
-      status: "ready";
-      siteId: string;
-      accounts: AccountData[];
-      updatedAt: Date;
-    }
-  | { status: "unavailable"; siteId: string | null }
-  | { status: "error"; siteId: string | null };
+import { createFamilyStatement } from "./family-finance-api";
+import { FinanceHistoryControl } from "./finance-history-control";
+import { useFamilyFinanceAccounts } from "./use-family-finance-accounts";
 
 type FinanceTab = "invoices" | "statements";
 
@@ -70,10 +45,17 @@ export function FamilyFinanceScreen() {
     return tabs;
   }, [canReadInvoices, canReadStatements]);
   const [tab, setTab] = useState<FinanceTab>(availableTabs[0] ?? "invoices");
-  const [viewState, setViewState] = useState<FinanceViewState>({
-    status: "loading",
-    siteId: activeSiteId,
-  });
+  const scopeKey =
+    isReady && activeSiteId
+      ? `${bootstrapState.state.userId ?? ""}:${activeSiteId}:${canReadInvoices}:${canReadStatements}`
+      : null;
+  const {
+    state: visibleState,
+    refresh,
+    loadMore,
+    denyAccess,
+    isCurrent,
+  } = useFamilyFinanceAccounts(scopeKey, canReadInvoices, canReadStatements);
   const [periodStart, setPeriodStart] = useState(() => defaultStatementStart());
   const [periodEnd, setPeriodEnd] = useState(() => defaultStatementEnd());
   const [requestingStatementFor, setRequestingStatementFor] = useState<
@@ -81,108 +63,47 @@ export function FamilyFinanceScreen() {
   >(null);
   const [statementError, setStatementError] = useState<string | null>(null);
   const [statementRequested, setStatementRequested] = useState(false);
-  const requestSequence = useRef(0);
-
-  const refresh = useCallback(async () => {
-    const siteId = activeSiteId;
-    if (!isReady || !siteId) {
-      setViewState({ status: "unavailable", siteId });
-      return;
-    }
-
-    const sequence = requestSequence.current + 1;
-    requestSequence.current = sequence;
-    setViewState((current) =>
-      current.status === "ready" && current.siteId === siteId
-        ? current
-        : { status: "loading", siteId },
-    );
-    try {
-      const payerAccounts = await listFamilyPayerAccounts();
-      const accounts = await Promise.all(
-        payerAccounts.map(async (account) => {
-          const [invoicePage, statementPage] = await Promise.all([
-            canReadInvoices
-              ? listFamilyInvoices(account.id)
-              : Promise.resolve({
-                  items: [] as FamilyInvoice[],
-                  nextCursor: null,
-                }),
-            canReadStatements
-              ? listFamilyStatements(account.id)
-              : Promise.resolve({
-                  items: [] as FamilyStatement[],
-                  nextCursor: null,
-                }),
-          ]);
-          return {
-            account,
-            invoices: invoicePage.items,
-            statements: statementPage.items,
-          };
-        }),
-      );
-      if (sequence !== requestSequence.current) return;
-      setViewState({
-        status: "ready",
-        siteId,
-        accounts,
-        updatedAt: new Date(),
-      });
-    } catch (error) {
-      if (sequence !== requestSequence.current) return;
-      if (error instanceof ApiError && error.status === 403) {
-        setViewState({ status: "unavailable", siteId });
-      } else {
-        setViewState({ status: "error", siteId });
-      }
-    }
-  }, [activeSiteId, canReadInvoices, canReadStatements, isReady]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void refresh();
-      return undefined;
-    }, [refresh]),
-  );
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") void refresh();
-    });
-    return () => subscription.remove();
-  }, [refresh]);
-
   useEffect(() => {
     if (!availableTabs.includes(tab)) {
       setTab(availableTabs[0] ?? "invoices");
     }
   }, [availableTabs, tab]);
 
+  useEffect(() => {
+    if (visibleState.status !== "ready") {
+      setRequestingStatementFor(null);
+      setStatementError(null);
+      setStatementRequested(false);
+    }
+  }, [visibleState.status, scopeKey]);
+
   const requestStatement = async (accountId: string) => {
     if (!isValidStatementRange(periodStart, periodEnd)) return;
+    const requestIsCurrent = isCurrent;
     setRequestingStatementFor(accountId);
     setStatementError(null);
     setStatementRequested(false);
     try {
       await createFamilyStatement(accountId, periodStart, periodEnd);
-      setStatementRequested(true);
-      await refresh();
+      if (!requestIsCurrent()) return;
+      if (await refresh()) setStatementRequested(true);
     } catch (error) {
+      if (!requestIsCurrent()) return;
+      if (
+        error instanceof ApiError &&
+        (error.status === 401 || error.status === 403)
+      ) {
+        denyAccess();
+        return;
+      }
       setStatementError(
-        error instanceof ApiError && error.status === 403
-          ? "Finance access changed. Ask the school office to check your access."
-          : "The statement could not be created. Check the dates and try again.",
+        "The statement could not be created. Check the dates and try again.",
       );
     } finally {
-      setRequestingStatementFor(null);
+      if (requestIsCurrent()) setRequestingStatementFor(null);
     }
   };
 
-  const hasCurrentState = viewState.siteId === activeSiteId;
-  const visibleState: FinanceViewState = hasCurrentState
-    ? viewState
-    : { status: "loading", siteId: activeSiteId };
   const schoolName = activeSite?.orgName ?? activeSite?.name ?? "Your school";
   const dateRangeValid = isValidStatementRange(periodStart, periodEnd);
 
@@ -284,14 +205,15 @@ export function FamilyFinanceScreen() {
               {visibleState.accounts.map(({ account, invoices }) => (
                 <View key={account.id} style={styles.accountGroup}>
                   <Text style={styles.accountName}>{account.displayName}</Text>
-                  {invoices.length ? (
-                    invoices.map((invoice) => (
+                  {invoices.items.length ? (
+                    invoices.items.map((invoice) => (
                       <FamilyFinanceInvoiceCard
                         key={invoice.id}
                         accountName={schoolName}
                         invoice={invoice}
                         canPay={canPayInvoices}
                         onRefresh={() => void refresh()}
+                        onAccessDenied={denyAccess}
                       />
                     ))
                   ) : (
@@ -301,6 +223,12 @@ export function FamilyFinanceScreen() {
                       </Text>
                     </BrandedCard>
                   )}
+                  <FinanceHistoryControl
+                    kind="invoices"
+                    accountName={account.displayName}
+                    page={invoices}
+                    onLoadMore={() => void loadMore(account.id, "invoices")}
+                  />
                 </View>
               ))}
             </View>
@@ -374,11 +302,12 @@ export function FamilyFinanceScreen() {
                       !dateRangeValid || requestingStatementFor !== null
                     }
                   />
-                  {statements.length ? (
-                    statements.map((statement) => (
+                  {statements.items.length ? (
+                    statements.items.map((statement) => (
                       <FamilyFinanceStatementCard
                         key={statement.id}
                         statement={statement}
+                        onAccessDenied={denyAccess}
                       />
                     ))
                   ) : (
@@ -388,6 +317,12 @@ export function FamilyFinanceScreen() {
                       </Text>
                     </BrandedCard>
                   )}
+                  <FinanceHistoryControl
+                    kind="statements"
+                    accountName={account.displayName}
+                    page={statements}
+                    onLoadMore={() => void loadMore(account.id, "statements")}
+                  />
                 </View>
               ))}
             </View>
@@ -506,7 +441,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   refreshLabel: {
-    color: mobileTokens.colors.accent.primary,
+    color: mobileTokens.colors.text.primary,
     fontFamily: mobileTokens.typography.fontFamily.body,
     fontWeight: mobileTokens.typography.weight.bold,
   },

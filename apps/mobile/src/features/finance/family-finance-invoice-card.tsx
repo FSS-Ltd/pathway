@@ -22,11 +22,13 @@ export function FamilyFinanceInvoiceCard({
   invoice,
   canPay,
   onRefresh,
+  onAccessDenied,
 }: {
   accountName: string;
   invoice: FamilyInvoice;
   canPay: boolean;
   onRefresh: () => void;
+  onAccessDenied?: () => void;
 }) {
   const [isStartingCheckout, setIsStartingCheckout] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -70,9 +72,20 @@ export function FamilyFinanceInvoiceCard({
         params: { attemptId: attempt.attemptId },
       });
     } catch (checkoutError) {
-      if (checkoutError instanceof ApiError && checkoutError.status === 403) {
+      if (
+        checkoutError instanceof ApiError &&
+        (checkoutError.status === 401 || checkoutError.status === 403)
+      ) {
+        onAccessDenied?.();
         setError(
           "Finance access changed. Ask the school office to check your access.",
+        );
+      } else if (
+        checkoutError instanceof ApiError &&
+        checkoutError.status === 422
+      ) {
+        setError(
+          "Card payment isn’t available for this amount. Use bank transfer or ask the school for help.",
         );
       } else if (
         checkoutError instanceof ApiError &&
@@ -104,7 +117,11 @@ export function FamilyFinanceInvoiceCard({
         await getFamilyBankTransferDetails(invoice.payerAccountId, invoice.id),
       );
     } catch (transferError) {
-      if (transferError instanceof ApiError && transferError.status === 403) {
+      if (
+        transferError instanceof ApiError &&
+        (transferError.status === 401 || transferError.status === 403)
+      ) {
+        onAccessDenied?.();
         setError(
           "Finance access changed. Ask the school office to check your access.",
         );
@@ -135,7 +152,11 @@ export function FamilyFinanceInvoiceCard({
       );
       setTransferNoticeSent(true);
     } catch (transferError) {
-      if (transferError instanceof ApiError && transferError.status === 403) {
+      if (
+        transferError instanceof ApiError &&
+        (transferError.status === 401 || transferError.status === 403)
+      ) {
+        onAccessDenied?.();
         setError(
           "Finance access changed. Ask the school office to check your access.",
         );
@@ -158,6 +179,11 @@ export function FamilyFinanceInvoiceCard({
         `invoice-${invoice.invoiceNumber ?? invoice.id}.pdf`,
       );
     } catch (downloadError) {
+      if (
+        downloadError instanceof ApiError &&
+        (downloadError.status === 401 || downloadError.status === 403)
+      )
+        onAccessDenied?.();
       setError(
         downloadError instanceof ApiError && downloadError.status === 403
           ? "Finance access changed. Ask the school office to check your access."
@@ -252,6 +278,14 @@ export function FamilyFinanceInvoiceCard({
         </View>
       ) : null}
 
+      {isPayable &&
+      !invoice.checkout &&
+      invoice.cardPayment?.eligible === false ? (
+        <Text accessibilityLiveRegion="polite" style={styles.secondaryText}>
+          {invoice.cardPayment.reason ??
+            "Card payment isn’t available for this amount. Use bank transfer or ask the school for help."}
+        </Text>
+      ) : null}
       {error ? (
         <Text accessibilityLiveRegion="polite" style={styles.error}>
           {error}
@@ -265,7 +299,9 @@ export function FamilyFinanceInvoiceCard({
       ) : null}
 
       <View style={styles.actions}>
-        {isPayable && !invoice.checkout ? (
+        {isPayable &&
+        !invoice.checkout &&
+        invoice.cardPayment?.eligible !== false ? (
           <ActionButton
             label={
               isStartingCheckout ? "Opening secure payment…" : "Pay invoice"
@@ -524,7 +560,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   textButtonLabel: {
-    color: mobileTokens.colors.accent.primary,
+    color: mobileTokens.colors.text.primary,
     fontFamily: mobileTokens.typography.fontFamily.body,
     fontWeight: mobileTokens.typography.weight.bold,
   },

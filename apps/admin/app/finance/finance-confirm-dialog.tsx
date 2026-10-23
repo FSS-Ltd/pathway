@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Button } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 
 type FinanceConfirmDialogProps = {
   title: string;
@@ -9,6 +9,8 @@ type FinanceConfirmDialogProps = {
   confirmLabel: string;
   busyLabel: string;
   busy: boolean;
+  children?: React.ReactNode;
+  error?: string | null;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -21,8 +23,12 @@ export function FinanceConfirmDialog({
   busy,
   onCancel,
   onConfirm,
+  children,
+  error,
 }: FinanceConfirmDialogProps) {
   const dialogRef = React.useRef<HTMLDialogElement>(null);
+  const cancelRef = React.useRef<HTMLButtonElement>(null);
+  const titleRef = React.useRef<HTMLHeadingElement>(null);
   const titleId = React.useId();
   const descriptionId = React.useId();
 
@@ -30,6 +36,12 @@ export function FinanceConfirmDialog({
     const dialog = dialogRef.current;
     if (!dialog) return;
     dialog.showModal();
+    if (dialog.scrollHeight > dialog.clientHeight) {
+      titleRef.current?.focus();
+      dialog.scrollTop = 0;
+    } else {
+      cancelRef.current?.focus();
+    }
     return () => {
       if (dialog.open) dialog.close();
     };
@@ -47,10 +59,12 @@ export function FinanceConfirmDialog({
       aria-describedby={descriptionId}
       aria-busy={busy}
       onCancel={handleCancel}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-2xl border border-border-subtle bg-surface p-0 text-text-primary shadow-xl backdrop:bg-black/40"
+      className={`m-auto w-[calc(100%-2rem)] ${children ? "max-w-2xl" : "max-w-md"} max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-2xl border border-border-subtle bg-surface p-0 text-text-primary shadow-xl backdrop:bg-black/40`}
     >
       <div className="p-5">
         <h3
+          ref={titleRef}
+          tabIndex={-1}
           id={titleId}
           className="font-heading text-lg font-semibold text-text-primary"
         >
@@ -62,8 +76,15 @@ export function FinanceConfirmDialog({
         >
           {description}
         </p>
+        {children}
+        {error ? (
+          <p role="alert" className="mt-4 text-sm text-text-primary">
+            {error}
+          </p>
+        ) : null}
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button
+            ref={cancelRef}
             autoFocus
             type="button"
             variant="secondary"

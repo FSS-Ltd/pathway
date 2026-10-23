@@ -11,8 +11,10 @@ import {
 
 export function FamilyFinanceStatementCard({
   statement,
+  onAccessDenied,
 }: {
   statement: FamilyStatement;
+  onAccessDenied?: () => void;
 }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +30,11 @@ export function FamilyFinanceStatementCard({
         `statement-${statement.id}.pdf`,
       );
     } catch (downloadError) {
+      if (
+        downloadError instanceof ApiError &&
+        (downloadError.status === 401 || downloadError.status === 403)
+      )
+        onAccessDenied?.();
       setError(
         downloadError instanceof ApiError && downloadError.status === 403
           ? "Finance access changed. Ask the school office to check your access."
@@ -143,7 +150,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   downloadLabel: {
-    color: mobileTokens.colors.accent.primary,
+    color: mobileTokens.colors.text.primary,
     fontFamily: mobileTokens.typography.fontFamily.body,
     fontWeight: mobileTokens.typography.weight.bold,
   },

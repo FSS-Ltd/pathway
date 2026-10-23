@@ -43,6 +43,8 @@ describe("buildFinanceStatementSnapshot", () => {
       },
     );
 
+    expect(snapshot.generatedAt).toBe("2026-11-02T12:00:00.000Z");
+    expect(snapshot.ledgerCutoffAt).toBe("2026-10-31T23:59:59.999Z");
     expect(snapshot.totals.processingFundsMinor).toBe("250");
     expect(snapshot.totals.unappliedFundsMinor).toBe("0");
     expect(accountBalanceAt.mock.calls[0]?.[3]).toEqual(
@@ -54,7 +56,7 @@ describe("buildFinanceStatementSnapshot", () => {
     expect(
       receiptFindMany.mock.calls[0][0].select.allocations.select
         .movementApplications.where.createdAt,
-    ).toEqual({ lte: new Date("2026-11-02T12:00:00.000Z") });
+    ).toEqual({ lte: new Date("2026-10-31T23:59:59.999Z") });
     expect(receiptFindMany.mock.calls[1][0].where).toMatchObject({
       createdAt: { lte: new Date("2026-10-31T23:59:59.999Z") },
       OR: [

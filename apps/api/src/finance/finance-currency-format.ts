@@ -1,7 +1,7 @@
 import {
   financeCurrencyFractionDigits,
   type FinanceCurrency,
-} from "@pathway/platform";
+} from "@pathway/platform/finance-currencies";
 
 export function formatFinanceMoney(
   amountMinor: string,

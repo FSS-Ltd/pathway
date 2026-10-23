@@ -19,6 +19,28 @@ function stripeResponse(body: unknown, status = 200): Response {
 }
 
 describe("StripeFinanceCheckoutProvider", () => {
+  it.each([29n, 100_000_000n])(
+    "rejects unsupported card amount %s permanently before I/O",
+    async (amountMinor) => {
+      const fetcher = jest.fn();
+      const provider = new StripeFinanceCheckoutProvider(testConfig, fetcher);
+      await expect(
+        provider.createSession({
+          stripeAccountId: "acct_school_test",
+          attemptId: "attempt-1",
+          invoiceId: "invoice-1",
+          invoiceNumber: "1001",
+          amountMinor,
+          currency: "GBP",
+          idempotencyKey: "finance-checkout-attempt-1",
+          integrationIdentifier: "nexsteps-finance-abcdefgh",
+          expiresAt: new Date(Date.now() + 3_600_000),
+        }),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
   it("creates an account-scoped one-time Checkout Session without shared customers or platform fees", async () => {
     const fetcher = jest.fn().mockResolvedValue(
       stripeResponse({
@@ -79,7 +101,7 @@ describe("StripeFinanceCheckoutProvider", () => {
         attemptId: "attempt-1",
         invoiceId: "invoice-1",
         invoiceNumber: "1001",
-        amountMinor: 1n,
+        amountMinor: 30n,
         currency: "GBP",
         idempotencyKey: "finance-checkout-attempt-1",
         integrationIdentifier: "nexsteps-finance-abcdefgh",
@@ -105,7 +127,7 @@ describe("StripeFinanceCheckoutProvider", () => {
         attemptId: "attempt-1",
         invoiceId: "invoice-1",
         invoiceNumber: "1001",
-        amountMinor: 1n,
+        amountMinor: 30n,
         currency: "GBP",
         idempotencyKey: "finance-checkout-attempt-1",
         integrationIdentifier: "nexsteps-finance-abcdefgh",

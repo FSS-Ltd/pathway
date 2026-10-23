@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
-import { Button, Card } from "@pathway/ui";
+import { Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import { ApiError } from "@/lib/api-transport";
 import {
   fetchFinanceCaseHistory,
@@ -160,7 +161,7 @@ export function OperationsCaseDetail({
                     : "none"}
                 </p>
                 {state.lastError ? (
-                  <p className="text-status-danger">{state.lastError}</p>
+                  <p className="text-text-primary">{state.lastError}</p>
                 ) : null}
               </li>
             ))}

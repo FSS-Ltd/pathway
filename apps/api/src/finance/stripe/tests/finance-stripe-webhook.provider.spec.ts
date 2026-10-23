@@ -58,6 +58,19 @@ describe("FinanceStripeWebhookProvider", () => {
     expect(verified.payloadSha256).toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it.each([
+    (body: string) => body.replace('"amount":2900', '"amount":2901'),
+    (body: string) => `${body}\n`,
+  ])("rejects changed raw bytes even when they remain valid JSON", (change) => {
+    const provider = new FinanceStripeWebhookProvider(config);
+    const changed = Buffer.from(change(rawBody.toString("utf8")));
+    expect(changed.equals(rawBody)).toBe(false);
+    expect(() => JSON.parse(changed.toString("utf8"))).not.toThrow();
+    expect(() => provider.verifyAndParse(changed, signature(rawBody))).toThrow(
+      "Invalid Stripe webhook signature",
+    );
+  });
+
   it("maps Accounts v2 event context to the connected account", () => {
     const v2AccountId = "acct_finance_v2_unit_002";
     const v2Body = Buffer.from(

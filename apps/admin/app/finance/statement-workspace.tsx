@@ -1,7 +1,8 @@
 "use client";
 
 import React from "react";
-import { Button, Card } from "@pathway/ui";
+import { Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import {
   downloadFinanceStatement,
   requestFinanceStatement,
@@ -145,7 +146,7 @@ export function FinanceStatementWorkspace({
               value={payerAccountId}
               onChange={(event) => setPayerAccountId(event.target.value)}
               disabled={pending || payerAccounts.length === 0}
-              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-status-info"
             >
               <option value="">Select a payer account</option>
               {payerAccounts.map((account) => (
@@ -183,7 +184,7 @@ export function FinanceStatementWorkspace({
               value={from}
               onChange={(event) => setFrom(event.target.value)}
               disabled={pending}
-              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-status-info"
             />
           </div>
           <div className="space-y-2">
@@ -200,7 +201,7 @@ export function FinanceStatementWorkspace({
               value={to}
               onChange={(event) => setTo(event.target.value)}
               disabled={pending}
-              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-status-info"
             />
           </div>
           <div className="flex flex-col gap-2 sm:col-span-2 xl:col-span-4 sm:flex-row sm:items-center sm:justify-between">
@@ -217,12 +218,12 @@ export function FinanceStatementWorkspace({
           </div>
         </form>
         {error ? (
-          <p role="alert" className="mt-3 text-sm text-status-danger">
+          <p role="alert" className="mt-3 text-sm text-text-primary">
             {error}
           </p>
         ) : null}
         {message ? (
-          <p role="status" className="mt-3 text-sm text-status-success">
+          <p role="status" className="mt-3 text-sm text-text-primary">
             {message}
           </p>
         ) : null}
@@ -247,7 +248,7 @@ export function FinanceStatementWorkspace({
             No statements are available for this Finance account yet.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full min-w-[680px] text-left text-sm">
               <caption className="sr-only">Finance statement history</caption>
               <thead className="border-b border-border-subtle text-xs uppercase tracking-wide text-text-muted">

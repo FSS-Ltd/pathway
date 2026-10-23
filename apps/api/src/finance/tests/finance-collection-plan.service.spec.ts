@@ -1,3 +1,4 @@
+import { FINANCE_BACS_COLLECTION_TERMS_VERSION } from "../domain/finance-collection-terms";
 import { withTenantRlsContext } from "@pathway/db";
 import type { Prisma } from "@pathway/db";
 import type { FinanceAccessService } from "../access/finance-access.service";
@@ -31,13 +32,19 @@ describe("FinanceCollectionPlanService", () => {
   let tx: {
     $queryRaw: jest.Mock;
     financeInvoice: { findFirst: jest.Mock };
-    financeCollectionPlan: { findFirst: jest.Mock; create: jest.Mock };
+    financeCollectionPlan: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
+      update: jest.Mock;
+    };
+    financeCollectionInstalment: { createMany: jest.Mock };
     financeProfile: { findFirst: jest.Mock };
     financeMandate: { findFirst: jest.Mock };
     financeStripeConnection: { findFirst: jest.Mock };
     financeCollectionPlanEvent: { create: jest.Mock };
   };
   let service: FinanceCollectionPlanService;
+  let balanceForInvoices: jest.Mock;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -49,6 +56,7 @@ describe("FinanceCollectionPlanService", () => {
           .fn()
           .mockResolvedValue({ id: "plan-existing", version: 1 }),
         create: jest.fn().mockResolvedValue({ id: "plan-new" }),
+        update: jest.fn(),
       },
       financeProfile: {
         findFirst: jest
@@ -71,28 +79,77 @@ describe("FinanceCollectionPlanService", () => {
         }),
       },
       financeCollectionPlanEvent: { create: jest.fn().mockResolvedValue({}) },
+      financeCollectionInstalment: { createMany: jest.fn() },
     };
     jest
       .mocked(withTenantRlsContext)
       .mockImplementation(async (_tenantId, _orgId, callback) =>
         callback(tx as unknown as Prisma.TransactionClient),
       );
+    balanceForInvoices = jest
+      .fn()
+      .mockResolvedValue(
+        new Map([[invoice.id, { outstandingMinor: "12000" }]]),
+      );
     service = new FinanceCollectionPlanService(
       {
         assertStaffAction: jest.fn().mockResolvedValue(undefined),
+        assertPayerAction: jest.fn().mockResolvedValue(undefined),
       } as unknown as FinanceAccessService,
       {
-        forInvoices: jest
-          .fn()
-          .mockResolvedValue(
-            new Map([[invoice.id, { outstandingMinor: "12000" }]]),
-          ),
+        forInvoices: balanceForInvoices,
       } as unknown as FinanceBalanceService,
       {
         mode: "test",
         webAppUrl: "https://family.example.test",
       } as FinanceStripeCheckoutConfig,
     );
+  });
+
+  it.each([
+    [1_000_001n, 1],
+    [2_000_001n, 2],
+  ])(
+    "rejects unsupported Bacs instalments including a final remainder for total %s and count %i",
+    async (totalMinor, instalmentCount) => {
+      tx.financeInvoice.findFirst.mockResolvedValue({ ...invoice, totalMinor });
+      await expect(
+        service.create(actor, invoice.id, {
+          payerAccountId,
+          mandateId,
+          instalmentCount,
+          firstDueDate: "2027-01-05",
+        }),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(tx.financeCollectionPlan.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it("revalidates a legacy pending plan before activation or persisting its schedule", async () => {
+    tx.financeCollectionPlan.findFirst.mockResolvedValue({
+      id: "plan-legacy",
+      status: "PENDING_PAYER_ACCEPTANCE",
+      financeProfileId: invoice.financeProfileId,
+      invoiceId: invoice.id,
+      mandateId,
+      amountMinor: 1_000_001n,
+      currency: "GBP",
+      instalmentCount: 1,
+      firstDueAt: new Date("2027-01-05T00:00:00Z"),
+      consentVersion: FINANCE_BACS_COLLECTION_TERMS_VERSION,
+    });
+    tx.financeInvoice.findFirst.mockResolvedValue({
+      ...invoice,
+      totalMinor: 1_000_001n,
+    });
+    balanceForInvoices.mockResolvedValue(
+      new Map([[invoice.id, { outstandingMinor: "1000001" }]]),
+    );
+    await expect(
+      service.accept(actor, payerAccountId, "plan-legacy"),
+    ).rejects.toMatchObject({ status: 422 });
+    expect(tx.financeCollectionPlan.update).not.toHaveBeenCalled();
+    expect(tx.financeCollectionInstalment.createMany).not.toHaveBeenCalled();
   });
 
   it("rejects a second collection plan while one is awaiting or processing", async () => {

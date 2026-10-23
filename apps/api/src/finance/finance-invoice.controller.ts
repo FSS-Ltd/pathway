@@ -25,6 +25,7 @@ import { FinanceInvoiceService } from "./finance-invoice.service";
 import {
   financeInvoiceDraftSchema,
   financeInvoiceIdSchema,
+  financeInvoiceTransitionSchema,
   financeInvoiceListQuerySchema,
   financeRequestChangesSchema,
   financeVoidInvoiceSchema,
@@ -112,11 +113,13 @@ export class FinanceInvoiceController {
   submitForReview(
     @Param("invoiceId", ParseUUIDPipe) invoiceId: string,
     @Headers("idempotency-key") key: string | undefined,
+    @Body() body: unknown,
   ) {
     return this.invoices.submitForReview(
       financeRequestActor(this.requestContext),
       invoiceId,
       financeIdempotencyKey(key),
+      parseFinanceInput(financeInvoiceTransitionSchema, body).expectedRevision,
     );
   }
 
@@ -129,11 +132,13 @@ export class FinanceInvoiceController {
   approve(
     @Param("invoiceId", ParseUUIDPipe) invoiceId: string,
     @Headers("idempotency-key") key: string | undefined,
+    @Body() body: unknown,
   ) {
     return this.invoices.approve(
       financeRequestActor(this.requestContext),
       invoiceId,
       financeIdempotencyKey(key),
+      parseFinanceInput(financeInvoiceTransitionSchema, body).expectedRevision,
     );
   }
 
@@ -165,11 +170,13 @@ export class FinanceInvoiceController {
   issue(
     @Param("invoiceId", ParseUUIDPipe) invoiceId: string,
     @Headers("idempotency-key") key: string | undefined,
+    @Body() body: unknown,
   ) {
     return this.invoices.issue(
       financeRequestActor(this.requestContext),
       invoiceId,
       financeIdempotencyKey(key),
+      parseFinanceInput(financeInvoiceTransitionSchema, body).expectedRevision,
     );
   }
 

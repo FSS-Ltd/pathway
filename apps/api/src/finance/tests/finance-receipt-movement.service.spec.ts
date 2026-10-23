@@ -62,6 +62,18 @@ function setup(
     .fn()
     .mockResolvedValue({ id: "application-1" });
   const tx = {
+    $queryRaw: jest.fn().mockResolvedValue(
+      [
+        ...new Set(
+          (inputRows.returnApplications ?? []).map((row) => row.invoiceId),
+        ),
+      ].map((id) => ({
+        id,
+        status: "ISSUED",
+        totalMinor: 1000n,
+      })),
+    ),
+    financeCreditNote: { findMany: jest.fn().mockResolvedValue([]) },
     financeReceiptMovement: {
       findFirst: movementFindFirst,
       create: movementCreate,
@@ -70,7 +82,10 @@ function setup(
       findMany: jest.fn().mockResolvedValue(inputRows.allocations ?? []),
     },
     financeReceiptMovementApplication: {
-      findMany: jest.fn().mockResolvedValue(inputRows.returnApplications ?? []),
+      findMany: jest.fn(
+        async (args: Prisma.FinanceReceiptMovementApplicationFindManyArgs) =>
+          args.where?.movementId ? (inputRows.returnApplications ?? []) : [],
+      ),
       create: movementApplicationCreate,
     },
   } as unknown as Prisma.TransactionClient;

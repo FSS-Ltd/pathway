@@ -10,7 +10,8 @@
     "./capability-definitions": "./src/capability-definitions.ts",
     "./capability-maps": "./src/capability-maps.ts",
     "./access-tags": "./src/access-tags.ts",
-    "./finance-currencies": "./src/finance-currencies.ts"
+    "./finance-currencies": "./src/finance-currencies.ts",
+    "./finance-collection-amount": "./src/finance-collection-amount.ts"
   },
   "scripts": {
     "build": "echo platform-build",

@@ -2,6 +2,7 @@ import { randomInt } from "node:crypto";
 import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
 import type { FinanceCurrency } from "@pathway/platform";
+import { assertFinanceCollectionAmount } from "../finance-collection-amount";
 import type { FinanceStripeCheckoutConfig } from "./finance-stripe-checkout.config";
 
 const STRIPE_API_VERSION = "2026-09-30.endive";
@@ -84,10 +85,12 @@ export class StripeFinanceCheckoutProvider implements FinanceStripeCheckoutProvi
     integrationIdentifier: string;
     expiresAt: Date;
   }): Promise<FinanceStripeCheckoutSession> {
+    assertFinanceCollectionAmount({
+      method: "card",
+      currency: input.currency,
+      amountMinor: input.amountMinor,
+    });
     const amount = Number(input.amountMinor);
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-      throw new FinanceStripeCheckoutProviderError(false);
-    }
 
     const form = new URLSearchParams();
     const successUrl = new URL(

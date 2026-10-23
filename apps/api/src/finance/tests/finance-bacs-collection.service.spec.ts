@@ -1,3 +1,4 @@
+import { UnprocessableEntityException } from "@nestjs/common";
 import { runTransaction, withTenantRlsContext } from "@pathway/db";
 import type { Prisma } from "@pathway/db";
 import { lockInvoice } from "../finance-invoice-operations";
@@ -229,6 +230,37 @@ describe("FinanceBacsCollectionService", () => {
     debitAttempt.createdAt = new Date(Date.now() - 26 * 60 * 60_000);
     await service.runDue(new Date("2026-10-20T12:00:00Z"));
     expect(provider.createDebit).not.toHaveBeenCalled();
+  });
+
+  it("marks a permanent amount rejection failed and pauses the plan instead of retaining an unknown retry", async () => {
+    provider.createDebit.mockReset().mockRejectedValue(
+      new UnprocessableEntityException({
+        code: "FINANCE_COLLECTION_AMOUNT_UNSUPPORTED",
+        message: "Bacs amount unsupported",
+      }),
+    );
+    await expect(
+      service.runDue(new Date("2026-10-21T12:00:00.000Z")),
+    ).resolves.toMatchObject({ debitsFailed: 1, debitsPending: 0 });
+    expect(tx.financeDebitAttempt.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "FAILED" }),
+      }),
+    );
+    expect(tx.financeCollectionInstalment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "FAILED" } }),
+    );
+    expect(tx.financeCollectionPlan.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "PAUSED" } }),
+    );
+    expect(tx.financeCollectionPlanEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          type: "DEBIT_FAILED",
+          details: { reason: "PROVIDER_REQUEST_FAILED" },
+        }),
+      }),
+    );
   });
 
   it("retries a timed-out debit with its original idempotency key", async () => {

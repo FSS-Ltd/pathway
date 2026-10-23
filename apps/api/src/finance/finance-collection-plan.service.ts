@@ -10,6 +10,7 @@ import {
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { FinanceAccessService } from "./access/finance-access.service";
 import type { FinanceAccessScope } from "./access/finance-access.reader";
+import { assertFinanceCollectionAmount } from "./finance-collection-amount";
 import { FinanceBalanceService } from "./finance-balance.service";
 import { lockInvoice } from "./finance-invoice-operations";
 import {
@@ -77,17 +78,24 @@ export class FinanceCollectionPlanService {
       if (!invoice || !invoice.payerAccountId || !invoice.issuedAt) {
         throw new NotFoundException("Issued Finance invoice not found");
       }
-      if (invoice.currency !== "GBP") {
-        throw new ConflictException(
-          "Bacs collection is available for GBP invoices",
-        );
-      }
+      let instalmentAmounts: bigint[];
       try {
-        splitFinanceInvoiceAmount(invoice.totalMinor, draft.instalmentCount);
+        instalmentAmounts = splitFinanceInvoiceAmount(
+          invoice.totalMinor,
+          draft.instalmentCount,
+        );
       } catch (error) {
         throw new BadRequestException(
           error instanceof Error ? error.message : "Collection plan is invalid",
         );
+      }
+
+      for (const amountMinor of instalmentAmounts) {
+        assertFinanceCollectionAmount({
+          method: "bacs",
+          currency: invoice.currency,
+          amountMinor,
+        });
       }
 
       const balance = await this.balances.forInvoices(tx, actor, [invoice]);
@@ -411,6 +419,14 @@ export class FinanceCollectionPlanService {
             ? error.message
             : "Collection dates are invalid",
         );
+      }
+
+      for (const { amountMinor } of instalments) {
+        assertFinanceCollectionAmount({
+          method: "bacs",
+          currency: plan.currency,
+          amountMinor,
+        });
       }
 
       await tx.financeCollectionPlan.update({

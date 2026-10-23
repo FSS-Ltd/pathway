@@ -31,7 +31,7 @@ export default function FinancePage() {
     return (
       <main className="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
         <header className="space-y-1">
-          <p className="text-sm font-semibold text-accent">Finance</p>
+          <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="font-heading text-2xl font-semibold text-text-primary">
             Family invoices and payments
           </h1>
@@ -43,7 +43,7 @@ export default function FinancePage() {
           {canAccessBilling(role) ? (
             <Link
               href="/billing"
-              className="inline-flex min-h-10 items-center rounded-lg bg-accent px-4 text-sm font-semibold text-white outline-none transition-colors hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+              className="inline-flex min-h-10 items-center rounded-lg bg-accent-primary px-4 text-sm font-semibold text-accent-foreground outline-none transition-colors hover:bg-accent-primary/90 focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2"
             >
               View Billing
             </Link>
@@ -57,7 +57,7 @@ export default function FinancePage() {
     return (
       <main className="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
         <header className="space-y-1">
-          <p className="text-sm font-semibold text-accent">Finance</p>
+          <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="font-heading text-2xl font-semibold text-text-primary">
             Access is restricted
           </h1>
