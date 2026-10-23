@@ -136,9 +136,13 @@ export class FinanceCommandService {
       existing.resourceType !== input.resourceType ||
       existing.requestHash !== requestHash
     ) {
-      throw new ConflictException(
-        "Idempotency-Key was already used for a different Finance command",
-      );
+      throw new ConflictException({
+        statusCode: 409,
+        error: "Conflict",
+        code: "IDEMPOTENCY_CONFLICT",
+        message:
+          "Idempotency-Key was already used for a different Finance command",
+      });
     }
     if (!existing.resourceId) {
       throw new ConflictException("Finance command is still being processed");
