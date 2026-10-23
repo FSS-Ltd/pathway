@@ -156,3 +156,113 @@ describe("Finance private document keys", () => {
     ).toBe(false);
   });
 });
+
+describe("create-only private Finance uploads", () => {
+  const originalEnv = { ...process.env };
+  const input = {
+    bucket: "private" as const,
+    key: financeDocumentStorageKey(
+      "tenant_1",
+      "invoice",
+      "04b7d8c4-c891-4af8-9011-d5a403ce3296",
+    ),
+    body: Buffer.from("issued document"),
+    contentType: "application/pdf",
+    overwrite: false,
+  };
+  beforeEach(() => {
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_SECRET_KEY = "server-secret";
+    process.env.SUPABASE_STORAGE_PRIVATE_BUCKET = "private-bucket";
+    process.env.SUPABASE_STORAGE_PUBLIC_BUCKET = "public-bucket";
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    process.env = { ...originalEnv };
+  });
+
+  it("does not send an overwrite header for an immutable upload", async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(Response.json({}));
+    await new SupabaseStorageService().uploadObject(input);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ "x-upsert": "false" }),
+      }),
+    );
+  });
+
+  it.each([
+    {
+      status: 400,
+      payload: {
+        statusCode: "409",
+        error: "Duplicate",
+        message: "The resource already exists",
+      },
+    },
+    {
+      status: 409,
+      payload: {
+        code: "ResourceAlreadyExists",
+        message: "The resource already exists",
+      },
+    },
+    {
+      status: 409,
+      payload: {
+        code: "KeyAlreadyExists",
+        message: "The resource already exists",
+      },
+    },
+    {
+      status: 409,
+      payload: {
+        code: "already_exists",
+        message: "The resource already exists",
+      },
+    },
+  ])(
+    "preserves the existing identity for documented duplicate response $status",
+    async ({ status, payload }) => {
+      jest
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(Response.json(payload, { status }));
+      await expect(
+        new SupabaseStorageService().uploadObject(input),
+      ).resolves.toEqual({
+        bucket: "private-bucket",
+        key: input.key,
+      });
+    },
+  );
+
+  it("does not treat an unrelated rejection as an existing object", async () => {
+    jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        Response.json({ code: "AccessDenied" }, { status: 403 }),
+      );
+    await expect(
+      new SupabaseStorageService().uploadObject(input),
+    ).rejects.toThrow();
+  });
+
+  it("preserves ordinary upload overwrite behavior", async () => {
+    const fetchMock = jest
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(Response.json({}));
+    await new SupabaseStorageService().uploadObject({
+      ...input,
+      overwrite: undefined,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({ "x-upsert": "true" }),
+      }),
+    );
+  });
+});

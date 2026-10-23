@@ -183,7 +183,8 @@ licenses against their source bytes; no new dependency or runtime font fetch.
 The initial local artifact attempt lacked its Prisma engine; the established
 cached-engine rerun passed. This closes the stated layout/name regression only;
 tagged-PDF/screen-reader accessibility and actual private-storage lifecycle are
-not established. Stored issued documents remain unchanged. Current-revision CI,
+not established. Layout checks had not proved stored-byte reuse; E23 records
+the subsequent overwrite finding and correction. Current-revision CI,
 provider proof and the T18 merge gate remain pending.
 
 E22: Current account-scoped Sandbox Checkout adapter created and expired14 unpaid
@@ -201,3 +202,21 @@ passed, as did API/serverless build, staged runtime, mobile types and focused
 lint/format checks. Family422/503 feedback preserves debt and other payment
 actions. Local product bounds are not a universal promise of provider acceptance. Bacs,
 private-storage, accessibility and final-revision CI/merge gaps remain open.
+
+E23: Source inspection contradicted the earlier stored-document preservation
+note: invoice/credit/receipt downloads regenerated and overwrote their objects.
+The document regression was RED for four cases, and valid-fixture storage
+regressions were RED for the overwrite header and documented duplicate
+responses. The correction returns existing bytes, uses create-only uploads and
+reads the canonical winner after racing creation. Accepted-upload response loss
+recovers across service restart; revoked access still denies cached bytes and a
+missing stored readback fails closed. Statements retain digest verification and
+now disable overwrite. Other uploads keep their previous overwrite default.
+Focused units passed3 suites/23 tests; actual HTTP/PostgreSQL authorization,
+lifecycle, receipt delivery and review-revision checks passed4 suites/17 tests.
+API build/types, staged runtime, real PDF smoke and focused lint passed. A full
+single-process unit run exhausted4GB after143 passing suites, so no complete unit
+pass is claimed; the bounded-worker rerun remains pending. No hosted storage ACL,
+tagged-PDF/screen-reader or complete T18 gate is proved. The latest owner rules
+also expose missing immediate post-commit worker wakeup; scheduled inbox draining
+alone does not satisfy that event-driven requirement. T19 remains unstarted.

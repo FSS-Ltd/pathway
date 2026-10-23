@@ -290,3 +290,52 @@ and was corrected before the recorded RED/GREEN runs. Full API/serverless build,
 staged artifact HTTP/auth/database smoke, focused API/mobile lint, formatting and
 diff checks passed. Current-head CI and merge evidence must still be recorded
 for this follow-up. T18 remains incomplete; T19 has not started.
+
+### Stored document immutability correction
+
+The earlier font checkpoint overstated stored-document preservation. Source
+inspection found that invoice, credit and receipt downloads regenerated their
+PDF and uploaded with overwrite enabled. Layout checks had not established byte
+immutability. No production font deployment or storage write was performed by
+this assurance work.
+
+The new request-driven storage helper reads an existing private object first.
+On first creation it disables overwrite and reads back the canonical stored
+object, including when another request wins the upload race. Lost upload
+responses recover the existing bytes on retry; missing readback fails closed.
+Current payer/staff authority is still checked before and after document access.
+Statement uploads also disable overwrite while retaining their immutable digest
+keys and verified download digest. Other uploads retain their existing default
+overwrite behavior. No new dependency, schema migration or polling is added.
+
+Four initial document cases and four valid-fixture storage cases were RED before
+the fix. Focused document/storage/statement verification passed three suites /23
+tests. Real HTTP/database authorization, lifecycle, concurrent receipt delivery
+and revision checks passed four suites /17 tests. API types/build/serverless,
+staged runtime, real PDF smoke and focused lint passed. The build completed with
+exit0 before a requested stop for local compiler contention reached it. The
+first complete API unit run exhausted its 4GB heap after143 passing suites; it
+is not a passing aggregate. A bounded two-worker run with memory recycling is
+underway and must be recorded separately before claiming a complete unit pass.
+
+Jest's existing renderer boundary now also replaces the ESM font loader; the
+real PDF smoke and staged font-byte verification remain unchanged. Their
+successful results do not imply actual hosted private-bucket configuration or
+screen-reader proof. PR #735 stays draft and T18 remains incomplete.
+
+The owner's replacement agent rules also require event-driven worker wakeups.
+The existing signed Finance webhook path commits its inbox entry, but source
+inspection found canonical draining through scheduled worker invocations without
+an immediate post-commit wakeup. This is a further T18 assurance gap, recorded in
+the recovery document. No event service or deployment has been introduced. The
+local CI polling watcher was stopped; GitHub jobs continue independently.
+
+The final focused storage/document rerun passed all23 tests in three suites,
+including the added canonical-read and create-only assertions. Changed API
+sources, fixtures and Jest configuration passed targeted ESLint and formatting.
+An extra lint invocation outside the package's configured source globs found the
+renderer test helper's pre-existing unused `_document` parameter; no unrelated
+renderer behavior was changed. The complete bounded unit run is still pending.
+Host inspection confirmed revision6b3dc89 failed four API suites on the ESM font
+loader's `import.meta`; subsequent integration jobs were skipped. The local Jest
+boundary correction addresses that cause, but only fresh CI can close the gate.

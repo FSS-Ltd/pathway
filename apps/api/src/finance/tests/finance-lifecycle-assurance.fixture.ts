@@ -96,8 +96,16 @@ export async function createFinanceLifecycleFixture() {
     .useValue(noNetworkBacs)
     .overrideProvider(SupabaseStorageService)
     .useValue({
-      uploadObject: async (input: { key: string; body: Buffer }) => {
-        objects.set(input.key, input.body);
+      privateBucketName: () =>
+        process.env.SUPABASE_STORAGE_PRIVATE_BUCKET?.trim() ?? null,
+      uploadObject: async (input: {
+        key: string;
+        body: Buffer;
+        overwrite?: boolean;
+      }) => {
+        if (input.overwrite !== false || !objects.has(input.key)) {
+          objects.set(input.key, input.body);
+        }
         return true;
       },
       downloadObject: async (_bucket: string, key: string) =>

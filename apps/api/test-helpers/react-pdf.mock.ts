@@ -10,6 +10,7 @@ export const Document = PdfNode;
 export const Page = PdfNode;
 export const Text = PdfNode;
 export const View = PdfNode;
+export const financeDocumentFontFamily = "Jest PDF renderer stub";
 
 export const StyleSheet = {
   create<T extends Record<string, unknown>>(styles: T): T {

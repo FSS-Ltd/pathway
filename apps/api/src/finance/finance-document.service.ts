@@ -1,15 +1,11 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-  ServiceUnavailableException,
-} from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import { FinanceAccessService } from "./access/finance-access.service";
 import type { FinanceAccessScope } from "./access/finance-access.reader";
 import { SupabaseStorageService } from "../common/storage/supabase-storage.service";
 import { financeDocumentStorageKey } from "../common/storage/storage-key.util";
 import { renderFinancePdf, type FinancePdfInput } from "./finance-document-pdf";
+import { loadOrCreateFinanceDocument } from "./finance-document-storage";
 
 export interface FinanceDocumentActor extends FinanceAccessScope {
   userId: string;
@@ -276,18 +272,11 @@ export class FinanceDocumentService {
     input: FinancePdfInput,
     payerAccountId?: string,
   ) {
-    const bytes = await renderFinancePdf(input);
-    const stored = await this.storage.uploadObject({
-      bucket: "private",
-      key: financeDocumentStorageKey(actor.tenantId, kind, documentId),
-      body: bytes,
-      contentType: "application/pdf",
-    });
-    if (!stored) {
-      throw new ServiceUnavailableException(
-        "Finance document storage is unavailable",
-      );
-    }
+    const bytes = await loadOrCreateFinanceDocument(
+      this.storage,
+      financeDocumentStorageKey(actor.tenantId, kind, documentId),
+      () => renderFinancePdf(input),
+    );
     if (payerAccountId) {
       await this.access.assertPayerAction(
         actor,

@@ -23,8 +23,18 @@ jest.mock("../finance-document-pdf", () => ({
 }));
 class ReceiptStorage extends SupabaseStorageService {
   readonly keys = new Set<string>();
+  private readonly objects = new Map<string, Buffer>();
+  override privateBucketName() {
+    return "private-finance-assurance";
+  }
+  override async downloadObject(_bucket: string, key: string) {
+    return this.objects.get(key) ?? null;
+  }
   override async uploadObject(input: StorageUploadInput) {
     this.keys.add(input.key);
+    if (input.overwrite !== false || !this.objects.has(input.key)) {
+      this.objects.set(input.key, input.body);
+    }
     return { bucket: input.bucket, key: input.key };
   }
 }
