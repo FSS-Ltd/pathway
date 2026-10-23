@@ -32,7 +32,7 @@ Staff reads and actions use Finance access modes, roles and tenant/legal-entity 
 
 ## Data and release impact
 
-The intended migration is additive: reconciliation state, scoped cases/history and API-recovery provenance for inbox evidence. It must preserve existing issued snapshots, economic identities and append-only ledger rows. All new financial records require forced tenant RLS, scoped foreign keys and indexes for bounded jobs. No live provider configuration or deployment is part of T17.
+The migration is additive: reconciliation state, scoped cases/history, API-recovery provenance for inbox evidence and a nullable, once-set refund provider-attempt timestamp. Existing approved Stripe refunds receive their approval time as a conservative earliest-possible attempt time; they do not receive a fresh retry window. This may hold a never-submitted older refund for review, which is safer than recreating an unknown refund. The backfill requires an administrative migration role with `BYPASSRLS` (or superuser) and fails explicitly without it. It does not weaken RLS policies. Issued snapshots, economic identities and append-only ledger rows remain intact. No live provider configuration or deployment is part of T17.
 
 Live checkout remains subject to commercial approval. Bacs remains live-disabled. Finance pricing remains £29 monthly / £290 annually. After T17 is merged and its evidence recorded, pause before T18 or T19 as requested.
 
@@ -56,4 +56,6 @@ Verification for the servicing increment: nine focused API suites / 56 tests pas
 
 The feature is not complete: scheduled jobs, canonical recovered evidence processing, operator UI, dry-run/sandbox evidence, runbooks and full verification remain.
 
-The next implementation pass must inspect refund and Bacs submission timestamps and key-retention behavior as part of the unresolved-operation sweep. Provider reads must recover already accepted operations before any permitted retry; an unresolved outcome beyond the safe retry window requires a case and retains its reservation.
+The fifth increment applies the same 23-hour safety window to Checkout, Bacs and refunds. An aged unknown Bacs attempt retains its identity and pauses its plan for review; a historical scheduling date cannot extend the wall-clock retry window. Refund preparation locks the receipt/request and commits a once-set attempt timestamp before the provider call. After the window expires, the provider may recover a matching existing refund but cannot create one. Refund lookup pagination is bounded and rejects a repeated cursor. The service distinguishes an unresolved outcome from a permanent failure and retains the approved reservation.
+
+Verification for the retention increment: four focused API suites / 29 tests passed; four database suites / 39 tests passed, including the four new refund timestamp/approval constraints and existing reconciliation/ledger/RLS cases. The three Finance schema-contract tests, Prisma validation/generation, API/database typechecks, targeted lint, formatting and whitespace checks passed. The database tests ran only against the disposable local PostgreSQL instance. The scheduled unresolved-operation sweep and visible reconciliation cases still need to consume these retained operations; no automated repair path is registered yet.

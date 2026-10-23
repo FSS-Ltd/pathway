@@ -13,6 +13,7 @@ import {
 import { FinanceAccessService } from "./access/finance-access.service";
 import type { FinanceAccessScope } from "./access/finance-access.reader";
 import { FinanceBalanceService } from "./finance-balance.service";
+import { canRetryFinanceProviderOperation } from "./domain/finance-provider-retry";
 import {
   FINANCE_BACS_COLLECTION_TERMS_VERSION,
   FINANCE_BACS_MANDATE_CONSENT_VERSION,
@@ -408,6 +409,7 @@ export class FinanceBacsCollectionService {
           status: true,
           stripePaymentIntentId: true,
           idempotencyKey: true,
+          createdAt: true,
         },
       });
       if (existingAttempt) {
@@ -424,6 +426,15 @@ export class FinanceBacsCollectionService {
           return null;
         }
         if (!["CREATING", "UNKNOWN"].includes(existingAttempt.status)) {
+          return null;
+        }
+        if (!canRetryFinanceProviderOperation(existingAttempt.createdAt)) {
+          await this.pausePlanForReview(
+            tx,
+            scope,
+            plan.id,
+            "UNKNOWN_DEBIT_REQUIRES_RECONCILIATION",
+          );
           return null;
         }
         return {

@@ -11,6 +11,7 @@ import { withTenantRlsContext } from "@pathway/db";
 import { FinanceAccessService } from "../access/finance-access.service";
 import type { FinanceAccessScope } from "../access/finance-access.reader";
 import { FinanceBalanceService } from "../finance-balance.service";
+import { canRetryFinanceProviderOperation } from "../domain/finance-provider-retry";
 import { lockInvoice } from "../finance-invoice-operations";
 import {
   FINANCE_STRIPE_CHECKOUT_CONFIG,
@@ -22,9 +23,6 @@ import type {
   FinanceStripeCheckoutPreparation,
   FinanceStripeCheckoutView,
 } from "./finance-stripe-checkout.types";
-
-// Stripe may prune v1 idempotency keys after 24 hours. Keep a safety margin.
-const CHECKOUT_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 
 @Injectable()
 export class FinanceStripeCheckoutAttemptService {
@@ -258,8 +256,7 @@ export class FinanceStripeCheckoutAttemptService {
         }
         if (
           existing.status === "CREATING" &&
-          now.getTime() - existing.createdAt.getTime() >=
-            CHECKOUT_RETRY_WINDOW_MS
+          !canRetryFinanceProviderOperation(existing.createdAt, now)
         ) {
           // Only provider evidence may release this obligation after an unknown outcome.
           return { kind: "view", view: checkingView(existing.id) };

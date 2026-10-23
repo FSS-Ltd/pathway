@@ -18,6 +18,92 @@ function stripeResponse(body: unknown, status = 200): Response {
 }
 
 describe("StripeFinanceRefundProvider", () => {
+  it("never posts an unknown refund beyond the permitted retry window", async () => {
+    const fetcher = jest
+      .fn()
+      .mockResolvedValue(stripeResponse({ data: [], has_more: false }));
+    const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
+    await expect(
+      provider.createRefund({
+        creationPermitted: false,
+        stripeAccountId: "acct_school_test",
+        paymentIntentId: "pi_school_payment_1",
+        refundId: "refund-unknown",
+        amountMinor: 2450n,
+        currency: "EUR",
+      }),
+    ).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0]?.[1]?.method).toBe("GET");
+  });
+
+  it("recovers a matching old refund without posting another refund", async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      stripeResponse({
+        data: [
+          {
+            id: "re_recovered",
+            amount: 2450,
+            currency: "eur",
+            status: "succeeded",
+            created: 1_800_000_000,
+            livemode: false,
+            metadata: { finance_refund_id: "refund-unknown" },
+          },
+        ],
+        has_more: false,
+      }),
+    );
+    const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
+    expect(
+      await provider.createRefund({
+        creationPermitted: false,
+        stripeAccountId: "acct_school_test",
+        paymentIntentId: "pi_school_payment_1",
+        refundId: "refund-unknown",
+        amountMinor: 2450n,
+        currency: "EUR",
+      }),
+    ).toMatchObject({ id: "re_recovered", status: "succeeded" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops repeated refund pagination without creating a refund", async () => {
+    const page = {
+      data: [
+        {
+          id: "re_repeat",
+          amount: 2450,
+          currency: "eur",
+          status: "succeeded",
+          created: 1_800_000_000,
+          livemode: false,
+          metadata: {},
+        },
+      ],
+      has_more: true,
+    };
+    const fetcher = jest
+      .fn()
+      .mockRejectedValue(new Error("Fixture pagination exceeded"))
+      .mockResolvedValueOnce(stripeResponse(page))
+      .mockResolvedValueOnce(stripeResponse(page));
+    const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
+    await expect(
+      provider.createRefund({
+        creationPermitted: true,
+        stripeAccountId: "acct_school_test",
+        paymentIntentId: "pi_school_payment_1",
+        refundId: "refund-unknown",
+        amountMinor: 2450n,
+        currency: "EUR",
+      }),
+    ).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(
+      fetcher.mock.calls.every(([, request]) => request.method === "GET"),
+    ).toBe(true);
+  });
   it("creates an idempotent refund in the connected school's account", async () => {
     const fetcher = jest
       .fn()
@@ -37,6 +123,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
         refundId: "refund-1",
@@ -120,6 +207,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
         refundId: "refund-1",
@@ -169,6 +257,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
         refundId: "refund-1",
@@ -231,6 +320,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
         refundId: "refund-1",

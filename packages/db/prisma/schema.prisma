@@ -6303,6 +6303,7 @@ model FinanceRefund {
   createdAt                DateTime            @default(now())
   updatedAt                DateTime            @updatedAt
   approvedAt               DateTime?
+  providerAttemptStartedAt DateTime?
   submittedAt              DateTime?
   providerStatusAt         DateTime?
   confirmedAt              DateTime?

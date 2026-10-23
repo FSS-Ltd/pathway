@@ -53,6 +53,7 @@ export interface FinanceStripeRefundProvider {
     refundId: string;
     amountMinor: bigint;
     currency: FinanceCurrency;
+    creationPermitted: boolean;
   }): Promise<{
     id: string;
     amountMinor: bigint;
@@ -66,6 +67,12 @@ export class FinanceStripeRefundProviderError extends Error {
   constructor(readonly retryable: boolean) {
     super("Stripe refund is temporarily unavailable");
     this.name = "FinanceStripeRefundProviderError";
+  }
+}
+
+export class FinanceStripeRefundUnknownOutcomeError extends FinanceStripeRefundProviderError {
+  constructor() {
+    super(true);
   }
 }
 
@@ -113,6 +120,7 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
     refundId: string;
     amountMinor: bigint;
     currency: FinanceCurrency;
+    creationPermitted: boolean;
   }): Promise<{
     id: string;
     amountMinor: bigint;
@@ -127,6 +135,8 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
 
     const existingRefund = await this.findExistingRefund(input);
     if (existingRefund) return existingRefund;
+    if (!input.creationPermitted)
+      throw new FinanceStripeRefundUnknownOutcomeError();
 
     const form = new URLSearchParams();
     form.set("payment_intent", input.paymentIntentId);
@@ -168,8 +178,10 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
     let startingAfter: string | undefined;
     let existingRefund: z.infer<typeof refundSchema> | undefined;
     let hasMore = true;
+    let pages = 0;
 
     while (hasMore) {
+      if (++pages > 10) throw new FinanceStripeRefundProviderError(true);
       const query = new URLSearchParams({
         payment_intent: input.paymentIntentId,
         limit: "100",
@@ -194,7 +206,8 @@ export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider 
       hasMore = parsed.data.has_more;
       if (!hasMore) continue;
       const lastId = parsed.data.data.at(-1)?.id;
-      if (!lastId) throw new FinanceStripeRefundProviderError(true);
+      if (!lastId || lastId === startingAfter)
+        throw new FinanceStripeRefundProviderError(true);
       startingAfter = lastId;
     }
 

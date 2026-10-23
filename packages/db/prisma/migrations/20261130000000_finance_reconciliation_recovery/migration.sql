@@ -227,3 +227,31 @@ $$;
 DROP TRIGGER "FinanceStripeWebhookEvent_evidence_guard" ON "FinanceStripeWebhookEvent";
 CREATE TRIGGER "FinanceStripeWebhookEvent_evidence_guard" BEFORE INSERT OR UPDATE OR DELETE ON "FinanceStripeWebhookEvent"
   FOR EACH ROW EXECUTE FUNCTION finance_stripe_webhook_event_guard();
+
+-- Existing approved refunds might already have an unknown provider outcome.
+-- Use their earliest possible attempt time conservatively; never grant a fresh retry window.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = current_user AND (rolsuper OR rolbypassrls)) THEN
+    RAISE EXCEPTION 'Finance reconciliation migration requires an administrative role with BYPASSRLS for the refund backfill';
+  END IF;
+END;
+$$;
+ALTER TABLE "FinanceRefund" ADD COLUMN "providerAttemptStartedAt" TIMESTAMP(3);
+UPDATE "FinanceRefund" SET "providerAttemptStartedAt" = COALESCE("approvedAt", "createdAt")
+  WHERE "source" = 'STRIPE_CARD' AND "status" = 'APPROVED';
+ALTER TABLE "FinanceRefund" ADD CONSTRAINT "FinanceRefund_retry_start_valid" CHECK (
+  "providerAttemptStartedAt" IS NULL OR ("source" = 'STRIPE_CARD' AND "status" <> 'PENDING')
+);
+CREATE FUNCTION finance_refund_retry_guard() RETURNS trigger LANGUAGE plpgsql SET search_path = '' AS $$
+BEGIN
+  IF (OLD."providerAttemptStartedAt" IS NOT NULL AND NEW."providerAttemptStartedAt" IS DISTINCT FROM OLD."providerAttemptStartedAt")
+    OR (OLD."providerAttemptStartedAt" IS NULL AND NEW."providerAttemptStartedAt" IS NOT NULL
+      AND (OLD."source" <> 'STRIPE_CARD' OR OLD."status" <> 'APPROVED')) THEN
+    RAISE EXCEPTION USING ERRCODE = '23514', MESSAGE = 'Finance refund provider attempt time is approval-bound and immutable';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER "FinanceRefund_retry_guard" BEFORE UPDATE ON "FinanceRefund"
+  FOR EACH ROW EXECUTE FUNCTION finance_refund_retry_guard();
