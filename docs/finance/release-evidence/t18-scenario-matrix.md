@@ -169,3 +169,19 @@ The external-refund review helper records the default `REOPEN_BALANCE` treatment
 E19: The exact A01 principal/fee PostgreSQL scenario passed with one canonical receipt/allocation and persisted, deduplicated balance evidence: principal30000, processor fee470, net29530, family outstanding0. Both family and saved settlement repositories were read. This is a provider-evidence fixture with real application persistence; it is not a claim that Stripe charged that example fee. Test: `finance-principal-fee-assurance.e2e.spec.ts`, `keeps a 30000 receipt and zero debt separate from a 470 fee and 29530 net`.
 
 E20: Actual iPhone 16e/iOS 26.3, Expo Go SDK 54 and Hermes component inspection exposed unsupported BigInt formatting and missing `formatToParts`. Both regressions were RED before the final exact-string formatter. Mobile verification passed 15 suites /71 tests, typecheck and focused lint. Native invoice, processing and statement components rendered with eight supported currencies. Synthetic action feedback/validation also passed observed checks. A 2.14 font scale at 390 points was observed and restored to 1.00; full enlarged scrolling/control and screen-reader checks remain pending. Local mocks do not establish production authentication, hosted consent or provider/ledger behavior. No Expo patch upgrade was made.
+
+E21: Actual PDF rendering exposed corrupted Polish/Romanian payer names with
+standard Helvetica. The real-renderer regression was RED for missing Unicode
+maps, then remained RED for Greek with Nunito alone. Locally embedded Nunito
+plus a Noto Sans fallback passed rendered Unicode-map assertions for the tested
+extended Latin, Greek and Cyrillic names. Poppler inspection covered an invoice,
+a negative credit note and a six-page statement: 70 synthetic activity rows
+retained once/in order and six footers; names, money and statement metadata were
+legible. API types, focused lint/format, API/serverless build and staged runtime
+passed. The staged artifact checks all four font files and both redistribution
+licenses against their source bytes; no new dependency or runtime font fetch.
+The initial local artifact attempt lacked its Prisma engine; the established
+cached-engine rerun passed. This closes the stated layout/name regression only;
+tagged-PDF/screen-reader accessibility and actual private-storage lifecycle are
+not established. Stored issued documents remain unchanged. Current-revision CI,
+provider proof and the T18 merge gate remain pending.

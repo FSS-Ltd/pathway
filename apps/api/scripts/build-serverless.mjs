@@ -2,7 +2,7 @@ import { createRequire } from "node:module";
 import { log } from "node:console";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, rm, writeFile } from "node:fs/promises";
 
 const apiRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outputDirectory = resolve(apiRoot, "dist/serverless");
@@ -43,6 +43,15 @@ for (const [assetPath, asset] of Object.entries(assets)) {
   await writeFile(assetDestination, asset.source, {
     ...(asset.permissions === undefined ? {} : { mode: asset.permissions }),
   });
+}
+
+// Font files are emitted by ncc's static asset relocation. Preserve their
+// redistribution licenses in the deployable artifact alongside those files.
+for (const license of ["OFL.txt", "NotoSans-OFL.txt"]) {
+  await copyFile(
+    resolve(apiRoot, "src/finance/fonts", license),
+    join(outputDirectory, license),
+  );
 }
 
 log(

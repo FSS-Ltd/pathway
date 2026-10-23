@@ -9,6 +9,7 @@ import {
 } from "@react-pdf/renderer";
 import type { FinanceCurrency } from "@pathway/platform";
 import { formatFinanceMoney } from "./finance-currency-format";
+import { financeDocumentFontFamily } from "./finance-document-fonts";
 
 export interface FinancePdfLine {
   date?: string;
@@ -41,7 +42,7 @@ const styles = StyleSheet.create({
     paddingTop: 46,
     paddingHorizontal: 48,
     paddingBottom: 56,
-    fontFamily: "Helvetica",
+    fontFamily: financeDocumentFontFamily,
     fontSize: 10,
     color: "#26343A",
     lineHeight: 1.45,
