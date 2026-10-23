@@ -37,7 +37,15 @@ export interface FinanceStripeWebhookStore {
 export interface FinanceStripeWebhookProcessor {
   process(
     event: ClaimedFinanceStripeWebhook,
+    signal?: AbortSignal,
   ): Promise<"processed" | "deferred">;
+}
+
+export interface FinanceStripeWebhookRunResult {
+  completed: number;
+  deferred: number;
+  retried: number;
+  deadLettered: number;
 }
 
 const BATCH_SIZE = 50;
@@ -50,15 +58,23 @@ export class FinanceStripeWebhookJob {
     private readonly processor: FinanceStripeWebhookProcessor,
   ) {}
 
-  async run(now = new Date()): Promise<{
-    completed: number;
-    deferred: number;
-    retried: number;
-    deadLettered: number;
-  }> {
+  async run(
+    now = new Date(),
+    signal?: AbortSignal,
+  ): Promise<FinanceStripeWebhookRunResult> {
+    if (signal?.aborted)
+      return { completed: 0, deferred: 0, retried: 0, deadLettered: 0 };
+    return this.runScopes(await this.store.findDueScopes(now), signal);
+  }
+
+  async runScopes(
+    scopes: readonly FinanceStripeWebhookScope[],
+    signal?: AbortSignal,
+  ): Promise<FinanceStripeWebhookRunResult> {
     const result = { completed: 0, deferred: 0, retried: 0, deadLettered: 0 };
 
-    for (const scope of await this.store.findDueScopes(now)) {
+    for (const scope of scopes) {
+      if (signal?.aborted) break;
       const claimNow = new Date();
       const reclaimBefore = new Date(claimNow.getTime() - CLAIM_LEASE_MS);
       const claimed = await this.store.claim(
@@ -69,9 +85,11 @@ export class FinanceStripeWebhookJob {
         BATCH_SIZE,
       );
       for (const event of claimed) {
+        if (signal?.aborted) break;
         try {
           if (!(await this.store.renew(event, new Date()))) continue;
-          const disposition = await this.processor.process(event);
+          if (signal?.aborted) break;
+          const disposition = await this.processor.process(event, signal);
           const updated =
             disposition === "processed"
               ? await this.store.complete(event)
@@ -79,13 +97,16 @@ export class FinanceStripeWebhookJob {
           if (updated && disposition === "processed") result.completed += 1;
           if (updated && disposition === "deferred") result.deferred += 1;
         } catch (error) {
+          // A cancelled request may already have posted. Keep its claim for
+          // canonical recovery instead of recording an invented failure.
+          if (signal?.aborted) break;
           const message = errorMessage(error);
           if (event.attempts >= MAX_ATTEMPTS) {
             if (await this.store.deadLetter(event, message)) {
               result.deadLettered += 1;
             }
           } else if (
-            await this.store.retry(event, retryTime(event, now), message)
+            await this.store.retry(event, retryTime(event, new Date()), message)
           ) {
             result.retried += 1;
           }

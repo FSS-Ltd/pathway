@@ -230,3 +230,26 @@ refund-return evidence resolves the case while preserving both ledger movements.
 Both complete database suites passed21 tests after behavioral RED. The initial
 nullable-fixture compilation failure ran no tests and is not RED proof. No real
 provider call, production migration or new receipt/allocation was introduced.
+
+E25: Event-driven inbox correction. Actual PostgreSQL RED showed no committed
+wake and no retry for early supported refund evidence. The additive trigger,
+restricted mode/deadline plan and opt-in persistent listener pass three new
+database suites/eight unique cases. With existing signed ingress/reversal suites,
+the final selected run passed five suites/29 tests. Coverage includes transactional
+commit/rollback, empty hints, future-only/page-independent deadlines, silent
+renewals, permission revocation, more-than-one-batch startup, reconnect catch-up,
+mode isolation and removal of actual subscription clients. The pure idle test
+advances 24 hours without additional SQL discovery. A minimal public-core migration
+smoke passed; full public-schema security is not established by that smoke.
+
+Independent review's shutdown race, URL override and code-less disconnect findings
+were reproduced by five failing regressions, then corrected; focused suites pass 30
+tests. The complete worker run passes 24 suites / 139 tests, with types/lint/isolated
+build passing. The enabled CLI reaches LISTEN, exits 0 after SIGTERM, leaves zero
+clients and makes no HTTP call for an empty inbox. These are disposable local
+proofs, not persistent-host deployment evidence. The listener stays disabled until
+host, session URL and least-privilege grants are approved and verified; current
+scheduled recovery remains unchanged. PR #735 merged at c886a54 after all eleven checks
+succeeded on f21c6cd. That CI predates E25 source and does not verify this correction.
+Mandatory Bacs, payout, private storage and accessibility proof remain open. T19
+has not started.

@@ -365,3 +365,64 @@ selected signed-ingress regression passed again (one executed test; nine exclude
 by the explicit name filter). Independent Sol review found no remaining P0–P2
 issue in this focused correction. The complete bounded API unit run remains in
 progress; neither old CI failure nor missing runtime evidence is waived.
+
+The bounded two-worker API rerun subsequently completed with exit0:368 suites and
+2464 tests passed. Jest reported one worker failing graceful teardown and forcing
+its exit; this is not proof of clean process shutdown. This checkpoint covers the
+storage/font/refund source before the new event-delivery continuation. New worker
+and dependency changes require their own checks; the aggregate is not being
+presented as verification of code added afterward.
+
+### T18 assurance correction merge and event-delivery continuation
+
+GitHub confirms [PR #735](https://github.com/FSS-Ltd/pathway/pull/735) merged into
+master on 23 October 2026 at 21:58:02 UTC, merge commit
+`c886a54d529c8ced8c5183e7f3ad31208999993b`. Its final checked revision was
+`f21c6cd436b85f98635c4cc447ef417a7dfbef47`. All eleven applicable checks succeeded:
+API serverless artifact; typecheck/lint/unit; both integration shards; Finance
+Backup Restore; System Role Seed Database Identity; Permission Definition
+Database; Organisation Role RLS; both Analyze jobs; CodeQL. CI run 40024101056 and
+CodeQL run 40024096831 cover that revision. This closes that correction PR's gate,
+not T18's remaining assurance or T19's pilot authorization.
+
+The event-delivery continuation stays within T18. A transactional empty PostgreSQL
+notification now accompanies runnable durable inbox changes. A disabled-by-default
+listener subscribes before catch-up, drains canonical scoped claims, schedules
+persisted deadlines and reconnects without idle SQL discovery. Supported Bacs and
+refund evidence missing linked records persists a retry instead of entering an
+unsupported-handler hold. No payment, balance or snapshot algorithm is replaced.
+The direct `pg` dependency is necessary because Prisma cannot subscribe to NOTIFY;
+existing lockfile resolutions are preserved. The 203rd migration adds only a
+trigger, restricted backend discovery function and two indexes. Index creation
+requires controlled migration locks; no production migration was applied.
+
+Independent Sol review found three P2 defects: immediate start/stop leaked a
+subscription, arbitrary URL query overrides bypassed connection safeguards, and
+pg's code-less unexpected disconnect was misclassified as configuration failure.
+Five new regression cases failed behaviorally before correction. The listener
+now checks shutdown before creating its client; URLs reject unsupported query
+overrides; connection-event failures retain a safe reconnectable classification.
+Both complete focused suites passed 30 tests afterward. Full worker verification
+passed 24 suites / 139 tests, typecheck, lint and a build with output isolated from
+API sources. Relevant API units passed 4 suites / 20 tests. Five real PostgreSQL
+suites passed 29 tests, including the three new suites' eight unique cases plus
+existing signed-ingress/reversal coverage. The minimal public-core migration
+smoke also passed; it is not a full public-schema security assurance claim.
+
+An enabled CLI process subscribed to the owned disposable PostgreSQL database,
+accepted SIGTERM, exited 0 and left zero subscription clients and zero HTTP calls.
+Disabled CLI verification proves it needs neither credentials nor a Prisma engine.
+The initial Prisma validation attempt hit a local cache-utime permission error;
+validation passed with both established cached engine paths explicitly supplied.
+These local results do not verify an approved persistent deployment, direct/session
+runtime URL or operator grants. Existing scheduled recovery stays unchanged until
+activation is authorized and proved. T18 remains incomplete; T19 is unstarted.
+
+Current event-delivery API verification passed typecheck/full build on the CI's
+Node 24 runtime with a 4096 MB heap, the staged serverless HTTP/auth/database/font
+smoke at a 1024-descriptor limit, the real Unicode PDF smoke, focused API lint,
+formatting and whitespace checks. The initial Node 20 / 3072 MB bundle attempt
+exhausted its heap after TypeScript passed; it is not a successful build. The
+complete 368-suite API unit result and PR #735 CI above predate this event source;
+fresh aggregate CI is required for this continuation. Self-review inspected each
+changed module, test, migration, manifest and document; no live runtime was enabled.

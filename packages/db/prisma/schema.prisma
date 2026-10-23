@@ -5732,6 +5732,8 @@ model FinanceStripeWebhookEvent {
 
   @@index([tenantId, orgId, status, nextAttemptAt])
   @@index([status, nextAttemptAt, claimedAt])
+  @@index([livemode, status, nextAttemptAt], map: "FinanceStripeWebhookEvent_mode_due_idx")
+  @@index([livemode, status, claimedAt], map: "FinanceStripeWebhookEvent_mode_claim_idx")
   @@index([reconciliationConnectionId, receivedAt], map: "FinanceStripeWebhookEvent_recovery_received_idx")
 }
 
