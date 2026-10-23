@@ -286,7 +286,7 @@ export class FinanceStripeBacsWebhookService {
         data: {
           status,
           cancelledAt: isInactive ? event.eventCreatedAt : undefined,
-          providerCancellationPending: false,
+          providerCancellationPending: isInactive ? false : undefined,
           providerStatusAt: event.eventCreatedAt,
         },
       });

@@ -8,6 +8,10 @@ import {
   refundEventTypes,
 } from "../stripe/finance-stripe-reversal-webhook.contracts";
 import { financeReversalReceiptMismatch } from "./finance-reversal-recovery.persistence";
+import {
+  isFinanceMandateObservationType,
+  matchFinanceMandateObservation,
+} from "./finance-mandate-match.persistence";
 import { matchFinancePaymentIntent } from "./finance-payment-intent-match.persistence";
 import {
   captureFinanceApiEvidence,
@@ -74,9 +78,16 @@ export async function recoverFinanceProviderObservation(
     disposition = matched.disposition;
     reason = matched.reason;
   }
+  if (isFinanceMandateObservationType(projected.eventType)) {
+    const matched = await matchFinanceMandateObservation(tx, scope, projected);
+    disposition = matched.disposition;
+    reason = matched.reason;
+  }
   const reference = projected.resourceReference;
   const fundsConfirmed =
-    projected.object.status === "succeeded" ||
+    ((projected.object.object === "payment_intent" ||
+      projected.object.object === "refund") &&
+      projected.object.status === "succeeded") ||
     disputeEventTypes.has(projected.eventType);
   if (mode === "capture") {
     const evidence = makeFinanceApiEvidence(
