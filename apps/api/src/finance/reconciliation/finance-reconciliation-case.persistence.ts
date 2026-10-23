@@ -101,6 +101,7 @@ export async function resolveReconciliationCase(
   scope: FinanceConnectionScope,
   key: string,
   now: Date,
+  reason = "provider_window_completed",
 ): Promise<void> {
   const existing = await lockCase(tx, scope, key);
   if (!existing || existing.status === "RESOLVED") return;
@@ -114,7 +115,7 @@ export async function resolveReconciliationCase(
       tenantId: scope.tenantId,
       orgId: scope.orgId,
       type: "RESOLVED",
-      details: { reason: "provider_window_completed" },
+      details: { reason },
       createdAt: now,
     },
   });
