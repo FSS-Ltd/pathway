@@ -17,7 +17,7 @@ Staff reads and actions use Finance access modes, roles and tenant/legal-entity 
 3. Add bounded sync and unresolved-operation runners. Persist a fixed coverage window and advance only after durable page handling. Reuse the window after interruption. Scan events plus current payments, sessions, refunds, disputes and settlement records. Fetch unresolved historical objects independently of the recent window.
 4. Feed recovered observations into the existing canonical handlers with explicit API-reconciliation provenance. Match immutable operation/account/amount/currency facts before linking a recovered identifier. Surface unmatched money, stale coverage, provider access failures, refund-plus-return and settlement differences.
 5. Add gated staff case inspection and safe replay/recheck actions, worker entry points, a dry-run command and missed-webhook, provider-outage, and refund/return runbooks. Dry run does not write rows or move a cursor.
-6. Run focused unit/contract/database/UI tests and the controlled sandbox dry run, then local quality checks and a fresh branch review. Rebase on current GitHub master before raising the T17 PR. Require current-revision CI and confirmed merge before the evidence update and the requested pause before T18–T19.
+6. Run focused unit/contract/database/UI tests and the controlled sandbox dry run, then local quality checks and a fresh branch review. Rebase on current GitHub master before raising the T17 PR. Require current-revision CI and confirmed merge before the evidence update and the model check before T18–T19.
 
 ## Recovery and coverage rules
 
@@ -34,7 +34,7 @@ Staff reads and actions use Finance access modes, roles and tenant/legal-entity 
 
 The migration is additive: reconciliation state, scoped cases/history, API-recovery provenance for inbox evidence and a nullable, once-set refund provider-attempt timestamp. Existing approved Stripe refunds receive their approval time as a conservative earliest-possible attempt time; they do not receive a fresh retry window. This may hold a never-submitted older refund for review, which is safer than recreating an unknown refund. The backfill requires an administrative migration role with `BYPASSRLS` (or superuser) and fails explicitly without it. It does not weaken RLS policies. Issued snapshots, economic identities and append-only ledger rows remain intact. No live provider configuration or deployment is part of T17.
 
-Live checkout remains subject to commercial approval. Bacs remains live-disabled. Finance pricing remains £29 monthly / £290 annually. After T17 is merged and its evidence recorded, pause before T18 or T19 as requested.
+Live checkout remains subject to commercial approval. Bacs remains live-disabled. Finance pricing remains £29 monthly / £290 annually. After T17 is merged and its evidence recorded, continue into T18/T19 only if the current model is verified as Sol; otherwise retain the requested pause for switching models.
 
 ## Implementation checkpoint
 
@@ -85,3 +85,5 @@ The eleventh increment separates historical mandate reads and existing-mandate c
 Seven provider assertions and two database assertions failed before the behavior was added. Normal Node 24 verification passed four unit suites / 39 tests, two database suites / five tests, API typecheck, targeted lint, formatting and whitespace checks. The two old cancellation tests moved from the collection client to the stronger servicing contract suite; collection creation tests remain. A read-only proof against the existing synthetic Sandbox school exercised the actual historical reader: SetupIntent succeeded, mandate active, Bacs method/customer references agreed, and both generic and customer-bound method GETs agreed. No real cancellation or provider mutation was performed. The historical sweeper is still pending.
 
 The twelfth increment fixes case-key overflow for valid 255-character provider IDs. The bounded key helper preserves existing short keys and hashes only an oversized provider reference. It never truncates the reference identity or stored evidence. Two database regressions failed on column length before the fix; two suites / 21 database tests, API typecheck, targeted lint, formatting and whitespace passed. Full T17 delivery remains in progress.
+
+The thirteenth increment retains uncertain mandate setup identity. Missing session persistence and local expiry do not prove provider failure. These states become UNKNOWN for evidence-led recovery, with no replacement setup; valid sessions remain reusable. Three regressions were RED before the fix. Two database suites / six tests, API typecheck, targeted lint, formatting and whitespace passed.

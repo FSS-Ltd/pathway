@@ -42,6 +42,7 @@ export interface FinanceStripeBacsMandateCancellationResult {
 }
 
 type MandateSetupPreparation =
+  | { kind: "review" }
   | {
       kind: "existing";
       mandateId: string;
@@ -195,8 +196,9 @@ export class FinanceStripeBacsMandateService {
               orgId: actor.orgId,
               status: "PENDING_SETUP",
             },
-            data: { status: "FAILED" },
+            data: { status: "UNKNOWN" },
           });
+          return { kind: "review" as const };
         }
 
         const customer = await tx.financeStripeCustomer.findFirst({
@@ -220,6 +222,11 @@ export class FinanceStripeBacsMandateService {
       },
     );
 
+    if (setup.kind === "review") {
+      throw new ConflictException(
+        "The school is checking the existing Bacs setup. Do not start another mandate",
+      );
+    }
     if (setup.kind === "existing") {
       return {
         mandateId: setup.mandateId,
