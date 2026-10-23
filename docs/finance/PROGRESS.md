@@ -260,3 +260,33 @@ runtime checks. The first local runtime attempt stopped on a missing Prisma
 engine; the rerun used the established cached local engine and passed. Current
 head CI and merge evidence must still be obtained after publishing this fix to
 draft PR #735. T18 remains incomplete and T19 remains unstarted.
+
+### Settlement-dependent card refusal evidence
+
+Actual account-scoped Sandbox currency checks created and expired 14 unpaid
+sessions: eight supported currencies at the product maximum, and six at their
+minimum. The GB test account rejected DKK250 and SEK300 minor units because
+their converted amount fell below its GBP30-minor-unit settlement minimum.
+Read-only retrieval verified all 14 accepted objects remained test-mode,
+expired and unpaid. Only the two refusals were repeated after the first
+harness failed writing its relative evidence path; accepted sessions were not
+created again. The redacted provider evidence is preserved privately.
+
+The real Checkout adapter/service regression reproduced the misleading HTTP503
+response for a definitive refusal. It now returns a safe HTTP422 after closing
+that failed attempt, while temporary and unknown outcomes retain their durable
+identity and retry recovery. Family feedback offers another payment method or
+school help for422 and retains the distinct temporary503 explanation. No raw
+provider message, exchange-rate assumption or money mutation is introduced.
+The local minimum remains a NexSteps product bound, not universal processor
+acceptance. Non-GB account eligibility and actual settlement remain unproved.
+
+Both API regression cases were RED before the fix. The family422 message test
+was also RED; the final complete mobile suite passed 15 suites /73 tests, with
+mobile types/lint passing. The focused API service/provider run passed two
+suites /22 tests using the established cached Prisma engine after an initial
+missing-engine attempt. The initial malformed mobile runner executed no tests
+and was corrected before the recorded RED/GREEN runs. Full API/serverless build,
+staged artifact HTTP/auth/database smoke, focused API/mobile lint, formatting and
+diff checks passed. Current-head CI and merge evidence must still be recorded
+for this follow-up. T18 remains incomplete; T19 has not started.

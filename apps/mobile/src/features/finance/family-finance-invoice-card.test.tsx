@@ -1,4 +1,5 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
+import { ApiError } from "@/lib/api/client";
 
 const mockOpenAuthSessionAsync = jest.fn();
 const mockReplace = jest.fn();
@@ -137,6 +138,38 @@ describe("FamilyFinanceInvoiceCard", () => {
     expect(getByText("GBP 29")).toBeTruthy();
     expect(mockStartCheckout).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [
+      422,
+      "Card payment isn’t available for this invoice. Use bank transfer or ask the school for help.",
+    ],
+    [
+      503,
+      "Secure card payment is temporarily unavailable. You can try again later.",
+    ],
+  ])(
+    "explains checkout HTTP %i without changing the invoice",
+    async (status, message) => {
+      mockStartCheckout.mockRejectedValue(
+        new ApiError("Checkout unavailable", status, ""),
+      );
+      const { getByRole, getByText, findByText } = render(
+        <FamilyFinanceInvoiceCard
+          accountName="North School"
+          canPay
+          invoice={invoice}
+          onRefresh={jest.fn()}
+        />,
+      );
+      fireEvent.press(getByRole("button", { name: "Pay invoice" }));
+      expect(await findByText(message)).toBeTruthy();
+      expect(getByRole("button", { name: "Bank transfer" })).toBeTruthy();
+      expect(getByText("GBP 1000")).toBeTruthy();
+      expect(mockOpenAuthSessionAsync).not.toHaveBeenCalled();
+      expect(mockReplace).not.toHaveBeenCalled();
+    },
+  );
 
   it("does not offer payment without the family payment permission", () => {
     const { queryByRole } = render(

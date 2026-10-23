@@ -185,3 +185,19 @@ cached-engine rerun passed. This closes the stated layout/name regression only;
 tagged-PDF/screen-reader accessibility and actual private-storage lifecycle are
 not established. Stored issued documents remain unchanged. Current-revision CI,
 provider proof and the T18 merge gate remain pending.
+
+E22: Current account-scoped Sandbox Checkout adapter created and expired14 unpaid
+sessions: all8 supported currency maxima, and GBP/EUR/CZK/HUF/PLN/RON minima.
+Read-only retrieval verified every accepted object as test-mode/expired/unpaid.
+The GB account refused DKK250 and SEK300 because conversion fell below its
+GBP30-minor-unit settlement minimum; only those two refusals were repeated.
+The initial harness output path failed after the API work, so accepted-object
+evidence was recovered through read-only retrieval rather than another create.
+No payment/FX settlement/payout or non-GB eligibility is proved. The actual
+adapter/service regression was RED for misleading503 and now returns safe422
+after a definitive refusal; temporary/unknown outcomes retain their identity.
+API service/provider2 suites/22 tests and complete mobile15 suites/73 tests
+passed, as did API/serverless build, staged runtime, mobile types and focused
+lint/format checks. Family422/503 feedback preserves debt and other payment
+actions. Local product bounds are not a universal promise of provider acceptance. Bacs,
+private-storage, accessibility and final-revision CI/merge gaps remain open.

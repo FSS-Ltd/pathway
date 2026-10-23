@@ -85,6 +85,30 @@ The Finance profile stores the school's legal country and one collection currenc
 
 The Finance profile must be saved before Stripe onboarding. This prevents the onboarding endpoint from silently using the database's legacy GBP default for an EU school. Existing profiles created before country selection retain GB/GBP as a migration default; a connected account or any Finance activity locks those settings.
 
+### T18 observed card currency boundaries — 23 October 2026
+
+The current pinned Checkout adapter created and expired 14 unpaid Sandbox
+sessions on one synthetic GB connected account: all eight supported currencies
+at the product maximum, and GBP/EUR/CZK/HUF/PLN/RON at the product minimum.
+Read-only retrieval confirmed all accepted sessions were test-mode, expired and
+unpaid. No payment was confirmed. These are account-scoped presentment-parameter
+checks, not proof of non-GB onboarding, successful collection, FX settlement or
+payout eligibility.
+
+Stripe rejected DKK250 and SEK300 minor units on that account because they
+converted below its GBP30-minor-unit settlement minimum. The two refusals were
+repeated independently and retained as negative evidence. Local product bounds
+therefore cannot promise acceptance for every school settlement configuration
+or future exchange rate. No exchange rate is hardcoded and invoice debt is not
+changed, split or rounded to force acceptance.
+
+A definitive provider refusal now closes the failed checkout attempt and returns
+a safe HTTP422 directing the payer to another payment method or the school.
+Temporary/unknown outcomes retain HTTP503 and their durable operation identity.
+The real adapter/service regression and family feedback tests distinguish those
+states without parsing or exposing provider error messages. Bacs and payout
+readiness remain blocked; this currency probe does not clear their gates.
+
 ## Verification assigned to delivery steps
 
 These tests depend on the application adapter and a disposable school-connected sandbox account. They are not prerequisites to documenting T01's architecture and account-level compatibility findings.
