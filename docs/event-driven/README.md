@@ -116,8 +116,9 @@ replacement is verified.
 - Targeted ESLint/Prettier for changed files and the workers build.
 
 The SQL integration suite refuses any host except localhost/127.0.0.1 and requires
-the database name `pathway_realtime_notifications_test`, with no URI query options
-or fragments. It rebuilds only its
+the database name `pathway_realtime_notifications_test`, a PostgreSQL URI scheme,
+and no URI query options or fragments. It passes the canonical validated URI to
+libpq. It rebuilds only its
 minimal fixture there; never point it at a shared or production database. The
 separate Realtime notification CI job runs these database proofs without secrets.
 

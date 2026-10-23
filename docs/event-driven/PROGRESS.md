@@ -35,9 +35,9 @@ record. Do not mark this step complete from local checks or a pushed branch alon
 
 ## Local verification
 
-- Full database suite with the notification fixture enabled: 92 passed; 33
+- Full database suite with the notification fixture enabled: 96 passed; 33
   existing opt-in database proofs skipped because their separate fixture flags
-  were not enabled. The new suite passed all 18 cases (9 capture cases and 9 test-target validation cases).
+  were not enabled. The new suite passed all 22 cases (9 capture cases and 13 test-target validation cases).
 - Workers: 21 suites / 97 tests passed.
 - Database and workers typechecking, targeted ESLint, workers build, changed-code
   and new-document Prettier checks, and `git diff --check` passed.
@@ -51,9 +51,10 @@ record. Do not mark this step complete from local checks or a pushed branch alon
 - Reviewed implementation range 82770da7..f9f6622d. No additional production
   correctness defect was established; current source-table RLS and cursor guards
   were inspected separately from the minimal capture fixture.
-- P2 fixed: reject URI query parameters/fragments before passing the destructive
-  fixture URL to libpq. Six override rejection cases were observed failing first;
-  the complete database suite then passed with all 18 notification/guard cases.
+- P2 fixed: reject URI query parameters/fragments and non-PostgreSQL schemes;
+  pass the canonical validated fixture URL to libpq. Six override cases and four
+  scheme/canonicalization cases were observed failing before their fixes. The full
+  database suite then passed with all 22 notification/guard cases.
 - No deferred minor findings. Remaining production authorization/bridge-view
   verification limits are recorded in README.md. Future-step behavior was correctly
   outside this review; it has not been implemented or claimed complete.

@@ -12,6 +12,7 @@ const migrationPath = path.resolve(
 function requireLocalTestDatabase(connectionString: string): string {
   const url = new URL(connectionString);
   if (
+    !["postgres:", "postgresql:"].includes(url.protocol) ||
     !["localhost", "127.0.0.1"].includes(url.hostname) ||
     url.pathname !== "/pathway_realtime_notifications_test" ||
     url.search !== "" ||
@@ -21,15 +22,15 @@ function requireLocalTestDatabase(connectionString: string): string {
       "Use the dedicated local pathway_realtime_notifications_test database",
     );
   }
-  return connectionString;
+  return url.toString();
 }
 
 function sql(statement: string): string {
   if (!databaseUrl) throw new Error("Notification test database is required");
-  requireLocalTestDatabase(databaseUrl);
+  const validatedDatabaseUrl = requireLocalTestDatabase(databaseUrl);
   return execFileSync(
     "psql",
-    [databaseUrl, "-X", "-qAt", "-v", "ON_ERROR_STOP=1"],
+    [validatedDatabaseUrl, "-X", "-qAt", "-v", "ON_ERROR_STOP=1"],
     {
       input: statement,
       encoding: "utf8",
@@ -95,6 +96,14 @@ describe("notification fixture database safety", () => {
     expect(requireLocalTestDatabase(local)).toBe(local);
   });
 
+  it("passes the canonical validated address to libpq", () => {
+    const normalizedPath = local.replace(
+      "/pathway_realtime",
+      "/other/../pathway_realtime",
+    );
+    expect(requireLocalTestDatabase(normalizedPath)).toBe(local);
+  });
+
   it.each([
     "?host=remote.example",
     "?hostaddr=192.0.2.1",
@@ -112,6 +121,9 @@ describe("notification fixture database safety", () => {
   it.each([
     "postgresql://postgres:test@remote.example/pathway_realtime_notifications_test",
     "postgresql://postgres:test@127.0.0.1/shared",
+    "http://postgres:test@127.0.0.1/pathway_realtime_notifications_test",
+    "https://postgres:test@127.0.0.1/pathway_realtime_notifications_test",
+    "ftp://postgres:test@127.0.0.1/pathway_realtime_notifications_test",
   ])("rejects a non-dedicated target: %s", (target) => {
     expect(() => requireLocalTestDatabase(target)).toThrow();
   });
