@@ -146,7 +146,8 @@ and report failure if draining/closing cannot finish; do not claim clean exit.
 ### Delivery and activation
 
 - [x] Review every changed file and final diff; obtain independent review.
-- [ ] Publish the T18 continuation PR with actual checks and limitations.
+- [x] Publish the T18 continuation PR with actual checks and limitations:
+      [PR #737](https://github.com/FSS-Ltd/pathway/pull/737).
 - [ ] Verify fresh current-revision CI before any merge. Record checked SHA,
       conclusions and host-confirmed merge in `docs/finance/PROGRESS.md`.
 - [ ] Before runtime activation, obtain an approved persistent host, an explicit

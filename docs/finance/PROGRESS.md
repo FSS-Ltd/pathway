@@ -426,3 +426,11 @@ exhausted its heap after TypeScript passed; it is not a successful build. The
 complete 368-suite API unit result and PR #735 CI above predate this event source;
 fresh aggregate CI is required for this continuation. Self-review inspected each
 changed module, test, migration, manifest and document; no live runtime was enabled.
+
+The event-delivery continuation is preserved in draft
+[PR #737](https://github.com/FSS-Ltd/pathway/pull/737), rebased onto current master
+`c886a54d529c8ced8c5183e7f3ad31208999993b` before publication. The initial source
+head `49b2aa30bc35f89c83ca57c6ef6280ff2c0cfe9f` has CI run40032001845 and
+CodeQL run40031999503 in progress. Pending checks are not passing evidence.
+The checked revision and final results must be refreshed after every push;
+no merge or full T18 completion is claimed.
