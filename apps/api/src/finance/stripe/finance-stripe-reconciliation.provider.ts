@@ -226,9 +226,11 @@ function parseObject(
     throw new FinanceStripeReconciliationError("INVALID_RESPONSE");
   const row = parsed.data;
   assertIdentity(stream, row.id);
+  // Refunds and balance transactions omit livemode; the key/account scope remains required.
+  const modeRequired = stream !== "balanceTransactions" && stream !== "refunds";
   if (
     row.object !== resources[stream].object ||
-    (stream !== "balanceTransactions" && row.livemode !== scope.livemode) ||
+    (modeRequired && row.livemode !== scope.livemode) ||
     (row.livemode !== undefined && row.livemode !== scope.livemode) ||
     (row.account != null && row.account !== scope.stripeAccountId)
   ) {

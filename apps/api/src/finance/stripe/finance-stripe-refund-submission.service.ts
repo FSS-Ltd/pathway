@@ -46,6 +46,7 @@ export class FinanceStripeRefundSubmissionService {
     try {
       providerResult = await this.stripeRefunds.createRefund({
         stripeAccountId: facts.stripeAccountId,
+        livemode: facts.livemode,
         paymentIntentId: facts.paymentIntentId,
         refundId: facts.id,
         amountMinor: facts.amountMinor,

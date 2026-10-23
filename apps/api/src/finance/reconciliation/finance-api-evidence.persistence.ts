@@ -9,27 +9,59 @@ export interface FinanceApiEvidence {
   digest: string;
 }
 
+export type FinanceApiEvidenceOrigin =
+  | { kind: "current-object" }
+  | { kind: "provider-event"; id: string; created: number }
+  | { kind: "balance-transaction"; id: string; created: number };
+
 export function makeFinanceApiEvidence(
   scope: FinanceConnectionScope,
   eventType: string,
   object: Prisma.InputJsonObject,
   observedAt: Date,
+  origin: FinanceApiEvidenceOrigin = { kind: "current-object" },
 ): FinanceApiEvidence {
+  if (origin.kind !== "current-object") {
+    const prefix = origin.kind === "provider-event" ? "evt_" : "txn_";
+    if (
+      !origin.id.startsWith(prefix) ||
+      origin.id.length > 255 ||
+      !/^[A-Za-z0-9_]+$/.test(origin.id) ||
+      !Number.isSafeInteger(origin.created) ||
+      origin.created <= 0 ||
+      origin.created > 8_640_000_000_000
+    )
+      throw new Error("Finance provider evidence origin is invalid");
+  }
   const identity = JSON.stringify({
     connectionId: scope.connectionId,
     account: scope.stripeAccountId,
     livemode: scope.livemode,
     eventType,
     object,
+    ...(origin.kind === "balance-transaction" ? { movementId: origin.id } : {}),
   });
-  const eventId = `recovery_${createHash("sha256").update(identity).digest("hex")}`;
+  const eventId =
+    origin.kind === "provider-event"
+      ? origin.id
+      : `recovery_${createHash("sha256").update(identity).digest("hex")}`;
   const payload = {
     id: eventId,
     type: eventType,
     account: scope.stripeAccountId,
     livemode: scope.livemode,
-    created: Math.floor(observedAt.getTime() / 1000),
+    created:
+      origin.kind === "current-object"
+        ? Math.floor(observedAt.getTime() / 1000)
+        : origin.created,
     data: { object },
+    reconciliation: {
+      basis: origin.kind,
+      ...(origin.kind !== "current-object"
+        ? { source_reference: origin.id }
+        : {}),
+      observed_at: observedAt.toISOString(),
+    },
   };
   return {
     eventId,

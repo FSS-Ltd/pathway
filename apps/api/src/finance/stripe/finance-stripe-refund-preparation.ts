@@ -15,6 +15,7 @@ type PreparedFinanceStripeRefund =
       kind: "submit";
       id: string;
       stripeAccountId: string;
+      livemode: boolean;
       paymentIntentId: string;
       amountMinor: bigint;
       currency: FinanceCurrency;
@@ -60,7 +61,7 @@ export async function prepareFinanceStripeRefund(
       orgId: actor.orgId,
       status: "PAID",
     },
-    select: { stripePaymentIntentId: true },
+    select: { stripePaymentIntentId: true, livemode: true },
   });
   if (!attempt?.stripePaymentIntentId)
     throw new ConflictException(
@@ -86,6 +87,7 @@ export async function prepareFinanceStripeRefund(
     kind: "submit",
     id: refund.id,
     stripeAccountId: refund.stripeAccountId,
+    livemode: attempt.livemode,
     paymentIntentId: attempt.stripePaymentIntentId,
     amountMinor: refund.amountMinor,
     currency: refund.currency,

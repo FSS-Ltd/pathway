@@ -18,6 +18,73 @@ function stripeResponse(body: unknown, status = 200): Response {
 }
 
 describe("StripeFinanceRefundProvider", () => {
+  it("rejects an operation from another provider environment before making a request", async () => {
+    const fetcher = jest
+      .fn()
+      .mockResolvedValue(stripeResponse({ data: [], has_more: false }));
+    const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
+    await expect(
+      provider.createRefund({
+        livemode: true,
+        stripeAccountId: "acct_school_test",
+        paymentIntentId: "pi_school",
+        refundId: "refund-1",
+        amountMinor: 100n,
+        currency: "GBP",
+        creationPermitted: true,
+      }),
+    ).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+  it("accepts the documented refund response without a livemode field under the test account key", async () => {
+    const fetcher = jest
+      .fn()
+      .mockResolvedValueOnce(stripeResponse({ data: [], has_more: false }))
+      .mockResolvedValueOnce(
+        stripeResponse({
+          id: "re_without_mode",
+          amount: 100,
+          currency: "gbp",
+          status: "succeeded",
+          created: 1_800_000_000,
+          metadata: { finance_refund_id: "refund-1" },
+        }),
+      );
+    const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
+    expect(
+      await provider.createRefund({
+        livemode: false,
+        stripeAccountId: "acct_school_test",
+        paymentIntentId: "pi_school",
+        refundId: "refund-1",
+        amountMinor: 100n,
+        currency: "GBP",
+        creationPermitted: true,
+      }),
+    ).toMatchObject({ id: "re_without_mode", status: "succeeded" });
+  });
+
+  it("rejects a provider key whose environment does not match configuration", async () => {
+    const fetcher = jest
+      .fn()
+      .mockResolvedValue(stripeResponse({ data: [], has_more: false }));
+    const provider = new StripeFinanceRefundProvider(
+      { mode: "test", secretKey: "rk_live_wrong_environment" },
+      fetcher,
+    );
+    await expect(
+      provider.createRefund({
+        livemode: false,
+        stripeAccountId: "acct_school_test",
+        paymentIntentId: "pi_school",
+        refundId: "refund-1",
+        amountMinor: 100n,
+        currency: "GBP",
+        creationPermitted: true,
+      }),
+    ).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
   it("retrieves the PaymentIntent of a non-card py_ charge in its connected account", async () => {
     const fetcher = jest.fn().mockResolvedValue(
       stripeResponse({
@@ -29,6 +96,7 @@ describe("StripeFinanceRefundProvider", () => {
     const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
     expect(
       await provider.retrieveChargePaymentIntent({
+        livemode: false,
         stripeAccountId: "acct_school_test",
         chargeId: "py_bacs_payment",
       }),
@@ -50,6 +118,7 @@ describe("StripeFinanceRefundProvider", () => {
     const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
     await expect(
       provider.createRefund({
+        livemode: false,
         creationPermitted: false,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
@@ -82,6 +151,7 @@ describe("StripeFinanceRefundProvider", () => {
     const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
     expect(
       await provider.createRefund({
+        livemode: false,
         creationPermitted: false,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
@@ -116,6 +186,7 @@ describe("StripeFinanceRefundProvider", () => {
     const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
     await expect(
       provider.createRefund({
+        livemode: false,
         creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
@@ -148,6 +219,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        livemode: false,
         creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
@@ -232,6 +304,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        livemode: false,
         creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
@@ -282,6 +355,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        livemode: false,
         creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",
@@ -311,6 +385,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.retrieveChargePaymentIntent({
+        livemode: false,
         stripeAccountId: "acct_school_test",
         chargeId: "ch_school_payment_1",
       }),
@@ -345,6 +420,7 @@ describe("StripeFinanceRefundProvider", () => {
 
     await expect(
       provider.createRefund({
+        livemode: false,
         creationPermitted: true,
         stripeAccountId: "acct_school_test",
         paymentIntentId: "pi_school_payment_1",

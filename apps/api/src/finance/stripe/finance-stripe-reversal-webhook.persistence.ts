@@ -5,7 +5,10 @@ import type { FinanceStripeReversalWebhookInput } from "./finance-stripe-reversa
 
 export async function findReceiptForPaymentIntent(
   tx: Prisma.TransactionClient,
-  input: FinanceStripeReversalWebhookInput,
+  input: Pick<
+    FinanceStripeReversalWebhookInput,
+    "tenantId" | "orgId" | "livemode"
+  >,
   stripeAccountId: string,
   paymentIntentId: string,
 ) {
@@ -13,6 +16,7 @@ export async function findReceiptForPaymentIntent(
     where: {
       stripeAccountId,
       stripePaymentIntentId: paymentIntentId,
+      livemode: input.livemode,
       tenantId: input.tenantId,
       orgId: input.orgId,
       status: "PAID",
@@ -47,6 +51,7 @@ export async function findReceiptForPaymentIntent(
     where: {
       stripeAccountId,
       stripePaymentIntentId: paymentIntentId,
+      stripeConnection: { livemode: input.livemode },
       status: "SUCCEEDED",
       tenantId: input.tenantId,
       orgId: input.orgId,

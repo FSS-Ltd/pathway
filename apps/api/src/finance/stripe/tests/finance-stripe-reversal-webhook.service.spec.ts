@@ -391,13 +391,9 @@ describe("FinanceStripeReversalWebhookService", () => {
       findReceiptForPaymentIntent(
         tx,
         {
-          stripeEventId: "evt_bacs_return",
           tenantId,
           orgId,
-          stripeAccountId,
-          eventType: "charge.dispute.created",
           livemode: false,
-          payloadJson: {} as Prisma.JsonValue,
         },
         stripeAccountId,
         "pi_school_bacs",

@@ -20,6 +20,24 @@ const event = (id: string) => ({
 });
 
 describe("Stripe Finance reconciliation reader", () => {
+  it("accepts the documented refund object without livemode using the validated account and key scope", async () => {
+    const row = { id: "re_no_mode", object: "refund", created };
+    const fetcher = jest
+      .fn()
+      .mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({ object: "list", data: [row], has_more: false }),
+          ),
+      );
+    const provider = new StripeFinanceReconciliationProvider(
+      "sk_test_finance_fixture",
+      fetcher,
+    );
+    expect((await provider.listPage(scope, "refunds", range)).data).toEqual([
+      row,
+    ]);
+  });
   const resourceCases: Array<
     [FinanceReconciliationStream, string, string, string]
   > = [

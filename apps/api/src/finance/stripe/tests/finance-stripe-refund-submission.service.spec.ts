@@ -123,9 +123,10 @@ describe("FinanceStripeRefundSubmissionService", () => {
           .mockResolvedValue({ sourceReference: "cs_test_1" }),
       },
       financeCheckoutAttempt: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({ stripePaymentIntentId: "pi_test_1" }),
+        findFirst: jest.fn().mockResolvedValue({
+          stripePaymentIntentId: "pi_test_1",
+          livemode: false,
+        }),
       },
       financeReceiptMovement: { findFirst: jest.fn(), create: jest.fn() },
     };

@@ -64,6 +64,7 @@ export class FinanceStripeReversalWebhookService {
       (chargeIdFromStripe(refund.charge)
         ? await this.stripe.retrieveChargePaymentIntent({
             stripeAccountId,
+            livemode: input.livemode,
             chargeId: chargeIdFromStripe(refund.charge)!,
           })
         : null);
@@ -240,6 +241,7 @@ export class FinanceStripeReversalWebhookService {
       (chargeIdFromStripe(dispute.charge)
         ? await this.stripe.retrieveChargePaymentIntent({
             stripeAccountId,
+            livemode: input.livemode,
             chargeId: chargeIdFromStripe(dispute.charge)!,
           })
         : null);
