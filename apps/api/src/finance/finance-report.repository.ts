@@ -13,6 +13,7 @@ import {
   sumMinorUnits,
 } from "./finance-report-projection";
 import { resolveFinanceReportPeriod } from "./finance-report-period";
+import { loadFinanceExternalRefundReviews } from "./finance-external-refund-report";
 import { loadFinanceWebhookExceptions } from "./finance-webhook-exceptions";
 import type {
   FinanceReportInvoice,
@@ -494,7 +495,13 @@ export class FinanceReportRepository {
               }),
             ),
         ];
+        const externalRefundReviews = await loadFinanceExternalRefundReviews(
+          tx,
+          actor,
+          period.asOfCutoff,
+        );
         rows.push(
+          ...externalRefundReviews.rows,
           ...receiptsRows,
           ...allocationRows,
           ...exceptionRows,
@@ -502,6 +509,7 @@ export class FinanceReportRepository {
         );
 
         const totals = calculateFinanceReportTotals({
+          externalRefundReviewAmounts: externalRefundReviews.amountsMinor,
           invoices,
           periodCredits,
           periodReceipts,

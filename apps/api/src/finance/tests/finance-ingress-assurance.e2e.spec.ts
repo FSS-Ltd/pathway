@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import request from "supertest";
 import { prisma, withTenantRlsContext } from "@pathway/db";
 import { requireDatabase } from "../../../test-helpers.e2e";
+import { FinanceStripeReversalWebhookService } from "../stripe/finance-stripe-reversal-webhook.service";
 import { FinanceReportRepository } from "../finance-report.repository";
 import {
   FinanceStripeWebhookReplayService,
@@ -312,6 +313,62 @@ describe("Finance signed HTTP ingress and durable replay assurance", () => {
         }),
       ),
     ).toEqual([{ refundId: null }]);
+    const storedRefund = await withTenantRlsContext(f.tenantId, f.orgId, (tx) =>
+      tx.financeStripeWebhookEvent.findFirstOrThrow({
+        where: {
+          tenantId: f.tenantId,
+          orgId: f.orgId,
+          stripeEventId: refund.id,
+        },
+      }),
+    );
+    for (let replay = 0; replay < 2; replay++) {
+      await server.app.get(FinanceStripeReversalWebhookService).process({
+        tenantId: f.tenantId,
+        orgId: f.orgId,
+        stripeEventId: storedRefund.stripeEventId,
+        stripeAccountId: storedRefund.stripeAccountId,
+        eventType: storedRefund.eventType,
+        livemode: storedRefund.livemode,
+        payloadJson: storedRefund.payloadJson,
+      });
+    }
+    const reviewCases = await withTenantRlsContext(f.tenantId, f.orgId, (tx) =>
+      tx.financeReconciliationCase.findMany({
+        where: {
+          tenantId: f.tenantId,
+          orgId: f.orgId,
+          stripeConnectionId: f.connection.id,
+          resourceReference: refundReference,
+        },
+        include: { events: true },
+      }),
+    );
+    expect(reviewCases).toHaveLength(1);
+    expect(reviewCases[0]).toMatchObject({
+      kind: "UNKNOWN_OPERATION",
+      status: "OPEN",
+      amountMinor: 5000n,
+      currency: "GBP",
+      details: {
+        reason: "EXTERNAL_REFUND_PENDING_TREATMENT",
+        treatment: "REOPEN_BALANCE",
+        receiptId: posted.receipts[0]?.id,
+        fundsConfirmed: true,
+      },
+    });
+    expect(reviewCases[0]?.events.map((item) => item.type)).toEqual([
+      "DETECTED",
+    ]);
+    const day = new Date().toISOString().slice(0, 10);
+    const report = await new FinanceReportRepository(f.balances).loadSnapshot(
+      f.actor,
+      { from: day, to: day, asOf: day },
+    );
+    expect(report.rows.some((row) => row.reference === refundReference)).toBe(
+      true,
+    );
+    expect(report.totals?.reviewRequiredMinor).toBe("5000");
   });
 
   it("replays the actual SaaS handler without creating family money or changing Finance entitlement", async () => {

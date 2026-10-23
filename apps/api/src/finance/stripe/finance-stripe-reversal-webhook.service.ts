@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { FinanceStripeReversalWebhookInput } from "./finance-stripe-reversal-webhook.contracts";
+import { reconcileFinanceExternalRefundReview } from "../finance-external-refund-review";
 import { reconcileFinanceReceiptException } from "../finance-receipt-exception.persistence";
 import { lockReceipt } from "../finance-receipt-operations";
 import { recordFinanceReceiptMovement } from "../finance-receipt-movement.service";
@@ -222,6 +223,17 @@ export class FinanceStripeReversalWebhookService {
           localRefund,
           sourceReference,
         );
+      }
+      if (!localRefund) {
+        await reconcileFinanceExternalRefundReview(tx, {
+          tenantId: input.tenantId,
+          orgId: input.orgId,
+          financeProfileId: payment.receipt.financeProfileId,
+          receiptId: payment.receipt.id,
+          stripeAccountId,
+          livemode: input.livemode,
+          refundReference: refund.id,
+        });
       }
       await reconcileFinanceReceiptException(tx, {
         ...input,
