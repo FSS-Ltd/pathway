@@ -25,7 +25,7 @@ const referenceSchema = z.union([
   z.object({ id: z.string().min(1) }).passthrough(),
 ]);
 
-const setupIntentSchema = z.object({
+export const setupIntentSchema = z.object({
   id: z.string().startsWith("seti_"),
   object: z.literal("setup_intent"),
   status: z.enum([
@@ -45,7 +45,7 @@ const setupIntentSchema = z.object({
   }),
 });
 
-const paymentIntentSchema = z.object({
+export const paymentIntentSchema = z.object({
   id: z.string().startsWith("pi_"),
   object: z.literal("payment_intent"),
   status: z.enum([
@@ -66,7 +66,7 @@ const paymentIntentSchema = z.object({
   }),
 });
 
-const mandateSchema = z.object({
+export const mandateSchema = z.object({
   id: z.string().startsWith("mandate_"),
   object: z.literal("mandate"),
   status: z.enum(["active", "inactive", "pending"]),
@@ -74,7 +74,7 @@ const mandateSchema = z.object({
   payment_method: referenceSchema.nullable().optional(),
 });
 
-const paymentMethodSchema = z.object({
+export const paymentMethodSchema = z.object({
   id: z.string().startsWith("pm_"),
   object: z.literal("payment_method"),
   customer: referenceSchema.nullable().optional(),
@@ -284,7 +284,7 @@ function referenceId(
   return reference?.id ?? null;
 }
 
-function paymentIntentEventStatus(
+export function paymentIntentEventStatus(
   eventType: string,
 ): "processing" | "succeeded" | "failed" | "cancelled" {
   switch (eventType) {
@@ -301,7 +301,7 @@ function paymentIntentEventStatus(
   }
 }
 
-function eventStatusMatchesIntent(
+export function eventStatusMatchesIntent(
   eventStatus: "processing" | "succeeded" | "failed" | "cancelled",
   intentStatus: z.infer<typeof paymentIntentSchema>["status"],
 ): boolean {

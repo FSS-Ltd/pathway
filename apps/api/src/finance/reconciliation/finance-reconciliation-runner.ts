@@ -34,6 +34,11 @@ interface Dependencies {
     FinanceReconciliationStateRepository,
     "preview" | "claim" | "commitPage" | "release" | "fail"
   >;
+  preparePage(
+    scope: FinanceConnectionScope,
+    stream: FinanceReconciliationStream,
+    objects: FinanceReconciliationObject[],
+  ): Promise<FinanceReconciliationObject[]>;
   handlePage(
     input: FinanceReconciliationPageInput,
   ): Promise<FinanceReconciliationPageSummary>;
@@ -48,7 +53,7 @@ export async function runFinanceReconciliation(
   },
   dependencies: Dependencies,
 ): Promise<FinanceReconciliationRunResult> {
-  const { states, provider, handlePage, clock } = dependencies;
+  const { states, provider, preparePage, handlePage, clock } = dependencies;
   const result: FinanceReconciliationRunResult = {
     mode: input.mode,
     status: "busy",
@@ -79,6 +84,7 @@ export async function runFinanceReconciliation(
           to: window.to,
           ...(window.cursor ? { startingAfter: window.cursor } : {}),
         });
+        const objects = await preparePage(input.scope, input.stream, page.data);
         phase = "capture";
         let summary: FinanceReconciliationPageSummary = {
           recoverable: 0,
@@ -89,7 +95,7 @@ export async function runFinanceReconciliation(
             mode: "dry-run",
             scope: input.scope,
             stream: input.stream,
-            objects: page.data,
+            objects,
             now: clock(),
           });
         } else {
@@ -105,7 +111,7 @@ export async function runFinanceReconciliation(
                 tx,
                 scope: input.scope,
                 stream: input.stream,
-                objects: page.data,
+                objects,
                 now: clock(),
               });
             },

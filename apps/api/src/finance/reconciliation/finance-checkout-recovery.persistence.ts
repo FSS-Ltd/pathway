@@ -2,6 +2,7 @@ import { Prisma } from "@pathway/db";
 import type { FinanceReconciliationObject } from "../stripe/finance-stripe-reconciliation.provider";
 import type { FinanceConnectionScope } from "./finance-reconciliation.types";
 import type { FinanceReconciliationPageSummary } from "./finance-reconciliation-runner";
+import type { FinanceStripeCheckoutEventType } from "../stripe/finance-stripe-checkout-events";
 import {
   checkoutRecoveryMismatch,
   projectFinanceCheckout,
@@ -17,6 +18,11 @@ import {
 } from "./finance-reconciliation-case.persistence";
 
 type Attempt = Prisma.FinanceCheckoutAttemptGetPayload<Record<string, never>>;
+export interface FinanceCheckoutRecoveryOrigin {
+  id: string;
+  created: number;
+  eventType: FinanceStripeCheckoutEventType;
+}
 
 function checkoutUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
@@ -63,6 +69,7 @@ export async function recoverFinanceCheckout(
   object: FinanceReconciliationObject,
   now: Date,
   mode: "capture" | "dry-run",
+  origin?: FinanceCheckoutRecoveryOrigin,
 ): Promise<FinanceReconciliationPageSummary> {
   const checkout = projectFinanceCheckout(object);
   const attempt = checkout
@@ -93,9 +100,12 @@ export async function recoverFinanceCheckout(
           };
       const evidence = makeFinanceApiEvidence(
         scope,
-        "finance.reconciliation.checkout.unmatched",
+        origin?.eventType ?? "finance.reconciliation.checkout.unmatched",
         facts,
         now,
+        origin
+          ? { kind: "provider-event", id: origin.id, created: origin.created }
+          : undefined,
       );
       await captureFinanceApiEvidence(tx, scope, evidence, "hold", now);
       const paid = checkout?.payment_status === "paid";
@@ -156,16 +166,20 @@ export async function recoverFinanceCheckout(
     });
   }
   const eventType =
-    checkout.status === "complete"
+    origin?.eventType ??
+    (checkout.status === "complete"
       ? "checkout.session.completed"
       : checkout.status === "expired"
         ? "checkout.session.expired"
-        : "finance.reconciliation.checkout.open_observed";
+        : "finance.reconciliation.checkout.open_observed");
   const evidence = makeFinanceApiEvidence(
     scope,
     eventType,
     { ...checkout },
     now,
+    origin
+      ? { kind: "provider-event", id: origin.id, created: origin.created }
+      : undefined,
   );
   await captureFinanceApiEvidence(
     tx,

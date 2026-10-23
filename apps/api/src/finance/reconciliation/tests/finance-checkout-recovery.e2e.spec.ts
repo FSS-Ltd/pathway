@@ -10,6 +10,73 @@ describe("lost Finance Checkout recovery", () => {
       throw new Error("Checkout recovery requires a disposable database");
   });
 
+  it("retains the original provider event identity and confirmation date when linking a lost session", async () => {
+    await withReconciliationOperation(async ({ tx, scope, checkout }) => {
+      const eventCreated = Math.floor(Date.now() / 1000);
+      await recoverFinanceCheckout(
+        tx,
+        scope,
+        checkout,
+        new Date((eventCreated + 3600) * 1000),
+        "capture",
+        {
+          id: "evt_original_checkout",
+          created: eventCreated,
+          eventType: "checkout.session.completed",
+        },
+      );
+      const evidence = await tx.financeStripeWebhookEvent.findFirstOrThrow({
+        where: { tenantId: scope.tenantId, orgId: scope.orgId },
+      });
+      expect(evidence.stripeEventId).toBe("evt_original_checkout");
+      expect(evidence.payloadJson).toMatchObject({ created: eventCreated });
+      await new FinanceStripePaymentWebhookService(
+        new FinanceBalanceService(),
+      ).process({
+        tenantId: scope.tenantId,
+        orgId: scope.orgId,
+        stripeEventId: evidence.stripeEventId,
+        stripeAccountId: scope.stripeAccountId,
+        livemode: false,
+        eventType: evidence.eventType,
+        payloadJson: evidence.payloadJson,
+      });
+      expect(
+        await tx.financeReceipt.findFirst({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          select: { confirmedAt: true },
+        }),
+      ).toEqual({ confirmedAt: new Date(eventCreated * 1000) });
+    });
+  });
+
+  it("holds an unmatched original Checkout event under its real type and identity", async () => {
+    await withReconciliationOperation(async ({ tx, scope, checkout }) => {
+      await recoverFinanceCheckout(
+        tx,
+        scope,
+        { ...checkout, amount_total: 9999 },
+        new Date(),
+        "capture",
+        {
+          id: "evt_unmatched_checkout",
+          created: Math.floor(Date.now() / 1000),
+          eventType: "checkout.session.completed",
+        },
+      );
+      expect(
+        await tx.financeStripeWebhookEvent.findFirst({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          select: { stripeEventId: true, eventType: true, status: true },
+        }),
+      ).toEqual({
+        stripeEventId: "evt_unmatched_checkout",
+        eventType: "checkout.session.completed",
+        status: "AWAITING_HANDLER",
+      });
+    });
+  });
+
   it("links a lost session, records API provenance and replays a confirmed receipt once", async () => {
     await withReconciliationOperation(
       async ({ tx, scope, checkout, attemptId, invoiceId }) => {

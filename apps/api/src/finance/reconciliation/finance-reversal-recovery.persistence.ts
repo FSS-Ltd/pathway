@@ -14,15 +14,13 @@ import {
 import {
   projectFinanceDispute,
   projectFinanceRefund,
-  type FinanceReversalObservation,
 } from "./finance-reversal-observation";
 
-async function matchReversal(
+export async function financeReversalReceiptMismatch(
   tx: Prisma.TransactionClient,
   scope: FinanceConnectionScope,
-  observation: FinanceReversalObservation,
+  object: Prisma.InputJsonObject,
 ): Promise<string | null> {
-  const object = observation.object;
   const paymentIntentId = object.payment_intent;
   if (typeof paymentIntentId !== "string") return "MISSING_PAYMENT_INTENT";
   const payment = await findReceiptForPaymentIntent(
@@ -39,7 +37,7 @@ async function matchReversal(
     object.currency.toUpperCase() !== payment.receipt.currency
   )
     return "RECEIPT_MONEY_MISMATCH";
-  if (observation.eventType.startsWith("refund.")) {
+  if (object.object === "refund") {
     const metadata = object.metadata;
     const refundId =
       metadata &&
@@ -90,7 +88,7 @@ export async function recoverFinanceReversal(
     (object.livemode !== undefined && object.livemode !== scope.livemode
       ? "PROVIDER_MODE_MISMATCH"
       : first
-        ? await matchReversal(tx, scope, first)
+        ? await financeReversalReceiptMismatch(tx, scope, first.object)
         : "NO_MOVEMENT_EVIDENCE");
   const fundsConfirmed =
     Boolean(first?.movement) || first?.object.status === "succeeded";

@@ -81,10 +81,45 @@ function dependencies() {
       [FinanceReconciliationPageInput]
     >()
     .mockResolvedValue({ recoverable: 1, exceptions: 0 });
-  return { states, provider, handlePage, clock: () => now };
+  const preparePage = async (
+    _scope: typeof scope,
+    _stream: FinanceReconciliationLease["stream"],
+    objects: (typeof object)[],
+  ) => objects;
+  return { states, provider, preparePage, handlePage, clock: () => now };
 }
 
 describe("bounded Finance reconciliation", () => {
+  it("finishes remote enrichment before opening the page transaction", async () => {
+    const deps = dependencies();
+    let prepared = false;
+    deps.preparePage = async () => {
+      expect(deps.states.commitPage).not.toHaveBeenCalled();
+      prepared = true;
+      return [{ ...object, payment_intent: "pi_verified" }];
+    };
+    deps.handlePage.mockImplementation(async (page) => {
+      expect(prepared).toBe(true);
+      expect(page.objects[0]).toHaveProperty("payment_intent", "pi_verified");
+      return { recoverable: 1, exceptions: 0 };
+    });
+    expect(await runFinanceReconciliation(input, deps)).toMatchObject({
+      status: "completed",
+    });
+  });
+
+  it("retains the cursor when provider enrichment fails", async () => {
+    const deps = dependencies();
+    deps.preparePage = async () => {
+      throw new FinanceStripeReconciliationError("UNAVAILABLE");
+    };
+    expect(await runFinanceReconciliation(input, deps)).toMatchObject({
+      status: "failed",
+      reason: "UNAVAILABLE",
+      pages: 0,
+    });
+    expect(deps.states.commitPage).not.toHaveBeenCalled();
+  });
   it("counts evidence only after its transaction commits", async () => {
     const deps = dependencies();
     expect(await runFinanceReconciliation(input, deps)).toMatchObject({
