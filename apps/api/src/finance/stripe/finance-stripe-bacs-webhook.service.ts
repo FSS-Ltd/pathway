@@ -32,11 +32,14 @@ const supportedEvents = new Set([
 export class FinanceStripeBacsWebhookService {
   constructor(
     @Inject(FinanceAccessService)
-    private readonly financeAccess: FinanceAccessService,
+    private readonly financeAccess: Pick<FinanceAccessService, "resolveMode">,
     @Inject(FinanceBalanceService)
     private readonly balances: FinanceBalanceService,
     @Inject(FINANCE_STRIPE_BACS_PROVIDER)
-    private readonly provider: FinanceStripeBacsProvider,
+    private readonly provider: Pick<
+      FinanceStripeBacsProvider,
+      "detachPaymentMethod"
+    >,
   ) {}
 
   supports(eventType: string): boolean {

@@ -19,6 +19,7 @@ interface OperationFixture {
 
 export async function withReconciliationOperation(
   check: (fixture: OperationFixture) => Promise<void>,
+  currency: "GBP" | "EUR" = "EUR",
 ): Promise<void> {
   const orgId = process.env.E2E_ORG_ID;
   if (!orgId) throw new Error("Missing reconciliation fixture organisation");
@@ -45,8 +46,8 @@ export async function withReconciliationOperation(
           tenantId,
           orgId,
           legalEntityName: "Recovery fixture",
-          countryCode: "NL",
-          currency: "EUR",
+          countryCode: currency === "GBP" ? "GB" : "NL",
+          currency,
         },
       });
       const payer = await tx.financePayerAccount.create({
@@ -123,7 +124,7 @@ export async function withReconciliationOperation(
           stripeAccountId,
           livemode: false,
           amountMinor: 2450n,
-          currency: "EUR",
+          currency,
           idempotencyKey: randomUUID(),
           integrationIdentifier: "nexsteps-finance-abcdefgh",
         },
@@ -138,7 +139,7 @@ export async function withReconciliationOperation(
         status: "complete",
         payment_status: "paid",
         amount_total: 2450,
-        currency: "eur",
+        currency: currency.toLowerCase(),
         client_reference_id: attempt.id,
         payment_intent: `pi_${randomUUID().replaceAll("-", "")}`,
         expires_at: created + 86400,
