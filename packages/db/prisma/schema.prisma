@@ -5520,6 +5520,7 @@ model FinanceDebitAttempt {
   @@unique([id, tenantId, orgId])
   @@unique([stripeAccountId, stripePaymentIntentId])
   @@index([tenantId, orgId, status, createdAt])
+  @@index([stripeConnectionId, tenantId, orgId, id], map: "FinanceDebitAttempt_recovery_idx")
 }
 
 model FinanceMandate {
@@ -5563,6 +5564,7 @@ model FinanceMandate {
   @@unique([stripeAccountId, stripeCheckoutSessionId])
   @@unique([stripeAccountId, stripeSetupIntentId])
   @@index([tenantId, orgId, payerAccountId, status, createdAt])
+  @@index([stripeConnectionId, tenantId, orgId, id], map: "FinanceMandate_recovery_idx")
 }
 
 model FinanceRecurringInvoiceTemplate {
@@ -5880,6 +5882,7 @@ model FinanceCheckoutAttempt {
   @@unique([stripeAccountId, stripePaymentIntentId], map: "FinanceCheckoutAttempt_account_payment_intent_key")
   @@index([tenantId, orgId, invoiceId, status, createdAt])
   @@index([financeProfileId, status, createdAt])
+  @@index([stripeConnectionId, tenantId, orgId, id], map: "FinanceCheckoutAttempt_recovery_idx")
 }
 
 model FinanceStatement {
@@ -6321,6 +6324,7 @@ model FinanceRefund {
   @@unique([financeProfileId, bankTransactionReference])
   @@index([tenantId, orgId, receiptId, status, createdAt])
   @@index([financeProfileId, status, createdAt])
+  @@index([tenantId, orgId, stripeAccountId, id], map: "FinanceRefund_recovery_idx")
 }
 
 model FinanceRefundEvent {
@@ -6371,6 +6375,7 @@ model FinanceReceiptMovement {
   @@unique([financeProfileId, source, type, sourceReference])
   @@index([tenantId, orgId, receiptId, occurredAt])
   @@index([tenantId, orgId, type, occurredAt])
+  @@index([tenantId, orgId, type, id], map: "FinanceReceiptMovement_recovery_idx")
 }
 
 model FinanceReceiptMovementApplication {

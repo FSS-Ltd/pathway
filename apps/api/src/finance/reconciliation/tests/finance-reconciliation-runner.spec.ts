@@ -189,7 +189,7 @@ describe("bounded Finance reconciliation", () => {
       2,
       scope,
       "refunds",
-      { from: window.from, to: now, startingAfter: "re_example" },
+      { from: window.from, to: now, startingAfter: "re_example", pageSize: 10 },
     );
   });
 

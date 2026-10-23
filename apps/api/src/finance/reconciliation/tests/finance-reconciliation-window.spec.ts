@@ -90,6 +90,49 @@ describe("Finance reconciliation coverage window", () => {
     });
   });
 
+  it("sweeps all unresolved history at a fixed five-minute cutoff", () => {
+    expect(
+      planReconciliationWindow(empty, "unresolvedOperations", now),
+    ).toEqual({
+      from: new Date(0),
+      to: new Date("2026-10-23T12:00:00Z"),
+      cursor: null,
+      gap: null,
+    });
+    expect(
+      planReconciliationWindow(
+        { active: null, completedThrough: new Date("2026-10-23T12:00:00Z") },
+        "unresolvedOperations",
+        new Date("2026-10-23T12:04:59Z"),
+      ),
+    ).toBeNull();
+    expect(
+      planReconciliationWindow(
+        { active: null, completedThrough: new Date("2026-10-23T12:00:00Z") },
+        "unresolvedOperations",
+        new Date("2026-10-23T12:05:00Z"),
+      ),
+    ).toMatchObject({
+      from: new Date(0),
+      to: new Date("2026-10-23T12:05:00Z"),
+    });
+  });
+
+  it("resumes unresolved pagination even when a newer sweep interval starts", () => {
+    const active = {
+      from: new Date(0),
+      to: new Date("2026-10-23T11:55:00Z"),
+      cursor: "mandate:operation",
+    };
+    expect(
+      planReconciliationWindow(
+        { active, completedThrough: null },
+        "unresolvedOperations",
+        now,
+      ),
+    ).toEqual({ ...active, gap: null });
+  });
+
   it("does not regress completed coverage when the clock moves backwards", () => {
     expect(
       planReconciliationWindow(

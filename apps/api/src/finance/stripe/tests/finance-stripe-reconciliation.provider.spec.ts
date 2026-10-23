@@ -48,6 +48,7 @@ describe("Stripe Finance reconciliation reader", () => {
       "/v1/checkout/sessions",
     ],
     ["paymentIntents", "payment_intent", "pi_payment", "/v1/payment_intents"],
+    ["setupIntents", "setup_intent", "seti_setup", "/v1/setup_intents"],
     ["charges", "charge", "ch_payment", "/v1/charges"],
     ["charges", "charge", "py_bacs_payment", "/v1/charges"],
     ["refunds", "refund", "re_refund", "/v1/refunds"],
@@ -122,6 +123,44 @@ describe("Stripe Finance reconciliation reader", () => {
     );
     expect(requests[0].headers.get("Idempotency-Key")).toBeNull();
     expect(requests[0].method).toBe("GET");
+  });
+
+  it("bounds provider page size for short capture transactions", async () => {
+    const provider = new StripeFinanceReconciliationProvider(
+      "sk_test_fixture",
+      async (input) => {
+        expect(new URL(String(input)).searchParams.get("limit")).toBe("10");
+        return json({ data: [event("evt_small")], has_more: false });
+      },
+    );
+    expect(
+      (await provider.listPage(scope, "events", { ...range, pageSize: 10 }))
+        .data,
+    ).toHaveLength(1);
+  });
+
+  it.each([0, -1, 101, 1.5, Number.NaN])(
+    "rejects invalid page size %s before fetching",
+    async (pageSize) => {
+      const provider = new StripeFinanceReconciliationProvider(
+        "sk_test_fixture",
+        async () => json({ data: [], has_more: false }),
+      );
+      await expect(
+        provider.listPage(scope, "events", { ...range, pageSize }),
+      ).rejects.toMatchObject({ reason: "INVALID_SCOPE" });
+    },
+  );
+
+  it("rejects a provider page larger than requested", async () => {
+    const provider = new StripeFinanceReconciliationProvider(
+      "sk_test_fixture",
+      async () =>
+        json({ data: [event("evt_one"), event("evt_two")], has_more: false }),
+    );
+    await expect(
+      provider.listPage(scope, "events", { ...range, pageSize: 1 }),
+    ).rejects.toMatchObject({ reason: "INVALID_RESPONSE" });
   });
 
   it("resumes an interrupted page without changing its fixed date window", async () => {

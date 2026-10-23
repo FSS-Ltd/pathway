@@ -82,6 +82,38 @@ describe("Finance reconciliation page transactions", () => {
     ).toBe(0);
   });
 
+  it("persists an independent unresolved-operation lease and fixed cutoff", async () => {
+    const scope = await fixture();
+    const lease = requiredLease(
+      await repository.claim(scope, "unresolvedOperations", now),
+    );
+    expect(lease.window.from).toEqual(new Date(0));
+    expect(lease.window.to).toEqual(now);
+    expect(
+      await repository.commitPage(
+        lease,
+        "mandate:operation",
+        now,
+        async () => {},
+      ),
+    ).toMatchObject({ kind: "continued" });
+    const row = await state(scope);
+    expect(row).toMatchObject({
+      stream: "unresolvedOperations",
+      pageCursor: "mandate:operation",
+      completedThrough: null,
+    });
+  });
+
+  it("keeps SetupIntent discovery coverage separate from unresolved inspection", async () => {
+    const scope = await fixture();
+    const lease = requiredLease(
+      await repository.claim(scope, "setupIntents", now),
+    );
+    expect(lease.stream).toBe("setupIntents");
+    expect(lease.window.from).toEqual(new Date("2026-10-16T12:00:00Z"));
+  });
+
   it("grants only one of two concurrent leases", async () => {
     const scope = await fixture();
     const claims = await Promise.all([

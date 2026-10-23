@@ -20,6 +20,7 @@ interface OperationFixture {
 export async function withReconciliationOperation(
   check: (fixture: OperationFixture) => Promise<void>,
   currency: "GBP" | "EUR" = "EUR",
+  operationCreatedAt?: Date,
 ): Promise<void> {
   const orgId = process.env.E2E_ORG_ID;
   if (!orgId) throw new Error("Missing reconciliation fixture organisation");
@@ -127,6 +128,7 @@ export async function withReconciliationOperation(
           currency,
           idempotencyKey: randomUUID(),
           integrationIdentifier: "nexsteps-finance-abcdefgh",
+          ...(operationCreatedAt ? { createdAt: operationCreatedAt } : {}),
         },
       });
       const created = Math.floor(Date.now() / 1000);

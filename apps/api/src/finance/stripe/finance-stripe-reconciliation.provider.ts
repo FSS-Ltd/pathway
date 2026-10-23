@@ -3,6 +3,7 @@ import { z } from "zod";
 export type FinanceReconciliationStream =
   | "events"
   | "checkoutSessions"
+  | "setupIntents"
   | "paymentIntents"
   | "charges"
   | "refunds"
@@ -26,6 +27,7 @@ export interface FinanceReconciliationRange {
   from: Date;
   to: Date;
   startingAfter?: string;
+  pageSize?: number;
 }
 
 export class FinanceStripeReconciliationError extends Error {
@@ -46,6 +48,11 @@ const resources = {
     path: "/v1/checkout/sessions",
     object: "checkout.session",
     prefix: "cs_",
+  },
+  setupIntents: {
+    path: "/v1/setup_intents",
+    object: "setup_intent",
+    prefix: "seti_",
   },
   paymentIntents: {
     path: "/v1/payment_intents",
@@ -101,6 +108,9 @@ export class StripeFinanceReconciliationProvider {
     data: FinanceReconciliationObject[];
     nextCursor: string | null;
   }> {
+    const pageSize = range.pageSize ?? 100;
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100)
+      throw new FinanceStripeReconciliationError("INVALID_SCOPE");
     const from = Math.floor(range.from.getTime() / 1000);
     const to = Math.floor(range.to.getTime() / 1000);
     if (
@@ -114,7 +124,7 @@ export class StripeFinanceReconciliationProvider {
     }
     if (range.startingAfter) assertIdentity(stream, range.startingAfter);
     const query = new URLSearchParams({
-      limit: "100",
+      limit: String(pageSize),
       "created[gte]": String(from),
       "created[lt]": String(to),
     });
@@ -125,7 +135,7 @@ export class StripeFinanceReconciliationProvider {
       Boolean(range.startingAfter),
     );
     const parsed = pageSchema.safeParse(payload);
-    if (!parsed.success)
+    if (!parsed.success || parsed.data.data.length > pageSize)
       throw new FinanceStripeReconciliationError("INVALID_RESPONSE");
     const data = parsed.data.data.map((row) => parseObject(scope, stream, row));
     if (

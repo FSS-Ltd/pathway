@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { withTenantRlsContext, type Prisma } from "@pathway/db";
-import type { FinanceReconciliationStream } from "../stripe/finance-stripe-reconciliation.provider";
 import {
   planReconciliationWindow,
   type FinanceReconciliationWindow,
 } from "./finance-reconciliation-window";
 import type {
   FinanceConnectionScope,
+  FinanceRecoveryStream,
   FinanceReconciliationLease,
   FinanceReconciliationPageCommit,
 } from "./finance-reconciliation.types";
@@ -39,7 +39,7 @@ function storedWindow(state: FinanceReconciliationState | null) {
 async function lockState(
   tx: Prisma.TransactionClient,
   scope: FinanceConnectionScope,
-  stream: FinanceReconciliationStream,
+  stream: FinanceRecoveryStream,
 ): Promise<FinanceReconciliationState | null> {
   const rows = await tx.$queryRaw<FinanceReconciliationState[]>`
     SELECT * FROM "FinanceReconciliationState"
@@ -70,7 +70,7 @@ function ownsPage(
 export class FinanceReconciliationStateRepository {
   async preview(
     scope: FinanceConnectionScope,
-    stream: FinanceReconciliationStream,
+    stream: FinanceRecoveryStream,
     now: Date,
   ): Promise<FinanceReconciliationWindow | null> {
     return withTenantRlsContext(scope.tenantId, scope.orgId, async (tx) => {
@@ -89,7 +89,7 @@ export class FinanceReconciliationStateRepository {
 
   async claim(
     scope: FinanceConnectionScope,
-    stream: FinanceReconciliationStream,
+    stream: FinanceRecoveryStream,
     now: Date,
   ): Promise<FinanceReconciliationLease | null> {
     return withTenantRlsContext(scope.tenantId, scope.orgId, async (tx) => {

@@ -80,6 +80,7 @@ export async function runFinanceReconciliation(
       let phase: "provider" | "capture" = "provider";
       try {
         const page = await provider.listPage(input.scope, input.stream, {
+          pageSize: 10,
           from: window.from,
           to: window.to,
           ...(window.cursor ? { startingAfter: window.cursor } : {}),

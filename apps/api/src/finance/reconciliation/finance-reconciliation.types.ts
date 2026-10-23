@@ -10,9 +10,13 @@ export interface FinanceConnectionScope extends FinanceReconciliationScope {
   orgId: string;
 }
 
+export type FinanceRecoveryStream =
+  | FinanceReconciliationStream
+  | "unresolvedOperations";
+
 export interface FinanceReconciliationLease {
   scope: FinanceConnectionScope;
-  stream: FinanceReconciliationStream;
+  stream: FinanceRecoveryStream;
   stateId: string;
   token: string;
   window: FinanceReconciliationWindow;
