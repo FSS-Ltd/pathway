@@ -434,3 +434,49 @@ head `49b2aa30bc35f89c83ca57c6ef6280ff2c0cfe9f` has CI run40032001845 and
 CodeQL run40031999503 in progress. Pending checks are not passing evidence.
 The checked revision and final results must be refreshed after every push;
 no merge or full T18 completion is claimed.
+
+### T18 hosted Bacs setup correction
+
+Read-only revalidation of all three known synthetic school accounts still found
+charges/payouts disabled and incomplete onboarding. That did not establish that
+every Sandbox Bacs operation was unavailable. A bounded real-adapter probe using
+an existing accepted test mandate created one £1 (100 GBP minor units) direct debit in
+`processing`. Its later provider status was `requires_payment_method`; this is
+not a confirmed receipt or complete cancellation/return assurance. The probe's
+durable operation identity and provider references are retained privately.
+
+The earlier T18 harness attempted direct SetupIntent confirmation, whereas
+[Stripe requires hosted Checkout setup for this Bacs path](https://docs.stripe.com/payments/bacs-debit).
+Exercising the actual hosted adapter exposed HTTP 400 `parameter_unknown` for
+`setup_intent_data[usage]`. Removing that unsupported Checkout override produced
+an open test-mode session restricted to Bacs. After explicit user approval of
+the new fictional payer mandate, in-app-browser submission completed. An
+account-scoped authenticated read verified SetupIntent `succeeded`, usage
+`off_session`, active mandate and matching customer/payment method. Hosted setup
+created no PaymentIntent. No school onboarding password was needed for that
+separate payer flow; school payout readiness remains unverified.
+
+The real return also exposed URL-encoded `{CHECKOUT_SESSION_ID}`. A second
+regression reproduced it. The adapter now serializes the mandate identifier
+before appending Stripe's literal placeholder, matching the existing card flow.
+A fresh unsubmitted test session retained that literal template and was expired
+through the real mandate-servicing adapter. Readback confirmed `expired`, a
+cancelled unsubmitted SetupIntent, no mandate/method and no PaymentIntent. The
+first expiry harness incorrectly expected no SetupIntent at all; that assertion
+failed after expiry. Read-only recovery verified the retained cancelled object
+without creating or expiring another session.
+
+Both product regressions were behaviorally RED; final provider/servicing units
+passed two suites /27 tests. An initial combined command named a nonexistent
+mandate unit file; its nine provider tests passed but the aggregate failed. The
+corrected complete suites are the successful 27-test result. API typecheck/full
+Node 24 build, focused lint and formatting passed. Independent Sol review found
+no P0–P2 issue in the two changed product files. These changes require fresh PR #737
+CI; results on its previous head do not cover this correction. Bacs live stays
+disabled, and T18/T19 completion is not claimed.
+
+**Queued owner request:** Add a Finance setting named “Name on parents' bank
+statements”, with validation and a preview, as a separate focused PR after the
+current PR passes and is confirmed merged. Card statement names and paid Bacs
+Custom Branding must be distinguished. No Bacs branding fee was enabled or
+approved; no implementation of that next change has started.

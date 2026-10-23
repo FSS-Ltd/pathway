@@ -253,3 +253,23 @@ scheduled recovery remains unchanged. PR #735 merged at c886a54 after all eleven
 succeeded on f21c6cd. That CI predates E25 source and does not verify this correction.
 Mandatory Bacs, payout, private storage and accessibility proof remain open. T19
 has not started.
+
+E26: Actual hosted Bacs adapter RED/GREEN. A saved accepted synthetic mandate
+allowed a £1 direct-debit probe despite incomplete Sandbox school onboarding;
+its later `requires_payment_method` status is not a receipt. The actual hosted
+adapter returned 400 `parameter_unknown` for `setup_intent_data[usage]`. Removing
+the unsupported override created Bacs-only Checkout. The user explicitly approved
+its fictional bank mandate; browser submission plus account-scoped provider reads
+verified completed Checkout, succeeded SetupIntent, `off_session` usage and an
+active, correctly bound mandate. This separates payer setup from school onboarding
+readiness. Direct non-hosted SetupIntent confirmation is not a substitute for
+this flow.
+
+The real return exposed an encoded session placeholder. Its unit regression was
+RED; the corrected adapter preserves the literal template. Actual creation/readback
+and servicing expiry of one unsubmitted session passed. The first expiry assertion
+incorrectly expected null SetupIntent; read-only recovery instead verified its
+cancelled, unsubmitted object without repeating writes. Two full unit suites/27
+tests, API types/build and targeted lint/formatting passed. Final-head CI is still
+required. These provider-only fixtures do not prove full ledger posting, required
+asynchronous return/cancellation cases, payout eligibility or all T18 assurance.
