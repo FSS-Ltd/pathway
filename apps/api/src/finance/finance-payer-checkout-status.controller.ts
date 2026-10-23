@@ -26,7 +26,7 @@ export class FinancePayerCheckoutStatusController {
 
   @Get(":attemptId")
   @Header("Cache-Control", "private, no-store")
-  @RequirePermission("finance.family_invoices.read")
+  @RequirePermission("finance.family_payments.pay")
   getStatus(@Param("attemptId", ParseUUIDPipe) attemptId: string) {
     return this.attempts.getPayerStatus(
       financeRequestActor(this.requestContext),
