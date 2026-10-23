@@ -56,7 +56,6 @@ import { FinanceStripeWebhookInternalController } from "./stripe/finance-stripe-
 import {
   FINANCE_STRIPE_CONNECT_CONFIG,
   loadFinanceStripeConnectConfig,
-  type FinanceStripeConnectConfig,
 } from "./stripe/finance-stripe-connect.config";
 import {
   DisabledFinanceStripeConnectProvider,
@@ -64,6 +63,16 @@ import {
   StripeFinanceConnectProvider,
 } from "./stripe/finance-stripe-connect.provider";
 import { FinanceStripeConnectionService } from "./stripe/finance-stripe-connection.service";
+import { FinanceStripeAccountSyncService } from "./stripe/finance-stripe-account-sync.service";
+import {
+  FINANCE_STRIPE_ACCOUNT_READER,
+  StripeFinanceAccountReader,
+} from "./stripe/finance-stripe-account-reader.provider";
+import {
+  FINANCE_STRIPE_SERVICING_CONFIG,
+  loadFinanceStripeServicingConfig,
+  type FinanceStripeServicingConfig,
+} from "./stripe/finance-stripe-servicing.config";
 import {
   FINANCE_STRIPE_REPORTING_PROVIDER,
   StripeFinanceReportingProvider,
@@ -167,6 +176,7 @@ import {
     FinanceProfileService,
     FinancePayerGrantService,
     FinanceStripeConnectionService,
+    FinanceStripeAccountSyncService,
     FinanceStripeCheckoutAttemptService,
     FinanceStripeCheckoutService,
     FinanceStripeBacsMandateService,
@@ -196,12 +206,23 @@ import {
       inject: [FINANCE_STRIPE_CONNECT_CONFIG],
     },
     {
+      provide: FINANCE_STRIPE_SERVICING_CONFIG,
+      useFactory: loadFinanceStripeServicingConfig,
+      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_ACCOUNT_READER,
+      useFactory: (config: FinanceStripeServicingConfig) =>
+        new StripeFinanceAccountReader(config),
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
+    },
+    {
       provide: FINANCE_STRIPE_REPORTING_PROVIDER,
-      useFactory: (config: FinanceStripeConnectConfig) =>
+      useFactory: (config: FinanceStripeServicingConfig) =>
         new StripeFinanceReportingProvider(
           config.mode === "disabled" ? "" : config.secretKey,
         ),
-      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
     {
       provide: FINANCE_STRIPE_CHECKOUT_CONFIG,
@@ -230,18 +251,16 @@ import {
     },
     {
       provide: FINANCE_STRIPE_REFUND_PROVIDER,
-      useFactory: (
-        config: ReturnType<typeof loadFinanceStripeCheckoutConfig>,
-      ) =>
+      useFactory: (config: FinanceStripeServicingConfig) =>
         config.mode === "disabled"
           ? new DisabledFinanceStripeRefundProvider()
           : new StripeFinanceRefundProvider(config),
-      inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
     {
       provide: FINANCE_STRIPE_WEBHOOK_CONFIG,
       useFactory: loadFinanceStripeWebhookConfig,
-      inject: [FINANCE_STRIPE_CONNECT_CONFIG],
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
   ],
 })

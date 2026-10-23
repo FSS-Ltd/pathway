@@ -1,7 +1,7 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
 import type { FinanceCurrency } from "@pathway/platform";
-import type { FinanceStripeCheckoutConfig } from "./finance-stripe-checkout.config";
+import type { FinanceStripeServicingConfig } from "./finance-stripe-servicing.config";
 
 const STRIPE_API_VERSION = "2026-09-30.endive";
 const STRIPE_API_BASE_URL = "https://api.stripe.com";
@@ -86,7 +86,7 @@ export class DisabledFinanceStripeRefundProvider implements FinanceStripeRefundP
 export class StripeFinanceRefundProvider implements FinanceStripeRefundProvider {
   constructor(
     private readonly config: Exclude<
-      FinanceStripeCheckoutConfig,
+      FinanceStripeServicingConfig,
       { mode: "disabled" }
     >,
     private readonly fetcher: typeof fetch = fetch,

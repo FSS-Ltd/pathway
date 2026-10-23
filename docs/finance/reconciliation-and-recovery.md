@@ -50,6 +50,10 @@ The third increment adds tenant-checked lease and page transactions, a fixed-win
 
 Verification for this increment: 11 real-database page/lease tests and 16 window/runner unit tests passed, following observed missing-behavior failures. API typecheck, targeted ESLint, formatting and whitespace checks passed. The API-observation handler and scheduled entry points are still pending; the runner is not yet registered for execution.
 
-The feature is not complete: scheduled jobs, canonical recovered evidence processing, operator UI, dry-run/sandbox evidence, runbooks and full verification remain. Read-only recovery must use servicing credentials even when new collection is disabled.
+The fourth increment separates provider servicing credentials from collection configuration. Existing enabled collection settings remain compatible; an explicit servicing mode/key supports existing-record work with collection disabled. Test/live runtime and key checks reject mixed environments. Webhooks, account-status reads, reports and approved refunds use the servicing binding. Account webhook refresh reads Stripe between short tenant transactions, then locks and rechecks the connection before updating; a concurrent disconnection stays disconnected. The account parser/status mapping is shared with Connect onboarding.
+
+Verification for the servicing increment: nine focused API suites / 56 tests passed, including collection-disabled servicing, environment/key rejection and disconnection races, after observed missing-behavior failures. API typecheck, targeted ESLint, formatting and whitespace checks passed. Configuration examples contain names only. No key, environment, account, live switch or deployment was changed.
+
+The feature is not complete: scheduled jobs, canonical recovered evidence processing, operator UI, dry-run/sandbox evidence, runbooks and full verification remain.
 
 The next implementation pass must inspect refund and Bacs submission timestamps and key-retention behavior as part of the unresolved-operation sweep. Provider reads must recover already accepted operations before any permitted retry; an unresolved outcome beyond the safe retry window requires a case and retains its reservation.

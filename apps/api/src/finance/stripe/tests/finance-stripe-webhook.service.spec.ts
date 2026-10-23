@@ -1,7 +1,7 @@
 import { ServiceUnavailableException } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { FinanceStripeWebhookConfig } from "../finance-stripe-webhook.config";
-import type { FinanceStripeConnectionService } from "../finance-stripe-connection.service";
+import type { FinanceStripeAccountSyncService } from "../finance-stripe-account-sync.service";
 import {
   FinanceStripeWebhookReplayService,
   FinanceStripeWebhookService,
@@ -95,7 +95,7 @@ describe("FinanceStripeWebhookReplayService", () => {
   const mockRls = jest.mocked(withTenantRlsContext);
   const sync = {
     refreshFromWebhook: jest.fn().mockResolvedValue(undefined),
-  } as unknown as FinanceStripeConnectionService;
+  } as unknown as FinanceStripeAccountSyncService;
   const paymentProcess = jest.fn().mockResolvedValue("deferred");
   const payments = {
     process: paymentProcess,

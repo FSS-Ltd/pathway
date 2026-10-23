@@ -25,6 +25,25 @@ the SaaS subscription webhook secret. The Finance webhook inbox remains the
 durable acceptance point before acknowledgement. Bacs remains test-only in the
 provider binding.
 
+T17 separates existing-record servicing from new collection. With collection
+disabled, configure `FINANCE_STRIPE_SERVICING_MODE=test` or `live` and the
+matching `FINANCE_STRIPE_SERVICING_SECRET_KEY_TEST` or
+`FINANCE_STRIPE_SERVICING_SECRET_KEY_LIVE` in that environment's secret store.
+Prefer a restricted key with only the required account-read, payment-read,
+settlement-read and approved-refund permissions. The application validates
+the key's mode; Stripe enforces its actual permissions. It does not fall back
+to another environment's key or the SaaS webhook secret.
+
+Existing enabled collection configuration remains a backward-compatible
+servicing source. An explicit servicing key takes precedence. Live servicing
+requires the Production runtime but does not require the new-collection live
+switch. Test servicing is rejected in Production; live servicing is rejected
+in Preview and local development. Webhook verification, refund servicing,
+account-status reads and provider reports use this servicing configuration.
+The optional explicit `disabled` servicing mode stops those provider paths;
+it is an incident stop, and queued evidence must be recovered afterwards.
+No environment or credential is enabled by this source change.
+
 The production Vercel sync script targets only the Production environment. It
 does not copy Stripe test API keys, test webhook secrets, or test price maps.
 Its Finance defaults are `FINANCE_STRIPE_CONNECT_MODE=disabled` and
@@ -60,8 +79,9 @@ documents the separate Supabase project restore rehearsal and its limits.
 
 - Test mode remains available in local and Preview environments for the
   authorized sandbox work.
-- Finance live Connect and Finance live webhook processing remain disabled
-  unless the production-only switch is deliberately configured.
+- Finance live Connect remains disabled unless the production-only collection
+  switch is deliberately configured. Existing live-record servicing requires
+  its separate explicit Production configuration when collection is disabled.
 - The database restore check runs only against fresh CI databases and is not
   wired to production deployment.
 - Reverting this step removes the new environment gate and restore check; no
