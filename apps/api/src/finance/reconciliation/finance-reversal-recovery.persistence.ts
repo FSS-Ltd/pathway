@@ -3,6 +3,7 @@ import { findReceiptForPaymentIntent } from "../stripe/finance-stripe-reversal-w
 import type { FinanceReconciliationObject } from "../stripe/finance-stripe-reconciliation.provider";
 import type { FinanceConnectionScope } from "./finance-reconciliation.types";
 import type { FinanceReconciliationPageSummary } from "./finance-reconciliation-runner";
+import { financeReconciliationCaseKey } from "./finance-reconciliation-case-key";
 import {
   captureFinanceApiEvidence,
   makeFinanceApiEvidence,
@@ -92,7 +93,11 @@ export async function recoverFinanceReversal(
         : "NO_MOVEMENT_EVIDENCE");
   const fundsConfirmed =
     Boolean(first?.movement) || first?.object.status === "succeeded";
-  const caseKey = `reversal:${object.id}:${fundsConfirmed ? "money" : "operation"}`;
+  const caseKey = financeReconciliationCaseKey(
+    "reversal",
+    object.id,
+    fundsConfirmed ? "money" : "operation",
+  );
   if (issue) {
     if (mode === "capture") {
       const evidence = makeFinanceApiEvidence(
@@ -137,7 +142,11 @@ export async function recoverFinanceReversal(
       },
       select: { id: true },
     });
-    const gapKey = `reversal:${object.id}:refund-history`;
+    const gapKey = financeReconciliationCaseKey(
+      "reversal",
+      object.id,
+      "refund-history",
+    );
     if (!original) {
       exceptions++;
       if (mode === "capture")
@@ -185,7 +194,11 @@ export async function recoverFinanceReversal(
   await resolveReconciliationCase(
     tx,
     scope,
-    `reversal:${object.id}:${fundsConfirmed ? "operation" : "money"}`,
+    financeReconciliationCaseKey(
+      "reversal",
+      object.id,
+      fundsConfirmed ? "operation" : "money",
+    ),
     now,
     "provider_receipt_matched",
   );

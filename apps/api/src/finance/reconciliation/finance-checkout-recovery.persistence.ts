@@ -3,6 +3,7 @@ import type { FinanceReconciliationObject } from "../stripe/finance-stripe-recon
 import type { FinanceConnectionScope } from "./finance-reconciliation.types";
 import type { FinanceReconciliationPageSummary } from "./finance-reconciliation-runner";
 import type { FinanceStripeCheckoutEventType } from "../stripe/finance-stripe-checkout-events";
+import { financeReconciliationCaseKey } from "./finance-reconciliation-case-key";
 import {
   checkoutRecoveryMismatch,
   projectFinanceCheckout,
@@ -113,7 +114,11 @@ export async function recoverFinanceCheckout(
         tx,
         scope,
         {
-          key: `checkout:${object.id}:${paid ? "money" : "operation"}`,
+          key: financeReconciliationCaseKey(
+            "checkout",
+            object.id,
+            paid ? "money" : "operation",
+          ),
           kind: paid ? "UNMATCHED_MONEY" : "UNKNOWN_OPERATION",
           resourceReference: object.id,
           ...(checkout
@@ -191,14 +196,14 @@ export async function recoverFinanceCheckout(
   await resolveReconciliationCase(
     tx,
     scope,
-    `checkout:${checkout.id}:money`,
+    financeReconciliationCaseKey("checkout", checkout.id, "money"),
     now,
     "provider_operation_recovered",
   );
   await resolveReconciliationCase(
     tx,
     scope,
-    `checkout:${checkout.id}:operation`,
+    financeReconciliationCaseKey("checkout", checkout.id, "operation"),
     now,
     "provider_operation_recovered",
   );

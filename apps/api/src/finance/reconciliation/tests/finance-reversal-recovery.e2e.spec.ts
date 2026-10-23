@@ -109,6 +109,27 @@ function dispute(
 }
 
 describe("canonical recovered refunds and dispute movements", () => {
+  it("retains distinct unresolved reversals at the provider identifier length limit", async () => {
+    await withReconciliationOperation(async ({ tx, scope, checkout }) => {
+      const ids = ["x", "y"].map((end) => `re_${"a".repeat(251)}${end}`);
+      for (const id of ids)
+        await recoverFinanceReversal(
+          tx,
+          scope,
+          "refunds",
+          { ...refund(checkout), id },
+          new Date(),
+          "capture",
+        );
+      const cases = await tx.financeReconciliationCase.findMany({
+        where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        select: { caseKey: true, resourceReference: true },
+      });
+      expect(cases).toHaveLength(2);
+      expect(cases.map((row) => row.resourceReference).sort()).toEqual(ids);
+      expect(cases.every((row) => row.caseKey.length <= 255)).toBe(true);
+    });
+  });
   beforeAll(() => {
     if (!requireDatabase())
       throw new Error("Reversal recovery requires a disposable database");

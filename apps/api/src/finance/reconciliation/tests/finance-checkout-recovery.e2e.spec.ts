@@ -5,6 +5,35 @@ import { recoverFinanceCheckout } from "../finance-checkout-recovery.persistence
 import { withReconciliationOperation } from "./finance-reconciliation-operation.fixture";
 
 describe("lost Finance Checkout recovery", () => {
+  it("retains distinct unmatched cases for maximum-length provider IDs", async () => {
+    await withReconciliationOperation(async ({ tx, scope, checkout }) => {
+      const ids = ["x", "y"].map((end) => `cs_${"a".repeat(251)}${end}`);
+      for (const id of ids) {
+        const unmatched = { ...checkout, id, metadata: {} };
+        await recoverFinanceCheckout(
+          tx,
+          scope,
+          unmatched,
+          new Date(),
+          "capture",
+        );
+        await recoverFinanceCheckout(
+          tx,
+          scope,
+          unmatched,
+          new Date(),
+          "capture",
+        );
+      }
+      const cases = await tx.financeReconciliationCase.findMany({
+        where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        select: { caseKey: true, resourceReference: true },
+      });
+      expect(cases).toHaveLength(2);
+      expect(cases.map((row) => row.resourceReference).sort()).toEqual(ids);
+      expect(cases.every((row) => row.caseKey.length <= 255)).toBe(true);
+    });
+  });
   beforeAll(() => {
     if (!requireDatabase())
       throw new Error("Checkout recovery requires a disposable database");
