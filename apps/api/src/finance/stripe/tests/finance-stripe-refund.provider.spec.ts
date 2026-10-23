@@ -18,6 +18,31 @@ function stripeResponse(body: unknown, status = 200): Response {
 }
 
 describe("StripeFinanceRefundProvider", () => {
+  it("retrieves the PaymentIntent of a non-card py_ charge in its connected account", async () => {
+    const fetcher = jest.fn().mockResolvedValue(
+      stripeResponse({
+        id: "py_bacs_payment",
+        object: "charge",
+        payment_intent: "pi_bacs_payment",
+      }),
+    );
+    const provider = new StripeFinanceRefundProvider(testConfig, fetcher);
+    expect(
+      await provider.retrieveChargePaymentIntent({
+        stripeAccountId: "acct_school_test",
+        chargeId: "py_bacs_payment",
+      }),
+    ).toBe("pi_bacs_payment");
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://api.stripe.com/v1/charges/py_bacs_payment",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({
+          "Stripe-Account": "acct_school_test",
+        }),
+      }),
+    );
+  });
   it("never posts an unknown refund beyond the permitted retry window", async () => {
     const fetcher = jest
       .fn()

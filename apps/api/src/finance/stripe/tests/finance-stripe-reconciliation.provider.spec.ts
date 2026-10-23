@@ -31,6 +31,7 @@ describe("Stripe Finance reconciliation reader", () => {
     ],
     ["paymentIntents", "payment_intent", "pi_payment", "/v1/payment_intents"],
     ["charges", "charge", "ch_payment", "/v1/charges"],
+    ["charges", "charge", "py_bacs_payment", "/v1/charges"],
     ["refunds", "refund", "re_refund", "/v1/refunds"],
     ["disputes", "dispute", "du_dispute", "/v1/disputes"],
     [

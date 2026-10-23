@@ -2,6 +2,7 @@ import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
 import type { FinanceCurrency } from "@pathway/platform";
 import type { FinanceStripeServicingConfig } from "./finance-stripe-servicing.config";
+import { stripeChargeIdSchema } from "./finance-stripe-references";
 
 const STRIPE_API_VERSION = "2026-09-30.endive";
 const STRIPE_API_BASE_URL = "https://api.stripe.com";
@@ -30,7 +31,7 @@ const refundListSchema = z.object({
   has_more: z.boolean(),
 });
 const chargeSchema = z.object({
-  id: z.string().startsWith("ch_"),
+  id: stripeChargeIdSchema,
   object: z.literal("charge"),
   payment_intent: z
     .union([

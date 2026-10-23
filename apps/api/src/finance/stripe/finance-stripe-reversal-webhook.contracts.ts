@@ -1,6 +1,7 @@
 import type { FinanceCurrency } from "@pathway/platform";
 import type { Prisma } from "@pathway/db";
 import { z } from "zod";
+import { stripeChargeIdSchema } from "./finance-stripe-references";
 
 export const refundEventTypes = new Set([
   "refund.created",
@@ -38,14 +39,15 @@ export const stripeRefundSchema = z
     payment_intent: stripePaymentIntentSchema,
     charge: z
       .union([
-        z.string().startsWith("ch_"),
-        z.object({ id: z.string().startsWith("ch_") }).passthrough(),
+        stripeChargeIdSchema,
+        z.object({ id: stripeChargeIdSchema }).passthrough(),
       ])
       .nullable()
       .optional(),
     metadata: z
       .object({ finance_refund_id: z.string().min(1).optional() })
       .passthrough()
+      .nullable()
       .optional(),
   })
   .passthrough();
@@ -59,8 +61,8 @@ export const stripeDisputeSchema = z
     payment_intent: stripePaymentIntentSchema,
     charge: z
       .union([
-        z.string().startsWith("ch_"),
-        z.object({ id: z.string().startsWith("ch_") }).passthrough(),
+        stripeChargeIdSchema,
+        z.object({ id: stripeChargeIdSchema }).passthrough(),
       ])
       .nullable()
       .optional(),

@@ -52,7 +52,7 @@ const resources = {
     object: "payment_intent",
     prefix: "pi_",
   },
-  charges: { path: "/v1/charges", object: "charge", prefix: "ch_" },
+  charges: { path: "/v1/charges", object: "charge", prefix: ["ch_", "py_"] },
   refunds: { path: "/v1/refunds", object: "refund", prefix: "re_" },
   disputes: { path: "/v1/disputes", object: "dispute", prefix: "du_" },
   balanceTransactions: {
@@ -63,7 +63,7 @@ const resources = {
   payouts: { path: "/v1/payouts", object: "payout", prefix: "po_" },
 } satisfies Record<
   FinanceReconciliationStream,
-  { path: string; object: string; prefix: string }
+  { path: string; object: string; prefix: string | readonly string[] }
 >;
 
 const objectSchema = z
@@ -205,8 +205,10 @@ export class StripeFinanceReconciliationProvider {
 }
 
 function assertIdentity(stream: FinanceReconciliationStream, id: string): void {
+  const prefix = resources[stream].prefix;
+  const prefixes = typeof prefix === "string" ? [prefix] : prefix;
   if (
-    !id.startsWith(resources[stream].prefix) ||
+    !prefixes.some((allowed) => id.startsWith(allowed)) ||
     id.length > 255 ||
     !/^[A-Za-z0-9_]+$/.test(id)
   ) {
