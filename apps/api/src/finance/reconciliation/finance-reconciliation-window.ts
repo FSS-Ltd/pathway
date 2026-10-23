@@ -1,0 +1,44 @@
+import type { FinanceReconciliationStream } from "../stripe/finance-stripe-reconciliation.provider";
+
+export interface FinanceReconciliationWindow {
+  from: Date;
+  to: Date;
+  cursor: string | null;
+  gap: { from: Date; to: Date } | null;
+}
+
+export interface StoredFinanceReconciliationWindow {
+  active: Omit<FinanceReconciliationWindow, "gap"> | null;
+  completedThrough: Date | null;
+}
+
+export function planReconciliationWindow(
+  state: StoredFinanceReconciliationWindow,
+  stream: FinanceReconciliationStream,
+  now: Date,
+): FinanceReconciliationWindow | null {
+  const cutoff = new Date(Math.floor(now.getTime() / 1000) * 1000);
+  const day = 24 * 60 * 60 * 1000;
+  if (
+    !state.active &&
+    state.completedThrough &&
+    state.completedThrough >= cutoff
+  )
+    return null;
+
+  const requested = state.active ?? {
+    from: new Date((state.completedThrough ?? cutoff).getTime() - 7 * day),
+    to: cutoff,
+    cursor: null,
+  };
+  const availableFrom = new Date(cutoff.getTime() - 30 * day);
+  if (stream !== "events" || requested.from >= availableFrom)
+    return { ...requested, gap: null };
+
+  return {
+    from: availableFrom,
+    to: requested.to > availableFrom ? requested.to : cutoff,
+    cursor: null,
+    gap: { from: requested.from, to: availableFrom },
+  };
+}
