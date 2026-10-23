@@ -339,3 +339,29 @@ renderer behavior was changed. The complete bounded unit run is still pending.
 Host inspection confirmed revision6b3dc89 failed four API suites on the ESM font
 loader's `import.meta`; subsequent integration jobs were skipped. The local Jest
 boundary correction addresses that cause, but only fresh CI can close the gate.
+
+### Repeated external-refund recovery correction
+
+Independent Sol review found that a confirmed external refund reused the generic
+reversal-operation case key. Matching provider recovery resolved that key; after
+identical evidence had completed, deduplication prevented another worker delivery
+from reopening the school's pending-treatment warning. The new signed-ingress
+regression reproduced `RESOLVED` where `OPEN` was required. Its first attempt
+failed to compile because the fixture account was nullable; that attempt ran no
+tests and is not the behavioral RED evidence.
+
+External refund treatment now has a distinct case purpose, separate from provider
+matching. Two actual recovery/worker cycles retain the warning and its5000-minor-
+unit report amount without a second movement or allocation. A confirmed refund
+return resolves the treatment case while preserving both movements. Both full
+PostgreSQL/signed-ingress and reversal suites passed21 tests after the fix in a
+separate disposable review database; earlier provider evidence was not reset.
+This helper was introduced in unmerged PR #735, so this correction does not
+assume or run a production legacy-key migration. T18 remains incomplete.
+
+API typecheck, targeted lint and formatting passed. After an additional assertion
+comparing the entire post-recovery ledger to its pre-recovery snapshot, the
+selected signed-ingress regression passed again (one executed test; nine excluded
+by the explicit name filter). Independent Sol review found no remaining P0–P2
+issue in this focused correction. The complete bounded API unit run remains in
+progress; neither old CI failure nor missing runtime evidence is waived.

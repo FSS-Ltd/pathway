@@ -59,7 +59,7 @@ export async function reconcileFinanceExternalRefundReview(
   const key = financeReconciliationCaseKey(
     "reversal",
     input.refundReference,
-    "operation",
+    "treatment",
   );
   const returnedMinor = refund.inverseMovements.reduce(
     (total, movement) => addMinorUnits(total, movement.amountMinor),

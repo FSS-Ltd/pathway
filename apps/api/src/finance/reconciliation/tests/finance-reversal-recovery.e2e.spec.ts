@@ -438,6 +438,20 @@ describe("canonical recovered refunds and dispute movements", () => {
           [{ id: invoiceId, status: "ISSUED", totalMinor: 2450n }],
         );
         expect(balances.get(invoiceId)?.outstandingMinor).toBe("0");
+        expect(
+          await tx.financeReconciliationCase.findMany({
+            where: {
+              tenantId: scope.tenantId,
+              orgId: scope.orgId,
+              resourceReference: original.id,
+              details: {
+                path: ["reason"],
+                equals: "EXTERNAL_REFUND_PENDING_TREATMENT",
+              },
+            },
+            select: { status: true },
+          }),
+        ).toEqual([{ status: "RESOLVED" }]);
       },
     );
   });

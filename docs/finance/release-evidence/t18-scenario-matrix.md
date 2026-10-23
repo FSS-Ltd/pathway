@@ -220,3 +220,13 @@ pass is claimed; the bounded-worker rerun remains pending. No hosted storage ACL
 tagged-PDF/screen-reader or complete T18 gate is proved. The latest owner rules
 also expose missing immediate post-commit worker wakeup; scheduled inbox draining
 alone does not satisfy that event-driven requirement. T19 remains unstarted.
+
+E24: Independent review exposed a collision between external refund treatment
+and generic provider-operation review. Actual signed ingress, canonical worker
+completion and repeated API recovery reproduced a silently resolved treatment
+warning. A distinct treatment case survives matched provider reads and completed
+evidence deduplication; its report retains5000 minor units for review. Confirmed
+refund-return evidence resolves the case while preserving both ledger movements.
+Both complete database suites passed21 tests after behavioral RED. The initial
+nullable-fixture compilation failure ran no tests and is not RED proof. No real
+provider call, production migration or new receipt/allocation was introduced.

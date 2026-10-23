@@ -4,6 +4,7 @@ import { prisma, withTenantRlsContext } from "@pathway/db";
 import { requireDatabase } from "../../../test-helpers.e2e";
 import { FinanceStripeReversalWebhookService } from "../stripe/finance-stripe-reversal-webhook.service";
 import { FinanceReportRepository } from "../finance-report.repository";
+import { recoverFinanceReversal } from "../reconciliation/finance-reversal-recovery.persistence";
 import {
   FinanceStripeWebhookReplayService,
   PrismaFinanceStripeWebhookInbox,
@@ -261,7 +262,7 @@ describe("Finance signed HTTP ingress and durable replay assurance", () => {
     expect(foreign.rows.some((row) => row.reference === event.id)).toBe(false);
   });
 
-  it("reconciles a signed Dashboard refund once and reopens only the returned principal", async () => {
+  it("keeps a signed external refund under review through repeated recovery of completed evidence", async () => {
     const f = await createFinanceIngressFixture();
     const { event, invoiceId } = await prepareIngressCheckout(f);
     await server.send(event).expect(200);
@@ -333,6 +334,37 @@ describe("Finance signed HTTP ingress and durable replay assurance", () => {
         payloadJson: storedRefund.payloadJson,
       });
     }
+    // The first provider read captures canonical evidence. Once processed, the
+    // same read deduplicates it; no second worker delivery can restore a warning.
+    const stripeAccountId = storedRefund.stripeAccountId;
+    if (!stripeAccountId) throw new Error("Missing synthetic school account");
+    for (let recovery = 0; recovery < 2; recovery++) {
+      await withTenantRlsContext(f.tenantId, f.orgId, (tx) =>
+        recoverFinanceReversal(
+          tx,
+          {
+            tenantId: f.tenantId,
+            orgId: f.orgId,
+            connectionId: f.connection.id,
+            stripeAccountId,
+            livemode: false,
+          },
+          "refunds",
+          {
+            ...refund.data.object,
+            id: refundReference,
+            object: "refund",
+            created: refund.created,
+          },
+          new Date(),
+          "capture",
+        ),
+      );
+      expect((await server.worker(f).run()).completed).toBe(
+        recovery === 0 ? 1 : 0,
+      );
+    }
+    expect(await ledger(f)).toEqual(posted);
     const reviewCases = await withTenantRlsContext(f.tenantId, f.orgId, (tx) =>
       tx.financeReconciliationCase.findMany({
         where: {
