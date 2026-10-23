@@ -10,4 +10,5 @@ export * from "./messaging/contracts";
 export * from "./messaging/realtime-events";
 export * from "./messaging/recipient-policy";
 export * from "./finance-currencies";
+export * from "./finance-collection-amount";
 export * from "./faith/reflection-policy";

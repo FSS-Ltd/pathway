@@ -10,6 +10,7 @@ import { randomUUID } from "node:crypto";
 import { withTenantRlsContext } from "@pathway/db";
 import { FinanceAccessService } from "../access/finance-access.service";
 import type { FinanceAccessScope } from "../access/finance-access.reader";
+import { assertFinanceCollectionAmount } from "../finance-collection-amount";
 import { FinanceBalanceService } from "../finance-balance.service";
 import { canRetryFinanceProviderOperation } from "../domain/finance-provider-retry";
 import { lockInvoice } from "../finance-invoice-operations";
@@ -281,6 +282,11 @@ export class FinanceStripeCheckoutAttemptService {
         };
       }
 
+      assertFinanceCollectionAmount({
+        method: "card",
+        currency: invoice.currency,
+        amountMinor: outstandingMinor,
+      });
       const attemptId = randomUUID();
       const created = await tx.financeCheckoutAttempt.create({
         data: {

@@ -7,6 +7,10 @@ import {
 import { Prisma, withTenantRlsContext } from "@pathway/db";
 import { FinanceAccessService } from "./access/finance-access.service";
 import type { FinanceAccessScope } from "./access/finance-access.reader";
+import {
+  loadFinanceInvoiceReview,
+  lockAndCheckFinanceInvoiceReview,
+} from "./finance-invoice-review";
 import { FinanceBalanceService } from "./finance-balance.service";
 import type {
   FinanceInvoiceDraftInput,
@@ -79,7 +83,10 @@ export class FinanceInvoiceService {
     await this.financeAccess.assertStaffAction(actor, "READ_RECORDS");
     return withTenantRlsContext(actor.tenantId, actor.orgId, async (tx) => {
       const invoice = await this.requireInvoice(tx, actor, invoiceId);
-      return this.toInvoiceView(tx, actor, invoice);
+      return {
+        ...(await this.toInvoiceView(tx, actor, invoice)),
+        ...(await loadFinanceInvoiceReview(tx, actor, invoice)),
+      };
     });
   }
 
@@ -242,6 +249,7 @@ export class FinanceInvoiceService {
     actor: FinanceInvoiceActor,
     invoiceId: string,
     idempotencyKey: string,
+    expectedRevision?: string,
   ) {
     await this.financeAccess.assertStaffAction(
       actor,
@@ -252,10 +260,16 @@ export class FinanceInvoiceService {
       idempotencyKey,
       commandType: "SUBMIT_INVOICE_FOR_REVIEW",
       resourceType: "INVOICE",
-      request: { invoiceId },
+      request: { invoiceId, expectedRevision },
       perform: async (tx) => {
         await lockInvoice(tx, actor, invoiceId);
         const invoice = await this.requireInvoice(tx, actor, invoiceId);
+        await lockAndCheckFinanceInvoiceReview(
+          tx,
+          actor,
+          invoice,
+          expectedRevision,
+        );
         if (invoice.status !== "DRAFT") {
           throw new ConflictException("Only draft invoices can enter review");
         }
@@ -287,6 +301,7 @@ export class FinanceInvoiceService {
     actor: FinanceInvoiceActor,
     invoiceId: string,
     idempotencyKey: string,
+    expectedRevision?: string,
   ) {
     await this.financeAccess.assertStaffAction(actor, "REVIEW_INVOICE");
     return this.commands.execute({
@@ -294,10 +309,16 @@ export class FinanceInvoiceService {
       idempotencyKey,
       commandType: "APPROVE_INVOICE",
       resourceType: "INVOICE",
-      request: { invoiceId },
+      request: { invoiceId, expectedRevision },
       perform: async (tx) => {
         await lockInvoice(tx, actor, invoiceId);
         const invoice = await this.requireInvoice(tx, actor, invoiceId);
+        await lockAndCheckFinanceInvoiceReview(
+          tx,
+          actor,
+          invoice,
+          expectedRevision,
+        );
         if (invoice.status !== "IN_REVIEW" || invoice.approvedAt) {
           throw new ConflictException("Invoice is not awaiting review");
         }
@@ -382,6 +403,7 @@ export class FinanceInvoiceService {
     actor: FinanceInvoiceActor,
     invoiceId: string,
     idempotencyKey: string,
+    expectedRevision?: string,
   ) {
     await this.financeAccess.assertStaffAction(actor, "ISSUE_INVOICE");
     return this.commands.execute({
@@ -389,10 +411,16 @@ export class FinanceInvoiceService {
       idempotencyKey,
       commandType: "ISSUE_INVOICE",
       resourceType: "INVOICE",
-      request: { invoiceId },
+      request: { invoiceId, expectedRevision },
       perform: async (tx) => {
         await lockInvoice(tx, actor, invoiceId);
         const invoice = await this.requireInvoice(tx, actor, invoiceId);
+        const review = await lockAndCheckFinanceInvoiceReview(
+          tx,
+          actor,
+          invoice,
+          expectedRevision,
+        );
         if (
           invoice.status !== "IN_REVIEW" ||
           !invoice.approvedAt ||
@@ -414,16 +442,7 @@ export class FinanceInvoiceService {
         if (!approvalEvent) {
           throw new ConflictException("Invoice approval evidence is missing");
         }
-        const profile = await tx.financeProfile.findFirst({
-          where: {
-            id: invoice.financeProfileId,
-            tenantId: actor.tenantId,
-            orgId: actor.orgId,
-          },
-          select: { legalEntityName: true },
-        });
-        const payer = invoice.payerAccount;
-        if (!profile || !payer) {
+        if (!review.legalEntityName || !review.payerName) {
           throw new ConflictException(
             "Finance invoice snapshot data is missing",
           );
@@ -439,8 +458,8 @@ export class FinanceInvoiceService {
             invoiceNumber,
             status: "ISSUED",
             issuedAt: new Date(),
-            payerNameSnapshot: payer.displayName,
-            legalEntityNameSnapshot: profile.legalEntityName,
+            payerNameSnapshot: review.payerName,
+            legalEntityNameSnapshot: review.legalEntityName,
           },
         });
         await this.recordEvent(tx, actor, invoiceId, "ISSUED");

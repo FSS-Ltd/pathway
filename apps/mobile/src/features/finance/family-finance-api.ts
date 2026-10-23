@@ -21,6 +21,7 @@ export interface FamilyInvoice {
   invoiceNumber: string | null;
   status: "ISSUED" | "VOID";
   currency: string;
+  cardPayment?: { eligible: boolean; reason: string | null };
   subtotalMinor: string;
   taxMinor: string;
   totalMinor: string;
@@ -105,17 +106,19 @@ export async function listFamilyPayerAccounts(): Promise<FamilyPayerAccount[]> {
 
 export function listFamilyInvoices(
   payerAccountId: string,
+  cursor?: string,
 ): Promise<FamilyInvoicePage> {
   return apiClient.request(
-    `/finance/payer-accounts/${encodeURIComponent(payerAccountId)}/invoices?limit=100`,
+    `/finance/payer-accounts/${encodeURIComponent(payerAccountId)}/invoices?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
   );
 }
 
 export function listFamilyStatements(
   payerAccountId: string,
+  cursor?: string,
 ): Promise<FamilyStatementPage> {
   return apiClient.request(
-    `/finance/payer-accounts/${encodeURIComponent(payerAccountId)}/statements?limit=100`,
+    `/finance/payer-accounts/${encodeURIComponent(payerAccountId)}/statements?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`,
   );
 }
 
@@ -212,8 +215,8 @@ export async function downloadFamilyDocument(
     );
     downloadedUri = download.uri;
     if (download.status < 200 || download.status >= 300) {
-      if (download.status === 403) {
-        throw new ApiError("Finance access unavailable", 403, "");
+      if (download.status === 401 || download.status === 403) {
+        throw new ApiError("Finance access unavailable", download.status, "");
       }
       throw new Error("The document could not be downloaded. Try again.");
     }

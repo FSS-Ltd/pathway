@@ -32,11 +32,13 @@ export async function buildFinanceStatementSnapshot(
   if (input.periodEnd <= input.periodStart) {
     throw new RangeError("Statement period end must follow its start");
   }
-  const ledgerCutoffAt = input.generatedAt;
   const closingAt = new Date(input.periodEnd.getTime() - 1);
+  // Closing a period freezes facts recorded by that period's end. Later evidence
+  // belongs to its recorded period, even when the provider occurrence is older.
+  const ledgerCutoffAt =
+    input.generatedAt < closingAt ? input.generatedAt : closingAt;
   const openingAt = new Date(input.periodStart.getTime() - 1);
-  const closingCutoffAt =
-    closingAt < ledgerCutoffAt ? closingAt : ledgerCutoffAt;
+  const closingCutoffAt = ledgerCutoffAt;
   const [
     openingBalance,
     closingBalance,
@@ -59,7 +61,10 @@ export async function buildFinanceStatementSnapshot(
       closingAt,
       ledgerCutoffAt,
     ),
-    loadFinanceStatementActivity(tx, scope, input.payerAccountId, input),
+    loadFinanceStatementActivity(tx, scope, input.payerAccountId, {
+      ...input,
+      generatedAt: ledgerCutoffAt,
+    }),
     tx.financeReceipt.findMany({
       where: {
         tenantId: scope.tenantId,

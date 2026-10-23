@@ -1,3 +1,4 @@
+import { assertFinanceCollectionAmount } from "../finance-collection-amount";
 import { ServiceUnavailableException } from "@nestjs/common";
 import { z } from "zod";
 import type { FinanceStripeCheckoutConfig } from "./finance-stripe-checkout.config";
@@ -193,10 +194,12 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
     amountMinor: bigint;
     idempotencyKey: string;
   }): Promise<FinanceStripeBacsPaymentIntent> {
+    assertFinanceCollectionAmount({
+      method: "bacs",
+      currency: "GBP",
+      amountMinor: input.amountMinor,
+    });
     const amount = Number(input.amountMinor);
-    if (!Number.isSafeInteger(amount) || amount <= 0) {
-      throw new FinanceStripeBacsProviderError(false);
-    }
 
     const form = new URLSearchParams();
     form.set("amount", amount.toString());

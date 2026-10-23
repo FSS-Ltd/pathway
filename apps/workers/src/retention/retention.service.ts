@@ -1,5 +1,11 @@
-import { prisma, withTenantRlsContext } from "@pathway/db";
+import { AuditEntityType, prisma, withTenantRlsContext } from "@pathway/db";
 import { RetentionConfigService } from "./retention-config.service";
+
+// Preserve Finance evidence until its owner-approved retention policy exists.
+const financeAuditEntityTypes: ReadonlySet<AuditEntityType> = new Set([
+  AuditEntityType.FINANCE_REPORT,
+  AuditEntityType.FINANCE_PAYER_ACCOUNT,
+]);
 
 type DeleteMany = (args?: unknown) => Promise<{ count: number }>;
 
@@ -93,7 +99,12 @@ export class RetentionService {
           deleteMany: DeleteMany;
         };
         const auditResult = await auditDelegate.deleteMany({
-          where: { createdAt: { lt: auditEventCutoff } },
+          where: {
+            tenantId: tenant.id,
+            orgId: tenant.orgId,
+            createdAt: { lt: auditEventCutoff },
+            entityType: { notIn: [...financeAuditEntityTypes] },
+          },
         });
 
         console.info("[Retention] Org processed", {

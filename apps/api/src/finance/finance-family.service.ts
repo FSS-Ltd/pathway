@@ -5,7 +5,9 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma, withTenantRlsContext } from "@pathway/db";
+import { getFinanceCollectionAmountEligibility } from "@pathway/platform/finance-collection-amount";
 import type { PermissionKey } from "@pathway/platform";
+import { financeCollectionAmountMessage } from "./finance-collection-amount";
 import { EffectivePermissionsService } from "../access-control/effective-permissions.service";
 import { FinanceAccessService } from "./access/finance-access.service";
 import type { FinanceRequestActor } from "./finance-controller-support";
@@ -242,7 +244,22 @@ function toFamilyInvoiceView(
   if (!balance) {
     throw new Error("Finance invoice balance projection is missing");
   }
+  const cardEligibility = getFinanceCollectionAmountEligibility({
+    method: "card",
+    currency: invoice.currency,
+    amountMinor: BigInt(balance.outstandingMinor),
+  });
   return {
+    cardPayment: {
+      eligible: cardEligibility.eligible,
+      reason: cardEligibility.eligible
+        ? null
+        : financeCollectionAmountMessage(
+            "card",
+            invoice.currency,
+            cardEligibility,
+          ),
+    },
     id: invoice.id,
     payerAccountId: invoice.payerAccountId,
     invoiceNumber: invoice.invoiceNumber?.toString() ?? null,

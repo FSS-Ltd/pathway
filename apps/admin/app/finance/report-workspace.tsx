@@ -2,7 +2,9 @@
 import { ProviderEvidenceSummary } from "./provider-evidence-summary";
 
 import React from "react";
-import { Button, Card } from "@pathway/ui";
+import { ApiError } from "@/lib/api-transport";
+import { Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import {
   downloadFinanceReport,
   fetchFinanceReport,
@@ -28,9 +30,11 @@ const reportOptions: Array<{ id: FinanceReportType; label: string }> = [
 export function FinanceReportWorkspace({
   canExport,
   initialFilters,
+  onAccessDenied,
 }: {
   canExport: boolean;
   initialFilters: FinanceReportFilters;
+  onAccessDenied?: () => void;
 }) {
   const [filters, setFilters] = React.useState(initialFilters);
   const [type, setType] =
@@ -42,30 +46,59 @@ export function FinanceReportWorkspace({
   const [exportMessage, setExportMessage] = React.useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = React.useState(false);
 
+  const requestSequence = React.useRef(0);
+  React.useEffect(
+    () => () => {
+      requestSequence.current += 1;
+    },
+    [],
+  );
+  const resetSelection = () => {
+    requestSequence.current += 1;
+    setIsLoading(false);
+    setReport(null);
+    setHasLoaded(false);
+    setError(null);
+    setExportMessage(null);
+  };
+
   const load = React.useCallback(async () => {
     if (filters.from > filters.to) {
       setError("The end date must be on or after the start date.");
       return;
     }
+    const sequence = ++requestSequence.current;
     setIsLoading(true);
     setError(null);
     setExportMessage(null);
     try {
       const nextReport = await fetchFinanceReport(type, filters);
+      if (sequence !== requestSequence.current) return;
       setReport(nextReport);
       setHasLoaded(true);
     } catch (caught) {
+      if (sequence !== requestSequence.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        setReport(null);
+        setHasLoaded(false);
+        onAccessDenied?.();
+      }
       setError(
         caught instanceof Error
           ? caught.message
           : "Report could not be loaded.",
       );
     } finally {
-      setIsLoading(false);
+      if (sequence === requestSequence.current) setIsLoading(false);
     }
-  }, [filters, type]);
+  }, [filters, onAccessDenied, type]);
 
   const exportCsv = async () => {
+    if (!report || !hasLoaded || isExporting || isLoading) return;
+    const sequence = requestSequence.current;
     setIsExporting(true);
     setError(null);
     setExportMessage(
@@ -73,9 +106,19 @@ export function FinanceReportWorkspace({
     );
     try {
       const result = await downloadFinanceReport(type, filters);
+      if (sequence !== requestSequence.current) return;
       fileFromBlob(result.filename, result.blob);
       setExportMessage(`Downloaded ${result.filename}.`);
     } catch (caught) {
+      if (sequence !== requestSequence.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        setReport(null);
+        setHasLoaded(false);
+        onAccessDenied?.();
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -118,14 +161,12 @@ export function FinanceReportWorkspace({
             <select
               id="finance-report-type"
               value={type}
+              disabled={isExporting}
               onChange={(event) => {
                 setType(event.target.value as FinanceReportType);
-                setReport(null);
-                setHasLoaded(false);
-                setError(null);
-                setExportMessage(null);
+                resetSelection();
               }}
-              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-status-info"
             >
               {reportOptions.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -137,37 +178,31 @@ export function FinanceReportWorkspace({
           <DateField
             label="From"
             id="finance-report-from"
+            disabled={isExporting}
             value={filters.from}
             onChange={(from) => {
               setFilters((current) => ({ ...current, from }));
-              setReport(null);
-              setHasLoaded(false);
-              setError(null);
-              setExportMessage(null);
+              resetSelection();
             }}
           />
           <DateField
             label="To"
             id="finance-report-to"
+            disabled={isExporting}
             value={filters.to}
             onChange={(to) => {
               setFilters((current) => ({ ...current, to }));
-              setReport(null);
-              setHasLoaded(false);
-              setError(null);
-              setExportMessage(null);
+              resetSelection();
             }}
           />
           <DateField
             label="As of"
             id="finance-report-as-of"
+            disabled={isExporting}
             value={filters.asOf}
             onChange={(asOf) => {
               setFilters((current) => ({ ...current, asOf }));
-              setReport(null);
-              setHasLoaded(false);
-              setError(null);
-              setExportMessage(null);
+              resetSelection();
             }}
           />
         </div>
@@ -182,14 +217,14 @@ export function FinanceReportWorkspace({
             <Button
               variant="secondary"
               onClick={() => void load()}
-              disabled={isLoading}
+              disabled={isLoading || isExporting}
             >
               {isLoading ? "Updating…" : "Run report"}
             </Button>
             {canExport ? (
               <Button
                 onClick={() => void exportCsv()}
-                disabled={isExporting || isLoading}
+                disabled={isExporting || isLoading || !hasLoaded || !report}
               >
                 {isExporting ? "Preparing export…" : "Export CSV"}
               </Button>
@@ -199,7 +234,7 @@ export function FinanceReportWorkspace({
         {error ? (
           <div
             role="alert"
-            className="mt-3 rounded-lg border border-status-danger/20 bg-status-danger/5 p-3 text-sm text-status-danger"
+            className="mt-3 rounded-lg border border-status-danger/20 bg-status-danger/5 p-3 text-sm text-text-primary"
           >
             <p>{error}</p>
             <Button
@@ -207,7 +242,7 @@ export function FinanceReportWorkspace({
               size="sm"
               className="mt-2"
               onClick={() => void load()}
-              disabled={isLoading}
+              disabled={isLoading || isExporting}
             >
               Retry report
             </Button>
@@ -302,7 +337,7 @@ export function FinanceReportWorkspace({
             {type === "exceptions" ? (
               <NextException row={report.rows[0]} />
             ) : null}
-            <div className="overflow-x-auto">
+            <div className="relative overflow-x-auto">
               <table className="w-full min-w-[1040px] text-left text-sm">
                 <caption className="sr-only">
                   {reportOptions.find((option) => option.id === type)?.label}{" "}
@@ -415,11 +450,13 @@ function DateField({
   id,
   value,
   onChange,
+  disabled,
 }: {
   label: string;
   id: string;
   value: string;
   onChange: (value: string) => void;
+  disabled: boolean;
 }) {
   return (
     <div className="space-y-2">
@@ -429,9 +466,10 @@ function DateField({
       <input
         id={id}
         type="date"
+        disabled={disabled}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-status-info"
       />
     </div>
   );
@@ -510,7 +548,7 @@ function NextException({ row }: { row: FinanceReportRow | undefined }) {
             ? "Check the provider result and leave the invoice balance unchanged until confirmed funds arrive."
             : "Review the source evidence and use the linked Finance action that matches the current status.";
   return (
-    <div className="mb-4 rounded-xl border border-status-warning/30 bg-status-warning/5 p-4">
+    <div className="mb-4 rounded-xl border border-status-warn/30 bg-status-warn/5 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
         Next exception
       </p>

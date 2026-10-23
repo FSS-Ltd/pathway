@@ -71,6 +71,24 @@ describe("downloadFamilyDocument", () => {
     );
   });
 
+  it.each([401, 403])(
+    "preserves an authorization denial (%s) and removes the unshared file",
+    async (status) => {
+      mockDownloadAsync.mockResolvedValue({
+        uri: "file:///finance-cache/invoice.pdf",
+        status,
+      });
+      await expect(
+        downloadFamilyDocument("/finance/invoice.pdf", "invoice.pdf"),
+      ).rejects.toMatchObject({ status });
+      expect(mockShareAsync).not.toHaveBeenCalled();
+      expect(mockDeleteAsync).toHaveBeenCalledWith(
+        "file:///finance-cache/invoice.pdf",
+        { idempotent: true },
+      );
+    },
+  );
+
   it("removes a partial file if the download fails", async () => {
     mockDownloadAsync.mockRejectedValue(new Error("Network unavailable"));
 

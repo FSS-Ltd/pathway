@@ -2,7 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
-import { Card, Button, Input } from "@pathway/ui";
+import { Card, Input } from "@pathway/ui";
+import { FinanceButton as Button } from "../finance-button";
 import {
   FINANCE_COUNTRY_CURRENCY_OPTIONS,
   FINANCE_CURRENCY_NAMES,
@@ -121,7 +122,7 @@ export default function FinanceSettingsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
         <header className="space-y-1">
-          <p className="text-sm font-semibold text-accent">Finance</p>
+          <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
             School currency
           </h1>
@@ -133,7 +134,7 @@ export default function FinanceSettingsPage() {
           {canAccessBilling(role) ? (
             <Link
               href="/billing"
-              className="inline-flex min-h-10 items-center rounded-md bg-accent px-4 text-sm font-semibold text-white outline-none transition-colors hover:bg-accent/90 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+              className="inline-flex min-h-10 items-center rounded-md bg-accent-primary px-4 text-sm font-semibold text-white outline-none transition-colors hover:bg-accent-primary/90 focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2"
             >
               View Billing
             </Link>
@@ -147,7 +148,7 @@ export default function FinanceSettingsPage() {
     return (
       <main className="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
         <header className="space-y-1">
-          <p className="text-sm font-semibold text-accent">Finance</p>
+          <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
             School currency
           </h1>
@@ -163,7 +164,7 @@ export default function FinanceSettingsPage() {
   return (
     <main className="mx-auto w-full max-w-3xl space-y-6 p-4 sm:p-6">
       <header className="space-y-1">
-        <p className="text-sm font-semibold text-accent">Finance</p>
+        <p className="text-sm font-semibold text-text-primary">Finance</p>
         <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
           School currency
         </h1>
@@ -221,7 +222,7 @@ export default function FinanceSettingsPage() {
                 value={settings.countryCode}
                 disabled={!canManageFinance || configurationLocked || isSaving}
                 onChange={(event) => handleCountryChange(event.target.value)}
-                className="h-10 w-full rounded-md border border-border-subtle bg-surface px-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-10 w-full rounded-md border border-border-subtle bg-surface px-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {FINANCE_COUNTRY_CURRENCY_OPTIONS.map((country) => (
                   <option key={country.countryCode} value={country.countryCode}>
@@ -255,12 +256,12 @@ export default function FinanceSettingsPage() {
             ) : null}
 
             {error ? (
-              <p role="alert" className="text-sm text-status-danger">
+              <p role="alert" className="text-sm text-text-primary">
                 {error}
               </p>
             ) : null}
             {saved ? (
-              <p role="status" className="text-sm text-status-success">
+              <p role="status" className="text-sm text-text-primary">
                 Finance settings saved.
               </p>
             ) : null}

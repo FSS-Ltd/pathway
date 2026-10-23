@@ -1,14 +1,19 @@
 "use client";
 
 import React from "react";
-import { Button, Card } from "@pathway/ui";
+import { Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import {
   transitionFinanceInvoice,
+  fetchFinanceInvoice,
+  type FinanceInvoiceDetail,
   type FinanceInvoice,
   type FinancePayerAccount,
 } from "@/lib/finance-workspace-client";
 import { formatFinanceDate, formatFinanceMoney } from "./finance-format";
 import { InvoiceDraftForm, PayerAccountForm } from "./invoice-forms";
+import { ApiError } from "@/lib/api-transport";
+import { InvoicePreview } from "./invoice-preview";
 import { FinanceConfirmDialog } from "./finance-confirm-dialog";
 
 type FinanceInvoiceWorkspaceProps = {
@@ -18,6 +23,7 @@ type FinanceInvoiceWorkspaceProps = {
   isLoadingMorePayerAccounts: boolean;
   onLoadMorePayerAccounts: () => Promise<void>;
   currency: string | null;
+  onAccessDenied?: () => void;
   canCreate: boolean;
   canReview: boolean;
   isLoading: boolean;
@@ -34,6 +40,7 @@ export function FinanceInvoiceWorkspace({
   isLoadingMorePayerAccounts,
   onLoadMorePayerAccounts,
   currency,
+  onAccessDenied,
   canCreate,
   canReview,
   isLoading,
@@ -47,15 +54,50 @@ export function FinanceInvoiceWorkspace({
   const [createdPayerAccounts, setCreatedPayerAccounts] = React.useState<
     FinancePayerAccount[]
   >([]);
-  const [confirmIssueId, setConfirmIssueId] = React.useState<string | null>(
-    null,
+  const [preview, setPreview] = React.useState<{
+    invoice: FinanceInvoiceDetail;
+    action: "submit-review" | "approve" | "issue";
+  } | null>(null);
+  const previewRequest = React.useRef(0);
+  React.useEffect(
+    () => () => {
+      previewRequest.current += 1;
+    },
+    [],
   );
   const [pendingId, setPendingId] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const openPreview = async (
+    invoice: FinanceInvoice,
+    action: "submit-review" | "approve" | "issue",
+  ) => {
+    const request = ++previewRequest.current;
+    setPendingId(invoice.id);
+    setError(null);
+    try {
+      const detail = await fetchFinanceInvoice(invoice.id);
+      if (request !== previewRequest.current) return;
+      setPreview({ invoice: detail, action });
+    } catch (caught) {
+      if (request !== previewRequest.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      )
+        onAccessDenied?.();
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Invoice preview could not be loaded.",
+      );
+    } finally {
+      if (request === previewRequest.current) setPendingId(null);
+    }
+  };
   const [actionKeys, setActionKeys] = React.useState<Record<string, string>>(
     {},
   );
   const [message, setMessage] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
   const selectablePayerAccounts = [
     ...createdPayerAccounts,
     ...payerAccounts.filter(
@@ -65,18 +107,23 @@ export function FinanceInvoiceWorkspace({
   ];
 
   const runInvoiceAction = async (
-    invoice: FinanceInvoice,
+    invoice: FinanceInvoiceDetail,
     action: "submit-review" | "approve" | "issue",
   ) => {
-    const actionKey = `${invoice.id}:${action}`;
+    const actionKey = `${invoice.id}:${action}:${invoice.reviewRevision}`;
     const idempotencyKey = actionKeys[actionKey] ?? crypto.randomUUID();
     setActionKeys((current) => ({ ...current, [actionKey]: idempotencyKey }));
     setPendingId(invoice.id);
     setError(null);
     setMessage(null);
     try {
-      await transitionFinanceInvoice(invoice.id, action, idempotencyKey);
-      setConfirmIssueId(null);
+      await transitionFinanceInvoice(
+        invoice.id,
+        action,
+        idempotencyKey,
+        invoice.reviewRevision,
+      );
+      setPreview(null);
       await onRefresh();
       setActionKeys((current) => {
         const next = { ...current };
@@ -91,9 +138,23 @@ export function FinanceInvoiceWorkspace({
             : "Invoice issued successfully.",
       );
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Invoice action failed.",
-      );
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        setPreview(null);
+        onAccessDenied?.();
+      }
+      if (caught instanceof ApiError && caught.status === 409) {
+        setPreview(null);
+        setError(
+          "Invoice changed. Open the invoice preview again to review the latest details before retrying.",
+        );
+      } else {
+        setError(
+          caught instanceof Error ? caught.message : "Invoice action failed.",
+        );
+      }
     } finally {
       setPendingId(null);
     }
@@ -126,10 +187,15 @@ export function FinanceInvoiceWorkspace({
         ) : null}
       </div>
 
-      {error ? (
+      {pendingId && !preview ? (
+        <p role="status" className="text-sm text-text-muted">
+          Updating invoice…
+        </p>
+      ) : null}
+      {error && !preview ? (
         <p
           role="alert"
-          className="rounded-lg border border-status-danger/20 bg-status-danger/5 p-3 text-sm text-status-danger"
+          className="rounded-lg border border-status-danger/20 bg-status-danger/5 p-3 text-sm text-text-primary"
         >
           {error}
         </p>
@@ -137,7 +203,7 @@ export function FinanceInvoiceWorkspace({
       {message ? (
         <p
           role="status"
-          className="rounded-lg border border-status-success/20 bg-status-success/5 p-3 text-sm text-text-primary"
+          className="rounded-lg border border-status-ok/20 bg-status-ok/5 p-3 text-sm text-text-primary"
         >
           {message}
         </p>
@@ -195,7 +261,12 @@ export function FinanceInvoiceWorkspace({
             No invoices yet. Create a draft to begin the review flow.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Invoice register scroll area"
+            className="relative overflow-x-auto"
+          >
             <table className="w-full min-w-[740px] text-left text-sm">
               <caption className="sr-only">Finance invoice register</caption>
               <thead className="border-b border-border-subtle text-xs uppercase tracking-wide text-text-muted">
@@ -258,12 +329,12 @@ export function FinanceInvoiceWorkspace({
                           size="sm"
                           variant="secondary"
                           disabled={
-                            pendingId === invoice.id ||
+                            pendingId !== null ||
                             !invoice.totalMinor ||
                             BigInt(invoice.totalMinor) <= 0n
                           }
                           onClick={() =>
-                            void runInvoiceAction(invoice, "submit-review")
+                            void openPreview(invoice, "submit-review")
                           }
                         >
                           Send for review
@@ -275,10 +346,8 @@ export function FinanceInvoiceWorkspace({
                         <Button
                           size="sm"
                           variant="secondary"
-                          disabled={pendingId === invoice.id}
-                          onClick={() =>
-                            void runInvoiceAction(invoice, "approve")
-                          }
+                          disabled={pendingId !== null}
+                          onClick={() => void openPreview(invoice, "approve")}
                         >
                           Approve
                         </Button>
@@ -288,8 +357,8 @@ export function FinanceInvoiceWorkspace({
                       canCreate ? (
                         <Button
                           size="sm"
-                          disabled={pendingId === invoice.id}
-                          onClick={() => setConfirmIssueId(invoice.id)}
+                          disabled={pendingId !== null}
+                          onClick={() => void openPreview(invoice, "issue")}
                         >
                           Issue invoice
                         </Button>
@@ -314,21 +383,40 @@ export function FinanceInvoiceWorkspace({
         ) : null}
       </Card>
 
-      {confirmIssueId ? (
+      {preview ? (
         <FinanceConfirmDialog
-          title="Issue this invoice?"
-          description={issueDescription(
-            invoices.find((invoice) => invoice.id === confirmIssueId),
-          )}
-          confirmLabel="Confirm issue"
-          busyLabel="Issuing…"
-          busy={pendingId === confirmIssueId}
-          onCancel={() => setConfirmIssueId(null)}
-          onConfirm={() => {
-            const invoice = invoices.find((item) => item.id === confirmIssueId);
-            if (invoice) void runInvoiceAction(invoice, "issue");
+          title={
+            preview.action === "issue"
+              ? "Issue this invoice?"
+              : preview.action === "approve"
+                ? "Approve these invoice charges?"
+                : "Send this invoice for review?"
+          }
+          description={
+            preview.action === "issue"
+              ? issueDescription(preview.invoice)
+              : "Check the payer, charges, tax and due date before confirming. The server checks the current invoice state again."
+          }
+          confirmLabel={
+            preview.action === "issue"
+              ? "Confirm issue"
+              : preview.action === "approve"
+                ? "Confirm approval"
+                : "Confirm send for review"
+          }
+          busyLabel="Saving…"
+          busy={pendingId !== null}
+          error={error}
+          onCancel={() => {
+            setPreview(null);
+            setError(null);
           }}
-        />
+          onConfirm={() =>
+            void runInvoiceAction(preview.invoice, preview.action)
+          }
+        >
+          <InvoicePreview invoice={preview.invoice} />
+        </FinanceConfirmDialog>
       ) : null}
     </section>
   );
@@ -338,7 +426,7 @@ function issueDescription(invoice: FinanceInvoice | undefined): string {
   if (!invoice) {
     return "This freezes the approved invoice snapshot and makes it available to the authorised family payer.";
   }
-  return `This freezes the approved snapshot for ${invoice.payerName ?? "the payer account"}: ${formatFinanceMoney(invoice.totalMinor, invoice.currency)}, due ${formatFinanceDate(invoice.dueDate)}. The authorised family payer can then view it.`;
+  return `Issuing freezes these server-calculated charges and the current school and payer details for ${invoice.payerName ?? "the payer account"}: ${formatFinanceMoney(invoice.totalMinor, invoice.currency)}, due ${formatFinanceDate(invoice.dueDate)}. The authorised family payer can then view it.`;
 }
 
 function StatusLabel({

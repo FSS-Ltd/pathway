@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   ServiceUnavailableException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import type { Prisma } from "@pathway/db";
 import type { FinanceAccessService } from "../../access/finance-access.service";
@@ -93,6 +94,7 @@ describe("FinanceStripeCheckoutService", () => {
       invoiceNumber: 1001n,
       status: "ISSUED",
       totalMinor: 12500n,
+      currency: "GBP",
     });
     mockPayerGrantFindFirst.mockResolvedValue({ id: "grant-a" });
     mockConnectionFindFirst.mockResolvedValue({
@@ -162,6 +164,67 @@ describe("FinanceStripeCheckoutService", () => {
     );
   });
 
+  it.each([29n, 100_000_000n])(
+    "rejects unsupported new card amount %s before persisting or contacting Stripe",
+    async (amountMinor) => {
+      mockBalanceForInvoices.mockResolvedValue(
+        new Map([["invoice-a", { outstandingMinor: amountMinor.toString() }]]),
+      );
+      await expect(
+        service.startCheckout(actor, "payer-account-a", "invoice-a"),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: expect.objectContaining({
+          code: "FINANCE_COLLECTION_AMOUNT_UNSUPPORTED",
+          method: "card",
+        }),
+      });
+      expect(mockCheckoutAttemptCreate).not.toHaveBeenCalled();
+      expect(mockCreateSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves an unresolved valid collection identity when the current debt falls below the card minimum", async () => {
+    mockBalanceForInvoices.mockResolvedValue(
+      new Map([["invoice-a", { outstandingMinor: "29" }]]),
+    );
+    attemptState = {
+      id: "attempt-unresolved",
+      financeProfileId: "profile-a",
+      stripeConnectionId: "connection-a",
+      stripeAccountId: "acct_school_test",
+      invoiceId: "invoice-a",
+      amountMinor: 12500n,
+      currency: "GBP",
+      status: "CREATING",
+      createdAt: new Date(Date.now() - 26 * 3_600_000),
+    };
+    await expect(
+      service.startCheckout(actor, "payer-account-a", "invoice-a"),
+    ).resolves.toMatchObject({
+      attemptId: "attempt-unresolved",
+      status: "CHECKING",
+    });
+    expect(mockCheckoutAttemptCreate).not.toHaveBeenCalled();
+    expect(mockCreateSession).not.toHaveBeenCalled();
+    expect(mockCheckoutAttemptUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("preserves permanent provider amount rejection instead of returning a retryable503", async () => {
+    mockCreateSession.mockRejectedValue(
+      new UnprocessableEntityException({
+        code: "FINANCE_COLLECTION_AMOUNT_UNSUPPORTED",
+        message: "Card amount unsupported",
+      }),
+    );
+    await expect(
+      service.startCheckout(actor, "payer-account-a", "invoice-a"),
+    ).rejects.toMatchObject({ status: 422 });
+    expect(mockCheckoutAttemptUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "FAILED" } }),
+    );
+  });
+
   it("creates one connected-account session for the server-calculated outstanding balance", async () => {
     mockCreateSession.mockResolvedValue({
       id: "cs_test_finance_1",
@@ -189,6 +252,7 @@ describe("FinanceStripeCheckoutService", () => {
     attemptState = {
       id: "attempt-existing",
       financeProfileId: "profile-a",
+      currency: "GBP",
       stripeConnectionId: "connection-a",
       stripeAccountId: "acct_school_test",
       invoiceId: "invoice-a",
@@ -217,6 +281,7 @@ describe("FinanceStripeCheckoutService", () => {
     attemptState = {
       id: "attempt-existing",
       financeProfileId: "profile-a",
+      currency: "GBP",
       stripeConnectionId: "connection-a",
       stripeAccountId: "acct_school_test",
       payerGrantId: "grant-a",
@@ -288,6 +353,7 @@ describe("FinanceStripeCheckoutService", () => {
       attemptState = {
         id: "attempt-unknown",
         financeProfileId: "profile-a",
+        currency: "GBP",
         stripeConnectionId: "connection-a",
         stripeAccountId: "acct_school_test",
         invoiceId: "invoice-a",

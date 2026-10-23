@@ -1,8 +1,5 @@
 import type { FinanceStripeCheckoutConfig } from "../finance-stripe-checkout.config";
-import {
-  FinanceStripeBacsProviderError,
-  StripeFinanceBacsProvider,
-} from "../finance-stripe-bacs.provider";
+import { StripeFinanceBacsProvider } from "../finance-stripe-bacs.provider";
 
 const testConfig = {
   mode: "test",
@@ -18,6 +15,60 @@ function stripeResponse(body: unknown, status = 200): Response {
 }
 
 describe("StripeFinanceBacsProvider", () => {
+  it.each([0n, 1_000_001n])(
+    "rejects unsupported Bacs amount %s permanently before I/O",
+    async (amountMinor) => {
+      const fetcher = jest.fn();
+      const provider = new StripeFinanceBacsProvider(testConfig, fetcher);
+      await expect(
+        provider.createDebit({
+          stripeAccountId: "acct_school_test",
+          customerId: "cus_school_payer",
+          paymentMethodId: "pm_school_bacs",
+          debitAttemptId: "debit-1",
+          instalmentId: "instalment-1",
+          amountMinor,
+          idempotencyKey: "finance-debit-attempt-1",
+        }),
+      ).rejects.toMatchObject({ status: 422 });
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([1n, 1_000_000n])(
+    "submits supported Bacs boundary %s unchanged",
+    async (amountMinor) => {
+      const fetcher = jest.fn().mockResolvedValue(
+        stripeResponse({
+          id: "pi_test_debit",
+          livemode: false,
+          amount: Number(amountMinor),
+          currency: "gbp",
+          customer: "cus_school_payer",
+          payment_method: "pm_school_bacs",
+          status: "processing",
+        }),
+      );
+      const provider = new StripeFinanceBacsProvider(testConfig, fetcher);
+      await expect(
+        provider.createDebit({
+          stripeAccountId: "acct_school_test",
+          customerId: "cus_school_payer",
+          paymentMethodId: "pm_school_bacs",
+          debitAttemptId: "debit-1",
+          instalmentId: "instalment-1",
+          amountMinor,
+          idempotencyKey: "finance-debit-attempt-1",
+        }),
+      ).resolves.toEqual({ id: "pi_test_debit", status: "processing" });
+      expect(
+        new URLSearchParams(String(fetcher.mock.calls[0]?.[1]?.body)).get(
+          "amount",
+        ),
+      ).toBe(amountMinor.toString());
+    },
+  );
+
   it("creates a payer customer inside the school's connected account", async () => {
     const fetcher = jest
       .fn()
@@ -176,9 +227,7 @@ describe("StripeFinanceBacsProvider", () => {
         amountMinor: BigInt(Number.MAX_SAFE_INTEGER) + 1n,
         idempotencyKey: "finance-debit-attempt-1",
       }),
-    ).rejects.toMatchObject<Partial<FinanceStripeBacsProviderError>>({
-      retryable: false,
-    });
+    ).rejects.toMatchObject({ status: 422 });
     expect(fetcher).not.toHaveBeenCalled();
   });
 });

@@ -233,6 +233,19 @@ describe("Finance ledger database foundation", () => {
 
     await expect(
       prisma.$transaction(async (tx) => {
+        // Other assurance suites deliberately retain immutable evidence. Compare
+        // the discovery delta while retaining exact RLS assertions below.
+        const existingScopes = await tx.$queryRaw<
+          { tenantId: string; orgId: string }[]
+        >`
+          SELECT "tenantId", "orgId"
+          FROM app.list_due_finance_stripe_webhook_scopes(
+            CURRENT_TIMESTAMP + INTERVAL '1 second'
+          )
+        `;
+        const existingScopeKeys = new Set(
+          existingScopes.map((scope) => `${scope.tenantId}:${scope.orgId}`),
+        );
         await tx.user.create({
           data: {
             id: userId,
@@ -316,7 +329,12 @@ describe("Finance ledger database foundation", () => {
             CURRENT_TIMESTAMP + INTERVAL '1 second'
           )
         `;
-        expect(dueScopes).toEqual(
+        expect(
+          dueScopes.filter(
+            (scope) =>
+              !existingScopeKeys.has(`${scope.tenantId}:${scope.orgId}`),
+          ),
+        ).toEqual(
           [
             { tenantId: tenantAId, orgId },
             { tenantId: tenantBId, orgId },

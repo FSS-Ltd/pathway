@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
-import { Button, Card } from "@pathway/ui";
+import { Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import { FINANCE_CURRENCIES } from "@pathway/platform/finance-currencies";
 import { ApiError } from "@/lib/api-transport";
 import {

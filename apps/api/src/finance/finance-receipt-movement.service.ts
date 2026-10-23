@@ -1,6 +1,7 @@
 import { Prisma } from "@pathway/db";
 import type { FinanceCurrency } from "@pathway/platform";
 import { addMinorUnits } from "./domain/minor-units";
+import { applyFinanceReturnMovement } from "./finance-receipt-return-application";
 
 export type FinanceReceiptMovementType =
   | "REFUND"
@@ -115,7 +116,7 @@ export async function recordFinanceReceiptMovement(
   });
 
   const appliedMinor = isReturnMovement(input.type)
-    ? await applyReturnMovement(tx, input, movement.id)
+    ? await applyFinanceReturnMovement(tx, input, movement.id)
     : await applyDebitMovement(tx, input, movement.id);
 
   return { id: movement.id, appliedMinor, duplicate: false };
@@ -172,59 +173,6 @@ async function applyDebitMovement(
         movementId,
         invoiceId: allocation.invoiceId,
         receiptAllocationId: allocation.id,
-        tenantId: input.tenantId,
-        orgId: input.orgId,
-        amountMinor,
-      },
-      select: { id: true },
-    });
-    remainingMinor -= amountMinor;
-    appliedMinor = addMinorUnits(appliedMinor, amountMinor);
-  }
-  return appliedMinor;
-}
-
-async function applyReturnMovement(
-  tx: Prisma.TransactionClient,
-  input: FinanceReceiptMovementInput,
-  movementId: string,
-): Promise<bigint> {
-  if (!input.originalMovementId) {
-    throw new Error("Finance return movement is missing its source movement");
-  }
-  const applications = await tx.financeReceiptMovementApplication.findMany({
-    where: {
-      movementId: input.originalMovementId,
-      tenantId: input.tenantId,
-      orgId: input.orgId,
-    },
-    select: {
-      id: true,
-      invoiceId: true,
-      receiptAllocationId: true,
-      amountMinor: true,
-      reversedByApplications: { select: { amountMinor: true } },
-    },
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-  });
-
-  let remainingMinor = input.amountMinor;
-  let appliedMinor = 0n;
-  for (const application of applications) {
-    const reversedMinor = application.reversedByApplications.reduce(
-      (sum, reversal) => addMinorUnits(sum, reversal.amountMinor),
-      0n,
-    );
-    const availableMinor = application.amountMinor - reversedMinor;
-    if (availableMinor <= 0n || remainingMinor <= 0n) continue;
-    const amountMinor =
-      availableMinor < remainingMinor ? availableMinor : remainingMinor;
-    await tx.financeReceiptMovementApplication.create({
-      data: {
-        movementId,
-        invoiceId: application.invoiceId,
-        receiptAllocationId: application.receiptAllocationId,
-        reversesApplicationId: application.id,
         tenantId: input.tenantId,
         orgId: input.orgId,
         amountMinor,

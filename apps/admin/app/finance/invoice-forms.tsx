@@ -1,5 +1,6 @@
 import React from "react";
-import { Button, Card, Input } from "@pathway/ui";
+import { Card, Input } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import {
   createFinanceInvoiceDraft,
   createFinancePayerAccount,
@@ -98,7 +99,7 @@ export function InvoiceDraftForm({
               setPayerAccountId(event.target.value);
               setIdempotencyKey(crypto.randomUUID());
             }}
-            className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-status-info"
             disabled={isSaving || payerAccounts.length === 0}
           >
             <option value="">Select a payer account</option>
@@ -213,7 +214,7 @@ export function InvoiceDraftForm({
           />
         </div>
         {error ? (
-          <p role="alert" className="sm:col-span-2 text-sm text-status-danger">
+          <p role="alert" className="sm:col-span-2 text-sm text-text-primary">
             {error}
           </p>
         ) : null}
@@ -290,7 +291,7 @@ export function PayerAccountForm({
         autoComplete="off"
       />
       {error ? (
-        <p role="alert" className="text-sm text-status-danger">
+        <p role="alert" className="text-sm text-text-primary">
           {error}
         </p>
       ) : null}

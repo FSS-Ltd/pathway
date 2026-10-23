@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, Button, Card } from "@pathway/ui";
+import { Badge, Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import type {
   FinanceInvoice,
   FinanceReceipt,
@@ -89,7 +90,7 @@ export function FinanceOverview({
             key={metric.label}
             type="button"
             onClick={() => onNavigate(metric.tab)}
-            className="rounded-xl border border-border-subtle bg-surface p-4 text-left shadow-sm outline-none transition-colors hover:border-accent/40 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+            className="rounded-xl border border-border-subtle bg-surface p-4 text-left shadow-sm outline-none transition-colors hover:border-accent-strong/40 focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2"
           >
             <span className="text-sm font-medium text-text-muted">
               {metric.label}
@@ -216,7 +217,7 @@ export function FinanceOverview({
             <button
               type="button"
               onClick={() => onNavigate("invoices")}
-              className="text-sm font-semibold text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="text-sm font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-status-info"
             >
               Review invoices
             </button>
@@ -238,7 +239,7 @@ export function FinanceOverview({
           <button
             type="button"
             onClick={() => onNavigate("payments")}
-            className="mt-3 text-sm font-semibold text-accent outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="mt-3 text-sm font-semibold text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-status-info"
           >
             Open payment review
           </button>

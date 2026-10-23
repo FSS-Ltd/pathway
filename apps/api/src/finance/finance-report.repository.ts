@@ -13,6 +13,7 @@ import {
   sumMinorUnits,
 } from "./finance-report-projection";
 import { resolveFinanceReportPeriod } from "./finance-report-period";
+import { loadFinanceWebhookExceptions } from "./finance-webhook-exceptions";
 import type {
   FinanceReportInvoice,
   FinanceReportMetadata,
@@ -493,7 +494,12 @@ export class FinanceReportRepository {
               }),
             ),
         ];
-        rows.push(...receiptsRows, ...allocationRows, ...exceptionRows);
+        rows.push(
+          ...receiptsRows,
+          ...allocationRows,
+          ...exceptionRows,
+          ...(await loadFinanceWebhookExceptions(tx, actor, period.asOfCutoff)),
+        );
 
         const totals = calculateFinanceReportTotals({
           invoices,

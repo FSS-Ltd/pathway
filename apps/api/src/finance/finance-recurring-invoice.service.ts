@@ -72,8 +72,6 @@ export class FinanceRecurringInvoiceService {
           createdByUserId: actor.userId,
           lines: {
             create: calculated.lines.map((line, lineOrder) => ({
-              tenantId: actor.tenantId,
-              orgId: actor.orgId,
               lineOrder,
               description: line.description,
               quantity: new Prisma.Decimal(line.quantity),
@@ -241,8 +239,6 @@ export class FinanceRecurringInvoiceService {
                 totalMinor: calculated.totals.totalMinor,
                 lines: {
                   create: calculated.lines.map((line, lineOrder) => ({
-                    tenantId: template.tenantId,
-                    orgId: template.orgId,
                     lineOrder,
                     description: line.description,
                     quantity: new Prisma.Decimal(line.quantity),

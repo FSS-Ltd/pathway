@@ -1,5 +1,6 @@
 import React from "react";
-import { Button, Input } from "@pathway/ui";
+import { Input } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import {
   allocateFinanceReceipt,
   reverseFinanceReceiptAllocation,
@@ -137,7 +138,7 @@ export function ReceiptAllocationForm({
               setMessage(null);
             }}
             disabled={isSaving || isConfirming}
-            className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-11 w-full rounded-lg border border-border-subtle bg-surface px-3 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-status-info"
           >
             <option value="">Select an invoice</option>
             {matchingInvoices.map((invoice) => (
@@ -187,15 +188,12 @@ export function ReceiptAllocationForm({
           </Button>
         </div>
         {error ? (
-          <p role="alert" className="sm:col-span-2 text-sm text-status-danger">
+          <p role="alert" className="sm:col-span-2 text-sm text-text-primary">
             {error}
           </p>
         ) : null}
         {message ? (
-          <p
-            role="status"
-            className="sm:col-span-2 text-sm text-status-success"
-          >
+          <p role="status" className="sm:col-span-2 text-sm text-text-primary">
             {message}
           </p>
         ) : null}
@@ -358,10 +356,7 @@ export function AllocationReversalForm({
             </Button>
           </div>
           {error ? (
-            <p
-              role="alert"
-              className="sm:col-span-2 text-sm text-status-danger"
-            >
+            <p role="alert" className="sm:col-span-2 text-sm text-text-primary">
               {error}
             </p>
           ) : null}

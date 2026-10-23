@@ -4,6 +4,7 @@ import {
   Inject,
   Injectable,
   ServiceUnavailableException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { FinanceAccessService } from "../access/finance-access.service";
 import { FinanceStripeCheckoutAttemptService } from "./finance-stripe-checkout-attempt.service";
@@ -113,6 +114,10 @@ export class FinanceStripeCheckoutService {
         expiresAt: financeCheckoutSessionExpiresAt(attempt.createdAt),
       });
     } catch (error) {
+      if (error instanceof UnprocessableEntityException) {
+        await this.attempts.markFailed(actor, attempt.id);
+        throw error;
+      }
       if (
         error instanceof FinanceStripeCheckoutProviderError &&
         !error.retryable

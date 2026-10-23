@@ -96,7 +96,23 @@ describe("FinanceRecurringInvoiceService", () => {
 
     expect(tx.financeRecurringInvoiceTemplate.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ currency: "EUR", dueDays: 14 }),
+        data: expect.objectContaining({
+          currency: "EUR",
+          dueDays: 14,
+          tenantId: scope.tenantId,
+          orgId: scope.orgId,
+          lines: {
+            create: [
+              {
+                lineOrder: 0,
+                description: "Monthly tuition",
+                quantity: expect.any(Prisma.Decimal),
+                unitAmountMinor: 10_000n,
+                taxRateBasisPoints: 0,
+              },
+            ],
+          },
+        }),
       }),
     );
   });
@@ -137,6 +153,23 @@ describe("FinanceRecurringInvoiceService", () => {
           recurringPeriodStart: new Date("2026-02-01T00:00:00.000Z"),
           dueAt: new Date("2026-03-14T00:00:00.000Z"),
           totalMinor: 10_000n,
+          tenantId: scope.tenantId,
+          orgId: scope.orgId,
+          lines: {
+            create: [
+              {
+                lineOrder: 0,
+                description: "Monthly tuition",
+                quantity: expect.any(Prisma.Decimal),
+                unitAmountMinor: 10_000n,
+                taxRateBasisPoints: 0,
+                netAmountMinor: 10_000n,
+                taxAmountMinor: 0n,
+                totalMinor: 10_000n,
+              },
+            ],
+          },
+          events: { create: { actorUserId: "staff-a", type: "CREATED" } },
         }),
       }),
     );

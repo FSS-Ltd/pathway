@@ -1,6 +1,6 @@
 # NexSteps Finance add-on build plan
 
-**Status:** T01–T13 are merged. T13 added hosted Bacs setup, fixed instalments and monthly invoice generation; a test-mode mandate and direct-charge success/failure were demonstrated on a synthetic school account in [PR #712](https://github.com/FSS-Ltd/pathway/pull/712). Bacs submission remains test-only while cancellation/return assurance is outstanding. Provider-backed card Checkout still awaits an eligible school test account.
+**Status:** T01–T17 are merged. T17 merged in [PR #733](https://github.com/FSS-Ltd/pathway/pull/733) at `74882be294cc2c71016a51eb146c3db23e69d226`, after all eleven checks passed on its current revision. T18 assurance is implemented locally and under verification; see [progress](PROGRESS.md) and the [scenario matrix](release-evidence/t18-scenario-matrix.md). An actual school-scoped Sandbox card payment, genuine signed durable ingress, canonical replay and disposable ledger restore have been demonstrated. Additional provider payout and Bacs assurance remain open. Bacs remains test-only, live commercial checkout remains gated, and T19 has not started.
 
 **Market:** Great Britain and the 27 EU member states, with one local collection currency per school legal country, one finance legal entity and one collection account per tenant for the initial release.
 

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import React from "react";
-import { Button, Card } from "@pathway/ui";
+import { Card } from "@pathway/ui";
+import { FinanceButton as Button } from "./finance-button";
 import { ApiError } from "@/lib/api-transport";
 import {
   fetchFinanceInvoices,
@@ -80,15 +81,34 @@ export function FinanceWorkspace({
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [financeLocked, setFinanceLocked] = React.useState(false);
+  const [accessDenied, setAccessDenied] = React.useState(false);
+  const readGeneration = React.useRef(0);
+  const denyAccess = React.useCallback(() => {
+    readGeneration.current += 1;
+    setSummary(null);
+    setInvoices([]);
+    setReceipts([]);
+    setPayerAccounts([]);
+    setStatements([]);
+    setInvoiceCursor(null);
+    setReceiptCursor(null);
+    setStatementCursor(null);
+    setPayerAccountCursor(null);
+    setAccessDenied(true);
+    setIsLoading(false);
+  }, []);
   const filters = React.useMemo(currentFinanceFilters, []);
 
   const load = React.useCallback(async () => {
+    const generation = ++readGeneration.current;
+    setAccessDenied(false);
     setIsLoading(true);
     setError(null);
     setFinanceLocked(false);
     let summaryLoaded = false;
     try {
       const nextSummary = await fetchFinanceReportSummary(filters);
+      if (generation !== readGeneration.current) return;
       summaryLoaded = true;
       const [invoicePage, receiptPage, payerPage, statementPage] =
         await Promise.all([
@@ -99,6 +119,7 @@ export function FinanceWorkspace({
             ? fetchFinanceStatements()
             : Promise.resolve({ items: [], nextCursor: null }),
         ]);
+      if (generation !== readGeneration.current) return;
       setSummary(nextSummary);
       setInvoices(invoicePage.items);
       setInvoiceCursor(invoicePage.nextCursor);
@@ -109,6 +130,13 @@ export function FinanceWorkspace({
       setStatements(statementPage.items);
       setStatementCursor(statementPage.nextCursor);
     } catch (caught) {
+      if (generation !== readGeneration.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        denyAccess();
+      }
       if (
         showUpgradeIfLocked &&
         !summaryLoaded &&
@@ -124,44 +152,81 @@ export function FinanceWorkspace({
           : "Finance could not be loaded.",
       );
     } finally {
-      setIsLoading(false);
+      if (generation === readGeneration.current) setIsLoading(false);
     }
-  }, [canReadStatements, filters, showUpgradeIfLocked]);
+  }, [canReadStatements, denyAccess, filters, showUpgradeIfLocked]);
 
   React.useEffect(() => {
     void load();
+    return () => {
+      readGeneration.current += 1;
+    };
   }, [load]);
 
   const refreshInvoices = React.useCallback(async () => {
-    const [invoicePage, payerPage] = await Promise.all([
-      fetchFinanceInvoices(),
-      fetchFinancePayerAccounts(),
-    ]);
-    setInvoices(invoicePage.items);
-    setInvoiceCursor(invoicePage.nextCursor);
-    setPayerAccounts(payerPage.items);
-    setPayerAccountCursor(payerPage.nextCursor);
-  }, []);
+    const generation = readGeneration.current;
+    try {
+      const [invoicePage, payerPage] = await Promise.all([
+        fetchFinanceInvoices(),
+        fetchFinancePayerAccounts(),
+      ]);
+      if (generation !== readGeneration.current) return;
+      setInvoices(invoicePage.items);
+      setInvoiceCursor(invoicePage.nextCursor);
+      setPayerAccounts(payerPage.items);
+      setPayerAccountCursor(payerPage.nextCursor);
+    } catch (caught) {
+      if (generation !== readGeneration.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      )
+        denyAccess();
+      throw caught;
+    }
+  }, [denyAccess]);
 
   const refreshReceipts = React.useCallback(async () => {
-    const [receiptPage, invoicePage] = await Promise.all([
-      fetchFinanceReceipts(),
-      fetchFinanceInvoices(),
-    ]);
-    setReceipts(receiptPage.items);
-    setReceiptCursor(receiptPage.nextCursor);
-    setInvoices(invoicePage.items);
-    setInvoiceCursor(invoicePage.nextCursor);
-  }, []);
+    const generation = readGeneration.current;
+    try {
+      const [receiptPage, invoicePage] = await Promise.all([
+        fetchFinanceReceipts(),
+        fetchFinanceInvoices(),
+      ]);
+      if (generation !== readGeneration.current) return;
+      setReceipts(receiptPage.items);
+      setReceiptCursor(receiptPage.nextCursor);
+      setInvoices(invoicePage.items);
+      setInvoiceCursor(invoicePage.nextCursor);
+    } catch (caught) {
+      if (generation !== readGeneration.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      )
+        denyAccess();
+      throw caught;
+    }
+  }, [denyAccess]);
 
   const loadMoreInvoices = React.useCallback(async () => {
     if (!invoiceCursor || loadingMoreInvoices) return;
     setLoadingMoreInvoices(true);
+    const generation = readGeneration.current;
     try {
       const page = await fetchFinanceInvoices(invoiceCursor);
+      if (generation !== readGeneration.current) return;
       setInvoices((current) => appendUnique(current, page.items));
       setInvoiceCursor(page.nextCursor);
     } catch (caught) {
+      if (generation !== readGeneration.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        denyAccess();
+        return;
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -170,16 +235,26 @@ export function FinanceWorkspace({
     } finally {
       setLoadingMoreInvoices(false);
     }
-  }, [invoiceCursor, loadingMoreInvoices]);
+  }, [denyAccess, invoiceCursor, loadingMoreInvoices]);
 
   const loadMoreReceipts = React.useCallback(async () => {
     if (!receiptCursor || loadingMoreReceipts) return;
     setLoadingMoreReceipts(true);
+    const generation = readGeneration.current;
     try {
       const page = await fetchFinanceReceipts(receiptCursor);
+      if (generation !== readGeneration.current) return;
       setReceipts((current) => appendUnique(current, page.items));
       setReceiptCursor(page.nextCursor);
     } catch (caught) {
+      if (generation !== readGeneration.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        denyAccess();
+        return;
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -188,16 +263,26 @@ export function FinanceWorkspace({
     } finally {
       setLoadingMoreReceipts(false);
     }
-  }, [loadingMoreReceipts, receiptCursor]);
+  }, [denyAccess, loadingMoreReceipts, receiptCursor]);
 
   const loadMoreStatements = React.useCallback(async () => {
     if (!statementCursor || loadingMoreStatements) return;
     setLoadingMoreStatements(true);
+    const generation = readGeneration.current;
     try {
       const page = await fetchFinanceStatements(statementCursor);
+      if (generation !== readGeneration.current) return;
       setStatements((current) => appendUnique(current, page.items));
       setStatementCursor(page.nextCursor);
     } catch (caught) {
+      if (generation !== readGeneration.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        denyAccess();
+        return;
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -206,16 +291,26 @@ export function FinanceWorkspace({
     } finally {
       setLoadingMoreStatements(false);
     }
-  }, [loadingMoreStatements, statementCursor]);
+  }, [denyAccess, loadingMoreStatements, statementCursor]);
 
   const loadMorePayerAccounts = React.useCallback(async () => {
     if (!payerAccountCursor || loadingMorePayerAccounts) return;
     setLoadingMorePayerAccounts(true);
+    const generation = readGeneration.current;
     try {
       const page = await fetchFinancePayerAccounts(payerAccountCursor);
+      if (generation !== readGeneration.current) return;
       setPayerAccounts((current) => appendUnique(current, page.items));
       setPayerAccountCursor(page.nextCursor);
     } catch (caught) {
+      if (generation !== readGeneration.current) return;
+      if (
+        caught instanceof ApiError &&
+        (caught.status === 401 || caught.status === 403)
+      ) {
+        denyAccess();
+        return;
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -224,7 +319,7 @@ export function FinanceWorkspace({
     } finally {
       setLoadingMorePayerAccounts(false);
     }
-  }, [loadingMorePayerAccounts, payerAccountCursor]);
+  }, [denyAccess, loadingMorePayerAccounts, payerAccountCursor]);
 
   const tabs: Array<{ id: FinanceTab; label: string }> = [
     { id: "overview", label: "Overview" },
@@ -259,11 +354,28 @@ export function FinanceWorkspace({
     document.getElementById(`finance-tab-${nextTab.id}`)?.focus();
   };
 
+  if (accessDenied && !financeLocked) {
+    return (
+      <main className="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
+        <h1 className="font-heading text-2xl font-semibold text-text-primary">
+          Finance access changed
+        </h1>
+        <p role="alert" className="text-sm text-text-muted">
+          Financial records have been cleared. Ask an organisation administrator
+          to check your access.
+        </p>
+        <Button variant="secondary" onClick={() => void load()}>
+          Check access again
+        </Button>
+      </main>
+    );
+  }
+
   if (financeLocked) {
     return (
       <main className="mx-auto w-full max-w-3xl space-y-5 p-4 sm:p-6">
         <header className="space-y-1">
-          <p className="text-sm font-semibold text-accent">Finance</p>
+          <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="font-heading text-2xl font-semibold text-text-primary">
             Family invoices and payments
           </h1>
@@ -293,7 +405,7 @@ export function FinanceWorkspace({
     <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <p className="text-sm font-semibold text-accent">Finance</p>
+          <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-text-primary">
             Family invoices and payments
           </h1>
@@ -319,7 +431,7 @@ export function FinanceWorkspace({
       </header>
 
       {summary?.accessMode === "SERVICING_ONLY" ? (
-        <div className="rounded-xl border border-status-warning/30 bg-status-warning/5 p-4 text-sm text-text-primary">
+        <div className="rounded-xl border border-status-warn/30 bg-status-warn/5 p-4 text-sm text-text-primary">
           <p className="font-semibold">Finance is in servicing mode</p>
           <p className="mt-1 text-text-muted">
             You can review historic records, reconcile payments, and export
@@ -378,9 +490,9 @@ export function FinanceWorkspace({
               tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
               onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-              className={`min-h-11 rounded-t-lg px-4 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${
+              className={`min-h-11 rounded-t-lg px-4 text-sm font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2 ${
                 activeTab === tab.id
-                  ? "border-b-2 border-accent text-accent"
+                  ? "border-b-2 border-accent text-text-primary"
                   : "text-text-muted hover:bg-muted/50 hover:text-text-primary"
               }`}
             >
@@ -399,7 +511,7 @@ export function FinanceWorkspace({
             aria-labelledby={`finance-tab-${tab.id}`}
             tabIndex={activeTab === tab.id ? 0 : -1}
             hidden={activeTab !== tab.id}
-            className="outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
+            className="outline-none focus-visible:ring-2 focus-visible:ring-status-info focus-visible:ring-offset-2"
           >
             {activeTab === tab.id && tab.id === "overview" ? (
               <FinanceOverview
@@ -418,6 +530,7 @@ export function FinanceWorkspace({
                 isLoadingMorePayerAccounts={loadingMorePayerAccounts}
                 onLoadMorePayerAccounts={loadMorePayerAccounts}
                 currency={summary?.metadata.currency ?? null}
+                onAccessDenied={denyAccess}
                 canCreate={
                   canCreateInvoices && summary?.accessMode !== "SERVICING_ONLY"
                 }
@@ -470,6 +583,7 @@ export function FinanceWorkspace({
               <FinanceReportWorkspace
                 canExport={canExport}
                 initialFilters={filters}
+                onAccessDenied={denyAccess}
               />
             ) : null}
           </div>

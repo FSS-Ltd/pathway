@@ -133,6 +133,7 @@ export class FinanceStatementDocumentService {
         "Finance statement could not be verified or retrieved",
       );
     }
+    await this.assertAccess(actor, payerAccountId, "DOWNLOAD");
     return {
       bytes,
       fileName: `statement-${financeStatementDateKey(ready.periodStart)}.pdf`,

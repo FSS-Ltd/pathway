@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { ForbiddenException } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { FinanceAccessService } from "../access/finance-access.service";
@@ -191,5 +192,74 @@ describe("FinanceStatementDocumentService", () => {
       "DOWNLOAD_DOCUMENT",
     );
     expect(storage.downloadObject).not.toHaveBeenCalled();
+  });
+
+  it("returns verified private statement bytes while payer access remains current", async () => {
+    const bytes = Buffer.from("private statement bytes");
+    const ready = statement("READY", {
+      key: "tenants/tenant-a/finance-statements/statement.pdf",
+      digest: createHash("sha256").update(bytes).digest("hex"),
+      size: bytes.length,
+    });
+    const { service, storage } = setup([ready, ready, ready]);
+    storage.downloadObject.mockResolvedValue(bytes);
+    const originalBucket = process.env.SUPABASE_STORAGE_PRIVATE_BUCKET;
+    process.env.SUPABASE_STORAGE_PRIVATE_BUCKET = "private-finance";
+    try {
+      await expect(
+        service.download(payerActor, statementId, payerAccountId),
+      ).resolves.toEqual({ bytes, fileName: "statement-2026-09-01.pdf" });
+    } finally {
+      if (originalBucket === undefined)
+        delete process.env.SUPABASE_STORAGE_PRIVATE_BUCKET;
+      else process.env.SUPABASE_STORAGE_PRIVATE_BUCKET = originalBucket;
+    }
+  });
+
+  it("denies statement delivery when the payer grant is revoked during private storage retrieval", async () => {
+    const bytes = Buffer.from("private statement bytes");
+    const ready = statement("READY", {
+      key: "tenants/tenant-a/finance-statements/statement.pdf",
+      digest: createHash("sha256").update(bytes).digest("hex"),
+      size: bytes.length,
+    });
+    const { service, access, storage } = setup([ready, ready, ready]);
+    let revoked = false;
+    access.assertPayerAction.mockImplementation(async () => {
+      if (revoked) throw new ForbiddenException("Grant revoked");
+    });
+    let resolveStorage!: (value: Buffer) => void;
+    let storageStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      storageStarted = resolve;
+    });
+    const pendingStorage = new Promise<Buffer>((resolve) => {
+      resolveStorage = resolve;
+    });
+    storage.downloadObject.mockImplementation(() => {
+      storageStarted();
+      return pendingStorage;
+    });
+    const originalBucket = process.env.SUPABASE_STORAGE_PRIVATE_BUCKET;
+    process.env.SUPABASE_STORAGE_PRIVATE_BUCKET = "private-finance";
+    try {
+      const download = service.download(
+        payerActor,
+        statementId,
+        payerAccountId,
+      );
+      const outcome = download.then(
+        (value) => ({ value }),
+        (error: unknown) => ({ error }),
+      );
+      await started;
+      revoked = true;
+      resolveStorage(bytes);
+      expect(await outcome).toEqual({ error: expect.any(ForbiddenException) });
+    } finally {
+      if (originalBucket === undefined)
+        delete process.env.SUPABASE_STORAGE_PRIVATE_BUCKET;
+      else process.env.SUPABASE_STORAGE_PRIVATE_BUCKET = originalBucket;
+    }
   });
 });
