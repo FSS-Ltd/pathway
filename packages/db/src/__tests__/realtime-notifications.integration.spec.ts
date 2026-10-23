@@ -9,17 +9,24 @@ const migrationPath = path.resolve(
   "../../prisma/migrations/20261204000000_transactional_realtime_notifications/migration.sql",
 );
 
-function sql(statement: string): string {
-  if (!databaseUrl) throw new Error("Notification test database is required");
-  const url = new URL(databaseUrl);
+function requireLocalTestDatabase(connectionString: string): string {
+  const url = new URL(connectionString);
   if (
     !["localhost", "127.0.0.1"].includes(url.hostname) ||
-    url.pathname !== "/pathway_realtime_notifications_test"
+    url.pathname !== "/pathway_realtime_notifications_test" ||
+    url.search !== "" ||
+    url.hash !== ""
   ) {
     throw new Error(
       "Use the dedicated local pathway_realtime_notifications_test database",
     );
   }
+  return connectionString;
+}
+
+function sql(statement: string): string {
+  if (!databaseUrl) throw new Error("Notification test database is required");
+  requireLocalTestDatabase(databaseUrl);
   return execFileSync(
     "psql",
     [databaseUrl, "-X", "-qAt", "-v", "ON_ERROR_STOP=1"],
@@ -79,6 +86,36 @@ function write(statement: string, orgId = "org-1"): string {
     `SET ROLE realtime_test_backend; SET app.org_id = '${orgId}'; SET app.realtime_capture_enabled = 'on'; ${statement}`,
   );
 }
+
+describe("notification fixture database safety", () => {
+  const local =
+    "postgresql://postgres:test@127.0.0.1:5432/pathway_realtime_notifications_test";
+
+  it("accepts the dedicated local database", () => {
+    expect(requireLocalTestDatabase(local)).toBe(local);
+  });
+
+  it.each([
+    "?host=remote.example",
+    "?hostaddr=192.0.2.1",
+    "?dbname=shared",
+    "?service=production",
+    "?options=-csearch_path=shared",
+    "#unexpected-fragment",
+  ])(
+    "rejects libpq overrides and URI fragments before invoking psql: %s",
+    (suffix) => {
+      expect(() => requireLocalTestDatabase(local + suffix)).toThrow();
+    },
+  );
+
+  it.each([
+    "postgresql://postgres:test@remote.example/pathway_realtime_notifications_test",
+    "postgresql://postgres:test@127.0.0.1/shared",
+  ])("rejects a non-dedicated target: %s", (target) => {
+    expect(() => requireLocalTestDatabase(target)).toThrow();
+  });
+});
 
 suite("transactional realtime notification capture", () => {
   it.each([

@@ -116,7 +116,8 @@ replacement is verified.
 - Targeted ESLint/Prettier for changed files and the workers build.
 
 The SQL integration suite refuses any host except localhost/127.0.0.1 and requires
-the database name `pathway_realtime_notifications_test`. It rebuilds only its
+the database name `pathway_realtime_notifications_test`, with no URI query options
+or fragments. It rebuilds only its
 minimal fixture there; never point it at a shared or production database. The
 separate Realtime notification CI job runs these database proofs without secrets.
 
@@ -124,3 +125,14 @@ Sources: [Broadcast](https://supabase.com/docs/guides/realtime/broadcast),
 [authorization](https://supabase.com/docs/guides/realtime/authorization),
 [pg_net](https://supabase.com/docs/guides/database/extensions/pg_net),
 [pg_cron](https://github.com/citusdata/pg_cron).
+
+## Step 1.1 verification boundaries
+
+The dedicated SQL fixture exercises the real capture migration and outbox RLS with
+minimal source tables. Production source-table RLS, foreign keys and cursor guards
+remain independently enforced by existing migrations; the fixture is not a claim
+of full production authorization interoperability. Full migration chains were also
+applied to separate app/public databases. Duplicate physical core-table copies and
+bridge views must be inspected during deployment preflight before enabling capture.
+Supabase delivery, delivery-time revocation and runtime lifecycle/idle proofs remain
+acceptance requirements for steps 1.2–1.5.

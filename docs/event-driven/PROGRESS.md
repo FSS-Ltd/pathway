@@ -4,13 +4,13 @@ Approved plan: [Event-driven updates and worker wakeups](README.md).
 Base: FSS-Ltd/pathway `master`; step 1.1 starts at
 `82770da7fd836d031c2e3ed76f127e5c723a5249` (PR #734 merged).
 
-| Step | State                            | PR / evidence                                        | Next permitted action                                          |
-| ---- | -------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------- |
-| 1.1  | Locally verified; review pending | Branch `build/event-driven-1-1`; local checks passed | Finish independent review and publish PR                       |
-| 1.2  | Planned                          | No implementation started                            | Wait for 1.1 PR, current-revision green CI and confirmed merge |
-| 1.3  | Planned                          | No implementation started                            | Wait for 1.2 gate                                              |
-| 1.4  | Planned                          | No implementation started                            | Wait for 1.3 gate                                              |
-| 1.5  | Planned                          | No implementation started                            | Wait for 1.4 gate                                              |
+| Step | State                        | PR / evidence                                                            | Next permitted action                                          |
+| ---- | ---------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| 1.1  | PR open; review fix verified | [#736](https://github.com/FSS-Ltd/pathway/pull/736); local checks passed | Verify latest-head CI; obtain production merge authorization   |
+| 1.2  | Planned                      | No implementation started                                                | Wait for 1.1 PR, current-revision green CI and confirmed merge |
+| 1.3  | Planned                      | No implementation started                                                | Wait for 1.2 gate                                              |
+| 1.4  | Planned                      | No implementation started                                                | Wait for 1.3 gate                                              |
+| 1.5  | Planned                      | No implementation started                                                | Wait for 1.4 gate                                              |
 
 ## Step 1.1 decisions and evidence
 
@@ -35,9 +35,9 @@ record. Do not mark this step complete from local checks or a pushed branch alon
 
 ## Local verification
 
-- Full database suite with the notification fixture enabled: 83 passed; 33
+- Full database suite with the notification fixture enabled: 92 passed; 33
   existing opt-in database proofs skipped because their separate fixture flags
-  were not enabled. The new 9-case PostgreSQL capture suite ran and passed.
+  were not enabled. The new suite passed all 18 cases (9 capture cases and 9 test-target validation cases).
 - Workers: 21 suites / 97 tests passed.
 - Database and workers typechecking, targeted ESLint, workers build, changed-code
   and new-document Prettier checks, and `git diff --check` passed.
@@ -45,3 +45,17 @@ record. Do not mark this step complete from local checks or a pushed branch alon
   disposable PostgreSQL 16 databases with app and public schema layouts.
 - No UI or provider delivery changed in step 1.1; browser/mobile E2E and live
   Supabase subscription/dispatch checks belong to subsequent delivery steps.
+
+## Independent review
+
+- Reviewed implementation range 82770da7..f9f6622d. No additional production
+  correctness defect was established; current source-table RLS and cursor guards
+  were inspected separately from the minimal capture fixture.
+- P2 fixed: reject URI query parameters/fragments before passing the destructive
+  fixture URL to libpq. Six override rejection cases were observed failing first;
+  the complete database suite then passed with all 18 notification/guard cases.
+- No deferred minor findings. Remaining production authorization/bridge-view
+  verification limits are recorded in README.md. Future-step behavior was correctly
+  outside this review; it has not been implemented or claimed complete.
+- Latest pushed revision, CI results and merge state are recorded in PR #736's
+  delivery record. Step 1.2 remains gated until current-revision CI and merge.
