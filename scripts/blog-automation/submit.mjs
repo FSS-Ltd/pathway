@@ -34,7 +34,7 @@ async function main() {
     console.log("Cover image: skipped");
     console.log("QA result: failed");
     console.log(
-      "Notes: Not the configured Monday, Wednesday, Friday 6:00-6:29am Europe/London window.",
+      "Notes: Not the configured daily 06:00-06:29 Europe/London window.",
     );
     return;
   }
