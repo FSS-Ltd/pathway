@@ -39,13 +39,13 @@ export async function readFinanceUnresolvedPage(
   // The receipt has no direct connection FK. Prove it through its canonical payment identity.
   const receiptInScope = Prisma.sql`(
     (r."source" = 'STRIPE_CARD' AND EXISTS (
-      SELECT 1 FROM app."FinanceCheckoutAttempt" a
+      SELECT 1 FROM "FinanceCheckoutAttempt" a
       WHERE a."tenantId" = ${scope.tenantId} AND a."orgId" = ${scope.orgId}
         AND a."stripeConnectionId" = ${scope.connectionId}
         AND a."stripeAccountId" = ${scope.stripeAccountId} AND a."livemode" = ${scope.livemode}
         AND a."stripeCheckoutSessionId" = r."sourceReference"
     )) OR (r."source" = 'STRIPE_BACS' AND EXISTS (
-      SELECT 1 FROM app."FinanceDebitAttempt" d
+      SELECT 1 FROM "FinanceDebitAttempt" d
       WHERE d."tenantId" = ${scope.tenantId} AND d."orgId" = ${scope.orgId}
         AND d."stripeConnectionId" = ${scope.connectionId}
         AND d."stripeAccountId" = ${scope.stripeAccountId}
@@ -57,7 +57,7 @@ export async function readFinanceUnresolvedPage(
     SELECT * FROM (
       (SELECT 'checkout:' || a."id" AS "key", 'checkout'::text AS "kind", a."id", a."createdAt",
         a."stripeCheckoutSessionId" AS "resourceId"
-       FROM app."FinanceCheckoutAttempt" a
+       FROM "FinanceCheckoutAttempt" a
        WHERE ${enabled("checkout")} AND a."id" > ${after("checkout")}
          AND a."tenantId" = ${scope.tenantId} AND a."orgId" = ${scope.orgId}
          AND a."stripeConnectionId" = ${scope.connectionId}
@@ -66,7 +66,7 @@ export async function readFinanceUnresolvedPage(
        ORDER BY a."id" LIMIT ${limit})
       UNION ALL
       (SELECT 'debit:' || d."id", 'debit'::text, d."id", d."createdAt", d."stripePaymentIntentId"
-       FROM app."FinanceDebitAttempt" d
+       FROM "FinanceDebitAttempt" d
        WHERE ${enabled("debit")} AND d."id" > ${after("debit")}
          AND d."tenantId" = ${scope.tenantId} AND d."orgId" = ${scope.orgId}
          AND d."stripeConnectionId" = ${scope.connectionId} AND d."stripeAccountId" = ${scope.stripeAccountId}
@@ -74,20 +74,20 @@ export async function readFinanceUnresolvedPage(
        ORDER BY d."id" LIMIT ${limit})
       UNION ALL
       (SELECT 'dispute:' || m."id", 'dispute'::text, m."id", m."createdAt", m."sourceReference"
-       FROM app."FinanceReceiptMovement" m
-       JOIN app."FinanceReceipt" r ON r."id" = m."receiptId" AND r."tenantId" = m."tenantId" AND r."orgId" = m."orgId"
+       FROM "FinanceReceiptMovement" m
+       JOIN "FinanceReceipt" r ON r."id" = m."receiptId" AND r."tenantId" = m."tenantId" AND r."orgId" = m."orgId"
        WHERE ${enabled("dispute")} AND m."id" > ${after("dispute")}
          AND m."tenantId" = ${scope.tenantId} AND m."orgId" = ${scope.orgId}
          AND m."createdAt" < ${cutoff} AND m."source" = 'STRIPE' AND m."type" = 'DISPUTE_WITHDRAWAL'
          AND ${receiptInScope} AND NOT EXISTS (
-           SELECT 1 FROM app."FinanceReceiptMovement" inverse
+           SELECT 1 FROM "FinanceReceiptMovement" inverse
            WHERE inverse."tenantId" = ${scope.tenantId} AND inverse."orgId" = ${scope.orgId}
              AND inverse."originalMovementId" = m."id" AND inverse."type" = 'DISPUTE_REINSTATEMENT'
          )
        ORDER BY m."id" LIMIT ${limit})
       UNION ALL
       (SELECT 'mandate:' || m."id", 'mandate'::text, m."id", m."createdAt", m."stripeSetupIntentId"
-       FROM app."FinanceMandate" m
+       FROM "FinanceMandate" m
        WHERE ${enabled("mandate")} AND m."id" > ${after("mandate")}
          AND m."tenantId" = ${scope.tenantId} AND m."orgId" = ${scope.orgId}
          AND m."stripeConnectionId" = ${scope.connectionId}
@@ -97,8 +97,8 @@ export async function readFinanceUnresolvedPage(
        ORDER BY m."id" LIMIT ${limit})
       UNION ALL
       (SELECT 'refund:' || f."id", 'refund'::text, f."id", f."createdAt", f."stripeRefundId"
-       FROM app."FinanceRefund" f
-       JOIN app."FinanceReceipt" r ON r."id" = f."receiptId" AND r."tenantId" = f."tenantId" AND r."orgId" = f."orgId"
+       FROM "FinanceRefund" f
+       JOIN "FinanceReceipt" r ON r."id" = f."receiptId" AND r."tenantId" = f."tenantId" AND r."orgId" = f."orgId"
        WHERE ${enabled("refund")} AND f."id" > ${after("refund")}
          AND f."tenantId" = ${scope.tenantId} AND f."orgId" = ${scope.orgId}
          AND f."stripeAccountId" = ${scope.stripeAccountId} AND f."source" = 'STRIPE_CARD'

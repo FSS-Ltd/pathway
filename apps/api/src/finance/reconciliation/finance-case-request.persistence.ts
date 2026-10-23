@@ -22,18 +22,18 @@ export async function readPendingFinanceCaseRequests(
   const rows = await tx.$queryRaw<FinanceCaseRequestRow[]>`
     SELECT e."id" AS "eventId", e."caseId", e."createdAt", e."details" AS "requestDetails",
       c."caseKey", c."kind", c."resourceReference", c."details" AS "caseDetails"
-    FROM app."FinanceReconciliationCaseEvent" e
-    JOIN app."FinanceReconciliationCase" c ON c."id" = e."caseId" AND c."tenantId" = e."tenantId" AND c."orgId" = e."orgId"
+    FROM "FinanceReconciliationCaseEvent" e
+    JOIN "FinanceReconciliationCase" c ON c."id" = e."caseId" AND c."tenantId" = e."tenantId" AND c."orgId" = e."orgId"
     WHERE e."tenantId" = ${scope.tenantId} AND e."orgId" = ${scope.orgId}
       AND c."stripeConnectionId" = ${scope.connectionId} AND e."type" = 'REPLAY_REQUESTED'
       AND e."createdAt" < ${cutoff} AND e."id" > ${cursor ?? ""}
       AND NOT EXISTS (
-        SELECT 1 FROM app."FinanceReconciliationCaseEvent" done
+        SELECT 1 FROM "FinanceReconciliationCaseEvent" done
         WHERE done."tenantId" = e."tenantId" AND done."orgId" = e."orgId" AND done."caseId" = e."caseId"
           AND done."type" = 'UPDATED' AND done."createdAt" >= e."createdAt"
           AND done."details"->>'completedRequestId' = e."details"->>'requestId'
       ) AND NOT EXISTS (
-        SELECT 1 FROM app."FinanceReconciliationCaseEvent" failed
+        SELECT 1 FROM "FinanceReconciliationCaseEvent" failed
         WHERE failed."tenantId" = e."tenantId" AND failed."orgId" = e."orgId" AND failed."caseId" = e."caseId"
           AND failed."type" = 'UPDATED' AND failed."details"->>'failedRequestId' = e."details"->>'requestId'
           AND (failed."details"->>'retryAfter')::TIMESTAMPTZ > ${now}
@@ -52,7 +52,7 @@ export async function lockPendingFinanceCaseRequest(
   request: FinanceCaseRequest,
 ): Promise<boolean> {
   await assertReconciliationScope(tx, scope);
-  await tx.$queryRaw`SELECT "id" FROM app."FinanceReconciliationCase" WHERE "id" = ${request.caseId} AND "tenantId" = ${scope.tenantId} AND "orgId" = ${scope.orgId} AND "stripeConnectionId" = ${scope.connectionId} FOR UPDATE`;
+  await tx.$queryRaw`SELECT "id" FROM "FinanceReconciliationCase" WHERE "id" = ${request.caseId} AND "tenantId" = ${scope.tenantId} AND "orgId" = ${scope.orgId} AND "stripeConnectionId" = ${scope.connectionId} FOR UPDATE`;
   const event = await tx.financeReconciliationCaseEvent.findFirst({
     where: {
       id: request.eventId,
@@ -98,7 +98,7 @@ export async function inspectFinanceCaseEvidence(
   const rows = await tx.$queryRaw<
     Array<{ id: string; status: string; attempts: number }>
   >`
-    SELECT "id", "status", "attempts" FROM app."FinanceStripeWebhookEvent"
+    SELECT "id", "status", "attempts" FROM "FinanceStripeWebhookEvent"
     WHERE "id" = ${request.evidenceId} AND "tenantId" = ${scope.tenantId} AND "orgId" = ${scope.orgId}
       AND "stripeAccountId" = ${scope.stripeAccountId} AND "livemode" = ${scope.livemode}
       AND (("evidenceSource" = 'API_RECONCILIATION' AND "reconciliationConnectionId" = ${scope.connectionId})

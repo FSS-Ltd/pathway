@@ -21,6 +21,7 @@ export async function withReconciliationOperation(
   check: (fixture: OperationFixture) => Promise<void>,
   currency: "GBP" | "EUR" = "EUR",
   operationCreatedAt?: Date,
+  connectionCreatedAt?: Date,
 ): Promise<void> {
   const orgId = process.env.E2E_ORG_ID;
   if (!orgId) throw new Error("Missing reconciliation fixture organisation");
@@ -77,6 +78,7 @@ export async function withReconciliationOperation(
           requestedByUserId: creator.id,
           stripeAccountId,
           status: "READY",
+          ...(connectionCreatedAt ? { createdAt: connectionCreatedAt } : {}),
         },
       });
       // Fixture-only access adapter; production permission and RLS boundaries have separate suites.
