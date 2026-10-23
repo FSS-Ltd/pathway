@@ -126,6 +126,7 @@ describe("FinanceStatementDocumentService", () => {
 
     const upload = storage.uploadObject.mock.calls[0][0];
     expect(upload.bucket).toBe("private");
+    expect(upload.overwrite).toBe(false);
     expect(upload.contentType).toBe("application/pdf");
     expect(upload.key).toMatch(
       new RegExp(

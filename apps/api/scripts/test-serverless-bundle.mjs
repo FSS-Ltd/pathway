@@ -59,6 +59,21 @@ try {
   );
   assert.doesNotMatch(bundleSource, /tsx\/cjs|tsx\/esm/);
 
+  for (const asset of [
+    "Nunito-Regular.ttf",
+    "Nunito-Bold.ttf",
+    "NotoSans-Regular.ttf",
+    "NotoSans-Bold.ttf",
+    "OFL.txt",
+    "NotoSans-OFL.txt",
+  ]) {
+    assert.deepEqual(
+      await readFile(join(stagedBundleDirectory, asset)),
+      await readFile(resolve(apiRoot, "src/finance/fonts", asset)),
+      `staged Finance font asset must match its source: ${asset}`,
+    );
+  }
+
   const bundle = await import(
     new URL(`file://${join(stagedBundleDirectory, "index.mjs")}`)
   );

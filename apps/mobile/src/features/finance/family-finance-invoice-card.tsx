@@ -85,7 +85,7 @@ export function FamilyFinanceInvoiceCard({
         checkoutError.status === 422
       ) {
         setError(
-          "Card payment isn’t available for this amount. Use bank transfer or ask the school for help.",
+          "Card payment isn’t available for this invoice. Use bank transfer or ask the school for help.",
         );
       } else if (
         checkoutError instanceof ApiError &&

@@ -8,6 +8,7 @@ import type { FinanceAccessService } from "../../access/finance-access.service";
 import type { FinanceBalanceService } from "../../finance-balance.service";
 import {
   FinanceStripeCheckoutProviderError,
+  StripeFinanceCheckoutProvider,
   type FinanceStripeCheckoutProvider,
 } from "../finance-stripe-checkout.provider";
 import type { FinanceStripeCheckoutConfig } from "../finance-stripe-checkout.config";
@@ -224,6 +225,65 @@ describe("FinanceStripeCheckoutService", () => {
       expect.objectContaining({ data: { status: "FAILED" } }),
     );
   });
+
+  it.each([
+    { currency: "DKK", amountMinor: "250" },
+    { currency: "SEK", amountMinor: "300" },
+  ])(
+    "explains an actual adapter refusal for $currency without offering a transient retry",
+    async ({ currency, amountMinor }) => {
+      mockInvoiceFindFirst.mockResolvedValue({
+        id: "invoice-a",
+        financeProfileId: "profile-a",
+        invoiceNumber: 1001n,
+        status: "ISSUED",
+        totalMinor: BigInt(amountMinor),
+        currency,
+      });
+      mockBalanceForInvoices.mockResolvedValue(
+        new Map([["invoice-a", { outstandingMinor: amountMinor }]]),
+      );
+      const fetcher = jest.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              type: "invalid_request_error",
+              param: "allowed_payment_method_types",
+              message:
+                "The Checkout Session's total amount must convert to at least 30 pence.",
+            },
+          }),
+          { status: 400 },
+        ),
+      );
+      const actualProviderService = new FinanceStripeCheckoutService(
+        financeAccess,
+        attempts,
+        config,
+        new StripeFinanceCheckoutProvider(config, fetcher),
+      );
+      await expect(
+        actualProviderService.startCheckout(
+          actor,
+          "payer-account-a",
+          "invoice-a",
+        ),
+      ).rejects.toMatchObject({
+        status: 422,
+        response: {
+          code: "FINANCE_CARD_PAYMENT_UNAVAILABLE",
+          message:
+            "Card payment is unavailable for this invoice. Choose another payment method or contact the school.",
+        },
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+      expect(attemptState).toMatchObject({
+        status: "FAILED",
+        stripeCheckoutSessionId: null,
+        checkoutUrl: null,
+      });
+    },
+  );
 
   it("creates one connected-account session for the server-calculated outstanding balance", async () => {
     mockCreateSession.mockResolvedValue({

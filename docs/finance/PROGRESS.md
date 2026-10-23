@@ -159,7 +159,7 @@ Current GitHub master was refreshed and contains the checked revision and merge 
 
 ## T18 assurance in progress
 
-T18 is **implemented locally and under verification; no PR or merge yet**. The branch starts at the verified T17 merge above. All A01–A48 and expanded-contract evidence is mapped in [the assurance matrix](release-evidence/t18-scenario-matrix.md); pending rows are not passing claims.
+T18's initial delivery **merged in [PR #734](https://github.com/FSS-Ltd/pathway/pull/734); assurance closure is still incomplete**. The branch starts at the verified T17 merge above. All A01–A48 and expanded-contract evidence is mapped in [the assurance matrix](release-evidence/t18-scenario-matrix.md); pending rows are not passing claims.
 
 Observed monetary regressions now have real PostgreSQL coverage: reinstatement after replacement payment restores only current debt and retains excess as unapplied; period-end ledger cutoffs exclude later-captured evidence and carry it as next-period adjustments. Actual recurring template/invoice generation exposed invalid Prisma nested tenant/org fields; scoped parent relations now supply those fields correctly. Concurrent manual/card/Bacs receipts, invoice numbering, monthly generation, scheduler restart, PI/Charge ordering and cancellation-before-final-payment scenarios passed their focused database runs.
 
@@ -182,3 +182,186 @@ The latest actual Bacs confirmation was blocked by Stripe HTTP 400: the selected
 Final local static checks passed for API, admin, mobile, workers and platform, with ESLint across changed TypeScript files. API/serverless compilation and admin production build passed. The admin build used explicit synthetic public build configuration, not production credentials. The real invoice/credit/receipt/statement PDF smoke passed. Worker tests passed all 21 suites / 97 tests. The serverless runtime smoke initially refused to run without an explicitly named disposable `TEST_DATABASE_URL`; that guard failure is not a passing test.
 
 After supplying the guarded disposable local `TEST_DATABASE_URL`, the serverless runtime smoke passed: packaged application startup, health, CORS preflight and unauthenticated-route handling were exercised without loading source TypeScript. The original missing-variable refusal remains recorded as a failed setup attempt, not a product failure.
+
+T18 preservation revision `54b8f6f440abf5512f2d584a498454ed570c28bc` was rebased cleanly onto current GitHub master `4bd8862e1c93464b462fef49e7dfa1ddbfd062d9` before draft PR publication. The current-master payer checkout-status controller regression passed. The complete rebased Finance PostgreSQL run passed **37 suites / 180 tests**, including all tenant RLS assertions and the corrected discovery-delta test. Formatting and diff checks passed on that revision. Further focused assurance examples remain in progress; CI is running and no merge is claimed. The PR stays draft while mandatory application/provider proof remains open; T19 is not permitted to start.
+
+Actual Sandbox accepted-response-loss recovery passed through the Checkout adapter and application services. Two accepted create requests with the same key/body produced one provider session, one persisted attempt and no payment. The subsequent cached start reused that attempt. Real signed expiry ingestion and canonical worker handling changed it to `EXPIRED`; the invoice remained outstanding100minor with no receipt allocation. Separate access enforcement remains established by actual HTTP tests, not this isolated provider fixture.
+
+Additional application assurance passed 19 of20 new cases initially. The servicing fixture used a date outside the reviewed 2026–2028 bank calendar and correctly received400; using a valid historical date inside that calendar passed the focused servicing case. These runs cover the exact30000/5000 credit/refund, accepted-before-timeout refund recovery, reinstatement races/credit ordering, persisted three instalments, weekend/holiday/London DST scheduler boundaries, forged-return debt, wrong-destination operator review, issued document/tax snapshots and servicing approval/job denials. Unknown-status recovery passed six resource types with unchanged debt and held evidence or durable retry failure. No new production fix or migration was needed for these additional examples.
+
+### T18 initial merge and required assurance closure
+
+GitHub reports PR #734 merged by the repository owner on 23 October 2026 at 15:59:51 UTC, with merge commit `82770da7fd836d031c2e3ed76f127e5c723a5249`. Its checked head was `54b8f6f440abf5512f2d584a498454ed570c28bc`. All eleven applicable checks completed successfully: API serverless artifact, Typecheck/Lint/Unit, Integration Tests1/2, Integration Tests2/2, Finance Backup Restore, System Role Seed Database Identity, Permission Definition Database, Organisation Role RLS, both CodeQL analyses and the CodeQL aggregate. CI run `39975659294` and security run `39975655164` provide the host evidence.
+
+This merge preserves the initial T18 changes; it does not establish that the documented outstanding application/provider assurance has passed. Additional verified examples and the `IDEMPOTENCY_CONFLICT` response fix were still local at merge time. They require a focused T18 assurance-closure PR from the current merged master, with its own current-revision verification and CI. An externally initiated refund also requires a visible pending-treatment review signal in addition to its confirmed principal reversal. This finding remains under reproduction; no provider refund has yet been initiated for that proof.
+
+**Next permissible work:** close T18 application/provider assurance, verify and merge its focused follow-up PR. T19 remains unstarted. Bacs/payout onboarding, actual delayed/return proof and explicit live-pilot authorization remain unmet gates. No live activation, production migration or deployment is authorized by this merge record.
+
+### T18 assurance follow-up verification
+
+The follow-up branch `fix/finance-t18-assurance-closure` starts from current merged master `82770da7fd836d031c2e3ed76f127e5c723a5249`. The named idempotency response was observed missing in an actual HTTP regression, then fixed to return `409 IDEMPOTENCY_CONFLICT` while preserving the existing status, error and message. The command/preview rerun passed seven tests.
+
+A signed external-refund regression exposed the missing pending-treatment case. A focused helper now creates one scoped, durable review case after canonical external refund posting, without changing the refund or allocation treatment. Duplicate/replayed evidence retains one case; confirmed refund returns resolve the no-longer-applicable signal. The exceptions report and review-required amount include open external refund reviews. Issued charges and confirmed debt projections still use the ledger. The signed ingress suite passed ten tests after the fix; affected unit suites passed fourteen tests. The existing reversal recovery suite passed eleven tests.
+
+The complete current Finance PostgreSQL run passed **43 suites / 200 tests**. This includes all twenty expanded assurance cases together with the existing Finance suites, correcting the earlier invalid-date fixture aggregate. API typecheck, focused lint, API/serverless compilation and packaged runtime smoke passed. No migration or dependency was added. The initial T18 full admin/mobile/worker checks remain recorded above; the follow-up's new production changes are API-only.
+
+Actual provider proof also advanced: an external school-scoped test API refund of20minor generated two genuine signed events and eight duplicate captures, leaving one movement and one pending-treatment case. The invoice changed from allocated100/outstanding0 to allocated80/outstanding20. A second independently approved internal refund20 was accepted once by Stripe, then its first response was deliberately discarded. The reservation remained intact; two provider list reads recovered the original refund, with no second create request. Total confirmed outflow40 left allocation60/outstanding40. These are synthetic Sandbox funds; Dashboard UI navigation and an internal signed-webhook race are not claimed.
+
+The latest connector readiness read still returns exactly two Standard GB accounts: details unsubmitted, charges/payouts disabled, and payment capabilities inactive. Bacs confirmation and actual payout proof therefore remain blocked. The owner/manager must finish hosted onboarding and required method activation in the same NexSteps Sandbox. T18 is not complete and T19 remains unstarted, regardless of the initial source merge.
+
+The exact A01 example also passed a focused PostgreSQL test after the complete200-test run: one30000 principal receipt/allocation, persisted470 fee/29530 net, zero family debt, and consistent family/settlement report reads. This additional test uses provider evidence fixtures and does not claim actual Stripe pricing for that example. The final follow-up CI must include it.
+
+### T18 follow-up PR and interaction checkpoint
+
+Draft [PR #735](https://github.com/FSS-Ltd/pathway/pull/735) preserves the focused assurance closure on `master`. Source revision `c12f4e22fdd3624a3e93c847c5f637da7c374557` was refreshed against master `82770da7fd836d031c2e3ed76f127e5c723a5249` before publication. Its API serverless artifact, both CodeQL analyses and aggregate CodeQL check succeeded. Typecheck and lint steps succeeded; the remaining CI workflow is still running. These partial results do not clear the merge or T18 gate. No merge commit exists for this follow-up at this checkpoint.
+
+Additional in-app-browser inspection used the actual staff Finance components with explicitly labelled local API mocks. Under emulated reduced motion, the invoice confirmation focused Cancel, retained its detailed financial preview and exposed a dark-text/teal primary action. Reports rendered no animated elements; a simulated HTTP 503 showed the retry alert, and retry restored the report. Existing results during a same-filter failure retained their generated timestamp. Light and dark colour-scheme preferences both retained the product's supported light tokens (`rgb(244,246,248)` background and `rgb(15,23,42)` text); this is not proof of a separate dark theme. The route loading skeleton's reduced-motion rule was inspected in source, not rendered by this component harness. Native-device and screen-reader checks remain unproved. Browser emulation was reset and the temporary tab/server closed after inspection.
+
+A fresh selected-Sandbox account read still found exactly two GB school accounts with details unsubmitted, charges/payouts disabled and payment capabilities inactive. The school selected for Bacs has 36 currently due requirements; the other has 41. Account existence does not establish completed onboarding or method readiness. No additional Bacs submission, owner agreement, live request or production change was performed.
+
+### Native runtime and integration-budget findings
+
+An actual iPhone 16e/iOS 26.3 simulator running Expo Go SDK 54 reproduced a Family Finance render crash: native `Intl.NumberFormat` rejected BigInt input. Removing that call exposed a second native limitation, missing `formatToParts`. Both failures were reproduced in the regression before the final fix. The formatter now derives the currency/sign layout from numeric 1 and inserts exact decimal strings; money never converts to floating point. The complete mobile suite passed **15 suites /71 tests**, with mobile typecheck and focused lint passing. Actual native invoice/processing/statement components then rendered; all eight supported currency samples displayed correctly. The local mock-action harness also exercised checkout HTTP503 feedback, over-balance transfer validation and a notice explicitly labelled as not a receipt. An initial native date error was a harness timestamp where the existing invoice contract requires a date-only string; only that fixture changed.
+
+The native harness uses the actual components and brand font assets, with clearly labelled synthetic API actions. It proves neither production authentication nor provider/ledger behavior. A 2.14 native font scale was observed at a 390-point viewport and a fresh render wrapped enlarged content. Full enlarged scrolling/control inspection and screen-reader assurance remain pending; this is not a complete native accessibility pass. The original 1.00 text preference was restored after five increases/decreases. Expo reported 54.0.33 with a recommended 54.0.37 patch; no dependency upgrade was performed.
+
+CI run [40007106981](https://github.com/FSS-Ltd/pathway/actions/runs/40007106981) checked revision `824be447a08a5c457cc15f641f1ec73b09af1fce`. Ten checks succeeded, including integration shard 2. Shard 1 reached its 30-minute job limit after 75 passing suites, with no test failure reported. Test discovery confirms 78 suites in that shard, leaving three suites plus its separate one-connection database check unfinished. The integration job budget is now 40 minutes to accommodate the expanded suite and final database check. The test commands, assertions, sharding and required checks are unchanged. Cancellation is not a pass; the new revision must clear fresh CI before merge.
+
+### Prefilled synthetic school checkpoint
+
+The owner clarified that no separate school logins are available and explicitly authorized fake business details. Stripe rejected updates to the original two full-Dashboard fixtures because their hosted onboarding links had locked those fields. Their historical payment evidence remains preserved. One additional GB Accounts v2 fixture was created with the same full Dashboard, Stripe fee/loss responsibilities and direct-charge model. Synthetic business/representative information, documented verification tokens and Stripe's GB test payout bank were supplied before creating its onboarding link. Idempotency retained one account/representative; an empty-bank guard prevented replacement of existing data.
+
+The owner explicitly approved sandbox-only agreement acceptance and fictional representative hosted onboarding. Stripe rejected API acceptance with `tos_acceptance_on_behalf_not_allowed`; no agreement was recorded by that request. The approved hosted flow reached password creation. Browser security policy requires human entry/submission of new credentials, so the in-app-browser page is handed over for that step. No school password was created or stored; the test API key cannot replace browser credentials. A separate setup-only probe on this prefilled account still received HTTP 400 because Bacs was not activated. No debit was submitted. Existing approvals remain valid after sign-in, but account activation, delayed/return/payout proof and the T18/T19 gate remain unresolved.
+
+### European-name PDF rendering correction
+
+Actual rendered invoice inspection found that the standard Helvetica PDF font
+silently corrupted Polish and Romanian payer names. An expanded real-renderer
+regression failed before the fix because the document lacked Unicode text maps.
+Embedding Nunito fixed extended Latin and Cyrillic, but the Greek case still
+failed; a locally embedded Noto Sans fallback closes that glyph gap. The final
+PDF regression verifies the rendered Unicode mappings for the tested Latin,
+Greek and Cyrillic name characters. Four static font assets and their two SIL
+Open Font Licenses are included locally; no package dependency or runtime font
+download is added. Font provenance is recorded beside the assets.
+
+Invoice, negative credit and six-page statement PDFs were rendered with the real
+renderer and inspected with Poppler. The statement retained all 70 synthetic
+activity rows once and in order, with a footer on each page. Names, euro/sterling
+amounts, negative credits, period, cutoff and separate unapplied funds were
+legible in the inspected output. This is document-layout evidence, not ledger
+or actual private-object-store verification. Existing stored issued documents
+are not regenerated by this change.
+
+API typecheck, focused lint, formatting, full API/serverless build and the PDF
+regression passed. The staged serverless test verifies byte-identical font and
+license assets without staged source files, then passes its HTTP/auth/database
+runtime checks. The first local runtime attempt stopped on a missing Prisma
+engine; the rerun used the established cached local engine and passed. Current
+head CI and merge evidence must still be obtained after publishing this fix to
+draft PR #735. T18 remains incomplete and T19 remains unstarted.
+
+### Settlement-dependent card refusal evidence
+
+Actual account-scoped Sandbox currency checks created and expired 14 unpaid
+sessions: eight supported currencies at the product maximum, and six at their
+minimum. The GB test account rejected DKK250 and SEK300 minor units because
+their converted amount fell below its GBP30-minor-unit settlement minimum.
+Read-only retrieval verified all 14 accepted objects remained test-mode,
+expired and unpaid. Only the two refusals were repeated after the first
+harness failed writing its relative evidence path; accepted sessions were not
+created again. The redacted provider evidence is preserved privately.
+
+The real Checkout adapter/service regression reproduced the misleading HTTP503
+response for a definitive refusal. It now returns a safe HTTP422 after closing
+that failed attempt, while temporary and unknown outcomes retain their durable
+identity and retry recovery. Family feedback offers another payment method or
+school help for422 and retains the distinct temporary503 explanation. No raw
+provider message, exchange-rate assumption or money mutation is introduced.
+The local minimum remains a NexSteps product bound, not universal processor
+acceptance. Non-GB account eligibility and actual settlement remain unproved.
+
+Both API regression cases were RED before the fix. The family422 message test
+was also RED; the final complete mobile suite passed 15 suites /73 tests, with
+mobile types/lint passing. The focused API service/provider run passed two
+suites /22 tests using the established cached Prisma engine after an initial
+missing-engine attempt. The initial malformed mobile runner executed no tests
+and was corrected before the recorded RED/GREEN runs. Full API/serverless build,
+staged artifact HTTP/auth/database smoke, focused API/mobile lint, formatting and
+diff checks passed. Current-head CI and merge evidence must still be recorded
+for this follow-up. T18 remains incomplete; T19 has not started.
+
+### Stored document immutability correction
+
+The earlier font checkpoint overstated stored-document preservation. Source
+inspection found that invoice, credit and receipt downloads regenerated their
+PDF and uploaded with overwrite enabled. Layout checks had not established byte
+immutability. No production font deployment or storage write was performed by
+this assurance work.
+
+The new request-driven storage helper reads an existing private object first.
+On first creation it disables overwrite and reads back the canonical stored
+object, including when another request wins the upload race. Lost upload
+responses recover the existing bytes on retry; missing readback fails closed.
+Current payer/staff authority is still checked before and after document access.
+Statement uploads also disable overwrite while retaining their immutable digest
+keys and verified download digest. Other uploads retain their existing default
+overwrite behavior. No new dependency, schema migration or polling is added.
+
+Four initial document cases and four valid-fixture storage cases were RED before
+the fix. Focused document/storage/statement verification passed three suites /23
+tests. Real HTTP/database authorization, lifecycle, concurrent receipt delivery
+and revision checks passed four suites /17 tests. API types/build/serverless,
+staged runtime, real PDF smoke and focused lint passed. The build completed with
+exit0 before a requested stop for local compiler contention reached it. The
+first complete API unit run exhausted its 4GB heap after143 passing suites; it
+is not a passing aggregate. A bounded two-worker run with memory recycling is
+underway and must be recorded separately before claiming a complete unit pass.
+
+Jest's existing renderer boundary now also replaces the ESM font loader; the
+real PDF smoke and staged font-byte verification remain unchanged. Their
+successful results do not imply actual hosted private-bucket configuration or
+screen-reader proof. PR #735 stays draft and T18 remains incomplete.
+
+The owner's replacement agent rules also require event-driven worker wakeups.
+The existing signed Finance webhook path commits its inbox entry, but source
+inspection found canonical draining through scheduled worker invocations without
+an immediate post-commit wakeup. This is a further T18 assurance gap, recorded in
+the recovery document. No event service or deployment has been introduced. The
+local CI polling watcher was stopped; GitHub jobs continue independently.
+
+The final focused storage/document rerun passed all23 tests in three suites,
+including the added canonical-read and create-only assertions. Changed API
+sources, fixtures and Jest configuration passed targeted ESLint and formatting.
+An extra lint invocation outside the package's configured source globs found the
+renderer test helper's pre-existing unused `_document` parameter; no unrelated
+renderer behavior was changed. The complete bounded unit run is still pending.
+Host inspection confirmed revision6b3dc89 failed four API suites on the ESM font
+loader's `import.meta`; subsequent integration jobs were skipped. The local Jest
+boundary correction addresses that cause, but only fresh CI can close the gate.
+
+### Repeated external-refund recovery correction
+
+Independent Sol review found that a confirmed external refund reused the generic
+reversal-operation case key. Matching provider recovery resolved that key; after
+identical evidence had completed, deduplication prevented another worker delivery
+from reopening the school's pending-treatment warning. The new signed-ingress
+regression reproduced `RESOLVED` where `OPEN` was required. Its first attempt
+failed to compile because the fixture account was nullable; that attempt ran no
+tests and is not the behavioral RED evidence.
+
+External refund treatment now has a distinct case purpose, separate from provider
+matching. Two actual recovery/worker cycles retain the warning and its5000-minor-
+unit report amount without a second movement or allocation. A confirmed refund
+return resolves the treatment case while preserving both movements. Both full
+PostgreSQL/signed-ingress and reversal suites passed21 tests after the fix in a
+separate disposable review database; earlier provider evidence was not reset.
+This helper was introduced in unmerged PR #735, so this correction does not
+assume or run a production legacy-key migration. T18 remains incomplete.
+
+API typecheck, targeted lint and formatting passed. After an additional assertion
+comparing the entire post-recovery ledger to its pre-recovery snapshot, the
+selected signed-ingress regression passed again (one executed test; nine excluded
+by the explicit name filter). Independent Sol review found no remaining P0–P2
+issue in this focused correction. The complete bounded API unit run remains in
+progress; neither old CI failure nor missing runtime evidence is waived.

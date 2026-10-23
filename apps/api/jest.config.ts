@@ -18,6 +18,9 @@ const config: Config = {
   moduleFileExtensions: ["ts", "tsx", "js", "json"],
   moduleNameMapper: {
     "^@react-pdf/renderer$": "<rootDir>/test-helpers/react-pdf.mock.ts",
+    // Match the existing renderer boundary: real ESM/font assets are exercised
+    // by test:finance-pdf and the staged serverless artifact, outside Jest.
+    "^\\./finance-document-fonts$": "<rootDir>/test-helpers/react-pdf.mock.ts",
     // Map workspace imports like @pathway/db -> ../../packages/db/src/index.ts for tests
     "^@pathway/([^/]+)$": "<rootDir>/../../packages/$1/src/index.ts",
     // Let @prisma/client resolve from node_modules; avoid manual mapping which can break typings/runtime

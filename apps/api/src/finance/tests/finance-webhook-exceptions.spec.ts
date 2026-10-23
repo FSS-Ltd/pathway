@@ -89,6 +89,7 @@ function setup() {
   ];
   const empty = () => ({ findMany: jest.fn().mockResolvedValue([]) });
   const tx = {
+    financeReconciliationCase: empty(),
     financeProfile: {
       findUnique: jest.fn().mockResolvedValue({
         id: "profile-a",

@@ -8,6 +8,8 @@
 
 The selected test key was verified against the expected NexSteps Sandbox platform before account-scoped operations. Finance used its pinned `2026-09-30.endive` API version. An actual connected-account £1 card Checkout completed with synthetic Stripe test data. A genuine signed `checkout.session.completed` event was durably stored while the worker was stopped: the application still showed no receipt and 100 minor units outstanding. Canonical replay and a restarted worker produced exactly one confirmed receipt and allocation, with zero outstanding. Five duplicate signed deliveries did not duplicate money. The evidence is specific to the exercised GBP card configuration and does not establish other countries, currencies or live eligibility.
 
+A second actual Sandbox proof discarded the first successful Checkout-create response after Stripe had accepted it. Retrying through the application sent the identical idempotency key and request body. Two accepted create requests returned one unique remote session; the provider list and database each contained one obligation/attempt. A repeated application start reused that attempt without another create request. The unpaid session was expired, and genuine signed expiry evidence drove the canonical local state to `EXPIRED`. No allocation or receipt was created for that invoice and its 100 minor units remained outstanding. This uses controlled transport response loss after actual provider acceptance, not a claim that an uncontrolled production outage occurred.
+
 The provider returned 100 minor units principal, 23 minor units processor fee and 77 minor units net. There was no application fee or destination transfer. Fees and net settlement remained separate from family debt. The returned descriptor was the synthetic fixture's placeholder, not an accepted school statement descriptor. No payout existed and payouts were disabled; payout reconciliation therefore remains an open provider assurance gate.
 
 Read-only readiness checks still returned two Standard GB school accounts with incomplete onboarding, inactive capabilities and disabled charges/payouts. Successful test charges do not supersede these account-readiness results or establish live capability approval. The owner/manager must complete hosted test onboarding in the selected Sandbox. No login credential, owner attestation or Connect agreement was submitted on their behalf during this assurance step.
@@ -16,7 +18,11 @@ A GBP card amount of 29 minor units was rejected by Stripe, while a 30 minor uni
 
 The populated disposable application database was dumped and restored into a separate local database. Source and restored canonical balances agreed: one invoice, one receipt, one allocation, one completed genuine provider event and zero outstanding. Selected ledger/event snapshots had the same SHA-256 digest, and forced row-level security remained enabled. This establishes a local recovery exercise, not production RPO/RTO.
 
-Bacs delayed-success/failure, cancellation, mandate refusal and dispute runtime assurance is blocked on the selected connected account. A synthetic SetupIntent was created in test mode and remained `requires_confirmation` with a payment method present. Confirmation returned HTTP 400 `invalid_request_error`: the allowed payment method types were not activated for the account. No debit instruction, receipt or allocation was created; the synthetic invoice remained fully outstanding. Completing account onboarding and enabling the required Bacs method/capability in the same Sandbox is required before retrying. Earlier test-mode compatibility remains valid for its stated scope; additional scenarios are not passing claims until the application ledger and signed-event outcomes are reconciled. Live Bacs stays disabled. No production migration, deployment, real payment or live pilot occurred.
+An actual externally initiated Sandbox API refund of 20 minor units produced genuine signed refund events. Two accepted events, eight duplicate captures, canonical replay and a restarted worker left one refund movement, no local refund operation and one pending-treatment case. The original paid 100 minor unit invoice then showed 80 allocated and 20 outstanding. The default remains `REOPEN_BALANCE`; no credit was inferred. This proves the external API/event boundary, not Stripe Dashboard UI navigation.
+
+A separate independently approved application refund of another 20 minor units exercised actual provider acceptance followed by deliberately lost response. The reservation remained approved with its original attempt identity. Two provider list reads recovered the one accepted refund without a second create request. Exactly one application refund was confirmed; combined with the external refund, total outflow was 40, net allocation 60 and outstanding 40. Signed-event racing for this internal refund was not exercised in that proof; local duplicate/racing coverage remains separately labelled.
+
+Bacs delayed-success/failure, cancellation, mandate refusal and dispute runtime assurance is blocked on the selected connected account. A synthetic SetupIntent was created in test mode and remained `requires_confirmation` with a payment method present. Confirmation returned HTTP 400 `invalid_request_error`: the allowed payment method types were not activated for the account. No debit instruction, receipt or allocation was created; the synthetic invoice remained fully outstanding. Completing account onboarding and enabling the required Bacs method/capability in the same Sandbox is required before retrying. Earlier test-mode compatibility remains valid for its stated scope; additional scenarios are not passing claims until the application ledger and signed-event outcomes are reconciled. Live Bacs stays disabled. No manual production migration/deployment or real-money pilot was performed by this assurance work.
 
 ## What is established
 
@@ -78,6 +84,30 @@ No credentials, account identifiers, service-user numbers, bank details or perso
 The Finance profile stores the school's legal country and one collection currency. The initial list covers the UK and all 27 EU member states: EUR for the 21 euro-area countries, and CZK, DKK, HUF, PLN, RON or SEK for the six other EU countries. The UI derives currency from country so invoice currency, Stripe Checkout presentment and school onboarding cannot be configured inconsistently. The [European Commission's country list](https://economy-finance.ec.europa.eu/euro/eu-countries-and-euro_en) confirms 21 euro-area members, including Bulgaria from 1 January 2026. Stripe's [supported currency guide](https://docs.stripe.com/currencies) lists all eight currencies for card presentment. Connected-account country eligibility and live card capability still have to be confirmed during onboarding; a currency on the presentment list does not guarantee payout in that currency. Stripe may convert to the school's settlement currency. HUF charges may use two decimal places, while manual HUF payouts must use whole amounts. Sources rechecked on 19 October 2026.
 
 The Finance profile must be saved before Stripe onboarding. This prevents the onboarding endpoint from silently using the database's legacy GBP default for an EU school. Existing profiles created before country selection retain GB/GBP as a migration default; a connected account or any Finance activity locks those settings.
+
+### T18 observed card currency boundaries — 23 October 2026
+
+The current pinned Checkout adapter created and expired 14 unpaid Sandbox
+sessions on one synthetic GB connected account: all eight supported currencies
+at the product maximum, and GBP/EUR/CZK/HUF/PLN/RON at the product minimum.
+Read-only retrieval confirmed all accepted sessions were test-mode, expired and
+unpaid. No payment was confirmed. These are account-scoped presentment-parameter
+checks, not proof of non-GB onboarding, successful collection, FX settlement or
+payout eligibility.
+
+Stripe rejected DKK250 and SEK300 minor units on that account because they
+converted below its GBP30-minor-unit settlement minimum. The two refusals were
+repeated independently and retained as negative evidence. Local product bounds
+therefore cannot promise acceptance for every school settlement configuration
+or future exchange rate. No exchange rate is hardcoded and invoice debt is not
+changed, split or rounded to force acceptance.
+
+A definitive provider refusal now closes the failed checkout attempt and returns
+a safe HTTP422 directing the payer to another payment method or the school.
+Temporary/unknown outcomes retain HTTP503 and their durable operation identity.
+The real adapter/service regression and family feedback tests distinguish those
+states without parsing or exposing provider error messages. Bacs and payout
+readiness remain blocked; this currency probe does not clear their gates.
 
 ## Verification assigned to delivery steps
 

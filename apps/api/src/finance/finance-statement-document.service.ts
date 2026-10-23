@@ -58,6 +58,7 @@ export class FinanceStatementDocumentService {
         key: storageKey,
         body: document,
         contentType: "application/pdf",
+        overwrite: false,
       });
       if (!stored) {
         throw new ServiceUnavailableException(
