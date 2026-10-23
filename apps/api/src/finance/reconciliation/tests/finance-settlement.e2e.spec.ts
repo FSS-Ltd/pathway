@@ -118,6 +118,8 @@ describe("private settlement evidence and durable payout coverage", () => {
       expect(
         await tx.financeReconciliationCase.findFirst({
           where: {
+            tenantId: scope.tenantId,
+            orgId: scope.orgId,
             stripeConnectionId: scope.connectionId,
             resourceReference: payout.id,
           },
@@ -247,7 +249,11 @@ describe("private settlement evidence and durable payout coverage", () => {
         expect(JSON.stringify(rows)).not.toContain("private");
         expect(
           await tx.financeReconciliationCase.count({
-            where: { stripeConnectionId: scope.connectionId },
+            where: {
+              tenantId: scope.tenantId,
+              orgId: scope.orgId,
+              stripeConnectionId: scope.connectionId,
+            },
           }),
         ).toBe(0);
         expect(
@@ -264,7 +270,11 @@ describe("private settlement evidence and durable payout coverage", () => {
         );
         expect(
           await tx.financeReconciliationCase.findFirst({
-            where: { stripeConnectionId: scope.connectionId },
+            where: {
+              tenantId: scope.tenantId,
+              orgId: scope.orgId,
+              stripeConnectionId: scope.connectionId,
+            },
           }),
         ).toMatchObject({ kind: "UNKNOWN_OPERATION" });
       },
@@ -306,7 +316,11 @@ describe("private settlement evidence and durable payout coverage", () => {
       ).toEqual([]);
       expect(
         await tx.financeReconciliationCase.count({
-          where: { stripeConnectionId: scope.connectionId },
+          where: {
+            tenantId: scope.tenantId,
+            orgId: scope.orgId,
+            stripeConnectionId: scope.connectionId,
+          },
         }),
       ).toBe(0);
       expect(

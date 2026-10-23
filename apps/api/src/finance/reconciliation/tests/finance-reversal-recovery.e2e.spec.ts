@@ -1,3 +1,4 @@
+import * as receiptExceptions from "../../finance-receipt-exception.persistence";
 import type { Prisma } from "@pathway/db";
 import { requireDatabase } from "../../../../test-helpers.e2e";
 import { FinanceBalanceService } from "../../finance-balance.service";
@@ -218,54 +219,135 @@ describe("canonical recovered refunds and dispute movements", () => {
     });
   });
 
-  it("preserves both a refund and a later bank return without adding processor fees to family debt", async () => {
-    await withReconciliationOperation(
-      async ({ tx, scope, checkout, invoiceId }) => {
-        await postOriginal(tx, scope, checkout);
-        expect(
-          await recoverFinanceReversal(
+  it.each(["refund-first", "return-first"] as const)(
+    "flags refund plus bank return in %s order without adding processor fees to debt",
+    async (order) => {
+      await withReconciliationOperation(
+        async ({ tx, scope, checkout, invoiceId }) => {
+          await postOriginal(tx, scope, checkout);
+          const entries =
+            order === "refund-first"
+              ? ([
+                  ["refunds", refund(checkout), "refund.updated"],
+                  [
+                    "disputes",
+                    dispute(checkout),
+                    "charge.dispute.funds_withdrawn",
+                  ],
+                ] as const)
+              : ([
+                  [
+                    "disputes",
+                    dispute(checkout),
+                    "charge.dispute.funds_withdrawn",
+                  ],
+                  ["refunds", refund(checkout), "refund.updated"],
+                ] as const);
+          for (const [stream, object, eventType] of entries) {
+            expect(
+              await recoverFinanceReversal(
+                tx,
+                scope,
+                stream,
+                object,
+                new Date(),
+                "capture",
+              ),
+            ).toEqual({ recoverable: 1, exceptions: 0 });
+            await replay(tx, scope, eventType);
+          }
+          await replay(tx, scope, "refund.updated");
+          await replay(tx, scope, "charge.dispute.funds_withdrawn");
+          expect(
+            await tx.financeReceiptMovement.findMany({
+              where: { tenantId: scope.tenantId, orgId: scope.orgId },
+              orderBy: { amountMinor: "asc" },
+              select: { type: true, amountMinor: true },
+            }),
+          ).toEqual([
+            { type: "REFUND", amountMinor: 1000n },
+            { type: "DISPUTE_WITHDRAWAL", amountMinor: 2450n },
+          ]);
+          const exceptions = await tx.financeReconciliationCase.findMany({
+            where: {
+              tenantId: scope.tenantId,
+              orgId: scope.orgId,
+              kind: "REFUND_AND_RETURN",
+            },
+          });
+          expect(exceptions).toHaveLength(1);
+          expect(exceptions[0]).toMatchObject({
+            status: "OPEN",
+            stripeConnectionId: scope.connectionId,
+            details: {
+              confirmedRefundMinor: "1000",
+              confirmedReturnMinor: "2450",
+              excessMinor: "1000",
+            },
+          });
+          const balances = await new FinanceBalanceService().forInvoices(
             tx,
             scope,
-            "refunds",
-            refund(checkout),
-            new Date(),
-            "capture",
-          ),
-        ).toEqual({ recoverable: 1, exceptions: 0 });
-        await replay(tx, scope, "refund.updated");
-        expect(
-          await recoverFinanceReversal(
-            tx,
-            scope,
-            "disputes",
-            dispute(checkout),
-            new Date(),
-            "capture",
-          ),
-        ).toEqual({ recoverable: 1, exceptions: 0 });
-        await replay(tx, scope, "charge.dispute.funds_withdrawn");
-        await replay(tx, scope, "refund.updated");
-        await replay(tx, scope, "charge.dispute.funds_withdrawn");
-        expect(
-          await tx.financeReceiptMovement.findMany({
-            where: { tenantId: scope.tenantId, orgId: scope.orgId },
-            orderBy: { amountMinor: "asc" },
-            select: { type: true, amountMinor: true },
-          }),
-        ).toEqual([
-          { type: "REFUND", amountMinor: 1000n },
-          { type: "DISPUTE_WITHDRAWAL", amountMinor: 2450n },
-        ]);
-        const balances = await new FinanceBalanceService().forInvoices(
+            [{ id: invoiceId, status: "ISSUED", totalMinor: 2450n }],
+          );
+          expect(balances.get(invoiceId)?.outstandingMinor).toBe("2450");
+        },
+      );
+    },
+  );
+
+  it("flags a historical combined ledger when duplicate canonical evidence is replayed", async () => {
+    await withReconciliationOperation(async ({ tx, scope, checkout }) => {
+      await postOriginal(tx, scope, checkout);
+      // Simulate pre-T17 history using real ledger writers, with only the new detector absent.
+      const detector = jest
+        .spyOn(receiptExceptions, "reconcileFinanceReceiptException")
+        .mockResolvedValue(undefined);
+      try {
+        await recoverFinanceReversal(
           tx,
           scope,
-          [{ id: invoiceId, status: "ISSUED", totalMinor: 2450n }],
+          "refunds",
+          refund(checkout),
+          new Date(),
+          "capture",
         );
-        expect(balances.get(invoiceId)?.outstandingMinor).toBe("2450");
-      },
-    );
+        await replay(tx, scope, "refund.updated");
+        await recoverFinanceReversal(
+          tx,
+          scope,
+          "disputes",
+          dispute(checkout),
+          new Date(),
+          "capture",
+        );
+        await replay(tx, scope, "charge.dispute.funds_withdrawn");
+      } finally {
+        detector.mockRestore();
+      }
+      expect(
+        await tx.financeReconciliationCase.count({
+          where: { tenantId: scope.tenantId, kind: "REFUND_AND_RETURN" },
+        }),
+      ).toBe(0);
+      await replay(tx, scope, "charge.dispute.funds_withdrawn");
+      await replay(tx, scope, "refund.updated");
+      expect(
+        await tx.financeReconciliationCase.count({
+          where: {
+            tenantId: scope.tenantId,
+            kind: "REFUND_AND_RETURN",
+            status: "OPEN",
+          },
+        }),
+      ).toBe(1);
+      expect(
+        await tx.financeReceiptMovement.count({
+          where: { tenantId: scope.tenantId },
+        }),
+      ).toBe(2);
+    });
   });
-
   it("reconstructs withdrawal and reinstatement from current dispute transaction evidence", async () => {
     await withReconciliationOperation(
       async ({ tx, scope, checkout, invoiceId }) => {

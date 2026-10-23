@@ -68,6 +68,7 @@ describe("historical unresolved runtime sweep", () => {
         ).toMatchObject({ status: "completed", objects: 1, exceptions: 1 });
         expect(
           await tx.financeReconciliationCase.findFirst({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
             select: { caseKey: true, details: true },
           }),
         ).toMatchObject({
@@ -88,6 +89,7 @@ describe("historical unresolved runtime sweep", () => {
         ).toEqual({ status: "CREATING", stripeCheckoutSessionId: null });
         expect(
           await tx.financeReconciliationCase.findFirst({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
             select: { status: true, details: true },
           }),
         ).toMatchObject({
@@ -125,7 +127,9 @@ describe("historical unresolved runtime sweep", () => {
           checkout.id,
         );
         expect(deps.provider.listPage).not.toHaveBeenCalled();
-        const evidence = await tx.financeStripeWebhookEvent.findFirstOrThrow();
+        const evidence = await tx.financeStripeWebhookEvent.findFirstOrThrow({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        });
         const handler = new FinanceStripePaymentWebhookService(
           new FinanceBalanceService(),
         );
@@ -136,8 +140,16 @@ describe("historical unresolved runtime sweep", () => {
             eventType: evidence.eventType,
             payloadJson: evidence.payloadJson,
           });
-        expect(await tx.financeReceipt.count()).toBe(1);
-        expect(await tx.financeReceiptAllocation.count()).toBe(1);
+        expect(
+          await tx.financeReceipt.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(1);
+        expect(
+          await tx.financeReceiptAllocation.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(1);
       },
       "GBP",
       old,
@@ -153,9 +165,21 @@ describe("historical unresolved runtime sweep", () => {
             deps,
           ),
         ).toMatchObject({ status: "completed", exceptions: 1 });
-        expect(await tx.financeStripeWebhookEvent.count()).toBe(0);
-        expect(await tx.financeReconciliationCase.count()).toBe(0);
-        expect(await tx.financeReconciliationState.count()).toBe(0);
+        expect(
+          await tx.financeStripeWebhookEvent.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
+        expect(
+          await tx.financeReconciliationCase.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
+        expect(
+          await tx.financeReconciliationState.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
       },
       "GBP",
       old,
@@ -176,10 +200,15 @@ describe("historical unresolved runtime sweep", () => {
         ).toMatchObject({ status: "failed", reason: "UNAVAILABLE", pages: 0 });
         expect(
           await tx.financeReconciliationState.findFirst({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
             select: { completedThrough: true, pageCursor: true },
           }),
         ).toEqual({ completedThrough: null, pageCursor: null });
-        expect(await tx.financeStripeWebhookEvent.count()).toBe(0);
+        expect(
+          await tx.financeStripeWebhookEvent.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
       },
       "GBP",
       old,

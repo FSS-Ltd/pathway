@@ -65,9 +65,11 @@ describe("actual case recheck preparation and canonical capture", () => {
             recoverable: 1,
             exceptions: 0,
           });
-          expect(await tx.financeStripeWebhookEvent.count()).toBe(
-            mode === "sync" ? 1 : 0,
-          );
+          expect(
+            await tx.financeStripeWebhookEvent.count({
+              where: { tenantId: scope.tenantId, orgId: scope.orgId },
+            }),
+          ).toBe(mode === "sync" ? 1 : 0);
           expect(
             await tx.financeCheckoutAttempt.findUnique({
               where: { id: attemptId },
@@ -76,7 +78,11 @@ describe("actual case recheck preparation and canonical capture", () => {
           ).toEqual({
             stripeCheckoutSessionId: mode === "sync" ? checkout.id : null,
           });
-          expect(await tx.financeReceipt.count()).toBe(0);
+          expect(
+            await tx.financeReceipt.count({
+              where: { tenantId: scope.tenantId, orgId: scope.orgId },
+            }),
+          ).toBe(0);
         },
       );
     },
@@ -102,8 +108,16 @@ describe("actual case recheck preparation and canonical capture", () => {
             `unresolved:checkout:${attemptId}`,
           ),
         ).rejects.toThrow(/scope/);
-        expect(await tx.financeStripeWebhookEvent.count()).toBe(0);
-        expect(await tx.financeReconciliationCase.count()).toBe(0);
+        expect(
+          await tx.financeStripeWebhookEvent.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
+        expect(
+          await tx.financeReconciliationCase.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
       },
     );
   });

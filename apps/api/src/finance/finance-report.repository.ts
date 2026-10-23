@@ -53,12 +53,15 @@ export class FinanceReportRepository {
             financeProfileId: profile.id,
             tenantId: actor.tenantId,
             orgId: actor.orgId,
-            status: "READY",
-            disconnectedAt: null,
             stripeAccountId: { not: null },
           },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: { id: true, stripeAccountId: true, livemode: true },
+          select: {
+            id: true,
+            stripeAccountId: true,
+            livemode: true,
+            status: true,
+          },
         });
 
         const [
@@ -513,6 +516,7 @@ export class FinanceReportRepository {
                 id: connection.id,
                 accountId: connection.stripeAccountId,
                 livemode: connection.livemode,
+                collectionStatus: connection.status,
               }
             : null,
           rows,

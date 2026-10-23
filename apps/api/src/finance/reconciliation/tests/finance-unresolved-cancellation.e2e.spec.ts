@@ -42,7 +42,11 @@ describe("unknown mandate cancellation acknowledgement", () => {
               );
               const evidence =
                 await tx.financeStripeWebhookEvent.findFirstOrThrow({
-                  where: { eventType: "setup_intent.succeeded" },
+                  where: {
+                    tenantId: scope.tenantId,
+                    orgId: scope.orgId,
+                    eventType: "setup_intent.succeeded",
+                  },
                 });
               const handler = new FinanceStripeBacsWebhookService(
                 {

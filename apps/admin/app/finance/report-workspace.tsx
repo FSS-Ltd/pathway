@@ -1,4 +1,5 @@
 "use client";
+import { ProviderEvidenceSummary } from "./provider-evidence-summary";
 
 import React from "react";
 import { Button, Card } from "@pathway/ui";
@@ -274,69 +275,7 @@ export function FinanceReportWorkspace({
           title="Stripe fees and payouts"
           description="These actual connected-account movements reconcile school settlement. They do not reduce family invoice balances."
         >
-          {report.provider?.status === "CONNECTED" ? (
-            <div className="space-y-3">
-              <p className="text-xs text-text-muted">
-                Saved provider evidence last observed{" "}
-                {formatFinanceDateTime(report.provider.fetchedAt)}. Freshness:{" "}
-                {report.provider.freshness.toLowerCase().replaceAll("_", " ")}.
-              </p>
-              <p className="text-xs text-text-muted">
-                Earliest historical coverage is unproven. Stream cutoffs
-                describe saved observations; a successful sync does not prove
-                full period coverage.
-                {report.provider.truncated
-                  ? " This report reached its row limit; fee totals and payout rows are partial."
-                  : ""}
-              </p>
-              {report.provider.context ? (
-                <p className="text-xs text-text-muted">
-                  Account {report.provider.context.accountId} ·{" "}
-                  {report.provider.context.livemode ? "Live" : "Test"}
-                </p>
-              ) : null}
-              <ul className="space-y-1 text-xs text-text-muted">
-                {report.provider.coverage.map((stream) => (
-                  <li key={stream.stream}>
-                    {stream.stream === "payouts"
-                      ? "Payouts"
-                      : "Balance transactions"}
-                    : completed through{" "}
-                    {formatFinanceDateTime(stream.completedThrough)}; last
-                    successful sync{" "}
-                    {formatFinanceDateTime(stream.lastSucceededAt)}.
-                  </li>
-                ))}
-              </ul>
-              {report.provider.feesByCurrency.length ? (
-                <ul className="grid gap-2 sm:grid-cols-2">
-                  {report.provider.feesByCurrency.map((fee) => (
-                    <li
-                      key={fee.currency}
-                      className="rounded-lg border border-border-subtle p-3"
-                    >
-                      <p className="text-xs text-text-muted">
-                        Processor fees · {fee.currency}
-                      </p>
-                      <p className="mt-1 font-semibold tabular-nums text-text-primary">
-                        {formatFinanceMoney(fee.amountMinor, fee.currency)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-text-muted">
-                  No processor fee evidence has been saved for this period.
-                </p>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-text-muted">
-              {report.provider?.status === "NOT_CONNECTED"
-                ? "Connect the school’s Stripe account to report its saved fee and payout evidence."
-                : "Saved Stripe evidence is unavailable for the selected account and environment. Check servicing configuration and reconciliation coverage."}
-            </p>
-          )}
+          <ProviderEvidenceSummary provider={report.provider} />
         </Card>
       ) : null}
 

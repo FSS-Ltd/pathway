@@ -18,6 +18,10 @@ CREATE INDEX "FinanceReconciliationCaseEvent_completion_idx"
   ON app."FinanceReconciliationCaseEvent"("tenantId","orgId","caseId",("details"->>'completedRequestId'))
   WHERE "type" = 'UPDATED';
 
+CREATE INDEX "FinanceReconciliationCaseEvent_failure_idx"
+  ON app."FinanceReconciliationCaseEvent"("tenantId","orgId","caseId",("details"->>'failedRequestId'))
+  WHERE "type" = 'UPDATED';
+
 CREATE FUNCTION app.list_due_finance_reconciliation_scopes(p_now TIMESTAMPTZ, p_livemode BOOLEAN, p_limit INTEGER, p_excluded TEXT[] DEFAULT ARRAY[]::TEXT[])
 RETURNS TABLE ("tenantId" TEXT,"orgId" TEXT,"connectionId" TEXT,"stream" TEXT)
 LANGUAGE sql SECURITY DEFINER SET search_path = '' AS $$

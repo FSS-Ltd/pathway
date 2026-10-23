@@ -1,3 +1,9 @@
+import type { FinanceAccessService } from "../../access/finance-access.service";
+import { FinanceReportService } from "../../finance-report.service";
+import { FinanceReportRepository } from "../../finance-report.repository";
+import { FinanceBalanceService } from "../../finance-balance.service";
+import { prepareFinancePayoutSettlement } from "../finance-settlement-prepare";
+import { projectFinancePayout } from "../finance-settlement.projection";
 import { requireDatabase } from "../../../../test-helpers.e2e";
 import { withReconciliationOperation } from "./finance-reconciliation-operation.fixture";
 import { captureFinanceSettlementObservation } from "../finance-settlement.persistence";
@@ -64,6 +70,98 @@ describe("saved settlement reporting", () => {
       expect(report.fetchedAt).toBe(now.toISOString());
     });
   });
+  it.each(["RESTRICTED", "DISCONNECTED"] as const)(
+    "retains fees and payouts through the public service for %s accounts",
+    async (status) => {
+      await withReconciliationOperation(async ({ tx, scope }) => {
+        const historyAt = new Date("2026-10-22T12:00:00Z");
+        const historicalBalance = {
+          ...balance,
+          created: Math.floor(historyAt.getTime() / 1000) - 10,
+        };
+        await captureFinanceSettlementObservation(
+          tx,
+          scope,
+          "balanceTransactions",
+          historicalBalance,
+          historyAt,
+        );
+        const payout = projectFinancePayout(scope, {
+          id: "po_retained",
+          object: "payout",
+          created: historicalBalance.created,
+          livemode: false,
+          amount: 90,
+          currency: "eur",
+          automatic: true,
+          status: "paid",
+          arrival_date: historicalBalance.created,
+          balance_transaction: "txn_payout",
+        });
+        const prepared = await prepareFinancePayoutSettlement(
+          {
+            async listPage() {
+              return { data: [historicalBalance], nextCursor: null };
+            },
+          },
+          scope,
+          payout,
+          { observedAt: historyAt },
+        );
+        await captureFinanceSettlementObservation(
+          tx,
+          scope,
+          "payouts",
+          payout,
+          historyAt,
+          prepared,
+        );
+        const connection = await tx.financeStripeConnection.findUniqueOrThrow({
+          where: { id: scope.connectionId },
+        });
+        await tx.financeStripeConnection.update({
+          where: { id: scope.connectionId },
+          data: {
+            status,
+            ...(status === "DISCONNECTED"
+              ? {
+                  disconnectedAt: now,
+                  disconnectedByUserId: connection.requestedByUserId,
+                }
+              : {}),
+          },
+        });
+        const access = {
+          assertStaffAction: jest.fn(async () => undefined),
+          resolveMode: jest.fn(async () => "SERVICING_ONLY" as const),
+        } as unknown as FinanceAccessService;
+        const service = new FinanceReportService(
+          access,
+          new FinanceReportRepository(new FinanceBalanceService()),
+          { mode: "test", secretKey: "sk_test_synthetic" },
+          reports,
+        );
+        const report = await service.report(
+          { ...scope, userId: connection.requestedByUserId },
+          "payout-reconciliation",
+          { ...filters, from: "2026-10-22" },
+        );
+        expect(report.provider).toMatchObject({
+          status: "UNAVAILABLE",
+          source: "PERSISTED_RECONCILIATION",
+          context: {
+            id: scope.connectionId,
+            accountId: scope.stripeAccountId,
+            livemode: false,
+          },
+          feesByCurrency: [{ currency: "EUR", amountMinor: "10" }],
+        });
+        expect(report.rows.some((row) => row.reference === "po_retained")).toBe(
+          true,
+        );
+      });
+    },
+  );
   it("rejects a forged account/mode selector without leaking saved amounts", async () => {
     await withReconciliationOperation(async ({ tx, scope }) => {
       await captureFinanceSettlementObservation(

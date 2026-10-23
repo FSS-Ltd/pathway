@@ -151,3 +151,31 @@ extends the stream allowlist, adds request/completion indexes and a backend-only
 scope-discovery function. Both require an administrative migration role; the
 runtime role must receive explicit function execution rights if distinct from the
 migration role. No production migration has been run.
+
+### Review fixes
+
+The fresh Sol review identified three operational gaps. Canonical receipt movement
+posting now detects combined confirmed refunds and independent principal returns,
+including either delivery order and idempotent replay of pre-existing history.
+One scoped `REFUND_AND_RETURN` case records the two net amounts and any excess;
+this warning never changes invoice debt. Confirmed reversing movements can resolve
+the combined exposure while preserving the append-only history.
+
+Operator requests now have separate durable retry audits. Failed preparation or
+capture rolls back that request, advances past it and retries after five minutes.
+After three failed attempts it completes as **manual review required**, while the
+underlying case remains unresolved. Active canonical claims and wrong-environment
+evidence remain untouched. Dry run records no retry or completion. Capture uses a
+savepoint so a failed database validation cannot poison later requests in the page.
+
+Reports select the latest retained school connection independently of collection
+readiness. Restriction/disconnection preserves saved fees, payouts and account/mode
+context, accompanied by unavailable-provider status. The staff UI continues to
+show the saved evidence during that outage. Collection readiness still controls
+new payment attempts.
+
+Three database suites passed 23 tests after these corrections. The new historical
+replay, both combined-movement arrival orders, restricted/disconnected public
+reports, request starvation, failed SQL capture and dry-run regressions were
+observed failing before their fixes. Existing unit mocks were updated to represent
+empty aggregate history instead of returning unrelated lock rows.

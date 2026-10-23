@@ -44,7 +44,11 @@ async function fixture(): Promise<FinanceConnectionScope> {
 async function state(scope: FinanceConnectionScope) {
   return withTenantRlsContext(scope.tenantId, scope.orgId, (tx) =>
     tx.financeReconciliationState.findFirst({
-      where: { stripeConnectionId: scope.connectionId },
+      where: {
+        tenantId: scope.tenantId,
+        orgId: scope.orgId,
+        stripeConnectionId: scope.connectionId,
+      },
     }),
   );
 }

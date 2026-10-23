@@ -14,7 +14,7 @@ async function replay(
   eventType: string,
 ): Promise<void> {
   const evidence = await tx.financeStripeWebhookEvent.findFirstOrThrow({
-    where: { eventType },
+    where: { tenantId: scope.tenantId, orgId: scope.orgId, eventType },
   });
   const handler = new FinanceStripeBacsWebhookService(
     {
@@ -70,8 +70,16 @@ describe("matched historical mandate recovery", () => {
             select: { status: true, stripeSetupIntentId: true },
           }),
         ).toEqual({ status: "ACTIVE", stripeSetupIntentId: setupIntent.id });
-        expect(await tx.financeReceipt.count()).toBe(0);
-        expect(await tx.financeStripeWebhookEvent.count()).toBe(1);
+        expect(
+          await tx.financeReceipt.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
+        expect(
+          await tx.financeStripeWebhookEvent.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(1);
       },
     );
   });
@@ -107,11 +115,16 @@ describe("matched historical mandate recovery", () => {
           ).toEqual({ status: "PENDING_SETUP" });
           expect(
             await tx.financeStripeWebhookEvent.count({
-              where: { status: "RECEIVED" },
+              where: {
+                tenantId: scope.tenantId,
+                orgId: scope.orgId,
+                status: "RECEIVED",
+              },
             }),
           ).toBe(0);
           expect(
             await tx.financeReconciliationCase.findFirst({
+              where: { tenantId: scope.tenantId, orgId: scope.orgId },
               select: { kind: true, details: true },
             }),
           ).toMatchObject({
@@ -148,6 +161,7 @@ describe("matched historical mandate recovery", () => {
         ).toEqual({ status: "PENDING_SETUP" });
         expect(
           await tx.financeStripeWebhookEvent.findFirst({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
             select: { status: true },
           }),
         ).toEqual({ status: "COMPLETED" });
@@ -166,8 +180,16 @@ describe("matched historical mandate recovery", () => {
           "dry-run",
         ),
       ).toEqual({ recoverable: 1, exceptions: 0 });
-      expect(await tx.financeStripeWebhookEvent.count()).toBe(0);
-      expect(await tx.financeReconciliationCase.count()).toBe(0);
+      expect(
+        await tx.financeStripeWebhookEvent.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
+      expect(
+        await tx.financeReconciliationCase.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
     });
   });
 
@@ -199,7 +221,11 @@ describe("matched historical mandate recovery", () => {
             select: { status: true, providerCancellationPending: true },
           }),
         ).toEqual({ status: "CANCELLED", providerCancellationPending: true });
-        expect(await tx.financeReceipt.count()).toBe(0);
+        expect(
+          await tx.financeReceipt.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
       },
     );
   });
@@ -361,6 +387,7 @@ describe("matched historical mandate recovery", () => {
         ).toEqual({ status: "CANCELLED" });
         expect(
           await tx.financeCollectionPlan.findFirst({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
             select: { status: true },
           }),
         ).toEqual({ status: "CANCELLED" });

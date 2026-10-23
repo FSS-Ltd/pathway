@@ -66,5 +66,10 @@ export type FinanceReportSnapshot = {
   metadata: FinanceReportMetadata;
   totals: FinanceReportTotals | null;
   rows: FinanceReportRow[];
-  connection: { id: string; accountId: string; livemode: boolean } | null;
+  connection: {
+    id: string;
+    accountId: string;
+    livemode: boolean;
+    collectionStatus: string;
+  } | null;
 };

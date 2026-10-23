@@ -10,13 +10,19 @@ const mockRead = jest.fn();
 const mockPending = jest.fn();
 const mockRequeue = jest.fn();
 const mockComplete = jest.fn();
-const mockTx = {} as Prisma.TransactionClient;
+const mockFailure = jest.fn();
+const mockTx = {
+  $executeRaw: jest.fn().mockResolvedValue(0),
+} as unknown as Prisma.TransactionClient;
 jest.mock("@pathway/db", () => ({
   withTenantRlsContext: (
     _tenant: string,
     _org: string,
     callback: (tx: Prisma.TransactionClient) => unknown,
   ) => callback(mockTx),
+}));
+jest.mock("../finance-case-request-failure.persistence", () => ({
+  recordFinanceCaseRequestFailure: mockFailure,
 }));
 jest.mock("../finance-case-request.persistence", () => ({
   readPendingFinanceCaseRequests: mockRead,
@@ -121,13 +127,20 @@ describe("durable case request runner", () => {
       "SCOPED_OBJECT_RECHECKED",
     );
   });
-  it("leaves failed capture pending with state backoff and no completion", async () => {
+  it("records a failed request independently while advancing the page", async () => {
     const { deps, capture, states } = dependencies();
     capture.mockRejectedValue(new Error("Capture failed"));
     await expect(
       runFinanceCaseRequestsReconciliation({ scope, mode: "sync" }, deps),
-    ).resolves.toMatchObject({ status: "failed", reason: "CAPTURE_FAILED" });
-    expect(states.fail).toHaveBeenCalledWith(lease, "CAPTURE_FAILED", now);
+    ).resolves.toMatchObject({ status: "completed", exceptions: 1 });
+    expect(states.fail).not.toHaveBeenCalled();
+    expect(mockFailure).toHaveBeenCalledWith(
+      mockTx,
+      scope,
+      request,
+      now,
+      "CAPTURE",
+    );
     expect(mockComplete).not.toHaveBeenCalled();
   });
   it("does not replay or complete an already consumed request", async () => {

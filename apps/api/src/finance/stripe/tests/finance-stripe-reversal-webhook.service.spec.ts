@@ -143,7 +143,7 @@ function setup(): {
   };
 
   mockTransaction = {
-    $queryRaw: jest.fn().mockResolvedValue([{ id: refundId }]),
+    $queryRaw: jest.fn().mockResolvedValue([]),
     financeCheckoutAttempt: {
       findFirst: jest.fn().mockResolvedValue({
         financeProfileId: "profile-1",

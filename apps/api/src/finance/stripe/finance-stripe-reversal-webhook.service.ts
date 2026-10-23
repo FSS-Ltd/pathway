@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { withTenantRlsContext } from "@pathway/db";
 import type { FinanceStripeReversalWebhookInput } from "./finance-stripe-reversal-webhook.contracts";
+import { reconcileFinanceReceiptException } from "../finance-receipt-exception.persistence";
 import { lockReceipt } from "../finance-receipt-operations";
 import { recordFinanceReceiptMovement } from "../finance-receipt-movement.service";
 import {
@@ -222,6 +223,11 @@ export class FinanceStripeReversalWebhookService {
           sourceReference,
         );
       }
+      await reconcileFinanceReceiptException(tx, {
+        ...input,
+        receiptId: payment.receipt.id,
+        source: "STRIPE",
+      });
       return "processed";
     });
   }
@@ -278,6 +284,11 @@ export class FinanceStripeReversalWebhookService {
           stripeEventId: event.id,
           occurredAt: eventAt,
         });
+        await reconcileFinanceReceiptException(tx, {
+          ...input,
+          receiptId: payment.receipt.id,
+          source: "STRIPE",
+        });
         return "processed";
       }
 
@@ -317,6 +328,11 @@ export class FinanceStripeReversalWebhookService {
         stripeEventId: event.id,
         originalMovementId: originalMovement.id,
         occurredAt: eventAt,
+      });
+      await reconcileFinanceReceiptException(tx, {
+        ...input,
+        receiptId: payment.receipt.id,
+        source: "STRIPE",
       });
       return "processed";
     });

@@ -53,7 +53,9 @@ describe("uncertain mandate setup retention", () => {
         if (failure === "provider timeout")
           await expect(first).rejects.toThrow();
         else await first;
-        const original = await tx.financeMandate.findFirstOrThrow();
+        const original = await tx.financeMandate.findFirstOrThrow({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        });
         if (failure === "lost session")
           await tx.financeMandate.update({
             where: { id: original.id },
@@ -73,6 +75,7 @@ describe("uncertain mandate setup retention", () => {
         ).rejects.toBeInstanceOf(ConflictException);
         expect(
           await tx.financeMandate.findMany({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
             select: { id: true, status: true },
           }),
         ).toEqual([{ id: original.id, status: "UNKNOWN" }]);
@@ -94,7 +97,11 @@ describe("uncertain mandate setup retention", () => {
       expect(
         await mandates.startSetup(actor, grant.financePayerAccountId),
       ).toEqual(first);
-      expect(await tx.financeMandate.count()).toBe(1);
+      expect(
+        await tx.financeMandate.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(1);
     }, "GBP");
   });
 });

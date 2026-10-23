@@ -49,7 +49,11 @@ describe("registered recovery page dispatch", () => {
         ),
       ).toEqual({ recoverable: 1, exceptions: 0 });
       const evidence = await tx.financeStripeWebhookEvent.findFirstOrThrow({
-        where: { eventType: "checkout.session.completed" },
+        where: {
+          tenantId: scope.tenantId,
+          orgId: scope.orgId,
+          eventType: "checkout.session.completed",
+        },
       });
       await new FinanceStripePaymentWebhookService(
         new FinanceBalanceService(),
@@ -103,15 +107,21 @@ describe("registered recovery page dispatch", () => {
       );
       expect(
         await tx.financeReceipt.findMany({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
           select: { amountMinor: true, source: true },
         }),
       ).toEqual([{ amountMinor: 2450n, source: "STRIPE_CARD" }]);
       expect(
         await tx.financeReceiptAllocation.findMany({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
           select: { amountMinor: true },
         }),
       ).toEqual([{ amountMinor: 2450n }]);
-      expect(await tx.financeReconciliationCase.count()).toBe(0);
+      expect(
+        await tx.financeReconciliationCase.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
       expect(JSON.stringify(evidence.payloadJson)).not.toContain("private");
     });
   });
@@ -135,10 +145,26 @@ describe("registered recovery page dispatch", () => {
           "dry-run",
         ),
       ).toEqual({ recoverable: 1, exceptions: 0 });
-      expect(await tx.financeStripeWebhookEvent.count()).toBe(0);
-      expect(await tx.financeReconciliationCase.count()).toBe(0);
-      expect(await tx.financeReconciliationState.count()).toBe(0);
-      expect(await tx.financeReceipt.count()).toBe(0);
+      expect(
+        await tx.financeStripeWebhookEvent.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
+      expect(
+        await tx.financeReconciliationCase.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
+      expect(
+        await tx.financeReconciliationState.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
+      expect(
+        await tx.financeReceipt.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
     });
   });
   it("retains only minimal setup Checkout observation without a payment receipt", async () => {
@@ -160,11 +186,21 @@ describe("registered recovery page dispatch", () => {
           "capture",
         ),
       ).toEqual({ recoverable: 0, exceptions: 0 });
-      const evidence = await tx.financeStripeWebhookEvent.findFirstOrThrow();
+      const evidence = await tx.financeStripeWebhookEvent.findFirstOrThrow({
+        where: { tenantId: scope.tenantId, orgId: scope.orgId },
+      });
       expect(evidence.status).toBe("COMPLETED");
       expect(JSON.stringify(evidence.payloadJson)).not.toContain("private");
-      expect(await tx.financeReconciliationCase.count()).toBe(0);
-      expect(await tx.financeReceipt.count()).toBe(0);
+      expect(
+        await tx.financeReconciliationCase.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
+      expect(
+        await tx.financeReceipt.count({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        }),
+      ).toBe(0);
     });
   });
 });

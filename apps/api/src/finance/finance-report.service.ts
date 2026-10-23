@@ -245,7 +245,8 @@ export class FinanceReportService {
       connection,
       filters,
     );
-    return this.stripeConfig.mode === "disabled"
+    return this.stripeConfig.mode === "disabled" ||
+      connection.collectionStatus !== "READY"
       ? { ...report, status: "UNAVAILABLE" }
       : report;
   }

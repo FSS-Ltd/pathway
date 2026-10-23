@@ -68,6 +68,8 @@ const REQUIRED_RLS_TABLES = [
   "FinanceReconciliationState",
   "FinanceReconciliationCase",
   "FinanceReconciliationCaseEvent",
+  "FinanceSettlementEvidence",
+  "FinancePayoutReconciliation",
   "FinancePayerAccount",
   "FinancePayerGrant",
   "FinanceCreditNote",

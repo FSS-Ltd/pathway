@@ -95,7 +95,7 @@ describe("current PaymentIntent recovery through canonical Bacs receipts", () =>
         ).toEqual([{ source: "STRIPE_BACS", amountMinor: 2450n }]);
         expect(
           await tx.financeReceiptAllocation.findMany({
-            where: { invoiceId },
+            where: { tenantId: scope.tenantId, orgId: scope.orgId, invoiceId },
             select: { amountMinor: true },
           }),
         ).toEqual([{ amountMinor: 2450n }]);

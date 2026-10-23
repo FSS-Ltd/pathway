@@ -12,6 +12,7 @@ import {
   lockFinanceRefund,
 } from "../finance-refund.persistence";
 import type { FinanceRefundActor } from "../finance-refund.service";
+import { reconcileFinanceReceiptException } from "../finance-receipt-exception.persistence";
 import { recordFinanceReceiptMovement } from "../finance-receipt-movement.service";
 import {
   financeRefundInclude,
@@ -121,6 +122,11 @@ export class FinanceStripeRefundSubmissionService {
           currency: refund.currency,
           sourceReference: providerResult.id,
           occurredAt: providerResult.createdAt,
+        });
+        await reconcileFinanceReceiptException(tx, {
+          ...actor,
+          receiptId: refund.receiptId,
+          source: "STRIPE",
         });
       }
       const eventType = stripeResponseEventType(providerResult.status);

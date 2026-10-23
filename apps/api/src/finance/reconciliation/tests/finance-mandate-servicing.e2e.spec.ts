@@ -76,7 +76,7 @@ describe("mandate cancellation after new collection stops", () => {
         ).toEqual({ status: "CANCELLED", providerCancellationPending: false });
         expect(
           await tx.financeCollectionPlan.findFirst({
-            where: { mandateId },
+            where: { tenantId: scope.tenantId, orgId: scope.orgId, mandateId },
             select: { status: true },
           }),
         ).toEqual({ status: "CANCELLED" });

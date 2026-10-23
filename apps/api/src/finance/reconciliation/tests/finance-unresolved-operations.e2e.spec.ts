@@ -41,8 +41,16 @@ describe("historical unresolved operation paging", () => {
           ["mandate", mandateId],
         ]);
         expect(second.nextCursor).toBeNull();
-        expect(await tx.financeReconciliationState.count()).toBe(0);
-        expect(await tx.financeReconciliationCase.count()).toBe(0);
+        expect(
+          await tx.financeReconciliationState.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
+        expect(
+          await tx.financeReconciliationCase.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
       },
     );
   });
@@ -103,7 +111,11 @@ describe("historical unresolved operation paging", () => {
           "capture",
         );
         const event = await tx.financeStripeWebhookEvent.findFirstOrThrow({
-          where: { eventType: "checkout.session.completed" },
+          where: {
+            tenantId: scope.tenantId,
+            orgId: scope.orgId,
+            eventType: "checkout.session.completed",
+          },
         });
         await new FinanceStripePaymentWebhookService(
           new FinanceBalanceService(),
@@ -113,7 +125,9 @@ describe("historical unresolved operation paging", () => {
           eventType: event.eventType,
           payloadJson: event.payloadJson,
         });
-        const receipt = await tx.financeReceipt.findFirstOrThrow();
+        const receipt = await tx.financeReceipt.findFirstOrThrow({
+          where: { tenantId: scope.tenantId, orgId: scope.orgId },
+        });
         const grant = await tx.financePayerGrant.findUniqueOrThrow({
           where: { id: grantId },
         });
@@ -154,7 +168,11 @@ describe("historical unresolved operation paging", () => {
         ]);
         expect(page.data[1].id).toBe(refund.id);
         const withdrawal = await tx.financeReceiptMovement.findFirstOrThrow({
-          where: { type: "DISPUTE_WITHDRAWAL" },
+          where: {
+            tenantId: scope.tenantId,
+            orgId: scope.orgId,
+            type: "DISPUTE_WITHDRAWAL",
+          },
         });
         await recordFinanceReceiptMovement(tx, {
           tenantId: scope.tenantId,

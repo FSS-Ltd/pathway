@@ -13,6 +13,7 @@ export async function readPendingFinanceCaseRequests(
   scope: FinanceConnectionScope,
   cutoff: Date,
   cursor: string | null,
+  now = cutoff,
 ): Promise<{ data: FinanceCaseRequest[]; nextCursor: string | null }> {
   if (!Number.isFinite(cutoff.getTime()))
     throw new Error("Case request cutoff is invalid");
@@ -31,6 +32,11 @@ export async function readPendingFinanceCaseRequests(
         WHERE done."tenantId" = e."tenantId" AND done."orgId" = e."orgId" AND done."caseId" = e."caseId"
           AND done."type" = 'UPDATED' AND done."createdAt" >= e."createdAt"
           AND done."details"->>'completedRequestId' = e."details"->>'requestId'
+      ) AND NOT EXISTS (
+        SELECT 1 FROM app."FinanceReconciliationCaseEvent" failed
+        WHERE failed."tenantId" = e."tenantId" AND failed."orgId" = e."orgId" AND failed."caseId" = e."caseId"
+          AND failed."type" = 'UPDATED' AND failed."details"->>'failedRequestId' = e."details"->>'requestId'
+          AND (failed."details"->>'retryAfter')::TIMESTAMPTZ > ${now}
       ) ORDER BY e."id" LIMIT 2
   `;
   return {

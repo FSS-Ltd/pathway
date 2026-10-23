@@ -109,11 +109,21 @@ describe("scheduled historical payout continuations", () => {
               }
             : (before?.coverage ?? {}),
         );
-        expect(await tx.financeReceipt.count()).toBe(0);
-        expect(await tx.financeReceiptMovement.count()).toBe(0);
-        expect(await tx.financeReconciliationState.count()).toBe(
-          mode === "sync" ? 1 : 0,
-        );
+        expect(
+          await tx.financeReceipt.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
+        expect(
+          await tx.financeReceiptMovement.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(0);
+        expect(
+          await tx.financeReconciliationState.count({
+            where: { tenantId: scope.tenantId, orgId: scope.orgId },
+          }),
+        ).toBe(mode === "sync" ? 1 : 0);
       });
     },
   );

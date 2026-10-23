@@ -10,6 +10,7 @@ const now = new Date("2026-10-23T12:00:00Z");
 async function fixture(
   status: "DEAD_LETTER" | "PROCESSING" = "DEAD_LETTER",
   evidenceMode = false,
+  action: "REPLAY" | "RECHECK" = "REPLAY",
 ) {
   const orgId = process.env.E2E_ORG_ID;
   if (!orgId) throw new Error("Missing case request test organisation");
@@ -79,13 +80,18 @@ async function fixture(
     const requestId = randomUUID();
     const request = await tx.financeReconciliationCaseEvent.create({
       data: {
+        id: `00000000-${randomUUID().slice(9)}`,
         caseId: record.id,
         tenantId,
         orgId,
         type: "REPLAY_REQUESTED",
         actorUserId: user.id,
         createdAt: new Date(now.getTime() - 60_000),
-        details: { action: "REPLAY", requestId, evidenceId: evidence.id },
+        details: {
+          action,
+          requestId,
+          evidenceId: action === "REPLAY" ? evidence.id : null,
+        },
       },
     });
     return { scope, record, evidence, request, requestId };
@@ -125,6 +131,142 @@ describe("durable Finance case request replay", () => {
   });
   afterAll(async () => {
     await prisma.$disconnect();
+  });
+  it("advances past failed rechecks, retries durably and ends exhausted work in manual review", async () => {
+    const data = await fixture("DEAD_LETTER", false, "RECHECK");
+    const laterId = randomUUID();
+    await withTenantRlsContext(data.scope.tenantId, data.scope.orgId, (tx) =>
+      tx.financeReconciliationCaseEvent.create({
+        data: {
+          id: `ffffffff-${randomUUID().slice(9)}`,
+          caseId: data.record.id,
+          tenantId: data.scope.tenantId,
+          orgId: data.scope.orgId,
+          type: "REPLAY_REQUESTED",
+          actorUserId: data.request.actorUserId,
+          createdAt: new Date(now.getTime() - 30_000),
+          details: {
+            action: "REPLAY",
+            requestId: laterId,
+            evidenceId: data.evidence.id,
+          },
+        },
+      }),
+    );
+    let tick = now;
+    const deps = {
+      ...dependencies(),
+      clock: () => tick,
+      prepareRecheck: async () => {
+        throw new Error("Synthetic unavailable historical event");
+      },
+    };
+    expect(
+      await runFinanceCaseRequestsReconciliation(
+        { scope: data.scope, mode: "sync" },
+        deps,
+      ),
+    ).toMatchObject({ status: "continued", pages: 1, exceptions: 1 });
+    expect(
+      await runFinanceCaseRequestsReconciliation(
+        { scope: data.scope, mode: "sync" },
+        deps,
+      ),
+    ).toMatchObject({ status: "completed", recoverable: 1 });
+    for (const minutes of [5, 10]) {
+      tick = new Date(now.getTime() + minutes * 60_000);
+      expect(
+        await runFinanceCaseRequestsReconciliation(
+          { scope: data.scope, mode: "sync" },
+          deps,
+        ),
+      ).toMatchObject({ status: "completed", exceptions: 1 });
+    }
+    const saved = await snapshot(data.scope);
+    expect(
+      saved.events.filter(
+        (event) =>
+          typeof event.details === "object" &&
+          event.details &&
+          !Array.isArray(event.details) &&
+          event.details.failedRequestId === data.requestId,
+      ),
+    ).toHaveLength(2);
+    expect(
+      saved.events.filter(
+        (event) =>
+          typeof event.details === "object" &&
+          event.details &&
+          !Array.isArray(event.details) &&
+          event.details.completedRequestId === data.requestId,
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        details: expect.objectContaining({
+          outcome: "MANUAL_REVIEW_REQUIRED_RETRY_EXHAUSTED",
+          attempts: 3,
+        }),
+      }),
+    ]);
+    expect(saved.evidence[0]).toMatchObject({ status: "RETRY", attempts: 0 });
+    await withTenantRlsContext(
+      data.scope.tenantId,
+      data.scope.orgId,
+      async (tx) => {
+        expect(
+          await tx.financeReconciliationCase.findUnique({
+            where: { id: data.record.id },
+          }),
+        ).toMatchObject({ status: "OPEN" });
+      },
+    );
+  });
+  it("rolls back a failed capture and preserves a durable retry without aborting the page", async () => {
+    const data = await fixture("DEAD_LETTER", false, "RECHECK");
+    const result = await runFinanceCaseRequestsReconciliation(
+      { scope: data.scope, mode: "sync" },
+      {
+        ...dependencies(),
+        prepareRecheck: async () => ({
+          outcome: "SYNTHETIC",
+          async capture(tx) {
+            await tx.$queryRaw`SELECT 1/0`;
+            throw new Error("Synthetic capture must fail");
+          },
+        }),
+      },
+    );
+    expect(result).toMatchObject({
+      status: "completed",
+      pages: 1,
+      exceptions: 1,
+    });
+    const saved = await snapshot(data.scope);
+    expect(saved.events).toHaveLength(2);
+    expect(
+      saved.events.some(
+        (event) =>
+          typeof event.details === "object" &&
+          event.details &&
+          !Array.isArray(event.details) &&
+          event.details.failedRequestId === data.requestId,
+      ),
+    ).toBe(true);
+    expect(saved.evidence[0].status).toBe("DEAD_LETTER");
+  });
+  it("reports preparation failure in dry run without writing retry state", async () => {
+    const data = await fixture("DEAD_LETTER", false, "RECHECK");
+    const before = await snapshot(data.scope);
+    const result = await runFinanceCaseRequestsReconciliation(
+      { scope: data.scope, mode: "dry-run" },
+      dependencies(),
+    );
+    expect(result).toMatchObject({
+      status: "completed",
+      pages: 1,
+      exceptions: 1,
+    });
+    expect(await snapshot(data.scope)).toEqual(before);
   });
   it("requeues stored evidence once and audits prior retry history without changing payload or money", async () => {
     const data = await fixture();
@@ -193,13 +335,24 @@ describe("durable Finance case request replay", () => {
         { scope: data.scope, mode: "sync" },
         dependencies(),
       ),
-    ).toMatchObject({ status: "failed", reason: "CAPTURE_FAILED" });
+    ).toMatchObject({ status: "completed", pages: 1, exceptions: 1 });
     const after = await snapshot(data.scope);
     expect(after.evidence[0]).toEqual(data.evidence);
-    expect(after.events.some((event) => event.type === "UPDATED")).toBe(false);
+    expect(
+      after.events.filter((event) => event.type === "UPDATED"),
+    ).toHaveLength(1);
+    expect(
+      after.events.some(
+        (event) =>
+          typeof event.details === "object" &&
+          event.details &&
+          !Array.isArray(event.details) &&
+          event.details.completedRequestId === data.requestId,
+      ),
+    ).toBe(false);
     expect(after.states[0]).toMatchObject({
-      lastError: "CAPTURE_FAILED",
-      completedThrough: null,
+      lastError: null,
+      completedThrough: now,
     });
   });
   it("dry run reports requests without inbox, event or cursor writes", async () => {
@@ -220,9 +373,20 @@ describe("durable Finance case request replay", () => {
         { scope: data.scope, mode: "sync" },
         dependencies(),
       ),
-    ).toMatchObject({ status: "failed", reason: "CAPTURE_FAILED" });
+    ).toMatchObject({ status: "completed", pages: 1, exceptions: 1 });
     const after = await snapshot(data.scope);
     expect(after.evidence[0]).toEqual(data.evidence);
-    expect(after.events.some((event) => event.type === "UPDATED")).toBe(false);
+    expect(
+      after.events.filter((event) => event.type === "UPDATED"),
+    ).toHaveLength(1);
+    expect(
+      after.events.some(
+        (event) =>
+          typeof event.details === "object" &&
+          event.details &&
+          !Array.isArray(event.details) &&
+          event.details.completedRequestId === data.requestId,
+      ),
+    ).toBe(false);
   });
 });
