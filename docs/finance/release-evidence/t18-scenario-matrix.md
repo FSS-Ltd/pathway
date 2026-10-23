@@ -273,3 +273,41 @@ cancelled, unsubmitted object without repeating writes. Two full unit suites/27
 tests, API types/build and targeted lint/formatting passed. Final-head CI is still
 required. These provider-only fixtures do not prove full ledger posting, required
 asynchronous return/cancellation cases, payout eligibility or all T18 assurance.
+
+E27: Actual hosted normal-bank Bacs collection passed through canonical collection,
+genuine signed processing/success ingress, transactional PostgreSQL notification
+and the scoped worker. One £1 debit retained 100 minor units outstanding while
+processing,
+then produced one confirmed receipt/allocation and zero outstanding. Eight duplicates
+and two canonical success replays preserved the result. Shutdown left zero listener
+clients. A separate authenticated provider read verified gross 100, fee 20/net 80 and
+no platform fee/destination charge; payout balance remained pending with no payout.
+This supersedes the earlier claim that incomplete school onboarding blocks every
+Sandbox Bacs operation. It does not prove a live direct-charge configuration,
+the three-minute delayed bank, payout reconciliation or family return UI.
+
+E28: A separate actual £1 debit was cancelled through the canonical mandate service
+while processing. The outstanding 100 minor units and absence of a receipt were
+preserved. Interruption stopped the test; its missing handle and process absence
+were verified before
+recovery, and the debit was not submitted again. An authenticated account-scoped
+read found the same debit succeeded. Canonical `API_RECONCILIATION` capture and
+notification-driven worker processing yielded one receipt/allocation and zero
+outstanding with the mandate still cancelled. Two additional canonical replays
+preserved the result.
+Recovery made zero provider writes. The processing event was genuinely signed;
+the success was recovered from the provider API, not received as a signed webhook.
+Future submission on the detached method is not authorized by this proof.
+
+E29: PR737 CI run 40034294164 failed six cases across three suites on a38d9eb;
+its other 155 integration suites passed 899 tests. A listener fixture selected a
+dotenv fallback URL instead of Prisma's centrally bound database, and the exact-fee
+fixture used UTC dates for a London report after midnight. Both reproduced in a
+focused Node 24 run before correction. The corrected fixtures preserve all financial
+assertions and pass four complete database suites/ten tests, including a new stale
+URL regression. No production ledger, date policy or connection safeguard changed.
+An initial Node 20 compile was intentionally stopped under verified memory pressure
+and is not a test result. Fresh final-head CI/merge remains required. Five additional
+hosted asynchronous setups are prepared but unaccepted, pending explicit user
+confirmation after automatic approval review blocked navigation. Full T18/T19
+completion remains unproved.

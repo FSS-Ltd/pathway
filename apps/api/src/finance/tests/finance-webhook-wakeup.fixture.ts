@@ -7,8 +7,10 @@ const listenerRole = "finance_e2e_notify_listener";
 const listenerPassword = "synthetic_notify_test_only";
 
 export async function prepareFinanceWebhookListenerRole(): Promise<string> {
-  const rawUrl = process.env.TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL;
-  if (!rawUrl) throw new Error("Disposable webhook test database required");
+  // The central Jest setup binds Prisma here after choosing the active E2E
+  // database. A dotenv fallback TEST_DATABASE_URL can point to another server.
+  const rawUrl = process.env.DATABASE_URL;
+  if (!rawUrl) throw new Error("Bound disposable webhook database required");
   const url = new URL(rawUrl);
   if (
     !["localhost", "127.0.0.1", "postgres"].includes(url.hostname) ||

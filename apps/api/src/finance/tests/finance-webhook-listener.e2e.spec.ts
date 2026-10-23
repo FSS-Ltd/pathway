@@ -27,6 +27,25 @@ async function within<T>(work: Promise<T>): Promise<T> {
 }
 
 describe("real PostgreSQL Finance listener lifecycle", () => {
+  it("uses the bound database when a loaded test URL points elsewhere", async () => {
+    if (!requireDatabase())
+      throw new Error("Disposable listener database required");
+    const boundUrl = process.env.DATABASE_URL;
+    if (!boundUrl) throw new Error("Bound E2E database required");
+    const previousTestUrl = process.env.TEST_DATABASE_URL;
+    const unrelatedUrl = new URL(boundUrl);
+    unrelatedUrl.port = "1";
+    process.env.TEST_DATABASE_URL = unrelatedUrl.toString();
+    try {
+      const listenerUrl = new URL(await prepareFinanceWebhookListenerRole());
+      expect(listenerUrl.host).toBe(new URL(boundUrl).host);
+      expect(listenerUrl.pathname).toBe(new URL(boundUrl).pathname);
+    } finally {
+      if (previousTestUrl === undefined) delete process.env.TEST_DATABASE_URL;
+      else process.env.TEST_DATABASE_URL = previousTestUrl;
+    }
+  });
+
   it("catches up more than one batch, isolates mode, reconnects and closes its subscription", async () => {
     if (!requireDatabase())
       throw new Error("Disposable listener database required");

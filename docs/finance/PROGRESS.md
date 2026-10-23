@@ -480,3 +480,73 @@ statements”, with validation and a preview, as a separate focused PR after the
 current PR passes and is confirmed merged. Card statement names and paid Bacs
 Custom Branding must be distinguished. No Bacs branding fee was enabled or
 approved; no implementation of that next change has started.
+
+### T18 real hosted Bacs collection and cancellation recovery
+
+The user-approved fictional normal-bank mandate produced one actual Sandbox
+direct debit for 100 GBP minor units. Genuine signed processing and success
+events passed through the durable inbox, PostgreSQL notification listener and
+canonical worker. Processing retained 100 minor units outstanding with no receipt;
+success produced one receipt, one allocation and zero outstanding. Eight duplicates
+and two additional canonical success replays preserved those counts. The listener
+closed with zero remaining clients. An account-scoped provider read found gross 100,
+processor fee 20 and net 80, with no platform fee or destination charge. The balance
+was pending and payouts were absent; this is not payout reconciliation or live
+capability approval. The shared fixture's old `successDelayed` label does not prove
+the separate three-minute test bank.
+
+A separate owned local database exercised cancellation while one actual £1 debit
+was processing. Canonical cancellation confirmed the mandate cancelled and retained
+the processing attempt, no receipt and 100 minor units outstanding. Interruption
+stopped the original test before its terminal event. Its missing exec handle and
+process inspection
+were checked before recovery; submission was not repeated. An authenticated
+account-scoped read found that same debit succeeded. Existing current-object
+reconciliation captured `API_RECONCILIATION` evidence; committed notification and
+canonical processing produced one receipt/allocation and zero outstanding despite
+cancellation.
+Two additional replays preserved the result. Recovery made zero provider writes.
+This cancellation case proves API recovery, not signed success delivery. Its
+detached payment method must not be reused for future submissions.
+
+Five further canonical hosted setups are prepared for delayed success, delayed
+insufficient funds, delayed debit refusal, dispute and mandate refusal. None has
+been accepted or charged. Automatic approval review blocked navigation because the
+previous approval covered only the earlier specific mandate. A batched confirmation
+for the five explicit fictional test-bank setups remains pending. No browser or
+API workaround bypasses that review. Mandatory asynchronous, payout, private-storage,
+accessibility and remaining family-route assurance stay open; T19 is unstarted.
+
+### T18 PR737 integration-fixture correction
+
+CI run 40034294164 failed on `a38d9ebca7eacdaca328e00bc80fde4f35a2e452`.
+Shard 1 passed 77 suites/500 tests and failed two cases; shard 2 passed 78 suites/399
+tests and failed four cases. Those results do not clear the merge gate.
+
+The listener helper selected a dotenv fallback `TEST_DATABASE_URL` on another
+port, while central global setup bound Prisma to the actual `E2E_DATABASE_URL`.
+A new regression changes that fallback after binding and reproduces the incorrect
+listener destination. The helper now uses the bound `DATABASE_URL`, preserving its
+local disposable-database guard and restricted listener role. Production connection
+and TLS behavior are unchanged.
+
+The principal/fee test also built UTC date filters for a London report. Its
+postings after 23:00 UTC during British Summer Time fell on the next London date
+and were correctly excluded from the old-day report. The test now derives London
+filters spanning the actual invoice/provider posting dates, including midnight
+crossing. Report and ledger calculations are unchanged; all amount assertions remain.
+
+Both defects reproduced behaviorally in the focused Node 24 run: two failed cases,
+one passed. The initial Node 20 compilation was deliberately stopped after stack
+sampling established local memory pressure; it counts as neither RED nor PASS.
+After correction, the complete listener, wakeup, principal/fee and dependency-replay
+database suites passed four suites/ten tests. Formatting and whitespace checks
+passed, as did the API typecheck and focused lint. Fresh current-head CI and
+host-confirmed merge are still required before the queued statement-name setting
+begins. Full T18 completion is not claimed.
+
+The branch was then rebased onto current master
+`0ae915f8c70b258056ec10164fff225da4c3d62a`. All 204 migrations applied to the owned
+review database. Rebased verification passed the same four database suites/ten
+tests, all 24 worker suites/139 tests, API typecheck, focused lint, formatting and
+whitespace checks. No production migration or listener activation occurred.
