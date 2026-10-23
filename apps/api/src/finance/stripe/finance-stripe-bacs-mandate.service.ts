@@ -19,6 +19,10 @@ import {
   type FinanceStripeBacsProvider,
   type FinanceStripeBacsSetupSession,
 } from "./finance-stripe-bacs.provider";
+import {
+  FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER,
+  type FinanceStripeMandateServicingProvider,
+} from "./finance-stripe-mandate-servicing.contracts";
 
 export interface FinanceStripeBacsMandateActor extends FinanceAccessScope {
   userId: string;
@@ -58,11 +62,16 @@ type MandateSetupPreparation =
 export class FinanceStripeBacsMandateService {
   constructor(
     @Inject(FinanceAccessService)
-    private readonly financeAccess: FinanceAccessService,
+    private readonly financeAccess: Pick<
+      FinanceAccessService,
+      "assertPayerAction"
+    >,
     @Inject(FINANCE_STRIPE_CHECKOUT_CONFIG)
     private readonly config: FinanceStripeCheckoutConfig,
     @Inject(FINANCE_STRIPE_BACS_PROVIDER)
     private readonly provider: FinanceStripeBacsProvider,
+    @Inject(FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER)
+    private readonly servicing: FinanceStripeMandateServicingProvider,
   ) {}
 
   async startSetup(
@@ -358,9 +367,12 @@ export class FinanceStripeBacsMandateService {
         }
       });
     } catch (error) {
-      await this.provider
+      await this.servicing
         .expireMandateSetupSession({
           stripeAccountId: setup.stripeAccountId,
+          livemode: setup.livemode,
+          customerId: stripeCustomerId,
+          mandateId,
           sessionId: session.id,
           idempotencyKey: `finance-bacs-expire-${mandateId}`,
         })
@@ -416,6 +428,8 @@ export class FinanceStripeBacsMandateService {
             stripeCheckoutSessionId: true,
             stripePaymentMethodId: true,
             providerCancellationPending: true,
+            livemode: true,
+            stripeCustomer: { select: { stripeCustomerId: true } },
           },
         });
         if (!current) throw new NotFoundException("Bacs mandate not found");
@@ -491,6 +505,8 @@ export class FinanceStripeBacsMandateService {
             stripeCheckoutSessionId: true,
             stripePaymentMethodId: true,
             providerCancellationPending: true,
+            livemode: true,
+            stripeCustomer: { select: { stripeCustomerId: true } },
           },
         });
         return {
@@ -509,24 +525,21 @@ export class FinanceStripeBacsMandateService {
           : "CONFIRMED",
       };
     }
-    if (this.config.mode === "disabled") {
-      return {
-        mandateId,
-        status: "CANCELLED",
-        providerCancellation: "PENDING",
-      };
-    }
-
     try {
       if (mandate.stripePaymentMethodId) {
-        await this.provider.detachPaymentMethod({
+        await this.servicing.detachPaymentMethod({
           stripeAccountId: mandate.stripeAccountId,
+          livemode: mandate.livemode,
+          customerId: mandate.stripeCustomer.stripeCustomerId,
           paymentMethodId: mandate.stripePaymentMethodId,
           idempotencyKey: `finance-bacs-cancel-${mandateId}`,
         });
       } else if (mandate.stripeCheckoutSessionId) {
-        await this.provider.expireMandateSetupSession({
+        await this.servicing.expireMandateSetupSession({
           stripeAccountId: mandate.stripeAccountId,
+          livemode: mandate.livemode,
+          customerId: mandate.stripeCustomer.stripeCustomerId,
+          mandateId,
           sessionId: mandate.stripeCheckoutSessionId,
           idempotencyKey: `finance-bacs-expire-${mandateId}`,
         });

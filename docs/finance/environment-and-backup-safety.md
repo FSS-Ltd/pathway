@@ -86,3 +86,7 @@ documents the separate Supabase project restore rehearsal and its limits.
   wired to production deployment.
 - Reverting this step removes the new environment gate and restore check; no
   schema migration or external resource needs rollback.
+
+### Mandate servicing with collection disabled
+
+T17 binds existing-mandate reads/cancellation to `FINANCE_STRIPE_SERVICING_CONFIG`, including the stored operation's account and test/live mode. New Bacs customer/setup/debit creation continues to use the collection binding and remains test-only. The servicing key must permit the required historical GETs and the two cancellation endpoints (`payment_methods/:id/detach` and `checkout/sessions/:id/expire`). Restricted-key configuration is covered by unit contracts; the actual Sandbox read proof used the user's existing named test key. No environment or secret was changed by that proof. Failed cancellation retains local `providerCancellationPending`; it never reinstates a locally cancelled collection plan.

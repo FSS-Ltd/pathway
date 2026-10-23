@@ -32,10 +32,6 @@ const paymentIntentSchema = z.object({
   status: z.string().min(1),
 });
 
-const detachedPaymentMethodSchema = z.object({
-  id: z.string().startsWith("pm_"),
-});
-
 export interface FinanceStripeBacsCustomer {
   id: string;
 }
@@ -75,11 +71,6 @@ export interface FinanceStripeBacsProvider {
     consentVersion: string;
     idempotencyKey: string;
   }): Promise<FinanceStripeBacsSetupSession>;
-  expireMandateSetupSession(input: {
-    stripeAccountId: string;
-    sessionId: string;
-    idempotencyKey: string;
-  }): Promise<void>;
   createDebit(input: {
     stripeAccountId: string;
     customerId: string;
@@ -89,11 +80,6 @@ export interface FinanceStripeBacsProvider {
     amountMinor: bigint;
     idempotencyKey: string;
   }): Promise<FinanceStripeBacsPaymentIntent>;
-  detachPaymentMethod(input: {
-    stripeAccountId: string;
-    paymentMethodId: string;
-    idempotencyKey: string;
-  }): Promise<void>;
 }
 
 export class FinanceStripeBacsProviderError extends Error {
@@ -246,36 +232,6 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
     };
   }
 
-  async expireMandateSetupSession(input: {
-    stripeAccountId: string;
-    sessionId: string;
-    idempotencyKey: string;
-  }): Promise<void> {
-    await this.request(
-      `/v1/checkout/sessions/${encodeURIComponent(input.sessionId)}/expire`,
-      input.stripeAccountId,
-      input.idempotencyKey,
-      "",
-    );
-  }
-
-  async detachPaymentMethod(input: {
-    stripeAccountId: string;
-    paymentMethodId: string;
-    idempotencyKey: string;
-  }): Promise<void> {
-    const payload = await this.request(
-      `/v1/payment_methods/${encodeURIComponent(input.paymentMethodId)}/detach`,
-      input.stripeAccountId,
-      input.idempotencyKey,
-      "",
-    );
-    const parsed = detachedPaymentMethodSchema.safeParse(payload);
-    if (!parsed.success || parsed.data.id !== input.paymentMethodId) {
-      throw new FinanceStripeBacsProviderError(true);
-    }
-  }
-
   private async request(
     path: string,
     stripeAccountId: string,
@@ -326,18 +282,6 @@ export class DisabledFinanceStripeBacsProvider implements FinanceStripeBacsProvi
   }
 
   async createDebit(): Promise<FinanceStripeBacsPaymentIntent> {
-    throw new ServiceUnavailableException(
-      "Finance Bacs collection is not configured",
-    );
-  }
-
-  async expireMandateSetupSession(): Promise<void> {
-    throw new ServiceUnavailableException(
-      "Finance Bacs collection is not configured",
-    );
-  }
-
-  async detachPaymentMethod(): Promise<void> {
     throw new ServiceUnavailableException(
       "Finance Bacs collection is not configured",
     );

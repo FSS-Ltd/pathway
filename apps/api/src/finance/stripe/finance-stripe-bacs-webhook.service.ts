@@ -9,9 +9,9 @@ import {
 } from "../domain/finance-collection-terms";
 import { recordConfirmedStripeReceipt } from "./finance-stripe-receipt";
 import {
-  FINANCE_STRIPE_BACS_PROVIDER,
-  type FinanceStripeBacsProvider,
-} from "./finance-stripe-bacs.provider";
+  FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER,
+  type FinanceStripeMandateServicingProvider,
+} from "./finance-stripe-mandate-servicing.contracts";
 import {
   parseFinanceStripeBacsEvent,
   type FinanceStripeBacsWebhookInput,
@@ -35,9 +35,9 @@ export class FinanceStripeBacsWebhookService {
     private readonly financeAccess: Pick<FinanceAccessService, "resolveMode">,
     @Inject(FinanceBalanceService)
     private readonly balances: FinanceBalanceService,
-    @Inject(FINANCE_STRIPE_BACS_PROVIDER)
+    @Inject(FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER)
     private readonly provider: Pick<
-      FinanceStripeBacsProvider,
+      FinanceStripeMandateServicingProvider,
       "detachPaymentMethod"
     >,
   ) {}
@@ -215,6 +215,7 @@ export class FinanceStripeBacsWebhookService {
             mandateId: mandate.id,
             stripeAccountId: mandate.stripeAccountId,
             paymentMethodId: event.paymentMethodId,
+            customerId: mandate.stripeCustomer.stripeCustomerId,
           };
         }
         return { kind: "processed" as const };
@@ -655,11 +656,14 @@ export class FinanceStripeBacsWebhookService {
       mandateId: string;
       stripeAccountId: string;
       paymentMethodId: string;
+      customerId: string;
     },
   ): Promise<void> {
     try {
       await this.provider.detachPaymentMethod({
         stripeAccountId: target.stripeAccountId,
+        livemode: input.livemode,
+        customerId: target.customerId,
         paymentMethodId: target.paymentMethodId,
         idempotencyKey: `finance-bacs-revoked-${target.mandateId}`,
       });

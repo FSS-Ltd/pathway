@@ -14,6 +14,9 @@ interface DebitFixture {
   paymentIntent: FinanceReconciliationObject;
   attemptId: string;
   invoiceId: string;
+  mandateId: string;
+  payerAccountId: string;
+  payerUserId: string;
 }
 
 export async function withReconciliationDebit(
@@ -131,6 +134,9 @@ export async function withReconciliationDebit(
         paymentIntent,
         attemptId: attempt.id,
         invoiceId,
+        mandateId: mandate.id,
+        payerAccountId: invoice.payerAccountId,
+        payerUserId: grant.payerUserId,
       });
     },
     "GBP",

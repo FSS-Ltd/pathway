@@ -89,6 +89,8 @@ import {
 import { FinanceStripeCheckoutAttemptService } from "./stripe/finance-stripe-checkout-attempt.service";
 import { FinanceStripeCheckoutService } from "./stripe/finance-stripe-checkout.service";
 import { FinanceStripeBacsMandateService } from "./stripe/finance-stripe-bacs-mandate.service";
+import { FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER } from "./stripe/finance-stripe-mandate-servicing.contracts";
+import { StripeFinanceMandateServicingProvider } from "./stripe/finance-stripe-mandate-servicing.provider";
 import { FinanceCollectionPlanService } from "./finance-collection-plan.service";
 import { FinanceRecurringInvoiceController } from "./finance-recurring-invoice.controller";
 import { FinanceRecurringInvoiceService } from "./finance-recurring-invoice.service";
@@ -255,6 +257,12 @@ import {
         config.mode === "disabled"
           ? new DisabledFinanceStripeRefundProvider()
           : new StripeFinanceRefundProvider(config),
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
+    },
+    {
+      provide: FINANCE_STRIPE_MANDATE_SERVICING_PROVIDER,
+      useFactory: (config: FinanceStripeServicingConfig) =>
+        new StripeFinanceMandateServicingProvider(config),
       inject: [FINANCE_STRIPE_SERVICING_CONFIG],
     },
     {
