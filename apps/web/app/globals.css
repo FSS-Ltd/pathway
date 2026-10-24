@@ -13,6 +13,8 @@
   --pw-accent-primary: 23 184 158;
   --pw-accent-subtle: 215 245 238;
   --pw-accent-strong: 15 157 130;
+  /* Text-only teal: --pw-accent-strong is 3.1:1 on light surfaces, this is 4.5:1+. */
+  --pw-accent-text: 12 122 101;
   --pw-accent-secondary: 247 202 104;
   --pw-accent-foreground: 15 23 42;
   --pw-border-subtle: 226 232 240;
@@ -41,6 +43,17 @@ a {
 
 :focus-visible {
   @apply outline-none ring-2 ring-offset-2 ring-status-info;
+}
+
+/* Hero poster: phones in portrait only ever show the centre of the 16:9 frame,
+   so they get a pre-cropped file with the same pixels instead of the 4K one. */
+.hero-poster {
+  background-image: url(/hero/nexsteps-hero-poster.webp);
+}
+@media (max-width: 767px) and (max-aspect-ratio: 3/4) {
+  .hero-poster {
+    background-image: url(/hero/nexsteps-hero-poster-portrait.webp);
+  }
 }
 
 @layer components {

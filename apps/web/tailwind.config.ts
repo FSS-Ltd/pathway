@@ -46,6 +46,10 @@ const config: Config = {
         "pw-warning": "rgb(var(--pw-status-warn) / <alpha-value>)",
         "pw-danger": "rgb(var(--pw-status-danger) / <alpha-value>)",
       },
+      // Only text-accent-strong darkens; bg/border/ring keep the brand teal.
+      textColor: {
+        accent: { strong: "rgb(var(--pw-accent-text) / <alpha-value>)" },
+      },
       fontFamily: {
         heading: ["var(--font-heading)", "Segoe UI", "system-ui", "-apple-system", "sans-serif"],
         body: ["var(--font-body)", "Segoe UI", "system-ui", "-apple-system", "sans-serif"],
@@ -65,7 +69,7 @@ const config: Config = {
           css: {
             "--tw-prose-body": "rgb(var(--pw-text-primary))",
             "--tw-prose-headings": "rgb(var(--pw-text-primary))",
-            "--tw-prose-links": "rgb(var(--pw-accent-strong))",
+            "--tw-prose-links": "rgb(var(--pw-accent-text))",
             maxWidth: "none",
             "p, ul, ol, blockquote": {
               marginTop: "1.25em",

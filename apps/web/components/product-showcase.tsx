@@ -26,7 +26,6 @@ function BrowserFrame({ src, alt }: { src: string; alt: string }) {
           fill
           sizes="(min-width: 768px) 768px, 100vw"
           className="object-cover object-top"
-          priority
         />
       </div>
     </div>
