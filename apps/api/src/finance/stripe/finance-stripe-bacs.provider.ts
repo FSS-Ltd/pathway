@@ -94,10 +94,15 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
   constructor(
     private readonly config: Extract<
       FinanceStripeCheckoutConfig,
-      { mode: "test" }
+      { mode: "test" | "live" }
     >,
     private readonly fetcher: typeof fetch = fetch,
   ) {}
+
+  /** Provider objects must be in the same Stripe mode as this configuration. */
+  private get isLive(): boolean {
+    return this.config.mode === "live";
+  }
 
   async createCustomer(input: {
     stripeAccountId: string;
@@ -114,7 +119,7 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
       form.toString(),
     );
     const parsed = stripeCustomerSchema.safeParse(payload);
-    if (!parsed.success || parsed.data.livemode) {
+    if (!parsed.success || parsed.data.livemode !== this.isLive) {
       throw new FinanceStripeBacsProviderError(true);
     }
     return { id: parsed.data.id };
@@ -170,7 +175,7 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
       form.toString(),
     );
     const parsed = checkoutSessionSchema.safeParse(payload);
-    if (!parsed.success || parsed.data.livemode) {
+    if (!parsed.success || parsed.data.livemode !== this.isLive) {
       throw new FinanceStripeBacsProviderError(true);
     }
     const url = new URL(parsed.data.url);
@@ -220,7 +225,7 @@ export class StripeFinanceBacsProvider implements FinanceStripeBacsProvider {
     const parsed = paymentIntentSchema.safeParse(payload);
     if (
       !parsed.success ||
-      parsed.data.livemode ||
+      parsed.data.livemode !== this.isLive ||
       parsed.data.amount !== amount ||
       parsed.data.currency.toLowerCase() !== "gbp" ||
       providerReference(parsed.data.customer) !== input.customerId ||

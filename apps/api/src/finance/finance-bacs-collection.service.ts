@@ -59,6 +59,11 @@ export class FinanceBacsCollectionService {
     private readonly provider: FinanceStripeBacsProvider,
   ) {}
 
+  /** Stored mandate, customer and account records must match the configured Stripe mode. */
+  private get isLive(): boolean {
+    return this.config.mode === "live";
+  }
+
   async runDue(asOf = new Date()): Promise<{
     scopes: number;
     invoicesGenerated: number;
@@ -66,9 +71,9 @@ export class FinanceBacsCollectionService {
     debitsPending: number;
     debitsFailed: number;
   }> {
-    if (this.config.mode !== "test") {
+    if (this.config.mode === "disabled") {
       throw new ServiceUnavailableException(
-        "Automated Bacs collection is available only in the test environment",
+        "Automated Bacs collection is not configured",
       );
     }
     const scopes = await runTransaction(
@@ -227,7 +232,7 @@ export class FinanceBacsCollectionService {
         plan.mandate.status !== "ACTIVE" ||
         plan.mandate.consentVersion !== FINANCE_BACS_MANDATE_CONSENT_VERSION ||
         !plan.mandate.stripePaymentMethodId ||
-        plan.mandate.livemode ||
+        plan.mandate.livemode !== this.isLive ||
         plan.mandate.stripeConnectionId !== plan.stripeConnectionId ||
         plan.mandate.stripeAccountId !==
           plan.stripeConnection.stripeAccountId ||
@@ -236,9 +241,9 @@ export class FinanceBacsCollectionService {
         plan.mandate.stripeCustomer.stripeConnectionId !==
           plan.stripeConnectionId ||
         plan.mandate.stripeCustomer.payerAccountId !== plan.payerAccountId ||
-        plan.mandate.stripeCustomer.livemode ||
+        plan.mandate.stripeCustomer.livemode !== this.isLive ||
         plan.stripeConnection.status !== "READY" ||
-        plan.stripeConnection.livemode ||
+        plan.stripeConnection.livemode !== this.isLive ||
         !plan.stripeConnection.stripeAccountId ||
         plan.stripeConnection.id !== plan.stripeConnectionId ||
         plan.financeProfile.countryCode !== "GB" ||

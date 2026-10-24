@@ -156,7 +156,7 @@ The task estimates sum to **66–102 engineering-days** for the expanded scope. 
 
 ### T13 Bacs job operation
 
-The API's internal collection job is `POST /internal/finance/bacs/run-due`. The worker command is `pnpm --filter @pathway/workers finance:bacs:run-due`; configure `FINANCE_BACS_COLLECTION_JOB_URL` with that exact HTTPS endpoint and `FINANCE_BACS_COLLECTION_JOB_SECRET` with the same secret configured on the API. The API rejects the job outside test mode, and the production provider binding remains disabled. Do not schedule this worker against live collection until the cancellation, return, replay and release-assurance gates pass.
+The API's internal collection job is `POST /internal/finance/bacs/run-due`. The worker command is `pnpm --filter @pathway/workers finance:bacs:run-due`; configure `FINANCE_BACS_COLLECTION_JOB_URL` with that exact HTTPS endpoint and `FINANCE_BACS_COLLECTION_JOB_SECRET` with the same secret configured on the API. The API rejects the job when collection is disabled and, otherwise, runs it in the configured test or live mode; stored mandates, customers and accounts must match that mode. The job stays unscheduled in production until the owner switches live collection on and records the Bacs evidence gates in the [go-live readiness](t19-go-live-readiness.md).
 
 ## 9. T01 repository findings
 

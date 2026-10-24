@@ -98,13 +98,24 @@ events carry identifiers, never card or bank details.
 - Zero cross-tenant or unentitled access found in access logs.
 - Pause rehearsed before the switch and works as described.
 
-## Bacs live (separate change)
+## Bacs live
 
-The Bacs provider is bound to test mode and rejects live responses, and the collection job
-refuses to run outside test mode. Live Bacs needs a reviewed code change that runs Bacs in live
-mode only when `FINANCE_STRIPE_LIVE_ENABLED=true`, plus the exact-path tests and the owner's
-recorded Bacs evidence (delayed collection, return, dispute, payout). Until it merges, Bacs stays
-test-only and card goes first.
+Bacs now runs in live mode on the same switch as card: the provider, mandate setup, plan
+approval, due-collection job and mandate activation all follow `FINANCE_STRIPE_CONNECT_MODE`.
+There is no separate Bacs switch, so the pause below stops both. Stored mandates, customers and
+school accounts must match the configured mode, and a mismatch is refused, so test-mode records
+can never be debited live.
+
+Two things sit outside the code change:
+
+1. **Owner evidence.** Record the Bacs outcomes you verified in Stripe (delayed collection, return,
+   dispute, payout) in [PROGRESS.md](PROGRESS.md) before switching live on.
+2. **The scheduled job.** `POST /internal/finance/bacs/run-due` collects due instalments. Schedule
+   the worker (`FINANCE_BACS_COLLECTION_JOB_URL` and `FINANCE_BACS_COLLECTION_JOB_SECRET`) only
+   when live collection is on. Until it runs, mandates can be set up but nothing is debited.
+
+Live Bacs setups need a GB school profile in GBP. Payers sign a mandate once, then instalments
+collect automatically; a debit is never a receipt until the provider confirms it.
 
 ## Handover
 

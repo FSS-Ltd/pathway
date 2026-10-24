@@ -79,9 +79,9 @@ export class FinanceStripeBacsMandateService {
     actor: FinanceStripeBacsMandateActor,
     payerAccountId: string,
   ): Promise<FinanceStripeBacsMandateSetupResult> {
-    if (this.config.mode !== "test") {
+    if (this.config.mode === "disabled") {
       throw new ServiceUnavailableException(
-        "Finance Bacs collection is available only in the test environment",
+        "Finance Bacs collection is not configured",
       );
     }
     await this.financeAccess.assertPayerAction(

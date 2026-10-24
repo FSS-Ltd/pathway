@@ -260,7 +260,7 @@ import {
       useFactory: (
         config: ReturnType<typeof loadFinanceStripeCheckoutConfig>,
       ) =>
-        config.mode !== "test"
+        config.mode === "disabled"
           ? new DisabledFinanceStripeBacsProvider()
           : new StripeFinanceBacsProvider(config),
       inject: [FINANCE_STRIPE_CHECKOUT_CONFIG],

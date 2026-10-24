@@ -143,7 +143,7 @@ For each test, record the repository and provider API/SDK versions, date, redact
 
 Bacs submission is not a receipt. Do not reduce an invoice balance until signed provider evidence or a scoped authenticated provider read confirms payment success and is captured durably for canonical processing. API recovery keeps explicit API provenance; it is never labelled as signature-verified. Processor payouts remain separate. Stripe documents typical settlement delays of four business days for an existing mandate and seven for a new mandate; sandbox timing may be accelerated. Families must see a pending state and must not be prompted to pay again while an attempt is unresolved.
 
-Live Bacs remains disabled until T13's exact-path tests, T18 assurance and the separately authorised pilot gates pass. A documentation gap or failed test is a blocker, not permission to change the charge model.
+Live Bacs is implemented behind the same live switch as card collection, and it stays off until the owner switches live collection on and records the Bacs evidence gates in the [go-live readiness](t19-go-live-readiness.md). A documentation gap or failed test is a blocker, not permission to change the charge model.
 
 ## T17 read-only sandbox recovery observation — 23 October 2026
 
