@@ -1,14 +1,14 @@
-# Live pilot: first payments and daily reconciliation
+# Live collection: first payments and daily reconciliation
 
-Use only after the owner has authorised the live pilot and every gate in
-[T19 readiness](../t19-pilot-readiness.md) is recorded. This document proves no live exercise.
+Use after the owner has switched live collection on and the platform gates in
+[T19 go-live readiness](../t19-go-live-readiness.md) are recorded. This document proves no live exercise.
 
 ## Before the first payment
 
 1. Confirm the staff workspace shows the school's live connection and the expected account.
 2. Confirm collection and servicing settings match the design doc, with `FINANCE_STRIPE_LIVE_ENABLED=true`.
 3. Confirm the pause procedure is understood by the person on call.
-4. Create one small real invoice for the owner or school lead.
+4. For the first payment from any customer, follow it end to end with the school's lead present.
 
 ## For each payment
 
