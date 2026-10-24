@@ -4,6 +4,7 @@ cd "$(dirname "$0")/../../../.."
 
 # Every resource belongs to this invocation. Fixed loopback ports deliberately
 # fail when occupied; never stop a different project's stack to obtain a port.
+export PII_ENCRYPTION_KEY="$(node -p 'require("node:crypto").randomBytes(32).toString("base64")')"
 fixture_id="pathway-realtime-${GITHUB_RUN_ID:-local}-$$"
 fixture_label="pathway.realtime-fixture=$fixture_id"
 fixture_directory="$(mktemp -d)"
@@ -86,9 +87,10 @@ export REALTIME_PROVIDER_DATABASE_URL=postgresql://supabase_admin:events-test-on
 DATABASE_URL="$REALTIME_PROVIDER_DATABASE_URL?schema=app" DIRECT_URL="$REALTIME_PROVIDER_DATABASE_URL?schema=app" \
   pnpm --filter @pathway/db prisma:migrate:deploy
 pnpm --filter @pathway/db prisma:generate
-websocket_flags=()
-if [ "$(node -p 'typeof WebSocket')" = undefined ]; then websocket_flags+=(--experimental-websocket); fi
-pnpm --filter @pathway/api exec node "${websocket_flags[@]}" --import tsx --test scripts/realtime-provider/delivery.test.ts
+if [ "$(node -p 'typeof WebSocket')" = undefined ]; then
+  export NODE_OPTIONS="${NODE_OPTIONS:-} --experimental-websocket"
+fi
+pnpm --filter @pathway/api exec node --import tsx --test scripts/realtime-provider/delivery.test.ts
 # Exercise HTTP permission guards and current-recipient/legal-access checks on
 # the same migrated disposable database. Never reset or select an ambient DB.
 E2E_USE_GLOBAL_SETUP=false E2E_ALLOW_RESET=false \

@@ -282,7 +282,9 @@ describe("message realtime connection", () => {
     await settle();
     let readSignal: AbortSignal | undefined;
     let finishRead: (() => void) | undefined;
+    let readCalls = 0;
     driver.setRefresh((signal) => {
+      readCalls += 1;
       readSignal = signal;
       return new Promise<void>((resolve) => {
         finishRead = resolve;
@@ -298,6 +300,7 @@ describe("message realtime connection", () => {
     finishRead?.();
     await jest.advanceTimersByTimeAsync(300_000);
     expect(driver.counts()).toMatchObject({ grants: 1, closes: 1, joins: 1 });
+    expect(readCalls).toBe(1);
     expect(jest.getTimerCount()).toBe(0);
   });
 

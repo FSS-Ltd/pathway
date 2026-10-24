@@ -86,8 +86,9 @@ record. Do not mark this step complete from local checks or a pushed branch alon
 - Full API unit attempt exhausted Node's heap; a recyclable-worker attempt was
   stopped due repeated compiler reloads. Run four bounded shards for full coverage.
   HTTP security verification, current builds and review remain pending.
-- Upstream #737 advanced master to `85d449db`; integrate that verified finance
-  release before final verification and the step's PR. No next-step work started.
+- Upstream #737 has all 12 checks green and is confirmed merged at `85d449db`.
+  Integrated it without rewriting shared history in `a1cfa3ba`; final verification
+  uses that updated base. No next-step work started.
 - [Activation and recovery runbook](MESSAGING-RUNBOOK.md) records migration impact,
   provider versions and hosted restart/upgrade verification limits. Production
   merge/activation authorization is still required for this step.
