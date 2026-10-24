@@ -218,25 +218,47 @@ test("validateBlogAutomationCandidate rejects cover images without namespaced ge
   assert.match(result.errors.join("\n"), /namespaced generator provenance/i);
 });
 
-test("isRunnableLondonScheduleTime accepts 6:00 through 6:29 Europe/London on Monday, Wednesday, or Friday", () => {
+test("isRunnableLondonScheduleTime accepts 06:00-06:29 on every London weekday", () => {
+  for (let day = 14; day <= 20; day += 1) {
+    const date = `2026-06-${day}`;
+    assert.equal(
+      isRunnableLondonScheduleTime(new Date(`${date}T05:00:00Z`)),
+      true,
+    );
+    assert.equal(
+      isRunnableLondonScheduleTime(new Date(`${date}T05:29:00Z`)),
+      true,
+    );
+    assert.equal(
+      isRunnableLondonScheduleTime(new Date(`${date}T05:30:00Z`)),
+      false,
+    );
+    assert.equal(
+      isRunnableLondonScheduleTime(new Date(`${date}T06:00:00Z`)),
+      false,
+    );
+  }
+});
+
+test("isRunnableLondonScheduleTime follows winter and summer London offsets", () => {
   assert.equal(
-    isRunnableLondonScheduleTime(new Date("2026-06-17T05:00:00.000Z")),
+    isRunnableLondonScheduleTime(new Date("2026-01-18T06:00:00Z")),
     true,
   );
   assert.equal(
-    isRunnableLondonScheduleTime(new Date("2026-06-17T05:29:00.000Z")),
+    isRunnableLondonScheduleTime(new Date("2026-01-18T06:29:00Z")),
     true,
   );
   assert.equal(
-    isRunnableLondonScheduleTime(new Date("2026-06-17T05:30:00.000Z")),
+    isRunnableLondonScheduleTime(new Date("2026-01-18T05:59:00Z")),
     false,
   );
   assert.equal(
-    isRunnableLondonScheduleTime(new Date("2026-06-17T06:00:00.000Z")),
-    false,
+    isRunnableLondonScheduleTime(new Date("2026-06-14T05:00:00Z")),
+    true,
   );
   assert.equal(
-    isRunnableLondonScheduleTime(new Date("2026-06-18T05:00:00.000Z")),
+    isRunnableLondonScheduleTime(new Date("2026-06-14T04:59:00Z")),
     false,
   );
 });

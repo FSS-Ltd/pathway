@@ -262,7 +262,6 @@ export function extractPlainText(contentJson) {
 export function isRunnableLondonScheduleTime(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/London",
-    weekday: "short",
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
@@ -271,7 +270,6 @@ export function isRunnableLondonScheduleTime(date = new Date()) {
     parts.map((part) => [part.type, part.value]),
   );
   return (
-    ["Mon", "Wed", "Fri"].includes(values.weekday) &&
     values.hour === "06" &&
     Number(values.minute) >= 0 &&
     Number(values.minute) <= 29
