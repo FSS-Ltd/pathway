@@ -310,6 +310,12 @@ END;
 $$;
 REVOKE ALL ON FUNCTION app.deliver_message_realtime_notification() FROM PUBLIC;
 
+-- The activation default is a function, not a database parameter: Supabase denies
+-- ALTER FUNCTION ... SET for custom parameters to the migration role. The app roles
+-- that fire the capture trigger call it, so it keeps its default PUBLIC execute.
+CREATE FUNCTION app.realtime_capture_default()
+RETURNS text LANGUAGE sql STABLE SET search_path = '' AS $$ SELECT 'off'::text $$;
+
 -- Capture notification intent in the source transaction. The installed consumer
 -- enqueues private recipient invalidations within the same commit boundary.
 -- No source rows are backfilled and no browser/Data API privileges are granted.
@@ -327,7 +333,7 @@ BEGIN
   -- A function-bound default applies to existing pools immediately. Explicit
   -- connection overrides remain available for controlled maintenance.
   IF COALESCE(NULLIF(pg_catalog.current_setting('app.realtime_capture_enabled', true), ''),
-    pg_catalog.current_setting('app.realtime_capture_default', true), 'off') <> 'on' THEN
+    app.realtime_capture_default(), 'off') <> 'on' THEN
     RETURN NEW;
   END IF;
 
@@ -392,7 +398,6 @@ DECLARE
 BEGIN
   outbox_schema := CASE WHEN pg_catalog.to_regclass('app."OutboxEvent"') IS NOT NULL THEN 'app' ELSE 'public' END;
   IF pg_catalog.to_regclass('realtime.messages') IS NULL THEN
-    ALTER FUNCTION app.capture_message_realtime_notification() SET app.realtime_capture_default = 'off';
     RETURN;
   END IF;
   EXECUTE pg_catalog.format('CREATE TRIGGER "OutboxEvent_deliver_realtime" AFTER INSERT ON %I."OutboxEvent"
@@ -408,7 +413,8 @@ BEGIN
     PERFORM app.enqueue_message_realtime_notification(outbox_schema, pending."id");
   END LOOP;
   PERFORM pg_catalog.set_config('app.org_id', COALESCE(previous_org, ''), true);
-  ALTER FUNCTION app.capture_message_realtime_notification() SET app.realtime_capture_default = 'on';
+  CREATE OR REPLACE FUNCTION app.realtime_capture_default()
+  RETURNS text LANGUAGE sql STABLE SET search_path = '' AS $fn$ SELECT 'on'::text $fn$;
 END;
 $$;
 COMMIT;
