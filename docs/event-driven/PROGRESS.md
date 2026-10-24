@@ -84,9 +84,11 @@ record. Do not mark this step complete from local checks or a pushed branch alon
 - Platform: 249 passed, five pre-existing skipped. Database: 96 passed,
   33 pre-existing skipped. Full browser units, API/admin/platform typechecks,
   targeted lint and current API/serverless/admin builds passed.
-- Actual Supabase provider: all 11 cases passed, covering commit/rollback, read
+- Actual Supabase provider: all 15 cases passed, covering commit/rollback, read
   cursors, duplicates, strict queue errors, forced RLS, signed-scope isolation,
-  revocation, off-screen inbox updates, renewals and transport recovery.
+  revocation, off-screen inbox updates, renewals and transport recovery. Added
+  tag-only responder join/delivery/revocation and guardian eligibility checks for
+  both live delivery and pending-intent reconciliation.
 - HTTP family security: 15 passed. Verification also ran without ambient local
   environment files, which were restored afterward. Open-handle detection in
   [Node 24 provider CI](https://github.com/FSS-Ltd/pathway/actions/runs/40049672666)
@@ -99,3 +101,18 @@ record. Do not mark this step complete from local checks or a pushed branch alon
 - [Activation and recovery runbook](MESSAGING-RUNBOOK.md) records migration impact,
   provider versions and hosted restart/upgrade verification limits. Production
   merge/activation authorization is still required for this step.
+
+- Independent whole-branch review completed for `85d449db..b2a52b3e`. The guardian
+  eligibility finding reproduced a two-row metadata leak before the shared ACL
+  fix; all 15 provider cases and 15 HTTP security cases then passed. The tag-key
+  finding was rejected after checking Prisma's enum mapping and proving actual
+  tag-only behavior. Review decisions and limits are recorded in STEP-1-2.md.
+- The final ACL-fix revision still needs current-revision CI and separate merge/
+  deployment authorization. No later delivery step has started.
+
+- Read-only production metadata preflight passed with verified TLS: queue columns/
+  defaults and migration-role INSERT privileges are compatible; existing ACE
+  private-topic policies use the authorizer. Bounded discovery found zero pending
+  realtime intents. Public core/identity/outbox plus partial app bridge views are
+  recorded in the runbook. Exact-layout local authorization and durable publication
+  passed inside a rolled-back transaction, including the public outbox trigger path.

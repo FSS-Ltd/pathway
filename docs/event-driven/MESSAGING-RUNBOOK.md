@@ -15,7 +15,9 @@ and recheck that anchor on join. One inbox subscription receives current eligibl
 changes across conversations, including those outside the open thread. Encoded
 segments prevent delimiter collisions for legacy text IDs. Only currently
 eligible recipients get queue rows, including when their old channel remains
-open after revocation. The signed allowlist, user, organisation and site must all
+open after revocation. Family threads also require an active guardian account
+without a student identity in the site, matching the authenticated API. Pending
+intents recheck this eligibility when reconciled. The signed allowlist, user, organisation and site must all
 match when joining. Client publication remains forbidden. Notifications contain
 IDs, an event name and opaque invalidation metadata; never message text or keys.
 
@@ -50,6 +52,29 @@ Existing clients will disconnect until they load the matching application build.
 Coordinate migration and application deployment; healthy new clients renew their
 short-lived authentication on the existing channel.
 
+## Production metadata preflight (2026-10-24)
+
+Read-only checks identified the production API project from its existing Vercel
+configuration and matched its database identity to the local production
+configuration. No business rows or production changes were made. TLS certificate
+and hostname verification used the public root certificate linked by Supabase's
+[dashboard configuration](https://github.com/supabase/supabase/blob/7e866ef83e89e35cdda45a6c98abd069d5fa1b2f/apps/studio/hooks/custom-content/custom-content.json).
+
+- The migration login is `postgres`, without superuser and with RLS bypass.
+  It has USAGE on `realtime` and INSERT on the partitioned `realtime.messages` queue.
+- Required queue columns and defaults are present, including generated UUID IDs,
+  timestamps and `skip_broadcast=false`. Existing ACE SELECT policies call the
+  topic authorizer; authenticated clients cannot publish to ACE topics.
+- Core, identity and outbox tables live in `public`. Message tables live in `app`,
+  with public bridge views. Partial app bridges include Tenant, SiteMembership,
+  StudentIdentity and Child. Because app.PermissionDefinition is absent, the
+  existing recipient selector correctly uses the complete public core schema.
+- The bounded 51-row activation discovery found zero pending realtime intents.
+  Recheck immediately before activation if release timing or configuration changes.
+
+This verifies catalog compatibility, not a production mutation or hosted provider
+upgrade. Deployment authorization and current-revision CI remain required.
+
 ## Client recovery and request budget
 
 - Subscribe before fetching history. Initial subscription failure permits one
@@ -80,7 +105,9 @@ Node 24 is used in CI; older supported local Node versions use their experimenta
 WebSocket flag when needed. Test credentials and generated keys are fixture-only.
 
 The provider cases cover commit/rollback, duplicate API requests and consumer
-calls, forced-RLS source writes, pre-commit silence, current recipient revocation,
+calls, forced-RLS source writes, pre-commit silence, tag-only responder joins and
+delivery, tag revocation, guardian deactivation/student conversion (including
+pending-intent reconciliation), current recipient revocation,
 user/organisation/signature boundaries, strict queue errors, three healthy token
 renewals, transport outage and reconnect catch-up. Pure lifecycle and browser
 workspace suites cover coalescing, stale responses, cleanup and manual refresh.

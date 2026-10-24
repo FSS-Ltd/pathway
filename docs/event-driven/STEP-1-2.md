@@ -86,3 +86,32 @@ Base: verified merge `0ae915f8c70b258056ec10164fff225da4c3d62a` from PR #736.
 - Provider proofs use a dedicated local database and ES256 application grants.
   Reuse the existing strict local test-URL guard; never pass an unvalidated URI
   through to libpq. Other projects' containers remain untouched.
+
+## Whole-branch review decisions
+
+- Confirmed guardian eligibility omission: the publication predicate must reject
+  family threads after the guardian account becomes inactive or acquires a site
+  student identity, matching the API. A real-provider regression observed two
+  unauthorized queue rows (live and pending reconciliation) before the fix.
+- Rejected the tag-key mismatch finding: Prisma maps `PARENT_MESSAGE_RESPONDER`
+  to the stored enum value `parent-message-responder`. Changing the SQL value
+  would break valid access. The actual tag-only join/delivery/revocation proof
+  passes with the existing value.
+- Other product apps, registered-scope grants, worker discovery and general CI
+  polling enforcement remain in steps 1.3–1.5. Starting them now would bypass the
+  approved merge gate; their existing behavior remains until those steps land.
+- Empty messaging lists retain existing initial metadata fetching and selection
+  behavior. No anchor means no subscription, as before this step. A newly available
+  conversation in an empty inbox requires a page reload until the broader resource
+  subscriptions in step 1.3.
+- The gateway outage verifies transport loss without resetting self-host signing
+  metadata. Hosted provider restart/upgrade remains a deployment verification limit;
+  the local proof does not establish every hosted version's compatibility.
+- Parent pagination loading was judged pre-existing, outside this change. No
+  unrelated pagination rewrite is included; any pre-existing loading issue remains.
+
+- Read-only production catalog checks confirmed the existing schema selector and
+  trigger arguments match the hosted layout. A disposable transactional proof
+  moves core/identity/outbox tables to public, recreates the observed partial app
+  bridges and installs the matching capture arguments; authorization and durable
+  enqueue pass before rolling all fixture DDL and source writes back.

@@ -136,6 +136,9 @@ BEGIN
                     ON guardian."id" = guardian_participant."guardianIdentityId"
                    AND guardian."tenantId" = site."id"
                    AND guardian."userId" = guardian_participant."userId"
+                  JOIN %1$I."User" guardian_account
+                    ON guardian_account."id" = guardian."userId"
+                   AND guardian_account."isActive" = true
                   JOIN %2$I."GuardianChildRelationship" relationship
                     ON relationship."guardianIdentityId" = guardian."id"
                    AND relationship."tenantId" = site."id"
@@ -147,6 +150,11 @@ BEGIN
                     AND guardian_participant."kind" = 'GUARDIAN'
                     AND guardian_participant."removedAt" IS NULL
                     AND guardian."id" = conversation."guardianIdentityId"
+                    AND NOT EXISTS (
+                      SELECT 1 FROM %1$I."StudentIdentity" guardian_student
+                      WHERE guardian_student."tenantId" = site."id"
+                        AND guardian_student."userId" = guardian."userId"
+                    )
                     AND relationship."legalAccess" = 'FULL'
                     AND relationship."startsAt" <= CURRENT_TIMESTAMP
                     AND relationship."endedAt" IS NULL

@@ -1,3 +1,5 @@
+import { registerLayoutCase } from "./layout.cases";
+import { registerFamilyCases } from "./family.cases";
 import {
   registerLifecycleCases,
   registerOutageCase,
@@ -363,6 +365,10 @@ test("an existing subscription updates the inbox when a different conversation c
   );
 });
 
+registerFamilyCases();
+
 registerLifecycleCases();
 
 registerOutageCase();
+
+registerLayoutCase();
