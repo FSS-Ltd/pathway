@@ -586,3 +586,54 @@ Actual database/process inspection verified no leftover listener connection or
 observer process. Existing Checkout identities are preserved for the human
 handoff; later recovery must retain its genuine evidence provenance. Full T18
 remains incomplete and T19 has not started.
+
+## T18 continuation PR #737: merge gate passed
+
+GitHub confirmed [PR #737](https://github.com/FSS-Ltd/pathway/pull/737) merged into `master` on
+24 October 2026 at 00:53:26 UTC, merge commit `85d449db81e07e14cd1076068401e734bb4ffcdc`.
+The checked head was `a26c5c14ec8634cbf0bc3565d994373c04275377` against base
+`0ae915f8c70b258056ec10164fff225da4c3d62a`. Integration logs confirm actual
+checkout of test-merge revision `7282a759e2fd9850d731b028fda691b7f286757a`.
+
+All twelve current-revision checks reported SUCCESS: API serverless artifact (Node 24, 1024 descriptors), Analyze (actions), Transactional realtime notification capture, Analyze (javascript-typescript), Typecheck, Lint & Unit Test, Integration Tests (1/2), Integration Tests (2/2), Finance Backup Restore, System Role Seed Database Identity, Permission Definition Database, Organisation Role RLS, CodeQL.
+CI run 40044762031, CodeQL 40044759103 and realtime notification run 40044762156
+completed successfully. Both integration shards passed; shard 1 explicitly includes
+the corrected external-refund assurance and the one-connection transaction checks.
+There were no blocking reviews or unresolved review conversations.
+
+This completes the correction's delivery gate. Full T18 remains incomplete:
+additional hosted Bacs outcomes, payout eligibility/reconciliation, private storage,
+complete accessibility and persistent-host activation evidence remain open. T19
+has not started. The requested statement-name setting is the next separately
+delivered Finance change; no paid Bacs custom-branding activation is authorized.
+
+## Finance statement-name setting: local verification
+
+Standalone delivery after the confirmed PR #737 merge, on branch
+`feature/finance-statement-name`, based on merge commit
+`85d449db81e07e14cd1076068401e734bb4ffcdc`. Scope and provider constraints are in
+[statement-name-setting.md](statement-name-setting.md).
+
+The staff settings surface now distinguishes a validated, unapplied card-name
+draft from Stripe's current applied descriptor. It provides an illustrative
+preview, copying and a school-owner Dashboard handoff, with explicit school/account
+selection. A fresh, scoped read verifies Stripe state. No local preference is
+presented as a provider save. A real Sandbox write proof returned HTTP 403 after
+hosted onboarding; the implemented read-only provider confirmed the current
+fictional full-Dashboard account's descriptor. Bacs branding remains separate and
+no paid option was activated.
+
+Local checks: API/admin type checks and builds, packaged API smoke at the 1024
+file-descriptor limit, targeted ESLint, Prettier and
+`git diff --check` passed. Three API unit suites/28 tests and five actual
+HTTP/auth/RLS integration tests passed. Admin component and validation tests
+passed. In-app browser review exercised keyboard focus, invalid/denied/servicing
+states and 320px container wrapping at 200% text; a scoped wrapping/control fix
+removed the observed overflow. Independent read-only review found no remaining
+blocking defects after correcting the optional Stripe prefix contract. Actual
+school-owner sign-in/edit and full native/assistive-technology assurance remain
+unproved. No production deployment, migration or subscription charge occurred.
+
+PR creation, fresh current-revision CI and merge remain pending. Full T18 remains
+incomplete and T19 has not started. No subsequent implementation step may begin
+until this standalone change satisfies its PR/CI/merge gate.

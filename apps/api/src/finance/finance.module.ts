@@ -50,6 +50,12 @@ import { FinancePayerAccountService } from "./finance-payer-account.service";
 import { FinanceFamilyController } from "./finance-family.controller";
 import { FinanceFamilyService } from "./finance-family.service";
 import { FinancePayerCheckoutStatusController } from "./finance-payer-checkout-status.controller";
+import { FinanceStatementNameController } from "./finance-statement-name.controller";
+import { FinanceStatementNameService } from "./stripe/finance-statement-name.service";
+import {
+  FINANCE_STATEMENT_NAME_READER,
+  StripeFinanceStatementNameReader,
+} from "./stripe/finance-statement-name-reader.provider";
 import { FinanceStripeConnectionController } from "./finance-stripe-connection.controller";
 import { FinanceStripeCheckoutController } from "./finance-stripe-checkout.controller";
 import { FinanceBacsMandateController } from "./finance-bacs-mandate.controller";
@@ -143,6 +149,7 @@ import {
     FinanceBankTransferController,
     FinanceManualReceiptController,
     FinanceStripeConnectionController,
+    FinanceStatementNameController,
     FinanceStripeCheckoutController,
     FinanceBacsMandateController,
     FinanceCollectionPlanController,
@@ -186,6 +193,13 @@ import {
     FinanceProfileService,
     FinancePayerGrantService,
     FinanceStripeConnectionService,
+    FinanceStatementNameService,
+    {
+      provide: FINANCE_STATEMENT_NAME_READER,
+      useFactory: (config: FinanceStripeServicingConfig) =>
+        new StripeFinanceStatementNameReader(config),
+      inject: [FINANCE_STRIPE_SERVICING_CONFIG],
+    },
     FinanceStripeAccountSyncService,
     FinanceStripeCheckoutAttemptService,
     FinanceStripeCheckoutService,

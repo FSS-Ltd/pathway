@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { Card, Input } from "@pathway/ui";
+import { StatementNameCard } from "./statement-name-card";
 import { FinanceButton as Button } from "../finance-button";
 import {
   FINANCE_COUNTRY_CURRENCY_OPTIONS,
@@ -124,12 +125,12 @@ export default function FinanceSettingsPage() {
         <header className="space-y-1">
           <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-            School currency
+            Finance settings
           </h1>
         </header>
         <Card
           title="Finance settings are locked"
-          description="School currency settings are available to authorised Finance staff when the Finance add-on is active."
+          description="Finance settings settings are available to authorised Finance staff when the Finance add-on is active."
         >
           {canAccessBilling(role) ? (
             <Link
@@ -150,7 +151,7 @@ export default function FinanceSettingsPage() {
         <header className="space-y-1">
           <p className="text-sm font-semibold text-text-primary">Finance</p>
           <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-            School currency
+            Finance settings
           </h1>
         </header>
         <Card
@@ -166,11 +167,11 @@ export default function FinanceSettingsPage() {
       <header className="space-y-1">
         <p className="text-sm font-semibold text-text-primary">Finance</p>
         <h1 className="text-2xl font-semibold tracking-tight text-text-primary">
-          School currency
+          Finance settings
         </h1>
         <p className="max-w-2xl text-sm leading-6 text-text-muted">
-          Set the school’s legal country. NexSteps uses its local currency on
-          family invoices, receipts and statements.
+          Manage the school’s invoice currency and the name families recognise
+          on card statements.
         </p>
       </header>
 
@@ -297,6 +298,7 @@ export default function FinanceSettingsPage() {
           </div>
         )}
       </Card>
+      <StatementNameCard canManage={canManageFinance} />
     </main>
   );
 }
