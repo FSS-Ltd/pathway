@@ -311,3 +311,24 @@ and is not a test result. Fresh final-head CI/merge remains required. Five addit
 hosted asynchronous setups are prepared but unaccepted, pending explicit user
 confirmation after automatic approval review blocked navigation. Full T18/T19
 completion remains unproved.
+
+E30: CI 40041158216 on 97c1d33 supplied behavioral RED for the signed external-refund
+review report: 78 other shard-1 suites/502 tests passed, while the remaining UTC
+filter omitted a review created on the next London date. The fixture now spans
+the provider refund's London date through the current London date, using the
+existing calendar helper. All financial assertions remain. The complete ingress
+and principal/fee database suites pass two suites/11 tests; API types, focused
+lint, formatting and whitespace checks pass. Existing London period/projection
+units pass two suites/10 tests, including daylight-saving boundaries. Production
+report/ledger code is unchanged. Fresh final-revision CI and merge are still required.
+
+E31: Native iPhone 16e/iOS 26.3 component evidence confirms font scales 1.00/2.14
+at a 390-point viewport. A cold render enlarged custom fonts and wrapped the top
+invoice content. Computer-use coordinate/scroll input failed; full enlarged
+scrolling/control and VoiceOver assurance remain open. Mock actions establish no
+authenticated Family Space or provider result. The test device's preference was
+restored to 1.00, its server exited successfully and the device shut down. Five
+additional hosted Bacs setups remain pending despite explicit user approval:
+automatic browser review requires the human final submission. The bounded
+observer exited successfully with no received events or debits; actual inspection
+found no remaining listener connection or observer process. Full T18 is incomplete.

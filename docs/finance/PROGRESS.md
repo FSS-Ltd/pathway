@@ -550,3 +550,39 @@ The branch was then rebased onto current master
 review database. Rebased verification passed the same four database suites/ten
 tests, all 24 worker suites/139 tests, API typecheck, focused lint, formatting and
 whitespace checks. No production migration or listener activation occurred.
+
+## T18 continuation: remaining London report fixture
+
+CI run 40041158216 on `97c1d330a6590b903f2c02827f2286d828278598`
+exposed another UTC-based report filter in the signed external-refund assurance
+test. Shard 1 passed 78 suites/502 tests and failed this one case. Its recorded
+failure at 23:58 UTC on 23 October occurred after London had entered 24 October.
+The report correctly excluded the new review case from the previous day's cutoff.
+
+The fixture now uses the existing London calendar helper, spanning the refund's
+provider timestamp through the current London date. All signed-ingress, duplicate,
+recovery, review-case, amount and balance assertions remain. No production report
+or ledger behavior changed. The full signed-ingress and principal/fee database
+suites pass two suites/11 tests; API types, focused lint, formatting and whitespace
+checks pass. Existing London period/projection unit suites pass two suites/10
+tests, including both daylight-saving boundaries. Fresh final-revision CI and
+host-confirmed merge remain required.
+
+Additional native evidence used the existing isolated iPhone 16e/iOS 26.3 component
+harness at a 390-point viewport. The native accessibility tree confirmed font
+scales 1.00 and 2.14. A cold render enlarged the custom fonts and wrapped the top
+invoice content. Native coordinate/scroll input failed in computer use, so full
+enlarged scrolling, control and screen-reader checks remain unproved. The test
+device was restored to 1.00 and shut down; its local server exited successfully.
+The ignored harness resolved an already installed Expo Babel preset explicitly;
+no product dependency changed. This fixture uses mock actions, not authenticated
+Family Space or provider calls.
+
+The user approved all five additional synthetic Bacs mandate setups. Automatic
+browser review nevertheless requires a human final submission; no alternate
+input or API bypass was attempted. The bounded signed-event observer exited
+successfully with five pending setups, no received events and zero debits.
+Actual database/process inspection verified no leftover listener connection or
+observer process. Existing Checkout identities are preserved for the human
+handoff; later recovery must retain its genuine evidence provenance. Full T18
+remains incomplete and T19 has not started.
