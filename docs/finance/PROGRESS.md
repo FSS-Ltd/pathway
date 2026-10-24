@@ -651,3 +651,44 @@ pending state. Copy feedback also updates an existing status region. A new
 component assertion failed before the correction and passed after it. Browser
 accessibility-tree review supplements these semantics; full VoiceOver evidence
 remains open in T18. This update requires fresh current-head CI before merge.
+
+## Finance statement-name setting PR #740: merge gate passed
+
+GitHub confirmed [PR #740](https://github.com/FSS-Ltd/pathway/pull/740) merged into `master` on
+24 October 2026 at 02:56:04 UTC, merge commit `fe709309da1493375751c53c1c510f6ce2da4b59`.
+The checked head was `e0ea09b3ed00aa944d3754585f85718a8adcb631` against base
+`49590ca28942af2df7bd6e5452990f1810b02f67`. All twelve current-revision checks reported
+SUCCESS: API serverless artifact (Node 24, 1024 descriptors), Analyze (actions), Transactional
+realtime notification capture, Analyze (javascript-typescript), Typecheck, Lint & Unit Test,
+Integration Tests (1/2), Integration Tests (2/2), Finance Backup Restore, System Role Seed
+Database Identity, Permission Definition Database, Organisation Role RLS and CodeQL. No
+blocking review decision was recorded.
+
+This clears the statement-name setting's delivery gate. Full T18 remains incomplete and T19
+has not started.
+
+## T18 continuation: private-storage and PDF assurance
+
+Branch `test/finance-t18-storage-pdf-assurance`, based on master `af52f5b7`. Evidence
+is E32 and E33 in the [scenario matrix](release-evidence/t18-scenario-matrix.md).
+
+- A disposable local Supabase Storage stack proved the private-bucket lifecycle
+  with the real service (create-only, no overwrite, denial of public/anon/unauthenticated
+  reads, fail-closed outage). It found and fixed a real defect: a missing object
+  reported as HTTP 400 with a 404 body made first-time document creation return 503.
+- Finance PDFs now declare `en-GB`; the smoke script asserts language and displayed title.
+- Remaining and not claimed: hosted bucket ACL and hosted API behaviour, tagged-PDF and
+  VoiceOver assurance, hosted Bacs delayed/return/dispute outcomes, Sandbox payout
+  evidence (payouts disabled on the account), persistent-host listener activation.
+  T19 has not started. Full T18 remains incomplete.
+
+### Technical Note: tagged PDF output
+
+**Problem.** Finance PDFs are untagged, so screen readers cannot navigate structure.
+**Context.** `@react-pdf/renderer` 4.3.2 supports title and language but not a tag tree.
+**Options.** A: accept untagged PDFs and treat the staff/family screens as the accessible
+path (no cost, weakest). B: replace the renderer for Finance documents (strongest, new
+dependency and re-proof of Unicode and layout, several engineering days). C: provide an
+accessible HTML or text alternative per document (moderate effort, no renderer change).
+**Recommendation.** C now, B only if a school or regulator requires tagged PDFs.
+**Decision needed.** Which option, before T19.

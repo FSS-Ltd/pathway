@@ -332,3 +332,39 @@ additional hosted Bacs setups remain pending despite explicit user approval:
 automatic browser review requires the human final submission. The bounded
 observer exited successfully with no received events or debits; actual inspection
 found no remaining listener connection or observer process. Full T18 is incomplete.
+
+E32: Actual private-storage lifecycle against a disposable local Supabase Storage
+API v1.70.3 (file backend, private bucket, loopback-only, reached through a
+`/storage/v1` gateway as hosted Supabase does). Command:
+`pnpm --filter @pathway/api test:finance-storage` (script refuses non-loopback hosts
+and fails rather than skips when the stack is absent). It exercised the real
+`SupabaseStorageService` and `loadOrCreateFinanceDocument`: a second request with
+different render bytes returned the first stored bytes; a direct create-only upload
+kept the original bytes while an explicit `overwrite: true` control replaced them;
+statement objects keep their content-digest identity; the bucket reports
+`public: false`; the public URL, an unauthenticated request, the anon role and the
+anon `authenticated` path all returned 400/404 with no PDF bytes; a key outside the
+Finance allow-list was rejected before any request; an unreachable storage host
+failed closed with 503. Five racing creators never returned divergent bytes: two
+converged, three failed closed (the file backend answered a read with a transient
+500 mid-write) and a retry converged on the one canonical object.
+
+The first live run was RED: this API version reports a missing object as HTTP 400
+with a body `statusCode: "404"`, but `downloadObject` only treated HTTP 404 as
+absent, so every first-time document creation failed closed with 503. Unit
+regression RED/GREEN (`supabase-storage.service.spec.ts`: 404 and 400+404-body read
+as absent; other 400, 403 and 500 still fail closed), then the live run passed.
+
+Limits: disposable local stack, not the hosted project. Hosted bucket policy/ACL,
+the hosted Storage API version's missing-object status, and S3-backend race timing
+are not proved and remain T19 gates. The default `pnpm test` does not run this
+script.
+
+E33: Actual rendered invoice, credit note and statement PDFs (`pdfinfo`,
+`pdftotext`): title present and shown, extractable text, but **Tagged: no** and no
+document language. The renderer (`@react-pdf/renderer` 4.3.2) emits no structure
+tree. Language was RED in `test:finance-pdf` (`/Lang` absent) and GREEN after
+declaring `en-GB` (labels are English) with `DisplayDocTitle true` asserted. Tagged-PDF
+and screen-reader accessibility stay **open**; see the Technical Note in
+[PROGRESS.md](../PROGRESS.md). Mobile and admin screens that present the same
+information remain the accessible path until that is decided.

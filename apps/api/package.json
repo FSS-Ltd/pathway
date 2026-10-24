@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "pnpm test:unit && pnpm test:finance-pdf",
     "test:finance-pdf": "tsx --tsconfig tsconfig.json scripts/test-finance-pdf.ts",
+    "test:finance-storage": "tsx --tsconfig tsconfig.json scripts/test-finance-storage-lifecycle.ts",
     "finance:reconcile": "tsx --tsconfig tsconfig.json scripts/finance-reconcile.ts",
     "test:watch": "jest --watch",
     "test:unit": "jest -c jest.projects.config.ts --selectProjects unit",

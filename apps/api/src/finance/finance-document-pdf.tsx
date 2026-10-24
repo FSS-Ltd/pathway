@@ -152,6 +152,7 @@ export async function renderFinancePdf(
   const document = (
     <Document
       title={input.title}
+      language="en-GB"
       author={input.legalEntityName}
       subject="NexSteps Finance document"
       creationDate={new Date(input.generatedAt)}
