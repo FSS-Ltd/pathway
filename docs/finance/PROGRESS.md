@@ -708,3 +708,17 @@ Database, Organisation Role RLS and CodeQL. No blocking review decision was reco
 This clears the storage and PDF continuation's delivery gate. Full T18 remains incomplete
 (hosted Bacs outcomes, Sandbox payouts, tagged PDF and VoiceOver, hosted storage ACL,
 persistent-host listener) and T19 has not started.
+
+## T19 pilot readiness (prepared, not started)
+
+Branch `docs/finance-t19-pilot-readiness`. The pilot-readiness design
+([t19-pilot-readiness.md](t19-pilot-readiness.md)) and a day-of runbook
+([pilot-reconciliation.md](runbooks/pilot-reconciliation.md)) are written for "the first customer".
+No pilot school exists, so no live switch was changed and no real payment was taken.
+
+- Card: live collection is configuration only (eleven gates G1 to G11 must be recorded first).
+- Bacs: the provider is bound to test mode and rejects live responses, and the collection job
+  refuses to run outside test mode. Live Bacs needs its own reviewed code change and go-ahead.
+- Pause is `FINANCE_STRIPE_LIVE_ENABLED=false` plus a redeploy; servicing stays on.
+
+T19 execution waits for an owner go-ahead naming the school, caps and date.
