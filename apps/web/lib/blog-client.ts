@@ -75,6 +75,18 @@ export async function fetchBlogPosts(
   }
 }
 
+/**
+ * The list endpoint also returns every article body (contentHtml/contentJson).
+ * The index hands these posts to a client component, so keeping the bodies
+ * would serialise the whole blog into the page's HTML.
+ */
+function toSummary(post: BlogPostSummary): BlogPostSummary {
+  const summary: Record<string, unknown> = { ...post };
+  delete summary.contentHtml;
+  delete summary.contentJson;
+  return summary as BlogPostSummary;
+}
+
 export async function fetchAllBlogPosts(
   pageLimit = 50,
   maxPages = 50,
@@ -84,7 +96,7 @@ export async function fetchAllBlogPosts(
 
   for (let page = 0; page < maxPages; page += 1) {
     const result = await fetchBlogPosts(cursor, pageLimit);
-    posts.push(...result.posts);
+    posts.push(...result.posts.map(toSummary));
 
     if (!result.nextCursor) break;
     cursor = result.nextCursor;

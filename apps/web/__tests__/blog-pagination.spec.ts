@@ -41,6 +41,25 @@ describe("blog pagination", () => {
     expect(pageSource).toContain("fetchAllBlogPosts");
   });
 
+  it("drops article bodies from the index posts", async () => {
+    const withBodies = {
+      ...makePost("1"),
+      contentHtml: "<p>full article</p>",
+      contentJson: { type: "doc", content: [] },
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ posts: [withBodies] }),
+    }) as unknown as typeof fetch;
+
+    const { fetchAllBlogPosts } = await import("../lib/blog-client");
+    const [post] = await fetchAllBlogPosts();
+
+    expect(post.id).toBe("1");
+    expect(post).not.toHaveProperty("contentHtml");
+    expect(post).not.toHaveProperty("contentJson");
+  });
+
   it("follows public blog cursors until every page is loaded", async () => {
     const responses = [
       { posts: [makePost("1")], nextCursor: "cursor-1" },
