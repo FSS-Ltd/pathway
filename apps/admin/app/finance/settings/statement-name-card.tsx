@@ -59,12 +59,18 @@ export function StatementNameCard({ canManage }: { canManage: boolean }) {
       title="Name on parents’ bank statements"
       description="Help families recognise card payments to your school."
     >
+      <p
+        role="status"
+        aria-label="Statement name check"
+        className={loading ? "mb-4 text-sm text-text-muted" : "sr-only"}
+      >
+        {loading
+          ? "Checking the applied name with Stripe…"
+          : connected
+            ? `Stripe name checked: ${connected.descriptor ?? "No statement name is set"}.`
+            : ""}
+      </p>
       <div className="space-y-5" aria-busy={loading}>
-        {loading ? (
-          <p role="status" className="text-sm text-text-muted">
-            Checking the applied name with Stripe…
-          </p>
-        ) : null}
         {error ? (
           <p role="alert" className="text-sm text-text-primary">
             {error}
@@ -195,11 +201,14 @@ export function StatementNameCard({ canManage }: { canManage: boolean }) {
                       </a>
                     </Button>
                   </div>
-                  {copyMessage ? (
-                    <p role="status" className="text-sm text-text-primary">
-                      {copyMessage}
-                    </p>
-                  ) : null}
+                  <p
+                    role="status"
+                    className={
+                      copyMessage ? "text-sm text-text-primary" : "sr-only"
+                    }
+                  >
+                    {copyMessage ?? ""}
+                  </p>
                 </div>
               </>
             )}

@@ -644,3 +644,10 @@ text. Actual in-app browser pointer hover confirmed foreground `rgb(15,23,42)`
 on background `rgb(15,157,130)`, contrast 5.24:1 (WCAG relative luminance).
 No provider navigation or submission occurred. The updated revision requires
 fresh CI before merge; results from the previous head cannot satisfy its gate.
+
+PR #740 accessibility follow-up keeps a persistent polite status region for
+Stripe checks, announcing the completed provider-confirmed name as well as the
+pending state. Copy feedback also updates an existing status region. A new
+component assertion failed before the correction and passed after it. Browser
+accessibility-tree review supplements these semantics; full VoiceOver evidence
+remains open in T18. This update requires fresh current-head CI before merge.

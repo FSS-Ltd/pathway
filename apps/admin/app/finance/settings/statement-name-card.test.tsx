@@ -89,6 +89,13 @@ async function run() {
       Response.json({ ...connected, descriptor: "CONFIRMED SCHOOL" });
     await act(async () => click(container, "Check applied name"));
     assert.match(container.textContent ?? "", /CONFIRMED SCHOOL/);
+    assert.match(
+      container.querySelector(
+        '[role="status"][aria-label="Statement name check"]',
+      )?.textContent ?? "",
+      /Stripe name checked: CONFIRMED SCHOOL/,
+      "A completed check is announced to screen readers",
+    );
     const pending = deferred<Response>();
     response = () => pending.promise;
     await act(async () => click(container, "Check applied name"));
